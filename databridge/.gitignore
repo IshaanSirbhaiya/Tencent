@@ -1,0 +1,29 @@
+# secrets — never commit real API keys (the gateway reads these at startup; .env.example is fine)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.uv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local workspace produced by the CLI (a demo is a zippable dir; not committed)
+.databridge/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# scratch test-output files (Bash multi-line stdout workaround)
+*.log
+/r.txt
+/*.out.txt

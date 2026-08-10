@@ -1,0 +1,38 @@
+# Model routing table (02_TRD §A.4). task_class → alias; aliases resolve via LiteLLM
+# (in packages/harness, Task 2). Swapping a whole deployment to local models (P1) is a
+# PROFILE change, not a code change. The verification model is deliberately a DIFFERENT
+# alias than the generator (adversarial separation reduces correlated failure).
+routing:
+  # task_class → model alias
+  schema_annotation:        sonnet          # closed-vocab classification
+  rule_proposal:            sonnet          # S→S mapping proposal (C06) — same alias as annotation for now
+  cross_table_inference:    frontier        # multi-hop reasoning → Fable/best local
+  agentic_orchestration:    frontier
+  entity_extraction:        sonnet
+  entity_resolution_judge:  sonnet
+  document_extraction:      sonnet          # U→S Pydantic extraction (C15, §11.2)
+  sql_generation:           sonnet
+  sql_revision:             sonnet
+  data_to_text:             sonnet
+  template_selection:       sonnet          # C17 §12.2 — pick a template from the library (generator tier)
+  verification_pass:        sonnet_alt      # DIFFERENT model than generator (adversarial separation, C17 §12.3b)
+  brain_query:              primary_llm     # T08 — Company-Brain NL answer over the graph context
+  brain_analysis:           primary_llm     # T08 — labelled [ANALYSIS] reasoning over the graph
+
+aliases:
+  sonnet:      {model: "anthropic/claude-sonnet-4-6"}
+  frontier:    {model: "anthropic/claude-fable-5"}
+  sonnet_alt:  {model: "openai/gpt-4.1"}            # or a second local model
+  local_main:  {model: "ollama_chat/qwen3:72b"}    # customer override target
+  # T08 demo primary LLM — gateway auto-detects from env: OPENAI_API_KEY → gpt-4o (default below),
+  # else ANTHROPIC_API_KEY → remapped to primary_llm_anthropic at runtime, else FakeBackend.
+  primary_llm:           {model: "openai/gpt-4o"}
+  primary_llm_anthropic: {model: "anthropic/claude-sonnet-4-6"}
+  ollama_local:          {model: "ollama_chat/qwen2.5:7b"}
+
+profiles:
+  cloud:   {}                                       # use aliases as-is
+  airgapped:                                        # P1 deployment: every alias → local
+    sonnet: local_main
+    frontier: local_main
+    sonnet_alt: {model: "ollama_chat/llama3.3:70b"}

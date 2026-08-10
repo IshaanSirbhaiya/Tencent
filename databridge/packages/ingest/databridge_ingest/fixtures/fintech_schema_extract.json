@@ -1,0 +1,109 @@
+{
+  "source_id": "fintech_fixture",
+  "extracted_at": "2026-06-17T00:00:00Z",
+  "tables": [
+    {
+      "name": "users",
+      "row_count": 1000,
+      "indexes": ["users_pkey", "users_email_idx"],
+      "foreign_keys": [],
+      "sample_rows": [
+        {"id": 1, "email": "ana@example.com", "full_name": "Ana Reyes", "created_at": "2025-01-04T09:12:00Z", "is_active": true, "country": "PH", "signup_source": "web", "risk_score": 12.5},
+        {"id": 2, "email": "ben@example.com", "full_name": "Ben Cruz", "created_at": "2025-02-18T14:03:00Z", "is_active": false, "country": "SG", "signup_source": "referral", "risk_score": 47.0}
+      ],
+      "columns": [
+        {"name": "id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 1000, "is_primary_key": true, "sample_values": [1, 2, 3, 4], "min_val": 1, "max_val": 1000},
+        {"name": "email", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 1000, "is_primary_key": false, "sample_values": ["ana@example.com", "ben@example.com", "cara@example.com"]},
+        {"name": "full_name", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 998, "is_primary_key": false, "sample_values": ["Ana Reyes", "Ben Cruz", "Cara Lim"]},
+        {"name": "created_at", "dtype": "timestamp", "null_fraction": 0.0, "unique_count": 1000, "is_primary_key": false, "sample_values": ["2025-01-04T09:12:00Z", "2025-02-18T14:03:00Z", "2025-03-22T08:45:00Z"]},
+        {"name": "is_active", "dtype": "boolean", "null_fraction": 0.0, "unique_count": 2, "is_primary_key": false, "sample_values": [true, false, true]},
+        {"name": "country", "dtype": "varchar", "null_fraction": 0.01, "unique_count": 24, "is_primary_key": false, "sample_values": ["PH", "SG", "US", "MY"]},
+        {"name": "signup_source", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 4, "is_primary_key": false, "sample_values": ["web", "referral", "ios", "android"]},
+        {"name": "risk_score", "dtype": "numeric", "null_fraction": 0.05, "unique_count": 870, "is_primary_key": false, "sample_values": [12.5, 47.0, 3.2, 88.1], "min_val": 0.0, "max_val": 100.0}
+      ]
+    },
+    {
+      "name": "merchants",
+      "row_count": 200,
+      "indexes": ["merchants_pkey"],
+      "foreign_keys": [],
+      "sample_rows": [
+        {"id": 1, "name": "Sunrise Coffee", "category": "food", "created_at": "2024-11-01T00:00:00Z", "is_verified": true, "website": "https://sunrise.example", "country": "PH"},
+        {"id": 2, "name": "TechBay", "category": "electronics", "created_at": "2024-12-15T00:00:00Z", "is_verified": false, "website": "https://techbay.example", "country": "SG"}
+      ],
+      "columns": [
+        {"name": "id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 200, "is_primary_key": true, "sample_values": [1, 2, 3], "min_val": 1, "max_val": 200},
+        {"name": "name", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 200, "is_primary_key": false, "sample_values": ["Sunrise Coffee", "TechBay", "GreenGrocer"]},
+        {"name": "category", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 12, "is_primary_key": false, "sample_values": ["food", "electronics", "grocery"]},
+        {"name": "created_at", "dtype": "timestamp", "null_fraction": 0.0, "unique_count": 200, "is_primary_key": false, "sample_values": ["2024-11-01T00:00:00Z", "2024-12-15T00:00:00Z"]},
+        {"name": "is_verified", "dtype": "boolean", "null_fraction": 0.0, "unique_count": 2, "is_primary_key": false, "sample_values": [true, false]},
+        {"name": "website", "dtype": "varchar", "null_fraction": 0.2, "unique_count": 180, "is_primary_key": false, "sample_values": ["https://sunrise.example", "https://techbay.example"]},
+        {"name": "country", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 18, "is_primary_key": false, "sample_values": ["PH", "SG", "US"]}
+      ]
+    },
+    {
+      "name": "transactions",
+      "row_count": 50000,
+      "indexes": ["transactions_pkey", "transactions_user_idx", "transactions_merchant_idx"],
+      "foreign_keys": [
+        {"column": "user_id", "ref_table": "users", "ref_column": "id", "declared": true, "confidence": 1.0},
+        {"column": "merchant_id", "ref_table": "merchants", "ref_column": "id", "declared": true, "confidence": 1.0}
+      ],
+      "sample_rows": [
+        {"id": 1001, "user_id": 1, "merchant_id": 2, "amount": 129.95, "currency": "USD", "status": "settled", "created_at": "2025-04-01T12:00:00Z", "description": "Online purchase"},
+        {"id": 1002, "user_id": 2, "merchant_id": 1, "amount": 4.50, "currency": "USD", "status": "settled", "created_at": "2025-04-01T12:05:00Z", "description": "Coffee"}
+      ],
+      "columns": [
+        {"name": "id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 50000, "is_primary_key": true, "sample_values": [1001, 1002, 1003], "min_val": 1001, "max_val": 51000},
+        {"name": "user_id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 1000, "is_primary_key": false, "sample_values": [1, 2, 3]},
+        {"name": "merchant_id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 200, "is_primary_key": false, "sample_values": [2, 1, 5]},
+        {"name": "amount", "dtype": "numeric", "null_fraction": 0.0, "unique_count": 41200, "is_primary_key": false, "sample_values": [129.95, 4.50, 1999.00], "min_val": 0.5, "max_val": 9999.0},
+        {"name": "currency", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 5, "is_primary_key": false, "sample_values": ["USD", "SGD", "PHP"]},
+        {"name": "status", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 4, "is_primary_key": false, "sample_values": ["settled", "pending", "failed", "refunded"]},
+        {"name": "created_at", "dtype": "timestamp", "null_fraction": 0.0, "unique_count": 49980, "is_primary_key": false, "sample_values": ["2025-04-01T12:00:00Z", "2025-04-01T12:05:00Z"]},
+        {"name": "description", "dtype": "text", "null_fraction": 0.3, "unique_count": 38000, "is_primary_key": false, "sample_values": ["Online purchase", "Coffee", "Monthly subscription"]}
+      ]
+    },
+    {
+      "name": "disputes",
+      "row_count": 2000,
+      "indexes": ["disputes_pkey", "disputes_txn_idx"],
+      "foreign_keys": [
+        {"column": "transaction_id", "ref_table": "transactions", "ref_column": "id", "declared": true, "confidence": 1.0}
+      ],
+      "sample_rows": [
+        {"id": 5, "transaction_id": 1001, "reason": "fraud", "status": "open", "opened_at": "2025-04-10T09:00:00Z", "resolved": false, "amount_disputed": 129.95},
+        {"id": 6, "transaction_id": 1002, "reason": "duplicate", "status": "resolved", "opened_at": "2025-04-11T16:30:00Z", "resolved": true, "amount_disputed": 4.50}
+      ],
+      "columns": [
+        {"name": "id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 2000, "is_primary_key": true, "sample_values": [5, 6, 7], "min_val": 1, "max_val": 2000},
+        {"name": "transaction_id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 1950, "is_primary_key": false, "sample_values": [1001, 1002, 1050]},
+        {"name": "reason", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 6, "is_primary_key": false, "sample_values": ["fraud", "duplicate", "not_received", "defective"]},
+        {"name": "status", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 3, "is_primary_key": false, "sample_values": ["open", "resolved", "rejected"]},
+        {"name": "opened_at", "dtype": "timestamp", "null_fraction": 0.0, "unique_count": 1995, "is_primary_key": false, "sample_values": ["2025-04-10T09:00:00Z", "2025-04-11T16:30:00Z"]},
+        {"name": "resolved", "dtype": "boolean", "null_fraction": 0.0, "unique_count": 2, "is_primary_key": false, "sample_values": [false, true]},
+        {"name": "amount_disputed", "dtype": "numeric", "null_fraction": 0.0, "unique_count": 1800, "is_primary_key": false, "sample_values": [129.95, 4.50, 1999.00], "min_val": 0.5, "max_val": 9999.0}
+      ]
+    },
+    {
+      "name": "support_messages",
+      "row_count": 30000,
+      "indexes": ["support_messages_pkey", "support_messages_user_idx"],
+      "foreign_keys": [
+        {"column": "user_id", "ref_table": "users", "ref_column": "id", "declared": true, "confidence": 1.0}
+      ],
+      "sample_rows": [
+        {"id": 90001, "user_id": 1, "body": "Hi, my card was charged twice for one order.", "sent_at": "2025-04-12T10:01:00Z", "is_from_agent": false, "channel": "email"},
+        {"id": 90002, "user_id": 1, "body": "Thanks for reaching out — we are looking into it.", "sent_at": "2025-04-12T10:09:00Z", "is_from_agent": true, "channel": "email"}
+      ],
+      "columns": [
+        {"name": "id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 30000, "is_primary_key": true, "sample_values": [90001, 90002, 90003], "min_val": 90001, "max_val": 120000},
+        {"name": "user_id", "dtype": "integer", "null_fraction": 0.0, "unique_count": 8200, "is_primary_key": false, "sample_values": [1, 1, 2]},
+        {"name": "body", "dtype": "text", "null_fraction": 0.0, "unique_count": 29500, "is_primary_key": false, "sample_values": ["Hi, my card was charged twice for one order.", "Thanks for reaching out — we are looking into it."]},
+        {"name": "sent_at", "dtype": "timestamp", "null_fraction": 0.0, "unique_count": 29900, "is_primary_key": false, "sample_values": ["2025-04-12T10:01:00Z", "2025-04-12T10:09:00Z"]},
+        {"name": "is_from_agent", "dtype": "boolean", "null_fraction": 0.0, "unique_count": 2, "is_primary_key": false, "sample_values": [false, true]},
+        {"name": "channel", "dtype": "varchar", "null_fraction": 0.0, "unique_count": 3, "is_primary_key": false, "sample_values": ["email", "chat", "phone"]}
+      ]
+    }
+  ]
+}

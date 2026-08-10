@@ -1,0 +1,53 @@
+{
+  "source_id": "fintech_fixture",
+  "domain": "fintech",
+  "roles": {
+    "users": "entity",
+    "merchants": "entity",
+    "transactions": "event",
+    "disputes": "event",
+    "support_messages": "log"
+  },
+  "columns": {
+    "users.id": "entity_id",
+    "users.email": "personal_identifier",
+    "users.full_name": "personal_identifier",
+    "users.created_at": "timestamp_created",
+    "users.is_active": "boolean_flag",
+    "users.country": "geographic_location",
+    "users.signup_source": "status_categorical",
+    "users.risk_score": "score_rating",
+
+    "merchants.id": "entity_id",
+    "merchants.name": "free_text",
+    "merchants.category": "status_categorical",
+    "merchants.created_at": "timestamp_created",
+    "merchants.is_verified": "boolean_flag",
+    "merchants.website": "url",
+    "merchants.country": "geographic_location",
+
+    "transactions.id": "entity_id",
+    "transactions.user_id": "foreign_key",
+    "transactions.merchant_id": "foreign_key",
+    "transactions.amount": "amount_money",
+    "transactions.currency": "status_categorical",
+    "transactions.status": "status_categorical",
+    "transactions.created_at": "timestamp_created",
+    "transactions.description": "free_text",
+
+    "disputes.id": "entity_id",
+    "disputes.transaction_id": "foreign_key",
+    "disputes.reason": "status_categorical",
+    "disputes.status": "status_categorical",
+    "disputes.opened_at": "timestamp_event",
+    "disputes.resolved": "boolean_flag",
+    "disputes.amount_disputed": "amount_money",
+
+    "support_messages.id": "entity_id",
+    "support_messages.user_id": "foreign_key",
+    "support_messages.body": "free_text",
+    "support_messages.sent_at": "timestamp_event",
+    "support_messages.is_from_agent": "boolean_flag",
+    "support_messages.channel": "status_categorical"
+  }
+}

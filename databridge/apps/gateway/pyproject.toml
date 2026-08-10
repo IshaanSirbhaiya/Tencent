@@ -1,0 +1,27 @@
+# apps/gateway — FastAPI gateway (08_PRD frontend, FRONTEND_PLAN_v2). The render layer's
+# single backend: wraps the SAME package functions the CLI imports (one brain, two mouths).
+# Owns all business logic + refusal/airgap/DB-safety enforcement. NO vendor SDK (P2): the
+# demo runs entirely on FakeBackend — no hosted model is constructible here.
+[project]
+name = "databridge-gateway"
+version = "0.0.0"
+description = "DataBridge FastAPI gateway — the frontend's backend (Phase A demo)"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-harness",
+  "databridge-ingest",
+  "databridge-semantic",
+  "databridge-convert",
+  "databridge-evals",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_gateway"]

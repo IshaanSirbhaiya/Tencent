@@ -1,0 +1,5 @@
+# Normalise line endings: store text as LF in the repo (avoids CRLF churn on Windows).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary

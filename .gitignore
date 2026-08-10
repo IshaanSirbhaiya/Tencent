@@ -1,0 +1,43 @@
+# secrets — never commit real API keys
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.uv/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / frontend
+node_modules/
+.next/
+out/
+build/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local workspace produced by the CLI (a demo is a zippable dir; not committed)
+.databridge/
+
+# Obsidian per-user workspace state (the vault IS the repo; workspace prefs are not)
+.obsidian/workspace*
+.obsidian/cache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# scratch test-output files
+*.log
+/r.txt
+/*.out.txt

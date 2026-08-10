@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design law (D-FE-3): near-neutral gray scale + ONE accent. Dark-first (PRD-08 §5,
+   projector-tested), light is a toggle. Provenance is the aesthetic; restraint reads as
+   professional. No gradients, no glassmorphism. */
+:root {
+  --bg: 222 18% 9%;
+  --surface: 222 16% 12%;
+  --elevated: 222 14% 16%;
+  --border: 222 12% 22%;
+  --muted: 222 12% 18%;
+  --fg: 210 16% 92%;
+  --subtle: 215 12% 62%;
+}
+
+.light {
+  --bg: 210 20% 98%;
+  --surface: 0 0% 100%;
+  --elevated: 210 20% 99%;
+  --border: 214 18% 88%;
+  --muted: 210 16% 95%;
+  --fg: 222 30% 12%;
+  --subtle: 215 14% 42%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: hsl(var(--bg));
+  color: hsl(var(--fg));
+  font-feature-settings: "cv02", "cv03", "cv04";
+}
+
+/* every metric / table figure renders with tabular numerals */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* the Grounded affordance: a dotted underline that signals "this value has a receipt" */
+.grounded {
+  text-decoration: underline dotted hsl(var(--subtle));
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* Honour reduced-motion globally — the count-up hook checks it in JS; this covers every CSS
+   animation/transition (node stagger, pulse-ring, bar fills, toast) for users who opt out. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
