@@ -9,13 +9,20 @@ Replaces the Acme Corp ``demo_seed.py``. Every node here comes from data that ex
 so the anti-fabrication wall in ``schema.py`` is not merely satisfied, it is satisfied by pointers
 that resolve to something a person can go and read.
 
-**Two deliberate omissions, both about not asserting more than the data supports.**
+**Three deliberate omissions, all about not asserting more than the data supports.**
 
 *Only connected nodes are seeded.* The registry holds 300 patients and the catalogue 33 tests, but
 a patient no document refers to and a test no package includes have no relationship to represent.
 Seeding them would add hundreds of orphans — nodes that answer no question and inflate every count
 on the dashboard. ``load_clinic_seed`` reports how many rows it skipped for this reason, so the
 number is visible rather than quietly dropped.
+
+*A document that names no subject gets no ``FOR_PATIENT`` edge.* The evidence for such a claim is
+the span the subject was read from, and there is no substitute for it: citing the document-level
+pointer attached a placeholder ``0:1`` span — one character of letterhead — to a patient-identity
+claim. With no subject span the document links to no candidate, which is the honest outcome (we
+cannot say who it is about). ``load_clinic_seed`` reports the dropped claims and names the
+documents, and each such document carries ``claimed_subject_field: None`` in its ``unresolved``.
 
 *``COVERED_BY``, ``EMPLOYED_BY`` and ``SCHEDULED_AS`` are reserved and unused here.* All three
 would state a fact **about a specific registry patient** — that this person is insured by that
@@ -186,6 +193,31 @@ def _span_of(gv: GroundedValue) -> SourcePointer:
     wall verified this one against the source text in Phase 1.
     """
     return gv.pointer
+
+
+#: The printed fields that can name a document's subject, most specific first. Order matters: an
+#: identifier localises a person better than a name does, so where both are printed the identifier's
+#: span is the evidence.
+SUBJECT_FIELDS = ("claimed_id_number", "claimed_name")
+
+
+def _subject_span(record) -> tuple[Optional[str], Optional[SourcePointer]]:
+    """WHICH printed field names this document's subject, and the exact span it was read from.
+
+    The **field name** comes back, never the value: the value is a patient's name or NRIC and the
+    graph has no business carrying either as a node attribute. The name is what makes an absence
+    legible — a document node whose ``claimed_subject_field`` is ``None`` puts that key in
+    ``unresolved``, so "this letter names nobody" is a recorded answer rather than a gap a reader
+    has to notice.
+
+    Returning ``(None, None)`` is load-bearing: it is the ONLY thing that may stop a ``FOR_PATIENT``
+    claim being written, and the caller must not substitute anything for the missing span.
+    """
+    for field in SUBJECT_FIELDS:
+        gv = getattr(record.subject, field, None)
+        if gv is not None:
+            return field, _span_of(gv)
+    return None, None
 
 
 def _derived_ptr(derivation: str, derived_from: list[SourcePointer]) -> SourcePointer:
@@ -419,8 +451,14 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
                                    [_yaml_ptr("packages", "includes_tests", i)]))
 
     # -- documents, and everything each one claims ---------------------------------
+    # Claims NOT written because the document names no subject. Counted, not swallowed: a seed that
+    # is quietly smaller than the corpus is indistinguishable from one that lost rows to a bug.
+    dropped_claims = 0
+    documents_with_no_subject: list[str] = []
     for document_id, record in intakes.items():
         doc_ptr = _doc_ptr(document_id, (texts or {}).get(document_id))
+        # Read BEFORE the document node is built, because its absence is itself a recorded fact.
+        subject_field, subject_span = _subject_span(record)
         # `valid_from` is the date ON the document where it carries one, falling back to the fixed
         # seed instant — NOT `record.document.received_at`, which is the wall clock and would make
         # the seed non-reproducible: an undated document would land in the future relative to
@@ -441,6 +479,11 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
                               dated[1] if dated is not None else None),
             "document_date_field": (dated[2] if dated is not None else None,
                                     dated[1] if dated is not None else None),
+            # WHICH printed field named the subject — the same pattern as `document_date_field`,
+            # and for the same reason. `None` here is the honest record of a letter that names
+            # nobody, and it is exactly the case in which NO `FOR_PATIENT` edge is written below.
+            # `unresolved` on this node then carries the unanswered claim.
+            "claimed_subject_field": (subject_field, subject_span),
             "unresolved_count": (len(record.unresolved),
                                  _derived_ptr("count of IntakeRecord.unresolved after extraction",
                                               [doc_ptr])),
@@ -462,14 +505,22 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
         # is the point: the graph must not collapse an unresolved identity into a single answer.
         #
         # The evidence is the span the SUBJECT was read from — the printed name, or the identifier
-        # when the document carries one. Citing the document-level pointer here would attach a
-        # one-character span at the top of the letterhead as proof of a patient relationship: a
-        # citation that looks authoritative and supports nothing.
-        subject_span = next(
-            (_span_of(gv) for gv in (record.subject.claimed_id_number, record.subject.claimed_name)
-             if gv is not None), None)
+        # when the document carries one. **There is no fallback.** This used to read
+        # `[subject_span or doc_ptr]`, so a document naming nobody produced a patient-identity
+        # claim evidenced by `_doc_ptr`'s placeholder `0:1` span: one character of letterhead,
+        # cited as proof of who a letter is about. That is constraints 1 and 2 broken at once —
+        # a citation that looks authoritative, supports nothing, and points at a person.
+        #
+        # With no subject span the honest outcome is NO EDGE: the document links to no candidate,
+        # because we cannot say who it is about. The claim is recorded instead — as
+        # `claimed_subject_field: None` in the document node's `unresolved`, and in the seed's
+        # `skipped` report, so the smaller number is visible rather than merely smaller.
         resolution = resolutions[document_id]
-        for candidate in resolution.candidates:
+        claimable = resolution.candidates if subject_span is not None else ()
+        if subject_span is None:
+            dropped_claims += len(resolution.candidates)
+            documents_with_no_subject.append(document_id)
+        for candidate in claimable:
             patient = registry_by_id[candidate.patient_id]
             # Each registry field carries the `table_cell` pointer it was read from. These were
             # written with only the name and ID pointers on the node, so an evidence sheet printed
@@ -489,7 +540,7 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
             # the rule that produced it and keeps the subject span that rule consumed.
             # `candidate_count` matters most: a renderer that cannot cite it falls back to the
             # LESS cautious wording for an identity claim, which is the wrong direction to fail.
-            claim_evidence = [subject_span] if subject_span is not None else [doc_ptr]
+            claim_evidence = [subject_span]
             edge_attrs, edge_ptrs = _grounded_attrs({
                 "basis": ("claimed_on_document",
                           _derived_ptr("the document names a subject; the registry was searched "
@@ -507,7 +558,7 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
                                     _derived_ptr("number of registry candidates returned",
                                                  claim_evidence))})
             edges.append(_edge(doc_id, EdgeKind.FOR_PATIENT, pat_id,
-                               [subject_span or doc_ptr],
+                               [subject_span],
                                attrs=edge_attrs, attr_sources=edge_ptrs))
 
         # REQUESTS_TEST — what the document printed, mapped to the catalogue.
@@ -568,6 +619,11 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
         "catalogue_tests_not_referenced": len(table.test_catalogue) - len(referenced_tests),
         "registry_patients_not_referenced": len(registry_by_id) - sum(
             1 for n in nodes.values() if n.kind is NodeKind.PATIENT),
+        # A document that names no subject links to no candidate. That is the honest outcome, and
+        # it makes the graph smaller — so the number is reported here rather than left to be
+        # noticed. The ids are listed because "which letters?" is the next question anyone asks.
+        "for_patient_claims_dropped_no_subject_span": dropped_claims,
+        "documents_with_no_subject_span": sorted(documents_with_no_subject),
     }
     node_list = list(nodes.values())
     return node_list, _reconcile_edge_validity(node_list, edges), skipped

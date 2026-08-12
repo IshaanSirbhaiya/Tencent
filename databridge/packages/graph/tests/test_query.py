@@ -7,6 +7,7 @@ templates, so the tests below exercise them against real clinic questions.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
 from databridge_graph import (
     EdgeKind,
@@ -171,3 +172,173 @@ def test_documents_are_provenance_never_the_answer_entity():
     s = _seeded()
     a = nl_query(s, "chit_01_meridian_referral.txt")
     assert not a.answer.startswith("chit_01")
+
+
+# --- R-30: every value the answer prints carries the citation for THAT value -------------------
+#
+# `nl_query` printed `attrs['date_of_birth']`, `attrs['kind']`, `attrs['billing_party']` and their
+# siblings into an answer whose `cite()` attached only the node's ENTITY pointers — the same Shape A
+# defect already fixed in `node_sheet`, `/evidence`, billing, the MCP payload and `clinic_history`.
+# This one feeds `/brain`'s answer box, so a judge who clicks a citation finds it does not support
+# the value printed beside it.
+#
+# The tests below walk the answer's values generically rather than checking three known fields, so
+# a new intent template cannot reintroduce the defect without failing here.
+
+# One question per intent template in `nl_query`, so the walk below covers every branch that
+# prints an attribute rather than only the branch someone remembered to test.
+_EVERY_TEMPLATE = [
+    "What does the WELL2 package include?",          # PACKAGE   — name, eligibility
+    "What does the PEE226 package include?",         # PACKAGE
+    "Who is Meridian Life Assurance?",               # ORG       — kind, billing_party
+    "Who is Northstar Life Assurance?",              # ORG
+    "Which package includes the Chest X-Ray?",       # TEST      — category
+    "What is the Full Blood Count?",                 # TEST
+    "Who is Loh Wei Ming?",                          # PATIENT   — date_of_birth
+    "What is the Meridian medical referral rule?",   # COVERAGE_RULE — issuer_code, billed_to,
+    "What is the Everwell Health Check-up Voucher rule?",             # ...and eligibility
+    "Tell me about the Visit scheduled by chit_02_everwell_voucher.txt",   # VISIT — appointment
+]
+
+
+def _grounded_answers():
+    store = _seeded()
+    answers = [(q, nl_query(store, q)) for q in _EVERY_TEMPLATE]
+    grounded = [(q, a) for q, a in answers if a.grounded]
+    assert grounded, "no question produced a grounded answer — the walk below would be vacuous"
+    return store, grounded
+
+
+def _uncited_text(answer: str, printed: set) -> str:
+    r"""The answer with every ALREADY-CITED value blanked out — what is left to account for.
+
+    A plain substring scan for "is this stored value in the answer?" is useless, and the first
+    draft of this test proved it three ways: a `list_price_sgd` of `25` "appears" inside the
+    package name *Pre-Employment Examination (ages 25 to 49)*, a `40` inside the band `40-59`, and
+    a `refused_count` of `0` inside `chit_01_...`. None of those is a value the answer printed, and
+    a test that reports them is noise that gets deleted rather than fixed.
+
+    Masking the cited values first is the right way round: whatever is left is text the answer
+    produced from something OTHER than a value it cited, which is exactly the defect being hunted.
+    Longest first, so a short value cannot eat a prefix of a longer one.
+    """
+    for text in sorted(printed, key=len, reverse=True):
+        answer = answer.replace(text, " ")
+    return answer
+
+
+def _appears_as_a_value(text: str, where: str) -> bool:
+    r"""Whole-value containment. The bounds are ``[\w-]`` rather than ``\b`` so a hyphenated value
+    such as ``40-59`` must match entire, not as the ``40`` inside it."""
+    return re.search(rf"(?<![\w-]){re.escape(text)}(?![\w-])", where) is not None
+
+
+def _node(store, entity_id):
+    from databridge_graph import row_to_node
+
+    row = store.open_node_row(entity_id)
+    assert row is not None, entity_id
+    return row_to_node(store, row)
+
+
+def test_every_value_an_answer_prints_carries_the_pointer_for_that_value():
+    """The positive form. For each value the answer printed: it is that node's stored value, the
+    pointer attached is that attribute's OWN pointer, and it is not merely one of the node's
+    entity citations — which is exactly the substitution the defect made."""
+    store, grounded = _grounded_answers()
+    checked, narrower_than_the_entity = 0, 0
+    for question, answer in grounded:
+        for value in answer.values:
+            node = _node(store, value.entity_id)
+            where = f"{question!r}: {value.entity_id}.{value.attr}"
+            assert value.value == str(node.attrs[value.attr]), where
+            assert value.pointer == node.attr_sources[value.attr], (
+                f"{where} is cited by something other than its own attr_source")
+            assert value.value in answer.answer, f"{where} is cited but never printed"
+            checked += 1
+            narrower_than_the_entity += value.pointer not in node.sources
+    assert checked > 0, "no answer printed an attribute value; the assertions above ran on nothing"
+    # Non-vacuity. An implementation that "fixed" this by copying `node.sources` onto every value
+    # would satisfy everything above, so at least some values must be cited by a pointer the
+    # entity citations do NOT contain. It is deliberately not asserted per value: a VISIT node is
+    # grounded by the appointment span, which is also its `appointment` attribute's pointer, and
+    # that coincidence is honest — one span really does establish both.
+    assert narrower_than_the_entity > 0, (
+        "every value's pointer is also one of its node's entity citations — the per-value channel "
+        "is carrying nothing the entity channel did not already say")
+
+
+def test_no_attribute_reaches_the_answer_text_without_its_own_citation():
+    """The generic form, and the one that fails if a template goes back to interpolating
+    `primary.attrs[...]` directly: any stored attribute value that turns up in the answer text must
+    appear in `values` with a pointer. Walking the text rather than a field list is deliberate —
+    a new template that prints a new attribute is caught without anyone updating this test."""
+    store, grounded = _grounded_answers()
+    offenders: list[str] = []
+    for question, answer in grounded:
+        printed = {v.value for v in answer.values}
+        residue = _uncited_text(answer.answer, printed)
+        for citation in answer.citations:
+            node = _node(store, citation.entity_id)
+            for attr, raw in node.attrs.items():
+                if raw is None:
+                    continue
+                text = str(raw)
+                if text and text not in printed and _appears_as_a_value(text, residue):
+                    offenders.append(
+                        f"{question!r}: {citation.entity_id}.{attr} = {text!r} is printed in the "
+                        f"answer but carries no citation of its own")
+    assert offenders == [], "\n".join(offenders)
+
+
+def test_a_patient_answer_cites_the_registry_row_the_date_of_birth_came_from():
+    """The worked example, because this is the one on screen: a registry DOB is a `table_cell` in
+    `patient_registration_synthetic.csv`, not something the entity citations ever saw."""
+    store = _seeded()
+    a = nl_query(store, "Who is Loh Wei Ming?")
+    assert a.grounded, a.refusal
+    dobs = [v for v in a.values if v.attr == "date_of_birth"]
+    assert dobs, "the patient answer printed no date of birth to check"
+    for value in dobs:
+        assert value.value in a.answer
+        assert "patient_registration" in (value.pointer.source_id or "")
+
+
+def test_an_ungroundable_value_is_not_printed_and_is_named_in_unresolved():
+    """The negative form. A value the graph cannot cite individually is not a fact the answer may
+    state; it belongs in `unresolved`, exactly as the node sheet moves it to its Unresolved
+    section. `None` is the honest way an attribute says "asked, not found"."""
+    from databridge_core import SourcePointer
+    from databridge_graph import GraphEdge, GraphNode
+
+    store = GraphStore(clock=lambda: SEED_SYSTEM_TIME)
+    ptr = SourcePointer(source_id="coverage_rules.yaml", kind="table_cell",
+                        table="issuers", column="name", row_id="0")
+    store.add_node(GraphNode(
+        id="org:zephyr", kind=NodeKind.ORG, label="Zephyr Mutual Assurance",
+        attrs={"kind": None, "billing_party": None}, sources=[ptr],
+        valid_from=SEED_SYSTEM_TIME, system_from=SEED_SYSTEM_TIME))
+    store.add_node(GraphNode(
+        id="document:d", kind=NodeKind.DOCUMENT, label="d.txt", sources=[ptr],
+        valid_from=SEED_SYSTEM_TIME, system_from=SEED_SYSTEM_TIME))
+    store.add_edge(GraphEdge(
+        id="e", src_id="org:zephyr", dst_id="document:d", kind=EdgeKind.ISSUED, sources=[ptr],
+        valid_from=SEED_SYSTEM_TIME, system_from=SEED_SYSTEM_TIME))
+
+    a = nl_query(store, "Who is Zephyr Mutual Assurance?")
+    assert a.grounded, a.refusal
+    assert "is a None" not in a.answer and "billing the None" not in a.answer
+    assert a.values == [], "nothing was citable, so nothing may be reported as cited"
+    assert "org:zephyr.kind" in a.unresolved
+    assert "org:zephyr.billing_party" in a.unresolved
+
+
+def test_the_answers_pointers_include_the_per_value_citations():
+    """`pointers()` is what a caller renders as "the evidence for this answer". Leaving the
+    per-value pointers out of it would fix the data model and leave the surface unchanged."""
+    store = _seeded()
+    a = nl_query(store, "Who is Meridian Life Assurance?")
+    assert a.grounded, a.refusal
+    assert a.values
+    for value in a.values:
+        assert value.pointer in a.pointers()

@@ -9,8 +9,14 @@
 `nl_query` is the load-bearing one. It is deterministic (no model in the retrieval loop, the
 gbrain proof point, 04_PRD §8) and every quantity/date in the answer is checked by **C17's
 ``claim_check``** against the cited graph nodes' grounded values. A number that does not equal a
-cited fact ⇒ the answer is REFUSED, not emitted (P4 / anti-fabrication). Free-text comes only from
-grounded node labels, each of which carries a SourcePointer.
+cited fact ⇒ the answer is REFUSED, not emitted (P4 / anti-fabrication).
+
+Two grounding channels, and an answer keeps them apart rather than pooling them (R-30): a
+``Citation`` grounds an ENTITY — that the node exists and is the thing its label names — while an
+``AnswerValue`` grounds one printed attribute with that attribute's own pointer. Free text comes
+only from node labels, which are grounded by the entity citations and by nothing narrower; that is
+a known gap (R-31: `label` has no pointer of its own) and the answer says which channel grounds
+what rather than implying one covers both.
 """
 from __future__ import annotations
 
@@ -190,10 +196,37 @@ def timeline(store: GraphStore, entity_id: str) -> list[TimelineEvent]:
 # --- nl_query (grounded answer) ---------------------------------------------------
 @dataclass
 class Citation:
+    """An ENTITY citation: that this node exists and is the thing named by its label.
+
+    It grounds the label and the id, and **nothing else**. `pointers` here are `node.sources`,
+    which have never seen the node's individual attribute values — see `AnswerValue`.
+    """
+
     entity_id: str
     label: str
     kind: str
     pointers: list[SourcePointer]
+
+
+@dataclass
+class AnswerValue:
+    """One attribute value the answer prints, carrying the pointer for **that value**.
+
+    The defect this exists to close (R-30) is the same one the node sheet had: `nl_query` printed
+    a patient's registry date of birth, an organisation's kind and billing party, a package's
+    eligibility band and a visit's appointment into an answer whose citations were the nodes'
+    ENTITY pointers. One citation appearing to vouch for values it had never seen — and this one
+    feeds `/brain`'s answer box, so a judge clicking the citation finds it does not support the
+    figure printed beside it.
+
+    `GraphNode.attr_sources` already holds the right pointer for every attribute; the bug was that
+    this module did not use it. Every value below travels with its own.
+    """
+
+    entity_id: str
+    attr: str
+    value: str
+    pointer: SourcePointer
 
 
 @dataclass
@@ -204,11 +237,17 @@ class GroundedAnswer:
     citations: list[Citation] = field(default_factory=list)
     matched_entities: list[str] = field(default_factory=list)
     refusal: str = ""
+    #: every attribute value printed in `answer`, each with the pointer for that value alone
+    values: list[AnswerValue] = field(default_factory=list)
+    #: `entity.attr` paths the answer asked for and could not ground, so did NOT print
+    unresolved: list[str] = field(default_factory=list)
 
     def pointers(self) -> list[SourcePointer]:
+        """Every pointer attached to this answer — entity citations AND per-value citations."""
         out: list[SourcePointer] = []
         for c in self.citations:
             out.extend(c.pointers)
+        out.extend(v.pointer for v in self.values)
         return out
 
 
@@ -264,10 +303,16 @@ def _node_citation(store: GraphStore, node: GraphNode) -> Citation:
 def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
     """Entity-link → 1-hop subgraph → build a GROUNDED answer, every quantity claim-checked.
 
-    The answer text is assembled ONLY from grounded node labels + each FACT node's canonical
-    ``rendered`` attr (both carry SourcePointers). ``claim_check`` then re-verifies that no
-    quantity/date in the answer escapes the cited set — a belt-and-braces anti-fabrication gate
-    (if assembly ever introduced an uncited number, the answer is refused)."""
+    Two grounding channels, and keeping them apart is the point (R-30):
+
+    * ``citations`` ground the ENTITIES named — that each node exists and is what its label says.
+    * ``values`` ground each attribute the answer PRINTS, one pointer per value, taken from that
+      node's ``attr_sources``. An attribute with no pointer of its own is not printed at all; its
+      path goes in ``unresolved``, exactly as ``node_sheet`` moves it to its *Unresolved* section.
+
+    ``claim_check`` then re-verifies that no quantity/date in the answer escapes the grounded set —
+    a belt-and-braces anti-fabrication gate (if assembly ever introduced an uncited number, the
+    answer is refused)."""
     matches = link_entities(store, question)
     if not matches:
         return GroundedAnswer(question, "", grounded=False,
@@ -280,20 +325,43 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
     sentences: list[str] = []
     citations: list[Citation] = []
     cited_ids: set[str] = set()
+    values: list[AnswerValue] = []
+    unresolved: list[str] = []
     allowed: list[str] = []          # grounded fact forms the answer may use — ALL from cited nodes
 
     def _allow_forms(n: GraphNode) -> list[str]:
-        # Every quantity-bearing form a cited node legitimately contributes: its label and each of
-        # its attribute values. This is the ONLY source of `allowed` entries, so a whitelisted
-        # token is, by construction, a value of a cited (and therefore grounded) node — which is
-        # exactly the property `check_claims` relies on.
-        return [n.label, *(str(v) for v in n.attrs.values() if v is not None)]
+        # Every quantity-bearing form a cited node legitimately contributes: its label and each
+        # attribute that carries a pointer OF ITS OWN. Iterating `attr_sources` rather than
+        # `attrs` is deliberate: the whitelist is what lets a number through `check_claims`, so it
+        # must be built from the values this module is able to cite individually, not from every
+        # value the node happens to hold.
+        return [n.label, *(str(n.attrs[k]) for k in sorted(n.attr_sources)
+                           if n.attrs.get(k) is not None)]
 
     def cite(n: GraphNode) -> None:
         if n.id not in cited_ids:
             citations.append(_node_citation(store, n))
             cited_ids.add(n.id)
             allowed.extend(_allow_forms(n))
+
+    def cited(n: GraphNode, attr: str) -> Optional[str]:
+        """The value of ``attr`` **with its own pointer recorded**, or ``None`` — never a bare one.
+
+        This is the whole of the R-30 fix, and it is deliberately the only door: a template below
+        cannot print an attribute without coming through here, and coming through here attaches
+        the pointer for that value to the answer. A value the graph cannot cite individually is
+        not printed as a fact; its path is named in ``unresolved`` instead, which is the honest
+        thing to show a reader who is about to click a citation.
+        """
+        if attr not in n.attrs:
+            return None
+        value, pointer = n.attrs[attr], n.source_for(attr)
+        if value is None or pointer is None:
+            unresolved.append(f"{n.id}.{attr}")
+            return None
+        text = str(value)
+        values.append(AnswerValue(entity_id=n.id, attr=attr, value=text, pointer=pointer))
+        return text
 
     cite(primary)
 
@@ -310,8 +378,9 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
         # are claims, and where a document has several candidates it produced several such edges
         # (ADR-0009; CLAUDE.md §Hard constraints 1).
         bits = [primary.label]
-        if primary.attrs.get("date_of_birth"):
-            bits.append(f"(registry date of birth {primary.attrs['date_of_birth']})")
+        dob = cited(primary, "date_of_birth")
+        if dob:
+            bits.append(f"(registry date of birth {dob})")
         sentences.append(" ".join(bits) + ".")
         for doc in _linked(EdgeKind.FOR_PATIENT, incoming=True):
             cite(doc)
@@ -320,20 +389,24 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
                 f"identity; staff confirm identity in person.")
     elif primary.kind == NodeKind.ORG:
         bits = [primary.label]
-        if primary.attrs.get("kind"):
-            bits.append(f"is a {primary.attrs['kind']}")
-        if primary.attrs.get("billing_party"):
-            bits.append(f"billing the {primary.attrs['billing_party']}")
+        org_kind = cited(primary, "kind")
+        if org_kind:
+            bits.append(f"is a {org_kind}")
+        billing_party = cited(primary, "billing_party")
+        if billing_party:
+            bits.append(f"billing the {billing_party}")
         sentences.append(" ".join(bits) + ".")
         for doc in _linked(EdgeKind.ISSUED, incoming=False):
             cite(doc)
             sentences.append(f"{primary.label} issued {doc.label}.")
     elif primary.kind == NodeKind.PACKAGE:
         s = primary.label
-        if primary.attrs.get("name"):
-            s += f" — {primary.attrs['name']}"
-        if primary.attrs.get("eligibility"):
-            s += f" ({primary.attrs['eligibility']})"
+        name = cited(primary, "name")
+        if name:
+            s += f" — {name}"
+        eligibility = cited(primary, "eligibility")
+        if eligibility:
+            s += f" ({eligibility})"
         sentences.append(s + ".")
         included = _linked(EdgeKind.INCLUDES_TEST, incoming=False)
         for t in included:
@@ -343,25 +416,30 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
                 f"{primary.label} includes: {', '.join(t.label for t in included)}.")
     elif primary.kind == NodeKind.TEST:
         s = primary.label
-        if primary.attrs.get("category"):
-            s += f" ({primary.attrs['category']})"
+        category = cited(primary, "category")
+        if category:
+            s += f" ({category})"
         sentences.append(s + ".")
         for pkg in _linked(EdgeKind.INCLUDES_TEST, incoming=True):
             cite(pkg)
             sentences.append(f"Included in package {pkg.label}.")
     elif primary.kind == NodeKind.COVERAGE_RULE:
         s = primary.label
-        if primary.attrs.get("issuer_code"):
-            s += f" — issuer {primary.attrs['issuer_code']}"
-        if primary.attrs.get("billed_to"):
-            s += f", billed to {primary.attrs['billed_to']}"
-        if primary.attrs.get("eligibility"):
-            s += f" ({primary.attrs['eligibility']})"
+        issuer_code = cited(primary, "issuer_code")
+        if issuer_code:
+            s += f" — issuer {issuer_code}"
+        billed_to = cited(primary, "billed_to")
+        if billed_to:
+            s += f", billed to {billed_to}"
+        eligibility = cited(primary, "eligibility")
+        if eligibility:
+            s += f" ({eligibility})"
         sentences.append(s + ".")
     elif primary.kind == NodeKind.VISIT:
         s = primary.label
-        if primary.attrs.get("appointment"):
-            s += f" — appointment {primary.attrs['appointment']}"
+        appointment = cited(primary, "appointment")
+        if appointment:
+            s += f" — appointment {appointment}"
         sentences.append(s + ".")
         for clinic in _linked(EdgeKind.AT_CLINIC, incoming=False):
             cite(clinic)
@@ -373,9 +451,13 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
     # the anti-fabrication gate: every quantity/date must be a cited node value (`allowed`)
     cc = check_claims(answer, facts=[], allow=allowed)
     if not cc.ok:
+        # A refusal emits no answer text, so it emits no values either — a value list beside an
+        # empty answer would be citations for something nobody was shown.
         return GroundedAnswer(question, "", grounded=False, citations=citations,
                               matched_entities=[m.id for m in matches],
                               refusal=f"answer refused: ungrounded quantity "
-                                      f"{[v.token for v in cc.violations]}")
+                                      f"{[v.token for v in cc.violations]}",
+                              unresolved=sorted(set(unresolved)))
     return GroundedAnswer(question, answer, grounded=True, citations=citations,
-                          matched_entities=[m.id for m in matches])
+                          matched_entities=[m.id for m in matches],
+                          values=values, unresolved=sorted(set(unresolved)))

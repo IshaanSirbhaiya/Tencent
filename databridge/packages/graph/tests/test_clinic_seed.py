@@ -388,3 +388,148 @@ def test_document_two_digit_year_picks_the_calendar_reading_closest_to_today():
     # 52 -> the DOB-style case still resolves sanely: 2052 is 26 years out, 1952 is 74 years back,
     # so 2052 remains nearer — this function does not special-case "the past is always right".
     assert _document_two_digit_year("01", "01", "52", today=today) == "01/01/2052"
+
+
+# --- R-02: an identity claim is evidenced by the subject span, or it is not made ---------------
+#
+# `_doc_ptr` mints a `0:1` span when a document's length is unknown, and the FOR_PATIENT edge used
+# to be built with `[subject_span or doc_ptr]`. A document naming nobody therefore produced a
+# patient-identity claim whose evidence was one character of letterhead — a citation that looks
+# authoritative and supports nothing, breaking constraints 1 and 2 in the same line.
+#
+# The fix has no fallback: with no exact subject pointer, NO edge is created. The tests below pin
+# both halves — the drop itself, and that nothing in the seed is evidenced by a placeholder span.
+
+
+def _blanked_subject_corpus():
+    """The real corpus with ONE document's subject removed, and its candidates left in place.
+
+    The point is to reproduce exactly the state the old fallback was written for: a resolver that
+    returned candidates while the document carries no span naming a subject. Blanking the subject
+    and re-resolving would return no candidates and the test would pass vacuously, so the original
+    resolution is kept — the seed then has candidates it cannot cite, which is the decision under
+    test.
+    """
+    from databridge_intake.registry import registry
+    from databridge_intake.resolve import resolve
+    from databridge_intake.rules import rules
+
+    from databridge_graph.clinic_seed import _fixture_intakes
+
+    intakes, texts = _fixture_intakes()
+    target = "chit_01_meridian_referral.txt"
+    resolutions = {name: resolve(record.subject) for name, record in intakes.items()}
+    record = intakes[target]
+    intakes[target] = record.model_copy(update={
+        "subject": record.subject.model_copy(
+            update={"claimed_name": None, "claimed_id_number": None})})
+    return target, intakes, resolutions, rules(), {r.patient_id: r for r in registry()}, texts
+
+
+def test_a_document_naming_no_subject_produces_no_for_patient_edge():
+    from databridge_graph.clinic_seed import _build
+
+    target, intakes, resolutions, table, registry_by_id, texts = _blanked_subject_corpus()
+    assert resolutions[target].candidates, "the fixture must still offer candidates to drop"
+
+    nodes, edges, _ = _build(intakes, resolutions, table, registry_by_id, texts)
+
+    doc_id = document_node_id(target)
+    claims = [e for e in edges if e.kind is EdgeKind.FOR_PATIENT and e.src_id == doc_id]
+    assert claims == [], (
+        "a document with no subject span must link to no candidate — we cannot say who it is "
+        "about, and an edge here would assert that we can")
+    # Dropping the claim must leave the graph consistent, not merely smaller: the candidate's
+    # PATIENT node is built inside the same loop, so a half-applied fix would leave it stranded
+    # or leave some other edge pointing at a node that was never created.
+    assert orphan_node_ids(nodes, edges) == []
+    ids = {n.id for n in nodes}
+    assert sorted({x for e in edges for x in (e.src_id, e.dst_id)} - ids) == []
+
+
+def test_the_dropped_identity_claims_are_reported_not_silently_missing():
+    """A seed that is quietly smaller than the corpus is indistinguishable from one losing rows to
+    a bug. `load_clinic_seed` already reports skipped registry rows; dropped claims follow it."""
+    from databridge_graph.clinic_seed import _build
+
+    target, intakes, resolutions, table, registry_by_id, texts = _blanked_subject_corpus()
+    expected = len(resolutions[target].candidates)
+
+    _, _, skipped = _build(intakes, resolutions, table, registry_by_id, texts)
+
+    assert skipped["for_patient_claims_dropped_no_subject_span"] == expected
+    assert skipped["documents_with_no_subject_span"] == [target]
+
+
+def test_the_unmade_claim_is_recorded_on_the_document_as_unresolved():
+    """Dropping the edge is only half of it. The question "who is this letter about?" was asked and
+    not answered, and `unresolved` is where an unanswered question lives (CLAUDE.md constraint 2) —
+    an attribute that simply vanished would read as "not applicable"."""
+    from databridge_graph.clinic_seed import _build
+
+    target, intakes, resolutions, table, registry_by_id, texts = _blanked_subject_corpus()
+    nodes, _, _ = _build(intakes, resolutions, table, registry_by_id, texts)
+
+    document = {n.id: n for n in nodes}[document_node_id(target)]
+    assert document.attrs["claimed_subject_field"] is None
+    assert "claimed_subject_field" in document.unresolved
+    assert "claimed_subject_field" not in document.attr_sources, (
+        "a pointer beside an absent value is a citation for nothing")
+
+
+def test_a_document_that_does_name_a_subject_records_which_field_named_it(nodes):
+    """The positive control for the above: every real chit names a subject, so every document node
+    records WHICH printed field it was read from — the field name, never the value, because the
+    value is a patient's name or NRIC and the graph has no business holding either as an attr."""
+    from databridge_graph.clinic_seed import SUBJECT_FIELDS
+
+    documents = [n for n in nodes if n.kind is NodeKind.DOCUMENT]
+    assert documents
+    named = [n for n in documents if n.attrs["claimed_subject_field"] is not None]
+    assert named, "no document in the corpus recorded a subject field"
+    for document in named:
+        assert document.attrs["claimed_subject_field"] in SUBJECT_FIELDS
+        assert document.attr_sources["claimed_subject_field"].kind == "doc_span"
+
+
+def test_no_for_patient_edge_in_the_seed_is_evidenced_by_a_placeholder_span(edges, by_id):
+    """Asserted over the WHOLE seed, not one document, so a chit nobody has written yet cannot
+    reintroduce the fallback quietly.
+
+    Two ways the placeholder gets in, and both are checked: as the edge's own evidence, and inside
+    a `derived` attribute pointer's `derived_from` (which is where `claim_evidence` put it).
+    """
+    claims = [e for e in edges if e.kind is EdgeKind.FOR_PATIENT]
+    assert claims, "no FOR_PATIENT edge was exercised"
+    offenders: list[str] = []
+    for edge in claims:
+        document = by_id[edge.src_id]
+        whole_document = list(document.sources)      # `_doc_ptr`, the self-citation
+        for pointer in [*edge.sources,
+                        *(p for ptr in edge.attr_sources.values()
+                          for p in (ptr.derived_from or []))]:
+            where = f"{edge.src_id} --for_patient--> {edge.dst_id}"
+            if pointer.kind != "doc_span":
+                offenders.append(f"{where}: cited a {pointer.kind}, not a span on the document")
+                continue
+            if pointer.char_start == 0 and (pointer.char_end or 0) <= 1:
+                offenders.append(
+                    f"{where}: evidenced by chars {pointer.char_start}-{pointer.char_end} — "
+                    f"one character of letterhead")
+            if (pointer.char_end or 0) <= (pointer.char_start or 0):
+                offenders.append(f"{where}: empty span {pointer.char_start}-{pointer.char_end}")
+            if pointer in whole_document:
+                offenders.append(
+                    f"{where}: evidenced by the document's own self-citation, which localises "
+                    f"nothing and names no subject")
+    assert offenders == [], "\n".join(offenders)
+
+
+def test_every_for_patient_edge_cites_the_span_its_document_named_a_subject_from(edges, by_id):
+    """The positive half: the evidence is not merely *some* span, it is the subject span recorded
+    on the document node — the same pointer, so the two cannot drift apart."""
+    for edge in (e for e in edges if e.kind is EdgeKind.FOR_PATIENT):
+        document = by_id[edge.src_id]
+        subject_pointer = document.attr_sources.get("claimed_subject_field")
+        assert subject_pointer is not None, f"{document.id} claims a patient but named no subject"
+        assert edge.sources == [subject_pointer], edge.id

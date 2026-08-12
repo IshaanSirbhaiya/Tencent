@@ -18,6 +18,8 @@ from .clinic_seed import (
 from .extractor import GraphExtractionResult, extract_graph, gold_extraction_handler
 from .merge import UpsertOutcome, token_set_ratio, upsert_edge, upsert_node
 from .query import (
+    AnswerValue,
+    Citation,
     GraphPath,
     GroundedAnswer,
     Snapshot,
@@ -41,7 +43,7 @@ __all__ = [
     "upsert_node", "upsert_edge", "UpsertOutcome", "token_set_ratio",
     # query
     "as_of", "neighbors", "path", "timeline", "nl_query", "link_entities",
-    "Snapshot", "Subgraph", "GraphPath", "GroundedAnswer",
+    "Snapshot", "Subgraph", "GraphPath", "GroundedAnswer", "Citation", "AnswerValue",
     # extractor
     "extract_graph", "GraphExtractionResult", "gold_extraction_handler",
     # clinic seed
