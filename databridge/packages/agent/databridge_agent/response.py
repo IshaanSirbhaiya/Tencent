@@ -44,7 +44,7 @@ if TYPE_CHECKING:                                     # pragma: no cover - typin
 #: Statuses `ClinicAgent._run_tool` can record. Repeated here so the public surface has a closed
 #: vocabulary of its own rather than passing through whatever the loop happens to write.
 READ_STATUSES = ("ok", "unknown_tool", "repeated", "schema_violation", "ungrounded_argument",
-                 "error")
+                 "error", "not_read")
 
 
 class AnswerValue(BaseModel):
@@ -71,9 +71,11 @@ class AnswerValue(BaseModel):
 class ReadRecord(BaseModel):
     """One tool call, reduced to what is safe to publish: which tool, and how it went.
 
-    ``tool`` is the name that was REQUESTED, which for a refused call is a name the model invented
-    — so it passes through ``render.safe_name`` and arrives as an identifier, never as prose.
-    ``status`` is checked against ``READ_STATUSES`` for the same reason.
+    ``tool`` is the name of a REGISTERED read, or — when the call named no registered tool — the
+    fixed code-authored string ``render.UNKNOWN_TOOL_NAME``. The model's own spelling never
+    appears: `Alice_Tan` is a valid identifier, so character-filtering a model-supplied name
+    publishes model-authored text with an identifier's shape. ``status`` is checked against
+    ``READ_STATUSES`` for the same reason.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -101,8 +103,10 @@ class AgentResponse(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    #: The staff member's own question, echoed. Not model output — but it is caller-supplied text,
-    #: so a page escapes it like any other user input.
+    #: The staff member's own question, echoed back **through the same renderer every tool value
+    #: goes through** — neutralised, length-capped, and replaced by the fixed redaction line if it
+    #: is instruction-shaped. It is caller-supplied text, and a route that serialised it verbatim
+    #: would be the one field on this type that reaches a page unscreened.
     question: str
     #: The rendered report. A stored field, not a property, which is the whole point of this type.
     answer: str
@@ -126,6 +130,7 @@ def to_response(answer: "AgentAnswer") -> AgentResponse:
     so adding a field to ``AgentAnswer`` — including one carrying model text — cannot widen what a
     page receives without somebody editing this function.
     """
+    question, _ = render.present(answer.question)
     values = []
     for field in answer.fields:
         text, redacted = render.present(field.value)
@@ -134,7 +139,7 @@ def to_response(answer: "AgentAnswer") -> AgentResponse:
             scope=field.scope, text=text, redacted=redacted,
             citation=render.cite(field.source), source=field.source))
     return AgentResponse(
-        question=answer.question,
+        question=question,
         answer=answer.answer,
         refused=answer.refused,
         refusal_code=answer.refusal_code,
@@ -142,7 +147,7 @@ def to_response(answer: "AgentAnswer") -> AgentResponse:
         values=tuple(values),
         unresolved=answer.unresolved,
         notes=tuple(AgentNote(key=key, text=render.note_text(key)) for key in answer.notes),
-        reads=tuple(ReadRecord(tool=render.safe_name(call.requested),
+        reads=tuple(ReadRecord(tool=render.public_name(call.requested, call.registered),
                                status=call.status if call.status in READ_STATUSES else "error")
                     for call in answer.tool_calls),
         model_calls=answer.model_calls,

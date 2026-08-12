@@ -54,6 +54,8 @@ from .agent import (
     ToolCallRecord,
     ToolPlan,
     ValueRef,
+    gate_answer,
+    screen_question,
 )
 from .guardrails import (
     IDENTITY_REFUSAL_CODE,
@@ -100,7 +102,7 @@ from .adapters import StaticReadAdapter
 # NOTE: only names, never the `render` function itself — binding `databridge_agent.render` to a
 # function would shadow the submodule of the same name, and a test importing the module would
 # silently get a callable instead.
-from .render import NOTES, note_text
+from .render import NOTES, UNKNOWN_TOOL_NAME, note_text, public_name
 from .results import ToolResult, ToolRow
 from .sealed import (
     AdapterRefused,
@@ -141,6 +143,7 @@ __all__ = [
     "GroundedField",
     "ToolCallRecord",
     "ToolPlan",
+    "UNKNOWN_TOOL_NAME",
     "ValueRef",
     # tools
     "Tool",
@@ -191,7 +194,10 @@ __all__ = [
     "to_response",
     # rendering
     "NOTES",
+    "gate_answer",
     "note_text",
+    "public_name",
+    "screen_question",
     # guardrails
     "screen_incoming",
     "screen_agent_output",

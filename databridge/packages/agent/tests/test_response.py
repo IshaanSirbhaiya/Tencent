@@ -135,12 +135,34 @@ def test_nothing_the_model_wrote_reaches_the_public_json():
     assert REDACTED_VALUE in payload, "the fixed redaction line is what should be there instead"
 
 
-def test_an_invented_tool_name_arrives_as_an_identifier_not_a_sentence():
-    """`requested` is model-authored for an unknown tool. It is a name in the audit list, so it is
-    reduced to a name."""
-    reads = _poisoned_answer().public().reads
-    assert [r.tool for r in reads] == ["intake_card", "send_email"]
+def test_an_invented_tool_name_is_never_echoed_at_all():
+    """A model-supplied identifier is model-authored text, and no character filter fixes that.
+
+    The old rule reduced `requested` to `[A-Za-z0-9_.:-]` and published it. `Alice_Tan` passes that
+    filter unchanged, so a hosted model could name a tool after a person, make one valid read
+    beside it, and have that name rendered on the page — visible, uncited, model-authored. The
+    only rule that closes it is: an unregistered name is replaced by a fixed string this repo
+    wrote, and the real one stays in the audit record and the server log.
+    """
+    from databridge_agent import UNKNOWN_TOOL_NAME
+
+    answer = _poisoned_answer()
+    reads = answer.public().reads
+    assert [r.tool for r in reads] == ["intake_card", UNKNOWN_TOOL_NAME]
     assert [r.status for r in reads] == ["ok", "unknown_tool"]
+    # The audit record still has it — this is a publication rule, not amnesia.
+    assert [c.requested for c in answer.tool_calls] == ["intake_card", "send_email"]
+
+
+def test_a_tool_name_that_is_a_persons_name_does_not_reach_the_page():
+    """The attack the character filter could not see. `Alice_Tan` is a valid identifier."""
+    from databridge_agent import UNKNOWN_TOOL_NAME, AgentAnswer, ToolCallRecord
+
+    answer = AgentAnswer(question="who is blocked?", tool_calls=(
+        ToolCallRecord(step=1, requested="Alice_Tan", status="unknown_tool", registered=False),))
+    public = answer.public()
+    assert [r.tool for r in public.reads] == [UNKNOWN_TOOL_NAME]
+    assert "Alice_Tan" not in public.model_dump_json()
 
 
 def test_the_value_text_is_the_rendered_text_not_the_raw_value():

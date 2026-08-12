@@ -253,8 +253,19 @@ export default function IntelligencePage() {
             graph={graph}
             title={selection?.title ?? null}
             members={selection?.members ?? []}
+            asOf={asOf}
           />
         </div>
+
+        <p className="max-w-3xl text-2xs text-subtle">
+          Documents are shown by an opaque handle and their type, never by filename: a filename can
+          carry a patient&rsquo;s name, and this page counts identity work without ever performing
+          any. Open the intake on <code>/frontdesk</code> to see the document itself. The cards and
+          the agent&rsquo;s answer are two separate reads of the graph, so a document arriving
+          between them can leave one a moment ahead of the other &mdash; within a single answer,
+          every tool shares one snapshot. The gateway says so in its own payload rather than only
+          here.
+        </p>
 
         <p className="max-w-3xl text-2xs text-subtle">
           Every figure above is a count of something structurally true in the graph, with the

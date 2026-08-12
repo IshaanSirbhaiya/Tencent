@@ -33,6 +33,10 @@ def _surface() -> list[pathlib.Path]:
     files = [
         frontend / "lib" / "intelligence-api.ts",
         _repo() / "apps" / "gateway" / "databridge_gateway" / "intelligence_routes.py",
+        # The naming policy — what this page may call an entity. It decides which labels print,
+        # so a hardcoded issuer HERE would be the most consequential place to put one.
+        _repo() / "apps" / "gateway" / "databridge_gateway" / "intelligence_surface.py",
+        _repo() / "apps" / "gateway" / "databridge_gateway" / "agent_tools.py",
         _repo() / "packages" / "graph" / "databridge_graph" / "analytics.py",
     ]
     files += sorted((frontend / "app" / "intelligence").rglob("*.tsx"))
@@ -57,8 +61,9 @@ def _tokens() -> set[str]:
 def test_the_surface_files_are_all_present():
     """A guard that silently scans nothing is worse than no guard."""
     found = {f.name for f in _surface()}
-    assert {"page.tsx", "intelligence-api.ts", "intelligence_routes.py", "analytics.py"} <= found
-    assert len(_surface()) >= 6, sorted(found)
+    assert {"page.tsx", "intelligence-api.ts", "intelligence_routes.py", "analytics.py",
+            "intelligence_surface.py", "agent_tools.py"} <= found
+    assert len(_surface()) >= 8, sorted(found)
 
 
 def test_no_issuer_or_package_name_appears_in_the_intelligence_surface():

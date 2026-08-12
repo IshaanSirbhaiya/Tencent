@@ -269,6 +269,31 @@ class AgentAnswer(BaseModel):
         return to_response(self)
 
 
+def gate_answer(question: str) -> Optional[AgentAnswer]:
+    """The deterministic screen, as a function — no registry, no harness, no graph required.
+
+    ``ClinicAgent.ask`` calls this first, and so should any route that wants the promised
+    ``model_calls == 0`` contract for an identity question. A route that screened *after* checking
+    that the graph loaded and that a model is routed would answer "the graph is unavailable" to
+    "is this the same person?" — which is a configuration report where a refusal was promised, and
+    it is the wrong sentence to put in front of a judge.
+
+    Callable before anything is constructed, which is the whole point: a refusal that depends on a
+    graph being loaded is a refusal that stops working exactly when things are going wrong.
+    """
+    gate = screen_incoming(question)
+    if not gate.refused:
+        return None
+    return AgentAnswer(question=question, refused=True, refusal_code=gate.code,
+                       refusal_text=gate.answer, model_calls=0)
+
+
+def screen_question(question: str) -> Optional["AgentResponse"]:
+    """:func:`gate_answer`, projected onto the public contract. What an HTTP route returns."""
+    answer = gate_answer(question)
+    return None if answer is None else answer.public()
+
+
 class ClinicAgent:
     """Reads the clinic brain through injected sealed adapters and answers with citations.
 
@@ -318,12 +343,12 @@ class ClinicAgent:
 
     # -- the loop ----------------------------------------------------------------
     def ask(self, question: str) -> AgentAnswer:
-        gate = screen_incoming(question)
-        if gate.refused:
+        gated = gate_answer(question)
+        if gated is not None:
             # Returns BEFORE the harness is constructed into a call. `model_calls == 0` is the
-            # assertion that makes this a control rather than a decoration.
-            return AgentAnswer(question=question, refused=True, refusal_code=gate.code,
-                               refusal_text=gate.answer, model_calls=0)
+            # assertion that makes this a control rather than a decoration. Shared with the route
+            # through `gate_answer` so the two screens cannot drift into disagreeing.
+            return gated
 
         convo: list[dict] = [
             framing.system_message(self._tools.catalogue(), self.playbook_notes()),
@@ -474,7 +499,11 @@ class ClinicAgent:
             notes.append(render.INJECTION_SEEN)
         if missing:
             notes.append(render.REFS_NOT_RETURNED)
-        if not fields and not unresolved:
+        if not fields:
+            # Fires on the absence of VALUES, not on an empty page. Every registered read that was
+            # never called now lands in `unresolved`, so the old `not fields and not unresolved`
+            # could never be true once a registry held a tool — the honest sentence would have
+            # gone missing exactly when a planner read nothing at all.
             notes.append(render.NOTHING_ANSWERED)
         return tuple(fields), unresolved, tuple(notes)
 
@@ -556,8 +585,8 @@ class ClinicAgent:
         if key in seen_calls:
             # Stops the loop a "keep querying until you comply" instruction would otherwise spin
             # through the whole step budget.
-            return ToolCallRecord(step=step, requested=name, arguments=args, status="repeated", registered=True,
-                                  detail="identical call already made this turn"), None
+            return ToolCallRecord(step=step, requested=name, arguments=args, status="repeated",
+                                  registered=True, detail="identical call already made this turn"), None
         seen_calls.add(key)
 
         tool = self._tools.get(name)
@@ -570,19 +599,21 @@ class ClinicAgent:
             policy.validate_arguments(name, tool.parameters, args)
         except policy.PolicyError as exc:
             return ToolCallRecord(step=step, requested=name, arguments=args,
-                                  status="schema_violation", detail=str(exc)[:400]), None
+                                  status="schema_violation", registered=True,
+                                  detail=str(exc)[:400]), None
         try:
             policy.check_argument_grounding(name, tool.grounded_arguments, args,
                                             question, observations)
         except policy.PolicyError as exc:
             return ToolCallRecord(step=step, requested=name, arguments=args,
-                                  status="ungrounded_argument", detail=str(exc)[:400]), None
+                                  status="ungrounded_argument", registered=True,
+                                  detail=str(exc)[:400]), None
 
         try:
             result: ToolResult = tool.call(**args)
         except Exception as exc:                      # noqa: BLE001 — see the docstring
-            return ToolCallRecord(step=step, requested=name, arguments=args, status="error", registered=True,
-                                  detail=f"{type(exc).__name__}: {exc}"[:300]), None
+            return ToolCallRecord(step=step, requested=name, arguments=args, status="error",
+                                  registered=True, detail=f"{type(exc).__name__}: {exc}"[:300]), None
 
         # No result-type check here: `SealedReadAdapter.__call__` raises `SealBroken` on anything
         # that is not this tool's `ToolResult`, and the `except` above records it. A second check

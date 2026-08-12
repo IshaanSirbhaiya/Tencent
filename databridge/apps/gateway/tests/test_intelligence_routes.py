@@ -75,6 +75,18 @@ def test_every_figure_carries_its_denominator_and_the_ids_behind_it(client):
         count = graph[key]
         assert count["label"], f"{key} is a bare number with no label"
         assert count["of"] >= count["n"]
+        if count.get("members_withheld"):
+            # The one figure where two of this page's rules collide, and the collision is
+            # ANNOUNCED rather than resolved quietly. `conflicts` counts REGISTRY ROWS, so its
+            # members are patients: "every figure names the ids it counted" and "this page never
+            # names a patient" cannot both hold, and constraint 1 is the one that wins. An empty
+            # `members` with no stated reason would read as a bug, or worse, as a zero.
+            from databridge_gateway.intelligence_surface import MEMBERS_WITHHELD
+
+            assert count["members_withheld"] == MEMBERS_WITHHELD
+            assert count["members"] == []
+            assert count["n"] >= 0 and count["of"] >= count["n"]
+            continue
         assert len(count["members"]) == count["n"], (
             f"{key}: {count['n']} counted, {len(count['members'])} ids given — a figure nobody "
             "can walk to is indistinguishable from a literal")

@@ -43,6 +43,9 @@ export function FigureCard({
           ? "text-band-spot"
           : "text-fg";
   const clickable = figure.members.length > 0;
+  // Why there is nothing to open. "the count is zero" is only one of the two reasons, and saying
+  // it about a figure whose members were WITHHELD would be a false statement about a real number.
+  const nothingToShow = figure.members_withheld ?? "nothing to show — the count is zero";
 
   return (
     <button
@@ -67,7 +70,7 @@ export function FigureCard({
       <div className="mt-0.5 text-2xs text-accent">
         {clickable
           ? `show the ${figure.members.length === 1 ? "subgraph" : `${figure.members.length} subgraphs`} behind this`
-          : "nothing to show — the count is zero"}
+          : nothingToShow}
       </div>
     </button>
   );

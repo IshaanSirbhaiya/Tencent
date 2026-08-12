@@ -43,12 +43,24 @@ on. So every degraded path here is a refusal with a code (`_refusal`), never a t
    exception text and unredacted rows while omitting the rendered answer entirely — a route
    returning it would publish everything `render.present` exists to withhold. `answer.public()`
    is the only supported projection, and `test_intelligence_ask.py` pins the exact key set.
-3. **Every cited value links to its own subgraph.** Each pointer the tools emit carries a graph
-   entity id in `source_id`, so a citation resolves through `GET /intelligence/subgraph/{id}` —
-   the drill-down that refuses when it cannot show the evidence.
-4. **The question is screened before a model is reached**, by the agent's own deterministic gate
-   (`databridge_agent.screen_incoming`), so an identity question is refused with `model_calls == 0`
-   and the refusal is a 200 carrying the fixed staff-facing text — it is an answer, not an error.
+3. **Every cited value links to its own subgraph — and that subgraph is held to the same
+   contract as the page.** Each pointer the tools emit names an entity, so a citation resolves
+   through `GET /intelligence/subgraph/{id}`. That drill-down runs `intelligence_surface`'s own
+   structural traversal rather than the generic `brain_neighbors` the `/brain` canvas uses: the
+   generic one walked a cited document's `for_patient` edges and returned registry patients with
+   their attributes and the edge's `match_score`, which is a ranked list of named candidates one
+   click from a page whose contract forbids one.
+4. **Nothing a document wrote is rendered here.** A document is an opaque handle plus its
+   `document_type`; an organisation prints its name only when that name is a cell in
+   `coverage_rules.yaml`. A filename can be `Alice_Tan_referral.pdf` — an ordinary label no content
+   screen can see — so the rule is about provenance, not phrasing (`intelligence_surface`).
+5. **The question is screened FIRST**, by the agent's own deterministic gate
+   (`databridge_agent.screen_question`) — before the `as_of` parse, before the graph, before the
+   model route. An identity question is refused with `model_calls == 0` and the refusal is a 200
+   carrying the fixed staff-facing text. Screening after the configuration checks meant an unloaded
+   graph answered "the clinic graph is not loaded" to "is this the same person?".
+6. **Bounds refuse rather than truncate.** Every figure here is a count, so a count over part of a
+   graph is a wrong number, not a short one (`intelligence_surface.check_graph_bounds`).
 """
 from __future__ import annotations
 
@@ -58,9 +70,16 @@ from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 log = logging.getLogger("databridge.gateway.intelligence")
+
+#: What a malformed `?as_of=` is answered with. The offending value is deliberately NOT quoted
+#: back: it is caller-supplied text on a page that renders no uncited free text anywhere else, and
+#: an error message is the classic place that rule gets forgotten. It goes to the log instead.
+BAD_AS_OF_MESSAGE = ("the `as of` value is not an ISO-8601 datetime (for example 2026-08-01). "
+                     "Refusing to guess which instant was meant — a rewound figure that quietly "
+                     "stopped being rewound is a wrong number presented as a right one.")
 
 #: A front-desk question, not a document. Anything longer is a paste, and a paste is an attempt to
 #: get document text into the one message that is NOT framed as untrusted data (`frame.py` frames
@@ -68,9 +87,37 @@ log = logging.getLogger("databridge.gateway.intelligence")
 MAX_QUESTION_CHARS = 500
 
 
+class RefusalBody(BaseModel):
+    """The refusal shape every route on this surface returns. A MODEL, not a dict literal.
+
+    `_refusal` used to build the body by hand and hand it to `JSONResponse`, which bypasses
+    FastAPI's `response_model` entirely — so the one path most likely to be wrong (the error path)
+    was the one path with no contract on it, and the route's declared type was a claim about the
+    happy case only. Every refusal below is now validated against this type before it is
+    serialised, and `responses=` publishes it in the schema so the claim is checkable from
+    outside.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    code: str
+    message: str
+    nearest_alternative: Optional[str] = None
+
+
+class SurfaceRefusal(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    refusal: RefusalBody
+
+
+#: What every route here declares for its refusal statuses, so the contract covers both paths.
+REFUSAL_RESPONSES = {status: {"model": SurfaceRefusal} for status in (404, 422, 503)}
+
+
 def _refusal(code: str, message: str, status: int = 422) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"refusal": {
-        "code": code, "message": message, "nearest_alternative": None}})
+    body = SurfaceRefusal(refusal=RefusalBody(code=code, message=message))
+    return JSONResponse(status_code=status, content=body.model_dump(mode="json"))
 
 
 def _parse_as_of(raw: Optional[str]) -> Optional[dt.datetime]:
@@ -96,7 +143,25 @@ def _graph_analytics(app: FastAPI, as_of: Optional[dt.datetime]) -> tuple[Option
     try:
         from databridge_graph.analytics import compute
 
-        return compute(brain.store, as_of=as_of).to_dict(), None
+        from .intelligence_surface import (
+            SurfaceNames,
+            SurfaceTooLarge,
+            check_graph_bounds,
+            sanitise_analytics,
+        )
+
+        try:
+            # Bounded BEFORE the traversal, not after. `compute` materialises the whole open node
+            # and edge set; on a graph past this surface's envelope the honest answer is "these
+            # figures are withheld", never a number somebody had to cut down to fit.
+            check_graph_bounds(brain.store)
+        except SurfaceTooLarge as exc:
+            return None, exc.message
+        names = SurfaceNames(brain.store)
+        # Sanitised on the way out, always. `conflicts` counts REGISTRY ROWS, so its members are
+        # patient node ids and `entities` carried their names — and the page rendered both, one
+        # `labelOf()` away from a patient's name on a business-intelligence screen.
+        return sanitise_analytics(compute(brain.store, as_of=as_of).to_dict(), names), None
     except Exception:                                                # noqa: BLE001
         log.exception("graph analytics unavailable; serving the page without them")
         return None, "the graph traversal failed; see server logs"
@@ -215,9 +280,8 @@ def _register_intelligence_routes(app: FastAPI) -> None:
         try:
             parsed = _parse_as_of(as_of)
         except ValueError:
-            return _refusal("BAD_AS_OF",
-                            f"'{as_of}' is not an ISO-8601 datetime; refusing to guess what "
-                            f"instant was meant")
+            log.info("rejected a malformed as_of on /intelligence")
+            return _refusal("BAD_AS_OF", BAD_AS_OF_MESSAGE)
         graph, graph_unavailable = _graph_analytics(app, parsed)
         queue, queue_unavailable = _queue_summary(app)
         return {
@@ -229,42 +293,76 @@ def _register_intelligence_routes(app: FastAPI) -> None:
             # Said in the payload, not only in the UI copy, so an agent reading this over MCP in
             # Phase 8 inherits the distinction rather than having to be told it.
             "note": "Counts of structural facts, each with its denominator. Time saved is "
-                    "measured separately at GET /impact and is never derived from these.",
+                    "measured separately at GET /impact and is never derived from these. These "
+                    "figures and POST /intelligence/ask are two requests over two reads of the "
+                    "graph: within one answer every tool shares one snapshot, but a document "
+                    "arriving between the two calls can leave a card and an answer a moment "
+                    "apart. Both report the `as_of` window they were read in; neither claims to "
+                    "have been read at the same instant as the other.",
         }
 
-    @app.get("/intelligence/subgraph/{entity_id:path}")
-    def intelligence_subgraph(entity_id: str, depth: int = 1):
+    @app.get("/intelligence/subgraph/{entity_id:path}", responses=REFUSAL_RESPONSES)
+    def intelligence_subgraph(entity_id: str, depth: int = 1, as_of: Optional[str] = None):
         """The traversal behind one figure's member — how a number on the page is checked.
 
-        Delegates to the same `brain_neighbors` the `/brain` canvas uses; this endpoint exists so
-        the BI page can show a subgraph without owning a second copy of the traversal.
+        **Its own traversal, not `brain_neighbors`.** The generic one serves `/brain`, which has a
+        different contract; running it here walked the cited document's `for_patient` edges and
+        returned registry patient nodes — name, date of birth, nationality — together with the
+        edge's `match_score` and `matched_on`. That is a ranked list of named candidates, one
+        click from a page whose whole contract is that it never produces one.
+
+        Filtering that result for this consumer would have been a subtractive control: it works by
+        remembering to subtract, so a node kind added later is exposed until somebody notices.
+        `structural_neighbors` is additive — an allow-list of edge kinds between an allow-list of
+        node kinds — so a new kind is invisible here until a human classifies it. The cost is that
+        this page cannot show a relationship nobody has classified; that is the right way to fail.
+
+        `as_of` is threaded through so a drill-down reads the same window the figure and the
+        answer were computed in. Without it a rewound answer opened into the present graph and
+        showed evidence that had changed, or none at all.
         """
         brain = getattr(app.state, "brain", None)
         if brain is None:
             return _refusal("GRAPH_UNAVAILABLE", "the clinic graph is not loaded", status=503)
-        depth = max(1, min(depth, 3))                # a BI drill-down, not a graph dump
         try:
-            out = brain.brain_neighbors(entity_id, depth)
+            parsed = _parse_as_of(as_of)
+        except ValueError:
+            log.info("rejected a malformed as_of on /intelligence/subgraph")
+            return _refusal("BAD_AS_OF", BAD_AS_OF_MESSAGE)
+        depth = max(1, min(depth, 3))                # a BI drill-down, not a graph dump
+
+        from .intelligence_surface import (
+            SurfaceNames,
+            SurfaceTooLarge,
+            check_graph_bounds,
+            structural_neighbors,
+            subgraph_sources,
+        )
+
+        try:
+            check_graph_bounds(brain.store)
+            names = SurfaceNames(brain.store)
+            resolved = names.resolve(entity_id)
+            if resolved is None:
+                return _refusal("UNKNOWN_ENTITY",
+                                "no entity on this surface matched that reference", status=404)
+            out = structural_neighbors(brain.store, names, resolved, depth=depth, as_of=parsed)
+        except SurfaceTooLarge as exc:
+            return _refusal(exc.code, exc.message,
+                            status=422 if exc.code == "NOT_ON_THIS_SURFACE" else 503)
         except Exception:                                            # noqa: BLE001
-            log.exception("subgraph lookup failed for %r", entity_id)
+            log.exception("subgraph lookup failed")
             return _refusal("SUBGRAPH_FAILED", "the traversal failed; see server logs",
                             status=503)
-        if out.get("error"):
-            return _refusal("UNKNOWN_ENTITY", out["error"], status=404)
         # R-21. This used to swallow a pointer-lookup failure, set `sources = {}` and return the
         # nodes anyway — the drill-down that exists to let a figure be CHECKED, rendering values
         # with the checking apparatus quietly removed. An empty `sources` map is indistinguishable
         # on the page from "this entity genuinely has no citations", so the failure looked like a
         # fact about the graph. If the evidence cannot be loaded there is nothing to show.
         try:
-            from brain_server import pointer_to_dict           # apps/mcp_server (on pythonpath)
-
-            sources = {}
-            for node in out.get("nodes", []):
-                sources[node["id"]] = [pointer_to_dict(p)
-                                       for p in brain.store.sources_for(node["id"])]
+            sources = subgraph_sources(brain.store, names, out)
         except Exception:                                            # noqa: BLE001
-            log.exception("pointer lookup failed for %r", entity_id)
+            log.exception("pointer lookup failed for a subgraph")
             return _refusal(
                 "EVIDENCE_UNAVAILABLE",
                 "the traversal succeeded but its citations could not be loaded, so the result is "
@@ -275,18 +373,19 @@ def _register_intelligence_routes(app: FastAPI) -> None:
             # which is exactly why listing the ids and returning the values anyway was wrong. If
             # it ever does happen, the invariant this whole page rests on has broken, and the
             # honest response is to say so rather than to render values under a caveat field.
-            log.error("subgraph %r returned entities with no citations: %s", entity_id, uncited)
+            log.error("subgraph returned %d entities with no citations", len(uncited))
             return _refusal(
                 "EVIDENCE_UNAVAILABLE",
                 f"{len(uncited)} entity/entities in this traversal have no SourcePointer, so the "
                 f"result is not checkable and is withheld", status=503)
-        return {**out, "depth": depth, "sources": sources}
+        return {**out, "depth": depth, "as_of": parsed.isoformat() if parsed else None,
+                "sources": sources}
 
     # -- the agent ------------------------------------------------------------------
     from databridge_agent import AgentResponse
 
     @app.post("/intelligence/ask", response_model=AgentResponse,
-              response_model_exclude_none=True)
+              response_model_exclude_none=True, responses=REFUSAL_RESPONSES)
     def intelligence_ask(payload: AskRequest):
         """A question in, a grounded list of values out — each with the pointer it came from.
 
@@ -304,12 +403,23 @@ def _register_intelligence_routes(app: FastAPI) -> None:
                 f"a question is {MAX_QUESTION_CHARS} characters or fewer. This box is for a "
                 f"question, not for a document — drop documents on /intake, where every value "
                 f"extracted from them is grounded and reviewed by a person.")
+        # THE SCREEN COMES FIRST — before the as_of parse, before the graph, before the model
+        # route. The endpoint promises that an identity question is refused with
+        # `model_calls == 0`; screening after the configuration checks meant a clinic with an
+        # unloaded graph answered "the clinic graph is not loaded" to "is this the same person?".
+        # That is a configuration report where a refusal was promised, and the refusal is the part
+        # that matters — it must not depend on the rest of the system being healthy.
+        from databridge_agent import screen_question
+
+        gated = screen_question(question)
+        if gated is not None:
+            return gated
+
         try:
             parsed = _parse_as_of(payload.as_of)
         except ValueError:
-            return _refusal("BAD_AS_OF",
-                            f"'{payload.as_of}' is not an ISO-8601 datetime; refusing to guess "
-                            f"what instant was meant")
+            log.info("rejected a malformed as_of on /intelligence/ask")
+            return _refusal("BAD_AS_OF", BAD_AS_OF_MESSAGE)
 
         brain = getattr(app.state, "brain", None)
         if brain is None:
@@ -331,6 +441,15 @@ def _register_intelligence_routes(app: FastAPI) -> None:
                 f"no model is routed for '{AGENT_TASK_CLASS}' in config/models.yaml, so this "
                 f"question cannot be planned. Routing is configuration; adding the line is the "
                 f"fix.", status=503)
+
+        from .intelligence_surface import SurfaceTooLarge, check_graph_bounds
+
+        try:
+            check_graph_bounds(brain.store)
+        except SurfaceTooLarge as exc:
+            # Loud, not truncated. Every value this agent reports is a count or a member of one,
+            # and a count computed over part of a graph is a wrong number, not a partial one.
+            return _refusal(exc.code, exc.message, status=503)
 
         try:
             from databridge_agent import ClinicAgent

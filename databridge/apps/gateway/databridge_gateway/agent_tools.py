@@ -70,6 +70,8 @@ from databridge_agent import (
 )
 from databridge_core import SourcePointer
 
+from .intelligence_surface import SurfaceNames
+
 #: The sentence every code-authored `waiting_on` / `finding` value is built from. Kept here, as
 #: data this repo wrote, so that nothing a document said can reach a staff-facing line except as a
 #: node LABEL — which `render.present` neutralises and redacts on the way out.
@@ -79,6 +81,13 @@ UNLINKED_TEXT = ("no registry row matched this document; the patient is register
                  "at the counter")
 COVERAGE_GAP_TEXT = ("requested on a document, and no package in the catalogue includes it; the "
                      "patient may be asked to pay for it")
+#: Said when the label this page WOULD have shown turns out to be addressed to an automated
+#: reader. The page no longer renders any text a document supplied (`intelligence_surface`), so
+#: the payload cannot be reproduced even redacted — but "a document in this result is talking to a
+#: machine" is worth saying, and this is the code-authored sentence that says it.
+INJECTED_LABEL_TEXT = ("the title this entity carries in the graph is addressed to an automated "
+                       "reader rather than to a person; it was not read as an instruction and is "
+                       "not reproduced here")
 
 #: The derivation every LABEL value carries. A label has no pointer of its own (`REMEDIATION.md`
 #: R-31), so the citation says what it actually establishes — that this node exists and these
@@ -120,6 +129,9 @@ class _GraphSnapshot:
         self._view = view
         self._as_of = as_of
         self._analytics: Any = None
+        #: The one naming policy this page has (`intelligence_surface`). Held here rather than
+        #: reimplemented per tool, so a tool cannot decide on its own that its labels are fine.
+        self.names = SurfaceNames(view)
 
     @property
     def as_of_text(self) -> str:
@@ -148,9 +160,13 @@ class _GraphSnapshot:
             pointers.extend(p for p in self._entity_pointers(other) if p not in pointers)
         if not pointers:
             return None
-        return SourcePointer(source_id=entity_id, kind="derived",
+        # Both halves go through the naming policy. `source_id` is what a citation button links
+        # to, and the nested pointers are what a reader opens: a `doc_span` in `derived_from`
+        # carries the filename in TWO fields, so projecting only the outer id would have left the
+        # thing being hidden sitting one level down in the same payload.
+        return SourcePointer(source_id=self.names.public_id(entity_id), kind="derived",
                              derivation=f"{derivation} [as of {self.as_of_text}]",
-                             derived_from=pointers)
+                             derived_from=[self.names.project(p) for p in pointers])
 
     def _entity_pointers(self, entity_id: str) -> list:
         try:
@@ -160,9 +176,26 @@ class _GraphSnapshot:
             # missing pointer into an unresolved name, which is the honest degrade.
             return []
 
-    def label(self, entity_id: str) -> Optional[str]:
-        entity = self.analytics().entities.get(entity_id)
-        return entity.label if entity is not None else None
+    def display(self, entity_id: str) -> Optional[str]:
+        """What this page may call an entity — its catalogue name, or an opaque handle.
+
+        Never the raw graph label. A seeded `DOCUMENT` label is the supplied filename, so
+        `Alice_Tan_referral.pdf` is an ordinary, non-injection-shaped label that would render
+        unchanged; the same is true of an organisation minted from a chit's employer field. The
+        rule is about where the text came from, not what it says — see `intelligence_surface`.
+        """
+        text, _handle = self.names.display(entity_id)
+        return text
+
+    def label_is_addressed_to_a_machine(self, entity_id: str) -> bool:
+        """Is the graph label this page declined to print an instruction to an automated reader?
+
+        Read for the FLAG only. The label itself never leaves this method.
+        """
+        from databridge_agent.guardrails import looks_like_injection
+
+        row = self.names.rows().get(entity_id)
+        return bool(row is not None and looks_like_injection(row["label"] or ""))
 
 
 def _row(pairs: dict) -> ToolRow:
@@ -210,13 +243,17 @@ class IssuerDocumentMix(_StructuralRead):
             count_rule = (
                 f"analytics.compute — `issued` edges to document nodes, over "
                 f"{analytics.documents} document(s) in the graph")
-            rows.append(_row({
-                "issuer": (issuer.issuer,
+            pairs = {
+                "issuer": (self._snapshot.display(issuer.issuer_id),
                            self._snapshot.pointer(issuer.issuer_id, LABEL_RULE)),
                 "documents": (issuer.n,
                               self._snapshot.pointer(issuer.issuer_id, count_rule,
                                                      also=issuer.documents)),
-            }))
+            }
+            if self._snapshot.label_is_addressed_to_a_machine(issuer.issuer_id):
+                pairs["note"] = (INJECTED_LABEL_TEXT,
+                                 self._snapshot.pointer(issuer.issuer_id, LABEL_RULE))
+            rows.append(_row(pairs))
         note = ("Counted over every document in the clinic graph. This read has no date filter, "
                 "so it cannot answer a question about one week on its own.")
         return ToolResult(tool=self.name, rows=tuple(rows), note=note)
@@ -246,11 +283,19 @@ class DocumentsNeedingAPerson(_StructuralRead):
                      "registry row matched it")
                     for doc_id in sorted(analytics.unlinked_documents.members)]
         for doc_id, waiting_on, rule in blocked:
-            rows.append(_row({
-                "document": (self._snapshot.label(doc_id),
+            pairs = {
+                # A handle and a document type from the closed `DocumentType` enum — never the
+                # graph label, which is the supplied filename and can therefore be a person's
+                # name (`intelligence_surface`). What a reader loses is the filename; what they
+                # keep is the kind of document, the count, and a citation that still walks.
+                "document": (self._snapshot.display(doc_id),
                              self._snapshot.pointer(doc_id, LABEL_RULE)),
                 "waiting_on": (waiting_on, self._snapshot.pointer(doc_id, rule)),
-            }))
+            }
+            if self._snapshot.label_is_addressed_to_a_machine(doc_id):
+                pairs["note"] = (INJECTED_LABEL_TEXT,
+                                 self._snapshot.pointer(doc_id, LABEL_RULE))
+            rows.append(_row(pairs))
         note = (f"{len(rows)} of {analytics.documents} document(s) in the graph need a person. "
                 f"Waiting on a human is this system working, not failing.")
         return ToolResult(tool=self.name, rows=tuple(rows), note=note)
@@ -273,7 +318,8 @@ class CoverageGaps(_StructuralRead):
                 f"analytics.compute — the target of a `requests_test` edge and of no "
                 f"`includes_test` edge, over {analytics.tests_in_catalogue} catalogue test(s)")
             rows.append(_row({
-                "test": (entity.label, self._snapshot.pointer(entity.id, LABEL_RULE)),
+                "test": (self._snapshot.display(entity.id),
+                         self._snapshot.pointer(entity.id, LABEL_RULE)),
                 "finding": (COVERAGE_GAP_TEXT, self._snapshot.pointer(entity.id, gap_rule)),
             }))
         note = ("Structural only: whether a given visit is billed for these is decided per intake "
@@ -298,6 +344,7 @@ def build_structural_registry(store: Any, *,
 
 __all__ = [
     "AMBIGUOUS_TEXT",
+    "INJECTED_LABEL_TEXT",
     "COVERAGE_GAP_TEXT",
     "CoverageGaps",
     "DocumentsNeedingAPerson",

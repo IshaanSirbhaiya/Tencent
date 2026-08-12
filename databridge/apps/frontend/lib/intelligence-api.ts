@@ -19,6 +19,11 @@ export interface Count {
   of: number;
   pct: number;
   members: string[];
+  /** Set when a figure was counted but cannot be listed — `conflicts` counts registry ROWS, so
+   *  naming its members would name patients (CLAUDE.md §Hard constraints 1). The reason is a
+   *  backend string, rendered as-is: an empty `members` with no explanation reads as a bug, or
+   *  worse, as a zero. */
+  members_withheld?: string;
 }
 
 export interface Entity {
@@ -105,6 +110,8 @@ export interface SubgraphEdge {
 export interface SubgraphResponse {
   root: string;
   depth: number;
+  /** The window this traversal was read in — the same one the figures and the answer used. */
+  as_of: string | null;
   nodes: SubgraphNode[];
   edges: SubgraphEdge[];
   /** node id → the SourcePointers grounding it, shown raw. */
@@ -179,9 +186,12 @@ export const intelligenceApi = {
     call<IntelligenceResponse>(
       `/intelligence${asOf ? `?as_of=${encodeURIComponent(asOf)}` : ""}`,
     ),
-  subgraph: (entityId: string, depth = 1) =>
+  // `asOf` is threaded through so a drill-down reads the window its figure was computed in. A
+  // rewound answer that opened into the present graph showed evidence that had since changed.
+  subgraph: (entityId: string, depth = 1, asOf?: string | null) =>
     call<SubgraphResponse>(
-      `/intelligence/subgraph/${encodeURIComponent(entityId)}?depth=${depth}`,
+      `/intelligence/subgraph/${encodeURIComponent(entityId)}?depth=${depth}` +
+        (asOf ? `&as_of=${encodeURIComponent(asOf)}` : ""),
     ),
   ask: (question: string, asOf?: string | null) =>
     call<AgentAsk>("/intelligence/ask", {
@@ -199,9 +209,11 @@ export const intelligenceApi = {
  *  citation rendered as plain text. */
 export function citedEntity(value: AnswerValue): string | null {
   const id = value.source?.source_id;
-  return value.source?.kind === "derived" && typeof id === "string" && id.includes(":")
-    ? id
-    : null;
+  if (value.source?.kind !== "derived" || typeof id !== "string") return null;
+  // Two shapes resolve: a catalogue entity id (`org:…`), and an opaque handle (`doc-a1b2c3d4e5`)
+  // for anything whose label came out of a document. The handle is what this surface reports a
+  // document as, so a citation that did not accept one would stop being walkable.
+  return id.includes(":") || /^[a-z]{3}-[0-9a-f]{10}$/.test(id) ? id : null;
 }
 
 /** The label the graph carries for an id, or the id itself. Never a guess, never a prettified

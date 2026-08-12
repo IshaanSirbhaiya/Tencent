@@ -27,10 +27,14 @@ export function SubgraphPanel({
   graph,
   title,
   members,
+  asOf,
 }: {
   graph: GraphAnalytics | null;
   title: string | null;
   members: string[];
+  /** The window the figures and the answer were read in. Passed down so a drill-down cannot show
+   *  the present graph under a rewound heading. */
+  asOf: string;
 }) {
   const [open, setOpen] = React.useState<string | null>(null);
 
@@ -76,7 +80,7 @@ export function SubgraphPanel({
               <span className="min-w-0 flex-1 truncate">{labelOf(graph, id)}</span>
               <span className="shrink-0 text-2xs text-subtle">{kindOf(graph, id) ?? "entity"}</span>
             </button>
-            {open === id && <Traversal entityId={id} graph={graph} />}
+            {open === id && <Traversal entityId={id} graph={graph} asOf={asOf} />}
           </li>
         ))}
       </ul>
@@ -84,10 +88,20 @@ export function SubgraphPanel({
   );
 }
 
-function Traversal({ entityId, graph }: { entityId: string; graph: GraphAnalytics | null }) {
+function Traversal({
+  entityId,
+  graph,
+  asOf,
+}: {
+  entityId: string;
+  graph: GraphAnalytics | null;
+  asOf: string;
+}) {
   const q = useQuery({
-    queryKey: ["intelligence-subgraph", entityId],
-    queryFn: () => intelligenceApi.subgraph(entityId, 1),
+    // `asOf` is in the key as well as in the call: a cached traversal from the live window
+    // rendered under a rewound heading is the same lie as not passing it at all.
+    queryKey: ["intelligence-subgraph", entityId, asOf],
+    queryFn: () => intelligenceApi.subgraph(entityId, 1, asOf || null),
   });
 
   if (q.isError) {

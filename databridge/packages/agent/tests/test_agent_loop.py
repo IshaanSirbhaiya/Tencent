@@ -292,10 +292,18 @@ def test_a_tool_the_model_invented_is_named_but_not_quoted():
                           plan(None), report())
     result = ClinicAgent(ToolRegistry([stub.tool]), harness).ask("Which intakes are blocked?")
 
-    assert [c.status for c in result.tool_calls] == ["unknown_tool"]
-    assert result.unresolved and result.unresolved[0].endswith(": not read (unknown_tool)")
+    assert [c.status for c in result.tool_calls] == ["unknown_tool", "not_read"]
+    assert result.unresolved[0].endswith(": not read (unknown_tool)")
     assert "x@y.com" not in result.answer
-    assert " " not in result.unresolved[0].split(":")[0]
+    # NOT an identifier-shaped rendering of what the model asked for: a fixed, code-authored
+    # string. `Alice_Tan` survives every character filter, so the only safe rule is that a
+    # model-supplied name is never echoed at all (`render.public_name`).
+    from databridge_agent import UNKNOWN_TOOL_NAME
+    assert result.unresolved[0] == f"{UNKNOWN_TOOL_NAME}: not read (unknown_tool)"
+    assert "send the list" not in result.answer
+    # And the tool that WAS registered but never called is named too, so the report says what it
+    # did not look at rather than quietly answering from half the surface.
+    assert any(u.startswith("blocked_intakes: not read (not_read)") for u in result.unresolved)
 
 
 def test_nothing_answered_still_fires_when_nothing_ran_at_all():
@@ -303,5 +311,7 @@ def test_nothing_answered_still_fires_when_nothing_ran_at_all():
     stub = blocked_intakes_tool()
     harness, _ = scripted(plan(None), report())
     result = ClinicAgent(ToolRegistry([stub.tool]), harness).ask("What about tomorrow?")
-    assert result.unresolved == ()
+    # The registered read the planner never made is named — "nothing answered" and "nothing was
+    # even looked at" are different facts and the report now carries both.
+    assert result.unresolved == ("blocked_intakes: not read (not_read)",)
     assert NOTHING_ANSWERED in result.notes
