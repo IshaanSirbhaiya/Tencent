@@ -427,8 +427,12 @@ def test_uncatalogued_tests_do_not_present_a_confident_zero_total(drafts):
     """The bug this pins: when EVERY printed test is uncatalogued, `patient_payable_items` (the
     catalogue-matched bucket) is empty, so the old total collapsed to a confident SGD 0 sitting
     right beside a non-empty `unknown_coverage_items` list — "nothing owed" printed next to tests
-    staff still had to price and assign a payer to by hand. The total must instead be flagged as a
-    LOWER BOUND, and the caveats must explain why."""
+    staff still had to price and assign a payer to by hand.
+
+    The first remedy flagged the zero as a LOWER BOUND and left the number at 0. Review's answer
+    to that (R-16) is the one pinned here: a caveat is prose a consumer may not render, while the
+    figure is what gets printed on the card. An incomplete total is `None`, and whatever DID price
+    is exposed separately, under a name that cannot be mistaken for the whole."""
     from databridge_core import GroundedValue, SourcePointer
 
     from databridge_intake.billing import draft_billing
@@ -444,9 +448,24 @@ def test_uncatalogued_tests_do_not_present_a_confident_zero_total(drafts):
     billing = draft_billing(all_uncatalogued, determine_coverage(all_uncatalogued))
     assert billing.patient_payable_items == []
     assert len(billing.unknown_coverage_items) == 1
-    assert billing.estimated_patient_payable_sgd == 0
+    assert billing.estimated_patient_payable_sgd is None, (
+        "a total printed beside unpriced tests is a number nobody can stand behind")
+    assert billing.known_subtotal_sgd is None, "nothing priced, so there is no subtotal either"
     assert "TOTAL_IS_LOWER_BOUND" in billing.caveats
     assert any("established manually" in c for c in billing.caveats)
+
+
+def test_a_genuinely_zero_total_is_still_distinguishable_from_an_unknown_one(drafts):
+    """The distinction this module exists to keep. Everything covered and nothing outstanding is
+    a real SGD 0; it must not be collapsed into `None` by the fix above."""
+    from databridge_intake.billing import draft_billing
+    from databridge_intake.eligibility import determine_coverage
+
+    record = drafts["chit_01_meridian_referral.txt"].record
+    billing = draft_billing(record, determine_coverage(record))
+    if not billing.patient_payable_items and not billing.unknown_coverage_items:
+        assert billing.estimated_patient_payable_sgd == 0
+        assert "TOTAL_IS_LOWER_BOUND" not in billing.caveats
 
 
 def test_a_test_printed_twice_is_billed_once(drafts):
@@ -555,3 +574,43 @@ def test_a_walk_in_produces_a_valid_self_pay_draft():
     assert draft.billing.billed_to == "patient"
     assert draft.resolution.status.value == "insufficient_identifiers"
     assert summary_card(draft)["identity"]["verified"] is False
+
+
+def test_every_billing_line_cites_each_of_its_four_claims(drafts):
+    """R-18. A line asserts four things — what was printed, what it maps to, whether the package
+    covers it, and what it costs — and it carried ONE `source_field` string for all of them. That
+    string is a dotted path into the IntakeRecord: it grounds the printed text and nothing else,
+    so on the one artefact where the number is the point, the price and the coverage decision rode
+    along uncited. `claim.py` fixed this for `ClaimLine`; this is the draft the patient is shown."""
+    from databridge_intake.billing import draft_billing
+    from databridge_intake.eligibility import determine_coverage
+
+    checked = 0
+    for draft in drafts.values():
+        billing = draft_billing(draft.record, determine_coverage(draft.record))
+        lines = [*billing.covered_items, *billing.patient_payable_items,
+                 *billing.unknown_coverage_items]
+        for line in lines:
+            for claim in ("as_printed", "canonical", "in_package", "list_price_sgd"):
+                if line.get(claim) is None and claim != "in_package":
+                    continue                       # absent values need no citation
+                assert claim in line["pointers"] or claim in line["unresolved"], (
+                    f"{line['as_printed']}: {claim} is neither cited nor named as unresolved")
+                if claim in line["pointers"]:
+                    assert line["pointers"][claim]["kind"], f"{claim} pointer has no kind"
+            checked += 1
+    assert checked > 0, "no billing lines were exercised"
+
+
+def test_the_billing_draft_cites_who_pays(drafts):
+    """`billed_to` is a determination read from a rule row, and nothing on the draft said so."""
+    from databridge_intake.billing import draft_billing
+    from databridge_intake.eligibility import determine_coverage
+
+    for draft in drafts.values():
+        billing = draft_billing(draft.record, determine_coverage(draft.record))
+        if billing.billed_to == "unknown":
+            continue
+        assert "billed_to" in billing.field_sources
+        pointer = billing.field_sources["billed_to"]
+        assert pointer.kind == "table_cell" and pointer.source_id == "coverage_rules.yaml"

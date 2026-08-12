@@ -24,9 +24,14 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
+from databridge_core import SourcePointer
+
 from .models import (BillingDraft, BillingParty, CoverageDetermination, CoverageStatus,
                      IntakeRecord)
 from .rules import CoverageRules, Package, rules
+
+# The config file every determination on this draft was read from.
+RULES_SOURCE_ID = "coverage_rules.yaml"
 
 SYNTHETIC_PRICE_CAVEAT = (
     "Prices are illustrative synthetic data from coverage_rules.yaml, not a Parkway Shenton "
@@ -48,14 +53,49 @@ def covered_by_rule(rule: Package, in_package: bool) -> bool:
     return bool(rule.tests_from_document or in_package)
 
 
-def _line(test) -> dict:
+def _yaml_ptr(table: str, column: str, row_id: object) -> SourcePointer:
+    """A ``table_cell`` pointer into ``coverage_rules.yaml``. Same shape `claim.py` already uses —
+    one helper per module rather than one shared one, because the two must never drift into
+    citing each other's rows."""
+    return SourcePointer(source_id=RULES_SOURCE_ID, kind="table_cell",
+                         table=table, column=column, row_id=str(row_id))
+
+
+def _line(test, rule) -> dict:
+    """One billing line, with a citation PER VALUE.
+
+    A line carries four claims — what was printed, what it maps to, whether the package covers it,
+    and what it costs — and it carried one `source_field` string for all of them. That string is a
+    dotted path into the IntakeRecord: it grounds the printed text and nothing else, so the price
+    and the coverage decision rode along uncited on the one artefact where the number is the whole
+    point. `claim.py` already fixed exactly this for `ClaimLine`; this is the same fix on the
+    draft the patient is actually shown.
+    """
+    priced = test.list_price_sgd is not None
+    pointers = {}
+    if test.pointer is not None:
+        pointers["as_printed"] = test.pointer
+        if test.canonical is not None:
+            # The catalogue match is a claim about this printed text, so it cites the same span.
+            pointers["canonical"] = test.pointer
+    if priced and test.canonical is not None:
+        pointers["list_price_sgd"] = _yaml_ptr("test_catalogue", "list_price_sgd", test.canonical)
+    if rule is not None:
+        pointers["in_package"] = _yaml_ptr(
+            "packages", "tests_from_document" if rule.tests_from_document else "includes_tests",
+            rule.id)
     return {
         "canonical": test.canonical,
         "as_printed": test.as_printed,
         "in_package": test.in_package,
-        "list_price_sgd": (str(test.list_price_sgd)
-                           if test.list_price_sgd is not None else None),
+        "list_price_sgd": (str(test.list_price_sgd) if priced else None),
         "source_field": test.source_field,
+        "pointers": {k: v.model_dump(mode="json", exclude_none=True)
+                     for k, v in pointers.items()},
+        # Named, not omitted: a line missing a price pointer is a line whose price nobody can
+        # check, and the card must be able to say which of the four claims is unsupported.
+        "unresolved": sorted({"as_printed", "canonical", "in_package", "list_price_sgd"}
+                             - set(pointers)),
     }
 
 
@@ -97,7 +137,7 @@ def draft_billing(record: IntakeRecord,
     unpriced: list[str] = []
     seen: set[str] = set()
     for test in coverage.authorised_tests:
-        line = _line(test)
+        line = _line(test, rule)
         # One line per test. A test printed twice (a referral table and again in prose, or under
         # two aliases) would otherwise be listed — and priced — twice.
         key = test.canonical or f"as_printed:{test.as_printed.strip().lower()}"
@@ -128,8 +168,7 @@ def draft_billing(record: IntakeRecord,
     # Nothing payable means the total is ZERO, not unknown. Returning None there is
     # indistinguishable on the card from "we could not price this", which is the one distinction
     # this module is otherwise careful to keep.
-    total: Optional[Decimal] = (Decimal("0") if not payable
-                                else (sum(known, Decimal("0")) if known else None))
+    known_subtotal: Optional[Decimal] = (sum(known, Decimal("0")) if known else None)
     # The printed total understates what the patient may owe whenever EITHER a catalogue-matched
     # payable test is missing a price, OR an uncatalogued test exists whose coverage was never
     # determined at all. The second half used to be left out: with every printed test uncatalogued,
@@ -138,7 +177,18 @@ def draft_billing(record: IntakeRecord,
     # list — the display said "nothing owed" while staff still had unpriced tests to resolve by
     # hand. Gated on `total is not None`: when the total is already `None` (a payable test with no
     # price at all and nothing else known) the card shows "unknown", which needs no extra flag.
-    lower_bound = total is not None and (bool(missing) or bool(unpriced))
+    # ANY unpriced or uncatalogued test makes the total unknowable, and unknowable is `None`.
+    incomplete = bool(missing) or bool(unpriced)
+    if incomplete:
+        total: Optional[Decimal] = None
+    elif not payable:
+        # Nothing payable and nothing unpriced: the total really is ZERO, and that is a different
+        # statement from "we could not price this" — the one distinction this module exists to
+        # keep. It survives because it is now only reachable when nothing is outstanding.
+        total = Decimal("0")
+    else:
+        total = known_subtotal
+    lower_bound = incomplete
 
     if missing:
         # A price we do not have is unknown, never zero — the total is explicitly partial.
@@ -170,8 +220,16 @@ def draft_billing(record: IntakeRecord,
         patient_payable_items=payable,
         unknown_coverage_items=unknown_coverage,
         estimated_patient_payable_sgd=total,
+        known_subtotal_sgd=known_subtotal if total is None else None,
         tpa_claim_required=tpa_required,
-        caveats=caveats)
+        caveats=caveats,
+        field_sources={
+            "billed_to": _yaml_ptr("packages", "billing.covered_by", rule.id),
+            # The issuer row is what says a TPA claim is needed. With no issuer row there is no
+            # such determination, so the key is absent rather than pointing at something else.
+            **({"tpa_claim_required": _yaml_ptr("issuers", "tpa_claim_required", issuer.code)}
+               if issuer is not None else {}),
+        })
 
 
 def walk_in_draft(table: Optional[CoverageRules] = None) -> BillingDraft:

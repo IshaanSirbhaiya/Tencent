@@ -75,6 +75,9 @@ export interface BillingDraft {
   covered_items: Record<string, unknown>[];
   patient_payable_items: Record<string, unknown>[];
   estimated_patient_payable_sgd: string | null;
+  // What DID price, when the total could not be completed. Named separately so it can never be
+  // rendered as the amount owed.
+  known_subtotal_sgd: string | null;
   tpa_claim_required: boolean;
   caveats: string[];
   /** Literal "draft". There is no other value. */

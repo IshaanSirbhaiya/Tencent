@@ -226,6 +226,14 @@ export function BillingSection({ card }: { card: SummaryCard }) {
             ? "unknown"
             : `SGD ${b.estimated_patient_payable_sgd}`}
           {lowerBound && <span className="ml-1 text-band-review">(lower bound)</span>}
+          {/* The gateway sends this ONLY when the total is unknown. Showing it as "so far"
+              rather than as a total is the whole point: staff need the figure they can already
+              quote, and must not read it as the amount owed. */}
+          {b.estimated_patient_payable_sgd === null && b.known_subtotal_sgd !== null && (
+            <div className="text-2xs text-subtle">
+              SGD {b.known_subtotal_sgd} priced so far — not a total
+            </div>
+          )}
         </dd>
         <dt className="text-subtle">TPA claim</dt>
         <dd>{b.tpa_claim_required ? "required after visit" : "not required"}</dd>

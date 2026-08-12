@@ -503,6 +503,11 @@ class BillingDraft(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     billed_to: str                         # insurer | employer | government_scheme | patient
+    # Every scalar below is a determination, and each was read from a different row of
+    # coverage_rules.yaml. A draft that carried them behind one caveat list was the Shape A
+    # pattern on the artefact where money is the point: `billed_to` says who pays, and nothing
+    # on the object said where that came from. Keyed by field name, exactly like the graph.
+    field_sources: dict[str, SourcePointer] = Field(default_factory=dict)
     covered_items: list[dict] = Field(default_factory=list)
     patient_payable_items: list[dict] = Field(default_factory=list)
     # A test the document prints that is not in the catalogue at all: neither confirmed covered
@@ -510,7 +515,16 @@ class BillingDraft(BaseModel):
     # bucket, separate from `patient_payable_items`, so a consumer cannot read "the patient pays
     # for this" out of a determination we were never able to make (billing.py `draft_billing`).
     unknown_coverage_items: list[dict] = Field(default_factory=list)
+    # `None` whenever ANYTHING on the document is unpriced or uncatalogued. A number here is a
+    # complete estimate or it is not a number: a UI renders the figure and may not render the
+    # caveat beside it, and "SGD 0" next to a non-empty `unknown_coverage_items` told a patient
+    # with one uncatalogued $400 test that they owed nothing. The machine-readable
+    # `TOTAL_IS_LOWER_BOUND` caveat was not enough, because it relies on the consumer choosing to
+    # read it.
     estimated_patient_payable_sgd: Optional[Decimal] = None
+    # What IS known, named so it cannot be mistaken for the whole. Present whenever the total is
+    # `None` but some lines did price — the front desk still needs the figure it can quote.
+    known_subtotal_sgd: Optional[Decimal] = None
     tpa_claim_required: bool = False
     caveats: list[str] = Field(default_factory=list)
     status: Literal["draft"] = "draft"
