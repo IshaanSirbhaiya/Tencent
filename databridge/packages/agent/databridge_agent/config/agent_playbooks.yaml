@@ -1,0 +1,82 @@
+# Agent playbooks — DATA, NOT CODE (CLAUDE.md §Hard constraints 3).
+#
+# Which read tools a recurring question needs, and which ROLE owns the follow-up. Adding an
+# insurer changes nothing here: `issuers.default_escalate_to` covers every code, and an override
+# row is needed only when a particular payer has its own named contact. Adding a playbook is a row,
+# not a function.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# THIS FILE CANNOT MAKE THE AGENT SEND ANYTHING.
+#
+# `escalate_to` is a clinic ROLE — deliberately not an email address, not a Slack channel id, not
+# a webhook. The agent has no transport (packages/agent has no HTTP, SMTP or vendor-API dependency
+# and `tools.py` refuses to register a send-capable tool), so an address here would be an address
+# nothing can read: a loaded gun on the table for whoever wires up T-46 in a hurry. Recipients get
+# resolved when the OutboxStore and the model-free dispatcher exist (T-45/T-46), behind the two
+# ADRs that are owed first — and even then the dispatcher reads them, never the agent.
+#
+# Every tool name below is screened by `tools.screen_declaration` at load. A playbook naming
+# `send_email` is refused before the file finishes parsing, so config cannot smuggle in a
+# capability the code refuses to have.
+# ─────────────────────────────────────────────────────────────────────────────────────
+version: 1
+
+defaults:
+  escalate_to: front_desk_lead
+  # There is no `false`. A playbook whose output does not need a human is a playbook that acts
+  # alone, and the loader refuses to construct one (CLAUDE.md §Hard constraints 4).
+  requires_human_approval: true
+
+playbooks:
+  - id: blocked_intakes_report
+    title: Which intakes are blocked, and on what
+    when: >-
+      Staff ask what is waiting on a human — the morning question, and the one the agent exists
+      to answer. Pure read; the answer goes back to whoever asked, in the channel they asked in.
+    tools: [blocked_intakes]
+    escalate_to: front_desk_lead
+    guidance: >-
+      List each blocked intake with the single thing it is blocked on and the tool the fact came
+      from. Where the blocker is an identity check, say a named human must do it in person and
+      stop there — do not rank, score or hint at which candidate is likely.
+
+  - id: coverage_gap_report
+    title: Tests ordered that the package does not authorise
+    when: >-
+      Staff ask what a patient will owe, or what is not covered, before the patient arrives.
+    tools: [coverage_gap, intake_card]
+    escalate_to: billing_lead
+    guidance: >-
+      Name each unauthorised test as printed on the document, the package that was expected to
+      cover it, and the rule row that says it does not. Prices are synthetic; say so.
+
+  - id: unrecognised_issuer_report
+    title: An issuer code nothing in the config table recognises
+    when: >-
+      A document quotes an issuer or scheme code with no row in coverage_rules.yaml.
+    tools: [graph_query, intake_card]
+    escalate_to: insurer_liaison
+    guidance: >-
+      Quote the exact span that could not be resolved and say which config table would need the
+      row. Never guess the issuer from the name, the logo or the format of the code.
+
+  - id: morning_digest
+    title: Today's intakes, and where they stand
+    when: >-
+      A scheduled read of the day's queue: how many are ready, what is blocked, what conflicts
+      the graph found. Pure read, no follow-up action.
+    tools: [intake_queue, blocked_intakes]
+    escalate_to: front_desk_lead
+    guidance: >-
+      Counts first, each with its denominator. A count with no denominator reads as a performance
+      claim, and these are counts of structural facts.
+
+# --- who owns the follow-up, per payer -------------------------------------------
+# Adding an insurer is a `coverage_rules.yaml` change and needs NOTHING here — an unlisted code
+# falls through to `default_escalate_to`. Override a code only to give it a named owner.
+issuers:
+  default_escalate_to: insurer_liaison
+  overrides:
+    # A government scheme is chased through a different desk than a commercial insurer.
+    - code: MOL0199VME
+      escalate_to: government_scheme_liaison

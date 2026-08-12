@@ -1,0 +1,32 @@
+# packages/agent — the read-only clinic agent (PHASE_7_BRAIN_AND_INTELLIGENCE.md T-40,
+# docs/hackathon/GRAPH_AGENT_AND_MCP.md step A).
+#
+# It reads the clinic brain through INJECTED tools and answers with citations. It has no send
+# capability of any kind and no dependency that could give it one — note the absence of any HTTP,
+# SMTP or vendor-API library below. That absence is load-bearing and `test_no_send_capability.py`
+# asserts it against the source, not against this file.
+#
+# It does NOT depend on databridge-graph or databridge-intake for TOOLS. Tools arrive as a list
+# from the composition root (gateway/CLI), the same dependency inversion `ClinicHistory` uses to
+# keep packages/intake and packages/graph from importing each other (PLAN.md §6.0, history.py).
+# The one intake import is `guardrails.check_question` — the deterministic identity refusal, reused
+# rather than reimplemented, because two copies of a safety rule drift and one of them is wrong.
+[project]
+name = "databridge-agent"
+version = "0.0.0"
+description = "The read-only clinic agent: reads the graph through injected tools, never sends (Hack4Health 2026)"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-harness",
+  "databridge-intake",
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_agent"]
