@@ -1,0 +1,8 @@
+{
+  "document_id": "walkin_01",
+  "channel": "walk_in",
+  "note": "Patient arrives with no document and intends to self-pay. This is a first-class path, not an edge case.",
+  "declared": {
+    "presenting_for": "GP consultation"
+  }
+}

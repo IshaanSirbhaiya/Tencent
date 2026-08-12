@@ -1,0 +1,364 @@
+# Coverage / eligibility rules — DATA, NOT CODE (CLAUDE.md §Hard constraints 3).
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# SYNTHETIC. No ground-truth benefit table exists in the competition materials. These
+# rules are inferred from the package structures visible on the sample chit letters
+# (WELL1/2/3 age bands, PEE224/225/226 age bands) and the prices are illustrative only.
+# The submission writeup must say so. See PLAN.md §6.5.
+# ─────────────────────────────────────────────────────────────────────────────────────
+#
+# Adding an insurer, package or test is a change to THIS FILE and nothing else. There is
+# no `if code == "MRDEB"` anywhere in packages/intake — `test_no_issuer_branching`
+# enforces that by grepping the source for every code defined here.
+version: 1
+
+# --- who issues documents, and who pays ------------------------------------------
+issuers:
+  - code: MRDEB
+    name: Meridian Life Assurance Pte Ltd
+    kind: insurer
+    billing_party: insurer
+    tpa_claim_required: true
+    default_visit_type: general_health_screening
+    default_questionnaire: general_health
+
+  - code: EVWPA
+    name: Everwell Insurance Group
+    kind: insurer
+    billing_party: insurer
+    tpa_claim_required: true
+    default_visit_type: general_health_screening
+    default_questionnaire: general_health
+
+  - code: EVWME
+    name: Everwell Insurance Group (Corporate Solutions)
+    kind: insurer
+    billing_party: insurer
+    tpa_claim_required: true
+    default_visit_type: general_health_screening
+    default_questionnaire: general_health
+
+  - code: BLPDE
+    name: Bluepeak Prosperity Life (New Business Underwriting)
+    kind: insurer
+    billing_party: insurer
+    tpa_claim_required: true
+    default_visit_type: general_health_screening
+    default_questionnaire: general_health
+
+  - code: BLPHS
+    name: Bluepeak Prosperity Life (Wellness)
+    kind: insurer
+    billing_party: insurer
+    tpa_claim_required: true
+    default_visit_type: general_health_screening
+    default_questionnaire: general_health
+
+  - code: NSTNBU
+    name: Northstar Life Assurance
+    kind: insurer
+    billing_party: insurer
+    tpa_claim_required: true
+    default_visit_type: general_health_screening
+    default_questionnaire: general_health
+
+  - code: MOL0199VME
+    name: Ministry of Learning Civil Service Medical Scheme (VITAL)
+    kind: government_scheme
+    billing_party: government_scheme
+    tpa_claim_required: false
+    default_visit_type: occupational_health_screening
+    default_questionnaire: occupational_health
+
+# --- packages -------------------------------------------------------------------
+# `package_code: null` + `tests_from_document: true` means the document itself lists the
+# authorised tests (a referral letter or voucher) rather than naming a named package.
+# `eligibility` is checked against the SELECTED patient's derived age; a mismatch raises
+# an `age_outside_package_band` flag for staff — it never silently re-picks a package.
+# `screening_type` is the Occupational Health questionnaire checkbox this package implies.
+# It lives here, not in prefill.py, because which screening a package authorises is a
+# property of the package — inferring it in code would guess `Pre/Re Employment` for a
+# hazard-specific referral. A rule that omits it leaves the checkbox for the patient.
+packages:
+  # Bluepeak wellness tiers — the age bands are printed on the voucher itself.
+  - id: rule_bluepeak_well1
+    issuer_code: BLPHS
+    package_code: WELL1
+    name: Essential Screen
+    eligibility: {age_max: 39}
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+    includes_tests:
+      [history_taking, physical_exam, bmi_fat_composition, blood_pressure,
+       full_blood_count, lipid_profile]
+
+  - id: rule_bluepeak_well2
+    issuer_code: BLPHS
+    package_code: WELL2
+    name: Comprehensive Screen
+    eligibility: {age_min: 40, age_max: 59}
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+    includes_tests:
+      [history_taking, physical_exam, bmi_fat_composition, blood_pressure,
+       full_blood_count, lipid_profile, liver_function, kidney_function,
+       thyroid_function, resting_ecg, medical_report_consultation]
+
+  - id: rule_bluepeak_well3
+    issuer_code: BLPHS
+    package_code: WELL3
+    name: Executive Screen
+    eligibility: {age_min: 60}
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+    includes_tests:
+      [history_taking, physical_exam, bmi_fat_composition, blood_pressure,
+       full_blood_count, lipid_profile, liver_function, kidney_function,
+       thyroid_function, resting_ecg, medical_report_consultation,
+       liver_cancer_marker]
+
+  # Civil-service pre-employment tiers (VITAL). Age bands printed on the form.
+  - id: rule_mol_pee224
+    issuer_code: MOL0199VME
+    package_code: PEE224
+    name: Pre-Employment Examination (ages 50 and above)
+    screening_type: Pre/Re Employment
+    eligibility: {age_min: 50}
+    questionnaire: occupational_health
+    billing: {covered_by: government_scheme, patient_payable_sgd: 0}
+    includes_tests: [medical_examination, full_blood_count, ufeme, chest_xray]
+
+  - id: rule_mol_pee225
+    issuer_code: MOL0199VME
+    package_code: PEE225
+    name: Pre-Employment Examination (ages 24 and below)
+    screening_type: Pre/Re Employment
+    eligibility: {age_max: 24}
+    questionnaire: occupational_health
+    billing: {covered_by: government_scheme, patient_payable_sgd: 0}
+    includes_tests: [medical_examination, full_blood_count, ufeme]
+
+  - id: rule_mol_pee226
+    issuer_code: MOL0199VME
+    package_code: PEE226
+    name: Pre-Employment Examination (ages 25 to 49)
+    screening_type: Pre/Re Employment
+    eligibility: {age_min: 25, age_max: 49}
+    questionnaire: occupational_health
+    billing: {covered_by: government_scheme, patient_payable_sgd: 0}
+    includes_tests: [medical_examination, full_blood_count, ufeme, chest_xray]
+
+  # Document-defined scopes: the letter/voucher enumerates the tests directly.
+  - id: rule_meridian_referral
+    issuer_code: MRDEB
+    package_code: null
+    name: Meridian medical referral (tests as listed on the letter)
+    tests_from_document: true
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+
+  - id: rule_everwell_voucher
+    issuer_code: EVWPA
+    package_code: null
+    name: Everwell Health Check-up Voucher (tests as listed on the voucher)
+    tests_from_document: true
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+
+  - id: rule_everwell_underwriting
+    issuer_code: EVWME
+    package_code: null
+    name: Everwell group underwriting medical (Adult Medical Examination)
+    tests_from_document: true
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+
+  - id: rule_bluepeak_underwriting
+    issuer_code: BLPDE
+    package_code: null
+    name: Bluepeak underwriting requirements (as listed on the memo)
+    tests_from_document: true
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+
+  - id: rule_northstar_underwriting
+    issuer_code: NSTNBU
+    package_code: null
+    name: Northstar further requirements (as listed on the letter)
+    tests_from_document: true
+    questionnaire: general_health
+    billing: {covered_by: insurer, patient_payable_sgd: 0}
+
+# --- self-pay ---------------------------------------------------------------------
+# The walk-in path is a rule like any other, not a special case in code.
+self_pay:
+  id: rule_self_pay
+  name: Self-pay / walk-in
+  billing: {covered_by: patient}
+  questionnaire: none
+  visit_type: gp_consult
+
+# --- test catalogue ---------------------------------------------------------------
+# `aliases` are matched exactly after normalisation, then fuzzily at >=0.90. A printed
+# test matching nothing here lands in `unmatched_tests` and is SHOWN TO STAFF — never
+# silently dropped and never invented into the catalogue.
+# Prices are illustrative (synthetic data).
+test_catalogue:
+  - canonical: medical_examination
+    category: examination
+    list_price_sgd: 80
+    aliases: ["Medical Examination", "Full Medical Examination", "Adult Medical Examination",
+              "Pre-Confirmation Medical Check-up", "Pre-employment medical examination"]
+
+  - canonical: history_taking
+    category: examination
+    list_price_sgd: 25
+    aliases: ["Complete History Taking", "History Taking"]
+
+  - canonical: physical_exam
+    category: examination
+    list_price_sgd: 45
+    aliases: ["Complete Physical Examination", "Physical Examination"]
+
+  - canonical: chest_xray
+    category: imaging
+    list_price_sgd: 45
+    aliases: ["Chest X-Ray", "Chest Xray", "CXR", "Chest X Ray"]
+
+  - canonical: hiv_antibody
+    category: serology
+    list_price_sgd: 60
+    aliases: ["HIV Antibody Test", "Anti-HIV Test", "BP#HIV", "Anti-HIV Test (BP#HIV)",
+              "Meridian Life# 10 - HIV Antibody Test", "HIV Test"]
+
+  - canonical: treadmill_ecg
+    category: cardiac
+    list_price_sgd: 180
+    aliases: ["Treadmill ECG", "Treadmill/Stress Test", "Stress Test", "Treadmill Test"]
+
+  - canonical: resting_ecg
+    category: cardiac
+    list_price_sgd: 50
+    aliases: ["Resting ECG", "Electrocardiogram (ECG)", "Electrocardiogram", "ECG"]
+
+  - canonical: lipid_profile
+    category: laboratory
+    list_price_sgd: 40
+    aliases: ["Lipid Profile", "Cholesterol screening", "Cholesterol Screen", "Lipids"]
+
+  - canonical: ufeme
+    category: laboratory
+    list_price_sgd: 25
+    aliases: ["UFEME", "Urine FEME", "Urine Examination and Microscopy",
+              "Urine Examination & Microscopy", "Urine Examination and Microscopy on different days"]
+
+  - canonical: full_blood_count
+    category: laboratory
+    list_price_sgd: 30
+    aliases: ["Full Blood Count", "FBC", "Complete Blood Count"]
+
+  - canonical: bmi_fat_composition
+    category: examination
+    list_price_sgd: 15
+    aliases: ["BMI and Fat Composition", "BMI", "Fat Composition"]
+
+  - canonical: blood_pressure
+    category: examination
+    list_price_sgd: 10
+    aliases: ["Blood pressure measurement", "Blood Pressure", "BP measurement"]
+
+  - canonical: liver_function
+    category: laboratory
+    list_price_sgd: 45
+    aliases: ["Liver function screening", "Liver Function Test", "LFT"]
+
+  - canonical: kidney_function
+    category: laboratory
+    list_price_sgd: 45
+    aliases: ["Kidney function screening", "Kidney Function Test", "Renal Panel"]
+
+  - canonical: thyroid_function
+    category: laboratory
+    list_price_sgd: 55
+    aliases: ["Thyroid function screening", "Thyroid Function Test", "TFT"]
+
+  - canonical: medical_report_consultation
+    category: consultation
+    list_price_sgd: 60
+    aliases: ["Medical Report Consultation", "Report Consultation"]
+
+  - canonical: liver_cancer_marker
+    category: laboratory
+    list_price_sgd: 70
+    aliases: ["Liver Cancer Marker", "AFP"]
+
+  - canonical: ghq60
+    category: questionnaire
+    list_price_sgd: 20
+    aliases: ["GHQ 60 Questionnaire", "GHQ 60", "GHQ60"]
+
+  # --- vaccinations & serology (the TPA authorisation form's section C) ---
+  - canonical: vacc_mmr_dose_1
+    category: vaccination
+    list_price_sgd: 55
+    aliases: ["MMR Dose 1 Vaccination", "MMR Dose 1", "MMR Dose 1 Vaccination (if applicable)"]
+
+  - canonical: vacc_mmr_dose_2
+    category: vaccination
+    list_price_sgd: 55
+    aliases: ["MMR Dose 2 (Vaccination)", "MMR Dose 2"]
+
+  - canonical: vacc_flu
+    category: vaccination
+    list_price_sgd: 35
+    aliases: ["Flu Single Dose (Vaccination)", "Flu Vaccination", "Influenza Vaccination"]
+
+  - canonical: vacc_tetanus
+    category: vaccination
+    list_price_sgd: 40
+    aliases: ["Tetanus (Vaccination)", "Tetanus Vaccination", "Tetanus"]
+
+  - canonical: vacc_typhoid
+    category: vaccination
+    list_price_sgd: 45
+    aliases: ["Typhoid Single Dose (Vaccination)", "Typhoid Vaccination"]
+
+  - canonical: vacc_yellow_fever
+    category: vaccination
+    list_price_sgd: 130
+    aliases: ["Yellow Fever Single Dose (Vaccination)", "Yellow Fever Vaccination"]
+
+  - canonical: vacc_varicella_dose_1
+    category: vaccination
+    list_price_sgd: 90
+    aliases: ["Varicella Dose 1 (Vaccination)", "Varicella Dose 1"]
+
+  - canonical: vacc_varicella_dose_2
+    category: vaccination
+    list_price_sgd: 90
+    aliases: ["Varicella Dose 2 (Vaccination)", "Varicella Dose 2"]
+
+  - canonical: vacc_hepatitis_b_dose_1
+    category: vaccination
+    list_price_sgd: 60
+    aliases: ["Hepatitis B Dose 1 (Vaccination)", "Hepatitis B Dose 1"]
+
+  - canonical: screen_mmrv
+    category: serology
+    list_price_sgd: 75
+    aliases: ["MMRV (Screening)", "MMRV Screening", "MMRV"]
+
+  - canonical: screen_hepatitis_a
+    category: serology
+    list_price_sgd: 50
+    aliases: ["Hepatitis A (Screening)", "Hepatitis A Screening"]
+
+  - canonical: screen_hepatitis_b
+    category: serology
+    list_price_sgd: 50
+    aliases: ["Hepatitis B (Screening)", "Hepatitis B Screening"]
+
+  - canonical: screen_hepatitis_c
+    category: serology
+    list_price_sgd: 55
+    aliases: ["Hepatitis C (Screening)", "Hepatitis C Screening"]

@@ -1,0 +1,471 @@
+# General Health Screening Questionnaire — 41 fields.
+#
+# Transcribed from docs/hackathon/Parkway_Shenton_Questionnaires_Field_Reference.md (§1). The field
+# set and ids are pinned to the columns of general_health_questionnaire_mock_patients.csv, which is
+# SHAPE ground truth only — it proves our ids, option sets and conditional logic match a real
+# completed form. It is never a source for any individual patient's answers.
+#
+# `prefill_source` is one of:
+#   registry.<field>          a cell of the SELECTED patient's registry row
+#   intake.<dotted.path>      a grounded value from the referring document
+#   derived                   computed from one of the above, with the derivation recorded
+#   patient_must_answer       the patient answers this; nothing may pre-fill it
+#
+# `clinical: true` marks self-reported clinical fact — medical/family history, lifestyle, pain,
+# sexual history, pregnancy, immunisation — plus the declaration and signature, which are a consent
+# ACT. Every clinical field is `patient_must_answer` and `test_prefill.py` asserts that structurally
+# rather than trusting this file. Pre-filling a patient's medical history from another dataset
+# would be fabricating clinical data about a real person: the exact failure this architecture
+# exists to prevent (PLAN.md §6.4, CLAUDE.md §Hard constraints 2).
+version: 1
+kind: general_health
+label: General Health Screening Questionnaire
+
+fields:
+  # --- Step 1: Your Details -------------------------------------------------------
+  - id: health_screening_provider
+    csv_column: Health Screening Provider
+    label: Health Screening Provider
+    section: your_details
+    type: dropdown
+    required: true
+    # NOT pre-filled. The documents carry an appointment LOCATION, not a provider, and filling a
+    # provider field with a location string would be a wrong value wearing a citation.
+    prefill_source: patient_must_answer
+    options: [Executive Health Screeners, Home Care, Mobile Health Screeners,
+              Parkway MediCentre, Parkway Shenton Medical Clinic]
+
+  - id: health_screening_location
+    csv_column: Health Screening Location
+    label: Health Screening Location
+    section: your_details
+    type: dropdown
+    required: true
+    # The live dropdown's own option set (field reference §1). It is the reason a document's
+    # appointment location is only pre-filled when it IS one of these: chit 2 names "Everwell
+    # Health Screening Centre", the INSURER's facility, and pre-filling that would put a venue the
+    # clinic does not operate into the form with a perfectly valid citation behind it.
+    options: [Home, On-site, Bedok Central, Gleneagles Hospital,
+              Mount Elizabeth Novena Hospital, Mount Elizabeth Orchard, Paragon, Republic Plaza,
+              Parkway MediCentre (Woodleigh), NCS Medical Clinic,
+              Parkway Shenton Medical Clinic (Alexandra Retail Centre),
+              Parkway Shenton Medical Clinic (Bedok Central),
+              Parkway Shenton Medical Clinic (Bukit Batok Central),
+              Parkway Shenton Medical Clinic (Bukit Panjang Plaza),
+              Parkway Shenton Medical Clinic (Guoco Tower),
+              Parkway Shenton Medical Clinic (Harbourfront Tower One),
+              Parkway Shenton Medical Clinic (Jurong Gateway),
+              Parkway Shenton Medical Clinic (Metropolis),
+              Parkway Shenton Medical Clinic (Republic Plaza),
+              Parkway Shenton Medical Clinic (Serangoon North),
+              Parkway Shenton Medical Clinic (Tembeling Centre),
+              Parkway Shenton Medical Group (Clementi Central),
+              Parkway Shenton Medical Group (Kovan Heartland Mall),
+              Parkway Shenton Medical Group (Pasir Ris Mall),
+              Parkway Shenton Medical Group (Punggol Oasis),
+              Parkway Shenton Medical Group (Robinson Road),
+              Shenton Medical Group (Buangkok MRT),
+              Shenton Medical Group (Esplanade Xchange),
+              Shenton Medical Group (Infineon In-house Clinic),
+              Shenton Medical Group (Pasir Ris Elias Mall),
+              Shenton Medical Group (Serangoon Central),
+              Shenton Medical Group (Tampines West),
+              Shenton Medical Group (Toa Payoh),
+              Shenton Medical Group (Toh Yi),
+              Shenton Medical Group (UE Biz Hub),
+              Shenton Medical Group (Woodlands MRT),
+              Shenton Medical Group (Yishun Central),
+              Singapore Telecom Clinic]
+    prefill_source: intake.authorisation.appointment_location
+
+  - id: name
+    csv_column: Name
+    label: Name
+    section: your_details
+    type: text
+    required: true
+    prefill_source: registry.full_name
+
+  - id: id_type
+    csv_column: ID Type
+    label: Select One
+    section: your_details
+    type: radio
+    required: true
+    options: [NRIC/FIN, Passport]
+    prefill_source: derived          # registry IdType -> "NRIC/FIN" / "Passport"
+
+  - id: id_number
+    csv_column: ID Number
+    label: NRIC/FIN no. or Passport
+    section: your_details
+    type: text
+    required: true
+    prefill_source: registry.id_number
+
+  - id: date_of_birth
+    csv_column: Date of Birth
+    label: Date of Birth
+    section: your_details
+    type: date
+    required: true
+    prefill_source: registry.date_of_birth
+
+  - id: email_address
+    csv_column: Email Address
+    label: Email Address
+    section: your_details
+    type: email
+    required: true
+    prefill_source: registry.email
+
+  - id: country_code
+    csv_column: Country Code
+    label: Country code
+    section: your_details
+    type: dropdown
+    required: true
+    # NOT pre-filled. The registry stores bare local numbers with no dialling code; defaulting to
+    # +65 would be a guess, and wrong for every foreign patient in the registry.
+    # The live form carries the full ITU list; these are the codes present in this dataset's
+    # nationalities. A required choice field with NO options cannot be answered at all.
+    options: ["+65", "+60", "+62", "+63", "+91", "+86", "+44", "+1", "+61", Other]
+    prefill_source: patient_must_answer
+
+  - id: phone_number
+    csv_column: Phone Number
+    label: Phone Number
+    section: your_details
+    type: tel
+    required: true
+    prefill_source: registry.contact_mobile
+
+  - id: address
+    csv_column: Address
+    label: Address
+    section: your_details
+    type: textarea
+    required: true
+    prefill_source: registry.address
+
+  - id: postal_code
+    csv_column: Postal Code
+    label: Postal Code
+    section: your_details
+    type: text
+    required: true
+    prefill_source: registry.postal_code
+
+  - id: ethnicity
+    csv_column: Ethnicity (Race)
+    label: Ethnicity (Race)
+    section: your_details
+    type: dropdown
+    required: true
+    options: [Asian, Chinese, Malay, Indian, Caucasian, Others]
+    # NOT pre-filled from registry.nationality. Nationality and ethnicity are different facts, and
+    # a Singaporean patient may be any of these. Inferring one from the other is a guess about a
+    # person's identity.
+    prefill_source: patient_must_answer
+
+  - id: gender
+    csv_column: Gender
+    label: Gender
+    section: your_details
+    type: radio
+    required: true
+    options: [Male, Female]
+    prefill_source: derived          # registry.sex M/F → Male/Female
+
+  - id: pregnant
+    csv_column: Pregnant (Female only)
+    label: Are you pregnant?
+    section: your_details
+    type: boolean
+    clinical: true
+    conditional_on: {field: gender, equals: Female}
+    prefill_source: patient_must_answer
+
+  - id: weeks_pregnant
+    csv_column: Weeks Pregnant
+    label: No. of weeks
+    section: your_details
+    type: text
+    clinical: true
+    conditional_on: {field: pregnant, equals: "Yes"}
+    prefill_source: patient_must_answer
+
+  # --- Step 2: Your Medical History ------------------------------------------------
+  - id: medical_history_conditions
+    csv_column: Medical History - Conditions
+    label: Please check if you have had any of the following medical issues
+    section: medical_history
+    type: checkbox_group
+    clinical: true
+    prefill_source: patient_must_answer
+    # `sex` gates an option to one gender; `requires` gates it on another field's answer.
+    options:
+      - {value: Asthma}
+      - {value: Breast Lumps}
+      - {value: Chronic Kidney Disease}
+      - {value: Chronic Obstructive Pulmonary Disease (COPD)}
+      - {value: Decreased Libido, sex: Male}
+      - {value: Depression / Anxiety}
+      - {value: Diabetes Type 1}
+      - {value: Diabetes Type 2}
+      - {value: Ejaculatory Complaints, sex: Male}
+      # Quoted: the comma would otherwise split this flow mapping into two keys.
+      - {value: "Eczema, Hives or Skin Allergies"}
+      - {value: Gallstones}
+      - {value: Gestational Diabetes, sex: Female}
+      - {value: Glaucoma}
+      - {value: Gout}
+      - {value: Heart Attack}
+      - {value: Ischaemic Heart Disease}
+      - {value: Hepatitis B Carrier}
+      - {value: High Blood Pressure}
+      - {value: Hyperthyroidism}
+      - {value: Hypothyroidism}
+      - {value: Kidney Stones}
+      - {value: High Cholesterol / Lipid Disorders}
+      - {value: Non-Alcoholic Fatty Liver Disease}
+      - {value: Peripheral Vascular Disease}
+      - {value: Polycystic Ovary Syndrome (PCOS), sex: Female}
+      - {value: Prostate Disease, sex: Male}
+      - {value: Rheumatoid Arthritis}
+      - {value: Stroke}
+      - {value: Thalassemia Minor}
+      - {value: Prior Surgery / Endoscopy}
+      - {value: Hysterectomy (Womb Removal Surgery), sex: Female,
+         requires: {option: Prior Surgery / Endoscopy}}
+
+  - id: prior_surgery_details
+    csv_column: Prior Surgery Details
+    label: Please provide details of the surgery
+    section: medical_history
+    type: textarea
+    clinical: true
+    conditional_on: {field: medical_history_conditions, contains: Prior Surgery / Endoscopy}
+    prefill_source: patient_must_answer
+
+  - id: other_diseases
+    csv_column: Other Diseases (specify)
+    label: Other Diseases (please specify)
+    section: medical_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: present_health_complaints
+    csv_column: Present Health Complaints
+    label: Present Health Complaints (if any)
+    section: medical_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: current_medications
+    csv_column: Current Medications
+    label: Current Medications
+    section: medical_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: other_medications
+    csv_column: Other Medications/Supplements
+    label: Other Medications / Supplements
+    section: medical_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: drug_allergies
+    csv_column: Drug Allergies
+    label: Drug Allergies
+    section: medical_history
+    type: text
+    # The ONE clinical-adjacent field that is pre-filled, and only as a value the patient is asked
+    # to CONFIRM — never as a settled fact. It is the "pharmacy re-asks about allergies" step in
+    # the problem statement, and the registry already holds the answer the patient gave last time.
+    clinical: false
+    requires_confirmation: true
+    prefill_source: registry.drug_allergy
+
+  - id: drug_allergy_details
+    csv_column: Drug Allergy Details
+    label: Drug Allergy Details
+    section: medical_history
+    type: textarea
+    clinical: true
+    conditional_on: {field: drug_allergies, not_equals: "None"}
+    prefill_source: patient_must_answer
+
+  # --- Step 3: Your Family History -------------------------------------------------
+  - id: family_history
+    csv_column: Family History
+    label: Family History
+    section: family_history
+    type: checkbox_matrix
+    clinical: true
+    prefill_source: patient_must_answer
+
+  # --- Step 4: Your Lifestyle ------------------------------------------------------
+  - id: exercise_frequency
+    csv_column: Exercise Frequency
+    label: How often do you exercise weekly?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: [Do not exercise regularly, Less than 100 mins/week,
+              Between 100 to 150 mins/week, More than 150 mins/week]
+    prefill_source: patient_must_answer
+
+  - id: smoking_status
+    csv_column: Smoking Status
+    label: Do you currently smoke?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["No", "Yes, less than 10 cigarettes/day", "Yes, 10-20 cigarettes/day",
+              "Yes, more than 20 cigarettes/day"]
+    prefill_source: patient_must_answer
+
+  - id: alcohol_intake
+    csv_column: Alcohol Intake Level
+    label: Alcohol intake level
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["No", Occasional, "Yes, less than 7 units/week", "Yes, 7-14 units/week",
+              "Yes, more than 14 units/week"]
+    prefill_source: patient_must_answer
+
+  - id: stress_frequency
+    csv_column: Stress Frequency
+    label: Over the past few weeks, how often have you felt overwhelmed, anxious or unable to cope?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: [Never, Rarely, Sometimes, Often, Always]
+    prefill_source: patient_must_answer
+
+  - id: special_diet
+    csv_column: Special Diet
+    label: Special diet
+    section: lifestyle
+    type: text
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: chronic_pain
+    csv_column: Chronic Pain
+    label: Are you experiencing pain regularly in certain areas?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: pain_area
+    csv_column: Pain Area
+    label: If so, which area(s)?
+    section: lifestyle
+    type: textarea
+    clinical: true
+    conditional_on: {field: chronic_pain, equals: "Yes"}
+    prefill_source: patient_must_answer
+
+  - id: pain_level
+    csv_column: Pain Level (1-10)
+    label: Pain level
+    section: lifestyle
+    type: rating
+    clinical: true
+    conditional_on: {field: chronic_pain, equals: "Yes"}
+    prefill_source: patient_must_answer
+
+  - id: sexual_history_shared
+    csv_column: Sexual History Shared
+    label: Are you comfortable to share your sexual history for the past 12 months?
+    section: sexual_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: sexually_active
+    csv_column: Sexually Active (Past 12 Months)
+    label: Have you been sexually active for the past 12 months?
+    section: sexual_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    conditional_on: {field: sexual_history_shared, equals: "Yes"}
+    prefill_source: patient_must_answer
+
+  - id: sexual_partners
+    csv_column: No. of Sexual Partners (Past 12 Months)
+    label: How many sexual partners have you had in the past 12 months?
+    section: sexual_history
+    type: text
+    clinical: true
+    conditional_on: {field: sexual_history_shared, equals: "Yes"}
+    prefill_source: patient_must_answer
+
+  - id: recent_vaccination
+    csv_column: Recent Vaccination (Past 1 Month)
+    label: Recent vaccination in the past 1 month?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: flu_vaccination_this_year
+    csv_column: Flu Vaccination This Year
+    label: Flu vaccination this year?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: menstrual_cycle
+    csv_column: Menstrual Cycle
+    label: Menstrual Cycle
+    section: gynaecological
+    type: radio
+    clinical: true
+    options: [Regular, Irregular]
+    conditional_on: {field: gender, equals: Female}
+    prefill_source: patient_must_answer
+
+  - id: contraception_use
+    csv_column: Contraception Use
+    label: Contraception Use
+    section: gynaecological
+    type: text
+    clinical: true
+    conditional_on: {field: gender, equals: Female}
+    prefill_source: patient_must_answer
+
+  # --- Step 5: Acknowledgement ------------------------------------------------------
+  - id: acknowledged_declaration
+    csv_column: Acknowledged Declaration
+    label: Consent to IHH Healthcare Singapore collecting/using/disclosing personal data
+    section: acknowledgement
+    type: declaration
+    required: true
+    # A consent ACT, not data. Nothing may pre-fill it, ever.
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: date_signed
+    csv_column: Date Signed
+    label: Date Signed
+    section: acknowledgement
+    type: date
+    required: true
+    clinical: true
+    prefill_source: patient_must_answer

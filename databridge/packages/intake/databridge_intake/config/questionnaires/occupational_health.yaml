@@ -1,0 +1,300 @@
+# Occupational Health Screening Questionnaire — 27 fields.
+#
+# Transcribed from docs/hackathon/Parkway_Shenton_Questionnaires_Field_Reference.md (§2), with ids
+# pinned to the columns of occupational_health_questionnaire_mock_patients.csv. Same rules as
+# general_health.yaml: that CSV is shape ground truth only, and `clinical: true` fields are always
+# `patient_must_answer`.
+#
+# This form is shorter but the same line holds: personal and family medical history, lifestyle,
+# the declaration and the employer-disclosure consent are the patient's to answer. The employer is
+# paying for the screening, which makes pre-filling any of it worse, not more acceptable.
+version: 1
+kind: occupational_health
+label: Occupational Health Screening Questionnaire
+
+fields:
+  # --- Step 1: Screening Type -------------------------------------------------------
+  - id: screening_types
+    csv_column: Screening Type(s)
+    label: Occupational Health Screening Type
+    section: screening_type
+    type: checkbox_group
+    required: true
+    # From the coverage determination, not from the patient — which package the issuer authorised
+    # is a fact about the document, and the rule id that produced it is recorded with the value.
+    prefill_source: derived
+    options: [Pre/Re Employment, IHH Pre/Re Employment, Arsenic Hazard, Asbestos Hazard,
+              Benzene Hazard, Cadmium Hazard, Free Silica Hazard, Inorganic Lead Hazard,
+              Manganese Hazard, Mercury Hazard, Noise Hazard, Organophosphate Hazard,
+              Perchloroethylene Hazard, "Tar, Pitch, Bitumen & Creosote Hazard",
+              Trichloroethylene Hazard]
+
+  - id: health_screening_location
+    csv_column: Health Screening Location
+    label: Health Screening Location
+    section: screening_type
+    type: dropdown
+    required: true
+    # The live dropdown's own option set (field reference §1). It is the reason a document's
+    # appointment location is only pre-filled when it IS one of these: chit 2 names "Everwell
+    # Health Screening Centre", the INSURER's facility, and pre-filling that would put a venue the
+    # clinic does not operate into the form with a perfectly valid citation behind it.
+    options: [Home, On-site, Bedok Central, Gleneagles Hospital,
+              Mount Elizabeth Novena Hospital, Mount Elizabeth Orchard, Paragon, Republic Plaza,
+              Parkway MediCentre (Woodleigh), NCS Medical Clinic,
+              Parkway Shenton Medical Clinic (Alexandra Retail Centre),
+              Parkway Shenton Medical Clinic (Bedok Central),
+              Parkway Shenton Medical Clinic (Bukit Batok Central),
+              Parkway Shenton Medical Clinic (Bukit Panjang Plaza),
+              Parkway Shenton Medical Clinic (Guoco Tower),
+              Parkway Shenton Medical Clinic (Harbourfront Tower One),
+              Parkway Shenton Medical Clinic (Jurong Gateway),
+              Parkway Shenton Medical Clinic (Metropolis),
+              Parkway Shenton Medical Clinic (Republic Plaza),
+              Parkway Shenton Medical Clinic (Serangoon North),
+              Parkway Shenton Medical Clinic (Tembeling Centre),
+              Parkway Shenton Medical Group (Clementi Central),
+              Parkway Shenton Medical Group (Kovan Heartland Mall),
+              Parkway Shenton Medical Group (Pasir Ris Mall),
+              Parkway Shenton Medical Group (Punggol Oasis),
+              Parkway Shenton Medical Group (Robinson Road),
+              Shenton Medical Group (Buangkok MRT),
+              Shenton Medical Group (Esplanade Xchange),
+              Shenton Medical Group (Infineon In-house Clinic),
+              Shenton Medical Group (Pasir Ris Elias Mall),
+              Shenton Medical Group (Serangoon Central),
+              Shenton Medical Group (Tampines West),
+              Shenton Medical Group (Toa Payoh),
+              Shenton Medical Group (Toh Yi),
+              Shenton Medical Group (UE Biz Hub),
+              Shenton Medical Group (Woodlands MRT),
+              Shenton Medical Group (Yishun Central),
+              Singapore Telecom Clinic]
+    prefill_source: intake.authorisation.appointment_location
+
+  # --- Step 2: Your Details ---------------------------------------------------------
+  - id: name
+    csv_column: Name
+    label: Name
+    section: your_details
+    type: text
+    required: true
+    prefill_source: registry.full_name
+
+  - id: id_type
+    csv_column: ID Type
+    label: Select One
+    section: your_details
+    type: radio
+    required: true
+    options: [NRIC/FIN, Passport]
+    prefill_source: derived          # registry IdType -> "NRIC/FIN" / "Passport"
+
+  - id: id_number
+    csv_column: ID Number
+    label: NRIC/FIN no. or Passport
+    section: your_details
+    type: text
+    required: true
+    prefill_source: registry.id_number
+
+  - id: date_of_birth
+    csv_column: Date of Birth
+    label: Date of Birth
+    section: your_details
+    type: date
+    required: true
+    prefill_source: registry.date_of_birth
+
+  - id: email_address
+    csv_column: Email Address
+    label: Email Address
+    section: your_details
+    type: email
+    required: true
+    prefill_source: registry.email
+
+  - id: ethnicity
+    csv_column: Ethnicity (Race)
+    label: Ethnicity (Race)
+    section: your_details
+    type: dropdown
+    required: true
+    options: [Asian, Chinese, Malay, Indian, Caucasian, Others]
+    # See general_health.yaml — nationality is not ethnicity.
+    prefill_source: patient_must_answer
+
+  - id: gender
+    csv_column: Gender
+    label: Gender
+    section: your_details
+    type: radio
+    required: true
+    options: [Male, Female]
+    prefill_source: derived          # registry.sex M/F → Male/Female
+
+  # --- Step 3: Your Medical History (personal) --------------------------------------
+  - id: personal_anaemia
+    csv_column: Personal - Anaemia
+    label: Anaemia
+    section: medical_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: personal_diabetes
+    csv_column: Personal - Diabetes Mellitus
+    label: Diabetes Mellitus
+    section: medical_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: personal_high_blood_pressure
+    csv_column: Personal - High Blood Pressure
+    label: High Blood Pressure
+    section: medical_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: personal_high_cholesterol
+    csv_column: Personal - High Cholesterol/Lipid Disorder
+    label: High Cholesterol / Lipid Disorder
+    section: medical_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: personal_heart_disease
+    csv_column: Personal - Heart Disease
+    label: Heart Disease
+    section: medical_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: personal_other_conditions
+    csv_column: Personal - Other Medical/Surgical Conditions
+    label: Other Medical / Surgical Conditions
+    section: medical_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: personal_current_medications
+    csv_column: Personal - Current Medications
+    label: Current Medications
+    section: medical_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  # --- Step 3: Your Medical History (family) ----------------------------------------
+  - id: family_diabetes
+    csv_column: Family - Diabetes Mellitus
+    label: Family — Diabetes Mellitus
+    section: family_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: family_high_cholesterol
+    csv_column: Family - High Cholesterol/Lipid Disorder
+    label: Family — High Cholesterol / Lipid Disorder
+    section: family_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: family_high_blood_pressure
+    csv_column: Family - High Blood Pressure
+    label: Family — High Blood Pressure
+    section: family_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: family_heart_diseases
+    csv_column: Family - Heart Diseases
+    label: Family — Heart Diseases
+    section: family_history
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: family_other_diseases
+    csv_column: Family - Other Diseases
+    label: Family — Other Diseases
+    section: family_history
+    type: textarea
+    clinical: true
+    prefill_source: patient_must_answer
+
+  # --- Step 4: Your Lifestyle -------------------------------------------------------
+  - id: lifestyle_smoking
+    csv_column: Lifestyle - Currently Smoking
+    label: Do you currently smoke?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: lifestyle_alcohol
+    csv_column: Lifestyle - Alcohol
+    label: Do you drink alcohol?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: ["Yes", "No"]
+    prefill_source: patient_must_answer
+
+  - id: lifestyle_exercise
+    csv_column: Lifestyle - Exercise
+    label: How often do you exercise?
+    section: lifestyle
+    type: radio
+    clinical: true
+    options: [Do not exercise regularly, Less than 100 mins/week,
+              Between 100 to 150 mins/week, More than 150 mins/week]
+    prefill_source: patient_must_answer
+
+  # --- Step 5: Acknowledgement ------------------------------------------------------
+  - id: acknowledged_declaration
+    csv_column: Acknowledged Declaration
+    label: Consent to IHH Healthcare Singapore collecting/using/disclosing personal data
+    section: acknowledgement
+    type: declaration
+    required: true
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: consent_disclose_employer
+    csv_column: Consent to Disclose to Employer/Insurer
+    label: Consent to disclose results to employer / insurer
+    section: acknowledgement
+    type: declaration
+    required: true
+    # An occupational screening is paid for by the employer, which makes this consent MORE
+    # sensitive, not less. It is a decision only the patient can make.
+    clinical: true
+    prefill_source: patient_must_answer
+
+  - id: date_signed
+    csv_column: Date Signed
+    label: Date Signed
+    section: acknowledgement
+    type: date
+    required: true
+    clinical: true
+    prefill_source: patient_must_answer

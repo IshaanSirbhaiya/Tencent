@@ -1,0 +1,140 @@
+# The as-is time model — DATA, NOT CODE.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# Transcribed from the Technical Problem Statement's description of the current counter
+# workflow. The band 23-32 minutes is the problem statement's; the per-step split is our
+# reading of it, and the `with_copilot` column is an ESTIMATE of what the built system
+# removes. Both are stated here so the number on /impact can be argued with rather than
+# taken on trust. The submission says so too.
+# ─────────────────────────────────────────────────────────────────────────────────────
+#
+# `never_automatable: true` is the load-bearing field. A step carrying it contributes
+# EXACTLY ZERO to minutes saved, and `metrics.py` refuses to construct a saving for it —
+# so it is structurally impossible for the headline number to include time "saved" on
+# identity verification, whatever anyone later edits into `with_copilot_min`.
+# `test_metrics.py::test_identity_verification_can_never_contribute_a_saving` proves it.
+version: 1
+
+# The dataset's clinic morning, used for the aggregate figure on /impact.
+patients_per_morning: 40
+
+# The step number that IS identity verification. `metrics.py` asserts this step carries
+# `never_automatable`. Without naming it, the guarantee degrades to "some step somewhere is
+# never automatable" — move the marker to step 1 and identity becomes claimable while the file
+# still validates.
+identity_step: 2
+
+# The band the Technical Problem Statement states. `metrics.py` asserts the per-step lows and
+# highs sum to exactly these, so the table cannot drift away from the figure it claims to be a
+# decomposition of.
+band_min_total: 23.0
+band_max_total: 32.0
+
+steps:
+  - step: 1
+    name: Patient arrives, takes a queue ticket
+    baseline_min_low: 0.5
+    baseline_min_high: 1.0
+    with_copilot_min: 0.75
+    automatable: false
+    claim_condition: never
+    note: >-
+      Physical arrival. Nothing to automate; listed so the baseline totals to the
+      problem statement's band rather than to a subset we happened to improve.
+
+  - step: 2
+    name: Identity verification (NRIC/FIN/passport checked against the person)
+    baseline_min_low: 1.0
+    baseline_min_high: 1.0
+    with_copilot_min: 1.0
+    automatable: false
+    never_automatable: true
+    claim_condition: never
+    note: >-
+      Performed in person by staff, always. The system presents registry candidates and
+      refuses to choose between them. This step's saving is zero by construction, not by
+      arithmetic that happens to come out at zero.
+
+  - step: 3
+    name: Registration — re-keying the patient's administrative details
+    baseline_min_low: 2.5
+    baseline_min_high: 3.0
+    with_copilot_min: 0.5
+    automatable: true
+    claim_condition: questionnaire_prefilled
+    note: >-
+      Claimed only when the questionnaire actually came back pre-filled, which requires a
+      staff-selected patient. An unresolved intake saves nothing here.
+
+  - step: 4
+    name: Document interpretation — reading the referring chit
+    baseline_min_low: 3.5
+    baseline_min_high: 4.5
+    with_copilot_min: 0.5
+    automatable: true
+    claim_condition: document_understood
+    note: >-
+      Claimed only when the classifier did not abstain and the extractor produced grounded
+      values. An UNRECOGNISED document still has to be read by a person.
+
+  - step: 5
+    name: Eligibility check against the insurer's rules
+    baseline_min_low: 3.5
+    baseline_min_high: 4.5
+    with_copilot_min: 0.5
+    automatable: true
+    claim_condition: coverage_determined
+    note: >-
+      Not claimed when coverage is UNDETERMINED (chit 8 — no test code on the form). Staff
+      still have to phone the issuer, so the minutes are still spent.
+
+  - step: 6
+    name: Package verification and finding the right questionnaire
+    baseline_min_low: 2.5
+    baseline_min_high: 3.5
+    with_copilot_min: 1.0
+    automatable: true
+    claim_condition: questionnaire_routed
+    note: Claimed when a package resolved AND it routed to a named questionnaire.
+
+  - step: 7
+    name: Billing determination — who pays for what
+    baseline_min_low: 1.5
+    baseline_min_high: 2.5
+    with_copilot_min: 0.5
+    automatable: true
+    claim_condition: billing_drafted
+    note: Not claimed when the payer could not be established (billed_to = unknown).
+
+  - step: 8
+    name: Queue number issued for the clinical encounter
+    baseline_min_low: 1.0
+    baseline_min_high: 1.0
+    with_copilot_min: 1.0
+    automatable: false
+    claim_condition: never
+    note: Counter mechanics. Unchanged by this system.
+
+  - step: 11
+    name: Pharmacy re-asks the patient about drug allergies
+    baseline_min_low: 2.0
+    baseline_min_high: 3.0
+    with_copilot_min: 1.0
+    automatable: true
+    claim_condition: allergy_carried_forward
+    note: >-
+      Claimed when the registry's recorded allergy was carried onto the questionnaire for
+      the patient to CONFIRM. The re-ask still happens — it is a confirmation, not a
+      fresh interview — so the residual is a full minute, not zero.
+
+  - step: 12
+    name: Payment and re-entering the visit into the TPA portal
+    baseline_min_low: 5.0
+    baseline_min_high: 8.0
+    with_copilot_min: 2.0
+    automatable: true
+    claim_condition: claim_draft_available
+    note: >-
+      The largest single line in the as-is table. Claimed only when a claim draft can
+      actually be produced — a determined coverage with a named payer. A human still
+      reviews and submits it; the system never files a claim.
