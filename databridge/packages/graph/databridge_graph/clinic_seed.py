@@ -133,8 +133,11 @@ def _document_two_digit_year(day: str, month: str, year: str, *, today: dt.date)
     return f"{day}/{month}/{best.year}"
 
 
-def _document_date(record) -> Optional[dt.datetime]:
-    """When the document itself is dated, from its own grounded text.
+def _document_date(record) -> Optional[tuple[dt.datetime, SourcePointer]]:
+    """When the document itself is dated, from its own grounded text — WITH its pointer.
+
+    The pointer comes back alongside the date because the date is also written to the node as an
+    attribute, and an attribute travels with its citation or it is not written at all.
 
     Every document node used to carry the same `_EPOCH` valid_from, which made the bi-temporal axis
     meaningless for documents ("what did we believe on 1 March?" returned everything or nothing) and
@@ -163,7 +166,8 @@ def _document_date(record) -> Optional[dt.datetime]:
                     text = resolved
         parsed = parse_claimed_dob(text)
         if parsed is not None:
-            return dt.datetime.combine(parsed, dt.time.min, tzinfo=dt.timezone.utc)
+            return (dt.datetime.combine(parsed, dt.time.min, tzinfo=dt.timezone.utc),
+                    _span_of(gv))
     return None
 
 
@@ -176,24 +180,56 @@ def _span_of(gv: GroundedValue) -> SourcePointer:
     return gv.pointer
 
 
+def _derived_ptr(derivation: str, derived_from: list[SourcePointer]) -> SourcePointer:
+    """A pointer for a value this seed COMPUTED rather than read.
+
+    Counts, scores and classifications are not printed in any document, so citing a span for them
+    would be a lie in the other direction. `derived` is the honest kind: it names the rule and
+    keeps the pointers the rule consumed, so the value stays checkable without pretending it was
+    read off a page.
+    """
+    return SourcePointer(source_id=RULES_SOURCE_ID, kind="derived", derivation=derivation,
+                         derived_from=derived_from)
+
+
+def _grounded_attrs(pairs: dict) -> tuple[dict, dict]:
+    """Split ``{name: (value, pointer)}`` into a node's ``attrs`` and its ``attr_sources``.
+
+    **A value with no pointer is not recorded as a fact.** It becomes ``None``, which puts its
+    name in ``unresolved`` — the question stays visible and unanswered instead of being answered
+    by something nobody can check. One rule, in one place, so no call site has to remember it.
+    """
+    attrs: dict = {}
+    ptrs: dict = {}
+    for name, (value, pointer) in pairs.items():
+        if value is None or pointer is None:
+            attrs[name] = None
+        else:
+            attrs[name] = value
+            ptrs[name] = pointer
+    return attrs, ptrs
+
+
 # --- node builders ----------------------------------------------------------------
 
 
 def _node(kind: NodeKind, node_key: str, label: str, sources: list[SourcePointer], *,
           canonical_id: Optional[str] = None, attrs: Optional[dict] = None,
+          attr_sources: Optional[dict] = None,
           valid_from: Optional[dt.datetime] = None) -> GraphNode:
     return GraphNode(id=node_id(kind, node_key), kind=kind, label=label,
-                     canonical_id=canonical_id, attrs=attrs or {}, sources=sources,
+                     canonical_id=canonical_id, attrs=attrs or {},
+                     attr_sources=attr_sources or {}, sources=sources,
                      valid_from=valid_from or _EPOCH, system_from=SEED_SYSTEM_TIME)
 
 
 def _edge(src_id: str, kind: EdgeKind, dst_id: str, sources: list[SourcePointer], *,
-          attrs: Optional[dict] = None) -> GraphEdge:
+          attrs: Optional[dict] = None, attr_sources: Optional[dict] = None) -> GraphEdge:
     """One relationship. ``valid_from`` is set provisionally and corrected by
     ``_reconcile_edge_validity`` once every node's own date is known — see that function for why it
     cannot be decided here."""
     return GraphEdge(id=f"{src_id}|{kind.value}|{dst_id}", src_id=src_id, kind=kind, dst_id=dst_id,
-                     attrs=attrs or {}, sources=sources,
+                     attrs=attrs or {}, attr_sources=attr_sources or {}, sources=sources,
                      valid_from=_EPOCH, system_from=SEED_SYSTEM_TIME)
 
 
@@ -304,11 +340,14 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
 
     # -- issuers (coverage_rules.yaml) ---------------------------------------------
     for i, issuer in enumerate(table.issuers):
+        attrs, attr_ptrs = _grounded_attrs({
+            "kind": (issuer.kind.value, _yaml_ptr("issuers", "kind", i)),
+            "issuer_code": (issuer.code, _yaml_ptr("issuers", "code", i)),
+            "billing_party": (issuer.billing_party.value,
+                              _yaml_ptr("issuers", "billing_party", i))})
         add(_node(NodeKind.ORG, org_key(issuer.name), issuer.name,
                   [_yaml_ptr("issuers", "name", i)],
-                  canonical_id=issuer.code,
-                  attrs={"kind": issuer.kind.value, "issuer_code": issuer.code,
-                         "billing_party": issuer.billing_party.value}))
+                  canonical_id=issuer.code, attrs=attrs, attr_sources=attr_ptrs))
 
     issuer_node_by_code = {issuer.code: org_node_id(issuer.name) for issuer in table.issuers}
 
@@ -326,33 +365,46 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
     for i, entry in enumerate(table.test_catalogue):
         if entry.canonical not in referenced_tests:
             continue
+        attrs, attr_ptrs = _grounded_attrs({
+            "category": (entry.category, _yaml_ptr("test_catalogue", "category", i)),
+            # An uncatalogued price stays None. `billing.py` must show "not priced", never SGD 0.
+            "list_price_sgd": (str(entry.list_price_sgd)
+                               if entry.list_price_sgd is not None else None,
+                               _yaml_ptr("test_catalogue", "list_price_sgd", i))})
         add(_node(NodeKind.TEST, catalogue_test_key(entry.canonical),
                   entry.aliases[0] if entry.aliases else entry.canonical,
                   [_yaml_ptr("test_catalogue", "canonical", i)],
-                  canonical_id=entry.canonical,
-                  attrs={"category": entry.category,
-                         "list_price_sgd": (str(entry.list_price_sgd)
-                                            if entry.list_price_sgd is not None else None)}))
+                  canonical_id=entry.canonical, attrs=attrs, attr_sources=attr_ptrs))
 
     for i, package in enumerate(table.packages):
         rule_ptr = _yaml_ptr("packages", "id", i)
+        rule_attrs, rule_ptrs = _grounded_attrs({
+            "issuer_code": (package.issuer_code, _yaml_ptr("packages", "issuer_code", i)),
+            "package_code": (package.package_code, _yaml_ptr("packages", "package_code", i)),
+            "questionnaire": (package.questionnaire.value,
+                              _yaml_ptr("packages", "questionnaire", i)),
+            "billed_to": (package.billing.covered_by.value,
+                          _yaml_ptr("packages", "billing.covered_by", i)),
+            "eligibility": (package.eligibility.describe(),
+                            _yaml_ptr("packages", "eligibility", i)),
+            "tests_from_document": (package.tests_from_document,
+                                    _yaml_ptr("packages", "tests_from_document", i))})
         rule_id = add(_node(NodeKind.COVERAGE_RULE, rule_key(package.id), package.name, [rule_ptr],
                             canonical_id=package.id,
-                            attrs={"issuer_code": package.issuer_code,
-                                   "package_code": package.package_code,
-                                   "questionnaire": package.questionnaire.value,
-                                   "billed_to": package.billing.covered_by.value,
-                                   "eligibility": package.eligibility.describe(),
-                                   "tests_from_document": package.tests_from_document}))
+                            attrs=rule_attrs, attr_sources=rule_ptrs))
         if package.package_code:
+            pkg_attrs, pkg_ptrs = _grounded_attrs({
+                "name": (package.name, _yaml_ptr("packages", "name", i)),
+                "eligibility": (package.eligibility.describe(),
+                                _yaml_ptr("packages", "eligibility", i)),
+                "questionnaire": (package.questionnaire.value,
+                                  _yaml_ptr("packages", "questionnaire", i))})
             pkg_id = add(_node(NodeKind.PACKAGE,
                                package_key(package.package_code, package.issuer_code),
                                package.package_code,
                                [_yaml_ptr("packages", "package_code", i)],
                                canonical_id=package.package_code,
-                               attrs={"name": package.name,
-                                      "eligibility": package.eligibility.describe(),
-                                      "questionnaire": package.questionnaire.value}))
+                               attrs=pkg_attrs, attr_sources=pkg_ptrs))
             edges.append(_edge(rule_id, EdgeKind.AUTHORISES, pkg_id, [rule_ptr]))
             for canonical in package.includes_tests:
                 edges.append(_edge(pkg_id, EdgeKind.INCLUDES_TEST, catalogue_test_node_id(canonical),
@@ -365,14 +417,26 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
         # seed instant — NOT `record.document.received_at`, which is the wall clock and would make
         # the seed non-reproducible: an undated document would land in the future relative to
         # `SEED_SYSTEM_TIME` and vanish from an `as_of` query at that instant.
-        issued_at = _document_date(record) or SEED_SYSTEM_TIME
+        dated = _document_date(record)
+        issued_at = dated[0] if dated is not None else SEED_SYSTEM_TIME
+        doc_attrs, doc_ptrs = _grounded_attrs({
+            "document_type": (record.document_type.value, _span_of(record.document_type)),
+            # An UNDATED document still needs a `valid_from` (the temporal axis needs an instant),
+            # but it records no `issued_at`: the fallback is our bookkeeping, not the letter's
+            # date, and printing it as an attribute presents a machine default as something read
+            # off the page. `unresolved` then says so out loud.
+            "issued_at": (dated[0].isoformat() if dated is not None else None,
+                          dated[1] if dated is not None else None),
+            "unresolved_count": (len(record.unresolved),
+                                 _derived_ptr("count of IntakeRecord.unresolved after extraction",
+                                              [doc_ptr])),
+            "refused_count": (len(record.refused),
+                              _derived_ptr("count of IntakeRecord.refused after the grounding wall",
+                                           [doc_ptr]))})
         doc_id = add(_node(NodeKind.DOCUMENT, document_id, document_id, [doc_ptr],
                            canonical_id=document_id,
                            valid_from=issued_at,
-                           attrs={"document_type": record.document_type.value,
-                                  "issued_at": issued_at.isoformat(),
-                                  "unresolved_count": len(record.unresolved),
-                                  "refused_count": len(record.refused)}))
+                           attrs=doc_attrs, attr_sources=doc_ptrs))
 
         issuer_code = (record.issuer.issuer_code.value
                        if record.issuer.issuer_code is not None else None)
@@ -393,27 +457,53 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
         resolution = resolutions[document_id]
         for candidate in resolution.candidates:
             patient = registry_by_id[candidate.patient_id]
+            # Each registry field carries the `table_cell` pointer it was read from. These were
+            # written with only the name and ID pointers on the node, so an evidence sheet printed
+            # a patient's sex, nationality and date of birth under a citation list that had never
+            # seen them.
+            pat_attrs, pat_ptrs = _grounded_attrs({
+                "sex": (patient.sex.value, patient.sex.pointer),
+                "nationality": (patient.nationality.value, patient.nationality.pointer),
+                "date_of_birth": (str(patient.date_of_birth.value),
+                                  patient.date_of_birth.pointer)})
             pat_id = add(_node(NodeKind.PATIENT, patient_key(candidate.patient_id),
                                str(patient.full_name.value),
                                [patient.full_name.pointer, patient.id_number.pointer],
                                canonical_id=candidate.patient_id,
-                               attrs={"sex": patient.sex.value,
-                                      "nationality": patient.nationality.value,
-                                      "date_of_birth": str(patient.date_of_birth.value)}))
+                               attrs=pat_attrs, attr_sources=pat_ptrs))
+            # Every one of these is the RESOLVER's output, not the letter's text, so each cites
+            # the rule that produced it and keeps the subject span that rule consumed.
+            # `candidate_count` matters most: a renderer that cannot cite it falls back to the
+            # LESS cautious wording for an identity claim, which is the wrong direction to fail.
+            claim_evidence = [subject_span] if subject_span is not None else [doc_ptr]
+            edge_attrs, edge_ptrs = _grounded_attrs({
+                "basis": ("claimed_on_document",
+                          _derived_ptr("the document names a subject; the registry was searched "
+                                       "for candidates", claim_evidence)),
+                "match_score": (candidate.score,
+                                _derived_ptr("resolve.py candidate score", claim_evidence)),
+                "matched_on": (",".join(candidate.matched_on),
+                               _derived_ptr("resolve.py fields that matched", claim_evidence)),
+                "requires_human_verification": (True,
+                                                _derived_ptr("invariant: identity is verified in "
+                                                             "person, never by this system "
+                                                             "(CLAUDE.md constraint 1)",
+                                                             claim_evidence)),
+                "candidate_count": (len(resolution.candidates),
+                                    _derived_ptr("number of registry candidates returned",
+                                                 claim_evidence))})
             edges.append(_edge(doc_id, EdgeKind.FOR_PATIENT, pat_id,
-                               [subject_span or doc_ptr], attrs={
-                "basis": "claimed_on_document",
-                "match_score": candidate.score,
-                "matched_on": ",".join(candidate.matched_on),
-                "requires_human_verification": True,
-                "candidate_count": len(resolution.candidates)}))
+                               [subject_span or doc_ptr],
+                               attrs=edge_attrs, attr_sources=edge_ptrs))
 
         # REQUESTS_TEST — what the document printed, mapped to the catalogue.
         for gv in (*record.authorisation.requested_tests, *record.authorisation.add_ons):
             match = table.match_test(str(gv.value))
             if match.matched:
-                edges.append(_edge(doc_id, EdgeKind.REQUESTS_TEST, catalogue_test_node_id(match.canonical),
-                                   [_span_of(gv)], attrs={"as_printed": str(gv.value)}))
+                edges.append(_edge(doc_id, EdgeKind.REQUESTS_TEST,
+                                   catalogue_test_node_id(match.canonical), [_span_of(gv)],
+                                   attrs={"as_printed": str(gv.value)},
+                                   attr_sources={"as_printed": _span_of(gv)}))
 
         # AUTHORISES — the coverage rule this document selects.
         package_code = (record.authorisation.package_code.value
@@ -436,7 +526,10 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
                 continue
             org_id = add(_node(NodeKind.ORG, org_key(str(gv.value)), str(gv.value),
                                [_span_of(gv)], canonical_id=org_canonical(str(gv.value)),
-                               attrs={"kind": "employer"}))
+                               attrs={"kind": "employer"},
+                               attr_sources={"kind": _derived_ptr(
+                                   "read from the document's employer/agency field",
+                                   [_span_of(gv)])}))
             edges.append(_edge(doc_id, EdgeKind.REFERENCES, org_id, [_span_of(gv)]))
 
         # A VISIT exists only where the document actually schedules one.
@@ -446,12 +539,14 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
             clinic_id = add(_node(NodeKind.CLINIC, _slug(str(location.value)),
                                   str(location.value), [_span_of(location)],
                                   canonical_id=_slug(str(location.value))))
+            visit_attrs, visit_ptrs = _grounded_attrs({
+                "appointment": (str(appointment.value) if appointment is not None else None,
+                                _span_of(appointment) if appointment is not None else None)})
             visit_id = add(_node(NodeKind.VISIT, f"{document_id}-visit",
                                  f"Visit scheduled by {document_id}",
                                  [_span_of(appointment) if appointment is not None
                                   else _span_of(location)],
-                                 attrs={"appointment": (str(appointment.value)
-                                                        if appointment is not None else None)}))
+                                 attrs=visit_attrs, attr_sources=visit_ptrs))
             edges.append(_edge(visit_id, EdgeKind.AT_CLINIC, clinic_id, [_span_of(location)]))
             edges.append(_edge(doc_id, EdgeKind.REFERENCES, visit_id, [_span_of(location)]))
 

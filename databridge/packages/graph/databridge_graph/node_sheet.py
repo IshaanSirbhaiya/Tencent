@@ -16,16 +16,34 @@ stored edges. There is no model in this path and no prose the graph cannot suppo
 narrated would be a fabrication surface pointed straight at the LLM's context window
 (CLAUDE.md §Hard constraints 2).
 
-**The `FOR_PATIENT` caveat is load-bearing.** A document naming a patient is a CLAIM, resolved
-against the registry into candidates that a human chooses between. Any rendering of that edge must
-carry the caveat, and `PLAN.md` §6.6 flags exactly this: a patient reached at hop 2 needs the same
-annotation the 1-hop path adds. Dropping it here would feed the model an identity assertion the
-rest of the system refuses to make (CLAUDE.md §Hard constraints 1).
+Three properties are load-bearing, and all three were found broken by review on 2026-08-12.
+
+**Every value carries its own citation.** The sheet used to print each attribute and then list
+``node.sources`` under a *Sources* heading that claimed "every value above is traceable to one of
+these". It was not true: a patient node carries name and ID pointers, and the sheet printed sex,
+nationality and date of birth beneath them. One citation appearing to vouch for values it had
+never seen is worse than no citation, because it survives being checked casually. Values now
+render beside their own pointer, and a value without one is not rendered as a value at all — it
+appears under *Unresolved*, which is the honest thing to show the model.
+
+**Every untrusted string is encoded.** Labels, attribute values and even document ids come from
+document text, which is attacker-controlled. The old escaper handled ``[]()*_``` and not newlines
+or raw HTML, so a label containing a blank line and ``<!--`` could comment out everything after
+it — including the identity caveat — or inject headings into the model's context. ``_text()`` is
+now the only way a foreign string reaches this document.
+
+**The ``FOR_PATIENT`` caveat is structural.** A document naming a patient is a CLAIM, resolved
+against the registry into candidates a human chooses between. Those claims render in their own
+section, under a caveat emitted before any untrusted text and outside every line that contains
+any — so there is no string an attacker can supply that lands inside the warning or ahead of it.
+Dropping it would feed the model an identity assertion the rest of the system refuses to make
+(CLAUDE.md §Hard constraints 1).
 """
 from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 from typing import Optional
 from urllib.parse import quote
 
@@ -39,151 +57,302 @@ from .schema import EdgeKind, GraphEdge, GraphNode, NodeKind
 CLAIMED_IDENTITY_EDGES = {EdgeKind.FOR_PATIENT}
 
 IDENTITY_CAVEAT = (
-    "**CLAIMED ON THE DOCUMENT — NOT VERIFIED.** This links a document to a registry candidate. "
-    "Identity is checked in person by clinic staff; the system never confirms it."
+    "**CLAIMED ON THE DOCUMENT — NOT VERIFIED.** These link a document to registry candidates. "
+    "Identity is checked in person by clinic staff; the system never confirms it, and nothing "
+    "below may be read as a determination of who this patient is."
 )
+
+# Longest untrusted string reproduced verbatim. A label is a name, a code or a short phrase; a
+# 40KB one is an attempt to push the caveat out of the model's attention, and truncating is the
+# cheap defence that costs a legitimate value nothing.
+MAX_TEXT = 240
+
+# Characters that can begin a markdown construct or raw HTML in PROSE position. Escaped, never
+# stripped: dropping characters silently changes the value, and a value that renders differently
+# from what the source says is its own kind of fabrication. `.`, `-` and `!` are deliberately not
+# here — they can only start a construct at the beginning of a line, and no untrusted string ever
+# reaches the beginning of one (newlines are neutralised below, so a value cannot create a line).
+_MD_ACTIVE = "\\`*_[]()<>&|~#"
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]+")
+_SPACE_RUN = re.compile(r"\s{2,}")
+_BACKTICKS = re.compile(r"`+")
+
+
+def _plain(value: object) -> str:
+    """Flatten an untrusted value to one line, bounded — before any context-specific encoding.
+
+    Newlines and control characters become single spaces, so no foreign string can open a block,
+    close one, or start an HTML comment that swallows the identity caveat. Everything downstream
+    can then assume it is handling a single line.
+    """
+    text = value if isinstance(value, str) else json.dumps(value, default=str, sort_keys=True)
+    text = _CONTROL.sub(" ", text).replace("\n", " ").replace("\r", " ")
+    text = _SPACE_RUN.sub(" ", text).strip()
+    if len(text) > MAX_TEXT:
+        text = text[:MAX_TEXT] + f"… [truncated, {len(text)} chars]"
+    return text
+
+
+def _text(value: object) -> str:
+    """An untrusted value in PROSE position — the only door into this document for foreign text."""
+    return "".join("\\" + ch if ch in _MD_ACTIVE else ch for ch in _plain(value))
+
+
+def _code(value: object) -> str:
+    r"""An untrusted value in a CODE SPAN, where markdown is already inert.
+
+    Backslash-escaping here would be worse than useless: `\_` is not an escape inside a code span,
+    it is two literal characters, so an id would render wrong and no longer match the store. The
+    only thing that can escape a code span is a backtick run, so the fence is widened past the
+    longest run in the value — the CommonMark rule, and it leaves the value itself untouched.
+    """
+    text = _plain(value)
+    if "`" in text:
+        fence = "`" * (max(len(m) for m in _BACKTICKS.findall(text)) + 1)
+        return f"{fence} {text} {fence}"
+    return f"`{text}`"
+
+
+def _vocab(value: object) -> str:
+    """A member of a CLOSED vocabulary — a NodeKind, EdgeKind or SourcePointerKind.
+
+    These come from `schema.py` and `provenance.py`, never from a document, so they are the one
+    class of string here that is ours. Encoding them would render `for_patient` as `for\\_patient`,
+    which is unreadable to a person and, worse, stops matching for anything reading these sheets.
+    """
+    return str(value)
 
 
 def _fmt_time(value: Optional[dt.datetime]) -> str:
     return value.date().isoformat() if value else "—"
 
 
-def _fmt_pointer(pointer: SourcePointer) -> str:
+def _fmt_pointer(pointer: SourcePointer, *, inline: bool = False) -> str:
     """One pointer, rendered so a person can go and look at the thing it names.
 
-    The raw object is included too. "Showcase the pointer" means a reader can check the citation,
-    not take our word for its shape.
+    Every locator field is encoded: a `document_id` comes from a filename and a `derivation` can
+    quote document text, so neither is trusted here just because it lives on a pointer.
     """
     kind = pointer.kind
     if kind == "doc_span":
-        where = f"`{pointer.document_id}` chars {pointer.char_start}–{pointer.char_end}"
+        where = f"{_code(pointer.document_id)} chars {pointer.char_start}–{pointer.char_end}"
     elif kind == "table_cell":
-        where = f"`{pointer.source_id}` → {pointer.table}[{pointer.row_id}].{pointer.column}"
+        where = (f"{_code(pointer.source_id)} → {_text(pointer.table)}"
+                 f"[{_text(pointer.row_id)}].{_text(pointer.column)}")
     elif kind == "ocr_bbox":
-        where = (f"`{pointer.media_id}` page {pointer.page} "
+        where = (f"{_code(pointer.media_id)} page {pointer.page} "
                  f"({pointer.x0},{pointer.y0})–({pointer.x1},{pointer.y1}), "
                  f"OCR confidence {pointer.ocr_conf}")
     elif kind == "derived":
-        where = pointer.derivation or "derived"
+        # A derived pointer names the RULE, and keeps what the rule read. Both matter: the rule
+        # alone is unfalsifiable, the inputs alone do not say what was done to them.
+        where = _text(pointer.derivation or "derived")
+        if pointer.derived_from:
+            where += f" — from {len(pointer.derived_from)} source(s)"
     else:
-        where = pointer.source_id
-    line = f"- **{kind}** — {where}"
+        where = _code(pointer.source_id)
+    if inline:
+        return f"**{_vocab(kind)}** {where}"
+    line = f"- **{_vocab(kind)}** — {where}"
     if pointer.child is not None:
         # A chained citation: extracted text → the region of the original it was read from.
         line += f"\n  - ↳ {_fmt_pointer(pointer.child).lstrip('- ')}"
     return line
 
 
-def _fmt_attrs(attrs: dict) -> list[str]:
-    if not attrs:
-        return ["_No attributes recorded._"]
-    out = []
+def _fmt_attrs(attrs: dict, attr_sources: dict) -> list[str]:
+    """Attributes that have a value AND a pointer. Anything else belongs under *Unresolved*."""
+    lines = []
     for key in sorted(attrs):
         value = attrs[key]
-        rendered = json.dumps(value, default=str) if isinstance(value, (dict, list)) else value
-        out.append(f"- `{key}`: {rendered}")
-    return out
+        pointer = attr_sources.get(key)
+        if value is None or pointer is None:
+            continue
+        lines.append(f"- {_code(key)}: {_text(value)}\n"
+                     f"  - cited: {_fmt_pointer(pointer, inline=True)}")
+    return lines or ["_No grounded attributes recorded._"]
+
+
+def _fmt_unresolved(attrs: dict, attr_sources: dict) -> list[str]:
+    """Every attribute the graph has no answer for, named rather than omitted.
+
+    An absent field that simply does not appear reads as "not applicable". Named, it reads as
+    "asked, and not found" — which is what it is, and what a human needs in order to go and look.
+    """
+    missing = [k for k in sorted(attrs)
+               if attrs[k] is None or attr_sources.get(k) is None]
+    return [f"- {_code(k)}: `None`" for k in missing]
 
 
 def _wikilink(label: str, entity_id: str) -> str:
     """A navigable reference to another node.
 
-    Mirrors the frontend's existing convention (`markdown-panel.tsx`): an ESCAPED label as the link
-    text and a URL-ENCODED id as the href, so neither a label containing markdown nor a forged href
-    can do anything — the renderer decodes the id and navigates only to that exact node. Labels
-    here come from document text, which is attacker-controlled in the real world.
+    Mirrors the frontend's existing convention (`markdown-panel.tsx`): an ENCODED label as the
+    link text and a URL-ENCODED id as the href, so neither a label containing markdown nor a
+    forged href can do anything — the renderer decodes the id and navigates only to that exact
+    node. Labels here come from document text, which is attacker-controlled in the real world.
     """
-    safe = label.replace("\\", "\\\\")
-    for ch in "[]()*_`":
-        safe = safe.replace(ch, "\\" + ch)
-    return f"[{safe}](#wiki:{quote(entity_id, safe='')})"
+    return f"[{_text(label)}](#wiki:{quote(entity_id, safe='')})"
 
 
 def _relation_line(edge: GraphEdge, other_label: str, other_id: str, outgoing: bool) -> str:
+    """One relationship, with the pointers that ground *this edge* — not the node's.
+
+    Relationship lines used to print a date and a candidate count and cite neither, beside a
+    Sources list belonging to the subject node. An edge is a claim in its own right and carries
+    its own evidence; this renders that evidence next to the claim it supports.
+    """
     arrow = "→" if outgoing else "←"
-    line = f"- {arrow} **{edge.kind.value}** {_wikilink(other_label, other_id)} (`{other_id}`)"
+    line = f"- {arrow} **{_vocab(edge.kind.value)}** {_wikilink(other_label, other_id)} " \
+           f"({_code(other_id)})"
     if edge.valid_from:
         line += f" — since {_fmt_time(edge.valid_from)}"
-    if edge.kind in CLAIMED_IDENTITY_EDGES:
-        count = edge.attrs.get("candidate_count")
-        # An UNKNOWN candidate count must produce the MORE cautious wording, never the less. The
-        # eligibility path had the inverse bug: a missing count read as falsy and emitted the
-        # stronger, unqualified phrasing for a link that was never resolved against the registry.
-        of_n = f"1 of {count} candidate(s)" if count else "one of an unrecorded number of candidates"
-        line += f"\n  - {IDENTITY_CAVEAT} ({of_n})"
+    for key in sorted(edge.attrs):
+        value, pointer = edge.attrs[key], edge.attr_sources.get(key)
+        if value is None or pointer is None:
+            line += f"\n  - {_code(key)}: `None` — not recorded"
+        else:
+            line += f"\n  - {_code(key)}: {_text(value)} — cited: {_fmt_pointer(pointer, inline=True)}"
+    for pointer in edge.sources:
+        line += f"\n  - evidence for this relationship: {_fmt_pointer(pointer, inline=True)}"
     return line
+
+
+def _candidate_phrase(edge: GraphEdge) -> str:
+    """How many candidates this claim is one of.
+
+    An UNKNOWN count must produce the MORE cautious wording, never the less. The eligibility path
+    had the inverse bug: a missing count read as falsy and emitted the stronger, unqualified
+    phrasing for a link that was never resolved against the registry. A count present but uncited
+    is treated as unknown — an identity figure nobody can check does not get to make the sheet
+    sound more certain.
+    """
+    count = edge.attrs.get("candidate_count")
+    if count and edge.attr_sources.get("candidate_count") is not None:
+        return f"one of {count} candidate(s)"
+    return "one of an unrecorded number of candidates"
+
+
+def _node_at(store, entity_id: str, as_of: Optional[dt.datetime]) -> Optional[GraphNode]:
+    """The version of ``entity_id`` valid at ``as_of`` — or the open one when ``as_of`` is None.
+
+    ``as_of`` used to filter edges only, so rewinding the sheet still showed the subject's and
+    every endpoint's CURRENT label and attributes: a replay that leaks the present is not a
+    replay. Belief is read as of now (`system_to IS NULL`) — the question the slider asks is
+    "what was true then", answered with everything we know today.
+    """
+    from .store import row_to_node
+
+    if as_of is None:
+        row = store.open_node_row(entity_id)
+        return row_to_node(store, row) if row is not None else None
+    for row in reversed(store.all_node_versions(entity_id)):
+        if row["system_to"] is not None:
+            continue                       # superseded belief, not what we hold today
+        valid_from, valid_to = _parse(row["valid_from"]), _parse(row["valid_to"])
+        if valid_from is not None and valid_from > as_of:
+            continue
+        if valid_to is not None and valid_to <= as_of:
+            continue
+        return row_to_node(store, row)
+    return None
 
 
 def node_markdown(store,
                   node_id: str,
                   *,
                   as_of: Optional[dt.datetime] = None) -> Optional[str]:
-    """The evidence sheet for ``node_id``, or ``None`` if no such node is open.
+    """The evidence sheet for ``node_id``, or ``None`` if no such node existed at ``as_of``.
 
-    ``as_of`` filters the relationships to those valid at that instant, so the sheet answers "what
-    did we know about this entity on that day?" — the same question the time slider asks, in prose.
+    ``as_of`` rewinds the whole sheet — subject, attributes, relationships and endpoint labels —
+    so it answers "what did we know about this entity on that day?" rather than showing today's
+    node wearing that day's edges.
     """
-    from .store import row_to_node
-
-    row = store.open_node_row(node_id)
-    if row is None:
+    node = _node_at(store, node_id, as_of)
+    if node is None:
         return None
-    node: GraphNode = row_to_node(store, row)
 
     lines: list[str] = [
-        f"# {node.label}",
+        f"# {_text(node.label)}",
         "",
-        f"**Kind:** `{node.kind.value}`  ·  **Id:** `{node.id}`",
+        f"**Kind:** {_code(node.kind.value)}  ·  **Id:** {_code(node.id)}",
     ]
     if node.canonical_id:
-        lines.append(f"**Canonical id:** `{node.canonical_id}`")
+        lines.append(f"**Canonical id:** {_code(node.canonical_id)}")
+    if as_of is not None:
+        lines.append(f"**Shown as of:** {_fmt_time(as_of)} (valid time; belief as held today)")
     lines += [
         f"**Known from:** {_fmt_time(node.valid_from)}"
         + (f" until {_fmt_time(node.valid_to)}" if node.valid_to else " (still current)"),
         "",
         "## Attributes",
-        *_fmt_attrs(node.attrs),
+        "_Each value is followed by the citation for that value alone._",
         "",
-        "## Relationships",
+        *_fmt_attrs(node.attrs, node.attr_sources),
     ]
 
-    edges = [row for row in store.edges_touching(node.id)]
-    rendered: list[str] = []
-    labels = {}
-    for edge_row in edges:
-        for endpoint in (edge_row["src_id"], edge_row["dst_id"]):
-            if endpoint not in labels:
-                other = store.open_node_row(endpoint)
-                labels[endpoint] = other["label"] if other is not None else endpoint
+    unresolved = _fmt_unresolved(node.attrs, node.attr_sources)
+    if unresolved:
+        lines += [
+            "",
+            "## Unresolved",
+            "_Asked for and not found in any source. Never guessed, inferred or defaulted._",
+            "",
+            *unresolved,
+        ]
 
-    for edge_row in edges:
-        edge = GraphEdge(
-            id=edge_row["id"], src_id=edge_row["src_id"], dst_id=edge_row["dst_id"],
-            kind=EdgeKind(edge_row["kind"]), weight=edge_row["weight"],
-            attrs=json.loads(edge_row["attrs_json"] or "{}"),
-            sources=store.sources_for(edge_row["id"]),
-            valid_from=_parse(edge_row["valid_from"]), valid_to=_parse(edge_row["valid_to"]),
-            system_from=_parse(edge_row["system_from"]))
+    claims: list[str] = []
+    relations: list[str] = []
+    for edge_row in store.edges_touching(node.id):
+        edge = _edge_from_row(store, edge_row)
         if as_of is not None:
-            start = edge.valid_from
-            end = edge.valid_to
+            start, end = edge.valid_from, edge.valid_to
             if (start and start > as_of) or (end and end <= as_of):
                 continue
         outgoing = edge.src_id == node.id
         other_id = edge.dst_id if outgoing else edge.src_id
-        rendered.append(_relation_line(edge, labels.get(other_id, other_id), other_id, outgoing))
+        other = _node_at(store, other_id, as_of)
+        if other is None:
+            # The endpoint did not exist at this instant. Rendering its current label here is
+            # exactly the leak `as_of` is supposed to prevent, so the id stands alone.
+            label = other_id
+        else:
+            label = other.label
+        line = _relation_line(edge, label, other_id, outgoing)
+        (claims if edge.kind in CLAIMED_IDENTITY_EDGES else relations).append(
+            line + (f"\n  - {_candidate_phrase(edge)}"
+                    if edge.kind in CLAIMED_IDENTITY_EDGES else ""))
 
-    lines += rendered or ["_No relationships recorded at this point in time._"]
+    if claims:
+        # A SEPARATE, TRUSTED BLOCK. The caveat is emitted before any untrusted text and is not
+        # part of any line that contains some, so no supplied label, attribute or id can sit
+        # inside it, precede it, or comment it out.
+        lines += ["", "## Claimed identity — NOT VERIFIED", "", f"> {IDENTITY_CAVEAT}", ""]
+        lines += claims
 
-    sources = node.sources
+    lines += ["", "## Relationships"]
+    lines += relations or ["_No relationships recorded at this point in time._"]
+
     lines += [
         "",
-        "## Sources",
-        f"_{len(sources)} citation(s). Every value above is traceable to one of these._",
+        "## Entity citations",
+        f"_{len(node.sources)} citation(s) for the EXISTENCE of this node — that it was read from "
+        f"somewhere. They do not vouch for the values above; each of those carries its own._",
         "",
     ]
-    lines += [_fmt_pointer(p) for p in sources] or ["_None._"]
+    lines += [_fmt_pointer(p) for p in node.sources] or ["_None._"]
     return "\n".join(lines)
+
+
+def _edge_from_row(store, row) -> GraphEdge:
+    return GraphEdge(
+        id=row["id"], src_id=row["src_id"], dst_id=row["dst_id"],
+        kind=EdgeKind(row["kind"]), weight=row["weight"],
+        attrs=json.loads(row["attrs_json"] or "{}"),
+        attr_sources=store.attr_sources_for(row["id"]),
+        sources=store.sources_for(row["id"]),
+        valid_from=_parse(row["valid_from"]), valid_to=_parse(row["valid_to"]),
+        system_from=_parse(row["system_from"]))
 
 
 def _parse(value) -> Optional[dt.datetime]:

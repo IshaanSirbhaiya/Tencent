@@ -29,8 +29,8 @@ from .store import GraphStore
 _EPOCH = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
 
 
-def _node_from(row, sources: list) -> GraphNode:
-    """Build a node from a row plus PRE-FETCHED pointers.
+def _node_from(row, sources: list, attr_sources: dict) -> GraphNode:
+    """Build a node from a row plus PRE-FETCHED pointers, entity-level and per-attribute.
 
     Deliberately not `store.row_to_node`, which calls `sources_for(id)` — one query per entity, 182
     to build a snapshot of the 69-node seed. This path is on the intake critical path, so the
@@ -41,20 +41,21 @@ def _node_from(row, sources: list) -> GraphNode:
     return GraphNode(
         id=row["id"], kind=NodeKind(row["kind"]), label=row["label"],
         canonical_id=row["canonical_id"], attrs=json.loads(row["attrs_json"] or "{}"),
-        sources=sources,
+        attr_sources=attr_sources, sources=sources,
         valid_from=dt.datetime.fromisoformat(row["valid_from"]),
         valid_to=dt.datetime.fromisoformat(row["valid_to"]) if row["valid_to"] else None,
         system_from=dt.datetime.fromisoformat(row["system_from"]),
         system_to=dt.datetime.fromisoformat(row["system_to"]) if row["system_to"] else None)
 
 
-def _edge_from(row, sources: list) -> GraphEdge:
+def _edge_from(row, sources: list, attr_sources: dict) -> GraphEdge:
     """As `_node_from`, for edges."""
     import json
 
     return GraphEdge(
         id=row["id"], src_id=row["src_id"], dst_id=row["dst_id"], kind=EdgeKind(row["kind"]),
-        weight=row["weight"], attrs=json.loads(row["attrs_json"] or "{}"), sources=sources,
+        weight=row["weight"], attrs=json.loads(row["attrs_json"] or "{}"),
+        attr_sources=attr_sources, sources=sources,
         valid_from=dt.datetime.fromisoformat(row["valid_from"]),
         valid_to=dt.datetime.fromisoformat(row["valid_to"]) if row["valid_to"] else None,
         system_from=dt.datetime.fromisoformat(row["system_from"]),
@@ -146,20 +147,29 @@ class GraphClinicHistory:
         src_max = self.store.fetchone("SELECT COUNT(*) c FROM sources")["c"]
         return (node_max, edge_max, src_max)
 
-    def _all_sources(self) -> dict[str, list]:
-        """Every entity's pointers in ONE query.
+    def _all_sources(self) -> tuple[dict[str, list], dict[str, dict]]:
+        """Every entity's pointers in ONE query — entity-level and per-attribute, kept apart.
 
         `row_to_node`/`row_to_edge` each call `sources_for(id)`, which is a query per entity — 182
         of them to build one snapshot of the 69-node/111-edge seed. This route is on the intake path,
         so that cost is paid on every upload and every selection.
+
+        The two kinds must not be pooled: a `field IS NULL` pointer grounds the entity, a keyed one
+        grounds exactly one attribute, and merging them is the laundering the `field` column was
+        added to stop.
         """
         from databridge_core import SourcePointer
 
-        out: dict[str, list] = {}
-        for row in self.store.fetchall("SELECT entity_id, source_pointer_json FROM sources"):
-            out.setdefault(row["entity_id"], []).append(
-                SourcePointer.model_validate_json(row["source_pointer_json"]))
-        return out
+        entity: dict[str, list] = {}
+        per_attr: dict[str, dict] = {}
+        for row in self.store.fetchall(
+                "SELECT entity_id, field, source_pointer_json FROM sources"):
+            pointer = SourcePointer.model_validate_json(row["source_pointer_json"])
+            if row["field"] is None:
+                entity.setdefault(row["entity_id"], []).append(pointer)
+            else:
+                per_attr.setdefault(row["entity_id"], {})[row["field"]] = pointer
+        return entity, per_attr
 
     def _snapshot(self) -> _Snapshot:
         """One read per graph generation, reused across candidates.
@@ -174,10 +184,11 @@ class GraphClinicHistory:
         if self._cache is not None and self._cache[0] == key:
             return self._cache[1]
 
-        sources = self._all_sources()
-        nodes = {r["id"]: _node_from(r, sources.get(r["id"], []))
+        sources, attr_sources = self._all_sources()
+        nodes = {r["id"]: _node_from(r, sources.get(r["id"], []), attr_sources.get(r["id"], {}))
                  for r in self.store.open_nodes()}
-        edges = [_edge_from(r, sources.get(r["id"], [])) for r in self.store.open_edges()]
+        edges = [_edge_from(r, sources.get(r["id"], []), attr_sources.get(r["id"], {}))
+                 for r in self.store.open_edges()]
         snapshot = _Snapshot(nodes, edges)
         self._cache = (key, snapshot)
         return snapshot

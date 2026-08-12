@@ -339,7 +339,7 @@ def test_document_date_pivots_a_near_future_two_digit_year_toward_today():
     **1926-09-01** because every 20xx reading landing after today was discarded outright, no matter
     how close. `_document_date` must land on 2026, the reading nearest to today."""
     record = _authorised(valid_from="01/09/26")
-    assert _document_date(record) == dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+    assert _document_date(record)[0] == dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
 
 
 def test_document_date_pivots_a_recent_past_two_digit_year_correctly_too():
@@ -348,12 +348,21 @@ def test_document_date_pivots_a_recent_past_two_digit_year_correctly_too():
     century readings are far enough apart (2024 vs 1924) that "nearest" and "prefer 2000s" agree —
     this pins that the comparison, not a hardcoded preference, is what is doing the work."""
     record = _authorised(valid_from="20/05/24")
-    assert _document_date(record) == dt.datetime(2024, 5, 20, tzinfo=dt.timezone.utc)
+    assert _document_date(record)[0] == dt.datetime(2024, 5, 20, tzinfo=dt.timezone.utc)
 
 
 def test_document_date_falls_back_to_appointment_when_valid_from_is_absent():
     record = _authorised(appointment_datetime="15/10/26")
-    assert _document_date(record) == dt.datetime(2026, 10, 15, tzinfo=dt.timezone.utc)
+    assert _document_date(record)[0] == dt.datetime(2026, 10, 15, tzinfo=dt.timezone.utc)
+
+
+def test_document_date_returns_the_pointer_the_date_was_read_from():
+    """The date is also written to the document node as an attribute, and an attribute travels
+    with its own citation. Returning the datetime alone forced the caller to either invent a
+    pointer or print the value uncited — the second is what it did."""
+    record = _authorised(valid_from="01/09/26")
+    _, pointer = _document_date(record)
+    assert pointer is record.authorisation.valid_from.pointer
 
 
 def test_document_date_returns_none_for_an_unparseable_value():

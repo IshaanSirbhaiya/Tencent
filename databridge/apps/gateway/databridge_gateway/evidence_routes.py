@@ -23,10 +23,16 @@ telling the truth about a seam nobody has wired yet. A ``table_cell`` pointer in
 configuration shipped with the app, reported as ``"config"`` rather than stretched to fit the
 upload/email/walk-in vocabulary.
 
-**Known limitation, shown on the page, not hidden here:** ``sources_for()`` is keyed by entity id,
-not by bi-temporal version, so the pointer list returned for a node/edge is EVERY pointer ever
-attached to that id — including ones a later ``as_of`` snapshot would not yet have known. This
-route does not attempt to filter by version; it says so in every response (``"limitation"``).
+**Two kinds of citation, never merged.** ``sources`` grounds the ENTITY — that this node or edge
+exists and was read from somewhere. ``attribute_sources`` grounds each value individually. The
+route used to return ``attrs`` beside one pooled list, which is the shape a reviewer named: a
+citation appearing to vouch for values it had never seen. Anything the graph could not ground is
+listed in ``unresolved`` rather than returned as a value.
+
+**Pointers are read for the version being shown.** ``sources_for()`` was keyed by entity id alone,
+so a node's pointer list was every pointer ever attached to that id and version 2's values could
+render beside version 1's citations. It now takes the row's ``version_pk``. What remains is
+narrower and is still declared in every response (``"limitation"``).
 """
 from __future__ import annotations
 
@@ -41,10 +47,10 @@ from databridge_graph import NodeKind, node_id, row_to_edge, row_to_node
 from databridge_intake.ledger import EvidenceLedger
 
 LIMITATION = (
-    "sources_for() is keyed by entity id, not by bi-temporal version: the pointer list below is "
-    "EVERY SourcePointer ever attached to this id, including ones learned after an earlier "
-    "as_of snapshot. An as_of query against a past moment can therefore surface pointers that "
-    "moment did not actually know about yet."
+    "sources_for() is read for the bi-temporal VERSION shown here, so a superseded value's "
+    "citations no longer appear beside its replacement. What this route still does not do is "
+    "rewind: it answers about the version open now, not about what was believed at some earlier "
+    "moment, so a pointer learned after that moment can still appear."
 )
 
 # The closed vocabulary this route reports for `ingestion_route`. Never widened by a guess —
@@ -216,6 +222,9 @@ def _node_response(app: FastAPI, store, ledger: EvidenceLedger, entity_id: str, 
             "system_from": node.system_from.isoformat() if node.system_from else None,
             "system_to": node.system_to.isoformat() if node.system_to else None,
             "attrs": node.attrs,
+            # Per value, so nothing downstream can present one citation as covering all of them.
+            "attribute_sources": {k: _pointer_dict(v) for k, v in node.attr_sources.items()},
+            "unresolved": node.unresolved,
         },
         "edge": None,
         "sources": _trace_sources(app, store, pointers),
@@ -243,6 +252,8 @@ def _edge_response(app: FastAPI, store, ledger: EvidenceLedger, entity_id: str, 
             "valid_from": edge.valid_from.isoformat() if edge.valid_from else None,
             "valid_to": edge.valid_to.isoformat() if edge.valid_to else None,
             "attrs": edge.attrs,
+            "attribute_sources": {k: _pointer_dict(v) for k, v in edge.attr_sources.items()},
+            "unresolved": edge.unresolved,
         },
         "sources": _trace_sources(app, store, pointers),
         "ledger_entries": ledger_entries,

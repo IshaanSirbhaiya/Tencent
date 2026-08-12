@@ -77,6 +77,17 @@ CREATE TABLE IF NOT EXISTS edges (
 );
 CREATE TABLE IF NOT EXISTS sources (
     entity_id          TEXT NOT NULL,
+    -- NULL  = this pointer grounds the ENTITY (that it exists, and was read from somewhere).
+    -- set   = it grounds ONE named attribute and nothing else. The distinction is the whole
+    --         point: a pooled list of entity pointers under a "Sources" heading reads as
+    --         vouching for every value printed above it, including values it never saw.
+    field              TEXT,
+    -- The nodes/edges row (bi-temporal VERSION) this pointer was recorded for. Without it the
+    -- table is keyed by entity id alone, so every pointer ever attached to an id pools together
+    -- and version 2's values render beside version 1's citations — a pointer that resolves to a
+    -- span which no longer says what the value says. NULL only for rows written before this
+    -- column existed.
+    version_pk         INTEGER,
     source_pointer_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ix_nodes_id ON nodes(id);
@@ -84,6 +95,8 @@ CREATE INDEX IF NOT EXISTS ix_nodes_canon ON nodes(canonical_id);
 CREATE INDEX IF NOT EXISTS ix_edges_src ON edges(src_id);
 CREATE INDEX IF NOT EXISTS ix_edges_dst ON edges(dst_id);
 CREATE INDEX IF NOT EXISTS ix_sources_eid ON sources(entity_id);
+CREATE INDEX IF NOT EXISTS ix_sources_field ON sources(entity_id, field);
+CREATE INDEX IF NOT EXISTS ix_sources_version ON sources(entity_id, version_pk);
 """
 
 
@@ -98,9 +111,25 @@ class GraphStore:
         self.conn.row_factory = sqlite3.Row
         self._lock = threading.RLock()
         self.conn.executescript(_SCHEMA)
+        self._migrate()
         self.conn.commit()
         # injectable clock → deterministic system_time in tests / reproducible demo seed.
         self._clock = clock or (lambda: datetime.now(timezone.utc))
+
+    def _migrate(self) -> None:
+        """Additive migrations for a graph created by an earlier version.
+
+        `CREATE TABLE IF NOT EXISTS` is a no-op against an existing table, so a new column has to
+        be added explicitly or every write against an on-disk store fails. Every pre-existing row
+        gets `field = NULL`, which is exactly right: those pointers were attached to the entity.
+        """
+        have = {r["name"] for r in self.conn.execute("PRAGMA table_info(sources)")}
+        if not have:
+            return
+        if "field" not in have:
+            self.conn.execute("ALTER TABLE sources ADD COLUMN field TEXT")
+        if "version_pk" not in have:
+            self.conn.execute("ALTER TABLE sources ADD COLUMN version_pk INTEGER")
 
     def now(self) -> datetime:
         return self._clock()
@@ -110,42 +139,56 @@ class GraphStore:
         if not node.sources:                              # defence-in-depth (P4)
             raise ValueError(f"node {node.id!r} REFUSED: no SourcePointer")
         with self._lock:
-            self.conn.execute(
+            cur = self.conn.execute(
                 "INSERT INTO nodes(id, kind, label, canonical_id, attrs_json, valid_from, valid_to,"
                 " system_from, system_to) VALUES (?,?,?,?,?,?,?,?,?)",
                 (node.id, node.kind.value, node.label, node.canonical_id,
                  json.dumps(node.attrs, sort_keys=True, default=str),
                  _iso(node.valid_from), _iso(node.valid_to) if node.valid_to else _OPEN,
                  _iso(node.system_from), _iso(node.system_to) if node.system_to else _OPEN))
-            self._attach_sources(node.id, node.sources)
+            self._attach_sources(node.id, node.sources, node.attr_sources, cur.lastrowid)
             self.conn.commit()
 
     def add_edge(self, edge: GraphEdge) -> None:
         if not edge.sources:
             raise ValueError(f"edge {edge.id!r} REFUSED: no SourcePointer")
         with self._lock:
-            self.conn.execute(
+            cur = self.conn.execute(
                 "INSERT INTO edges(id, src_id, dst_id, kind, weight, attrs_json, valid_from, valid_to,"
                 " system_from, system_to) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (edge.id, edge.src_id, edge.dst_id, edge.kind.value, edge.weight,
                  json.dumps(edge.attrs, sort_keys=True, default=str),
                  _iso(edge.valid_from), _iso(edge.valid_to) if edge.valid_to else _OPEN,
                  _iso(edge.system_from), _iso(edge.system_to) if edge.system_to else _OPEN))
-            self._attach_sources(edge.id, edge.sources)
+            self._attach_sources(edge.id, edge.sources, edge.attr_sources, cur.lastrowid)
             self.conn.commit()
 
-    def _attach_sources(self, entity_id: str, sources: list[SourcePointer]) -> None:
+    def _attach_sources(self, entity_id: str, sources: list[SourcePointer],
+                        attr_sources: Optional[dict] = None,
+                        version_pk: Optional[int] = None) -> None:
         # caller holds _lock (add_node/add_edge); for the corroboration path use append_sources.
+        rows = [(entity_id, None, version_pk, sp.model_dump_json()) for sp in sources]
+        rows += [(entity_id, field, version_pk, sp.model_dump_json())
+                 for field, sp in sorted((attr_sources or {}).items())]
         self.conn.executemany(
-            "INSERT INTO sources(entity_id, source_pointer_json) VALUES (?, ?)",
-            [(entity_id, sp.model_dump_json()) for sp in sources])
+            "INSERT INTO sources(entity_id, field, version_pk, source_pointer_json) "
+            "VALUES (?, ?, ?, ?)", rows)
 
     def append_sources(self, entity_id: str, sources: list[SourcePointer]) -> None:
-        """Corroboration: add new SourcePointers to an existing entity (locked + committed)."""
+        """Corroboration: add new SourcePointers to an existing entity (locked + committed).
+
+        The pointers attach to the version that is OPEN now, because that is the version whose
+        values they were just found to support. Attaching them to the entity at large would put
+        them in front of superseded values they were never checked against.
+        """
         if not sources:
             return
         with self._lock:
-            self._attach_sources(entity_id, sources)
+            row = self.conn.execute(
+                "SELECT rowid_pk FROM nodes WHERE id = ? AND system_to IS NULL "
+                "UNION ALL SELECT rowid_pk FROM edges WHERE id = ? AND system_to IS NULL",
+                (entity_id, entity_id)).fetchone()
+            self._attach_sources(entity_id, sources, None, row["rowid_pk"] if row else None)
             self.conn.commit()
 
     def close_node(self, entity_id: str, *, at: datetime, valid_to: Optional[datetime] = None) -> int:
@@ -177,14 +220,14 @@ class GraphStore:
                 "UPDATE nodes SET system_to = ?, valid_to = COALESCE(valid_to, ?) "
                 "WHERE id = ? AND system_to IS NULL", (_iso(at), _iso(valid_to), node.id))
             closed = cur.rowcount
-            self.conn.execute(
+            inserted = self.conn.execute(
                 "INSERT INTO nodes(id, kind, label, canonical_id, attrs_json, valid_from, valid_to,"
                 " system_from, system_to) VALUES (?,?,?,?,?,?,?,?,?)",
                 (node.id, node.kind.value, node.label, node.canonical_id,
                  json.dumps(node.attrs, sort_keys=True, default=str),
                  _iso(node.valid_from), _iso(node.valid_to) if node.valid_to else _OPEN,
                  _iso(node.system_from), _iso(node.system_to) if node.system_to else _OPEN))
-            self._attach_sources(node.id, node.sources)
+            self._attach_sources(node.id, node.sources, node.attr_sources, inserted.lastrowid)
             self.conn.commit()
             return closed
 
@@ -225,10 +268,41 @@ class GraphStore:
             "SELECT * FROM nodes WHERE kind = ? AND system_to IS NULL ORDER BY rowid_pk",
             (kind.value,))
 
-    def sources_for(self, entity_id: str) -> list[SourcePointer]:
-        rows = self.fetchall(
-            "SELECT source_pointer_json FROM sources WHERE entity_id = ?", (entity_id,))
-        return [SourcePointer.model_validate_json(r["source_pointer_json"]) for r in rows]
+    def _pointers(self, entity_id: str, *, field_is_null: bool,
+                  version_pk: Optional[int]) -> list:
+        sql = ("SELECT field, source_pointer_json FROM sources WHERE entity_id = ? AND field IS "
+               + ("NULL" if field_is_null else "NOT NULL"))
+        params: tuple = (entity_id,)
+        if version_pk is not None:
+            # A pointer written before `version_pk` existed (NULL) is kept: it was attached to
+            # this entity at a time when versions were not distinguished, and dropping it would
+            # silently remove real provenance from an upgraded store.
+            sql += " AND (version_pk = ? OR version_pk IS NULL)"
+            params += (version_pk,)
+        rows = self.fetchall(sql, params)
+        if field_is_null:
+            return [SourcePointer.model_validate_json(r["source_pointer_json"]) for r in rows]
+        return {r["field"]: SourcePointer.model_validate_json(r["source_pointer_json"])
+                for r in rows}
+
+    def sources_for(self, entity_id: str,
+                    *, version_pk: Optional[int] = None) -> list[SourcePointer]:
+        """Pointers grounding the ENTITY itself — deliberately NOT the per-attribute ones.
+
+        Mixing the two produces the laundering this schema exists to prevent: a longer citation
+        list under one heading, from which a reader (or a model) infers that every value shown
+        was cited. Per-attribute pointers come back keyed, from `attr_sources_for`.
+
+        ``version_pk`` scopes the answer to ONE bi-temporal version. Without it the result is
+        every pointer ever attached to this id, which is what made a superseded value's citation
+        appear beside its replacement.
+        """
+        return self._pointers(entity_id, field_is_null=True, version_pk=version_pk)
+
+    def attr_sources_for(self, entity_id: str,
+                         *, version_pk: Optional[int] = None) -> dict[str, SourcePointer]:
+        """``{attribute: pointer}``, scoped to one version when ``version_pk`` is given."""
+        return self._pointers(entity_id, field_is_null=False, version_pk=version_pk)
 
     def all_node_versions(self, entity_id: str) -> list[sqlite3.Row]:
         return self.fetchall(
@@ -243,19 +317,39 @@ class GraphStore:
     def counts(self) -> dict[str, int]:
         n = self.fetchone("SELECT COUNT(*) c FROM nodes WHERE system_to IS NULL")["c"]
         e = self.fetchone("SELECT COUNT(*) c FROM edges WHERE system_to IS NULL")["c"]
-        s = self.fetchone("SELECT COUNT(*) c FROM sources")["c"]
-        return {"nodes": n, "edges": e, "sources": s}
+        # Reported apart, because they are not the same claim. `sources` grounds entities;
+        # `attribute_sources` grounds individual values. Summing them into one "sources" figure
+        # would inflate every provenance count on the dashboard the moment per-attribute pointers
+        # landed, and would say nothing about how much of what is DISPLAYED is actually cited.
+        s = self.fetchone("SELECT COUNT(*) c FROM sources WHERE field IS NULL")["c"]
+        a = self.fetchone("SELECT COUNT(*) c FROM sources WHERE field IS NOT NULL")["c"]
+        return {"nodes": n, "edges": e, "sources": s, "attribute_sources": a}
 
     def close(self) -> None:
         self.conn.close()
 
 
 # --- row → typed helpers (used by query.py / serialisation) -----------------------
+def _version_of(row) -> Optional[int]:
+    """The bi-temporal version a row IS, so its pointers are read for that version alone.
+
+    A row that arrived without `rowid_pk` selected (`SELECT id, label ...`) falls back to the
+    unscoped read rather than silently returning no citations — an entity that renders with an
+    empty Sources list reads as ungrounded, which is a worse lie than an over-broad list.
+    """
+    try:
+        return row["rowid_pk"]
+    except (IndexError, KeyError):
+        return None
+
+
+
 def row_to_node(store: GraphStore, row: sqlite3.Row) -> GraphNode:
     return GraphNode(
         id=row["id"], kind=NodeKind(row["kind"]), label=row["label"],
         canonical_id=row["canonical_id"], attrs=json.loads(row["attrs_json"]),
-        sources=store.sources_for(row["id"]),
+        attr_sources=store.attr_sources_for(row["id"], version_pk=_version_of(row)),
+        sources=store.sources_for(row["id"], version_pk=_version_of(row)),
         valid_from=_parse(row["valid_from"]), valid_to=_parse(row["valid_to"]),
         system_from=_parse(row["system_from"]), system_to=_parse(row["system_to"]))
 
@@ -264,6 +358,7 @@ def row_to_edge(store: GraphStore, row: sqlite3.Row) -> GraphEdge:
     return GraphEdge(
         id=row["id"], src_id=row["src_id"], dst_id=row["dst_id"], kind=EdgeKind(row["kind"]),
         weight=row["weight"], attrs=json.loads(row["attrs_json"]),
-        sources=store.sources_for(row["id"]),
+        attr_sources=store.attr_sources_for(row["id"], version_pk=_version_of(row)),
+        sources=store.sources_for(row["id"], version_pk=_version_of(row)),
         valid_from=_parse(row["valid_from"]), valid_to=_parse(row["valid_to"]),
         system_from=_parse(row["system_from"]), system_to=_parse(row["system_to"]))

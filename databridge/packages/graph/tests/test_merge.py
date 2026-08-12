@@ -33,9 +33,15 @@ def _ptr(src="d"):
 
 
 def _org(label, canonical=None, attrs=None, src="d"):
+    # Every attribute gets the same pointer the node is grounded on. A test helper is exactly
+    # where the per-attribute wall would otherwise be quietly worked around, so it grounds them
+    # properly rather than passing a bag of uncited values.
     return GraphNode(id=node_id(NodeKind.ORG, (canonical or label).lower()),
                      kind=NodeKind.ORG, label=label, canonical_id=canonical,
-                     attrs=attrs or {}, sources=[_ptr(src)], valid_from=_T0, system_from=_LEARN)
+                     attrs=attrs or {},
+                     attr_sources={k: _ptr(src) for k, v in (attrs or {}).items()
+                                   if v is not None},
+                     sources=[_ptr(src)], valid_from=_T0, system_from=_LEARN)
 
 
 def _store():

@@ -17,7 +17,8 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]          # databridge/
 # `No module named 'databridge_intake'` — invisible to pytest, fatal to the demo. The assertion
 # below makes that drift impossible to ship.
 _PACKAGES = ("packages/core", "packages/harness", "packages/ingest", "packages/semantic",
-             "packages/convert", "packages/graph", "packages/intake", "packages/evals",
+             "packages/convert", "packages/graph", "packages/intake", "packages/agent",
+             "packages/evals",
              "apps/gateway", "apps/mcp_server")
 for _p in _PACKAGES:
     _path = _ROOT / _p

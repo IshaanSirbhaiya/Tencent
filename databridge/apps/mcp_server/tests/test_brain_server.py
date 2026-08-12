@@ -190,9 +190,13 @@ def _synthetic_add_on_graph():
                              char_start=0, char_end=1)
 
     def node(kind, slug, label, attrs=None):
+        # Each attribute is grounded on the same pointer the node is. Passing a bag of uncited
+        # values would work around the per-attribute wall in the one place it is easiest to.
         return GraphNode(id=node_id(kind, slug), kind=kind, label=label,
-                         canonical_id=slug, attrs=attrs or {}, sources=[ptr()],
-                         valid_from=t0, system_from=t0)
+                         canonical_id=slug, attrs=attrs or {},
+                         attr_sources={k: ptr() for k, v in (attrs or {}).items()
+                                       if v is not None},
+                         sources=[ptr()], valid_from=t0, system_from=t0)
 
     def edge(src, kind, dst, attrs=None):
         return GraphEdge(id=f"{src}|{kind.value}|{dst}", src_id=src, kind=kind, dst_id=dst,

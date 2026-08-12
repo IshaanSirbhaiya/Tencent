@@ -83,6 +83,8 @@ def test_document_node_trace_shows_unknown_ingestion_route_when_no_intake_matche
         assert src["document_id"] == CHIT_01
         assert src["document"]["id"] == f"document:{CHIT_01}"
     assert "sources_for()" in body["limitation"]
+    assert "EVERY SourcePointer ever attached" not in body["limitation"], (
+        "the version-pooling limitation was fixed; the notice must not still claim it")
 
 
 def test_the_self_citation_pointer_resolves_against_the_real_document_text(client):
@@ -213,3 +215,22 @@ def test_ledger_entry_trace_of_an_unknown_row_is_404(client):
     r = client.get("/evidence/trace/ledger:999999")
     assert r.status_code == 404
     assert r.json()["refusal"]["code"] == "UNKNOWN_ENTITY"
+
+
+def test_a_traced_node_cites_each_attribute_separately(client):
+    """Shape A at the API boundary. The route returned `attrs` beside one pooled pointer list, so
+    a caller reading the response — a person, the UI, or a model — could take any citation in that
+    list as covering any value in the dict. Sex, nationality and date of birth are the concrete
+    case named in the review: the node is grounded on name and ID pointers alone."""
+    trace = client.get("/evidence/trace/patient:pat:4e487c99807b").json()
+    if not trace.get("found"):
+        import pytest
+        pytest.skip("seed patient id changed")
+    node = trace["node"]
+    assert node["attrs"], "no attributes to check"
+    for key, value in node["attrs"].items():
+        if value is None:
+            assert key in node["unresolved"], f"{key} is absent but not named as unresolved"
+        else:
+            assert key in node["attribute_sources"], f"{key} is returned with no pointer of its own"
+            assert node["attribute_sources"][key]["kind"], f"{key}'s pointer has no kind"

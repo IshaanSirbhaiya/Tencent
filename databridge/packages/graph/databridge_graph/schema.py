@@ -11,6 +11,18 @@ information **invalidates** a prior version (close its open `*_to`) rather than 
 
 Anti-fabrication (P4, the load-bearing invariant): **a node or edge with no grounded
 SourcePointer is REFUSED at construction** — never stored. `sources` is non-empty by validator.
+
+**And the same wall applies one level down, per attribute.** `sources` grounds the ENTITY — that
+this patient, this document, this rule exists and was read from somewhere. It says nothing about
+the individual values in `attrs`, and a review found sheets printing a patient's sex, nationality
+and date of birth under a `Sources` heading listing only the name and ID pointers: one citation
+appearing to vouch for values it had never seen. So `attr_sources` carries a pointer PER
+ATTRIBUTE, and `_attrs_are_grounded` refuses construction if any attribute has a value but no
+pointer of its own.
+
+An attribute whose value is `None` is the honest way to say "not found", and needs no pointer —
+there is nothing to ground. `unresolved` lists exactly those keys, so a renderer can show the
+question that was asked and left unanswered rather than omitting it silently.
 """
 from __future__ import annotations
 
@@ -18,7 +30,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from databridge_core import SourcePointer
 
@@ -59,8 +71,50 @@ class EdgeKind(str, Enum):
 # single FOR_PATIENT edge as "this is who the patient is" (CLAUDE.md §Hard constraints 1).
 
 
+def _attrs_are_grounded(attrs: dict, attr_sources: dict, what: str) -> None:
+    """The per-attribute grounding wall. Raises rather than storing an uncited value.
+
+    Three rules, and the second is the one a reviewer found broken:
+
+    1. a **non-None** attribute must carry its own pointer — the entity's `sources` do not vouch
+       for it (CLAUDE.md §Hard constraints 2);
+    2. a **None** attribute must NOT carry one — a pointer beside "not found" is a citation for
+       nothing, and reads to both a person and the model as though the absence were established;
+    3. a pointer may not name an attribute that is not there, which is how a value gets deleted
+       while its citation stays behind and later attaches to a different value.
+    """
+    uncited = sorted(k for k, v in attrs.items() if v is not None and k not in attr_sources)
+    if uncited:
+        raise ValueError(
+            f"{what} REFUSED: attribute(s) {uncited} carry a value with no SourcePointer of their "
+            f"own. Ground each one, or set it to None and let `unresolved` name it "
+            f"(anti-fabrication wall, P4)")
+    cited_but_absent = sorted(k for k in attr_sources if k not in attrs)
+    if cited_but_absent:
+        raise ValueError(
+            f"{what} REFUSED: pointer(s) for attribute(s) {cited_but_absent} that do not exist")
+    cited_but_none = sorted(k for k in attr_sources if attrs.get(k) is None)
+    if cited_but_none:
+        raise ValueError(
+            f"{what} REFUSED: attribute(s) {cited_but_none} are None but carry a SourcePointer — "
+            f"a citation for an absent value")
+
+
+class _Grounded(BaseModel):
+    """Shared by GraphNode and GraphEdge: `unresolved`, and the per-attribute wall."""
+
+    @property
+    def unresolved(self) -> list[str]:
+        """Attribute names asked for and not found. Never guessed, never defaulted."""
+        return sorted(k for k, v in self.attrs.items() if v is None)
+
+    def source_for(self, attr: str) -> Optional[SourcePointer]:
+        """The pointer for one attribute, or None if the value itself is absent."""
+        return self.attr_sources.get(attr)
+
+
 # --- in-memory record shapes (the store persists these to SQLite) -----------------
-class GraphNode(BaseModel):
+class GraphNode(_Grounded):
     """One versioned node. ``id`` is stable across versions (``f"{kind}:{slug}"``); each
     bi-temporal version is a distinct row in ``nodes`` sharing this ``id``."""
 
@@ -71,6 +125,7 @@ class GraphNode(BaseModel):
     label: str
     canonical_id: Optional[str] = None       # email / domain / employee-id — exact-merge key
     attrs: dict = Field(default_factory=dict)
+    attr_sources: dict[str, SourcePointer] = Field(default_factory=dict)
     sources: list[SourcePointer] = Field(default_factory=list)
     valid_from: datetime
     valid_to: Optional[datetime] = None
@@ -87,8 +142,13 @@ class GraphNode(BaseModel):
             raise ValueError("GraphNode REFUSED: no SourcePointer (anti-fabrication wall, P4)")
         return v
 
+    @model_validator(mode="after")
+    def _attrs_must_be_grounded(self) -> "GraphNode":
+        _attrs_are_grounded(self.attrs, self.attr_sources, f"node {self.id!r}")
+        return self
 
-class GraphEdge(BaseModel):
+
+class GraphEdge(_Grounded):
     """One versioned, typed, bi-temporal relationship. Grounded like a node (P4)."""
 
     model_config = ConfigDict(frozen=True)
@@ -99,6 +159,7 @@ class GraphEdge(BaseModel):
     kind: EdgeKind
     weight: float = 1.0
     attrs: dict = Field(default_factory=dict)
+    attr_sources: dict[str, SourcePointer] = Field(default_factory=dict)
     sources: list[SourcePointer] = Field(default_factory=list)
     valid_from: datetime
     valid_to: Optional[datetime] = None
@@ -113,6 +174,11 @@ class GraphEdge(BaseModel):
                 "GraphEdge REFUSED: a relationship with no grounded SourcePointer is never "
                 "stored (anti-fabrication wall, P4 / 04_PRD §3)")
         return v
+
+    @model_validator(mode="after")
+    def _attrs_must_be_grounded(self) -> "GraphEdge":
+        _attrs_are_grounded(self.attrs, self.attr_sources, f"edge {self.id!r}")
+        return self
 
 
 def node_id(kind: NodeKind, slug: str) -> str:
