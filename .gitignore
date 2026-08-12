@@ -75,3 +75,8 @@ desktop.ini
 
 # The outbox store the gateway and the dispatcher share. A runtime artefact, not source.
 databridge/var/
+
+# Generated OCR trial documents — rebuild with fixtures/hackathon/ocr_samples/build.py.
+# Same convention as packages/convert/tests/fixtures/chits: no binaries checked in.
+databridge/fixtures/hackathon/ocr_samples/*.png
+databridge/fixtures/hackathon/ocr_samples/*.pdf

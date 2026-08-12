@@ -115,4 +115,13 @@ def main() -> None:  # pragma: no cover (entrypoint)
 
 
 if __name__ == "__main__":  # pragma: no cover
+    # Standalone launch: put the sibling packages on sys.path BEFORE the imports below
+    # resolve. These servers are separate processes by design, so they have to be runnable
+    # on their own — see _bootstrap.
+    import pathlib as _pl
+    import sys as _sys
+    _sys.path.insert(0, str(_pl.Path(__file__).resolve().parent))
+    from _bootstrap import ensure_path
+    ensure_path()
+
     main()
