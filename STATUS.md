@@ -123,10 +123,39 @@ to be requested will be missed. Scoping is now the default and pooling must be n
 
 **1770 passed.**
 
+### 2026-08-12 (evening) — Shape A is closed, and the billing round was reviewed too
+
+**R-18 + R-16 together** (`22d48e9`), then **R-21** (`9b2e9dd`), then a scoped codex pass on both
+which found **5 more, all real** (`fa7e991`):
+
+- An unresolved COVERAGE still printed a confident amount. The completeness check looked only at
+  the price side, so a merely-PARTIAL determination produced a figure with the reason in prose
+  beside it. R-16 again by a different route — **the number is what gets read**.
+- A citation that contradicted its own value: `in_package` cited `tests_from_document`, so the
+  line emitted `false` next to a YAML cell reading `true`. The pointer belonged to a different
+  claim, which now has its own name (`covered_by_rule`).
+- `canonical` cited the document span — "the letter says FBC" offered as evidence for "FBC means
+  full_blood_count".
+- The totals had no provenance at all, on the artefact where the number is the point.
+- `/intelligence/subgraph` still failed open on an empty pointer read, and **its test was vacuous**
+  — it asserted only inside a branch `GraphNode`'s own validator makes unreachable.
+
+**Shape A is now closed everywhere except R-09**, which lives in `packages/agent` and goes with
+Shape E.
+
+**1775 passed.**
+
 ## Now
 
-Nothing in flight. Next section is `REMEDIATION.md` §4 item 2's remainder (R-18 with R-16, and
-R-21), then Shape B.
+Nothing in flight. Two agents ran at the user's request: a push-readiness audit, and
+`docs/hackathon/PROJECT_CONTEXT.md` (full end-to-end project context, for the hackathon's other
+documentation deliverables).
+
+## Next
+
+`REMEDIATION.md` §4 item 3 — **Shape B** (R-17, R-22), then Shape C, then R-13, then Shape E.
+**R-33 now blocks §3.1** and is tracked with it: `_text()` is an HTML/markdown encoder, not a
+prompt-injection boundary, so the model-facing consumer must delimit untrusted evidence itself.
 
 ## Next — work `REMEDIATION.md` §4 top-down
 
