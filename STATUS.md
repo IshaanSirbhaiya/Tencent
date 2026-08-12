@@ -110,10 +110,23 @@ rather than at each renderer:
 
 **1758 passed** (1605 + the 133 that never ran + 20 new), 5 deselected.
 
+### 2026-08-12 (later still) — the review gate on that fix found 13 more
+
+`cb9a622` was reviewed by both. **codex: 11. `/code-review high`: 4 more.** They overlapped on
+almost nothing. Nine fixed in `cb117b9`, four carried forward as R-30…R-33 in `REMEDIATION.md`
+§2.7 — including **R-33, which blocks §3.1**: `_text()` is an HTML/markdown encoder, not a
+prompt-injection boundary, and the model-facing consumer must delimit untrusted evidence itself.
+
+The lesson worth keeping: **I made version scoping opt-in and three call sites did not opt in**,
+one of them eight lines below a comment claiming the defect was fixed. A safety property that has
+to be requested will be missed. Scoping is now the default and pooling must be named.
+
+**1770 passed.**
+
 ## Now
 
-Review gate running on `cb9a622`: `/code-review high` and one scoped `codex exec`, launched
-together. **Do not start the next section until both land.**
+Nothing in flight. Next section is `REMEDIATION.md` §4 item 2's remainder (R-18 with R-16, and
+R-21), then Shape B.
 
 ## Next — work `REMEDIATION.md` §4 top-down
 
