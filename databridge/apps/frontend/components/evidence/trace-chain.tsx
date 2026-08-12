@@ -6,8 +6,21 @@
  * rather than inventing a new look for the one page whose whole job is to be believed.
  */
 import * as React from "react";
-import { AlertTriangle, FileStack, GitCommitHorizontal, Link2, ShieldCheck } from "lucide-react";
-import type { EvidenceLedgerEntry, EvidenceSource, EvidenceTrace } from "@/lib/evidence-api";
+import {
+  AlertTriangle,
+  FileStack,
+  GitCommitHorizontal,
+  HelpCircle,
+  Link2,
+  Share2,
+  ShieldCheck,
+} from "lucide-react";
+import type {
+  EvidenceIncidentEdge,
+  EvidenceLedgerEntry,
+  EvidenceSource,
+  EvidenceTrace,
+} from "@/lib/evidence-api";
 import { cn } from "@/lib/utils";
 import { PointerJson } from "./pointer-json";
 import { RoutePill } from "./route-pill";
@@ -43,6 +56,18 @@ function Stage({
 }
 
 function EntityBadge({ trace }: { trace: EvidenceTrace }) {
+  if (trace.entity_type === "identity_claim") {
+    // Deliberately NOT the accent pill every other entity gets. This is not a relationship the
+    // clinic holds, and it must not read like one at a glance (R-26).
+    return (
+      <span
+        data-testid="evidence-claim-badge"
+        className="rounded bg-band-review/15 px-1.5 py-0.5 text-2xs font-medium text-band-review"
+      >
+        unresolved identity claim · not a relationship
+      </span>
+    );
+  }
   const label =
     trace.entity_type === "node"
       ? `graph node · ${trace.node?.kind}`
@@ -53,6 +78,63 @@ function EntityBadge({ trace }: { trace: EvidenceTrace }) {
     <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-medium text-accent">
       {label}
     </span>
+  );
+}
+
+/** The caveat, printed above any untrusted text and never inside a line that carries some — the
+ *  same structural rule the graph's evidence sheet follows. The wording comes from the response,
+ *  so the two surfaces cannot drift apart. */
+function IdentityCaveat({ caveat }: { caveat: string }) {
+  return (
+    <p
+      data-testid="evidence-identity-caveat"
+      className="mb-3 flex items-start gap-2 rounded-lg border border-band-review/40 bg-band-review/[0.06] px-3 py-2 text-2xs text-band-review"
+    >
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{caveat.replace(/\*\*/g, "")}</span>
+    </p>
+  );
+}
+
+function RelationCard({ relation }: { relation: EvidenceIncidentEdge }) {
+  return (
+    <div
+      data-testid="evidence-relationship"
+      className="mb-2 rounded-lg border border-border bg-surface p-3 last:mb-0"
+    >
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="text-subtle">{relation.direction === "outgoing" ? "→" : "←"}</span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium">{relation.kind}</span>
+        <span className="font-medium">{relation.other_label ?? relation.other_id}</span>
+        <code className="text-2xs text-subtle">{relation.other_id}</code>
+      </div>
+      {relation.established_by.length > 0 && (
+        <p className="mt-1 text-2xs text-band-auto">
+          established by committed ledger row(s) {relation.established_by.join(", ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ClaimCard({ claim }: { claim: EvidenceIncidentEdge }) {
+  return (
+    <div
+      data-testid="evidence-identity-claim"
+      className="mb-2 rounded-lg border border-dashed border-band-review/50 bg-band-review/[0.04] p-3 last:mb-0"
+    >
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="rounded bg-band-review/15 px-1.5 py-0.5 text-2xs font-medium text-band-review">
+          claimed, not verified
+        </span>
+        <span className="font-medium">{claim.other_label ?? claim.other_id}</span>
+        <code className="text-2xs text-subtle">{claim.other_id}</code>
+      </div>
+      <p className="mt-1 text-2xs text-subtle">
+        {claim.candidate_phrase ?? "one of an unrecorded number of candidates"} · no committed
+        ledger row names this pairing, so this system does not say it is the same person
+      </p>
+    </div>
   );
 }
 
@@ -164,6 +246,11 @@ function LedgerRowCard({ entry }: { entry: EvidenceLedgerEntry }) {
 }
 
 export function EvidenceTraceView({ trace }: { trace: EvidenceTrace }) {
+  const hasNeighbours = trace.relationships.length > 0 || trace.identity_claims.length > 0;
+  // Step numbers move with the chain rather than being hardcoded, so the relationships stage can
+  // be absent (an edge or a ledger row has no neighbourhood of its own to show).
+  const neighbourStep = hasNeighbours ? 3 : null;
+  const ledgerStep = hasNeighbours ? 4 : 3;
   return (
     <div className="flex flex-col gap-1">
       <Stage n={1} title="Entity" icon={GitCommitHorizontal}>
@@ -172,6 +259,27 @@ export function EvidenceTraceView({ trace }: { trace: EvidenceTrace }) {
             <code className="text-xs font-medium">{trace.entity_id}</code>
             <EntityBadge trace={trace} />
           </div>
+          {trace.claim && (
+            <>
+              {trace.identity_caveat && <IdentityCaveat caveat={trace.identity_caveat} />}
+              <KeyValueGrid
+                pairs={[
+                  ["claimed by", trace.claim.src_id],
+                  ["claimed to be", trace.claim.dst_id],
+                  ["status", "no committed ledger row — awaiting a human"],
+                  [
+                    "one of",
+                    trace.claim.candidate_phrase ?? "an unrecorded number of candidates",
+                  ],
+                ]}
+              />
+              <p className="mt-2 text-2xs text-subtle">
+                This is what the document says, not what the clinic knows. Staff check
+                NRIC/FIN/passport against the person, in person, and select a candidate; until
+                then there is no relationship here to show.
+              </p>
+            </>
+          )}
           {trace.node && (
             <KeyValueGrid
               pairs={[
@@ -191,6 +299,11 @@ export function EvidenceTraceView({ trace }: { trace: EvidenceTrace }) {
                 ["dst", trace.edge.dst_id],
                 ["valid_from", trace.edge.valid_from ?? "—"],
                 ["valid_to", trace.edge.valid_to ?? "still open"],
+                ...(trace.edge.established_by.length > 0
+                  ? ([
+                      ["established by", `ledger row(s) ${trace.edge.established_by.join(", ")}`],
+                    ] as [string, React.ReactNode][])
+                  : []),
               ]}
             />
           )}
@@ -200,6 +313,9 @@ export function EvidenceTraceView({ trace }: { trace: EvidenceTrace }) {
               this system wrote down.
             </p>
           )}
+          <p data-testid="evidence-authorisation" className="mt-2 text-2xs text-subtle">
+            Released because {trace.authorisation.why}.
+          </p>
         </div>
       </Stage>
 
@@ -214,7 +330,38 @@ export function EvidenceTraceView({ trace }: { trace: EvidenceTrace }) {
         )}
       </Stage>
 
-      <Stage n={3} title="Committed ledger rows" icon={ShieldCheck} last>
+      {neighbourStep !== null && (
+        <Stage
+          n={neighbourStep}
+          title={`Relationships (${trace.relationships.length}) & unresolved claims (${trace.identity_claims.length})`}
+          icon={Share2}
+        >
+          {trace.identity_claims.length > 0 && (
+            <div className="mb-4">
+              <p className="mb-1.5 flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-band-review">
+                <HelpCircle className="h-3 w-3" />
+                Claimed identity — not verified
+              </p>
+              {trace.identity_caveat && <IdentityCaveat caveat={trace.identity_caveat} />}
+              {trace.identity_claims.map((c) => (
+                <ClaimCard key={c.id} claim={c} />
+              ))}
+            </div>
+          )}
+          <p className="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-subtle">
+            Established relationships
+          </p>
+          {trace.relationships.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-subtle">
+              None. Nothing above has been settled by a human yet.
+            </p>
+          ) : (
+            trace.relationships.map((r) => <RelationCard key={r.id} relation={r} />)
+          )}
+        </Stage>
+      )}
+
+      <Stage n={ledgerStep} title="Committed ledger rows" icon={ShieldCheck} last>
         {trace.ledger_entries.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-subtle">
             Nothing has been committed for this entity yet. A value only reaches the ledger after

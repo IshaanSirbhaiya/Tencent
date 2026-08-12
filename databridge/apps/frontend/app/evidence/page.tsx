@@ -63,6 +63,12 @@ function EvidencePageInner() {
           in, by which route, the exact <code>SourcePointer</code> that grounds it, and — if
           staff have confirmed it — who attested and when. Read-only; nothing here writes.
         </p>
+        <p className="mt-1 max-w-2xl text-xs text-subtle">
+          A document→patient link is shown as a <span className="text-fg">relationship</span> only
+          where a committed ledger row names that document and that patient. Everything else is an{" "}
+          <span className="text-band-review">unresolved identity claim</span> — shown, counted,
+          and never asserted. An entity nobody has confirmed yet is not served at all.
+        </p>
       </header>
 
       <form onSubmit={submit} className="flex items-center gap-2">
@@ -108,10 +114,20 @@ function EvidencePageInner() {
       {entityId && q.data && isRefusal(q.data) && (
         <div
           data-testid="evidence-refusal"
+          data-refusal-code={q.data.refusal.code}
           className="rounded-lg border border-band-review/40 bg-band-review/[0.06] px-4 py-3 text-xs"
         >
           <p className="font-medium text-band-review">{q.data.refusal.code}</p>
           <p className="mt-1 text-subtle">{q.data.refusal.message}</p>
+          {q.data.refusal.code === "AWAITING_HUMAN_CONFIRMATION" && (
+            // "Not yet confirmed" is a different fact from "does not exist", and the page must
+            // not let them look the same: this one is the gate working, not a lookup failure.
+            <p className="mt-2 text-subtle">
+              This is the confirmation gate, not an error. The entity exists; its evidence becomes
+              readable the moment a named staff member checks identity in person, selects a
+              registry row and confirms.
+            </p>
+          )}
         </div>
       )}
 
