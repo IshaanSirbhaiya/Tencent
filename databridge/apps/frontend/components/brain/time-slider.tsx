@@ -2,6 +2,7 @@
 import * as React from "react";
 import { Clock, RotateCcw } from "lucide-react";
 import type { BrainGraph } from "@/lib/brain-types";
+import { ExportSheetsButton } from "./export-sheets-button";
 
 /**
  * The bi-temporal time slider: "show me the clinic as the graph knew it on <date>".
@@ -132,6 +133,11 @@ export function TimeSlider({
           </button>
         ) : null}
       </div>
+
+      {/* The export lives HERE, beside the instant it uses. `null` at "now" means the archive is
+          the current graph; rewound, it carries the same instant the label above reports, so the
+          folder that lands in Downloads is the graph on screen rather than today's. */}
+      <ExportSheetsButton asOf={atNow || ts === null ? null : new Date(ts).toISOString()} />
     </div>
   );
 }

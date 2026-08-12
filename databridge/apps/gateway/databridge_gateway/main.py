@@ -24,6 +24,8 @@ from databridge_semantic.confirmation import ConfirmationSession, MandatoryRevie
 
 from . import demo_state as ds
 from .evidence_routes import register_evidence_routes
+from .export_routes import register_export_routes
+from .mcp_routes import register_mcp_routes
 from .intake_routes import _register_intake_routes
 from .intelligence_routes import _register_intelligence_routes
 from .models import (
@@ -112,6 +114,8 @@ def create_app() -> FastAPI:
     # row, with the raw SourcePointer shown rather than summarised. This is the
     # Governance & Safety criterion rendered instead of asserted.
     register_evidence_routes(app)
+    register_mcp_routes(app)
+    register_export_routes(app)
 
     # ---- intelligence: the graph, interpreted ----------------------------------
     # Counts of STRUCTURAL FACTS, each with its denominator and each walkable to the
@@ -313,6 +317,13 @@ def create_app() -> FastAPI:
                 when = dt.datetime.fromisoformat(as_of)
             except ValueError:
                 return _refusal("BAD_AS_OF", f"'{as_of}' is not an ISO-8601 timestamp")
+            if when.tzinfo is None:
+                # The store holds nothing but UTC-aware instants, and comparing a naive one
+                # against them raises TypeError deep inside the renderer — which surfaces as a
+                # 500 rather than as the refusal this endpoint is careful to give everywhere
+                # else. `?as_of=2026-05-01` is a perfectly reasonable thing for a person to
+                # type, so it is normalised rather than rejected.
+                when = when.replace(tzinfo=dt.timezone.utc)
         sheet = node_markdown(app.state.brain.store, entity_id, as_of=when)
         if sheet is None:
             return _refusal("UNKNOWN_ENTITY", f"no open node '{entity_id}'", status=404)

@@ -46,6 +46,32 @@ export const brainApi = {
     call<{ entity_id: string; markdown: string } & { refusal?: Refusal }>(
       `/brain/node/${encodeURIComponent(entityId)}/sheet`,
     ),
+  /** EVERY node's evidence sheet, as a zip of markdown files.
+   *
+   * The same document `nodeSheet` returns, for every entity at once — a folder that opens in any
+   * editor or Obsidian vault. It is the provenance claim made portable: a reviewer who will never
+   * run this app can still read what the system knows about an entity and check each value against
+   * the citation printed beside it.
+   *
+   * `asOf` is passed through so the download matches what is on screen: with the time slider
+   * rewound, the sheets are the ones that instant would have produced, and an entity that did not
+   * exist then is absent from the folder rather than present and empty.
+   *
+   * Fetched as a blob rather than navigated to, so a refusal (503 when the graph is not loaded)
+   * arrives as a value this app can show instead of raw JSON replacing the page. */
+  downloadSheets: async (asOf?: string | null): Promise<{ filename: string; blob: Blob }> => {
+    const query = asOf ? `?as_of=${encodeURIComponent(asOf)}` : "";
+    const res = await fetch(`${GATEWAY}/brain/export/sheets${query}`, { cache: "no-store" });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { refusal?: Refusal };
+      throw new Error(body.refusal?.message ?? `Export failed (${res.status})`);
+    }
+    // The server names the archive (it knows the instant it actually rendered at); fall back only
+    // if the header is absent — `Content-Disposition` is readable here because the route exposes it.
+    const disposition = res.headers.get("content-disposition") ?? "";
+    const match = /filename="([^"\\]+)"/.exec(disposition);
+    return { filename: match?.[1] ?? "clinic-evidence-sheets.zip", blob: await res.blob() };
+  },
   // drag-and-drop ingest (Part 2): a registered fixture filename (or inline text) → grounded
   // extraction → new graph nodes. Returns the genuinely NEW entity labels.
   ingest: (source_path: string, text?: string | null) =>
