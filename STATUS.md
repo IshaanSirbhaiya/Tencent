@@ -11,7 +11,7 @@ which is the file to read after `CLAUDE.md` in a fresh session.**
 2026-08-12 and every one came back with Criticals, including both pieces the lead wrote. They are
 five recurring shapes, not eighteen bugs; `REMEDIATION.md` §1 names them and §4 gives the order.
 
-**Green:** `python -m pytest -m "not integration"` → **1938 passed, 5 deselected** ·
+**Green:** `python -m pytest -m "not integration"` → **2131 passed, 5 deselected** ·
 `npx playwright test` → **18 passed** · `npx tsc --noEmit` clean.
 The e2e suite is now genuinely offline — see Gotchas.
 
@@ -170,25 +170,61 @@ safe: disjoint files, never "different features").
 
 **1938 passed, 5 deselected.**
 
+### 2026-08-13 — the agent does things now, and the MCPs are real connections
+
+The build moved from "an agent that reports" to **an agent that acts**, and from "an MCP server
+exists" to **an aggregator you can connect anything to**.
+
+**Real MCP, proven end to end.** A self-hosted MCPJungle aggregator fronts our read-only clinic
+server; `brain_query` was invoked *through it* against real clinic data, and `brain_ingest` is
+unreachable from it ("Unknown tool"). Then the harder proof: a **third-party** MCP server
+(`@modelcontextprotocol/server-memory`) was bridged from stdio to streamable HTTP, registered, and
+invoked — so this is a general connector, not a demo wired to one endpoint.
+
+**The trap worth knowing:** most published MCP servers are stdio, and an aggregator in Docker
+cannot spawn a process on the host. The bridge is one line
+(`npx -y supergateway --stdio "<cmd>" --outputTransport streamableHttp --port N`), and the failure
+without it looks like a protocol fault rather than a transport mismatch. `MCP_RUNBOOK.md` §4 records
+that and the three other failure modes hit on the way — including the MCP SDK's DNS-rebinding
+protection returning **421** for `host.docker.internal`, which is invisible from the host because
+local curl succeeds.
+
+**The capability model is written down** (`AGENT_CAPABILITIES.md`) and it is the design everything
+follows: the agent may **propose anything and perform nothing**. Tier 1 reads run immediately;
+Tier 2 writes a draft to an append-only outbox; Tier 3 is a **model-free dispatcher** that executes
+approved rows through act-capable servers the agent's aggregator does not front. An instruction
+injected into a referral letter can at worst produce a draft a human reads.
+
+**`/intelligence` was naming the people it counted.** The review found the citation drill-down
+reached named, scored candidates one click from an answer. Working it found worse: `GET
+/intelligence` published patient names with **no click at all** — `conflicts.members` are patient
+node ids and `entities` carried their labels. Both closed structurally: a dedicated traversal built
+from allow-lists that default shut (a *filter* would expose every node kind added later), no
+`attrs` emitted at all, and labels gated on **provenance** — a label prints only if every pointer
+grounding it is a cell in `coverage_rules.yaml`, which catches the employer name and the clinic
+location as well as the filename.
+
+**OCR is in the UI, and R-13 was fixed in the same change.** R-13 was deferred on exactly one
+ground — no UI reached OCR — so adding the button removed the ground. The rule: *a checkbox-derived
+field may be grounded only from characters that were **read**, not **recognised***. Origin proves
+completeness; no OCR output can. Verified against a real scan where the engine genuinely drops every
+glyph. **Cost, stated in `POC_SCOPE.md` §2a:** a scanned document yields no package code, name,
+requested tests or add-ons — a scan alone cannot drive the coverage determination.
+
+**2131 passed.**
+
 ## Now
 
-**The agent is hardened but NOT wired, and NOT cleared.** A scoped `codex exec` on `5c402f2`
-returned **"I would not ship this"** — 7 findings, 2 Critical, and they are the right kind:
+Five tracks in flight, partitioned by file ownership: connectors UI + MCP management, the outbox +
+dispatcher + mail MCP, R-02/R-30 in `packages/graph`, and node-sheet markdown export.
 
-1. **The model could still steer identity — by presentation.** `AnswerPlan.report` let it filter
-   and reorder rows, so it could show only candidate 2 or place it first. Showing one candidate of
-   three *is* a recommendation, and the code-authored "a human must select" sentence does not undo
-   it. Constraint 1, surviving in a subtler form than the tool-argument attack that was fixed.
-2. **The argument screen walked one level.** Nested `{"filters": {"properties": {"patient_id"}}}`
-   passes, as do generic names (`id`, `query`, `record`) and `patternProperties`. It was a
-   denylist of names — the same shape of guard R-10 had already failed with once.
-3. **The safe renderer is not the API contract.** `AgentAnswer.answer` being a property means
-   serialisation omits it while `tool_calls` emits raw model arguments and unredacted rows, so any
-   route returning that object bypasses `render.present()` entirely.
+**The last big piece is the `/intelligence` action console** — request box → grounded answer →
+proposed action cards → approve → executed result. It is queued behind the outbox landing, because
+the propose/execute tiers need it.
 
-Fixes are in flight. `/intelligence` stays unwired until they land and are re-reviewed: putting an
-agent that can steer identity onto the surface judges look at is the exact ordering error this
-remediation exists to prevent.
+**Process note, learned the hard way twice today:** `git add -A` is wrong while other tracks are
+writing. It swept another track's in-flight files into two unrelated commits; both were backed out.
+Stage explicit paths.
 
 ## Next
 
