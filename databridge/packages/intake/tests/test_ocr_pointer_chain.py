@@ -20,7 +20,7 @@ import pytest
 from databridge_core import GroundedValue, SourcePointer
 from databridge_convert.adapters.source.docling_extract import TextRegion
 
-from databridge_intake.extract import extract_intake
+from databridge_intake.extract import CHECKBOX_SENSITIVE, extract_intake
 from databridge_intake.gold import gold_harness
 from databridge_intake.ocr import (MediaIndex, UnsupportedUpload, attach_media_provenance,
                                    extract_upload)
@@ -166,15 +166,26 @@ def test_the_classification_pointer_chains_through_to_the_scan(scanned_record):
 
 
 def test_the_same_document_without_geometry_is_unchanged_except_for_the_children(chit_text):
-    # Pasted text has no page behind it. The record must be identical apart from the missing
-    # children — the media index is an ENRICHMENT, never a second extraction path.
+    # Pasted text has no page behind it. Apart from the missing children the two records must
+    # agree — the media index is an ENRICHMENT, never a second extraction path.
+    #
+    # With ONE exception, and it is deliberate (R-13): `from_ocr` is also the evidence behind the
+    # checkbox control, because a ☐ the engine failed to recognise is indistinguishable from one
+    # that was never printed. So the four `CHECKBOX_SENSITIVE` paths are withheld from recognised
+    # text and land in `unresolved` instead. Everything else must still match, which is what makes
+    # the control narrow rather than "refuse the scan".
     plain = extract_intake(chit_text, document_id=CHIT, harness=gold_harness())
     scanned = extract_intake(chit_text, document_id=CHIT, harness=gold_harness(),
                              media=line_regions(chit_text, CHIT))
-    assert plain.unresolved == scanned.unresolved
-    assert plain.refused == scanned.refused
+    assert set(plain.unresolved) <= set(scanned.unresolved)
+    assert set(scanned.unresolved) - set(plain.unresolved) <= CHECKBOX_SENSITIVE
+    scanned_fields = scanned.grounded_fields()
     for path, value in plain.grounded_fields().items():
-        other = scanned.grounded_fields()[path]
+        if path.rsplit("[", 1)[0] in CHECKBOX_SENSITIVE:
+            assert path not in scanned_fields, (
+                f"{path} grounded off text whose checkbox state cannot be proved complete")
+            continue
+        other = scanned_fields[path]
         assert value.value == other.value
         assert value.pointer.char_start == other.pointer.char_start
         assert value.pointer.char_end == other.pointer.char_end

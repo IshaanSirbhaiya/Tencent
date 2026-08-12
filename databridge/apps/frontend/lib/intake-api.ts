@@ -47,6 +47,40 @@ export const intakeApi = {
       body: JSON.stringify({ document_id: documentId, text, channel }),
     }),
 
+  /** Upload a referring document as a FILE — `.txt`/`.md`/`.eml`, a PDF, or a scan.
+   *
+   *  Deliberately NOT routed through `call`: that helper pins `Content-Type: application/json`,
+   *  and a multipart body needs the boundary the browser generates. Setting the header by hand
+   *  here would produce a body FastAPI cannot parse, which surfaces as a 422 that reads like a
+   *  refusal — so the header is omitted on purpose, not by oversight.
+   *
+   *  This is the SAME endpoint and the same pipeline the paste box uses one step later: the file
+   *  is extracted server-side into one text, and that text is what the record is built from. There
+   *  is no client-side parsing and no separate demo path.
+   *
+   *  A refusal is an expected outcome here (`IDENTITY_DOCUMENT_REFUSED`, `UNSUPPORTED_DOCUMENT`,
+   *  `EXTRACTION_UNAVAILABLE`), so it is returned rather than thrown, exactly as elsewhere. */
+  uploadFile: async (
+    file: File,
+    documentId?: string,
+    channel = "upload",
+  ): Promise<SummaryCard | Refusal> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (documentId?.trim()) form.append("document_id", documentId.trim());
+    form.append("channel", channel);
+    const res = await fetch(`${GATEWAY}/intake/upload-file`, {
+      method: "POST",
+      body: form,
+      cache: "no-store",
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok && !("refusal" in body)) {
+      throw new Error(`/intake/upload-file → ${res.status}`);
+    }
+    return body as SummaryCard | Refusal;
+  },
+
   evidence: (intakeId: string, fieldPath: string) =>
     call<EvidenceView | Refusal>(
       // The route is `{field_path:path}`, so the dots must survive — encode per SEGMENT rather

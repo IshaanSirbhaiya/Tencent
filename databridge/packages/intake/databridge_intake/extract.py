@@ -298,7 +298,12 @@ def extract_intake(
     # unticked lines blanked out. Otherwise the wall happily confirms an option the form declined:
     # PEE224/PEE225 and WELL1/WELL3 are all printed on their forms, so "does this string appear?"
     # is the wrong question for them. Offsets are preserved, so pointers still resolve.
-    selected_view = mask_unticked_options(text)
+    #
+    # `media`/`media_type` are what make that a control rather than a hope (R-13): a scan that
+    # lost its ☒/☐ leaves the option text on the page and the masking silently no-ops, so the
+    # view also blanks any stretch whose checkbox state cannot be PROVED complete. These four
+    # fields then come back None + `unresolved` instead of grounded beside a warning.
+    selected_view = mask_unticked_options(text, media=media, media_type=media_type)
 
     def _source_for(path: str) -> str:
         return selected_view if path in CHECKBOX_SENSITIVE else text

@@ -166,9 +166,105 @@ def _find_span_ignoring_whitespace(text: str, canon_needle: str) -> Optional[tup
 TICKED_BOX = "☒"       # ☒
 UNTICKED_BOX = "☐"     # ☐
 
+# Media types whose text can only have come out of a RECOGNITION step, or might have. An image
+# always did. A PDF may carry its own text layer instead — but from the media type alone the two
+# are indistinguishable, and the distinction is exactly what this control turns on, so a PDF with
+# no region index is treated as unproven rather than assumed to be a text layer.
+_RECOGNISED_MEDIA_PREFIXES = ("image/",)
+_RECOGNISED_MEDIA_TYPES = frozenset({"application/pdf"})
 
-def mask_unticked_options(text: str) -> str:
-    """Blank out lines carrying an UNTICKED checkbox, preserving offsets.
+
+def _may_be_recognised(media_type: str) -> bool:
+    mt = (media_type or "").split(";")[0].strip().lower()
+    return bool(mt) and (mt in _RECOGNISED_MEDIA_TYPES
+                         or any(mt.startswith(p) for p in _RECOGNISED_MEDIA_PREFIXES))
+
+
+def _line_bounds(text: str) -> list[tuple[int, int]]:
+    """(start, end) of each line's CONTENT — the terminator is excluded, offsets are absolute."""
+    bounds, cursor = [], 0
+    for line in text.splitlines(keepends=True):
+        content = len(line.rstrip("\r\n"))
+        bounds.append((cursor, cursor + content))
+        cursor += len(line)
+    return bounds
+
+
+def unprovable_checkbox_spans(text: str, media: Any = None,
+                              media_type: str = "text/plain") -> tuple[tuple[int, int], ...]:
+    """Character ranges of ``text`` whose checkbox state cannot be **proved** complete (R-13).
+
+    **What "provably complete" means here, and why it is this and not something looser.**
+
+    ``mask_unticked_options`` is only a control while the ``☐`` is still on the page. If the glyph
+    is lost, the option text survives, the masking silently becomes a no-op, and a test the
+    patient DECLINED can be grounded, confirmed and billed. So the question is not "did we see a
+    checkbox?" but "can we prove we saw *every* checkbox?".
+
+    For recognised text that proof does not exist, and cannot be manufactured. The evidence of a
+    missing checkbox is precisely its absence: a line reading ``WELL1 — Essential Screen`` looks
+    identical whether the form printed no box beside it or the engine failed to recognise the box
+    it did print. Recovering a ``☒`` somewhere else on the page is not evidence about *this* line —
+    per-line recognition succeeds and fails independently — which is why "we saw at least one box"
+    is not a control, and why the document-wide warning this replaces was not one either.
+
+    The proof that *does* exist is about ORIGIN, not about glyphs: where the characters were read
+    rather than recognised — a text file taken verbatim, or a PDF's own text layer — the character
+    stream is the document's own, so a ``☐`` that is not there was never printed. That is the only
+    complete-recovery proof available, so it is the one encoded:
+
+      * region index reports OCR-recognised lines → **those lines** are unprovable (per line, so a
+        mixed PDF keeps its text-layer pages and a partially recognised page fails closed);
+      * region index reports only text-layer lines → provable, nothing is withheld;
+      * **no region index at all, but a media type that recognition could have produced** →
+        unprovable, whole document. This is the fail-closed default for a caller that extracted a
+        scan and did not thread ``media`` through: forgetting must not silently restore the
+        permissive behaviour, because no test anywhere would notice;
+      * no region index, and a media type recognition never touches (pasted text, ``.txt``,
+        ``.eml``) → provable, nothing is withheld.
+
+    There is deliberately no branch in which recognised text is treated as provably complete. If an
+    engine ever reported per-glyph recall — "this line was searched for a ballot box and none was
+    printed" — that is where it would go, and it would be a change to this function alone.
+    """
+    regions = tuple(getattr(media, "regions", ()) or ())
+    recognised = [r for r in regions
+                  if getattr(r, "from_ocr", False)
+                  and getattr(r, "char_start", None) is not None
+                  and getattr(r, "char_end", None) is not None]
+    if recognised:
+        # A whole LINE, not the region's own span: a value can sit in the gap between two
+        # recognised cells (a form's label/value columns are separate cells), and a control that
+        # only blanked the cells would leave exactly those values groundable.
+        covered = bytearray(len(text))
+        for r in recognised:
+            start = max(0, min(int(r.char_start), len(text)))
+            end = max(start + 1, min(int(r.char_end), len(text)))
+            covered[start:end] = b"\x01" * (end - start)
+        return tuple((s, e) for s, e in _line_bounds(text)
+                     if s < e and any(covered[s:e]))
+    if regions:
+        return ()                       # every recognised line came from a text layer
+    if _may_be_recognised(media_type):
+        return ((0, len(text)),)        # the forgotten-media case — fail closed, loudly
+    return ()
+
+
+def _blank(chars: list[str], start: int, end: int) -> None:
+    """Replace a range with spaces IN PLACE, leaving line terminators alone.
+
+    Offsets are preserved (characters replaced, never deleted) so pointers built against the
+    masked view still resolve correctly against the original text.
+    """
+    for i in range(max(0, start), min(end, len(chars))):
+        if chars[i] not in ("\n", "\r"):
+            chars[i] = " "
+
+
+def mask_unticked_options(text: str, *, media: Any = None,
+                          media_type: str = "text/plain") -> str:
+    """The view a checkbox-derived field is grounded against: declined options and unproven
+    checkbox state both blanked out, offsets preserved.
 
     On a checkbox form the unselected options are printed in full: the TPA authorisation form
     lists PEE224, PEE225 *and* PEE226, and the wellness voucher lists WELL1, WELL2 *and* WELL3.
@@ -180,19 +276,29 @@ def mask_unticked_options(text: str) -> str:
     Unicode ballot box rather than on any issuer's layout, so it works for any form that uses the
     convention and is a no-op for documents that do not.
 
-    Offsets are preserved (characters replaced with spaces, not deleted) so pointers built against
-    the masked view still resolve correctly against the original text.
+    **R-13.** That is only true while the glyphs are on the page, so the second half of this view
+    is about the glyphs that are NOT. ``media``/``media_type`` say where the characters came from;
+    any stretch whose checkbox state cannot be proved complete
+    (``unprovable_checkbox_spans``) is blanked as well. The caller grounds only the
+    checkbox-derived fields against this view, so the effect is that those fields — and only
+    those — come back ``None`` and land in ``unresolved`` instead of arriving as a grounded value
+    beside a warning nobody has to act on.
+
+    Both arguments are keyword-only and both are consulted: passing neither, for a document that
+    a recognition step produced, is the failure this control exists to catch.
     """
-    if UNTICKED_BOX not in text:
+    withheld = unprovable_checkbox_spans(text, media, media_type)
+    if UNTICKED_BOX not in text and not withheld:
         return text
-    out = []
-    for line in text.splitlines(keepends=True):
-        if UNTICKED_BOX in line and TICKED_BOX not in line:
-            stripped = line.rstrip("\r\n")
-            out.append(" " * len(stripped) + line[len(stripped):])
-        else:
-            out.append(line)
-    return "".join(out)
+    chars = list(text)
+    if UNTICKED_BOX in text:
+        for start, end in _line_bounds(text):
+            line = text[start:end]
+            if UNTICKED_BOX in line and TICKED_BOX not in line:
+                _blank(chars, start, end)
+    for start, end in withheld:
+        _blank(chars, start, end)
+    return "".join(chars)
 
 
 # --- locating a value in the source ------------------------------------------------

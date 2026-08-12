@@ -109,6 +109,25 @@ export interface ConfirmationView {
   blocked_because: string;
 }
 
+/** How an uploaded FILE became text. Present only on `/intake/upload-file` responses.
+ *
+ *  Kept beside the card rather than folded into it because it describes the *reading*, not the
+ *  document: which engine ran, which pages needed OCR, and — the part that matters — what could
+ *  not be recovered. A scan whose checkbox marks were lost is not a footnote, it is the reason
+ *  `authorisation.package_code` is in `unresolved`, and a silent OCR result that looks identical
+ *  to typed text is exactly the failure mode this field exists to prevent. */
+export interface ExtractionReport {
+  engine: string;
+  media_type: string;
+  page_count: number;
+  /** 1-based page numbers that went through recognition. Empty for text and text-layer PDFs. */
+  ocr_pages: number[];
+  /** How many recognised regions back the pointers — each `ocr_bbox` comes from one of these. */
+  regions: number;
+  warnings: string[];
+  loss_report: unknown[];
+}
+
 export interface SummaryCard {
   intake_id: string;
   document: {
@@ -126,6 +145,8 @@ export interface SummaryCard {
   /** Values the grounding wall dropped, with reasons. A caught fabrication is worth showing. */
   refused: string[];
   confirmation?: ConfirmationView;
+  /** Only on a file upload. Absent for a paste — there was no extraction to report. */
+  extraction?: ExtractionReport;
 }
 
 export interface QueueRow {

@@ -23,6 +23,13 @@ The child is attached **only** where the text was genuinely OCR'd — see ``docl
 restriction (2). A PDF's own text layer has geometry but no recognition step, so it has no OCR
 confidence, and manufacturing one would be a value without a source wearing a source's clothes.
 Pasted text has neither, and gets no child at all.
+
+**The index is not only an enrichment (R-13).** ``from_ocr`` is also the evidence behind the
+checkbox control: a ``☐`` the engine failed to recognise is indistinguishable from one that was
+never printed, so ``ground.unprovable_checkbox_spans`` withholds every recognised line from the
+view that checkbox-derived fields are grounded against. Which means a caller that extracts a scan
+and does not thread this index into the pipeline gets the *safe* answer (nothing grounded from a
+checkbox) rather than the permissive one. See ``ground.mask_unticked_options``.
 """
 from __future__ import annotations
 
@@ -169,18 +176,28 @@ def extract_upload(data: bytes, *, document_id: str, filename: str = "",
         raise UnsupportedUpload("this file could not be read as a PDF or an image") from exc
 
     warnings = list(extracted.warnings)
-    if extracted.ocr_pages and TICKED_BOX not in extracted.text \
-            and UNTICKED_BOX not in extracted.text:
+    if extracted.ocr_pages:
         # The checkbox state IS the package signal on the authorisation forms and the wellness
         # voucher — `ground.mask_unticked_options` blanks the unticked lines so the wall cannot
         # confirm an option the form declined. OCR does not reliably recognise ☒/☐ (the bundled
         # engine drops them entirely), and when they are gone the masking silently becomes a
         # no-op: every declined option is back on the page as far as the wall is concerned, and
-        # the wrong examination can be authorised and billed. We cannot tell "this scan had no
-        # checkboxes" from "this scan's checkboxes were lost", so we say so rather than guess.
+        # the wrong examination can be authorised and billed.
+        #
+        # We cannot tell "this scan had no checkboxes" from "this scan's checkboxes were lost",
+        # and recovering a mark on one line says nothing about the next one — so this warning is
+        # unconditional on any glyph having survived, and it reports a REFUSAL rather than asking
+        # the reader to be careful. `unprovable_checkbox_spans` withholds the recognised lines
+        # from the checkbox view, so the package, the requested tests and the add-ons come back
+        # unresolved for a scan. R-13: a document-wide warning is not a grounding control, so this
+        # text now describes the control instead of standing in for one.
+        recovered = TICKED_BOX in extracted.text or UNTICKED_BOX in extracted.text
         warnings.append(
-            "checkbox marks (☒/☐) were not recovered from this scan; if the document is "
-            "a tick-box form, any package or test selection must be checked against the original")
+            "checkbox state cannot be proved complete for text recovered by OCR"
+            + (", even though some ☒/☐ marks were recognised" if recovered
+               else " (no ☒/☐ marks were recognised at all)")
+            + ": the package, the requested tests and any add-ons have been left unresolved "
+              "rather than read from the scan, and must be taken from the original document")
     return UploadExtraction(
         text=extracted.text,
         media=MediaIndex(document_id=document_id, regions=extracted.regions),
