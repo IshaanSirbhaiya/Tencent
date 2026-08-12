@@ -74,28 +74,39 @@ def _line(test, rule) -> dict:
     priced = test.list_price_sgd is not None
     pointers = {}
     if test.pointer is not None:
+        # The span the printed text was read from. It establishes THAT text and nothing else.
         pointers["as_printed"] = test.pointer
-        if test.canonical is not None:
-            # The catalogue match is a claim about this printed text, so it cites the same span.
-            pointers["canonical"] = test.pointer
+    if test.canonical is not None:
+        # The catalogue match is a claim about the CATALOGUE, not about the letter. Citing the
+        # document span for it — which the first version of this did — offers "the letter says
+        # 'FBC'" as evidence for "'FBC' means full_blood_count", which the span cannot establish.
+        pointers["canonical"] = _yaml_ptr("test_catalogue", "canonical", test.canonical)
     if priced and test.canonical is not None:
         pointers["list_price_sgd"] = _yaml_ptr("test_catalogue", "list_price_sgd", test.canonical)
     if rule is not None:
-        pointers["in_package"] = _yaml_ptr(
+        # `in_package` is membership of the package's OWN list, so it cites that list — always,
+        # including for a `tests_from_document` rule. Citing `tests_from_document` there emitted
+        # `false` beside a YAML cell reading `true`: the citation contradicted the value, because
+        # it belonged to a different claim.
+        pointers["in_package"] = _yaml_ptr("packages", "includes_tests", rule.id)
+        # ...and THAT different claim gets its own key. Whether the rule covers this test is the
+        # decision the card acts on, and it was the one value with no name and no pointer.
+        pointers["covered_by_rule"] = _yaml_ptr(
             "packages", "tests_from_document" if rule.tests_from_document else "includes_tests",
             rule.id)
+    claims = {"as_printed", "canonical", "in_package", "list_price_sgd", "covered_by_rule"}
     return {
         "canonical": test.canonical,
         "as_printed": test.as_printed,
         "in_package": test.in_package,
+        "covered_by_rule": covered_by_rule(rule, test.in_package) if rule is not None else None,
         "list_price_sgd": (str(test.list_price_sgd) if priced else None),
         "source_field": test.source_field,
         "pointers": {k: v.model_dump(mode="json", exclude_none=True)
                      for k, v in pointers.items()},
         # Named, not omitted: a line missing a price pointer is a line whose price nobody can
-        # check, and the card must be able to say which of the four claims is unsupported.
-        "unresolved": sorted({"as_printed", "canonical", "in_package", "list_price_sgd"}
-                             - set(pointers)),
+        # check, and the card must be able to say which claim is unsupported.
+        "unresolved": sorted(claims - set(pointers)),
     }
 
 
@@ -178,7 +189,14 @@ def draft_billing(record: IntakeRecord,
     # hand. Gated on `total is not None`: when the total is already `None` (a payable test with no
     # price at all and nothing else known) the card shows "unknown", which needs no extra flag.
     # ANY unpriced or uncatalogued test makes the total unknowable, and unknowable is `None`.
-    incomplete = bool(missing) or bool(unpriced)
+    #
+    # So does an unresolved COVERAGE. The first version of this checked only the price side, so a
+    # determination that was merely PARTIAL — or one carrying eligibility flags nobody had cleared
+    # — still printed a confident figure, and the caveat explaining why sat in prose beside it.
+    # That is R-16 again with a different cause: the number is what gets read.
+    incomplete = (bool(missing) or bool(unpriced)
+                  or coverage.status is not CoverageStatus.DETERMINED
+                  or bool(coverage.eligibility_flags))
     if incomplete:
         total: Optional[Decimal] = None
     elif not payable:
@@ -214,6 +232,24 @@ def draft_billing(record: IntakeRecord,
         # would otherwise present a lower bound as a complete estimate.
         caveats.insert(0, "TOTAL_IS_LOWER_BOUND")
 
+    # A total is a value like any other, and it was the one value on this object emitted with
+    # no citation at all — on the artefact where the number is the point. It is `derived`, which
+    # is the honest kind: it names the arithmetic and keeps every price pointer that went into
+    # it, so a reader can re-add the figures rather than take the sum on trust.
+    price_pointers = [_yaml_ptr("test_catalogue", "list_price_sgd", item["canonical"])
+                      for item in payable
+                      if item["list_price_sgd"] is not None and item["canonical"] is not None]
+    # With NO priced payable lines the sum has no price rows behind it — but a genuine SGD 0 is
+    # still a claim, and what grounds it is the rule that made every printed test covered. That
+    # is the honest basis, and an empty `derived_from` is refused by SourcePointer anyway.
+    basis = price_pointers or [_yaml_ptr("packages", "includes_tests", rule.id)]
+    total_pointer = SourcePointer(
+        source_id=RULES_SOURCE_ID, kind="derived", derived_from=basis,
+        derivation=("sum of catalogue list prices for tests the coverage rule leaves payable by "
+                    "the patient; None whenever any test is unpriced or uncatalogued, or the "
+                    "coverage determination is not final"),
+        row_count=len(price_pointers))
+
     return BillingDraft(
         billed_to=payer.value,
         covered_items=covered,
@@ -224,6 +260,9 @@ def draft_billing(record: IntakeRecord,
         tpa_claim_required=tpa_required,
         caveats=caveats,
         field_sources={
+            **({"estimated_patient_payable_sgd": total_pointer} if total is not None else {}),
+            **({"known_subtotal_sgd": total_pointer}
+               if total is None and known_subtotal is not None else {}),
             "billed_to": _yaml_ptr("packages", "billing.covered_by", rule.id),
             # The issuer row is what says a TPA claim is needed. With no issuer row there is no
             # such determination, so the key is absent rather than pointing at something else.

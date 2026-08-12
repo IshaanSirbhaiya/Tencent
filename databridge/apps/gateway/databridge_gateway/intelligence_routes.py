@@ -195,7 +195,14 @@ def _register_intelligence_routes(app: FastAPI) -> None:
                 "the traversal succeeded but its citations could not be loaded, so the result is "
                 "not checkable and is withheld", status=503)
         uncited = sorted(n["id"] for n in out.get("nodes", []) if not sources.get(n["id"]))
-        return {**out, "depth": depth, "sources": sources,
-                # Named rather than left to be inferred from a missing key. A node the graph holds
-                # no pointer for is a real state, and it must not look like the failure above.
-                "uncited_entities": uncited}
+        if uncited:
+            # `GraphNode` refuses construction without a pointer, so this should be unreachable —
+            # which is exactly why listing the ids and returning the values anyway was wrong. If
+            # it ever does happen, the invariant this whole page rests on has broken, and the
+            # honest response is to say so rather than to render values under a caveat field.
+            log.error("subgraph %r returned entities with no citations: %s", entity_id, uncited)
+            return _refusal(
+                "EVIDENCE_UNAVAILABLE",
+                f"{len(uncited)} entity/entities in this traversal have no SourcePointer, so the "
+                f"result is not checkable and is withheld", status=503)
+        return {**out, "depth": depth, "sources": sources}

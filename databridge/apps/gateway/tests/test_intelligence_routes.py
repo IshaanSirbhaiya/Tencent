@@ -269,12 +269,12 @@ def test_the_drilldown_withholds_the_result_when_its_citations_cannot_be_loaded(
     assert "nodes" not in body, "values were returned without the evidence for them"
 
 
-def test_the_drilldown_names_an_uncited_entity_rather_than_leaving_it_to_inference(client, app):
-    """A node the graph holds no pointer for is a real state, and it must not be silently
-    indistinguishable from a citation lookup that failed."""
+def test_every_entity_the_drilldown_returns_is_cited(client, app):
+    """The invariant, asserted unconditionally. The first version of this test only checked nodes
+    that HAD no sources — and `GraphNode` refuses construction without a pointer, so that branch
+    could never run and the test could not fail."""
     entity = app.state.brain.store.open_nodes()[0]["id"]
     body = client.get(f"/intelligence/subgraph/{entity}").json()
-    assert "uncited_entities" in body
+    assert body["nodes"], "nothing traversed, so nothing was checked"
     for node in body["nodes"]:
-        if not body["sources"].get(node["id"]):
-            assert node["id"] in body["uncited_entities"]
+        assert body["sources"].get(node["id"]), f"{node['id']} returned with no citation"
