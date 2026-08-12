@@ -66,8 +66,10 @@ export default function IntakeUploadPage() {
       <div className="flex items-start gap-2 rounded-lg border border-band-review/40 bg-band-review/[0.05] px-3 py-2">
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-band-review" />
         <p className="text-2xs text-subtle">
-          Do not upload insurance e-cards or photographs of identity documents. Identity and e-card
-          validity are checked in person at the counter — this system never reads them.
+          Do not upload insurance e-cards or photographs of identity documents. Identity and
+          e-card validity are checked in person at the counter. This screen accepts no images at
+          all, and any identity document submitted to the API is refused and nothing from it is
+          stored.
         </p>
       </div>
 
