@@ -49,3 +49,26 @@ Thumbs.db
 /.review-prompt.txt
 /.reviews/*.txt
 !/.reviews/*.review.txt
+
+# Claude Code per-machine state. These were ignored only by the developer's GLOBAL gitignore,
+# which does not travel with the repo — on a fresh clone `git add -A` would sweep them in.
+# Skills under .claude/skills/ ARE tracked deliberately and must stay.
+.claude/settings.local.json
+.claude/settings.local.json.backup
+**/.claude/settings.local.json
+
+# Coverage / build output
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+dist/
+*.egg-info/
+
+# Editor / OS junk
+.idea/
+.vscode/
+*.swp
+*~
+ehthumbs.db
+desktop.ini
