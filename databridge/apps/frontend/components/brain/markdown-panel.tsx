@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { X } from "lucide-react";
 import { brainApi } from "@/lib/brain-api";
-import { NODE_STYLE } from "@/lib/brain-layout";
+import { nodeStyle } from "@/lib/brain-layout";
 import type { NodeDetail, NodeKind } from "@/lib/brain-types";
 import type { SourcePointer } from "@/lib/types";
 
@@ -40,10 +40,21 @@ function buildMarkdown(d: NodeDetail): string {
   const link = (label: string, id: string) => `[${mdEsc(label)}](${WIKI}${encodeURIComponent(id)})`;
 
   const parts = [`## ${mdEsc(d.node.label)}`, meta.join("\n")];
-  if (d.decisions.length) {
+  // Candidate patients this DOCUMENT names. The heading and the caveat line are not decoration:
+  // this panel is what a staff member reads before they look at the person in front of them, and
+  // a bare list of names here reads as an answer to "who is this?" (CLAUDE.md §Hard constraints 1).
+  if (d.claims?.length) {
     parts.push(
-      "## Decisions\n" +
-        d.decisions.map((x) => `- ${link(x.label, x.id)}${x.made_at ? ` — ${mdEsc(x.made_at)}` : ""}`).join("\n"),
+      "## Claimed patient — NOT verified\n" +
+        "_Identity is verified in person by staff. These are registry candidates only._\n\n" +
+        d.claims
+          .map((x) => {
+            const score = x.match_score != null ? ` — match ${x.match_score.toFixed(2)}` : "";
+            const of = x.candidate_count && x.candidate_count > 1 ? ` (1 of ${x.candidate_count})` : "";
+            const on = x.matched_on ? ` · matched on ${mdEsc(x.matched_on)}` : "";
+            return `- ${link(x.label, x.id)}${score}${of}${on}`;
+          })
+          .join("\n"),
     );
   }
   if (d.connections.length) {
@@ -74,6 +85,14 @@ export function MarkdownPanel({
     queryFn: () => brainApi.node(nodeId!),
     enabled: !!nodeId,
   });
+  // The sheet is rendered SERVER-SIDE and is the same text the assistant is grounded on. Building
+  // markdown here instead meant the reader and the model saw two different documents, so "check
+  // the answer against the evidence" was not something a person could actually do.
+  const { data: sheet } = useQuery({
+    queryKey: ["brain-node-sheet", nodeId],
+    queryFn: () => brainApi.nodeSheet(nodeId!),
+    enabled: !!nodeId,
+  });
   const open = !!nodeId;
   const panelRef = React.useRef<HTMLElement>(null);
 
@@ -87,8 +106,10 @@ export function MarkdownPanel({
 
   if (!open || !data || !data.node) return null;
   const kind = data.node.kind as NodeKind;
-  const color = NODE_STYLE[kind].color;
-  const md = buildMarkdown(data);
+  const color = nodeStyle(kind).color;
+  // Fall back to the client-built summary only while the sheet is in flight or unavailable, so a
+  // slow request shows the old view rather than an empty panel.
+  const md = sheet && !sheet.refusal ? sheet.markdown : buildMarkdown(data);
 
   const Wikilink = ({ href, children }: { href?: string; children?: React.ReactNode }) => {
     if (href?.startsWith(WIKI)) {
@@ -119,7 +140,7 @@ export function MarkdownPanel({
       <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "#2a2a2a" }}>
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
-          <span className="text-2xs uppercase tracking-wide text-white/50">{NODE_STYLE[kind].label}</span>
+          <span className="text-2xs uppercase tracking-wide text-white/50">{nodeStyle(kind).label}</span>
         </div>
         <button onClick={onClose} aria-label="Close" className="rounded text-white/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30">
           <X className="h-4 w-4" />

@@ -14,6 +14,7 @@ import { InsightsPanel } from "@/components/brain/insights-panel";
 import { StatsPanel } from "@/components/brain/stats-panel";
 import { MarkdownPanel } from "@/components/brain/markdown-panel";
 import { Toast } from "@/components/brain/toast";
+import { ResizeHandle, useBottomPanelHeight } from "@/components/brain/resize-handle";
 import { NODE_STYLE } from "@/lib/brain-layout";
 import { onDemoAction } from "@/lib/demo";
 
@@ -39,6 +40,9 @@ function Legend() {
   );
 }
 
+// The insurer that issued most of the corpus — a real node in the clinic seed.
+const MERIDIAN_NODE_ID = "org:meridian-life-assurance";
+
 export default function BrainPage() {
   const graphQ = useQuery({ queryKey: ["brain-graph"], queryFn: brainApi.graph });
   const insightsQ = useQuery({ queryKey: ["brain-insights"], queryFn: () => brainApi.insights() });
@@ -53,6 +57,7 @@ export default function BrainPage() {
   const [seeding, setSeeding] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const [autoAsk, setAutoAsk] = React.useState<{ q: string; n: number } | undefined>(undefined);
+  const [bottomHeight, setBottomHeight] = useBottomPanelHeight();
 
   // highlight a set of node ids + the edges that connect any two of them (backend edges only).
   const highlightFromNodes = React.useCallback(
@@ -116,7 +121,7 @@ export default function BrainPage() {
       const g = data as BrainGraph | undefined;
       if (g) {
         setToast(
-          `Acme Corp brain loaded — ${g.stats.nodes} entities, ${g.stats.edges} connections from ${Object.keys(g.provenance_by_source).length} sources`,
+          `Clinic graph loaded — ${g.stats.nodes} nodes, ${g.stats.edges} edges from ${Object.keys(g.provenance_by_source).length} sources`,
         );
       }
     } finally {
@@ -124,18 +129,23 @@ export default function BrainPage() {
     }
   }, [graphQ, insightsQ]);
 
-  // automated /demo autoplay (Part 4): perform the step the global DemoOverlay emits.
+  // automated /demo autoplay: perform the step the global DemoOverlay emits.
   React.useEffect(() => {
     return onDemoAction((action) => {
       if (action === "load") onLoadDemo();
       else if (action === "ask")
-        setAutoAsk((prev) => ({ q: "What did Sarah decide about BigClient?", n: (prev?.n ?? 0) + 1 }));
+        setAutoAsk((prev) => ({ q: "What does the WELL2 package include?", n: (prev?.n ?? 0) + 1 }));
       else if (action === "slider") {
-        setAsOf(new Date("2024-01-15T00:00:00Z"));
-        setTimeout(() => setAsOf(null), 4000); // rewind to Jan, then bring the graph back
+        // May 2026: the coverage rules and the test catalogue are already in force, but none of
+        // the referrals have arrived yet — a genuinely meaningful "before" view. The old date
+        // (Jan 2024) predated the entire clinic seed, so the slider rewound to an EMPTY graph.
+        setAsOf(new Date("2026-05-01T00:00:00Z"));
+        setTimeout(() => setAsOf(null), 4000);
       } else if (action === "node") {
-        setSelectedNode("person:sarah@acmecorp.com");
-        setFocusNode("person:sarah@acmecorp.com");
+        // A node that exists. This used to focus `person:sarah@acmecorp.com`, deleted with the
+        // Acme seed in Phase 2 — so the step silently selected nothing.
+        setSelectedNode(MERIDIAN_NODE_ID);
+        setFocusNode(MERIDIAN_NODE_ID);
       }
     });
   }, [onLoadDemo]);
@@ -153,8 +163,10 @@ export default function BrainPage() {
       <PurposeBanner />
       <DropZone onIngested={onIngested} />
 
-      {/* HERO: the knowledge graph (≈60% height) */}
-      <div className="relative min-h-0 flex-[3] border-b border-border bg-bg">
+      {/* HERO: the knowledge graph. Takes whatever height is left once the bottom row below claims
+          its resizable share — `flex-1` rather than a fixed ratio, so the drag handle has something
+          to actually trade against instead of two ratios that both stay fixed. */}
+      <div className="relative min-h-0 flex-1 border-b border-border bg-bg">
         <Legend />
         {graph ? (
           <GraphView
@@ -175,12 +187,25 @@ export default function BrainPage() {
         )}
       </div>
 
-      <TimeSlider onChange={setAsOf} />
+      {/* The slider's domain is derived from this graph's own valid_from/valid_to. It used to be
+          hardcoded to Jan–Jun 2024, two years before the clinic seed, so any drag blanked the
+          canvas. */}
+      <TimeSlider graph={graph} onChange={setAsOf} />
 
-      {/* BOTTOM: 3 columns (≈40% height) */}
-      <div className="grid min-h-0 flex-[2] grid-cols-3 gap-px bg-border">
-        <div className="overflow-hidden bg-bg p-4">
-          <AskPanel onAnswer={onAnswer} autoAsk={autoAsk} />
+      {/* T-32: draggable/keyboard-resizable boundary — see components/brain/resize-handle.tsx. */}
+      <ResizeHandle height={bottomHeight} onResize={setBottomHeight} />
+
+      {/* BOTTOM: height is the user's own drag choice (persisted), not a ratio.
+          The ask panel gets TWO of four columns. It was one of three, so a grounded answer —
+          which is prose, not a stat — was rendered into a 319×54px box: the reply arrived, was
+          correct, and was invisible without scrolling a two-line window. It read as "the LLM does
+          not respond", and it is the single most important thing on this screen. */}
+      <div
+        className="grid shrink-0 grid-cols-4 gap-px overflow-hidden bg-border"
+        style={{ height: bottomHeight }}
+      >
+        <div className="col-span-2 overflow-hidden bg-bg p-4">
+          <AskPanel onAnswer={onAnswer} autoAsk={autoAsk} graph={graph} />
         </div>
         <div className="overflow-hidden bg-bg p-4">
           <InsightsPanel insights={insightsQ.data?.insights} onFocus={(id) => focusOne(id)} />

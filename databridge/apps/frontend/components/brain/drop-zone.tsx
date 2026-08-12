@@ -1,20 +1,25 @@
 "use client";
 import * as React from "react";
-import { Upload, Mail, FileText, MessageSquare, FileSignature, Loader2 } from "lucide-react";
+import { Upload, FileText, FileSignature, Loader2 } from "lucide-react";
 import { brainApi } from "@/lib/brain-api";
 import type { IngestResult } from "@/lib/brain-types";
 
-// Part 2 — drag-and-drop ingest zone (above the graph). Dropping (or clicking a fixture) runs the
-// REAL grounded extraction + bi-temporal upsert on the backend and the new nodes animate into the
-// graph. The 3 demo fixtures live in /public/fixtures/brain_demo and resolve to registered sources
-// server-side; an unknown text file is read client-side and sent inline.
+// Drag-and-drop ingest zone (above the graph). Dropping (or clicking a fixture) runs the REAL
+// grounded extraction + bi-temporal upsert on the backend and the new nodes animate into the graph.
+//
+// The quick-ingest button resolves to a source the gateway REGISTERS server-side; an unknown text
+// file is read client-side and sent inline. The three Acme fixtures that used to live here
+// (email_001.eml, meeting_001.txt, contract_001.pdf) were deleted with the rest of the Acme demo
+// in Phase 2 — leaving the buttons behind meant three visible controls on a linked page that
+// failed on click.
 
 type Phase = "idle" | "uploading" | "extracting" | "done";
 
 const FIXTURES = [
-  { file: "email_001.eml", label: "Email", icon: Mail },
-  { file: "meeting_001.txt", label: "Meeting", icon: MessageSquare },
-  { file: "contract_001.pdf", label: "Contract", icon: FileSignature },
+  // `demo_sample.txt` is the gateway's one registered ingest source (see `main.py` lifespan): the
+  // EV-INTAKE fixture text, which extracts a referral document, its issuer, its tests and the
+  // employer — and deliberately no patient.
+  { file: "demo_sample.txt", label: "Referral", icon: FileSignature },
 ];
 const KNOWN = new Set(FIXTURES.map((f) => f.file));
 
@@ -113,7 +118,7 @@ export function DropZone({ onIngested }: { onIngested: (r: IngestResult) => void
         </div>
       </div>
 
-      {/* quick-ingest the 3 demo fixtures (also draggable from /public/fixtures/brain_demo) */}
+      {/* quick-ingest the registered demo source */}
       <div className="flex shrink-0 items-center gap-1.5">
         {FIXTURES.map((f) => {
           const Icon = f.icon;

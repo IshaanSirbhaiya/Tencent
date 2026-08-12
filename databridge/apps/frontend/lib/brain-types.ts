@@ -2,7 +2,15 @@
 // Wire shapes only — the frontend renders them, never computes from them (D-FE-2).
 import type { SourcePointer } from "./types";
 
-export type NodeKind = "person" | "org" | "project" | "decision" | "fact" | "document";
+export type NodeKind =
+  | "patient"
+  | "org"
+  | "package"
+  | "test"
+  | "visit"
+  | "clinic"
+  | "coverage_rule"
+  | "document";
 
 export interface BrainNode {
   id: string;
@@ -90,7 +98,16 @@ export interface NodeDetail {
   node: BrainNode;
   sources: SourcePointer[];
   connections: Connection[];
-  decisions: { id: string; label: string; made_at: string | null }[];
+  // Candidate patients a DOCUMENT claims to be about. Never a determination: `candidate_count`
+  // is how many the resolver returned, and every one still needs an in-person check.
+  claims: {
+    id: string;
+    label: string;
+    match_score: number | null;
+    matched_on: string | null;
+    candidate_count: number | null;
+    requires_human_verification: boolean;
+  }[];
 }
 
 export interface IngestResult {

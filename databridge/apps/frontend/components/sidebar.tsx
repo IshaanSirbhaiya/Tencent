@@ -5,44 +5,71 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Boxes,
   Network,
-  Link2,
-  Database,
-  MessageSquare,
-  FileText,
   BarChart3,
-  Package,
+  ClipboardList,
+  FileUp,
+  ShieldCheck,
   Check,
+  Plug,
+  Waypoints,
+  RefreshCw,
+  Archive,
   type LucideIcon,
+  Brain,
+  Fingerprint,
 } from "lucide-react";
 import { brainApi } from "@/lib/brain-api";
 import { cn } from "@/lib/utils";
+import { StaffChip } from "@/components/staff-gate";
 
-// Grouped navigation with PURPOSE LABELS (Part 3) — the section headers tell an investor what each
-// area does without reading anything. Live status footer reads the REAL backend numbers (D-FE-2).
+// Navigation, ordered the way the clinic works: the counter first, then the brain behind it, then
+// the evidence that the whole thing is honest.
+//
+// The DataBridge engine pages were dropped from the nav in Phase 4b (PLAN.md §6.7) without being
+// deleted — the packages behind them are still load-bearing (`packages/convert`, the grounding
+// wall, the evidence ledger), only the screens went dark. PHASE_7 §1.6/T-35 restores what still
+// earns its place:
+//   - `/connectors` — the Gmail/Slack/Drive surface remembered as "the MCP tab". Phase 8 wires real
+//     MCP servers behind these same cards, so the honest demo-mode badge on that page matters now,
+//     not just later.
+//   - `/schema`, `/convert`, `/artifacts` — the confirmation-gate, format-conversion and
+//     replay-determinism story (EV-DET) is exactly the Governance & Safety material `/evals` also
+//     serves, and neither page carries any Acme-era content (checked: no hardcoded issuer/company
+//     references survive in either).
+// `/ask` is deliberately left OUT. It still serves `databridge_evals.e_sql.PAIRS` — stale DataBridge
+// SQL questions with no healthcare content (TASKS.md T-21) — and unlike the three pages above it
+// would read as a wrong product to a judge who clicks it, not just an old one. Restore it once T-21
+// repoints it at intake data; until then a nav entry here would be worse than the gap it fills.
 const SECTIONS: { label: string; routes: { href: string; label: string; icon: LucideIcon }[] }[] = [
   {
-    label: "The Brain",
+    label: "Front desk",
     routes: [
-      { href: "/brain", label: "Company Brain", icon: Network },
-      { href: "/connectors", label: "Connectors", icon: Link2 },
+      { href: "/frontdesk", label: "Queue", icon: ClipboardList },
+      { href: "/intake", label: "Read a document", icon: FileUp },
     ],
   },
   {
-    label: "Understand your data",
+    label: "Clinic brain",
+    routes: [{ href: "/brain", label: "Knowledge graph", icon: Network }],
+  },
+  {
+    label: "Connections",
+    routes: [{ href: "/connectors", label: "Connectors", icon: Plug }],
+  },
+  {
+    label: "Data engine",
     routes: [
-      { href: "/schema", label: "Schema Explorer", icon: Database },
-      { href: "/ask", label: "Question Answerer", icon: MessageSquare },
+      { href: "/schema", label: "Schema mapping", icon: Waypoints },
+      { href: "/convert", label: "Convert", icon: RefreshCw },
     ],
   },
   {
-    label: "Transform your data",
-    routes: [{ href: "/convert", label: "Conversion Studio", icon: FileText }],
-  },
-  {
-    label: "Measure quality",
+    label: "Evidence",
     routes: [
-      { href: "/evals", label: "Eval Dashboard", icon: BarChart3 },
-      { href: "/artifacts", label: "Artifact Browser", icon: Package },
+      { href: "/intelligence", label: "Intelligence", icon: Brain },
+      { href: "/evidence", label: "Provenance", icon: Fingerprint },
+      { href: "/impact", label: "Impact", icon: BarChart3 },
+      { href: "/evals", label: "Eval dashboard", icon: ShieldCheck },
     ],
   },
 ];
@@ -58,7 +85,7 @@ export function Sidebar() {
     <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex h-12 items-center gap-2 border-b border-border px-4">
         <Boxes className="h-5 w-5 text-accent" />
-        <span className="text-sm font-semibold tracking-tight">DataBridge</span>
+        <span className="text-sm font-semibold tracking-tight">Walnut</span>
       </div>
 
       <nav className="flex flex-1 flex-col gap-3 overflow-y-auto p-2">
@@ -69,7 +96,10 @@ export function Sidebar() {
             </div>
             <div className="flex flex-col gap-0.5">
               {section.routes.map((r) => {
-                const active = path === r.href || (path === "/" && r.href === "/brain");
+                const active =
+                  path === r.href ||
+                  path.startsWith(`${r.href}/`) ||
+                  (path === "/" && r.href === "/frontdesk");
                 const Icon = r.icon;
                 return (
                   <Link
@@ -90,6 +120,12 @@ export function Sidebar() {
         ))}
       </nav>
 
+      {/* Who is at this terminal. On screen at all times because their staff id is what the
+          evidence ledger attributes every confirmation to. */}
+      <div className="border-t border-border px-3 py-2 text-2xs">
+        <StaffChip />
+      </div>
+
       {/* live STATUS footer — real backend figures */}
       <div className="border-t border-border p-3">
         <div className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-subtle/70">
@@ -102,11 +138,16 @@ export function Sidebar() {
           </div>
           <div className="flex items-center gap-1.5 text-subtle">
             <Network className="h-3 w-3" />
-            <span className="tnum text-fg">{stats?.nodes ?? 0}</span> entities
+            <span className="tnum text-fg">{stats?.nodes ?? 0}</span> graph nodes
           </div>
           <div className="flex items-center gap-1.5 text-subtle">
             <Check className="h-3 w-3 text-band-auto" />
-            <span className="tnum text-fg">{stats?.provenance_pct ?? 100}%</span> provenance
+            <span className="tnum text-fg">
+              {/* No optimistic default: with the backend down this used to read "0 nodes,
+                  100% provenance", which is the worst possible lie on a governance panel. */}
+              {stats ? `${stats.provenance_pct}%` : "—"}
+            </span>{" "}
+            provenance
           </div>
         </div>
       </div>

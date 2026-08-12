@@ -22,13 +22,20 @@ interface Step {
   ms: number;
 }
 
+// The scripted tour, opt-in via `/demo`. Retargeted from the Acme investor script to the clinic
+// story — and ordered the way the argument runs: the queue, then the constraint, then the evidence.
+//
+// It deliberately does NOT route to `/connectors`, `/schema`, `/convert`, `/ask` or `/artifacts`:
+// those are the DataBridge conversion-engine screens, retired from the nav in Phase 4b.
 const STEPS: Step[] = [
-  { route: "/brain", caption: "Meet the Company Brain — built automatically from your real data.", action: "load", ms: 9000 },
-  { caption: "Ask anything. Every answer is cited — nothing is made up.", action: "ask", ms: 10000 },
-  { caption: "Rewind time — see exactly what the company knew, and when.", action: "slider", ms: 9000 },
-  { caption: "DataBridge found Sarah from an email. You can verify the source.", action: "node", ms: 8000 },
-  { route: "/connectors", caption: "Connect Gmail, Slack, Drive — and this graph builds itself.", ms: 8000 },
-  { route: "/brain", caption: "100% provenance. 0 fabrications. Enterprise-ready.", action: "finish", ms: 7000 },
+  { route: "/frontdesk", caption: "The front desk queue — documents read before the patient reaches the counter.", ms: 8000 },
+  { route: "/intake", caption: "Any referring document: insurer letter, voucher, TPA form, HR email — or nothing at all.", ms: 8000 },
+  { route: "/brain", caption: "The clinic brain: patients, insurers, packages and tests, built from the real data.", action: "load", ms: 9000 },
+  { caption: "Ask it anything. Every answer is cited — and it refuses to confirm anyone's identity.", action: "ask", ms: 10000 },
+  { caption: "Rewind: what did the clinic know in May, before any of these referrals arrived?", action: "slider", ms: 9000 },
+  { caption: "Click any node for its receipts — the exact rows and spans it was built from.", action: "node", ms: 8000 },
+  { route: "/impact", caption: "~16 minutes of admin saved per patient — and zero claimed on identity, by design.", ms: 9000 },
+  { route: "/frontdesk", caption: "Every value traces to the characters it came from. Nothing commits without a human.", action: "finish", ms: 7000 },
 ];
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

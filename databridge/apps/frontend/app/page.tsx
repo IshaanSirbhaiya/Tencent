@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
-// The Company Brain is the investor-first landing (T08). The conversion pipeline routes remain in
-// the sidebar.
+// The front-desk QUEUE is the landing page, not the graph. The product is what happens at the
+// counter; the knowledge graph is the thing behind it. Someone opening this app cold should see
+// the work waiting for them, not a visualisation.
 export default function Home() {
-  redirect("/brain");
+  redirect("/frontdesk");
 }

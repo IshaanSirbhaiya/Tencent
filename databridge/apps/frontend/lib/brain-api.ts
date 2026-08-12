@@ -35,6 +35,17 @@ export const brainApi = {
     ),
   node: (entityId: string) =>
     call<NodeDetail & { refusal?: Refusal }>(`/brain/node/${encodeURIComponent(entityId)}`),
+  /** The node's EVIDENCE SHEET, rendered server-side.
+   *
+   * The panel used to assemble its own markdown in the browser from a node-detail payload, which
+   * meant the person reading a node and the model answering about it saw DIFFERENT text. That
+   * defeats the point of grounding: an answer can only be checked against the evidence if both
+   * sides were shown the same evidence. One renderer, on the server
+   * (`packages/graph/databridge_graph/node_sheet.py`), feeds both. */
+  nodeSheet: (entityId: string) =>
+    call<{ entity_id: string; markdown: string } & { refusal?: Refusal }>(
+      `/brain/node/${encodeURIComponent(entityId)}/sheet`,
+    ),
   // drag-and-drop ingest (Part 2): a registered fixture filename (or inline text) → grounded
   // extraction → new graph nodes. Returns the genuinely NEW entity labels.
   ingest: (source_path: string, text?: string | null) =>

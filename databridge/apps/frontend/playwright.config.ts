@@ -20,6 +20,14 @@ export default defineConfig({
       url: "http://127.0.0.1:8000/health",
       timeout: 120_000,
       reuseExistingServer: true,
+      // The gateway now extracts through a live model whenever a key is present. These specs
+      // assert exact extracted values ("MRDEB"), so they must run against the deterministic gold
+      // backend — `CLAUDE.md`: no test depends on a live model.
+      //
+      // NOTE `reuseExistingServer` means this only applies to a gateway Playwright starts itself.
+      // If you already have one running from `start-databridge.ps1` with a key configured, these
+      // specs will exercise the live path. Stop it first for a deterministic run.
+      env: { DATABRIDGE_FORCE_GOLD: "1" },
     },
     {
       command: "npm run start",
