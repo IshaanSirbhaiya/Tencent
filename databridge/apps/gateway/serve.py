@@ -12,10 +12,17 @@ import pathlib
 import sys
 
 _ROOT = pathlib.Path(__file__).resolve().parents[2]          # databridge/
-for _p in ("packages/core", "packages/harness", "packages/ingest", "packages/semantic",
-           "packages/convert", "packages/graph", "packages/evals", "apps/gateway",
-           "apps/mcp_server"):
-    sys.path.insert(0, str(_ROOT / _p))
+# Must stay in step with the root pyproject's `pythonpath`. It drifted once: `packages/intake` was
+# added there (so the whole suite passed) but not here, and the server then failed to boot with
+# `No module named 'databridge_intake'` — invisible to pytest, fatal to the demo. The assertion
+# below makes that drift impossible to ship.
+_PACKAGES = ("packages/core", "packages/harness", "packages/ingest", "packages/semantic",
+             "packages/convert", "packages/graph", "packages/intake", "packages/evals",
+             "apps/gateway", "apps/mcp_server")
+for _p in _PACKAGES:
+    _path = _ROOT / _p
+    assert _path.exists(), f"serve.py: {_p} is on the path list but does not exist"
+    sys.path.insert(0, str(_path))
 
 # Load a local .env if present (optional dep — env vars work without python-dotenv).
 try:

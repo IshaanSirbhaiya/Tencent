@@ -14,16 +14,36 @@ import copy
 import os
 from typing import Optional
 
-SYSTEM_PROMPT = (
-    "You are a business intelligence assistant for Acme Corp. Answer questions using ONLY the graph "
-    "context provided below. Label every fact with its source document. Label any inference or "
-    "interpretation with a leading [ANALYSIS] tag. Never invent information that is not in the "
-    "context. If the answer is not in the graph, say so clearly and briefly."
-)
+def _system_prompt() -> str:
+    """Assembled from `packages/intake/.../config/assistant.yaml`, not hardcoded here.
+
+    Config rather than code so swapping the provider (Azure OpenAI, for the Copilot Studio story)
+    does not mean editing a Python string, and so the refusal rules are reviewable by someone who
+    does not read Python. The rules are ALSO enforced deterministically in `guardrails.py`, which
+    runs before this prompt is ever sent — a prompt is a request, the guardrail is the guarantee.
+    """
+    from databridge_intake.assistant import assistant_config
+
+    return assistant_config().system_prompt()
+
+
+def __getattr__(name: str):
+    if name == "SYSTEM_PROMPT":
+        return _system_prompt()
+    raise AttributeError(name)
 
 
 def detect_llm() -> dict:
-    """Inspect env and decide the backend. Never returns the key itself."""
+    """Inspect env and decide the backend. Never returns the key itself.
+
+    ``DATABRIDGE_FORCE_GOLD=1`` reports "no key" regardless of what is set. It lives HERE rather
+    than at each call site because the first version guarded only the intake path, and the
+    Playwright run then showed `LiteLLM completion() model= gpt-4o` while the e2e assertions ran:
+    `/brain/query` builds its own harness and was never covered. One switch, at the point the
+    decision is actually made, is the only version that cannot be half-applied.
+    """
+    if os.getenv("DATABRIDGE_FORCE_GOLD") == "1":
+        return {"backend": "fake", "model": None, "api_key_present": False, "alias_model": None}
     if os.getenv("OPENAI_API_KEY"):
         return {"backend": "openai", "model": "openai/gpt-4o", "api_key_present": True,
                 "alias_model": None}
@@ -47,8 +67,53 @@ def build_query_harness(detected: dict):
     return Harness(LiteLLMBackend(), config=cfg, profile="cloud")
 
 
+def build_extraction_harness(detected: dict):
+    """A real Harness for the intake pipeline, or ``None`` to leave the gold backend in place.
+
+    **Why this exists at all.** ``run_intake``'s harness argument defaults to
+    ``gold_harness()`` — a ``FakeBackend`` that dispatches on a marker string unique to each of the
+    ten chit fixtures and returns an EMPTY draft for anything else. That default is right for the
+    library (tests and an offline demo must be deterministic) and wrong for the gateway, which is
+    the one caller whose whole job is reading a document it has never seen. No call site passed a
+    harness, so every upload — including a judge pasting their own referral letter — went through
+    the fixture table and came back blank. Review found it; `CLAUDE.md` had said a real model runs
+    whenever a key is present, and `models.yaml` had routed `intake_extraction` since Phase 1.
+
+    **Why the alias is remapped.** `intake_extraction` routes to the ``sonnet`` alias, which names
+    an Anthropic model. A deployment holding only an ``OPENAI_API_KEY`` cannot serve that alias, so
+    the detected model is substituted on a DEEP COPY of the config — the same remap
+    ``build_query_harness`` already performs for ``primary_llm``, applied to the alias the intake
+    path actually uses. Routing stays configuration; this only picks the configured provider that
+    is reachable. ``sonnet_alt`` is deliberately left alone: it exists to be a *different* model
+    from the generator, and collapsing the two would quietly end that adversarial separation.
+    """
+    if detected["backend"] == "fake" or not detected.get("model"):
+        return None
+    from databridge_core.config import load_model_config
+    from databridge_harness import Harness, LiteLLMBackend
+
+    cfg = copy.deepcopy(load_model_config())
+    cfg.setdefault("aliases", {}).setdefault("sonnet", {})["model"] = detected["model"]
+    return Harness(LiteLLMBackend(), config=cfg, profile="cloud")
+
+
 def _source_of(node) -> str:
     return node.sources[0].source_id if node.sources else "unknown"
+
+
+def _candidate_phrase(count: Optional[int]) -> str:
+    """Render a FOR_PATIENT edge's corroboration count for the LLM context.
+
+    ``candidate_count`` is only populated by the clinic seed (``clinic_seed.py``'s ``_edge``
+    calls, which always set it); a FOR_PATIENT edge minted by ``extract_graph`` (the live
+    ``brain_ingest`` path) builds edges with empty ``attrs``, so ``count`` arrives here as
+    ``None``. Printing that straight into the f-string produced literal text like
+    ``"doc" (1 of None candidate(s) — UNVERIFIED)`` — a model reading that sees a specific,
+    slightly malformed NUMBER rather than what it actually means, which is "we never counted
+    at all". An unknown count must read as unknown, not as the string ``"None"`` sitting where a
+    number belongs.
+    """
+    return f"1 of {count} candidate(s)" if count is not None else "an unknown number of candidates"
 
 
 def build_context(brain, question: str, *, top_k: int = 8) -> dict:
@@ -74,24 +139,30 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
             by_id.setdefault(n.id, n)
         edges_seen.extend(sub.edges)
 
-    lines = ["COMPANY BRAIN CONTEXT — Acme Corp", "=" * 35, "ENTITIES FOUND:"]
+    lines = ["CLINIC BRAIN CONTEXT — Parkway Shenton", "=" * 38, "ENTITIES FOUND:"]
     for m in matches:
         n = by_id[m.id]
         head = n.label
-        if n.kind == NodeKind.PERSON and n.attrs.get("role"):
-            head = f"{n.label} ({n.attrs['role']})"
-            if n.attrs.get("email"):
-                head += f" — {n.attrs['email']}"
-        elif n.kind == NodeKind.FACT and n.attrs.get("rendered"):
-            head = f"{n.attrs.get('claim', n.label)}: {n.attrs['rendered']}"
-        elif n.kind in (NodeKind.PROJECT, NodeKind.ORG) and n.attrs.get("status", n.attrs.get("type")):
-            head = f"{n.label} ({n.attrs.get('status', n.attrs.get('type'))})"
+        if n.kind == NodeKind.ORG and n.attrs.get("kind"):
+            head = f"{n.label} ({n.attrs['kind']})"
+            if n.attrs.get("issuer_code"):
+                head += f" — {n.attrs['issuer_code']}"
+        elif n.kind == NodeKind.PACKAGE and n.attrs.get("eligibility"):
+            head = f"{n.label} ({n.attrs.get('name', '')}, {n.attrs['eligibility']})"
+        elif n.kind == NodeKind.TEST and n.attrs.get("category"):
+            head = f"{n.label} ({n.attrs['category']})"
+        elif n.kind == NodeKind.COVERAGE_RULE and n.attrs.get("billed_to"):
+            head = f"{n.label} (billed to {n.attrs['billed_to']})"
         lines.append(f"- {head}")
-        # decisions made (person)
-        decs = [by_id[e.dst_id].label for e in edges_seen
-                if e.kind == EdgeKind.DECIDED and e.src_id == n.id and e.dst_id in by_id]
-        if decs:
-            lines.append("    Decisions: " + "; ".join(f'"{d}"' for d in decs[:4]))
+        # Documents that CLAIM to be about this patient. Rendered with the caveat inline because
+        # this text goes straight into an LLM prompt — a bare "patient X, document Y" line invites
+        # the model to narrate it as an established identity (CLAUDE.md §Hard constraints 1).
+        claims = [(by_id[e.src_id].label, e.attrs.get("candidate_count")) for e in edges_seen
+                  if e.kind == EdgeKind.FOR_PATIENT and e.dst_id == n.id and e.src_id in by_id]
+        if claims:
+            rendered = "; ".join(
+                f'"{label}" ({_candidate_phrase(count)} — UNVERIFIED)' for label, count in claims[:4])
+            lines.append("    Named by (claimed, not verified): " + rendered)
         lines.append(f"    Source: {_source_of(n)}")
 
     rels = []
@@ -102,7 +173,17 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
             if key in seen_rel:
                 continue
             seen_rel.add(key)
-            rels.append(f"- {by_id[e.src_id].label} --[{e.kind.value.upper()}]--> {by_id[e.dst_id].label}")
+            line = (f"- {by_id[e.src_id].label} --[{e.kind.value.upper()}]--> "
+                    f"{by_id[e.dst_id].label}")
+            # A FOR_PATIENT edge must NEVER reach the model as a bare arrow. The per-entity caveat
+            # above only covers nodes that were themselves matched; a patient reached through the
+            # 1-hop neighbourhood arrives here instead, and "document --[FOR_PATIENT]--> Loh Wei
+            # Ming" is precisely the line that gets narrated back as an established identity.
+            if e.kind == EdgeKind.FOR_PATIENT:
+                count = e.attrs.get("candidate_count")
+                line += (f"  [CLAIMED ON DOCUMENT — UNVERIFIED; {_candidate_phrase(count)}; "
+                         f"identity is checked in person by staff]")
+            rels.append(line)
     if rels:
         lines.append("")
         lines.append("RELATIONSHIPS:")

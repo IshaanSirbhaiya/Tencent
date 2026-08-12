@@ -8,8 +8,10 @@ forge it (REVIEW_2 build-note 3). Replay-first /ask (D-FE-4): no live model, eve
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import logging
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +23,9 @@ from databridge_semantic import build_report
 from databridge_semantic.confirmation import ConfirmationSession, MandatoryReviewPending
 
 from . import demo_state as ds
+from .evidence_routes import register_evidence_routes
+from .intake_routes import _register_intake_routes
+from .intelligence_routes import _register_intelligence_routes
 from .models import (
     AnnotateRequest,
     AnnotateResponse,
@@ -67,11 +72,13 @@ async def lifespan(app: FastAPI):
     app.state.replay_store, app.state.replay_artifacts = ds.build_replay_store(app.state.engine)
     app.state.artifacts = ds.build_demo_artifacts()
     app.state.eval_e1 = ds.run_eval_e1()
-    # Company Brain (T08): pre-seed the demo graph so /brain/* renders instantly (<1s seed).
+    # Clinic brain: pre-seed the graph so /brain/* renders instantly (<1s seed).
     from brain_server import BrainTools                  # apps/mcp_server (on pythonpath)
-    from brain_demo import demo_ingest_harness, registered_sources
-    # the dispatching harness extracts each dropped fixture's OWN entities (Part 2 drag-and-drop).
-    app.state.brain = BrainTools(harness=demo_ingest_harness(), sources=registered_sources())
+    from databridge_evals.e_intake import FIXTURE_TEXT, gold_harness
+    # `sources` is an ALLOW-LIST: brain_ingest never opens an arbitrary path, so an agent with MCP
+    # access cannot turn it into a file-read primitive.
+    app.state.brain = BrainTools(harness=gold_harness(),
+                                 sources={"demo_sample.txt": FIXTURE_TEXT})
     app.state.brain.load_seed()
     # Real-LLM detection (T08 16.5d): a key in env → /brain/query is LLM-narrated; else the
     # deterministic claim-checked fallback. The extraction/ingest harness stays deterministic.
@@ -94,6 +101,24 @@ def create_app() -> FastAPI:
         allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
         allow_methods=["*"], allow_headers=["*"],
     )
+
+    # ---- intake: the front-desk pipeline ----------------------------------------
+    # The whole product surface. `POST /intake/{id}/confirm` is the gate: nothing reaches the
+    # evidence ledger without a named staff member attesting to an in-person identity check.
+    _register_intake_routes(app)
+
+    # ---- evidence: the provenance chain, made visible --------------------------
+    # Read-only. Source -> pointer -> extracted value -> graph node -> committed ledger
+    # row, with the raw SourcePointer shown rather than summarised. This is the
+    # Governance & Safety criterion rendered instead of asserted.
+    register_evidence_routes(app)
+
+    # ---- intelligence: the graph, interpreted ----------------------------------
+    # Counts of STRUCTURAL FACTS, each with its denominator and each walkable to the
+    # subgraph behind it. It deliberately claims no minutes and no money: `/impact`
+    # owns the only saving this system asserts, and a structural count sitting beside
+    # a performance number starts reading as one.
+    _register_intelligence_routes(app)
 
     # ---- health / readiness (REVIEW_2 L7: visible boot failure) ------------------
     @app.get("/health")
@@ -268,8 +293,45 @@ def create_app() -> FastAPI:
             return _refusal("UNKNOWN_ENTITY", out["error"], status=404)
         return out
 
+    @app.get("/brain/node/{entity_id:path}/sheet")
+    def brain_node_sheet(entity_id: str, as_of: Optional[str] = None):
+        """The node's **evidence sheet** — what the graph knows about one entity, as markdown.
+
+        Assembled entirely from stored values, pointers and edges: no model runs in this path, so
+        the sheet cannot narrate something the graph does not hold. It is both what a person sees
+        on clicking a node and the grounding unit the assistant reads, which is the point — an
+        answer should be checkable against the same document the reader was shown.
+
+        `{entity_id:path}` because node ids contain colons and slashes
+        (`patient:pat:4e487c99807b`, `document:chit_01_meridian_referral.txt`).
+        """
+        from databridge_graph.node_sheet import node_markdown
+
+        when: Optional[dt.datetime] = None
+        if as_of:
+            try:
+                when = dt.datetime.fromisoformat(as_of)
+            except ValueError:
+                return _refusal("BAD_AS_OF", f"'{as_of}' is not an ISO-8601 timestamp")
+        sheet = node_markdown(app.state.brain.store, entity_id, as_of=when)
+        if sheet is None:
+            return _refusal("UNKNOWN_ENTITY", f"no open node '{entity_id}'", status=404)
+        return {"entity_id": entity_id, "as_of": as_of, "markdown": sheet}
+
     @app.post("/brain/query")
     def brain_query(req: BrainQueryRequest):
+        # THE GUARDRAIL, FIRST. Identity-verification questions are refused deterministically,
+        # before any model is reached — the system prompt forbids them too, but a prompt is a
+        # request and this is the guarantee (CLAUDE.md §Hard constraints 1).
+        from databridge_intake.guardrails import check_question
+
+        screened = check_question(req.question)
+        if screened.refused:
+            return JSONResponse(status_code=422, content={"refusal": {
+                "code": screened.code, "message": screened.answer,
+                "nearest_alternative": "Ask what a document authorises, or which registry "
+                                       "candidates it matches."}})
+
         # Real LLM when a key is present: serialise the relevant subgraph as context and answer over
         # it (sources labelled, nothing invented). Else the deterministic claim-checked nl_query.
         llm = getattr(app.state, "brain_llm", None)
@@ -333,8 +395,8 @@ def create_app() -> FastAPI:
 
     @app.get("/evals/brain")
     def evals_brain():
-        from databridge_evals.e_brain import gold_harness, run_ev_brain
-        return run_ev_brain(gold_harness()).to_dict()
+        from databridge_evals.e_intake import gold_harness, run_ev_intake
+        return run_ev_intake(gold_harness()).to_dict()
 
     # ---- live progress (same-origin only; in-VPC) --------------------------------
     @app.websocket("/ws/{job_id}")

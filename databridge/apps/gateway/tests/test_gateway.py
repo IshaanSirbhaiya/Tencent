@@ -24,16 +24,24 @@ def client():
 def test_health_ready(client):
     body = client.get("/health").json()
     assert body["status"] == "ok"
-    # LLM-backend metadata (T08 16.5d): no key in CI → fake backend; graph counts surfaced
-    assert body["llm_backend"] == "fake" and body["api_key_present"] is False
+    # LLM-backend metadata. The backend is environment-dependent (a key in env selects a real
+    # model), so assert the INVARIANT rather than one environment: the reported backend and the
+    # key-present flag must agree. Asserting `== "fake"` made this test pass only on a keyless
+    # machine, which is why it read as a permanent "known failure" for so long.
+    assert (body["llm_backend"] == "fake") is (body["api_key_present"] is False)
     assert body["profile"] == "cloud"
-    assert body["graph_nodes"] >= 100 and body["graph_edges"] >= 150
+    # The clinic seed (ADR-0009), not the old 100+/150+ Acme demo graph.
+    assert body["graph_nodes"] >= 60 and body["graph_edges"] >= 100
 
 
-def test_brain_query_marks_fallback_real_llm_false(client):
-    # with no API key the deterministic fallback answers and flags is_real_llm=false
-    r = client.post("/brain/query", json={"question": "What is the BigClient contract value?"})
-    assert r.status_code == 200 and r.json()["is_real_llm"] is False
+def test_brain_query_reports_which_backend_answered(client):
+    """`is_real_llm` tells the UI whether a model narrated the answer or the deterministic
+    claim-checked fallback did. Which one runs depends on the environment; that the flag agrees
+    with the health endpoint does not."""
+    r = client.post("/brain/query", json={"question": "What does the WELL2 package include?"})
+    assert r.status_code == 200, r.text
+    health = client.get("/health").json()
+    assert r.json()["is_real_llm"] is (health["llm_backend"] != "fake")
 
 
 def test_llm_detect_and_context(monkeypatch):
@@ -47,9 +55,55 @@ def test_llm_detect_and_context(monkeypatch):
 
     t = BrainTools()
     t.load_seed()
-    ctx = build_context(t, "What is the BigClient contract value?")
-    assert "COMPANY BRAIN CONTEXT" in ctx["context"] and ctx["nodes_used"] and ctx["citations"]
-    assert "$2,400,000" in ctx["context"]      # the fact value made it into the LLM context
+    ctx = build_context(t, "What does the WELL2 package include?")
+    assert "CLINIC BRAIN CONTEXT" in ctx["context"] and ctx["nodes_used"] and ctx["citations"]
+    assert "ages 40-59" in ctx["context"]      # the package's age band reached the LLM context
+
+
+def test_build_context_renders_a_missing_candidate_count_as_unknown_not_none():
+    """The bug this pins: `candidate_count` is only ever SET by `clinic_seed.py`'s `_edge` calls.
+    A FOR_PATIENT edge minted by `extract_graph` (the live `brain_ingest` path) builds edges with
+    empty `attrs`, so `e.attrs.get("candidate_count")` comes back `None` — and the old f-string
+    printed that literally: `"doc" (1 of None candidate(s) — UNVERIFIED)`. A model reading that
+    context sees a specific, slightly odd NUMBER where it should see an explicit unknown. Built as
+    a synthetic graph rather than routing through `brain_ingest`'s extraction pipeline, so the
+    missing `candidate_count` is asserted directly rather than hoping the fixture text happens to
+    reproduce it."""
+    import datetime as dt
+
+    from databridge_core import SourcePointer
+    from databridge_gateway.llm import build_context
+    from databridge_graph import GraphEdge, GraphNode, GraphStore, upsert_edge, upsert_node
+    from databridge_graph.schema import EdgeKind, NodeKind, node_id
+    from brain_server import BrainTools
+
+    t0 = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
+
+    def ptr():
+        return SourcePointer(source_id="ingested.txt", kind="doc_span",
+                             document_id="ingested.txt", char_start=0, char_end=1)
+
+    patient = GraphNode(id=node_id(NodeKind.PATIENT, "zorion-qualtrix"), kind=NodeKind.PATIENT,
+                        label="Zorion Qualtrix", canonical_id="zorion-qualtrix",
+                        sources=[ptr()], valid_from=t0, system_from=t0)
+    document = GraphNode(id=node_id(NodeKind.DOCUMENT, "ingested.txt"), kind=NodeKind.DOCUMENT,
+                         label="ingested.txt", canonical_id="ingested.txt",
+                         sources=[ptr()], valid_from=t0, system_from=t0)
+    # NO `attrs={"candidate_count": ...}` — exactly what `extract_graph` builds, unlike
+    # `clinic_seed._edge`, which always sets it.
+    claim = GraphEdge(id=f"{document.id}|for_patient|{patient.id}", src_id=document.id,
+                      kind=EdgeKind.FOR_PATIENT, dst_id=patient.id, sources=[ptr()],
+                      valid_from=t0, system_from=t0)
+
+    store = GraphStore(clock=lambda: t0)
+    upsert_node(store, patient)
+    upsert_node(store, document)
+    upsert_edge(store, claim)
+
+    ctx = build_context(BrainTools(store=store), "Zorion Qualtrix")
+    assert ctx["nodes_used"], "the synthetic patient must actually be retrieved"
+    assert "None" not in ctx["context"], ctx["context"]
+    assert "an unknown number of candidates" in ctx["context"]
 
 
 # -- ingest + schema + SSRF --------------------------------------------------------
@@ -178,36 +232,39 @@ def test_evals_e1_scorecard(client):
 # -- company brain (T08) -----------------------------------------------------------
 def test_brain_graph_seeded(client):
     body = client.get("/brain/graph").json()
-    assert body["stats"]["nodes"] >= 100 and body["stats"]["edges"] >= 150   # dense investor seed
+    assert body["stats"]["nodes"] >= 60 and body["stats"]["edges"] >= 100    # the clinic seed
     assert body["nodes"] and body["edges"][0].get("source")    # React Flow shape
 
 
 def test_brain_graph_seed_reload_idempotent(client):
     body = client.get("/brain/graph/seed").json()
     # idempotent on re-seed: either a fresh full load or 0 new (already seeded in lifespan)
-    assert body["stats"]["nodes_created"] == 0 or body["stats"]["nodes_created"] >= 100
+    assert body["stats"]["nodes_created"] == 0 or body["stats"]["nodes_created"] >= 60
     assert body["nodes"]
 
 
 def test_brain_query_grounded(client):
-    r = client.post("/brain/query", json={"question": "What is the BigClient contract value?"})
+    r = client.post("/brain/query", json={"question": "What does the WELL2 package include?"})
     assert r.status_code == 200
     body = r.json()
-    assert body["grounded"] and "$2,400,000" in body["answer"] and body["citations"]
+    assert body["grounded"] and "WELL2" in body["answer"] and body["citations"]
 
 
 def test_brain_query_no_match_refuses(client):
-    r = client.post("/brain/query", json={"question": "what is the meaning of life"})
+    # NB: not "the meaning of life" — two seeded insurers are "...Life Assurance", so token
+    # overlap matches. See STATUS.md (token-overlap linking, Phase 4 guardrail pass).
+    r = client.post("/brain/query",
+                    json={"question": "What is the airspeed velocity of an unladen swallow?"})
     assert r.status_code == 422 and r.json()["refusal"]["code"] == "UNGROUNDED_OR_NO_MATCH"
 
 
 def test_brain_timeline(client):
-    r = client.get("/brain/timeline/person:sarah@acmecorp.com")
+    r = client.get("/brain/timeline/org:meridian-life-assurance")
     assert r.status_code == 200 and r.json()["events"]
 
 
 def test_brain_timeline_unknown_404(client):
-    assert client.get("/brain/timeline/person:nobody").status_code == 404
+    assert client.get("/brain/timeline/patient:nobody").status_code == 404
 
 
 def test_brain_ingest_demo_sample(client):
@@ -216,16 +273,21 @@ def test_brain_ingest_demo_sample(client):
     assert r.status_code == 200 and r.json()["entities_added"] >= 1
 
 
-def test_brain_ingest_fixture_adds_new_entities(client):
-    # dropping a real demo fixture extracts its OWN entities and adds genuinely NEW nodes (Part 2)
-    r = client.post("/brain/ingest", json={"source_path": "email_001.eml"})
-    assert r.status_code == 200
+def test_brain_ingest_refuses_an_unregistered_source(client):
+    """`sources` is an allow-list: brain_ingest must never open an arbitrary path, or any agent
+    with MCP access gains a file-read primitive.
+
+    The refusal is reported in the body rather than as an error status — the route's contract is
+    unchanged from Phase 1. What matters is that nothing is read and nothing is ingested."""
+    r = client.post("/brain/ingest", json={"source_path": "../../etc/passwd"})
     body = r.json()
-    assert "Alice Wong" in body["new_entities"] and not body["refused"]
+    assert body.get("error") and "no arbitrary file access" in body["error"]
+    assert body["entities_added"] == 0
 
 
 def test_brain_path(client):
-    r = client.post("/brain/path", json={"from_entity": "Sarah Chen", "to_entity": "Data Migration"})
+    r = client.post("/brain/path", json={"from_entity": "Meridian Life Assurance Pte Ltd",
+                                        "to_entity": "Chest X-Ray"})
     assert r.status_code == 200 and r.json()["found"]
 
 
@@ -235,20 +297,23 @@ def test_brain_insights_grounded(client):
 
 
 def test_brain_node_detail(client):
-    r = client.get("/brain/node/person:sarah@acmecorp.com")
+    r = client.get("/brain/node/org:meridian-life-assurance")
     assert r.status_code == 200
     body = r.json()
-    assert body["node"]["label"] == "Sarah Chen" and body["sources"] and body["connections"]
+    assert body["node"]["label"] == "Meridian Life Assurance Pte Ltd"
+    assert body["sources"] and body["connections"]
 
 
 def test_brain_node_unknown_404(client):
-    assert client.get("/brain/node/person:ghost").status_code == 404
+    assert client.get("/brain/node/patient:ghost").status_code == 404
 
 
 def test_brain_graph_has_provenance_breakdown(client):
     body = client.get("/brain/graph").json()
-    # the 3 seed source docs are always present (a prior ingest test may add more to the shared store)
-    assert {"email_001.eml", "meeting_001.txt", "contract_001.pdf"} <= set(body["provenance_by_source"])
+    # the real fixture files ground the seed (a prior ingest test may add more to the shared store)
+    prov = set(body["provenance_by_source"])
+    assert {"coverage_rules.yaml", "patient_registration_synthetic.csv"} <= prov
+    assert any(s.startswith("chit_") for s in prov)
 
 
 def test_evals_brain_scorecard(client):
