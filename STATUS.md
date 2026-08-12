@@ -11,7 +11,7 @@ which is the file to read after `CLAUDE.md` in a fresh session.**
 2026-08-12 and every one came back with Criticals, including both pieces the lead wrote. They are
 five recurring shapes, not eighteen bugs; `REMEDIATION.md` §1 names them and §4 gives the order.
 
-**Green:** `python -m pytest -m "not integration"` → **1605 passed, 5 deselected** ·
+**Green:** `python -m pytest -m "not integration"` → **1938 passed, 5 deselected** ·
 `npx playwright test` → **18 passed** · `npx tsc --noEmit` clean.
 The e2e suite is now genuinely offline — see Gotchas.
 
@@ -146,36 +146,57 @@ Shape E.
 
 **1775 passed.**
 
+### 2026-08-12 (night) — Shape B, Shape E, R-34, and MCP is REAL
+
+Four tracks landed, three of them run in parallel by file ownership (the rule that makes that
+safe: disjoint files, never "different features").
+
+- **Shape B** (`8901341`) — R-17/R-22. Attestations bind to a `subject_fingerprint` over document
+  revision + selected patient + **sorted** candidate ids. The pre-existing
+  `confirmation.intake_id != record.intake_id` check is kept with a comment explaining it could
+  never have caught this: `intake_id` is `sha256(document_id + text sha)` and is identical on both
+  sides of a re-extraction. **A guard that looks like the guard you need is worse than none.**
+- **R-34** (`f41a689`, `0b4ba7f`) — the MCP server is two processes with separate registries,
+  sealed against a capability manifest at construction. Read-ness is which process a tool lives
+  in, not an `effect: "read"` label on it.
+- **Shape E + R-33** (`5c402f2`) — the model can no longer author facts or identity. It returns
+  references; code resolves them to stored values and their own pointers. `AgentAnswer.answer` is
+  a property with `extra="forbid"`, so uncited prose is unrepresentable rather than merely
+  screened. 133 → 229 tests in that package.
+- **Real MCP** — a self-hosted MCPJungle aggregator fronts the reader server. `brain_query` was
+  invoked **through the aggregator** and returned real graph data with resolving pointers;
+  `brain_ingest` is unreachable ("Unknown tool"). See `docs/hackathon/MCP_RUNBOOK.md` for the
+  executed commands and the four failure modes hit on the way.
+
+**1938 passed, 5 deselected.**
+
 ## Now
 
-Nothing in flight. Two agents ran at the user's request: a push-readiness audit, and
-`docs/hackathon/PROJECT_CONTEXT.md` (full end-to-end project context, for the hackathon's other
-documentation deliverables).
+**The agent is hardened but NOT wired, and NOT cleared.** A scoped `codex exec` on `5c402f2`
+returned **"I would not ship this"** — 7 findings, 2 Critical, and they are the right kind:
+
+1. **The model could still steer identity — by presentation.** `AnswerPlan.report` let it filter
+   and reorder rows, so it could show only candidate 2 or place it first. Showing one candidate of
+   three *is* a recommendation, and the code-authored "a human must select" sentence does not undo
+   it. Constraint 1, surviving in a subtler form than the tool-argument attack that was fixed.
+2. **The argument screen walked one level.** Nested `{"filters": {"properties": {"patient_id"}}}`
+   passes, as do generic names (`id`, `query`, `record`) and `patternProperties`. It was a
+   denylist of names — the same shape of guard R-10 had already failed with once.
+3. **The safe renderer is not the API contract.** `AgentAnswer.answer` being a property means
+   serialisation omits it while `tool_calls` emits raw model arguments and unredacted rows, so any
+   route returning that object bypasses `render.present()` entirely.
+
+Fixes are in flight. `/intelligence` stays unwired until they land and are re-reviewed: putting an
+agent that can steer identity onto the surface judges look at is the exact ordering error this
+remediation exists to prevent.
 
 ## Next
 
-`REMEDIATION.md` §4 item 3 — **Shape B** (R-17, R-22), then Shape C, then R-13, then Shape E.
-**R-33 now blocks §3.1** and is tracked with it: `_text()` is an HTML/markdown encoder, not a
-prompt-injection boundary, so the model-facing consumer must delimit untrusted evidence itself.
-
-## Next — work `REMEDIATION.md` §4 top-down
-
-1. ~~Commit in coherent chunks.~~ **Done.**
-2. **Shape A — the rest.** R-18 (`billing.py`: `billed_to`, `tpa_claim_required`, the total and
-   every `_line()` field behind one `source_field` string) and R-21 (`/intelligence` returns values
-   after catching a pointer-lookup failure and setting `sources = {}`). Do R-18 **together with
-   R-16**, which is the same file and the same shape pointing the other way: an all-uncatalogued
-   document shows **SGD 0** beside a non-empty `unknown_coverage_items`. R-09 belongs with the
-   agent work below — same file.
-3. **Shape B — bind an attestation to its subject** (R-17, R-22). Six instances so far, four fixed.
-4. **Shape C — guards before the guarded action** (R-12, R-19), then **R-13** (checkbox fail-closed
-   — a declined test can currently be billed).
-5. **Shape E — typed agent output** (R-07…R-11). Unblocks the real agent behind `/intelligence`.
-6. Then `/intelligence` + MCPJungle, per `REMEDIATION.md` §3.
-
-**Sequencing note:** R-01, R-03 and R-06 were fixed in one pass rather than three, because all
-three live in `node_sheet.py`. The ownership rule exists to stop two tracks editing one file
-concurrently, not to force three visits to the same file.
+1. Land and re-review the agent fixes, then wire `POST /intelligence/ask` — **structural reads
+   only**, no candidate or patient-scoped tools on that page.
+2. Shape C (R-12, R-19), then R-13 (a declined test can still be billed).
+3. Shape D (R-02, R-04, R-05, R-29), then the remainder.
+4. Carried findings R-30…R-32 in `REMEDIATION.md` §2.7.
 
 ## Known open issues
 
