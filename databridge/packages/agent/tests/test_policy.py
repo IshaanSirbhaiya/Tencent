@@ -4,6 +4,17 @@ The finding was that the schema was rendered into the system prompt and never ch
 shown to a model is a request. These tests assert the two halves of the fix: a call that violates
 the schema never reaches the adapter, and a general search primitive cannot be aimed at text that
 appears neither in the question nor in the data.
+
+**Round two.** A second review found the argument control bypassable in three ways at once, and
+each has a test below that fails without the fix:
+
+* the screen read ``parameters["properties"]`` and stopped, so
+  ``{"filters": {"properties": {"patient_id": …}}}`` was one harmless property called ``filters``;
+* it matched a denylist of names, so ``id``, ``key``, ``record`` and ``query`` were never on it;
+* ``patternProperties`` admits names nobody wrote down, so no name screen can see them.
+
+The durable answer is not a longer list. It is that a **candidate- or patient-scoped tool declares
+no arguments at all**, and that the tree is walked rather than peeked at.
 """
 from __future__ import annotations
 
@@ -12,9 +23,13 @@ from agent_stubs import BLOCKED_POINTER, make_stub, plan, report, scripted
 
 from databridge_agent import (
     ArgumentSchemaViolation,
+    CandidateRead,
     ClinicAgent,
     IdentityArgumentRefused,
+    PatientReadGrant,
+    PatientScopedRead,
     SchemaNotStrict,
+    SelectorArgumentRefused,
     ToolRegistry,
     ToolRow,
     UngroundedArgument,
@@ -67,6 +82,131 @@ def test_a_patient_argument_is_refused_even_in_a_strict_schema():
 
 def test_an_intake_argument_is_allowed():
     screen_parameters("t", INTAKE_SCHEMA)
+
+
+# --- round two: the ways the name screen was got round ----------------------------
+
+
+def _nested(inner: dict) -> dict:
+    """A selector one level down, inside an object the screen used to call `filters`."""
+    return {"type": "object", "additionalProperties": False,
+            "properties": {"filters": {"type": "object", "additionalProperties": False,
+                                       "properties": inner}}}
+
+
+def test_a_selector_nested_one_level_down_is_refused():
+    """The review's own payload. The old screen inspected one level of a recursive structure."""
+    with pytest.raises(IdentityArgumentRefused):
+        screen_parameters("clinic_lookup", _nested({"patient_id": {"type": "string"}}))
+
+
+NESTED_PLACES = [
+    # `entries`, not `rows`: `rows` is itself a generic selector, and the case would then be
+    # refused by that rule rather than by the tree walk it exists to exercise.
+    ("in an array item", {
+        "type": "object", "additionalProperties": False,
+        "properties": {"entries": {"type": "array", "items": {
+            "type": "object", "additionalProperties": False,
+            "properties": {"nric": {"type": "string"}}}}}}),
+    ("in $defs", {
+        "type": "object", "additionalProperties": False, "properties": {},
+        "$defs": {"sel": {"type": "object", "additionalProperties": False,
+                          "properties": {"candidate_index": {"type": "integer"}}}}}),
+    ("in anyOf", {
+        "type": "object", "additionalProperties": False, "properties": {},
+        "anyOf": [{"type": "object", "additionalProperties": False,
+                   "properties": {"patientId": {"type": "string"}}}]}),
+    ("in a dependent schema", {
+        "type": "object", "additionalProperties": False,
+        "properties": {"intake_id": {"type": "string"}},
+        "dependentSchemas": {"intake_id": {"type": "object", "additionalProperties": False,
+                                           "properties": {"subject": {"type": "string"}}}}}),
+    ("two levels down", _nested({"deeper": {"type": "object", "additionalProperties": False,
+                                            "properties": {"passport": {"type": "string"}}}})),
+]
+
+
+@pytest.mark.parametrize("where,schema", NESTED_PLACES, ids=[w for w, _ in NESTED_PLACES])
+def test_a_selector_is_refused_wherever_in_the_tree_it_hides(where, schema):
+    with pytest.raises(IdentityArgumentRefused):
+        screen_parameters("clinic_lookup", schema)
+
+
+def test_pattern_properties_are_refused_outright():
+    """A pattern admits property names nobody has written down, so no screen over names can see
+    what it lets through. There is nothing to inspect, so there is nothing to allow."""
+    with pytest.raises(SchemaNotStrict):
+        screen_parameters("clinic_lookup", {
+            "type": "object", "additionalProperties": False,
+            "patternProperties": {"^p.*": {"type": "string"}}})
+
+
+GENERIC_SELECTORS = ["id", "key", "record", "row", "index", "uid", "target", "which", "select"]
+
+
+@pytest.mark.parametrize("argument", GENERIC_SELECTORS)
+def test_a_generic_selector_argument_is_refused(argument):
+    """"Use record 2" needs no patient vocabulary to arrive, which is why a denylist of
+    patient-shaped names was never the control."""
+    with pytest.raises(IdentityArgumentRefused):
+        screen_parameters("clinic_lookup", {
+            "type": "object", "additionalProperties": False,
+            "properties": {argument: {"type": "string"}}})
+
+
+def test_a_nested_object_that_is_not_closed_is_refused():
+    """Closing only the top level leaves the inner object open, and an open object accepts the
+    argument it never mentioned — which is how the identity gets supplied."""
+    with pytest.raises(SchemaNotStrict):
+        screen_parameters("clinic_lookup", {
+            "type": "object", "additionalProperties": False,
+            "properties": {"filters": {"type": "object",
+                                       "properties": {"since": {"type": "string"}}}}})
+
+
+# --- round two: a subject-bound tool takes NOTHING --------------------------------
+
+GRANT = dict(patient_id="patient:0042", subject_fingerprint="sha256:abc",
+             attested_by="staff:front_desk_01", attested_at="2026-08-12T09:00:00")
+
+INNOCENT_ARGUMENT = {"type": "object", "additionalProperties": False,
+                     "properties": {"since": {"type": "string"}}}
+
+
+@pytest.mark.parametrize("scope", ["candidates", "patient"])
+def test_a_subject_bound_tool_may_declare_no_argument_at_all(scope):
+    """Not "no patient-shaped argument" — none.
+
+    ``since`` is innocent, and that is the point: any argument on a subject-bound tool is a channel
+    the model can narrow or redirect a human's attestation through, and the next innocent-looking
+    name is one nobody put on a list.
+    """
+    with pytest.raises(SelectorArgumentRefused):
+        screen_parameters("patient_record", INNOCENT_ARGUMENT, scope=scope)
+
+
+@pytest.mark.parametrize("scope", ["candidates", "patient"])
+def test_a_subject_bound_tool_with_no_properties_is_fine(scope):
+    """The over-refusal guard: the rule is zero arguments, not zero tools."""
+    screen_parameters("patient_record", {"type": "object", "properties": {},
+                                         "additionalProperties": False}, scope=scope)
+
+
+def test_a_structural_tool_may_still_take_arguments():
+    """The other over-refusal guard. `clinic_structural` reads name no patient by capability."""
+    screen_parameters("coverage_gap", INTAKE_SCHEMA, scope="clinic_structural")
+
+
+def test_the_rule_holds_through_the_adapter_and_the_tool(caplog):
+    """Both doors: the adapter screens its own schema at construction, so a Tool built round it
+    later cannot be the first place anybody looks."""
+    from agent_stubs import RowsAdapter
+
+    with pytest.raises(SelectorArgumentRefused):
+        RowsAdapter(CandidateRead(), name="registry_candidates", parameters=INNOCENT_ARGUMENT)
+    with pytest.raises(SelectorArgumentRefused):
+        RowsAdapter(PatientScopedRead(grant=PatientReadGrant(**GRANT)), name="patient_record",
+                    parameters=INNOCENT_ARGUMENT)
 
 
 # --- validate_arguments -----------------------------------------------------------
@@ -198,3 +338,55 @@ def test_narrow_tools_are_listed_before_broad_ones_in_the_catalogue():
     narrow = make_stub("intake_card").tool
     catalogue = ToolRegistry([broad, narrow]).catalogue()
     assert catalogue.index("intake_card") < catalogue.index("graph_query")
+
+
+# --- round two: validation is on EVERY path, not only the loop's ------------------
+
+
+def test_a_direct_tool_call_is_validated_too():
+    """``Tool.call`` is public. Validation used to live in ``ClinicAgent._run_tool``, so this path
+    — the one a route or a test would reach for — walked straight past the schema."""
+    stub = _stub_with(INTAKE_SCHEMA)
+    with pytest.raises(ArgumentSchemaViolation):
+        stub.tool.call(intake_id="intake:0001", patient_id="patient:0043")
+    assert stub.calls == [], "the adapter ran despite an argument the schema forbids"
+
+
+def test_a_direct_adapter_call_is_validated_too():
+    """And the adapter itself, which is what ``Tool.call`` delegates to."""
+    stub = _stub_with(INTAKE_SCHEMA)
+    with pytest.raises(ArgumentSchemaViolation):
+        stub.adapter(intake_id="not-an-intake-id")
+    assert stub.calls == []
+
+
+def test_a_direct_call_that_conforms_still_works():
+    """Guards the two above: they must fail on the schema, not on the plumbing."""
+    stub = _stub_with(INTAKE_SCHEMA)
+    assert stub.tool.call(intake_id="intake:0001").rows
+    assert stub.calls == [{"intake_id": "intake:0001"}]
+
+
+def test_mutating_the_schema_after_registration_changes_nothing():
+    """The snapshot is taken at construction, screened once, and frozen.
+
+    Before this, ``adapter.parameters`` was an ordinary dict: a tool could be registered with a
+    closed, screened schema and then have a ``patient_id`` property added to it, and every
+    subsequent call would be validated against the widened version that no screen had ever seen.
+    """
+    from databridge_agent import AdapterSealMutated
+
+    stub = _stub_with(INTAKE_SCHEMA)
+    registry = ToolRegistry([stub.tool])
+
+    with pytest.raises(AdapterSealMutated):
+        stub.adapter.parameters["properties"]["patient_id"] = {"type": "string"}
+    with pytest.raises(AdapterSealMutated):
+        stub.adapter.parameters["additionalProperties"] = True
+    with pytest.raises(AdapterSealMutated):
+        stub.adapter.parameters = {"type": "object", "properties": {"patient_id": {}},
+                                   "additionalProperties": True}
+
+    assert "patient_id" not in registry.get("intake_card").parameters["properties"]
+    with pytest.raises(ArgumentSchemaViolation):
+        stub.tool.call(intake_id="intake:0001", patient_id="patient:0043")

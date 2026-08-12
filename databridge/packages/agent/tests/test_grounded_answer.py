@@ -31,6 +31,7 @@ from agent_stubs import (
 from databridge_agent import ClinicAgent, ToolRegistry, ToolRow, screen_agent_output
 from databridge_agent.guardrails import check_question
 from databridge_agent.render import (
+    HEADING_CANDIDATES,
     HEADING_UNRESOLVED,
     HEADING_VALUES,
     HUMAN_SELECTION,
@@ -144,23 +145,29 @@ def test_the_rendered_answer_is_only_tool_values_and_table_sentences():
                                 ("registry_candidates", 0, "date_of_birth_matches"))
     value_line = re.compile(r"^- [\w:]+\[\d+\]\.\w+: .*  \[source: .+\]$")
     sentences = {t for note in NOTES.values() for t in note.split("\n")}
+    headings = (HEADING_VALUES, HEADING_UNRESOLVED, HEADING_CANDIDATES)
 
     for line in result.answer.splitlines():
-        if not line.strip() or line in (HEADING_VALUES, HEADING_UNRESOLVED):
+        if not line.strip() or line in headings:
             continue
         assert value_line.match(line) or line in sentences, f"unaccounted line: {line!r}"
 
 
 def test_a_value_and_its_pointer_travel_together_into_the_text():
     result, _ = _ask_candidates("", ("registry_candidates", 0, "printed_name"))
-    field = result.fields[0]
+    field = next(f for f in result.fields if f.key == "registry_candidates[0].printed_name")
     assert field.source == DOC_POINTER
     assert f"- {field.key}: LIM WEI MING  [source: {cite(DOC_POINTER)}]" in result.answer
 
 
 def test_citations_are_derived_from_the_reported_values():
-    result, _ = _ask_candidates("", ("registry_candidates", 0, "printed_name"),
-                                ("registry_candidates", 0, "registry_row"))
+    """In REPORT order, for the reads the model does get to summarise (a structural one here —
+    candidates are ordered by code, which the tests below assert separately)."""
+    stub = blocked_intakes_tool()
+    harness, _ = scripted(plan("blocked_intakes"), plan(None),
+                          report(("blocked_intakes", 0, "detail"),
+                                 ("blocked_intakes", 0, "intake_id")))
+    result = ClinicAgent(ToolRegistry([stub.tool]), harness).ask("What is blocked?")
     assert result.citations == (DOC_POINTER, BLOCKED_POINTER)
 
 
@@ -212,3 +219,72 @@ def test_present_neutralises_a_role_marker_in_a_value():
 def test_render_composes_headings_only_when_there_is_something_under_them():
     assert render([], [], []) == ""
     assert HEADING_VALUES not in render([], ["a[0].b"], [])
+
+
+# --- the model cannot recommend a candidate by omission or by order ---------------
+#
+# The second review's sharpest point, and the one the first fix missed entirely: the fixed
+# human-selection sentence was added by code, but the ROWS above it were still whatever the model
+# chose to reference, in whatever order it chose. Showing only candidate 2 is a recommendation.
+# Putting candidate 2 first is a recommendation. Neither says a word that any screen could match.
+
+
+def _candidate_fields(result):
+    return [f.key for f in result.fields if f.scope == "candidates"]
+
+
+ALL_CANDIDATE_KEYS = [
+    "registry_candidates[0].date_of_birth_matches",
+    "registry_candidates[0].printed_name",
+    "registry_candidates[0].registry_row",
+    "registry_candidates[1].date_of_birth_matches",
+    "registry_candidates[1].printed_name",
+    "registry_candidates[1].registry_row",
+]
+
+
+def test_a_model_reporting_only_one_candidate_still_gets_all_of_them():
+    """Selection by omission. The model reports candidate 2 alone; both are printed."""
+    result, _ = _ask_candidates(MODEL_IDENTITY_PROSE,
+                                ("registry_candidates", 1, "registry_row"))
+
+    assert _candidate_fields(result) == ALL_CANDIDATE_KEYS
+    assert "patient:0042" in result.answer, "the candidate the model left out is missing"
+    assert "patient:0043" in result.answer
+
+
+def test_a_model_reordering_the_candidates_changes_nothing():
+    """Selection by sequence. Two runs, opposite report orders, byte-identical candidate blocks."""
+    forward, _ = _ask_candidates("", ("registry_candidates", 0, "registry_row"),
+                                 ("registry_candidates", 1, "registry_row"))
+    reversed_, _ = _ask_candidates("", ("registry_candidates", 1, "registry_row"),
+                                   ("registry_candidates", 0, "registry_row"))
+
+    assert _candidate_fields(forward) == _candidate_fields(reversed_) == ALL_CANDIDATE_KEYS
+    assert forward.answer == reversed_.answer
+
+
+def test_reporting_no_candidates_at_all_still_prints_them():
+    """The strongest form: the model says nothing, and the full list appears anyway. What the
+    front desk sees is a property of what was READ, not of what the model was willing to say."""
+    result, _ = _ask_candidates("no comment")
+
+    assert _candidate_fields(result) == ALL_CANDIDATE_KEYS
+    assert HEADING_CANDIDATES in result.answer
+    assert note_text(HUMAN_SELECTION) in result.answer
+
+
+def test_the_candidate_block_is_labelled_as_a_complete_list_not_a_selection():
+    """A heading of its own, because the guarantee it carries differs from the block beneath it."""
+    result, _ = _ask_candidates("", ("registry_candidates", 0, "registry_row"))
+    assert HEADING_CANDIDATES in result.answer
+    assert "not a ranking" in result.answer
+
+
+def test_a_model_reference_cannot_duplicate_a_candidate_to_the_top():
+    """The remaining ordering trick: name a row twice and hope it is printed twice. Each value
+    appears exactly once, at the position the code gave it."""
+    result, _ = _ask_candidates("", ("registry_candidates", 1, "registry_row"),
+                                ("registry_candidates", 1, "registry_row"),
+                                ("registry_candidates", 1, "printed_name"))
+    assert _candidate_fields(result) == ALL_CANDIDATE_KEYS

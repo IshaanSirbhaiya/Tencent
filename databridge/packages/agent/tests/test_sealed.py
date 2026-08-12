@@ -25,12 +25,15 @@ from pydantic import ValidationError
 
 from databridge_agent import (
     AdapterRefused,
+    AdapterSealMutated,
     CandidateRead,
+    IdentityArgumentRefused,
     ClinicStructuralRead,
     GrantRefused,
     PatientReadGrant,
     PatientScopedRead,
     SealBroken,
+    SubjectMismatch,
     Tool,
     ToolRegistry,
     ToolResult,
@@ -106,6 +109,64 @@ def test_the_scan_catches_each_planted_violation(planted, expected):
 
 def test_the_scan_does_not_fire_on_ordinary_read_code():
     scan_source("rows = store.open_node_row(node_id)\ncursor.execute('SELECT 1')\n", "reader")
+
+
+# The one-line off switch. `_abstract_base` skips the scan, and until this test it was honoured
+# wherever it was set — including on a concrete adapter in somebody else's module, which is the
+# code the scan exists to examine. A guard whose own bypass is reachable by the code it guards is
+# not a guard, and this is the second time this repo has found that shape (REMEDIATION.md Shape C).
+_OPT_OUT_MODULE = (
+    "from databridge_agent import ClinicStructuralRead, SealedReadAdapter, ToolResult\n"
+    "class OptOut(SealedReadAdapter):\n"
+    "    _abstract_base = True\n"
+    "    name = 'clinic_lookup'\n"
+    "    def read(self, **a):\n"
+    "        return ToolResult(tool='clinic_lookup')\n")
+
+
+def test_a_concrete_adapter_cannot_switch_the_scan_off(tmp_path):
+    """`_abstract_base = True` in another module buys nothing: the transport is still found."""
+    with pytest.raises(TransportInAdapter):
+        _load(tmp_path, "opt_out_adapter", _TRANSPORT + "\n" + _OPT_OUT_MODULE)
+
+
+def test_the_opt_out_module_is_otherwise_importable(tmp_path):
+    """Guards the test above from passing for the wrong reason — without the planted transport the
+    same module loads, so the refusal is the scan firing and not a broken fixture."""
+    module = _load(tmp_path, "opt_out_clean", _OPT_OUT_MODULE)
+    assert module.OptOut(ClinicStructuralRead()).name == "clinic_lookup"
+
+
+def test_a_subclass_does_not_inherit_its_parents_scan_record(tmp_path):
+    """`scanned_source` is inherited like any class attribute, and an inherited scan record
+    describes a DIFFERENT file. The child's own module is what will run."""
+    parent = _load(tmp_path, "clean_parent", CLEAN_MODULE)
+    child_source = ("from clean_parent import Clean\n"
+                    + _TRANSPORT + "\n"
+                    "class Child(Clean):\n"
+                    "    name = 'clinic_lookup_2'\n")
+    sys.modules["clean_parent"] = parent
+    try:
+        with pytest.raises(TransportInAdapter):
+            _load(tmp_path, "dirty_child", child_source)
+    finally:
+        sys.modules.pop("clean_parent", None)
+
+
+_PRESET_MODULE = (
+    "from databridge_agent import ClinicStructuralRead, SealedReadAdapter, ToolResult\n"
+    "class Preset(SealedReadAdapter):\n"
+    "    scanned_source = 'already scanned, honest'\n"
+    "    name = 'clinic_lookup'\n"
+    "    def read(self, **a):\n"
+    "        return ToolResult(tool='clinic_lookup')\n")
+
+
+def test_claiming_to_have_been_scanned_is_not_being_scanned(tmp_path):
+    """The other one-line off switch. `scanned_source` is an ordinary class attribute, so a class
+    body can preset it; whether a class was scanned is tracked where a class body cannot write."""
+    with pytest.raises(TransportInAdapter):
+        _load(tmp_path, "preset_adapter", _TRANSPORT + "\n" + _PRESET_MODULE)
 
 
 def test_an_adapter_with_no_readable_source_is_refused():
@@ -223,4 +284,52 @@ def test_the_seal_passes_a_well_formed_result():
                     value_sources={"intake_id": BLOCKED_POINTER}),)
     adapter = RowsAdapter(ClinicStructuralRead(), rows=rows, name="blocked_intakes",
                           parameters=NO_ARGUMENTS)
+    assert adapter().rows == rows
+
+
+# --- the schema is sealed at construction (R-11, round two) -----------------------
+
+
+def test_the_declared_schema_is_frozen_at_construction():
+    """Screened once, then frozen: the thing that runs has to be the thing that was screened."""
+    adapter = RowsAdapter(ClinicStructuralRead(), name="intake_card", parameters={
+        "type": "object", "properties": {"intake_id": {"type": "string"}},
+        "additionalProperties": False})
+
+    with pytest.raises(AdapterSealMutated):
+        adapter.parameters["properties"]["patient_id"] = {"type": "string"}
+    with pytest.raises(AdapterSealMutated):
+        adapter.parameters["properties"].update({"nric": {"type": "string"}})
+    with pytest.raises(AdapterSealMutated):
+        adapter.name = "something_else"
+    assert sorted(adapter.parameters["properties"]) == ["intake_id"]
+
+
+def test_the_adapter_screens_its_own_schema_at_construction():
+    """The Tool is not the only door. An adapter is a callable in its own right."""
+    with pytest.raises(IdentityArgumentRefused):
+        RowsAdapter(ClinicStructuralRead(), name="intake_card",
+                    parameters={"type": "object", "properties": {"patient_id": {"type": "string"}},
+                                "additionalProperties": False})
+
+
+def test_a_patient_scoped_read_returning_another_patients_row_is_refused():
+    """A tripwire, not the boundary — see `_check_subject`. Subject scoping is enforced where the
+    query is written; this catches the row that arrives labelled with somebody else."""
+    grant = PatientReadGrant(**GRANT)
+    rows = (ToolRow(values={"patient_id": "patient:0043", "package_code": "WELL2"},
+                    value_sources={"patient_id": BLOCKED_POINTER,
+                                   "package_code": BLOCKED_POINTER}),)
+    adapter = RowsAdapter(PatientScopedRead(grant=grant), rows=rows, name="patient_record")
+    with pytest.raises(SubjectMismatch):
+        adapter()
+
+
+def test_a_patient_scoped_read_of_its_own_subject_passes():
+    """Guards the test above: it must fail on the mismatch, not on the check being unconditional."""
+    grant = PatientReadGrant(**GRANT)
+    rows = (ToolRow(values={"patient_id": "patient:0042", "package_code": "WELL2"},
+                    value_sources={"patient_id": BLOCKED_POINTER,
+                                   "package_code": BLOCKED_POINTER}),)
+    adapter = RowsAdapter(PatientScopedRead(grant=grant), rows=rows, name="patient_record")
     assert adapter().rows == rows

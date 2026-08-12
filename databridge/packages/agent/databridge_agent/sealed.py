@@ -22,32 +22,49 @@ and none of them dependent on a model or an author behaving well:
 3. **The subject is bound at CONSTRUCTION, never supplied by the model.** A patient-scoped adapter
    holds a ``PatientReadGrant``, and the grant is created by the composition root at the moment a
    named human attests to an in-person selection. The model's only channel into this package is a
-   JSON object parsed into ``ToolPlan``; it has no field that can carry a grant, and
-   ``policy.screen_parameters`` refuses any tool whose schema would let arguments carry a patient
-   id. That is R-08: the model cannot make an identity decision through tool ARGUMENTS because no
-   argument can name a patient.
-4. **The result is checked on the way out.** ``__call__`` refuses anything that is not a
-   ``ToolResult`` for this tool, so an adapter cannot hand back a bare dict that skipped the
-   per-value grounding wall.
+   JSON object parsed into ``ToolPlan``; it has no field that can carry a grant, and a
+   patient- or candidate-scoped adapter may declare **no arguments at all**
+   (``policy.screen_parameters``, called from ``__init__``). That is R-08: the model cannot make an
+   identity decision through tool ARGUMENTS because such a tool has no arguments.
+4. **Arguments are validated, and the result is checked, on the way out.** ``__call__`` validates
+   every call against an IMMUTABLE snapshot of the schema taken at construction, then refuses
+   anything that is not a ``ToolResult`` for this tool — so an adapter cannot hand back a bare dict
+   that skipped the per-value grounding wall. Validation lives here, at the final callable
+   boundary, rather than in the agent loop: ``Tool.call()`` and a direct ``adapter(**args)`` reach
+   the same check, which is what the second review found missing.
 
-What this does NOT claim: that a determined author cannot defeat it. ``getattr``-assembled module
-names, a connection handle captured before the class was defined, a C extension — all get through.
-The scan is a wall against the ordinary way this goes wrong (somebody adds ``import httpx`` to a
-tool module on a deadline), and it is loud when it fires. It is not a sandbox, and this package
-should never be described as one.
+**What this does NOT claim — read this before relying on any of it.**
+
+* *The scan is textual, and it covers exactly one file: the module the subclass is defined in.* It
+  does not follow imports, so an adapter that calls ``helpers.fetch()`` in a neighbouring module is
+  not examined at all. ``getattr``/``importlib``-assembled module names, ``eval``, a connection
+  handle captured before the class was defined, a callable injected through ``__init__``
+  (``StaticReadAdapter``'s ``log``), a C extension — all get through. The scan is a wall against the
+  ordinary way this goes wrong (somebody adds ``import httpx`` to a tool module on a deadline), and
+  it is loud when it fires. **It is not a sandbox, it is not an authorization boundary, and this
+  package must never be described as one.** Do not run this process with network egress, mail
+  credentials or a writable ledger handle on the assumption that the scan prevents their use.
+* *A ``PatientReadGrant`` is an assertion by the code that constructed it, not proof that a human
+  attested to anything.* Any caller in-process can write ``attested_by="Alice"``. What this package
+  guarantees is only that the fields exist and are not machine-shaped. The binding to a real person
+  is the composition root's job — see ``PatientReadGrant``'s own docstring for the rule the route
+  must follow.
 """
 from __future__ import annotations
 
 import abc
+import copy
 import inspect
 import pathlib
 import re
 import sys
+import weakref
 from datetime import datetime
 from typing import Any, ClassVar, Literal, Union
 
 from pydantic import BaseModel, ConfigDict
 
+from . import policy
 from .results import ToolResult
 
 
@@ -69,6 +86,14 @@ class AdapterSourceUnavailable(AdapterRefused):
 
 class SealBroken(AdapterRefused):
     """An adapter returned something the seal does not permit."""
+
+
+class AdapterSealMutated(AdapterRefused):
+    """Something tried to change a declaration after it was screened. It is fixed at construction."""
+
+
+class SubjectMismatch(SealBroken):
+    """A patient-scoped adapter returned a row labelled with a different subject than its grant."""
 
 
 class GrantRefused(RuntimeError):
@@ -149,6 +174,29 @@ def _module_source(cls: type) -> tuple[str, str]:
             f"adapter {cls.__name__!r} REFUSED: {exc}") from None
 
 
+#: Classes this process has actually scanned. A module-level set rather than a class attribute,
+#: because a class attribute is settable from the class body — ``scanned_source = "trust me"``
+#: would be the same one-line off switch as ``_abstract_base``, which is the hole this round of
+#: review was about. A class cannot put itself in here while it is being defined.
+_SCANNED: "weakref.WeakSet[type]" = weakref.WeakSet()
+
+
+def _scan_class(cls: type) -> None:
+    """Scan the module ``cls`` was defined in, unless this exact class has already been scanned.
+
+    Membership is by class IDENTITY, so a subclass never inherits its parent's clearance: an
+    inherited scan record describes a different file than the one the subclass lives in, and the
+    subclass's file is the one that will run.
+    """
+    if cls in _SCANNED:
+        return
+    source, path = _module_source(cls)
+    scan_source(source, f"adapter {cls.__name__!r}")
+    # Informational only — the audit trail says which file was read. Nothing branches on it.
+    cls.scanned_source = path
+    _SCANNED.add(cls)
+
+
 # --- the closed capability set ----------------------------------------------------
 
 
@@ -168,6 +216,24 @@ class PatientReadGrant(BaseModel):
     ``REMEDIATION.md`` §1 Shape B). It is required, and it is opaque to this package: computing it
     is the composition root's job because only the route sees the resolution. What this package
     guarantees is that a grant cannot exist without one.
+
+    **What this type is NOT.** It is an *assertion made by the code that constructed it*, not proof
+    that a named human stood at a counter. Any in-process caller can write
+    ``attested_by="Alice"``, invent a fingerprint and set ``selection_made_in_person=True``; the
+    class cannot tell the difference, and nothing here binds the grant to an authenticated session
+    or to the candidate set a human was actually shown. This package screens the *shape* of the
+    claim and nothing more.
+
+    So the rule for whoever builds the route, stated here because this is where it will be read:
+
+    * **Never deserialize a grant from a request.** Not from a body, not from a header, not from a
+      cookie. A grant arriving over HTTP is an identity decision made by whoever sent the request,
+      which for this system includes a model reading an attacker's document.
+    * Construct it **server-side only**, from the staff session that is already authenticated, at
+      the moment the confirmation endpoint records the in-person attestation, with the fingerprint
+      computed from the resolution the route itself performed.
+    * A grant should not outlive that attestation. Re-attesting is cheap; a stale grant is an
+      identity nobody checked.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -243,36 +309,113 @@ ReadCapability = Union[ClinicStructuralRead, CandidateRead, PatientScopedRead]
 # --- the adapter ------------------------------------------------------------------
 
 
+class _FrozenDict(dict):
+    """A dict that refuses mutation. Used for the schema snapshot the seal enforces against.
+
+    A dict SUBCLASS rather than ``MappingProxyType`` for one practical reason: ``jsonschema``'s
+    type checker asks ``isinstance(instance, dict)``, and a mapping proxy is not one — a frozen
+    schema that fails its own metaschema check would be worse than no freezing at all.
+    """
+
+    def _refuse(self, *args: Any, **kwargs: Any):
+        raise AdapterSealMutated(
+            "the argument schema is sealed at construction: it was screened once, and the screen "
+            "is only a control if the thing it screened is the thing that runs. Declare the "
+            "schema on the class or pass it to __init__ (sealed.py; REMEDIATION.md R-11)")
+
+    __setitem__ = __delitem__ = _refuse
+    setdefault = update = pop = popitem = clear = _refuse   # type: ignore[assignment]
+
+    def __copy__(self) -> dict:
+        return dict(self)
+
+    def __deepcopy__(self, memo: dict) -> dict:
+        return {k: copy.deepcopy(v, memo) for k, v in self.items()}
+
+
+class _FrozenList(list):
+    """The list half of the same freeze. A ``list`` subclass, for the reason above."""
+
+    def _refuse(self, *args: Any, **kwargs: Any):
+        raise AdapterSealMutated("the argument schema is sealed at construction")
+
+    append = extend = insert = remove = pop = clear = sort = reverse = _refuse  # type: ignore[assignment]
+    __setitem__ = __delitem__ = __iadd__ = __imul__ = _refuse                   # type: ignore[assignment]
+
+    def __copy__(self) -> list:
+        return list(self)
+
+    def __deepcopy__(self, memo: dict) -> list:
+        return [copy.deepcopy(v, memo) for v in self]
+
+
+def freeze(node: Any) -> Any:
+    """A deep, immutable copy of a JSON-shaped structure. Public so a test can prove it is frozen."""
+    if isinstance(node, dict):
+        return _FrozenDict({k: freeze(v) for k, v in node.items()})
+    if isinstance(node, list):
+        return _FrozenList(freeze(v) for v in node)
+    return node
+
+
+# Row keys that LABEL a subject. Matched as whole tokens, so `registry_row` and `document_id` are
+# not subject labels and an ordinary read is not second-guessed. Narrow on purpose: this is a check
+# on rows that name a patient, not a claim that every returned row was scoped to one.
+_SUBJECT_KEY_TOKENS = frozenset({"patient", "patientid", "subject", "mrn"})
+
+
+def _name_tokens(name: str) -> set[str]:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name)
+    return {t for t in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if t}
+
+
 class SealedReadAdapter(abc.ABC):
     """The only thing a ``Tool`` may call.
 
     Subclasses declare ``name``, ``description``, ``parameters`` (a strict JSON Schema) and
     implement ``read``. They are scanned at class definition; they are called only through
-    ``__call__``, which checks what comes back.
+    ``__call__``, which validates the arguments against the sealed schema and checks what comes
+    back.
+
+    **Two things are fixed at construction and cannot be changed afterwards**: ``parameters`` — a
+    deep-frozen snapshot, so mutating it later cannot widen the schema past the screen it already
+    passed — and ``name``, which is what every citation in the answer is attributed to.
     """
 
     name: ClassVar[str] = ""
     description: ClassVar[str] = ""
-    # A STRICT object schema: `additionalProperties: false`, enforced by `policy.screen_parameters`
-    # when the tool is declared, and validated against every call before the adapter runs (R-11).
+    # A STRICT object schema: `additionalProperties: false` at every level, no `patternProperties`,
+    # no selector-shaped property names, and — for a candidate- or patient-scoped adapter — no
+    # properties at all. Screened by `policy.screen_parameters` in `__init__` and enforced against
+    # every call in `__call__` (R-08/R-11).
     parameters: ClassVar[dict] = {"type": "object", "properties": {}, "additionalProperties": False}
     # "broad" marks a general search primitive — one that takes free text and can reach anything.
     # `policy.check_argument_grounding` binds its arguments to the question that was asked, so it
-    # cannot be pointed at whatever an injected document suggests (R-11, second half).
+    # cannot be pointed at whatever an injected document suggests (R-11, second half). That check
+    # needs the question, which only the loop has, so it runs there and not here.
     breadth: ClassVar[Literal["narrow", "broad"]] = "narrow"
     # Argument names whose value must appear in the question or in what the tools already returned.
     grounded_arguments: ClassVar[frozenset] = frozenset()
 
-    #: Set by ``__init_subclass__`` — the file the scan actually read, for the audit trail.
+    #: Set by the scan — the file it actually read, for the audit trail. **Informational.** Nothing
+    #: branches on it; whether a class has been scanned is tracked in ``_SCANNED``, which a class
+    #: body cannot write to.
     scanned_source: ClassVar[str] = ""
+
+    #: Only ``sealed.py`` itself may declare a base class that is not scanned. A concrete subclass
+    #: in another module setting this has no effect — see ``__init_subclass__``.
+    _abstract_base: ClassVar[bool] = False
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        if inspect.isabstract(cls) or getattr(cls, "_abstract_base", False):
+        # `_abstract_base` used to be honoured wherever it was set, which meant any concrete
+        # adapter could opt out of the scan with one line — the guard's own off switch, reachable
+        # by the code it guards. It is now honoured only for classes defined in THIS module, which
+        # is code that ships with the package and is reviewed with it. Everything else is scanned,
+        # abstract or not: an abstract intermediate's module is still code that will run.
+        if cls.__module__ == __name__ and cls.__dict__.get("_abstract_base", False):
             return
-        source, path = _module_source(cls)
-        scan_source(source, f"adapter {cls.__name__!r}")
-        cls.scanned_source = path
+        _scan_class(cls)
 
     def __init__(self, capability: ReadCapability) -> None:
         if not isinstance(capability, (ClinicStructuralRead, CandidateRead, PatientScopedRead)):
@@ -281,7 +424,32 @@ class SealedReadAdapter(abc.ABC):
                 f"of the three read capabilities. The set is closed and contains no writer.")
         if not self.name:
             raise AdapterRefused(f"adapter {type(self).__name__!r} REFUSED: no tool name")
-        self._capability = capability
+        # A class that reached here without being scanned — built by `type()`, or inheriting a
+        # parent's `scanned_source` — is scanned now. `cls.__dict__` rather than `getattr`, because
+        # an inherited scan record is a record of a DIFFERENT file.
+        _scan_class(type(self))
+
+        # Screened, then snapshotted, in that order: the thing that runs must be the thing that
+        # was screened. `dict(...)` first so a subclass that assigned a plain dict is normalised.
+        declared = copy.deepcopy(dict(self.parameters))
+        policy.screen_parameters(self.name, declared, scope=capability.scope)
+
+        object.__setattr__(self, "_capability", capability)
+        object.__setattr__(self, "parameters", freeze(declared))
+        object.__setattr__(self, "_sealed", True)
+
+    #: Declarations fixed at construction. Rebinding them would change what the model is shown, or
+    #: what a call is validated against, after the screens have run.
+    _FIXED_AFTER_INIT = ("parameters", "name", "_capability", "_sealed")
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        if getattr(self, "_sealed", False) and key in self._FIXED_AFTER_INIT:
+            raise AdapterSealMutated(
+                f"adapter {self.name!r} REFUSED: {key!r} is fixed at construction. It was screened "
+                f"once — `policy.screen_parameters` for the schema, `tools.screen_declaration` for "
+                f"the name — and a declaration that can change afterwards is a declaration nobody "
+                f"has screened (REMEDIATION.md R-08/R-11).")
+        object.__setattr__(self, key, value)
 
     @property
     def capability(self) -> ReadCapability:
@@ -303,6 +471,13 @@ class SealedReadAdapter(abc.ABC):
         """Do the read. Arguments have already been validated against ``parameters``."""
 
     def __call__(self, **arguments: Any) -> ToolResult:
+        """Validate, read, check. THE call boundary — every path into ``read`` comes through here.
+
+        Validation was previously done by the agent loop, which left ``Tool.call()`` and a direct
+        ``adapter(**args)`` unvalidated. It is here now, against the frozen snapshot, so there is
+        one place to review rather than one place per caller.
+        """
+        policy.validate_arguments(self.name, self.parameters, arguments)
         result = self.read(**arguments)
         if not isinstance(result, ToolResult):
             raise SealBroken(
@@ -313,11 +488,36 @@ class SealedReadAdapter(abc.ABC):
             raise SealBroken(
                 f"adapter {self.name!r} returned a result labelled {result.tool!r}. The label is "
                 f"what the answer attributes each value to; a mismatch misattributes evidence.")
+        self._check_subject(result)
         return result
+
+    def _check_subject(self, result: ToolResult) -> None:
+        """A patient-scoped read must not return a row LABELLED with a different subject.
+
+        Honest about its reach: this catches a row that names a patient other than the one the
+        human attested to. It cannot prove the underlying query was scoped — that has to be
+        enforced where the query is written, in the composition root, because only that code knows
+        what it asked the datastore for. It is a tripwire on the way out, not the boundary.
+        """
+        cap = self._capability
+        if not isinstance(cap, PatientScopedRead):
+            return
+        for index, row in enumerate(result.rows):
+            for key, value in row.values.items():
+                if not (_name_tokens(key) & _SUBJECT_KEY_TOKENS):
+                    continue
+                if isinstance(value, str) and value and value != cap.patient_id:
+                    raise SubjectMismatch(
+                        f"adapter {self.name!r} REFUSED: row {index} is labelled "
+                        f"{key}={value!r}, but this adapter is bound to {cap.patient_id!r} by a "
+                        f"human's attestation. A patient-scoped read returning another patient's "
+                        f"row is the identity the grant exists to prevent "
+                        f"(CLAUDE.md §Hard constraints 1).")
 
 
 __all__ = [
     "AdapterRefused",
+    "AdapterSealMutated",
     "AdapterSourceUnavailable",
     "CandidateRead",
     "ClinicStructuralRead",
@@ -327,7 +527,9 @@ __all__ = [
     "ReadCapability",
     "SealBroken",
     "SealedReadAdapter",
+    "SubjectMismatch",
     "TransportInAdapter",
+    "freeze",
     "WriterInAdapter",
     "scan_source",
 ]

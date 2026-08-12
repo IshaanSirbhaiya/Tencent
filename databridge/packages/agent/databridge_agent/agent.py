@@ -34,6 +34,18 @@ for an identity decision (R-08): there is no such property, and the closed schem
 channel through which uncited prose could reach ``AgentAnswer`` — ``answer`` is a rendered
 property, not a field.
 
+**Candidate rows are not the model's to choose or to order.** References only decide what is shown
+from *structural and patient-scoped* reads. Everything a candidate-returning tool returned is
+printed, in an order fixed by this code, whatever the model asked for — because a report showing
+only candidate 2, or showing candidate 2 first, is an identity recommendation made by omission and
+by sequence, and no fixed sentence underneath undoes it.
+
+**"Not found" is derived from what ran, not from what the model said.** ``unresolved`` is built
+from every ``None`` in every row every tool returned and from every call that did not succeed. The
+previous version populated it only when the model happened to reference a missing value, which
+made constraint 2's "``None`` plus a name in ``unresolved``" conditional on the model's
+cooperation.
+
 **The rendered answer is screened before staff see it.** Identity assertions, claims to have
 acted, and NRIC-shaped identifiers that no tool returned are all refused deterministically
 (``guardrails.py``). This is now a backstop over a structural control rather than the control
@@ -42,7 +54,7 @@ itself.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -60,6 +72,9 @@ from .guardrails import (
 from .playbooks import Playbooks, playbooks as shipped_playbooks
 from .results import ToolResult, ToolRow
 from .tools import ToolRegistry
+
+if TYPE_CHECKING:                                     # pragma: no cover - import cycle at runtime
+    from .response import AgentResponse
 
 # The routing class for every model call this package makes. A NAME, never a model id: routing is
 # config (`databridge/config/models.yaml`), so pointing the agent at a cheaper model — or at Azure
@@ -122,6 +137,10 @@ class GroundedField(BaseModel):
     field: str
     value: Any
     source: SourcePointer
+    #: The capability scope of the tool this came from (``clinic_structural`` | ``candidates`` |
+    #: ``patient``). Set by the loop from the registry, never from the model. ``render`` prints
+    #: candidate values under their own heading on the strength of it.
+    scope: str = ""
 
     @model_validator(mode="after")
     def _value_is_present(self) -> "GroundedField":
@@ -172,6 +191,13 @@ class AgentAnswer(BaseModel):
     ``extra="forbid"`` matters more than it looks: without it ``AgentAnswer(answer="...")`` would
     be silently accepted and silently ignored, and a caller — or a test — would believe prose had
     been carried when it had not.
+
+    **This type is the AUDIT record, not the API contract. Never return it from an HTTP route.**
+    ``answer`` is a property, so it does not serialize at all; ``tool_calls`` does, and it carries
+    the model's raw arguments, exception text, adapter notes and unredacted row values. A route
+    handing this to a page would therefore ship everything ``render.present`` exists to withhold
+    and none of what it produces. Call :meth:`public` and return that
+    (:mod:`databridge_agent.response`).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -228,6 +254,11 @@ class AgentAnswer(BaseModel):
     @property
     def grounded(self) -> bool:
         return bool(self.fields)
+
+    def public(self) -> "AgentResponse":
+        """The safe, serializable view of this answer — the only thing a route may return."""
+        from .response import to_response
+        return to_response(self)
 
 
 class ClinicAgent:
@@ -295,7 +326,6 @@ class ClinicAgent:
         # the offsets it is shown and the offsets resolved here have to come from one structure.
         collected: dict[str, list[ToolRow]] = {}
         seen_calls: set[str] = set()
-        saw_candidates = False
         model_calls = 0
 
         for step in range(1, self._max_steps + 1):
@@ -320,8 +350,6 @@ class ClinicAgent:
                 observations.append(data)
                 convo.append({"role": "user",
                               "content": framing.frame(f"tool_result:{record.requested}", data)})
-                if self._tools.get(record.requested).requires_human_selection:
-                    saw_candidates = True
             else:
                 convo.append({"role": "user", "content": framing.frame(
                     "tool_error",
@@ -335,7 +363,7 @@ class ClinicAgent:
         ).parsed
         model_calls += 1
 
-        fields, unresolved, notes = self._compose(plan_out, collected, saw_candidates)
+        fields, unresolved, notes = self._compose(plan_out, collected, records)
         answer = AgentAnswer(question=question, fields=fields, unresolved=unresolved,
                              notes=notes, tool_calls=tuple(records), model_calls=model_calls)
 
@@ -355,19 +383,40 @@ class ClinicAgent:
         self,
         plan: AnswerPlan,
         collected: dict[str, list[ToolRow]],
-        saw_candidates: bool,
+        records: list[ToolCallRecord],
     ) -> tuple[tuple[GroundedField, ...], tuple[str, ...], tuple[str, ...]]:
-        """Resolve the model's references against what the tools actually returned.
+        """Build the answer from what RAN, and — for everything except candidates — what the model
+        asked to surface from it.
 
         Every branch here either produces a value with its own pointer, names something as
         unresolved, or drops the reference and says so through a code-authored note. There is no
-        branch that emits text the model wrote.
+        branch that emits text the model wrote, and no branch in which the model affects which
+        candidates appear.
         """
         fields: list[GroundedField] = []
-        unresolved: list[str] = []
-        missing = 0
         seen_keys: set[str] = set()
+        candidate_tools = tuple(
+            name for name in collected if self._tools.get(name).requires_human_selection)
 
+        # 1. Candidates: everything, code-ordered, before anything the model chose.
+        #
+        # Not truncated by MAX_REPORTED_VALUES either. A cap would be code deciding which
+        # candidates a human gets to choose between, which is the same act as the model deciding
+        # it — only quieter. The row count comes from the adapter, which is our code.
+        for name in sorted(candidate_tools):
+            for index, row in enumerate(collected[name]):
+                for key in sorted(row.values):
+                    value, source = row.values[key], row.source_for(key)
+                    if value is None or source is None:
+                        continue                      # named by the unresolved pass below
+                    field = GroundedField(tool=name, row=index, field=key, value=value,
+                                          source=source, scope=render.CANDIDATE_SCOPE)
+                    seen_keys.add(field.key)
+                    fields.append(field)
+
+        # 2. Everything else: the model's references, in the model's order. Summarising a
+        #    structural or patient-scoped read is a presentation choice, not an identity one.
+        missing = 0
         for ref in plan.report[:MAX_REPORTED_VALUES]:
             rows = collected.get(ref.tool)
             if rows is None or ref.row < 0 or ref.row >= len(rows) or not ref.field:
@@ -378,20 +427,23 @@ class ClinicAgent:
                 missing += 1
                 continue
             if ref.key in seen_keys:
-                continue
+                continue                              # includes every candidate value, already in
             seen_keys.add(ref.key)
+            if ref.tool in candidate_tools:
+                continue                              # a candidate the code did not print is a
+                                                      # None; it belongs in `unresolved`, not here
             value = row.values[ref.field]
             source = row.source_for(ref.field)
             if value is None or source is None:
-                # A value the tool was asked for and did not have. Named, never filled in — the
-                # `unresolved` channel from `GraphNode`/`_Grounded`, one layer up.
-                unresolved.append(ref.key)
-                continue
-            fields.append(GroundedField(tool=ref.tool, row=ref.row, field=ref.field,
-                                        value=value, source=source))
+                continue                              # named by the unresolved pass below
+            fields.append(GroundedField(tool=ref.tool, row=ref.row, field=ref.field, value=value,
+                                        source=source,
+                                        scope=self._tools.get(ref.tool).capability.scope))
+
+        unresolved = self._unresolved(collected, records)
 
         notes: list[str] = []
-        if saw_candidates:
+        if candidate_tools:
             # Added by CODE, on every answer built from a candidate-returning capability, whether
             # or not the model cooperated (CLAUDE.md §Hard constraints 1; R-10).
             notes.append(render.HUMAN_SELECTION)
@@ -401,7 +453,38 @@ class ClinicAgent:
             notes.append(render.REFS_NOT_RETURNED)
         if not fields and not unresolved:
             notes.append(render.NOTHING_ANSWERED)
-        return tuple(fields), tuple(unresolved), tuple(notes)
+        return tuple(fields), unresolved, tuple(notes)
+
+    @staticmethod
+    def _unresolved(
+        collected: dict[str, list[ToolRow]],
+        records: list[ToolCallRecord],
+    ) -> tuple[str, ...]:
+        """Everything asked for and not found, derived from EXECUTION rather than from the plan.
+
+        Two sources, both outside the model's control:
+
+        * every ``None`` in every row every tool returned — the tool was asked for that name and
+          did not have it, whether or not the model chose to mention it;
+        * every call that did not succeed — an unknown tool, a schema violation, an adapter that
+          raised. "The graph was not reached" is exactly the thing a front desk must not have to
+          infer from a short answer.
+
+        The old version added an entry only when the model referenced a returned ``None``, which
+        made constraint 2 — *unknown is ``None`` plus a name in ``unresolved``* — hold only when
+        the model felt like it.
+        """
+        names: list[str] = []
+        for tool, rows in collected.items():
+            for index, row in enumerate(rows):
+                names.extend(f"{tool}[{index}].{key}" for key in row.unresolved)
+        for record in records:
+            if record.status != "ok":
+                # `requested` is whatever the model typed — for an unknown tool it is not a name
+                # this repo has ever seen. Reduced to an identifier before it can be a sentence.
+                names.append(f"{render.safe_name(record.requested)}: not read ({record.status})")
+        seen: set[str] = set()
+        return tuple(n for n in names if not (n in seen or seen.add(n)))
 
     @staticmethod
     def _injection_seen(collected: dict[str, list[ToolRow]]) -> bool:
@@ -462,14 +545,14 @@ class ClinicAgent:
                                   status="ungrounded_argument", detail=str(exc)[:400]), None
 
         try:
-            result: Any = tool.call(**args)
+            result: ToolResult = tool.call(**args)
         except Exception as exc:                      # noqa: BLE001 — see the docstring
             return ToolCallRecord(step=step, requested=name, arguments=args, status="error",
                                   detail=f"{type(exc).__name__}: {exc}"[:300]), None
 
-        if not isinstance(result, ToolResult):        # pragma: no cover - the seal raises first
-            return ToolCallRecord(step=step, requested=name, arguments=args, status="error",
-                                  detail=f"tool returned {type(result).__name__}, not ToolResult"), None
-
+        # No result-type check here: `SealedReadAdapter.__call__` raises `SealBroken` on anything
+        # that is not this tool's `ToolResult`, and the `except` above records it. A second check
+        # downstream of a raise can never fire, and a guard that cannot fire reads to the next
+        # person as a guarantee that something is checked twice.
         return ToolCallRecord(step=step, requested=name, arguments=args, status="ok",
                               result=result), result

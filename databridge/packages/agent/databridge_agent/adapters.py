@@ -8,6 +8,13 @@ the file that defines the wall is a good sign; splitting the concrete adapter ou
 ``StaticReadAdapter`` covers the honest common case: rows a caller has already grounded, handed to
 the agent unchanged. Tests use it, and so does any fixture-backed demo. It adds no capability —
 the capability is the one passed in, from the closed set in ``sealed.py``.
+
+**What the scan does not see here.** ``log`` is an injected object and ``read`` calls
+``log.append``. The module scan reads *this file* and finds a method call on a parameter; it has no
+way to know what that object does, so a caller passing something whose ``append`` writes to a
+socket would not be refused by anything in this package. That is not a hole peculiar to ``log`` —
+it is the general shape of the limit (``sealed.py``: *the scan is textual, and it covers exactly
+one file*). Pass a list.
 """
 from __future__ import annotations
 

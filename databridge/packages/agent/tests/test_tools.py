@@ -12,6 +12,9 @@ from agent_stubs import NO_ARGUMENTS, RowsAdapter, make_stub
 from databridge_agent import (
     ClinicStructuralRead,
     DuplicateTool,
+    MultipleSubjectsRefused,
+    PatientReadGrant,
+    PatientScopedRead,
     IdentityArgumentRefused,
     IdentityToolRefused,
     RegistrySealed,
@@ -292,3 +295,66 @@ def test_from_one_source_grounds_only_the_values_that_are_present():
 def test_the_no_argument_schema_used_by_the_stubs_is_the_strict_one():
     """Guards every test above that relies on the default fixture schema being closed."""
     assert NO_ARGUMENTS["additionalProperties"] is False
+
+
+# --- one registry, one subject (R-08, round two) ----------------------------------
+
+_ATTESTATION = dict(subject_fingerprint="sha256:doc+row+candidates",
+                    attested_by="staff:front_desk_01", attested_at="2026-08-12T09:00:00")
+
+
+def _patient_tool(name: str, patient_id: str, fingerprint: str = "sha256:doc+row+candidates"):
+    grant = PatientReadGrant(**{**_ATTESTATION, "patient_id": patient_id,
+                                "subject_fingerprint": fingerprint})
+    return make_stub(name, capability=PatientScopedRead(grant=grant),
+                     description="The record for the patient a human selected in person.").tool
+
+
+def test_two_patient_tools_bound_to_different_people_are_refused():
+    """R-08 one level up from the argument it was removed from.
+
+    With two subject-bound tools in one registry, the model choosing a tool IS the model choosing a
+    patient: an injected "use the record for candidate 2" needs no argument at all, and every
+    argument screen in this package watches it happen without seeing anything.
+    """
+    registry = ToolRegistry([_patient_tool("patient_record", "patient:0042")])
+    with pytest.raises(MultipleSubjectsRefused):
+        registry.register(_patient_tool("patient_history", "patient:0043"))
+
+
+def test_two_patient_tools_from_one_attestation_are_allowed():
+    """The over-refusal guard: one subject may legitimately be read through several narrow tools."""
+    registry = ToolRegistry([_patient_tool("patient_record", "patient:0042"),
+                             _patient_tool("patient_history", "patient:0042")]).seal()
+    assert len(registry.patient_scoped()) == 2
+
+
+def test_the_same_patient_attested_twice_differently_is_still_two_attestations():
+    """The fingerprint binds a grant to the candidate set and document revision it was made
+    against (Shape B). Two of them are two decisions, and the registry says so rather than
+    silently preferring one."""
+    registry = ToolRegistry([_patient_tool("patient_record", "patient:0042", "sha256:first")])
+    with pytest.raises(MultipleSubjectsRefused):
+        registry.register(_patient_tool("patient_history", "patient:0042", "sha256:second"))
+
+
+def test_the_single_subject_rule_is_checked_again_at_seal():
+    """`seal()` is the moment the agent takes the registry — the only moment that is true of the
+    whole surface at once, and the last one before a model can name anything."""
+    registry = ToolRegistry()
+    registry._tools["patient_record"] = _patient_tool("patient_record", "patient:0042")
+    registry._tools["patient_history"] = _patient_tool("patient_history", "patient:0043")
+    with pytest.raises(MultipleSubjectsRefused):
+        registry.seal()
+
+
+def test_a_sealed_registry_refuses_to_have_its_tools_swapped():
+    """`seal()` blocked `register`; the dict behind it was still rebindable."""
+    registry = ToolRegistry([_tool("graph_query")]).seal()
+    with pytest.raises(RegistrySealed):
+        registry._tools = {}
+    with pytest.raises(RegistrySealed):
+        registry._sealed = False
+    with pytest.raises(TypeError):
+        registry._tools["intake_queue"] = _tool("intake_queue")
+    assert registry.names() == ("graph_query",)

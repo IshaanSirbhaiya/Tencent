@@ -13,8 +13,18 @@ blacklist. Two findings fell straight out of that:
 
 Both disappear if the model never authors the sentence. Here it does not. It returns *references*
 — tool, row number, field name — and this module resolves each one against the ``ToolResult`` the
-loop actually recorded, printing the value beside the pointer that value carries. Three properties
-follow mechanically rather than by inspection:
+loop actually recorded, printing the value beside the pointer that value carries.
+
+**Candidates are not among the things the model may reference.** The second review made the point
+the first fix missed: choosing *which* candidate rows appear, and in *what order*, is itself an
+identity recommendation. "Only candidate 2 is shown" and "candidate 2 is first" are both a steer,
+and the fixed human-selection sentence underneath does not undo either. So the candidate block is
+built by ``agent._compose`` from **every row every candidate-scoped tool returned**, in an order
+this code fixes (tool name, then row index as returned, then field name), and a model reference
+into a candidate tool changes nothing about what is printed. It is rendered under its own heading
+so a reader can see it is a full list rather than a selection.
+
+Three properties follow mechanically rather than by inspection:
 
 1. **Every value in the answer has its own pointer**, because a value with no pointer cannot exist
    in a ``ToolRow`` (``results.py``) and a reference that resolves to ``None`` is rendered under
@@ -35,6 +45,7 @@ is the worst available outcome.
 from __future__ import annotations
 
 import datetime as dt
+import re
 from typing import Any, Iterable
 
 from databridge_core import SourcePointer
@@ -58,10 +69,11 @@ NOTHING_ANSWERED = "nothing_answered"
 
 NOTES: dict[str, str] = {
     HUMAN_SELECTION: (
-        "Identity is decided in person. The rows above are registry candidates, not a "
-        "determination: a named member of clinic staff checks the NRIC, FIN or passport against "
-        "the person at the counter and selects one. Nothing in this report is a ranking, a score "
-        "or a recommendation, and this system has no way to make that choice."),
+        "Identity is decided in person. The registry candidates above are every candidate the "
+        "registry returned, listed in a fixed order this system chose and not in any order of "
+        "likelihood: a named member of clinic staff checks the NRIC, FIN or passport against the "
+        "person at the counter and selects one. Nothing in this report is a ranking, a score or a "
+        "recommendation, and this system has no way to make that choice."),
     INJECTION_SEEN: (
         "At least one value read for this answer contains text addressed to an automated reader — "
         "an instruction inside a clinical document. It was not followed, and it is not reproduced "
@@ -75,6 +87,25 @@ NOTES: dict[str, str] = {
 
 HEADING_VALUES = "What the clinic graph holds:"
 HEADING_UNRESOLVED = "Asked for, not found:"
+# Its own heading, because the guarantee it carries is different from the block above it: this one
+# is complete and code-ordered, that one is what the model chose to surface.
+HEADING_CANDIDATES = "Registry candidates — all of them, in a fixed order, not a ranking:"
+
+#: ``GroundedField.scope`` for a value that came from a candidate-returning capability.
+CANDIDATE_SCOPE = "candidates"
+
+
+# A tool name the model INVENTED is model-authored text. `ToolCallRecord.requested` is whatever
+# the plan said, so it reaches the report ("x: not read (unknown_tool)") and the public DTO. It is
+# reduced to an identifier-shaped token before either: a name is a name, and a sentence is not.
+_NAME_SAFE = re.compile(r"[^A-Za-z0-9_.:\-]")
+MAX_NAME_CHARS = 64
+
+
+def safe_name(name: str) -> str:
+    """An identifier-shaped rendering of a tool name, which the model may have invented."""
+    cleaned = _NAME_SAFE.sub("", name or "")[:MAX_NAME_CHARS]
+    return cleaned or "(unnamed)"
 
 
 def note_text(key: str) -> str:
@@ -139,9 +170,19 @@ def render(fields: Iterable[Any], unresolved: Iterable[str], notes: Iterable[str
     notes = list(notes)
     lines: list[str] = []
 
-    if fields:
-        lines.append(HEADING_VALUES)
-        for field in fields:
+    # Candidates first and under their own heading. The split is on the field's own scope rather
+    # than on anything the model said, so there is no input through which the two blocks could be
+    # confused with each other.
+    candidates = [f for f in fields if getattr(f, "scope", "") == CANDIDATE_SCOPE]
+    others = [f for f in fields if getattr(f, "scope", "") != CANDIDATE_SCOPE]
+
+    for heading, block in ((HEADING_CANDIDATES, candidates), (HEADING_VALUES, others)):
+        if not block:
+            continue
+        if lines:
+            lines.append("")
+        lines.append(heading)
+        for field in block:
             text, _ = present(field.value)
             lines.append(f"- {field.key}: {text}  [source: {cite(field.source)}]")
     if unresolved:
@@ -157,6 +198,9 @@ def render(fields: Iterable[Any], unresolved: Iterable[str], notes: Iterable[str
 
 
 __all__ = [
+    "CANDIDATE_SCOPE",
+    "MAX_NAME_CHARS",
+    "HEADING_CANDIDATES",
     "HEADING_UNRESOLVED",
     "HEADING_VALUES",
     "HUMAN_SELECTION",
@@ -170,4 +214,5 @@ __all__ = [
     "note_text",
     "present",
     "render",
+    "safe_name",
 ]

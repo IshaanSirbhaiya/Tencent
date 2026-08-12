@@ -27,26 +27,40 @@ Five layers, in the order they fire:
 3. ``screen_declaration`` refuses a send-SHAPED name or description even if it is honestly marked
    ``read``. Layer 2 catches the honest mistake; this catches the tool called ``notify_insurer``
    that "only drafts, really".
-4. ``policy.screen_parameters`` refuses an argument schema that is not closed, and refuses any
-   tool whose arguments could name a patient. That is R-08: screening tool *names* stopped
-   ``select_patient`` and did nothing about ``patient_record(patient_id=2)``.
+4. ``policy.screen_parameters`` walks the whole argument schema, refuses one that is not closed at
+   every level, and refuses a **candidate- or patient-scoped tool that declares any argument at
+   all**. That is R-08: screening tool *names* stopped ``select_patient`` and did nothing about
+   ``patient_record(patient_id=2)``; screening argument *names* did nothing about
+   ``patient_record(filters={"patient_id": 2})``. A subject-bound tool now has no arguments to
+   carry a selector in.
 5. It refuses an identity-DECISION-shaped name — ``select_patient``, ``verify_identity`` — so the
    agent has no such tool *at all*.
+6. **A registry may hold at most one human-bound subject.** Checked at ``register`` and again at
+   ``seal``. Without it, two ``PatientScopedRead`` tools bound to different grants would make
+   *choosing a tool* the same act as choosing a patient — the identity decision back, one level up
+   from the argument it was just removed from (CLAUDE.md §Hard constraints 1).
 
-Layers 3–5 are deterministic matching over the declaration, and they run at REGISTRATION — before
+Layers 3–6 are deterministic matching over the declaration, and they run at REGISTRATION — before
 any model has spoken. An injected instruction cannot summon a tool that was never registered, and
 the model has no path to registration.
 
 **The registry is frozen once the agent holds it.** ``ClinicAgent`` seals its registry in
-``__init__``, and a sealed registry refuses ``register``. Previously the set of things the agent
-could do was mutable for the lifetime of the process, so "the tool surface was reviewed" was a
-statement about one moment rather than about the run.
+``__init__``; a sealed registry refuses ``register`` and refuses to have its internals rebound.
+Previously the set of things the agent could do was mutable for the lifetime of the process, so
+"the tool surface was reviewed" was a statement about one moment rather than about the run.
+
+What ``seal()`` does **not** do is make the underlying objects unreachable: ``agent.tools`` returns
+this registry, and anything holding a reference to an adapter still holds it. The adapters
+themselves refuse post-construction mutation of their name and schema (``sealed.py``), which is the
+part that matters for what the model can reach; in-process code that is determined to interfere can
+still interfere, and this package is not a sandbox.
 """
 from __future__ import annotations
 
 import json
 import re
-from typing import Any, Iterable, Iterator, Literal
+from types import MappingProxyType
+from typing import Any, Iterable, Iterator, Literal, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -83,6 +97,10 @@ class UnknownTool(ToolError):
 
 class RegistrySealed(ToolError):
     """The tool surface was frozen when the agent took it, and something tried to widen it."""
+
+
+class MultipleSubjectsRefused(ToolError):
+    """Two patient-scoped tools bound to different people. Choosing the tool would choose them."""
 
 
 # --- the deterministic declaration screens ----------------------------------------
@@ -171,7 +189,7 @@ class Tool(BaseModel):
     @model_validator(mode="after")
     def _screen(self) -> "Tool":
         screen_declaration(self.name, self.description)
-        policy.screen_parameters(self.name, self.parameters)
+        policy.screen_parameters(self.name, self.parameters, scope=self.capability.scope)
         return self
 
     # -- everything below is the adapter's declaration, never a parallel copy of it --
@@ -209,7 +227,13 @@ class Tool(BaseModel):
         return self.adapter.subject
 
     def call(self, **arguments: Any) -> ToolResult:
-        """Run the adapter. Arguments are validated by the LOOP before this is reached."""
+        """Run the adapter.
+
+        Arguments are validated inside ``SealedReadAdapter.__call__`` — at the final callable
+        boundary — so this path is checked whether the loop screened first or not. It previously
+        was not: validation lived only in ``ClinicAgent._run_tool``, and ``Tool.call`` was a public
+        method that walked straight past it.
+        """
         return self.adapter(**arguments)
 
     def spec(self) -> dict:
@@ -230,10 +254,21 @@ class ToolRegistry:
     """
 
     def __init__(self, tools: Iterable[Tool] = ()) -> None:
-        self._tools: dict[str, Tool] = {}
+        self._tools: Mapping[str, Tool] = {}
         self._sealed = False
         for tool in tools:
             self.register(tool)
+
+    #: Rebinding these after `seal()` would swap the reviewed surface for another one.
+    _FIXED_AFTER_SEAL = ("_tools", "_sealed")
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        if getattr(self, "_sealed", False) and key in self._FIXED_AFTER_SEAL:
+            raise RegistrySealed(
+                f"registry REFUSED: {key!r} is fixed once an agent has taken this registry. "
+                f"A tool surface that can be swapped after review is a tool surface nobody has "
+                f"reviewed (REMEDIATION.md R-07)")
+        object.__setattr__(self, key, value)
 
     def register(self, tool: Tool) -> None:
         if self._sealed:
@@ -252,10 +287,43 @@ class ToolRegistry:
         # Screened again here even though `Tool` screens at construction: `register` is the door
         # every tool comes through, and it must hold however the Tool was built.
         screen_declaration(tool.name, tool.description)
-        policy.screen_parameters(tool.name, tool.parameters)
+        policy.screen_parameters(tool.name, tool.parameters, scope=tool.capability.scope)
+        self._check_one_subject(tool)
         self._tools[tool.name] = tool
 
+    def _check_one_subject(self, incoming: Optional[Tool] = None) -> None:
+        """At most one human-bound subject in a registry. See layer 6 in the module docstring.
+
+        Two patient-scoped tools bound to different grants would put the identity decision back in
+        the model's hands as *tool selection*: an injected "use the record for candidate 2" needs
+        no argument if there is a second tool that already means candidate 2. Grants are compared
+        whole — the same patient attested twice, with different fingerprints, is two different
+        attestations and the registry should say so rather than pick one.
+        """
+        bound = [t for t in self._tools.values() if isinstance(t.capability, PatientScopedRead)]
+        if incoming is not None and isinstance(incoming.capability, PatientScopedRead):
+            bound.append(incoming)
+        grants = {(t.capability.grant.patient_id, t.capability.grant.subject_fingerprint)
+                  for t in bound}
+        if len(grants) > 1:
+            raise MultipleSubjectsRefused(
+                f"registry REFUSED: tools {sorted(t.name for t in bound)} are bound to "
+                f"{len(grants)} different attestations {sorted(grants)}. A registry carries at "
+                f"most ONE human-bound subject: with two, the model picking a tool is the model "
+                f"picking a patient, and no argument screen sees it happen "
+                f"(CLAUDE.md §Hard constraints 1; REMEDIATION.md R-08)")
+
     def seal(self) -> "ToolRegistry":
+        """Freeze the surface, after one last check that it names at most one subject.
+
+        Checked here as well as in ``register`` because ``seal`` is the moment the agent takes the
+        registry, and it is the only moment that is true of the whole surface at once.
+        """
+        self._check_one_subject()
+        # The mapping itself, not only the attribute holding it: `seal()` used to block `register`
+        # while leaving `registry._tools["x"] = ...` open, which is the same door with a longer
+        # name on it. Nothing writes to it after this point — `register` raises.
+        self._tools = MappingProxyType(dict(self._tools))
         self._sealed = True
         return self
 
@@ -303,6 +371,7 @@ __all__ = [
     "ClinicStructuralRead",
     "DuplicateTool",
     "IdentityToolRefused",
+    "MultipleSubjectsRefused",
     "PatientScopedRead",
     "RegistrySealed",
     "SendCapabilityRefused",

@@ -12,14 +12,23 @@ refuses a tool whose schema is not a closed object (``additionalProperties: fals
 schema did not mention that argument" can never mean "the argument was allowed".
 ``validate_arguments`` then checks every planned call against it.
 
-**2. No argument may name a patient.** This is the direct structural fix for R-08. Screening tool
-*names* stopped ``select_patient``; it did nothing about ``patient_record(patient_id=2)``, which is
-an identity decision expressed as an argument. An injected document says "use candidate 2", a
-compliant model passes ``2``, and the machine has inherited an identity that no human attested to.
-So a tool that declares a patient-identifying property is refused at declaration, and — because
-the schema is closed — a call that supplies one anyway is rejected before the adapter is entered.
-The subject of a patient-scoped read comes from a ``PatientReadGrant`` bound at construction
-(``sealed.py``), which the model has no channel to create, name, or choose between.
+**2. A patient- or candidate-scoped tool takes NO model-authored arguments at all.** This is the
+direct structural fix for R-08, in the form the second review demanded. The first attempt was a
+*denylist of property names* — ``patient``, ``nric``, ``candidate`` — and a denylist over names is
+the same shape of guard R-10 already failed with: ``{"filters": {"properties": {"patient_id": …}}}``
+never reached it (it looked one level deep), and ``id``, ``key``, ``record`` and ``query`` were
+never on it in the first place. So the rule is now an allowlist expressed as zero: a tool whose
+capability is ``candidates`` or ``patient`` may declare **no properties whatsoever**. There is no
+argument to smuggle a selector into, whatever it is called and however deeply it is nested. The
+subject of a patient-scoped read comes from a ``PatientReadGrant`` bound at construction
+(``sealed.py``), which the model has no channel to create, name, or choose between; a candidate
+read returns every candidate and takes nothing.
+
+The name screen survives for ``clinic_structural`` tools, where arguments are legitimate — but it
+now walks the **whole** schema tree (nested ``properties``, ``items``, ``$defs``,
+``allOf``/``anyOf``/``oneOf``, …), refuses ``patternProperties`` outright (a pattern can match a
+name no denylist can see), and requires every object level to be closed rather than only the top
+one. It is a second layer, not the guarantee.
 
 **3. A broad tool's free text has to come from the question.** "Prefer narrow reads over general
 search primitives" is a design instruction; this is the enforceable version of it. A tool marked
@@ -57,6 +66,10 @@ class UngroundedArgument(PolicyError):
     """A broad tool was pointed at text that appears neither in the question nor in the data."""
 
 
+class SelectorArgumentRefused(IdentityArgumentRefused):
+    """A subject-bound tool declared an argument. Those tools take none, whatever it is called."""
+
+
 # Property names that would let an argument stand in for an identity decision. Matched as whole
 # tokens across snake_case, kebab-case and camelCase, so `package_code` and `document_id` pass and
 # `patientId`, `nric`, `candidate_index` do not.
@@ -69,6 +82,25 @@ _IDENTITY_ARGUMENT_TOKENS = frozenset({
     "candidate", "candidates", "person", "people", "identity", "subject", "mrn", "uin",
     "individual", "visitor", "holder",
 })
+
+# Property names that select a row without saying what kind of row. `intake_id` names its domain;
+# a bare `id` does not, and "give me record 2" is the R-08 injection with the noun filed off.
+# Matched against the WHOLE property name, never as a token, so `intake_id` and `document_id` stay
+# legal — over-refusing here would push people to loosen the screen, which costs more than it saves.
+_GENERIC_SELECTOR_NAMES = frozenset({
+    "id", "ids", "key", "keys", "ref", "refs", "record", "records", "row", "rows", "index",
+    "idx", "uid", "uuid", "target", "who", "which", "selector", "select", "choice", "pick",
+})
+
+# JSON Schema keywords whose value is a MAPPING of name -> subschema. The names are property names
+# and are screened; the subschemas are walked.
+_NAMED_SUBSCHEMAS = ("properties", "patternProperties", "dependentSchemas", "$defs", "definitions")
+# Keywords whose value is a single subschema.
+_SINGLE_SUBSCHEMA = ("items", "contains", "additionalItems", "additionalProperties",
+                     "unevaluatedItems", "unevaluatedProperties", "propertyNames",
+                     "not", "if", "then", "else")
+# Keywords whose value is a LIST of subschemas.
+_SUBSCHEMA_LISTS = ("allOf", "anyOf", "oneOf", "prefixItems")
 
 
 def _contains_ref(node: object) -> bool:
@@ -85,12 +117,52 @@ def _tokens(name: str) -> set[str]:
     return {t for t in re.split(r"[^A-Za-z0-9]+", spaced.lower()) if t}
 
 
-def screen_parameters(tool_name: str, parameters: dict) -> None:
-    """Refuse an argument schema that cannot be enforced, or that could carry an identity.
+def walk_schema(schema: object, path: str = "<arguments>"):
+    """Yield ``(path, subschema)`` for the schema and every subschema below it, at any depth.
 
-    Runs at tool DECLARATION, before any model has spoken — the same placement as the name screens
-    in ``tools.py``, and for the same reason: a check that runs after the model has chosen is a log
-    entry (``REMEDIATION.md`` Shape C).
+    Public because the point of it is to be testable on its own. The previous screen read
+    ``parameters["properties"]`` and stopped, so a ``filters`` object with a ``patient_id`` inside
+    it was screened as one harmless property called ``filters``. A guard that inspects one level of
+    a recursive structure is a guard against the example it was written from.
+    """
+    if not isinstance(schema, dict):
+        return
+    yield path, schema
+    for keyword in _NAMED_SUBSCHEMAS:
+        block = schema.get(keyword)
+        if isinstance(block, dict):
+            for name, sub in block.items():
+                yield from walk_schema(sub, f"{path}.{keyword}[{name}]")
+    for keyword in _SINGLE_SUBSCHEMA:
+        sub = schema.get(keyword)
+        if isinstance(sub, dict):
+            yield from walk_schema(sub, f"{path}.{keyword}")
+    for keyword in _SUBSCHEMA_LISTS:
+        block = schema.get(keyword)
+        if isinstance(block, list):
+            for i, sub in enumerate(block):
+                yield from walk_schema(sub, f"{path}.{keyword}[{i}]")
+
+
+def _declared_property_names(parameters: dict) -> list[tuple[str, str]]:
+    """Every property name declared anywhere in the tree, with the path it was declared at."""
+    found: list[tuple[str, str]] = []
+    for path, node in walk_schema(parameters):
+        block = node.get("properties")
+        if isinstance(block, dict):
+            found.extend((name, path) for name in block)
+    return found
+
+
+def screen_parameters(tool_name: str, parameters: dict, *, scope: str = "") -> None:
+    """Refuse an argument schema that cannot be enforced, or that could carry a selector.
+
+    Runs at tool DECLARATION and at adapter CONSTRUCTION, before any model has spoken — the same
+    placement as the name screens in ``tools.py``, and for the same reason: a check that runs after
+    the model has chosen is a log entry (``REMEDIATION.md`` Shape C).
+
+    ``scope`` is the adapter's capability scope. For ``candidates`` and ``patient`` the rule is not
+    "no patient-shaped argument" but **no argument at all** — see the module docstring.
     """
     if not isinstance(parameters, dict):
         raise SchemaNotStrict(f"tool {tool_name!r} REFUSED: `parameters` must be a JSON Schema "
@@ -99,14 +171,7 @@ def screen_parameters(tool_name: str, parameters: dict) -> None:
         raise SchemaNotStrict(
             f"tool {tool_name!r} REFUSED: the argument schema must declare `type: object`. The "
             f"agent calls tools with a keyword mapping and nothing else.")
-    if parameters.get("additionalProperties", None) is not False:
-        raise SchemaNotStrict(
-            f"tool {tool_name!r} REFUSED: the argument schema must set "
-            f"`additionalProperties: false`. An open schema cannot reject an argument it never "
-            f"mentioned, and the argument it never mentioned is how an identity gets supplied "
-            f"(REMEDIATION.md R-08/R-11).")
-    properties = parameters.get("properties", {})
-    if not isinstance(properties, dict):
+    if not isinstance(parameters.get("properties", {}), dict):
         raise SchemaNotStrict(f"tool {tool_name!r} REFUSED: `properties` must be a mapping")
     if _contains_ref(parameters):
         # `$ref` is the one JSON Schema keyword that can perform IO: a remote reference is
@@ -124,13 +189,49 @@ def screen_parameters(tool_name: str, parameters: dict) -> None:
             f"tool {tool_name!r} REFUSED: the argument schema is not valid JSON Schema — "
             f"{exc.message}") from None
 
-    offending = sorted(p for p in properties if _tokens(p) & _IDENTITY_ARGUMENT_TOKENS)
+    # -- every level of the tree, not only the top one --------------------------------
+    for path, node in walk_schema(parameters):
+        if "patternProperties" in node:
+            raise SchemaNotStrict(
+                f"tool {tool_name!r} REFUSED: `patternProperties` at {path}. A pattern admits "
+                f"property names nobody has written down, so no screen over names can see what it "
+                f"lets through. Declare the properties.")
+        looks_like_object = node.get("type") == "object" or "properties" in node
+        if looks_like_object and node.get("additionalProperties", None) is not False:
+            raise SchemaNotStrict(
+                f"tool {tool_name!r} REFUSED: the object schema at {path} does not set "
+                f"`additionalProperties: false`. An open schema cannot reject an argument it never "
+                f"mentioned, and the argument it never mentioned is how an identity gets supplied "
+                f"(REMEDIATION.md R-08/R-11). Nested objects count: closing only the top level "
+                f"leaves a `filters` object carrying `patient_id` wide open.")
+
+    declared = _declared_property_names(parameters)
+
+    # -- subject-bound tools take nothing ---------------------------------------------
+    if scope in ("candidates", "patient") and declared:
+        raise SelectorArgumentRefused(
+            f"tool {tool_name!r} REFUSED: a {scope}-scoped tool declares "
+            f"{sorted({n for n, _ in declared})}, and a tool bound to a human's choice takes NO "
+            f"model-authored arguments at all. Not 'no patient-shaped argument' — none: a "
+            f"denylist of names is the guard R-10 already failed with, and any argument on this "
+            f"tool is a channel through which the model, reading attacker-controlled documents, "
+            f"could narrow or redirect a subject a human attested to "
+            f"(CLAUDE.md §Hard constraints 1; REMEDIATION.md R-08).")
+
+    offending = sorted({name for name, _ in declared if _tokens(name) & _IDENTITY_ARGUMENT_TOKENS})
     if offending:
         raise IdentityArgumentRefused(
             f"tool {tool_name!r} REFUSED: argument(s) {offending} would let the caller name a "
             f"patient, and the caller is a model reading attacker-controlled documents. A "
             f"patient-scoped read binds its subject to a PatientReadGrant at construction; it "
             f"never takes one as an argument (CLAUDE.md §Hard constraints 1; REMEDIATION.md R-08)")
+
+    generic = sorted({n for n, _ in declared if n.strip().lower() in _GENERIC_SELECTOR_NAMES})
+    if generic:
+        raise IdentityArgumentRefused(
+            f"tool {tool_name!r} REFUSED: argument(s) {generic} select a row without naming what "
+            f"kind of row, so 'use record 2' needs no patient vocabulary to arrive. Name the "
+            f"domain — `intake_id`, `document_id` — or take no argument.")
 
 
 def validate_arguments(tool_name: str, parameters: dict, arguments: dict) -> None:
@@ -209,9 +310,11 @@ __all__ = [
     "IdentityArgumentRefused",
     "PolicyError",
     "SchemaNotStrict",
+    "SelectorArgumentRefused",
     "UngroundedArgument",
     "check_argument_grounding",
     "preferred_order",
     "screen_parameters",
     "validate_arguments",
+    "walk_schema",
 ]
