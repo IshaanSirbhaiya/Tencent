@@ -1,4 +1,4 @@
-"""Company-Brain MCP server (T08 Part 3, 04_PRD §9 — agent access, read-only by design).
+"""Clinic-brain MCP server — agent access to the clinic graph, read-only by design.
 
 Exposes the brain to AI agents over MCP:
 
@@ -32,7 +32,7 @@ from databridge_graph import (
     row_to_node,
     timeline,
 )
-from databridge_graph.demo_seed import SEED_SYSTEM_TIME, load_demo_seed
+from databridge_graph.clinic_seed import SEED_SYSTEM_TIME, load_clinic_seed
 
 
 # --- serialisation (graph → JSON the React Flow UI / agents consume) --------------
@@ -83,9 +83,9 @@ class BrainTools:
         # agent) — it ingests inline text or a registered source only.
         self.sources = dict(sources or {})
 
-    # -- demo seed ----------------------------------------------------------------
+    # -- clinic seed --------------------------------------------------------------
     def load_seed(self) -> dict:
-        return load_demo_seed(self.store)
+        return load_clinic_seed(self.store)
 
     def graph(self) -> dict:
         nodes = [row_to_node(self.store, r) for r in self.store.open_nodes()]
@@ -130,58 +130,125 @@ class BrainTools:
             return out
 
         items: list[dict] = []
-        # 1) most active decider
-        decided: dict[str, list[str]] = {}
+
+        # Documents grouped by the patient claims they carry. Every intake in the graph is
+        # unconfirmed by construction (the seed writes claims, never determinations), so these
+        # counts are structural facts about the queue, not assertions about any patient.
+        claims_by_doc: dict[str, list[str]] = {}
         for e in edges:
-            # only count deciders whose node is OPEN (a superseded/closed decider isn't in `nodes`;
-            # selecting it would KeyError on nodes[top]). Guard both src and dst.
-            if e.kind == EdgeKind.DECIDED and e.src_id in nodes and e.dst_id in nodes:
-                decided.setdefault(e.src_id, []).append(e.dst_id)
-        if decided:
-            top = sorted(decided, key=lambda k: (-len(decided[k]), k))[0]
-            decs = decided[top]
-            items.append({"text": f"{nodes[top].label} made {len(decs)} decisions",
-                          "focus": top, "kind": "person", "citations": cites(top, *decs)})
-        # 2) funded + active projects
-        for e in sorted([e for e in edges if e.kind == EdgeKind.FUNDS], key=lambda e: e.dst_id):
-            proj, dec = nodes.get(e.dst_id), nodes.get(e.src_id)
-            if proj:
-                status = proj.attrs.get("status", "")
-                items.append({"text": f"{proj.label} is funded and {status}", "focus": proj.id,
-                              "kind": "project", "detail": dec.label if dec else "",
-                              "citations": cites(proj.id, e.src_id)})
-        # 3) priority flags (decisions whose label mentions priority)
-        for nid, n in sorted(nodes.items()):
-            if n.kind == NodeKind.DECISION and "priorit" in n.label.lower():
-                items.append({"text": n.label, "focus": nid, "kind": "decision",
-                              "citations": cites(nid)})
-        # 4) blocked projects
-        for e in sorted([e for e in edges if e.kind == EdgeKind.BLOCKS], key=lambda e: e.dst_id):
-            proj, dec = nodes.get(e.dst_id), nodes.get(e.src_id)
-            if proj:
-                who = dec.attrs.get("made_by", "a decision") if dec else "a decision"
-                items.append({"text": f"{proj.label} is blocked by {who}'s decision",
-                              "focus": proj.id, "kind": "decision", "citations": cites(proj.id, e.src_id)})
-        # 5) project ownership
-        owns: dict[str, list[str]] = {}
+            if e.kind == EdgeKind.FOR_PATIENT and e.src_id in nodes and e.dst_id in nodes:
+                claims_by_doc.setdefault(e.src_id, []).append(e.dst_id)
+
+        # 1) the queue: EVERY intake waiting on an in-person identity check.
+        #
+        #    Counted over all DOCUMENT nodes, not over `claims_by_doc`. A document whose resolution
+        #    came back with no candidate at all carries no FOR_PATIENT edge, so keying the count on
+        #    those edges drops exactly the intakes that need the most counter work — the ones that
+        #    must be registered from scratch — out of the queue figure.
+        all_documents = sorted(nid for nid, n in nodes.items() if n.kind == NodeKind.DOCUMENT)
+        unmatched = [d for d in all_documents if d not in claims_by_doc]
+        if all_documents:
+            items.append({
+                "text": f"{len(all_documents)} intakes awaiting in-person identity verification"
+                        + (f" ({len(unmatched)} with no registry match — register at the counter)"
+                           if unmatched else ""),
+                "focus": all_documents[0], "kind": "document",
+                "citations": cites(*all_documents)})
+
+        # 2) ambiguous identities — the ones staff must disambiguate at the counter
+        ambiguous = sorted(d for d, pats in claims_by_doc.items() if len(pats) > 1)
+        for doc_id in ambiguous:
+            patients = claims_by_doc[doc_id]
+            items.append({
+                "text": f"{nodes[doc_id].label} matches {len(patients)} registry patients — "
+                        f"staff must select the correct one in person",
+                "focus": doc_id, "kind": "document",
+                "citations": cites(doc_id, *patients)})
+
+        # 3) documents the extractor could not fully read
+        incomplete = sorted(
+            (nid for nid, n in nodes.items()
+             if n.kind == NodeKind.DOCUMENT and int(n.attrs.get("unresolved_count") or 0) > 0),
+            key=lambda nid: (-int(nodes[nid].attrs.get("unresolved_count") or 0), nid))
+        if incomplete:
+            top = incomplete[0]
+            items.append({
+                "text": f"{nodes[top].label} has "
+                        f"{nodes[top].attrs['unresolved_count']} fields not stated on the document",
+                "focus": top, "kind": "document", "citations": cites(top)})
+
+        # 4) busiest issuer — which payer the morning's paperwork is going to
+        issued: dict[str, list[str]] = {}
         for e in edges:
-            if e.kind == EdgeKind.OWNS and e.src_id in nodes and e.dst_id in nodes:
-                owns.setdefault(e.src_id, []).append(e.dst_id)
-        if owns:
-            def active_count(k: str) -> int:
-                return sum(1 for p in owns[k] if nodes.get(p) and nodes[p].attrs.get("status") == "active")
-            # surface the owner of the most ACTIVE work (deterministic: -active, -total, id)
-            top = sorted(owns, key=lambda k: (-active_count(k), -len(owns[k]), k))[0]
-            ps, active = owns[top], active_count(top)
-            items.append({"text": f"{nodes[top].label} owns {active} active project"
-                                  + ("s" if active != 1 else ""),
-                          "focus": top, "kind": "person", "citations": cites(top, *ps)})
+            if e.kind == EdgeKind.ISSUED and e.src_id in nodes and e.dst_id in nodes:
+                issued.setdefault(e.src_id, []).append(e.dst_id)
+        if issued:
+            top = sorted(issued, key=lambda k: (-len(issued[k]), k))[0]
+            docs = issued[top]
+            items.append({
+                "text": f"{nodes[top].label} issued {len(docs)} of today's referring documents",
+                "focus": top, "kind": "org", "citations": cites(top, *docs)})
+
+        # 5) tests ordered ON TOP OF a named package — the billing question staff would otherwise
+        #    discover at the counter.
+        #
+        #    "requested but not in any package" is NOT the right test. Five coverage rules are
+        #    `tests_from_document`: the document's own list IS the covered scope, so every test on
+        #    a referral letter would be reported as possibly patient-payable. The genuine add-on is
+        #    a test requested by a document that authorises a CODED package which does not include
+        #    it (chit 7's MMR vaccination on top of PEE226).
+        coded_rule_by_doc: dict[str, str] = {}
+        for e in edges:
+            if e.kind == EdgeKind.AUTHORISES and e.dst_id in nodes:
+                rule = nodes[e.dst_id]
+                if rule.kind == NodeKind.COVERAGE_RULE and rule.attrs.get("package_code"):
+                    coded_rule_by_doc[e.src_id] = e.dst_id
+        # A rule AUTHORISES the specific PACKAGE it selects; a package INCLUDES_TEST the tests it
+        # lists. Chained per-rule so "not included in it" means the ONE package THIS document
+        # names — not every package in the clinic's whole catalogue. A global `tests_in_packages`
+        # set (every INCLUDES_TEST edge, from any issuer's package) wrongly cleared a test that
+        # happens to sit in some UNRELATED issuer's package, silently under-reporting add-ons: a
+        # test genuinely billable on top of Alice's package would vanish here just because Bob's
+        # package, from a different insurer, happens to include a test of the same name.
+        packages_by_rule: dict[str, set[str]] = {}
+        for e in edges:
+            if e.kind == EdgeKind.AUTHORISES and e.src_id in coded_rule_by_doc.values():
+                packages_by_rule.setdefault(e.src_id, set()).add(e.dst_id)
+        tests_by_package: dict[str, set[str]] = {}
+        for e in edges:
+            if e.kind == EdgeKind.INCLUDES_TEST:
+                tests_by_package.setdefault(e.src_id, set()).add(e.dst_id)
+
+        def _tests_in_this_documents_package(doc_id: str) -> set[str]:
+            rule_id = coded_rule_by_doc.get(doc_id)
+            covered: set[str] = set()
+            for package_id in packages_by_rule.get(rule_id, ()):
+                covered |= tests_by_package.get(package_id, set())
+            return covered
+
+        add_ons = sorted({
+            e.dst_id for e in edges
+            if e.kind == EdgeKind.REQUESTS_TEST
+            and e.src_id in coded_rule_by_doc          # the document names a coded package…
+            # …which does not include this test:
+            and e.dst_id not in _tests_in_this_documents_package(e.src_id)
+            and e.dst_id in nodes})
+        if add_ons:
+            items.append({
+                "text": f"{len(add_ons)} test(s) ordered on top of a named package and not "
+                        f"included in it — may be patient-payable",
+                "focus": add_ons[0], "kind": "test", "citations": cites(*add_ons)})
+
         return {"insights": items[:5]}
 
     def node_detail(self, entity_id: str) -> dict:
-        """Full detail for the node-detail drawer (§Part 3): the node, its actual SourcePointers
-        (the provenance receipts), its connections, and — for a person — the decisions it made.
-        All grounded, computed server-side (D-FE-2)."""
+        """Full detail for the node-detail drawer: the node, its actual SourcePointers (the
+        provenance receipts), its connections, and — for a document — the patient claims it
+        carries. All grounded, computed server-side.
+
+        ``claims`` is deliberately not called "patients": each entry is a candidate a document
+        names, carrying the score and the candidate count, and every one requires an in-person
+        check (CLAUDE.md §Hard constraints 1)."""
         from databridge_graph import EdgeKind, row_to_edge
         nid = self._resolve(entity_id)
         if nid is None:
@@ -193,7 +260,7 @@ class BrainTools:
         sources = [pointer_to_dict(p) for p in self.store.sources_for(nid)]
         by_id = {r["id"]: row_to_node(self.store, r) for r in self.store.open_nodes()}
         edges = [row_to_edge(self.store, r) for r in self.store.open_edges()]
-        connections, decisions = [], []
+        connections, claims = [], []
         for e in edges:
             if e.src_id != nid and e.dst_id != nid:
                 continue
@@ -205,18 +272,37 @@ class BrainTools:
                 "other_id": other_id, "other_label": other.label if other else other_id,
                 "other_kind": other.kind.value if other else "",
                 "pointers": [pointer_to_dict(p) for p in e.sources]})
-            if out and e.kind == EdgeKind.DECIDED and other:
-                decisions.append({"id": other_id, "label": other.label,
-                                  "made_at": other.attrs.get("made_at")})
+            # OUTGOING only. FOR_PATIENT runs document → patient, so without the direction guard
+            # a PATIENT node's `claims` fills with the DOCUMENTS pointing at it — each rendered in
+            # the drawer as a candidate patient, complete with a match score.
+            if out and e.kind == EdgeKind.FOR_PATIENT and other:
+                claims.append({
+                    "id": other_id, "label": other.label,
+                    "match_score": e.attrs.get("match_score"),
+                    "matched_on": e.attrs.get("matched_on"),
+                    "candidate_count": e.attrs.get("candidate_count"),
+                    "requires_human_verification": True})
         connections.sort(key=lambda c: (c["edge_kind"], c["other_label"]))
-        decisions.sort(key=lambda d: (d.get("made_at") or "", d["label"]))
-        return {"node": node, "sources": sources, "connections": connections, "decisions": decisions}
+        claims.sort(key=lambda c: (-(c.get("match_score") or 0), c["label"]))
+        return {"node": node, "sources": sources, "connections": connections, "claims": claims}
 
     # -- entity reference resolution ---------------------------------------------
     def _resolve(self, ref: str) -> Optional[str]:
-        """Accept a node id OR a natural-language name; return the node id (or None)."""
+        """Accept a node id OR a natural-language name; return the node id (or None).
+
+        `link_entities` deliberately skips DOCUMENT nodes — they are provenance, never the answer
+        entity — so a document referred to by filename would fall through to whichever unrelated
+        node happened to share a token, and every tool would then answer confidently about the
+        wrong thing. Documents are therefore resolved by an explicit exact lookup on label /
+        canonical_id first, and an unmatched document-shaped reference returns None rather than
+        drifting to a neighbour.
+        """
         if self.store.open_node_row(ref) is not None:
             return ref
+        needle = ref.strip().lower()
+        for row in self.store.open_nodes():
+            if (row["label"] or "").lower() == needle or (row["canonical_id"] or "").lower() == needle:
+                return row["id"]
         linked = link_entities(self.store, ref, top_k=1)
         return linked[0].id if linked else None
 
@@ -298,7 +384,7 @@ def build_mcp_server(tools: Optional[BrainTools] = None):
     if tools is None:
         # default: demo seed + a gold extraction harness + the demo source registered, so every
         # tool (including brain_ingest) works out of the box for an agent connecting over MCP.
-        from databridge_evals.e_brain import FIXTURE_TEXT, gold_harness
+        from databridge_evals.e_intake import FIXTURE_TEXT, gold_harness
         tools = BrainTools(harness=gold_harness(), sources={"demo_sample.txt": FIXTURE_TEXT})
     tools.load_seed()
     mcp = FastMCP("databridge-brain")
