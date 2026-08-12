@@ -9,6 +9,9 @@ dependencies = [
   "databridge-ingest",
   "databridge-harness",
   "databridge-semantic",
+  # e_intake imports both: the graph (store, extractor, clinic seed) and convert's claim_check.
+  "databridge-graph",
+  "databridge-convert",
   "pydantic>=2.7",
 ]
 
