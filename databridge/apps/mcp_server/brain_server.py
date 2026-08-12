@@ -1,4 +1,13 @@
-"""Clinic-brain MCP server — agent access to the clinic graph, read-only by design.
+"""Clinic-brain MCP server — agent access to the clinic graph.
+
+**NOT read-only, despite what this line used to say.** ``brain_ingest`` writes to the graph, and
+the header claiming otherwise is the kind of statement that gets believed by the next person
+wiring this up. It matters concretely: `REMEDIATION.md` §3.2 requires read capabilities and write
+or send capabilities to live in DIFFERENT PROCESSES, and the plan is to register "our read-only
+clinic server" behind an aggregator. Doing that with this server as it stands would put a write
+tool behind the endpoint the agent is allowed to reach, collapsing the boundary into a naming
+convention — which is the specific failure that argument exists to prevent. Tracked as R-34; the
+fix is to split the ingest tool into a separate server before any of this is registered.
 
 Exposes the brain to AI agents over MCP:
 
