@@ -201,9 +201,19 @@ class _FutureEngine:
 
 
 class DoclingEngine(_FutureEngine):
+    """Still future scope AS A RASTER ENGINE, which is what this chain is.
+
+    docling itself is now a dependency and is used for extraction — see
+    ``adapters/source/docling_extract.py`` (T-36). It is a whole document converter (bytes →
+    layout → text lines with page geometry), not an ``image ndarray → lines`` recogniser, so
+    wedging it into ``OcrEngine`` would mean rasterising a page only to hand it back to something
+    that wants the page. The two live side by side deliberately: this chain OCRs a raster for the
+    image/PDF adapters, ``docling_extract`` reads a whole file.
+    """
+
     name = "docling"
-    _why = ("future scope — docling-bundled OCR/layout stack (richer table+layout structure); "
-            "planned post-POC, see [[50-research/tools/ocr-engines]]")
+    _why = ("future scope as a raster OCR engine — docling is used as a whole-document extractor "
+            "instead, in adapters/source/docling_extract.py (T-36)")
 
 
 class OpenDataLoaderEngine(_FutureEngine):

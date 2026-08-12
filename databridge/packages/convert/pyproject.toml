@@ -18,6 +18,13 @@ dependencies = [
 
 [project.optional-dependencies]
 adapters = ["ruamel.yaml>=0.18", "lxml>=5"]   # C04 semi-structured adapters (PROMPT 6)
+# T-36 document extraction (PDF + scans → text with per-line page geometry). An EXTRA, not a hard
+# dependency: docling pulls a torch-backed layout model, and `databridge-convert` is imported by
+# every other package here — making that mandatory would put a multi-gigabyte install behind
+# `import databridge_core`. `adapters/source/docling_extract.py` imports it lazily and raises a
+# typed `DoclingUnavailable`, and the gateway answers that with a 503 rather than a stack trace.
+# The gateway needs it: install with `pip install -e "packages/convert[docling]"`.
+docling = ["docling>=2.55"]
 
 [build-system]
 requires = ["hatchling"]
