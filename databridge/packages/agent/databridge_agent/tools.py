@@ -8,37 +8,57 @@ the interface, the package that has it implements it, and composition happens at
 also means every test here runs against stubs, so a test never needs a graph to prove a safety
 property.
 
-**The whole safety story of this file is that a send tool cannot be registered.**
-``docs/hackathon/GRAPH_AGENT_AND_MCP.md`` §3 states the rule the design hangs on — *the agent never
-holds send credentials* — because patient documents are attacker-controlled text and an agent that
-could send is one prompt injection away from mailing patient data out. Three layers make that a
-property of the code rather than a promise in a prompt:
+**The whole safety story of this file is that a send tool cannot be registered, and that a
+registered tool cannot be an arbitrary callable.** ``docs/hackathon/GRAPH_AGENT_AND_MCP.md`` §3
+states the rule the design hangs on — *the agent never holds send credentials* — because patient
+documents are attacker-controlled text and an agent that could send is one prompt injection away
+from mailing patient data out.
 
-1. ``Tool.effect`` is ``Literal["read"]``. There is no other value, so a send-capable tool is
-   **unconstructible** — the same device as
-   ``ResolutionResult.requires_human_selection: Literal[True]`` (CLAUDE.md §Hard constraints 1).
-   Adding a second value is a visible schema change that cannot happen by accident in a hurried
-   demo.
-2. ``ToolRegistry.register`` refuses a send-SHAPED name or description even if it is honestly
-   marked ``read``. Layer 1 catches the honest mistake; this catches the tool called
-   ``notify_insurer`` that "only drafts, really".
-3. It refuses an identity-DECISION-shaped name — ``select_patient``, ``verify_identity`` — so the
-   agent has no such tool *at all* (CLAUDE.md §Hard constraints 1). It may report "3 candidates,
-   needs a human"; there is no callable through which it could choose one.
+Five layers, in the order they fire:
 
-Layers 2 and 3 are deterministic string matching over the declaration, and they run at REGISTRATION
-— before any model has spoken. An injected instruction cannot summon a tool that was never
-registered, and the model has no path to registration.
+1. **``Tool.adapter`` must be a ``SealedReadAdapter``** (``sealed.py``). This is R-07's fix. The
+   old ``call: Callable[..., ToolResult]`` accepted *anything* — a tool honestly marked
+   ``effect="read"`` and named ``clinic_lookup`` could POST or write to the ledger, and this
+   package would never know. A sealed adapter carries one of three closed read capabilities and is
+   scanned at class definition for transport, vendor SDKs and write-shaped calls.
+2. ``Tool.effect`` is ``Literal["read"]``. A send-capable tool is **unconstructible** — the same
+   device as ``ResolutionResult.requires_human_selection: Literal[True]`` (CLAUDE.md §Hard
+   constraints 1).
+3. ``screen_declaration`` refuses a send-SHAPED name or description even if it is honestly marked
+   ``read``. Layer 2 catches the honest mistake; this catches the tool called ``notify_insurer``
+   that "only drafts, really".
+4. ``policy.screen_parameters`` refuses an argument schema that is not closed, and refuses any
+   tool whose arguments could name a patient. That is R-08: screening tool *names* stopped
+   ``select_patient`` and did nothing about ``patient_record(patient_id=2)``.
+5. It refuses an identity-DECISION-shaped name — ``select_patient``, ``verify_identity`` — so the
+   agent has no such tool *at all*.
+
+Layers 3–5 are deterministic matching over the declaration, and they run at REGISTRATION — before
+any model has spoken. An injected instruction cannot summon a tool that was never registered, and
+the model has no path to registration.
+
+**The registry is frozen once the agent holds it.** ``ClinicAgent`` seals its registry in
+``__init__``, and a sealed registry refuses ``register``. Previously the set of things the agent
+could do was mutable for the lifetime of the process, so "the tool surface was reviewed" was a
+statement about one moment rather than about the run.
 """
 from __future__ import annotations
 
 import json
 import re
-from typing import Any, Callable, Iterable, Iterator, Literal
+from typing import Any, Iterable, Iterator, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
-from databridge_core import SourcePointer
+from . import policy
+from .results import ToolResult, ToolRow
+from .sealed import (
+    CandidateRead,
+    ClinicStructuralRead,
+    PatientScopedRead,
+    ReadCapability,
+    SealedReadAdapter,
+)
 
 
 class ToolError(RuntimeError):
@@ -59,6 +79,10 @@ class DuplicateTool(ToolError):
 
 class UnknownTool(ToolError):
     """The agent asked for a tool that is not registered. Raised, never guessed at."""
+
+
+class RegistrySealed(ToolError):
+    """The tool surface was frozen when the agent took it, and something tried to widen it."""
 
 
 # --- the deterministic declaration screens ----------------------------------------
@@ -128,97 +152,116 @@ def screen_declaration(name: str, description: str = "") -> None:
             f"(CLAUDE.md §Hard constraints 1)")
 
 
-# --- what a tool returns ----------------------------------------------------------
-
-
-class ToolResult(BaseModel):
-    """One tool's answer: rows of data, and the pointers they came from.
-
-    ``rows`` are plain JSON-able mappings — whatever the graph returned. ``citations`` are the
-    ``SourcePointer``s behind them, and the validator below refuses a result that has rows but no
-    pointers. The agent composes its citations mechanically from these, so a tool that returned
-    facts with nothing to click through to would produce a cited-looking answer with no evidence
-    under it — the exact failure ``GroundedValue`` exists to make impossible (CLAUDE.md
-    §Hard constraints 2).
-
-    A tool that legitimately found nothing returns no rows and, honestly, no citations: "nothing is
-    blocked today" is not a claim about a document. ``note`` carries that.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    tool: str
-    rows: tuple[dict, ...] = ()
-    citations: tuple[SourcePointer, ...] = ()
-    note: str = ""
-
-    @model_validator(mode="after")
-    def _rows_must_be_grounded(self) -> "ToolResult":
-        if self.rows and not self.citations:
-            raise ValueError(
-                f"ToolResult({self.tool!r}) REFUSED: {len(self.rows)} row(s) and no SourcePointer. "
-                f"The agent may only compose values the graph already returned, and it composes "
-                f"its citations from this field — an ungrounded row would become an uncitable "
-                f"sentence.")
-        return self
-
-    def as_data(self) -> str:
-        """The rows as JSON, for the framed observation the model sees.
-
-        JSON, not prose: a sentence inside a JSON string value reads to a model as *the value of a
-        field*, which is what it is. Prose formatting is what makes injected text look like a line
-        of the conversation.
-        """
-        payload: dict[str, Any] = {"tool": self.tool, "rows": [dict(r) for r in self.rows]}
-        if self.note:
-            payload["note"] = self.note
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+# --- the declared tool ------------------------------------------------------------
 
 
 class Tool(BaseModel):
-    """A declared capability: a name, a description, a JSON-Schema for its arguments, a callable.
+    """A declared capability: a sealed read adapter, exposed to the model under a screened name.
 
-    ``effect`` is the constraint. ``Literal["read"]`` means a send-capable tool cannot be
-    constructed — not "is not constructed", *cannot be*. See the module docstring.
+    Everything the model is shown comes from the adapter. There is no way to declare a name,
+    description or schema that differs from the thing that will actually run, which is how a
+    reviewed catalogue and an executed call get out of step.
     """
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    name: str
-    description: str
-    parameters: dict = Field(default_factory=dict)      # JSON Schema for the arguments object
-    call: Callable[..., ToolResult]
+    adapter: SealedReadAdapter
     effect: Literal["read"] = "read"
 
     @model_validator(mode="after")
     def _screen(self) -> "Tool":
         screen_declaration(self.name, self.description)
+        policy.screen_parameters(self.name, self.parameters)
         return self
 
+    # -- everything below is the adapter's declaration, never a parallel copy of it --
+    @property
+    def name(self) -> str:
+        return self.adapter.name
+
+    @property
+    def description(self) -> str:
+        return self.adapter.description
+
+    @property
+    def parameters(self) -> dict:
+        return self.adapter.parameters
+
+    @property
+    def breadth(self) -> str:
+        return self.adapter.breadth
+
+    @property
+    def grounded_arguments(self) -> frozenset:
+        return self.adapter.grounded_arguments
+
+    @property
+    def capability(self) -> ReadCapability:
+        return self.adapter.capability
+
+    @property
+    def requires_human_selection(self) -> bool:
+        return self.adapter.requires_human_selection
+
+    @property
+    def subject(self) -> str:
+        """The patient a patient-scoped tool is bound to — from a human's grant, not an argument."""
+        return self.adapter.subject
+
+    def call(self, **arguments: Any) -> ToolResult:
+        """Run the adapter. Arguments are validated by the LOOP before this is reached."""
+        return self.adapter(**arguments)
+
     def spec(self) -> dict:
-        """The declaration shown to the model. The callable is not in it — a model names a tool,
+        """The declaration shown to the model. The adapter is not in it — a model names a tool,
         it never receives a reference to one."""
         return {"name": self.name, "description": self.description,
-                "parameters": self.parameters, "effect": self.effect}
+                "parameters": self.parameters, "effect": self.effect,
+                "breadth": self.breadth, "scope": self.capability.scope,
+                "requires_human_selection": self.requires_human_selection}
 
 
 class ToolRegistry:
-    """The closed set of things the agent can do. Nothing executes that is not in here."""
+    """The closed set of things the agent can do. Nothing executes that is not in here.
+
+    Frozen by ``seal()`` when an agent takes it. Before that a composition root builds it; after
+    that the surface is fixed for the life of the object, so "these are the tools" is a statement
+    about the run rather than about the moment somebody looked.
+    """
 
     def __init__(self, tools: Iterable[Tool] = ()) -> None:
         self._tools: dict[str, Tool] = {}
+        self._sealed = False
         for tool in tools:
             self.register(tool)
 
     def register(self, tool: Tool) -> None:
+        if self._sealed:
+            raise RegistrySealed(
+                f"tool {getattr(tool, 'name', tool)!r} REFUSED: this registry was sealed when an "
+                f"agent took it. A tool surface that can grow after review is a tool surface "
+                f"nobody has reviewed (REMEDIATION.md R-07)")
+        if not isinstance(tool, Tool):
+            raise ToolError(
+                f"{type(tool).__name__} is not a Tool. The registry holds declarations backed by "
+                f"sealed read adapters; a duck-typed stand-in would skip every screen.")
         if tool.name in self._tools:
             raise DuplicateTool(
                 f"tool {tool.name!r} is already registered; a silently shadowed tool means the "
                 f"agent calls one thing and the reviewer reads another")
         # Screened again here even though `Tool` screens at construction: `register` is the door
-        # every tool comes through, and it must hold for a duck-typed stand-in too.
+        # every tool comes through, and it must hold however the Tool was built.
         screen_declaration(tool.name, tool.description)
+        policy.screen_parameters(tool.name, tool.parameters)
         self._tools[tool.name] = tool
+
+    def seal(self) -> "ToolRegistry":
+        self._sealed = True
+        return self
+
+    @property
+    def sealed(self) -> bool:
+        return self._sealed
 
     def get(self, name: str) -> Tool:
         try:
@@ -231,12 +274,19 @@ class ToolRegistry:
         return tuple(self._tools)
 
     def specs(self) -> tuple[dict, ...]:
-        return tuple(t.spec() for t in self._tools.values())
+        return tuple(policy.preferred_order(t.spec() for t in self._tools.values()))
 
     def catalogue(self) -> str:
-        """The tool list as JSON, for the system message."""
-        return json.dumps([t.spec() for t in self._tools.values()],
-                          ensure_ascii=False, sort_keys=True)
+        """The tool list as JSON, for the system message. Narrow reads first (``policy``)."""
+        return json.dumps(list(self.specs()), ensure_ascii=False, sort_keys=True)
+
+    def scopes(self) -> tuple[str, ...]:
+        return tuple(sorted({t.capability.scope for t in self._tools.values()}))
+
+    def patient_scoped(self) -> tuple[Tool, ...]:
+        """Tools bound to one patient by a human's grant. Empty before an attestation exists."""
+        return tuple(t for t in self._tools.values()
+                     if isinstance(t.capability, PatientScopedRead))
 
     def __contains__(self, name: object) -> bool:
         return name in self._tools
@@ -246,3 +296,21 @@ class ToolRegistry:
 
     def __len__(self) -> int:
         return len(self._tools)
+
+
+__all__ = [
+    "CandidateRead",
+    "ClinicStructuralRead",
+    "DuplicateTool",
+    "IdentityToolRefused",
+    "PatientScopedRead",
+    "RegistrySealed",
+    "SendCapabilityRefused",
+    "Tool",
+    "ToolError",
+    "ToolRegistry",
+    "ToolResult",
+    "ToolRow",
+    "UnknownTool",
+    "screen_declaration",
+]

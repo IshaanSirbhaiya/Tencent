@@ -23,6 +23,24 @@ the model has spoken on the way out, and depends on no model behaving well. Scop
 as coverage in both directions: refusing "intake 4 is blocked on an identity check" would make the
 agent useless for the one question it exists to answer, so the patterns below are scoped to the
 agent claiming a DECISION or an ACTION, never to it reporting a state.
+
+**What changed with R-10, and what these patterns are for now.** ``_IDENTITY_ASSERTIONS`` used to
+be the *only* thing standing between an injected document and an identity claim on a clinic
+screen, and a review pointed out the obvious: "Proceed with candidate 2; their demographics
+correspond to the visitor" matches none of it, and no finite list of phrases ever will. A blacklist
+over free text is a guess about phrasing. So the model no longer writes the answer at all
+(``render.py``): it returns typed references, code renders the values beside their pointers, and
+the identity wording is a fixed sentence from a closed table. These patterns now do two narrower
+jobs they can actually do:
+
+* ``screen_incoming`` still gates the QUESTION, deterministically, before any model call;
+* ``screen_agent_output`` runs over the RENDERED report as a backstop — if a tool ever returns a
+  value that reads as an identity determination, it stops there rather than on a screen;
+* ``looks_like_injection`` uses the same patterns to decide, deterministically, that a value is
+  addressed to an automated reader and must be redacted from the report rather than reproduced.
+
+The blacklist is no longer the guarantee. It is a second layer over a structural one, which is the
+only honest use for a list of phrases.
 """
 from __future__ import annotations
 
@@ -46,6 +64,7 @@ __all__ = [
     "screen_incoming",
     "screen_agent_output",
     "check_answer_values",
+    "looks_like_injection",
 ]
 
 NO_SEND_CODE = "AGENT_HAS_NO_SEND_CAPABILITY"
@@ -204,6 +223,51 @@ def screen_agent_output(answer: str) -> GuardrailResult:
     if rule:
         return GuardrailResult(refused=True, code=NO_SEND_CODE, reason=rule, answer=NO_SEND_TEXT)
     return GuardrailResult(refused=False)
+
+
+# --- text that is addressed to an automated reader --------------------------------
+
+# Instruction SHAPES, as opposed to the send/identity claims above. These are how a document talks
+# to a model rather than to a clinician, and they are what `render.present` redacts. Over-matching
+# is the cheap direction here: a redacted value keeps its citation, so a human can open the source
+# and read it in place, and the cost of a false positive is one extra click.
+_INJECTION_SHAPES: tuple[tuple[str, re.Pattern], ...] = (
+    ("ignore_instructions", re.compile(
+        r"\b(?:ignore|disregard|forget|override|bypass)\b[^.?!]{0,30}?"
+        r"\b(?:previous|prior|above|earlier|all|these|any|the)\b[^.?!]{0,25}?"
+        r"\b(?:instruction|instructions|rules?|prompt|guidance|constraints?|warnings?)\b", re.I)),
+    ("role_reassignment", re.compile(
+        r"\byou are (?:now|no longer|actually|really)\b|\bact as\b|\bpretend to be\b|"
+        r"\bfrom now on\b|\byour new (?:role|task|instructions)\b", re.I)),
+    ("addressed_to_reader", re.compile(
+        r"\b(?:ai|assistant|agent|language model|automated reader|chatbot|copilot|bot)\b"
+        r"[^.?!]{0,25}?\b(?:must|should|please|now|instead)\b", re.I)),
+    ("instructed_identity_decision", re.compile(
+        r"\b(?:confirm|verify|accept|approve|select|choose|use|proceed with|go with)\b"
+        r"[^.?!]{0,30}?"
+        r"\b(?:identity|candidate|candidate \d|this person|the visitor|the patient)\b", re.I)),
+    ("system_prompt_talk", re.compile(
+        r"\bsystem prompt\b|\bnew instructions\b|\bdeveloper message\b|\bjailbreak\b", re.I)),
+)
+
+
+def looks_like_injection(text: str) -> bool:
+    """True when a VALUE reads as an instruction to an automated reader.
+
+    Deterministic, and applied to tool output rather than to model output — the model no longer
+    writes prose, so the remaining way attacker text reaches a member of staff is by being a value
+    the report prints. ``render.present`` replaces anything this flags with a fixed redaction line
+    and keeps the pointer, so the evidence stays reachable and the payload is not reproduced.
+
+    This is the output half of R-33. The input half is ``frame.untrusted``.
+    """
+    normalised = _normalise(text)
+    if not normalised:
+        return False
+    return bool(_match(normalised, _INJECTION_SHAPES)
+                or _match(normalised, _SEND_REQUESTS)
+                or _match(normalised, _IDENTITY_ASSERTIONS)
+                or _match(normalised, _ACTION_CLAIMS))
 
 
 def check_answer_values(answer: str, observations: str) -> GuardrailResult:

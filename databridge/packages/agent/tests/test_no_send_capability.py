@@ -53,9 +53,27 @@ def _violations(modules: tuple[str, ...]) -> list[str]:
 
 
 def test_the_package_has_sources_to_scan():
-    """Guards every scan below: an empty file list would make all of them vacuously green."""
+    """Guards every scan below: an empty file list would make all of them vacuously green.
+
+    The list is named module by module rather than counted, so a new module is a deliberate
+    addition to the scanned set rather than something that quietly joins it or quietly does not.
+    """
     names = {p.name for p in _sources()}
-    assert {"agent.py", "tools.py", "guardrails.py", "frame.py"} <= names
+    assert {"adapters.py", "agent.py", "frame.py", "guardrails.py", "policy.py", "render.py",
+            "results.py", "sealed.py", "tools.py"} <= names
+
+
+def test_the_same_rule_is_applied_to_adapters_that_arrive_from_outside():
+    """`sealed.scan_source` is this scan pointed at the composition root's code (R-07).
+
+    Two lists that are meant to encode one rule will drift, and the one that drifts is the one
+    nobody reads. This asserts they still agree on the module names that matter.
+    """
+    from databridge_agent.sealed import _FORBIDDEN_MODULES
+    for name in ("smtplib", "socket", "httpx", "requests", "subprocess", "slack_sdk"):
+        assert name in _FORBIDDEN_MODULES, f"the adapter scan would not catch {name!r}"
+    for name in VENDOR_MODULES[:2]:
+        assert name in _FORBIDDEN_MODULES
 
 
 def test_no_vendor_sdk_is_imported():

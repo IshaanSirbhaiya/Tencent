@@ -22,6 +22,10 @@ dependencies = [
   "databridge-intake",
   "pydantic>=2.7",
   "pyyaml>=6.0",
+  # Argument-schema enforcement (R-11). A declared schema that is only SHOWN to the model is
+  # not a validation, so every planned call is checked against it here, outside the model.
+  # A validator, not a transport: it opens nothing and speaks to nobody.
+  "jsonschema>=4.20",
 ]
 
 [build-system]
