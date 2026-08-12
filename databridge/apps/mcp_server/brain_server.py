@@ -1,26 +1,26 @@
-"""Clinic-brain MCP server — agent access to the clinic graph.
+"""Clinic-brain tool layer — the shared implementation behind every mouth on the graph.
 
-**NOT read-only, despite what this line used to say.** ``brain_ingest`` writes to the graph, and
-the header claiming otherwise is the kind of statement that gets believed by the next person
-wiring this up. It matters concretely: `REMEDIATION.md` §3.2 requires read capabilities and write
-or send capabilities to live in DIFFERENT PROCESSES, and the plan is to register "our read-only
-clinic server" behind an aggregator. Doing that with this server as it stands would put a write
-tool behind the endpoint the agent is allowed to reach, collapsing the boundary into a naming
-convention — which is the specific failure that argument exists to prevent. Tracked as R-34; the
-fix is to split the ingest tool into a separate server before any of this is registered.
+**This module is not a server, and it is not read-only.** It is the one place the graph tools are
+implemented; ``brain_ingest`` among them writes. Three callers use it, and which of these methods
+each one can reach is the capability boundary:
 
-Exposes the brain to AI agents over MCP:
+  ``brain_reader_server.py``  MCP, read tools only — the endpoint an agent may reach
+  ``brain_writer_server.py``  MCP, ``brain_ingest`` only — the model-free ingestion path
+  ``apps/gateway``            the FastAPI ``/brain/*`` routes (its own surface, its own gates)
 
-  brain_query(question, as_of?)     → grounded answer + citations
-  brain_neighbors(entity, depth?)   → subgraph JSON
-  brain_ingest(source_path)         → IngestResult (the one write path: ingestion only)
-  brain_timeline(entity)            → bi-temporal history
-  brain_path(from_entity, to_entity)→ provenance path
+The two MCP servers are **separate processes with separate tool registries**, declared in
+``capabilities.py``. That split is R-34 in `REMEDIATION.md` §3.2: this module previously built a
+single server carrying all five tools while its own header claimed read-only, and registering that
+behind the aggregator would have put a write tool behind the agent's endpoint — collapsing the
+boundary `docs/hackathon/GRAPH_AGENT_AND_MCP.md` §3 requires into a naming convention. Read
+``capabilities.py`` for what the split does and does not enforce; it is deliberately specific.
 
-"One brain, two mouths" (mirrors the gateway): the MCP tools and the FastAPI ``/brain/*`` routes
-both call the SAME ``BrainTools`` methods — no logic forks. Tools are read-only except
-``brain_ingest`` (single-writer integrity, 04_PRD §9). The actual ``mcp`` SDK is wired only if
-installed; the tool functions are plain Python so the gateway and tests use them with no server.
+The methods below are NOT forked per caller. "One brain, two mouths": the MCP tools and the
+``/brain/*`` routes call the SAME methods, so what a test proves here holds on both surfaces. The
+boundary is which methods a process exposes — never a second copy of the logic.
+
+The tool bodies are plain Python and need no ``mcp`` SDK, so the gateway and the tests use them
+directly with no server running.
 
 Every answer value traces to a graph node/edge SourcePointer (P4); ``nl_query`` runs the answer
 through C17's ``claim_check`` so an ungrounded quantity is refused, never narrated.
@@ -326,7 +326,10 @@ class BrainTools:
         linked = link_entities(self.store, ref, top_k=1)
         return linked[0].id if linked else None
 
-    # -- the five MCP tools -------------------------------------------------------
+    # -- the tools ----------------------------------------------------------------
+    # Four reads and one write. Which process exposes which is decided in ``capabilities.py``,
+    # not here — this class is the shared implementation, and it deliberately knows nothing about
+    # the boundary drawn across it.
     def brain_query(self, question: str, as_of: Optional[str] = None) -> dict:
         # as_of (valid-time) narrows the snapshot the answer is drawn from (audit/replay).
         a = nl_query(self.store, question)
@@ -370,8 +373,11 @@ class BrainTools:
     def brain_ingest(self, source_path: str, *, text: Optional[str] = None) -> dict:
         """The single write path (04_PRD §9). Build a DocumentRecord from ``text`` (inline) or a
         REGISTERED source (``self.sources[source_path]``) and extract a grounded subgraph into the
-        store. NEVER opens an arbitrary filesystem path — an MCP agent calling
-        ``brain_ingest("/etc/passwd")`` gets a refusal, not a file read."""
+        store. NEVER opens an arbitrary filesystem path — a caller asking for
+        ``brain_ingest("/etc/passwd")`` gets a refusal, not a file read.
+
+        Over MCP this is exposed by ``brain_writer_server.py`` alone; the reader process neither
+        registers it nor holds a harness to run it with (R-34)."""
         if self.harness is None:
             return {"error": "ingest unavailable: no harness configured", "entities_added": 0}
         if text is None:
@@ -395,46 +401,18 @@ class BrainTools:
                 "refused": res.refused, "stats": self.store.counts()}
 
 
-# --- optional MCP SDK wiring (only if `mcp` is installed) --------------------------
-def build_mcp_server(tools: Optional[BrainTools] = None):
-    """Construct an MCP ``Server`` exposing the five tools. Imports the SDK lazily so the module
-    is usable (gateway + tests) without `mcp` installed."""
-    from mcp.server.fastmcp import FastMCP  # type: ignore
+# --- the combined server, removed (R-34) ------------------------------------------
+def build_mcp_server(*_args, **_kwargs):
+    """Removed. It built ONE server carrying the read tools and ``brain_ingest`` together.
 
-    if tools is None:
-        # default: demo seed + a gold extraction harness + the demo source registered, so every
-        # tool (including brain_ingest) works out of the box for an agent connecting over MCP.
-        from databridge_evals.e_intake import FIXTURE_TEXT, gold_harness
-        tools = BrainTools(harness=gold_harness(), sources={"demo_sample.txt": FIXTURE_TEXT})
-    tools.load_seed()
-    mcp = FastMCP("databridge-brain")
+    Kept as a tripwire rather than deleted: a caller that still imports this name is a caller about
+    to front a write tool with the endpoint an agent connects to, and a clear failure beats an
+    ``ImportError`` somebody fixes by reintroducing the combined builder.
 
-    @mcp.tool()
-    def brain_query(question: str, as_of: Optional[str] = None) -> dict:
-        return tools.brain_query(question, as_of)
-
-    @mcp.tool()
-    def brain_neighbors(entity: str, depth: int = 1) -> dict:
-        return tools.brain_neighbors(entity, depth)
-
-    @mcp.tool()
-    def brain_ingest(source_path: str) -> dict:
-        return tools.brain_ingest(source_path)
-
-    @mcp.tool()
-    def brain_timeline(entity: str) -> dict:
-        return tools.brain_timeline(entity)
-
-    @mcp.tool()
-    def brain_path(from_entity: str, to_entity: str) -> dict:
-        return tools.brain_path(from_entity, to_entity)
-
-    return mcp
-
-
-def main() -> None:  # pragma: no cover (entrypoint)
-    build_mcp_server().run()
-
-
-if __name__ == "__main__":  # pragma: no cover
-    main()
+    Use ``brain_reader_server.build_reader_server()`` (the agent-reachable process) or
+    ``brain_writer_server.build_writer_server()`` (ingestion), and run them separately.
+    """
+    raise RuntimeError(
+        "build_mcp_server() was removed by R-34: read tools and brain_ingest are now two "
+        "processes with two registries. Use brain_reader_server.build_reader_server() or "
+        "brain_writer_server.build_writer_server() — see capabilities.py.")
