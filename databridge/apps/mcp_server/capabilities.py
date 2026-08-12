@@ -7,10 +7,14 @@ register "our read-only clinic server" behind a self-hosted aggregator that an a
 **different processes** — "so the capability boundary is a process boundary rather than a naming
 convention". A single endpoint fronting both collapses exactly that.
 
-So there are now two servers, and this module is the list each one is built from:
+So there are now three servers, and this module is the list each one is built from:
 
     READ_CAPABILITIES   → brain_reader_server.py   (the agent-reachable process)
     WRITE_CAPABILITIES  → brain_writer_server.py   (the model-free ingestion process)
+    SEND_CAPABILITIES   → mail_send_server.py      (the DISPATCHER-only process)
+
+``SEND_CAPABILITIES`` is the sharpest of the three and is documented at its own declaration below.
+Read that before adding anything to it.
 
 **What is actually enforced, precisely — no more:**
 
@@ -85,6 +89,26 @@ WRITE_CAPABILITIES: tuple[Capability, ...] = (
                "into the store. The single write path (04_PRD §9)."),
 )
 
+# --- the send surface — a third process, and the one that can be irreversible ---------
+#
+# ``mail_send_server.py`` only. This list is NEVER registered behind the aggregator, and it is not
+# a ``BrainTools`` method: sending is not something the clinic brain does, it is something a
+# model-free dispatcher does to a row a named human approved.
+#
+# `docs/hackathon/GRAPH_AGENT_AND_MCP.md` §4.2 states the gate in one line — ``send_email``
+# reachable **only** by the dispatcher, never the agent — and §3 gives the reason: patient
+# documents are attacker-controlled text, so an agent that could send is one prompt injection away
+# from mailing patient data out. The boundary is not this comment. It is that the aggregator is
+# registered against the reader's socket and against nothing else (MCP_RUNBOOK.md §3), and that
+# ``packages/agent`` refuses a tool named like a transport at registration
+# (``tools.screen_declaration``) — which would refuse ``send_email`` by name if anybody tried.
+SEND_CAPABILITIES: tuple[Capability, ...] = (
+    Capability("send_email", "send_email",
+               "Hand one already-approved message to the mail server. Reachable by the dispatcher "
+               "only; it decides nothing and reads no outbox."),
+)
+
+
 # --- everything else on BrainTools --------------------------------------------------
 #
 # Public methods that back the HTTP routes and are NOT exposed over MCP at all. Named explicitly so
@@ -111,6 +135,7 @@ def capability_names(caps: Iterable[Capability]) -> tuple[str, ...]:
 
 READ_TOOL_NAMES: frozenset[str] = frozenset(capability_names(READ_CAPABILITIES))
 WRITE_TOOL_NAMES: frozenset[str] = frozenset(capability_names(WRITE_CAPABILITIES))
+SEND_TOOL_NAMES: frozenset[str] = frozenset(capability_names(SEND_CAPABILITIES))
 
 
 class CapabilityBoundaryError(RuntimeError):

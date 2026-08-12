@@ -1,0 +1,32 @@
+# packages/outbox — the send gate (docs/hackathon/GRAPH_AGENT_AND_MCP.md §4.3, build step D).
+#
+# A draft is written here; a human approves it; a separate, model-free process sends it. This
+# package is the boundary between those three facts, and it holds NONE of them together:
+#
+#   * it has no transport. There is no smtplib, no httpx, no slack SDK below, and
+#     `tests/test_outbox_cannot_send.py` asserts that against the source rather than against this
+#     file. An outbox that could send is not a gate, it is a queue with extra steps.
+#   * it has no model. No databridge-harness, no vendor SDK. Composition is template
+#     interpolation over committed values, which is why every emitted sentence has a pointer.
+#
+# It DOES depend on databridge-intake, and that dependency is the point: a recipient may only come
+# from a committed evidence-ledger row (or from a human typing it), so the ledger type is part of
+# the drafting signature.
+[project]
+name = "databridge-outbox"
+version = "0.0.0"
+description = "The send gate: grounded outbound drafts, append-only, nothing sends without a human (Hack4Health 2026)"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-intake",
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_outbox"]

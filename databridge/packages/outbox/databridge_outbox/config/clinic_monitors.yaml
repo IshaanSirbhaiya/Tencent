@@ -1,0 +1,93 @@
+# Clinic monitors — DATA, NOT CODE (CLAUDE.md §Hard constraints 3).
+#
+# Each row is one condition worth telling somebody about, and the only thing a row can produce is a
+# DRAFT. Adding an automation is a row here; `monitors.py` contains no branch on a monitor id, and
+# a test asserts that against its source.
+#
+# ─────────────────────────────────────────────────────────────────────────────────────
+# THIS FILE CANNOT DECIDE WHO A MESSAGE GOES TO.
+#
+# `recipient_from` names a DOOR, not a person: `committed_ledger` resolves the patient a named
+# human already attested to in person, and `typed_by_human` means a member of staff types the
+# address in the review UI — until they do, there is no draft. There is no field here that can hold
+# an address, and `load_monitors` scans the whole file and refuses it if anything in it is shaped
+# like a mailbox or a URL. That check covers fields nobody has invented yet, which is the point:
+# an address in config would be a third door onto the identity decision this system refuses to
+# make (CLAUDE.md §Hard constraints 1).
+#
+# `escalate_to` is a clinic ROLE, for the same reason `agent_playbooks.yaml` gives.
+#
+# THIS FILE ALSO CANNOT SEND ANYTHING. There is no `action` key and no `send` key.
+# `requires_human_approval` is `true` and the loader accepts no other value — a monitor whose
+# output does not need a human is a monitor that acts alone (CLAUDE.md §Hard constraints 4).
+# ─────────────────────────────────────────────────────────────────────────────────────
+#
+# Placeholders: `{fact_name}` only. Every one must be a grounded fact in the observation, or the
+# draft is refused at build time — a sentence a patient reads must be traceable to the value it
+# came from, exactly as an extracted field must (CLAUDE.md §Hard constraints 2).
+version: 1
+
+defaults:
+  channel: email
+  # There is no `false`.
+  requires_human_approval: true
+
+monitors:
+  # ---------------------------------------------------------------------------------
+  - id: intake_blocked_too_long
+    title: An intake has been waiting on a human for too long
+    when: >-
+      A registration has sat on the same blocker past the clinic's threshold. Nobody is at fault;
+      the point is that the patient does not know, and finds out at the counter.
+    condition:
+      fact: minutes_blocked
+      op: at_least
+      value: 20
+    # A blocked intake is usually blocked BECAUSE identity has not been established, so there is no
+    # committed selection to resolve an address from — and inferring one from the document would be
+    # exactly the identity determination this system refuses to make. Staff type it.
+    recipient_from: typed_by_human
+    escalate_to: front_desk_lead
+    subject_template: Your registration is waiting on one step
+    body_template: >-
+      Your registration has been waiting {minutes_blocked} minutes on one step: {blocked_on}.
+      A member of our front-desk team completes this with you in person when you arrive, so
+      there is nothing for you to do in advance. We are sorry for the wait.
+
+  # ---------------------------------------------------------------------------------
+  - id: coverage_conflict_on_file
+    title: A test on the referral is not authorised by the package on file
+    when: >-
+      The chit orders a test the confirmed package does not include, so the patient will be asked
+      to pay for it. Telling them before they arrive is the difference between a conversation and
+      a surprise at the payment counter.
+    condition:
+      fact: unauthorised_test
+      op: is_present
+    recipient_from: committed_ledger
+    escalate_to: billing_lead
+    subject_template: A test on your referral may not be covered
+    body_template: >-
+      Your referral lists {unauthorised_test}, which the package recorded on your authorisation
+      ({package_code}) does not include. You may be asked to pay for that test at the counter.
+      Any figures our clinic system quotes are synthetic demonstration prices, not a quotation.
+      If that is not what you expected, please reply and our billing team will look at it before
+      your visit.
+
+  # ---------------------------------------------------------------------------------
+  - id: questionnaire_outstanding
+    title: The pre-visit questionnaire has not come back
+    when: >-
+      A questionnaire the visit needs is still outstanding. Completing it before arrival is the
+      single largest saving available at the counter.
+    condition:
+      fact: questionnaire_outstanding
+      op: is_true
+    recipient_from: committed_ledger
+    escalate_to: front_desk_lead
+    subject_template: Your pre-visit questionnaire is still outstanding
+    body_template: >-
+      We have not yet received your {questionnaire_name} questionnaire for your upcoming visit.
+      Completing it before you arrive saves time at the counter and means we can start on time.
+      Bring your identification document with you: our staff check it in person, and no part of
+      that check happens automatically.

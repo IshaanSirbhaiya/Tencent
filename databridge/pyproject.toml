@@ -14,10 +14,12 @@ members = ["packages/*", "apps/*"]
 # run the suite). `scripts` exposes the vendor-import checker to its test.
 pythonpath = ["packages/core", "packages/harness", "packages/ingest", "packages/semantic",
               "packages/convert", "packages/graph", "packages/intake", "packages/agent",
-              "packages/evals", "apps/cli", "apps/gateway", "apps/mcp_server", "scripts"]
+              "packages/outbox", "packages/evals", "apps/cli", "apps/gateway",
+              "apps/mcp_server", "apps/dispatcher", "scripts"]
 testpaths = ["tests", "packages/core/tests", "packages/harness/tests",
              "packages/ingest/tests", "packages/semantic/tests",
              "packages/convert/tests", "packages/graph/tests", "packages/intake/tests",
              "packages/agent/tests", "packages/evals/tests", "apps/cli/tests",
-             "apps/gateway/tests", "apps/mcp_server/tests"]
+             "packages/outbox/tests", "apps/gateway/tests", "apps/mcp_server/tests",
+             "apps/dispatcher/tests"]
 markers = ["integration: hits a real backend (Ollama/LiteLLM); skips when unavailable"]

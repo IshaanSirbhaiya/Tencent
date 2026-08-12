@@ -2,8 +2,10 @@
 
 The aggregator (MCPJungle, `REMEDIATION.md` §3.2) registers a server by URL and speaks
 streamable HTTP to it, so each process listens on its own port and each is registered — or, for the
-writer, deliberately *not* registered — separately. **Two ports, because two processes: that is the
-capability boundary made operational.** Point the aggregator at the reader's port only.
+writer and the sender, deliberately *not* registered — separately. **Three ports, because three
+processes: that is the capability boundary made operational.** Point the aggregator at the reader's
+port only. The writer (8766) and the send server (8767) are addressable and are never registered;
+what an agent can call is decided by which socket the aggregator was pointed at.
 
 Two things that bite, both learned the hard way against a running MCPJungle:
 
@@ -32,9 +34,13 @@ from typing import Any
 # one without addressing the other.
 DEFAULT_READER_PORT = 8765
 DEFAULT_WRITER_PORT = 8766
+# The send server. A THIRD port because a third process: reachable by the dispatcher only, and
+# never registered with the aggregator the agent reads from (`mail_send_server.py`).
+DEFAULT_SEND_PORT = 8767
 
 READER_PORT_ENV = "DATABRIDGE_MCP_READER_PORT"
 WRITER_PORT_ENV = "DATABRIDGE_MCP_WRITER_PORT"
+SEND_PORT_ENV = "DATABRIDGE_MCP_SEND_PORT"
 BIND_HOST_ENV = "DATABRIDGE_MCP_BIND_HOST"
 
 DEFAULT_BIND_HOST = "127.0.0.1"
