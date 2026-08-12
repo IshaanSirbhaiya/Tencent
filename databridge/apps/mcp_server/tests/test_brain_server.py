@@ -254,3 +254,26 @@ def test_serialisers_round_trip():
     answer = t.brain_query("What does the WELL2 package include?")
     assert set(answer) >= {"question", "answer", "grounded", "citations"}
     assert answer_to_dict.__name__
+
+
+def test_the_mcp_node_payload_cites_each_attribute_and_names_the_rest():
+    """This payload is consumed by a model. `attrs` beside `n_sources` is the pooled-citation
+    shape at its purest: a COUNT names nothing, so "3 citations" sitting next to four values reads
+    as backing all four and cannot be checked."""
+    from databridge_graph.clinic_seed import fresh_clinic_store
+    from databridge_graph.store import row_to_node
+
+    from brain_server import node_to_dict
+
+    store = fresh_clinic_store()
+    patients = [r for r in store.open_nodes() if r["id"].startswith("patient:")]
+    assert patients, "no patient nodes in the seed"
+    payload = node_to_dict(row_to_node(store, patients[0]))
+
+    for key, value in payload["attrs"].items():
+        if value is None:
+            assert key in payload["unresolved"]
+        else:
+            assert key in payload["attribute_sources"], f"{key} is emitted with no pointer"
+            assert payload["attribute_sources"][key]["kind"]
+    assert "not the values" in payload["sources_ground"]

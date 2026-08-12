@@ -103,6 +103,25 @@ def test_a_broken_history_does_not_block_an_intake():
     assert draft.resolution.candidates
 
 
+
+def _prior(**fields) -> PriorIntake:
+    """A `PriorIntake` for a FAKE history, with every supplied value grounded on `PTR`.
+
+    Production code must name a real pointer per value — that is the wall. A stand-in for the
+    graph has only one pointer to give, and spelling it out per field in twenty fixtures would
+    obscure what each test is actually about.
+    """
+    sources = fields.pop("sources", [PTR])
+    return PriorIntake(**fields, sources=sources,
+                       field_sources={k: PTR for k, v in fields.items() if v is not None})
+
+
+def _prior_test(**fields) -> PriorTest:
+    sources = fields.pop("sources", [PTR])
+    return PriorTest(**fields, sources=sources,
+                     field_sources={k: PTR for k, v in fields.items() if v is not None})
+
+
 def test_a_naive_timestamp_from_the_port_does_not_blow_up_the_intake():
     """The guard used to wrap only the port CALL, not the loop that reads its result.
 
@@ -114,7 +133,7 @@ def test_a_naive_timestamp_from_the_port_does_not_blow_up_the_intake():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     naive = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_naive.txt", patient_id=patient_id, issuer_code="NSTNBU",
+        _prior(document_id="chit_naive.txt", patient_id=patient_id, issuer_code="NSTNBU",
                     seen_at=dt.datetime(2026, 8, 9), sources=[PTR])])       # no tzinfo
     result = _draft(history=naive)
     assert result.coverage.status.value in {"determined", "partial"}
@@ -129,7 +148,7 @@ def test_codes_are_compared_the_way_the_rules_table_compares_them():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     same_but_scruffy = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id,
+        _prior(document_id="chit_other.txt", patient_id=patient_id,
                     issuer_code="  mrdeb ", sources=[PTR])])
     assert FLAG_CONFLICTING_DOCUMENT not in _draft(
         history=same_but_scruffy).coverage.eligibility_flags
@@ -139,7 +158,7 @@ def test_a_finding_carries_the_pointers_it_was_given():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     conflicting = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id,
+        _prior(document_id="chit_other.txt", patient_id=patient_id,
                     issuer_code="NSTNBU", sources=[PTR])])
     findings = _draft(history=conflicting).coverage.history_findings
     assert len(findings) == 1
@@ -153,7 +172,7 @@ def test_an_ambiguous_prior_document_is_described_as_such():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     ambiguous = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id, issuer_code="NSTNBU",
+        _prior(document_id="chit_other.txt", patient_id=patient_id, issuer_code="NSTNBU",
                     candidate_count=3, sources=[PTR])])
     reasoning = _draft(history=ambiguous).coverage.reasoning
     assert any("may also concern" in r and "1 of 3 candidates" in r for r in reasoning)
@@ -172,7 +191,7 @@ def test_a_prior_document_with_no_recorded_candidate_count_is_described_as_unkno
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     unknown_count = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id, issuer_code="NSTNBU",
+        _prior(document_id="chit_other.txt", patient_id=patient_id, issuer_code="NSTNBU",
                     sources=[PTR])])                       # candidate_count intentionally omitted
     reasoning = _draft(history=unknown_count).coverage.reasoning
     assert any("may also concern" in r and "candidate count on that document is unknown" in r
@@ -200,7 +219,7 @@ def test_history_never_changes_a_candidate_score():
     without = _draft(history=NoHistory())
     patient_id = without.resolution.candidates[0].patient_id
     rich = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id,
+        _prior(document_id="chit_other.txt", patient_id=patient_id,
                     issuer_code="ZZOTHER", seen_at=dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc),
                     candidate_count=1, sources=[PTR])
         for _ in range(5)])
@@ -228,7 +247,7 @@ def test_an_ambiguous_document_with_history_still_returns_both_candidates():
     draft = _draft("chit_03_everwell_group_invitation.txt", history=NoHistory())
     first = draft.resolution.candidates[0].patient_id
     rich = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_prior.txt", patient_id=first, issuer_code="EVWME",
+        _prior(document_id="chit_prior.txt", patient_id=first, issuer_code="EVWME",
                     sources=[PTR])])
     with_history = _draft("chit_03_everwell_group_invitation.txt", history=rich)
     assert len(with_history.resolution.candidates) == 2
@@ -242,7 +261,7 @@ def test_a_document_with_a_different_issuer_on_file_raises_the_conflict_flag():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     conflicting = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id,
+        _prior(document_id="chit_other.txt", patient_id=patient_id,
                     issuer_code="NSTNBU", sources=[PTR])])
     flagged = _draft(history=conflicting)
     assert FLAG_CONFLICTING_DOCUMENT in flagged.coverage.eligibility_flags
@@ -255,7 +274,7 @@ def test_the_same_document_is_not_a_conflict_with_itself():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     itself = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_01_meridian_referral.txt", patient_id=patient_id,
+        _prior(document_id="chit_01_meridian_referral.txt", patient_id=patient_id,
                     issuer_code="ZZOTHER", sources=[PTR])])
     assert FLAG_CONFLICTING_DOCUMENT not in _draft(history=itself).coverage.eligibility_flags
 
@@ -265,7 +284,7 @@ def test_a_matching_issuer_on_file_is_not_a_conflict():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     agreeing = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id,
+        _prior(document_id="chit_other.txt", patient_id=patient_id,
                     issuer_code="MRDEB", sources=[PTR])])
     assert FLAG_CONFLICTING_DOCUMENT not in _draft(history=agreeing).coverage.eligibility_flags
 
@@ -275,7 +294,7 @@ def test_a_conflict_makes_the_coverage_partial_not_determined():
     draft = _draft(history=NoHistory())
     patient_id = draft.resolution.candidates[0].patient_id
     conflicting = FakeHistory(intakes=[
-        PriorIntake(document_id="chit_other.txt", patient_id=patient_id,
+        _prior(document_id="chit_other.txt", patient_id=patient_id,
                     issuer_code="NSTNBU", sources=[PTR])])
     assert _draft(history=conflicting).coverage.status.value == "partial"
 
@@ -283,7 +302,7 @@ def test_a_conflict_makes_the_coverage_partial_not_determined():
 def test_prior_intake_and_prior_test_require_grounding():
     """An enrichment on the card must be clickable-through exactly like an extracted field."""
     with pytest.raises(Exception):
-        PriorIntake(document_id="d", patient_id="p", sources=[{"not": "a pointer"}])
-    ok = PriorTest(canonical="chest_xray", as_printed="Chest X-Ray", document_id="d",
+        _prior(document_id="d", patient_id="p", sources=[{"not": "a pointer"}])
+    ok = _prior_test(canonical="chest_xray", as_printed="Chest X-Ray", document_id="d",
                    sources=[PTR])
     assert ok.sources[0].source_id == "chit_x.txt"

@@ -133,11 +133,18 @@ def _document_two_digit_year(day: str, month: str, year: str, *, today: dt.date)
     return f"{day}/{month}/{best.year}"
 
 
-def _document_date(record) -> Optional[tuple[dt.datetime, SourcePointer]]:
-    """When the document itself is dated, from its own grounded text — WITH its pointer.
+def _document_date(record) -> Optional[tuple[dt.datetime, SourcePointer, str]]:
+    """A date printed on the document, its pointer, and WHICH printed field it came from.
 
     The pointer comes back alongside the date because the date is also written to the node as an
     attribute, and an attribute travels with its citation or it is not written at all.
+
+    The field name comes back because the two candidates do not mean the same thing. A voucher's
+    "Valid From" and an appointment date are both dates on the letter, and neither is the date the
+    letter was *issued* — which no fixture prints at all. Recording either under `issued_at` put a
+    pointer next to a claim it does not support: the span says "appointment: 15/10/26", and the
+    attribute said the document was issued then. The value is now named after the field it was
+    actually read from.
 
     Every document node used to carry the same `_EPOCH` valid_from, which made the bi-temporal axis
     meaningless for documents ("what did we believe on 1 March?" returned everything or nothing) and
@@ -149,7 +156,8 @@ def _document_date(record) -> Optional[tuple[dt.datetime, SourcePointer]]:
     from databridge_intake.registry import DATASET_TODAY
     from databridge_intake.resolve import parse_claimed_dob
 
-    for gv in (record.authorisation.valid_from, record.authorisation.appointment_datetime):
+    for field, gv in (("valid_from", record.authorisation.valid_from),
+                      ("appointment_datetime", record.authorisation.appointment_datetime)):
         if gv is None:
             continue
         raw = gv.value
@@ -167,7 +175,7 @@ def _document_date(record) -> Optional[tuple[dt.datetime, SourcePointer]]:
         parsed = parse_claimed_dob(text)
         if parsed is not None:
             return (dt.datetime.combine(parsed, dt.time.min, tzinfo=dt.timezone.utc),
-                    _span_of(gv))
+                    _span_of(gv), field)
     return None
 
 
@@ -422,11 +430,17 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
         doc_attrs, doc_ptrs = _grounded_attrs({
             "document_type": (record.document_type.value, _span_of(record.document_type)),
             # An UNDATED document still needs a `valid_from` (the temporal axis needs an instant),
-            # but it records no `issued_at`: the fallback is our bookkeeping, not the letter's
+            # but it records no date attribute: the fallback is our bookkeeping, not the letter's
             # date, and printing it as an attribute presents a machine default as something read
             # off the page. `unresolved` then says so out loud.
-            "issued_at": (dated[0].isoformat() if dated is not None else None,
-                          dated[1] if dated is not None else None),
+            #
+            # `document_date_field` names WHICH printed field the date came from, so nothing
+            # downstream has to assume it means "issued". Both share the one pointer, and both
+            # are things that span genuinely establishes.
+            "document_date": (dated[0].isoformat() if dated is not None else None,
+                              dated[1] if dated is not None else None),
+            "document_date_field": (dated[2] if dated is not None else None,
+                                    dated[1] if dated is not None else None),
             "unresolved_count": (len(record.unresolved),
                                  _derived_ptr("count of IntakeRecord.unresolved after extraction",
                                               [doc_ptr])),
@@ -620,7 +634,12 @@ def load_clinic_seed(store: GraphStore, intakes=None, texts=None) -> dict:
     return {
         "nodes_created": after["nodes"] - before["nodes"],
         "edges_created": after["edges"] - before["edges"],
+        # Reported apart for the same reason the store counts them apart. Summing them would
+        # hide which kind grew; reporting only the entity count — as this did after the split —
+        # made the per-attribute provenance invisible in the one number the demo shows for it.
         "sources_attached": after["sources"] - before["sources"],
+        "attribute_sources_attached": (after["attribute_sources"]
+                                       - before["attribute_sources"]),
         "skipped": skipped,
     }
 

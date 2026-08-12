@@ -234,3 +234,39 @@ def test_the_snapshot_is_read_once_per_graph_generation(history, two_document_pa
         assert calls["n"] == after_first, "the snapshot was re-read despite no graph change"
     finally:
         history.store.open_nodes = original                  # type: ignore[method-assign]
+
+
+def test_the_bulk_loader_scopes_pointers_to_the_version_it_loaded():
+    """Found by codex: `_all_sources` never calls `sources_for`, so it kept pooling pointers by
+    entity id after the store stopped. It is the one path where that would have stayed invisible,
+    and it is the path on the intake critical path."""
+    import datetime as dt
+
+    from databridge_core import SourcePointer
+    from databridge_graph import GraphNode, GraphStore, NodeKind
+    from databridge_graph.clinic_history import GraphClinicHistory
+
+    utc = dt.timezone.utc
+    t0 = dt.datetime(2026, 1, 1, tzinfo=utc)
+    t1 = dt.datetime(2026, 2, 1, tzinfo=utc)
+    old = SourcePointer(source_id="v1", kind="doc_span", document_id="v1",
+                        char_start=0, char_end=2)
+    new = SourcePointer(source_id="v2", kind="doc_span", document_id="v2",
+                        char_start=0, char_end=2)
+
+    store = GraphStore()
+    store.add_node(GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="d",
+                             attrs={"document_type": "referral"},
+                             attr_sources={"document_type": old},
+                             sources=[old], valid_from=t0, system_from=t0))
+    store.replace_node(GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="d",
+                                 attrs={"document_type": "voucher"},
+                                 attr_sources={"document_type": new},
+                                 sources=[new], valid_from=t0, system_from=t1),
+                       at=t1, valid_to=t1)
+
+    snapshot = GraphClinicHistory(store)._snapshot()
+    node = snapshot.nodes["document:d"]
+    assert node.attrs["document_type"] == "voucher"
+    assert [p.source_id for p in node.sources] == ["v2"]
+    assert node.attr_sources["document_type"].source_id == "v2"

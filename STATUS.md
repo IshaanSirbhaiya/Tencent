@@ -77,26 +77,62 @@ Phase 8 `/intelligence` + agent + MCP plan, with a **parallel execution plan by 
 Landed: T-30 (bi-temporal, above), T-31 (build animation removed), T-32 (resizable ask panel),
 T-34 (query pipeline made legible), T-35 (connector/MCP nav restored).
 
+### 2026-08-12 (later) — the tree is committed, and Shape A landed in the graph
+
+**§4 item 1 done.** 14 commits on `prototype`, working tree clean. Grouped by area — docs,
+competition data, the Acme demo retirement, then one commit per package. A diff-based reviewer can
+now see `packages/intake/`, `packages/agent/`, `components/frontdesk/` and `e2e/`.
+
+**Found while committing: `packages/agent` was in neither `pythonpath` nor `testpaths`, so its
+133 tests had never run** — `test_injection.py` and `test_no_send_capability.py` among them, the
+two standing behind constraint 1 and the read/send capability boundary. They pass. But "1605
+passed" had been reported as covering the agent for as long as the package has existed. That is
+lesson 7 again: a guard whose failure mode is silence gets reported as coverage. `serve.py` has
+its own path list and a test that pins the two together, which caught the second half of this.
+
+**§4 item 2, the graph half — R-01, R-03, R-06, R-27 fixed** (`cb9a622`). Fixed at the schema
+rather than at each renderer:
+
+- `GraphNode`/`GraphEdge` carry `attr_sources` and **refuse construction** when an attribute has a
+  value and no pointer of its own. A `None` value needs none and is named by `unresolved`; a
+  pointer for an absent value is refused too, since a citation beside "not found" reads as though
+  the absence had been established.
+- The `sources` table gains `field` **and `version_pk`**. It was keyed by entity id alone, so a
+  superseded value's citation rendered beside its replacement — a pointer resolving to a span that
+  no longer says what the value says, which is exactly the kind that survives a spot check.
+- Node sheets: values render beside their own pointer, ungrounded ones move to *Unresolved*, each
+  edge renders its own evidence, and the heading claiming "every value above is traceable to one of
+  these" is gone. It was false.
+- All foreign text goes through one encoder. The old escaper handled ``[]()*_` `` and not newlines
+  or raw HTML, so a label with a blank line and `<!--` could comment out the identity caveat. The
+  caveat is now a separate trusted block emitted before any untrusted string.
+- `as_of` rewinds the whole sheet. It filtered edges only, so a replay showed today's labels.
+
+**1758 passed** (1605 + the 133 that never ran + 20 new), 5 deselected.
+
 ## Now
 
-Nothing in flight. **The entire build is still uncommitted** — one commit (`2d54aeb`), ~95 changed
-paths, branch `prototype`. Six agents' work sits in that tree with no checkpoint. This is the top
-risk and the first item below.
+Review gate running on `cb9a622`: `/code-review high` and one scoped `codex exec`, launched
+together. **Do not start the next section until both land.**
 
 ## Next — work `REMEDIATION.md` §4 top-down
 
-1. **Commit in coherent chunks.** A diff-based reviewer cannot see `packages/intake/`,
-   `packages/agent/`, `components/frontdesk/` or `e2e/` while they are untracked, so the review
-   gate itself is degraded until this lands.
-2. **Shape A — a pointer per value** (R-01, R-18, R-21, R-27, R-09). R-01 matters most: node
-   evidence sheets feed the LLM's context, so ungrounded attributes there are constraint 2 aimed
-   at the model.
-3. **Shape B — bind an attestation to its subject** (R-17, R-22). Six instances of this bug so far,
-   four fixed.
+1. ~~Commit in coherent chunks.~~ **Done.**
+2. **Shape A — the rest.** R-18 (`billing.py`: `billed_to`, `tpa_claim_required`, the total and
+   every `_line()` field behind one `source_field` string) and R-21 (`/intelligence` returns values
+   after catching a pointer-lookup failure and setting `sources = {}`). Do R-18 **together with
+   R-16**, which is the same file and the same shape pointing the other way: an all-uncatalogued
+   document shows **SGD 0** beside a non-empty `unknown_coverage_items`. R-09 belongs with the
+   agent work below — same file.
+3. **Shape B — bind an attestation to its subject** (R-17, R-22). Six instances so far, four fixed.
 4. **Shape C — guards before the guarded action** (R-12, R-19), then **R-13** (checkbox fail-closed
    — a declined test can currently be billed).
 5. **Shape E — typed agent output** (R-07…R-11). Unblocks the real agent behind `/intelligence`.
 6. Then `/intelligence` + MCPJungle, per `REMEDIATION.md` §3.
+
+**Sequencing note:** R-01, R-03 and R-06 were fixed in one pass rather than three, because all
+three live in `node_sheet.py`. The ownership rule exists to stop two tracks editing one file
+concurrently, not to force three visits to the same file.
 
 ## Known open issues
 

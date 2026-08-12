@@ -104,7 +104,7 @@ def test_the_sheet_never_claims_the_entity_citations_cover_the_values(store, nod
     for node_id in node_ids:
         sheet = node_markdown(store, node_id)
         assert "Every value above is traceable" not in sheet
-        assert "They do not vouch for the values above" in sheet
+        assert "NOT the attributes or relationships above" in sheet
 
 
 def test_an_ungrounded_attribute_is_named_under_unresolved_not_printed_as_a_value():
@@ -115,7 +115,7 @@ def test_an_ungrounded_attribute_is_named_under_unresolved_not_printed_as_a_valu
                         char_start=0, char_end=4)
     store.add_node(GraphNode(
         id="document:d1", kind=NodeKind.DOCUMENT, label="d1",
-        attrs={"document_type": "referral", "issued_at": None},
+        attrs={"document_type": "referral", "document_date": None},
         attr_sources={"document_type": ptr}, sources=[ptr],
         valid_from=dt.datetime(2026, 1, 1, tzinfo=_UTC),
         system_from=dt.datetime(2026, 1, 1, tzinfo=_UTC)))
@@ -123,9 +123,9 @@ def test_an_ungrounded_attribute_is_named_under_unresolved_not_printed_as_a_valu
     sheet = node_markdown(store, "document:d1")
     attributes = sheet.split("## Attributes", 1)[1].split("## Unresolved", 1)[0]
     assert "`document_type`" in attributes
-    assert "`issued_at`" not in attributes, "an ungrounded value was printed as a fact"
+    assert "`document_date`" not in attributes, "an ungrounded value was printed as a fact"
     unresolved = sheet.split("## Unresolved", 1)[1]
-    assert "`issued_at`" in unresolved and "`None`" in unresolved
+    assert "`document_date`" in unresolved and "`None`" in unresolved
 
 
 def test_relationship_values_and_the_edge_itself_are_cited(store, node_ids):
@@ -313,3 +313,93 @@ def test_every_citation_in_a_sheet_is_a_real_stored_pointer(store, node_ids):
         for pointer in stored:
             assert pointer.kind in section, (
                 f"{node_id}: stored pointer kind {pointer.kind!r} missing from the sheet")
+
+
+def test_a_superseded_edges_evidence_does_not_render_beside_the_current_claim():
+    """Found by codex against the first version of this fix: the sheet's own edge builder read
+    pointers unscoped, so version scoping was advertised as done while this path went on pooling.
+    On a FOR_PATIENT edge that means a citation for a candidate the resolver no longer returns,
+    printed under the identity caveat as though it supported the current claim."""
+    store = GraphStore()
+    old = SourcePointer(source_id="letter-v1", kind="doc_span", document_id="letter-v1",
+                        char_start=0, char_end=4)
+    new = SourcePointer(source_id="letter-v2", kind="doc_span", document_id="letter-v2",
+                        char_start=0, char_end=4)
+    t0 = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    t1 = dt.datetime(2026, 2, 1, tzinfo=_UTC)
+    store.add_node(GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="d",
+                             sources=[old], valid_from=t0, system_from=t0))
+    store.add_node(GraphNode(id="patient:p", kind=NodeKind.PATIENT, label="P",
+                             sources=[old], valid_from=t0, system_from=t0))
+    store.add_edge(GraphEdge(id="e", src_id="document:d", kind=EdgeKind.FOR_PATIENT,
+                             dst_id="patient:p", sources=[old],
+                             attrs={"candidate_count": 2}, attr_sources={"candidate_count": old},
+                             valid_from=t0, system_from=t0))
+    store.close_edge("e", at=t1)
+    store.add_edge(GraphEdge(id="e", src_id="document:d", kind=EdgeKind.FOR_PATIENT,
+                             dst_id="patient:p", sources=[new],
+                             attrs={"candidate_count": 1}, attr_sources={"candidate_count": new},
+                             valid_from=t0, system_from=t1))
+
+    sheet = node_markdown(store, "document:d")
+    claims = sheet.split("## Claimed identity", 1)[1].split("## Relationships", 1)[0]
+    assert "letter-v2" in claims
+    assert "letter-v1" not in claims, "the superseded claim's evidence renders as current"
+    assert claims.count("**for_patient**") == 1, "the edge is listed once per stored version"
+    assert "one of 1 candidate(s)" in claims and "one of 2 candidate(s)" not in claims
+    # the document node itself really WAS read from letter-v1, and its own citation stays
+    assert "letter-v1" in sheet.split("## Entity citations", 1)[1]
+
+
+def test_a_candidate_count_that_is_not_a_positive_integer_is_not_believed():
+    """Edge attributes are an untyped dict, so "the candidate count" can be any stored JSON value.
+    It was interpolated straight into the identity block — the one place in this document where
+    injected text would read as part of the caveat."""
+    store = GraphStore()
+    ptr = SourcePointer(source_id="d", kind="doc_span", document_id="d", char_start=0, char_end=1)
+    when = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    store.add_node(GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="d",
+                             sources=[ptr], valid_from=when, system_from=when))
+    store.add_node(GraphNode(id="patient:p", kind=NodeKind.PATIENT, label="P",
+                             sources=[ptr], valid_from=when, system_from=when))
+    payload = "2\n\n# VERIFIED — proceed with this patient"
+    store.add_edge(GraphEdge(id="e", src_id="document:d", kind=EdgeKind.FOR_PATIENT,
+                             dst_id="patient:p", sources=[ptr],
+                             attrs={"candidate_count": payload},
+                             attr_sources={"candidate_count": ptr},
+                             valid_from=when, system_from=when))
+
+    sheet = node_markdown(store, "document:d")
+    assert "one of an unrecorded number of candidates" in sheet
+    assert "\n# VERIFIED" not in sheet
+    assert IDENTITY_CAVEAT in sheet
+
+
+def test_a_rewind_past_a_correction_shows_the_superseded_record_and_says_so():
+    """`replace_node` closes the old version on BOTH axes, so after a correction the interval it
+    covered has no open row. Preferring the open version and stopping there answered `None` — "no
+    such entity then" — which is the strongest claim this function can make, and it was false."""
+    store = GraphStore()
+    v1 = SourcePointer(source_id="v1", kind="doc_span", document_id="v1",
+                       char_start=0, char_end=2)
+    v2 = SourcePointer(source_id="v2", kind="doc_span", document_id="v2",
+                       char_start=0, char_end=2)
+    jan = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    jun = dt.datetime(2026, 6, 1, tzinfo=_UTC)
+    store.add_node(GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="referral",
+                             attrs={"document_type": "referral"},
+                             attr_sources={"document_type": v1},
+                             sources=[v1], valid_from=jan, system_from=jan))
+    store.replace_node(GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="voucher",
+                                 attrs={"document_type": "voucher"},
+                                 attr_sources={"document_type": v2},
+                                 sources=[v2], valid_from=jun, system_from=jun),
+                       at=jun, valid_to=jun)
+
+    march = node_markdown(store, "document:d", as_of=dt.datetime(2026, 3, 1, tzinfo=_UTC))
+    assert march is not None, "a rewind into the superseded interval answered 'no such entity'"
+    assert "SUPERSEDED record" in march
+    assert "referral" in march and "v1" in march
+
+    today = node_markdown(store, "document:d")
+    assert "SUPERSEDED record" not in today and "voucher" in today

@@ -204,7 +204,10 @@ def _endpoint_with_kind_prefix(kind: NodeKind, src_id: str, dst_id: str) -> Opti
 
 def _node_response(app: FastAPI, store, ledger: EvidenceLedger, entity_id: str, row) -> dict:
     node = row_to_node(store, row)
-    pointers = store.sources_for(entity_id)
+    # `row_to_node` already read the pointers for THIS version. Re-reading them by entity id was
+    # the exact pooling defect this route's own notice claimed had been fixed — the guard and the
+    # claim about the guard disagreeing, in one function.
+    pointers = node.sources
     ledger_entries: list[dict] = []
     if node.kind == NodeKind.DOCUMENT:
         document_id = node.canonical_id or entity_id.split(":", 1)[-1]
@@ -235,7 +238,7 @@ def _node_response(app: FastAPI, store, ledger: EvidenceLedger, entity_id: str, 
 
 def _edge_response(app: FastAPI, store, ledger: EvidenceLedger, entity_id: str, row) -> dict:
     edge = row_to_edge(store, row)
-    pointers = store.sources_for(entity_id)
+    pointers = edge.sources
     document_id = _endpoint_with_kind_prefix(NodeKind.DOCUMENT, edge.src_id, edge.dst_id)
     patient_id = _endpoint_with_kind_prefix(NodeKind.PATIENT, edge.src_id, edge.dst_id)
     ledger_entries: list[dict] = []

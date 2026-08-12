@@ -228,34 +228,56 @@ def _candidate_phrase(edge: GraphEdge) -> str:
     sound more certain.
     """
     count = edge.attrs.get("candidate_count")
-    if count and edge.attr_sources.get("candidate_count") is not None:
-        return f"one of {count} candidate(s)"
+    # Edge attributes are an untyped dict, so "the candidate count" can be any JSON value that
+    # was stored under that key — including a string carrying newlines, a heading or model
+    # instructions. It was interpolated straight into the identity block, which is the one place
+    # in this document where injected text would be read as part of the caveat. It must be a
+    # positive integer to be believed at all, and it is encoded regardless.
+    if (isinstance(count, int) and not isinstance(count, bool) and count > 0
+            and edge.attr_sources.get("candidate_count") is not None):
+        return f"one of {_text(count)} candidate(s)"
     return "one of an unrecorded number of candidates"
 
 
-def _node_at(store, entity_id: str, as_of: Optional[dt.datetime]) -> Optional[GraphNode]:
-    """The version of ``entity_id`` valid at ``as_of`` — or the open one when ``as_of`` is None.
+def _node_at(store, entity_id: str,
+             as_of: Optional[dt.datetime]) -> tuple[Optional[GraphNode], bool]:
+    """The version of ``entity_id`` valid at ``as_of``, and whether that is a superseded belief.
 
     ``as_of`` used to filter edges only, so rewinding the sheet still showed the subject's and
     every endpoint's CURRENT label and attributes: a replay that leaks the present is not a
-    replay. Belief is read as of now (`system_to IS NULL`) — the question the slider asks is
-    "what was true then", answered with everything we know today.
+    replay.
+
+    Preferring the open version is right, but *only* preferring it opened a hole. `replace_node`
+    closes the old version on BOTH axes, so after a correction the interval the old version
+    covered has no open row at all: a rewind to March finds v1 system-closed and v2 not yet
+    valid, and answers `None` — "there was no such entity then", which is false and is the
+    strongest thing this function can say. The honest answer is the superseded record, returned
+    with a flag so the sheet can label it as a belief we no longer hold rather than passing it
+    off as current.
     """
     from .store import row_to_node
 
     if as_of is None:
         row = store.open_node_row(entity_id)
-        return row_to_node(store, row) if row is not None else None
-    for row in reversed(store.all_node_versions(entity_id)):
-        if row["system_to"] is not None:
-            continue                       # superseded belief, not what we hold today
+        return (row_to_node(store, row) if row is not None else None), False
+
+    def covers(row) -> bool:
         valid_from, valid_to = _parse(row["valid_from"]), _parse(row["valid_to"])
         if valid_from is not None and valid_from > as_of:
-            continue
-        if valid_to is not None and valid_to <= as_of:
-            continue
-        return row_to_node(store, row)
-    return None
+            return False
+        return not (valid_to is not None and valid_to <= as_of)
+
+    versions = store.all_node_versions(entity_id)
+    for row in reversed(versions):
+        if row["system_to"] is None and covers(row):
+            return row_to_node(store, row), False
+    # No belief we still hold covers that instant. Fall back to the most recently superseded
+    # record that does — latest system_from wins, because that was our last word on the matter.
+    superseded = [r for r in versions if r["system_to"] is not None and covers(r)]
+    if superseded:
+        best = max(superseded, key=lambda r: (r["system_from"], r["rowid_pk"]))
+        return row_to_node(store, best), True
+    return None, False
 
 
 def node_markdown(store,
@@ -268,7 +290,7 @@ def node_markdown(store,
     so it answers "what did we know about this entity on that day?" rather than showing today's
     node wearing that day's edges.
     """
-    node = _node_at(store, node_id, as_of)
+    node, superseded = _node_at(store, node_id, as_of)
     if node is None:
         return None
 
@@ -279,8 +301,15 @@ def node_markdown(store,
     ]
     if node.canonical_id:
         lines.append(f"**Canonical id:** {_code(node.canonical_id)}")
+    lines.append("_Title, id and canonical id are grounded by the entity citations at the foot of "
+                 "this sheet. Everything else carries its own citation inline._")
     if as_of is not None:
         lines.append(f"**Shown as of:** {_fmt_time(as_of)} (valid time; belief as held today)")
+    if superseded:
+        lines.append(
+            "**This is a SUPERSEDED record.** A later correction replaced it, so nothing here is "
+            "a belief the clinic currently holds. It is shown because it is what was on file at "
+            "the instant requested.")
     lines += [
         f"**Known from:** {_fmt_time(node.valid_from)}"
         + (f" until {_fmt_time(node.valid_to)}" if node.valid_to else " (still current)"),
@@ -304,6 +333,12 @@ def node_markdown(store,
     claims: list[str] = []
     relations: list[str] = []
     for edge_row in store.edges_touching(node.id):
+        if edge_row["system_to"] is not None:
+            # A SUPERSEDED belief, not a relationship. `edges_touching` returns every version of
+            # every edge, so without this the sheet listed an edge twice — once as it used to be
+            # and once as it is — and the reader had no way to tell which was which. Belief is
+            # read as of now; `as_of` below rewinds valid time, which is the other axis.
+            continue
         edge = _edge_from_row(store, edge_row)
         if as_of is not None:
             start, end = edge.valid_from, edge.valid_to
@@ -311,7 +346,7 @@ def node_markdown(store,
                 continue
         outgoing = edge.src_id == node.id
         other_id = edge.dst_id if outgoing else edge.src_id
-        other = _node_at(store, other_id, as_of)
+        other, _ = _node_at(store, other_id, as_of)
         if other is None:
             # The endpoint did not exist at this instant. Rendering its current label here is
             # exactly the leak `as_of` is supposed to prevent, so the id stands alone.
@@ -336,8 +371,9 @@ def node_markdown(store,
     lines += [
         "",
         "## Entity citations",
-        f"_{len(node.sources)} citation(s) for the EXISTENCE of this node — that it was read from "
-        f"somewhere. They do not vouch for the values above; each of those carries its own._",
+        f"_{len(node.sources)} citation(s) for this node's IDENTITY — that it exists, and that it "
+        f"is the thing named in the title. They ground the title, the id and the canonical id, "
+        f"and NOT the attributes or relationships above: each of those carries its own._",
         "",
     ]
     lines += [_fmt_pointer(p) for p in node.sources] or ["_None._"]
@@ -345,12 +381,16 @@ def node_markdown(store,
 
 
 def _edge_from_row(store, row) -> GraphEdge:
+    # Pointers for THIS version of the edge. Reading them unscoped puts a superseded claim's
+    # evidence beside the current one — on a FOR_PATIENT edge that means a citation for a
+    # candidate the resolver no longer returns, under the identity caveat.
+    version = row["rowid_pk"]
     return GraphEdge(
         id=row["id"], src_id=row["src_id"], dst_id=row["dst_id"],
         kind=EdgeKind(row["kind"]), weight=row["weight"],
         attrs=json.loads(row["attrs_json"] or "{}"),
-        attr_sources=store.attr_sources_for(row["id"]),
-        sources=store.sources_for(row["id"]),
+        attr_sources=store.attr_sources_for(row["id"], version_pk=version),
+        sources=store.sources_for(row["id"], version_pk=version),
         valid_from=_parse(row["valid_from"]), valid_to=_parse(row["valid_to"]),
         system_from=_parse(row["system_from"]))
 

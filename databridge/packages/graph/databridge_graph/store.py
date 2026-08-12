@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS sources (
     version_pk         INTEGER,
     source_pointer_json TEXT NOT NULL
 );
+"""
+
+# Indexes are created SEPARATELY, after `_migrate()`. Two of them name columns that a store
+# written by an earlier version does not have, and `CREATE TABLE IF NOT EXISTS` will not add
+# them — so running these inside `_SCHEMA` fails with "no such column" on exactly the legacy
+# store the migration exists to rescue, before the migration has had a chance to run.
+_INDEXES = """
 CREATE INDEX IF NOT EXISTS ix_nodes_id ON nodes(id);
 CREATE INDEX IF NOT EXISTS ix_nodes_canon ON nodes(canonical_id);
 CREATE INDEX IF NOT EXISTS ix_edges_src ON edges(src_id);
@@ -112,6 +119,7 @@ class GraphStore:
         self._lock = threading.RLock()
         self.conn.executescript(_SCHEMA)
         self._migrate()
+        self.conn.executescript(_INDEXES)
         self.conn.commit()
         # injectable clock → deterministic system_time in tests / reproducible demo seed.
         self._clock = clock or (lambda: datetime.now(timezone.utc))
@@ -126,18 +134,68 @@ class GraphStore:
         have = {r["name"] for r in self.conn.execute("PRAGMA table_info(sources)")}
         if not have:
             return
+        added = False
         if "field" not in have:
             self.conn.execute("ALTER TABLE sources ADD COLUMN field TEXT")
+            added = True
         if "version_pk" not in have:
             self.conn.execute("ALTER TABLE sources ADD COLUMN version_pk INTEGER")
+            added = True
+        if added:
+            self._retire_ungrounded_legacy_attrs()
+
+    def _retire_ungrounded_legacy_attrs(self) -> None:
+        """Blank any stored attribute the old schema had no way to cite.
+
+        A store written before per-attribute pointers existed holds values with entity-level
+        citations only. Adding the columns lets that store be WRITTEN to again, but not read: the
+        grounding wall refuses every one of those nodes, so the migration rescued a database
+        nobody can open.
+
+        The rule the rest of the codebase already follows decides this. A value that cannot be
+        cited is not a value — it becomes `None`, and `unresolved` names it. Doing that once,
+        here, at the moment of upgrade, is visible and explainable. Doing it in the reader would
+        hide the same defect in freshly written stores, where it would be a real bug.
+        """
+        for table in ("nodes", "edges"):
+            rows = self.conn.execute(
+                f"SELECT rowid_pk, id, attrs_json FROM {table}").fetchall()
+            for row in rows:
+                attrs = json.loads(row["attrs_json"] or "{}")
+                if not attrs:
+                    continue
+                cited = {r["field"] for r in self.conn.execute(
+                    "SELECT field FROM sources WHERE entity_id = ? AND field IS NOT NULL",
+                    (row["id"],))}
+                retired = {k: (v if k in cited else None) for k, v in attrs.items()}
+                if retired != attrs:
+                    self.conn.execute(
+                        f"UPDATE {table} SET attrs_json = ? WHERE rowid_pk = ?",
+                        (json.dumps(retired, sort_keys=True, default=str), row["rowid_pk"]))
 
     def now(self) -> datetime:
         return self._clock()
 
     # -- writes ------------------------------------------------------------------
+    @staticmethod
+    def _recheck_grounding(entity) -> None:
+        """Re-run the per-attribute wall at the store boundary.
+
+        `ConfigDict(frozen=True)` freezes the pydantic model's ATTRIBUTES, not the dictionaries
+        they point at: `node.attrs["sex"] = "M"` and `del node.attr_sources["sex"]` both succeed
+        on a "frozen" node that passed validation. A wall that only fires at construction is
+        therefore not a wall at all for anything held across a few statements — and the store is
+        the last place a value can be stopped before it is durable.
+        """
+        from .schema import _attrs_are_grounded
+
+        _attrs_are_grounded(entity.attrs, entity.attr_sources, f"{type(entity).__name__} "
+                                                               f"{entity.id!r}")
+
     def add_node(self, node: GraphNode) -> None:
         if not node.sources:                              # defence-in-depth (P4)
             raise ValueError(f"node {node.id!r} REFUSED: no SourcePointer")
+        self._recheck_grounding(node)
         with self._lock:
             cur = self.conn.execute(
                 "INSERT INTO nodes(id, kind, label, canonical_id, attrs_json, valid_from, valid_to,"
@@ -152,6 +210,7 @@ class GraphStore:
     def add_edge(self, edge: GraphEdge) -> None:
         if not edge.sources:
             raise ValueError(f"edge {edge.id!r} REFUSED: no SourcePointer")
+        self._recheck_grounding(edge)
         with self._lock:
             cur = self.conn.execute(
                 "INSERT INTO edges(id, src_id, dst_id, kind, weight, attrs_json, valid_from, valid_to,"
@@ -184,11 +243,16 @@ class GraphStore:
         if not sources:
             return
         with self._lock:
-            row = self.conn.execute(
-                "SELECT rowid_pk FROM nodes WHERE id = ? AND system_to IS NULL "
-                "UNION ALL SELECT rowid_pk FROM edges WHERE id = ? AND system_to IS NULL",
-                (entity_id, entity_id)).fetchone()
-            self._attach_sources(entity_id, sources, None, row["rowid_pk"] if row else None)
+            version_pk = self._open_version_pk(entity_id)
+            if version_pk is None:
+                # REFUSE rather than write `version_pk = NULL`. NULL means "written before
+                # versions were distinguished" and is read as applying to every version, so an
+                # orphan here would lie in wait and attach itself to the next entity created with
+                # this id — corroboration for a record it never saw.
+                raise ValueError(
+                    f"append_sources REFUSED: {entity_id!r} has no open version to corroborate. "
+                    f"A pointer with no version would apply to every future version of this id.")
+            self._attach_sources(entity_id, sources, None, version_pk)
             self.conn.commit()
 
     def close_node(self, entity_id: str, *, at: datetime, valid_to: Optional[datetime] = None) -> int:
@@ -215,11 +279,22 @@ class GraphStore:
         zero open versions (the torn 'no current belief' window). Returns rows closed."""
         if not node.sources:
             raise ValueError(f"node {node.id!r} REFUSED: no SourcePointer")
+        self._recheck_grounding(node)
         with self._lock:
             cur = self.conn.execute(
                 "UPDATE nodes SET system_to = ?, valid_to = COALESCE(valid_to, ?) "
                 "WHERE id = ? AND system_to IS NULL", (_iso(at), _iso(valid_to), node.id))
             closed = cur.rowcount
+            if closed != 1:
+                # Supersession means "this replaces exactly one open belief". Zero means there
+                # was nothing to replace (this is an insert wearing the wrong name); more than
+                # one means the store already held a torn entity. The caller's `assert` ran
+                # AFTER the commit and vanishes under `python -O`, so it never protected
+                # anything — the transaction has to refuse itself.
+                self.conn.rollback()
+                raise ValueError(
+                    f"replace_node REFUSED: {node.id!r} had {closed} open versions, expected "
+                    f"exactly 1. Nothing was written.")
             inserted = self.conn.execute(
                 "INSERT INTO nodes(id, kind, label, canonical_id, attrs_json, valid_from, valid_to,"
                 " system_from, system_to) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -268,41 +343,72 @@ class GraphStore:
             "SELECT * FROM nodes WHERE kind = ? AND system_to IS NULL ORDER BY rowid_pk",
             (kind.value,))
 
+    def _open_version_pk(self, entity_id: str) -> Optional[int]:
+        """The rowid of the version believed NOW, for either table.
+
+        `ORDER BY rowid_pk DESC` matters and its absence was a real defect: an unordered
+        `UNION ALL … fetchone` returns the LOWEST rowid, while every renderer reads through
+        `open_node_row`, which takes the highest. An id with more than one open row — which the
+        store permits and `add_node` does not prevent — then cited one version while displaying
+        another, and corroboration attached to the version nobody looks at.
+        """
+        row = self.fetchone(
+            "SELECT rowid_pk FROM ("
+            " SELECT rowid_pk FROM nodes WHERE id = ? AND system_to IS NULL"
+            " UNION ALL SELECT rowid_pk FROM edges WHERE id = ? AND system_to IS NULL"
+            ") ORDER BY rowid_pk DESC LIMIT 1",
+            (entity_id, entity_id))
+        return row["rowid_pk"] if row is not None else None
+
     def _pointers(self, entity_id: str, *, field_is_null: bool,
-                  version_pk: Optional[int]) -> list:
+                  version_pk: Optional[int], all_versions: bool) -> list:
         sql = ("SELECT field, source_pointer_json FROM sources WHERE entity_id = ? AND field IS "
                + ("NULL" if field_is_null else "NOT NULL"))
         params: tuple = (entity_id,)
-        if version_pk is not None:
-            # A pointer written before `version_pk` existed (NULL) is kept: it was attached to
-            # this entity at a time when versions were not distinguished, and dropping it would
-            # silently remove real provenance from an upgraded store.
-            sql += " AND (version_pk = ? OR version_pk IS NULL)"
-            params += (version_pk,)
+        if not all_versions:
+            # SCOPING IS THE DEFAULT, and that is the point. Making it opt-in put the burden on
+            # every call site to remember, and two of them promptly did not: the evidence sheet's
+            # edge builder and the clinic-history bulk loader both went on pooling pointers across
+            # versions while the store advertised the defect as fixed. A safety property that has
+            # to be requested is a safety property that will be missed somewhere.
+            if version_pk is None:
+                version_pk = self._open_version_pk(entity_id)
+            if version_pk is None:
+                # Nothing open: an entity fully closed on the system axis. Its pointers are still
+                # reachable through `all_versions=True`, which an audit path asks for explicitly.
+                sql += " AND version_pk IS NULL"
+            else:
+                # A pointer written before `version_pk` existed (NULL) is kept: it was attached to
+                # this entity at a time when versions were not distinguished, and dropping it
+                # would silently remove real provenance from an upgraded store.
+                sql += " AND (version_pk = ? OR version_pk IS NULL)"
+                params += (version_pk,)
         rows = self.fetchall(sql, params)
         if field_is_null:
             return [SourcePointer.model_validate_json(r["source_pointer_json"]) for r in rows]
         return {r["field"]: SourcePointer.model_validate_json(r["source_pointer_json"])
                 for r in rows}
 
-    def sources_for(self, entity_id: str,
-                    *, version_pk: Optional[int] = None) -> list[SourcePointer]:
+    def sources_for(self, entity_id: str, *, version_pk: Optional[int] = None,
+                    all_versions: bool = False) -> list[SourcePointer]:
         """Pointers grounding the ENTITY itself — deliberately NOT the per-attribute ones.
 
         Mixing the two produces the laundering this schema exists to prevent: a longer citation
         list under one heading, from which a reader (or a model) infers that every value shown
         was cited. Per-attribute pointers come back keyed, from `attr_sources_for`.
 
-        ``version_pk`` scopes the answer to ONE bi-temporal version. Without it the result is
-        every pointer ever attached to this id, which is what made a superseded value's citation
-        appear beside its replacement.
+        The answer is scoped to ONE bi-temporal version: the one named by ``version_pk``, or the
+        version open now. Pooling across versions is what made a superseded value's citation
+        appear beside its replacement, and is available only by asking for ``all_versions``.
         """
-        return self._pointers(entity_id, field_is_null=True, version_pk=version_pk)
+        return self._pointers(entity_id, field_is_null=True, version_pk=version_pk,
+                              all_versions=all_versions)
 
-    def attr_sources_for(self, entity_id: str,
-                         *, version_pk: Optional[int] = None) -> dict[str, SourcePointer]:
-        """``{attribute: pointer}``, scoped to one version when ``version_pk`` is given."""
-        return self._pointers(entity_id, field_is_null=False, version_pk=version_pk)
+    def attr_sources_for(self, entity_id: str, *, version_pk: Optional[int] = None,
+                         all_versions: bool = False) -> dict[str, SourcePointer]:
+        """``{attribute: pointer}`` for one version — the named one, or the version open now."""
+        return self._pointers(entity_id, field_is_null=False, version_pk=version_pk,
+                              all_versions=all_versions)
 
     def all_node_versions(self, entity_id: str) -> list[sqlite3.Row]:
         return self.fetchall(
@@ -333,9 +439,8 @@ class GraphStore:
 def _version_of(row) -> Optional[int]:
     """The bi-temporal version a row IS, so its pointers are read for that version alone.
 
-    A row that arrived without `rowid_pk` selected (`SELECT id, label ...`) falls back to the
-    unscoped read rather than silently returning no citations — an entity that renders with an
-    empty Sources list reads as ungrounded, which is a worse lie than an over-broad list.
+    A row selected without `rowid_pk` returns None, which the store reads as "scope to whatever
+    is open" — not as "pool everything". The unsafe reading has to be asked for by name.
     """
     try:
         return row["rowid_pk"]

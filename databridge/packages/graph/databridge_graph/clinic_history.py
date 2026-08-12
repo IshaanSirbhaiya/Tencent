@@ -160,16 +160,32 @@ class GraphClinicHistory:
         """
         from databridge_core import SourcePointer
 
-        entity: dict[str, list] = {}
-        per_attr: dict[str, dict] = {}
+        entity: dict[tuple, list] = {}
+        per_attr: dict[tuple, dict] = {}
         for row in self.store.fetchall(
-                "SELECT entity_id, field, source_pointer_json FROM sources"):
+                "SELECT entity_id, field, version_pk, source_pointer_json FROM sources"):
             pointer = SourcePointer.model_validate_json(row["source_pointer_json"])
+            # Keyed by (entity, version). Keying by entity alone pools every pointer ever
+            # attached to that id, which is the defect `version_pk` exists to close — and this
+            # bulk loader is the one path that would have gone on doing it invisibly, because it
+            # never calls `sources_for` at all.
+            key = (row["entity_id"], row["version_pk"])
             if row["field"] is None:
-                entity.setdefault(row["entity_id"], []).append(pointer)
+                entity.setdefault(key, []).append(pointer)
             else:
-                per_attr.setdefault(row["entity_id"], {})[row["field"]] = pointer
+                per_attr.setdefault(key, {})[row["field"]] = pointer
         return entity, per_attr
+
+    @staticmethod
+    def _for_version(index: dict, row, empty):
+        """This row's pointers, plus any written before versions were distinguished (NULL)."""
+        own = index.get((row["id"], row["rowid_pk"]))
+        legacy = index.get((row["id"], None))
+        if own is None and legacy is None:
+            return empty
+        if isinstance(empty, dict):
+            return {**(legacy or {}), **(own or {})}
+        return [*(legacy or []), *(own or [])]
 
     def _snapshot(self) -> _Snapshot:
         """One read per graph generation, reused across candidates.
@@ -185,9 +201,11 @@ class GraphClinicHistory:
             return self._cache[1]
 
         sources, attr_sources = self._all_sources()
-        nodes = {r["id"]: _node_from(r, sources.get(r["id"], []), attr_sources.get(r["id"], {}))
+        nodes = {r["id"]: _node_from(r, self._for_version(sources, r, []),
+                                     self._for_version(attr_sources, r, {}))
                  for r in self.store.open_nodes()}
-        edges = [_edge_from(r, sources.get(r["id"], []), attr_sources.get(r["id"], {}))
+        edges = [_edge_from(r, self._for_version(sources, r, []),
+                            self._for_version(attr_sources, r, {}))
                  for r in self.store.open_edges()]
         snapshot = _Snapshot(nodes, edges)
         self._cache = (key, snapshot)
@@ -204,7 +222,7 @@ class GraphClinicHistory:
         return doc.canonical_id or doc.label
 
     def _package_code_for(self, snap: _Snapshot,
-                          doc: GraphNode) -> tuple[Optional[str], list]:
+                          doc: GraphNode) -> tuple[Optional[str], list, object]:
         """The package this document authorises, and the pointers proving it.
 
         Handles BOTH shapes the vocabulary allows: document → coverage_rule → package (what
@@ -217,20 +235,27 @@ class GraphClinicHistory:
             if dst is None:
                 continue
             if dst.kind is NodeKind.PACKAGE:
-                return (dst.canonical_id or dst.label), [*edge.sources, *dst.sources]
+                # The PACKAGE node's own citation IS the package_code cell it was built from, so
+                # it grounds the value and not merely the node's existence.
+                own = dst.sources[0] if dst.sources else None
+                return (dst.canonical_id or dst.label), [*edge.sources, *dst.sources], own
             if dst.kind is NodeKind.COVERAGE_RULE:
                 code = dst.attrs.get("package_code")
                 sources = [*edge.sources, *dst.sources]
                 if code:
-                    return str(code), sources
+                    # The rule node carries a pointer for this attribute specifically. Citing
+                    # `dst.sources` here would offer the pointer that proves the RULE exists as
+                    # evidence for which package it names.
+                    return str(code), sources, dst.attr_sources.get("package_code")
                 # A document-defined rule names no package; still cite the rule we walked to.
                 for pkg_id, pkg_edge in snap.rule_package.get(dst_id, []):
                     pkg = snap.nodes.get(pkg_id)
                     if pkg is not None and pkg.kind is NodeKind.PACKAGE:
-                        return (pkg.canonical_id or pkg.label), [
-                            *sources, *pkg_edge.sources, *pkg.sources]
-                return None, sources
-        return None, []
+                        return ((pkg.canonical_id or pkg.label),
+                                [*sources, *pkg_edge.sources, *pkg.sources],
+                                pkg.sources[0] if pkg.sources else None)
+                return None, sources, None
+        return None, [], None
 
     # -- the port ------------------------------------------------------------------
     def prior_intakes_for(self, patient_id: str) -> list[PriorIntake]:
@@ -257,6 +282,7 @@ class GraphClinicHistory:
                 continue
 
             issuer_code: Optional[str] = None
+            issuer_pointer = None
             sources = [*claim.sources, *doc.sources]
             issued = snap.issued_by.get(doc.id)
             if issued is not None:
@@ -265,8 +291,15 @@ class GraphClinicHistory:
                     issuer_code = issuer_node.canonical_id
                     # The EDGE first: it is what proves this document came from this insurer.
                     sources += [*issued[1].sources, *issuer_node.sources]
+                    # ...but the VALUE is the issuer's code, and the ORG node carries a pointer
+                    # for that attribute specifically. `issuer_node.sources` proves the insurer
+                    # exists; offering it as evidence for the code is the pooled-list mistake in
+                    # miniature. Fall back to the ISSUED edge, which at least ties this document
+                    # to this issuer, and never to the node's mere existence.
+                    issuer_pointer = (issuer_node.attr_sources.get("issuer_code")
+                                      or (issued[1].sources[0] if issued[1].sources else None))
 
-            package_code, package_sources = self._package_code_for(snap, doc)
+            package_code, package_sources, package_pointer = self._package_code_for(snap, doc)
             sources += package_sources
 
             if not sources:
@@ -274,14 +307,43 @@ class GraphClinicHistory:
                 # path is not evidence, so it is dropped rather than reported.
                 continue
 
+            # A value whose own pointer could not be found is NOT reported. `_Grounded` refuses
+            # it anyway; dropping it here makes the reason explicit and keeps the rest of the
+            # prior intake usable rather than losing the whole row.
+            seen_at = _aware(doc.valid_from)
+            seen_at_pointer = doc.attr_sources.get("document_date")
+            candidate_count = claim.attrs.get("candidate_count")
+            candidate_pointer = claim.attr_sources.get("candidate_count")
+            field_sources = {
+                "document_id": doc.sources[0],
+                "patient_id": claim.sources[0],
+            }
+            if issuer_code is not None and issuer_pointer is not None:
+                field_sources["issuer_code"] = issuer_pointer
+            else:
+                issuer_code = None
+            if package_code is not None and package_pointer is not None:
+                field_sources["package_code"] = package_pointer
+            else:
+                package_code = None
+            if seen_at is not None and seen_at_pointer is not None:
+                field_sources["seen_at"] = seen_at_pointer
+            else:
+                seen_at = None
+            if candidate_count is not None and candidate_pointer is not None:
+                field_sources["candidate_count"] = candidate_pointer
+            else:
+                candidate_count = None
+
             out.append(PriorIntake(
                 document_id=document_id,
                 patient_id=patient_id,
                 issuer_code=issuer_code,
                 package_code=package_code,
-                seen_at=_aware(doc.valid_from),
-                candidate_count=claim.attrs.get("candidate_count"),
-                sources=sources))
+                seen_at=seen_at,
+                candidate_count=candidate_count,
+                sources=sources,
+                field_sources=field_sources))
 
         out.sort(key=lambda p: (_aware(p.seen_at) or _EPOCH, p.document_id), reverse=True)
         return out
@@ -323,13 +385,27 @@ class GraphClinicHistory:
             sources = [*claim.sources, *doc.sources, *test.sources, *path]
             if not sources:
                 return
+            # `path` is the REQUESTS_TEST edge's own evidence — the span on the document where
+            # this test is printed. That is the pointer for both the canonical name and the
+            # printed text, and it is a stronger citation than the catalogue node's existence.
+            printed = path[0] if path else (test.sources[0] if test.sources else None)
+            when_pointer = doc.attr_sources.get("document_date")
+            fields = {"canonical": printed, "as_printed": printed,
+                      "document_id": doc.sources[0]}
+            if when is not None and when_pointer is not None:
+                fields["performed_at"] = when_pointer
+            else:
+                when = None
+            if printed is None:
+                return
             seen.add(key)
             out.append(PriorTest(
                 canonical=test.canonical_id or test.id.split(":", 1)[-1],
                 as_printed=test.label,
                 document_id=document_id,
                 performed_at=when,
-                sources=sources))
+                sources=sources,
+                field_sources=fields))
 
         for e in snap.edges:
             if e.kind is EdgeKind.REQUESTS_TEST and e.src_id in claims:

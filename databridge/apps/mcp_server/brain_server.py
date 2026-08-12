@@ -36,15 +36,28 @@ from databridge_graph.clinic_seed import SEED_SYSTEM_TIME, load_clinic_seed
 
 
 # --- serialisation (graph → JSON the React Flow UI / agents consume) --------------
+
+def pointer_to_dict(p) -> dict:
+    return p.model_dump(mode="json", exclude_none=True)
+
+
 def node_to_dict(node) -> dict:
     return {
         "id": node.id, "kind": node.kind.value, "label": node.label,
         "canonical_id": node.canonical_id, "attrs": node.attrs,
+        # A COUNT of entity citations beside a dict of N values is the pooled-citation shape in
+        # its purest form: it reads as "3 citations back these 4 values" and cannot be checked,
+        # because a count names nothing. This payload is consumed by a model, so it gets the same
+        # treatment the node sheet and /evidence got — a pointer per value, and the unanswered
+        # fields named rather than omitted.
+        "attribute_sources": {k: pointer_to_dict(v) for k, v in node.attr_sources.items()},
+        "unresolved": node.unresolved,
         "valid_from": node.valid_from.isoformat() if node.valid_from else None,
         "valid_to": node.valid_to.isoformat() if node.valid_to else None,
         "system_from": node.system_from.isoformat() if node.system_from else None,
         "system_to": node.system_to.isoformat() if node.system_to else None,
         "n_sources": len(node.sources),
+        "sources_ground": "the identity of this node — not the values in `attrs`",
     }
 
 
@@ -52,14 +65,12 @@ def edge_to_dict(edge) -> dict:
     return {
         "id": edge.id, "source": edge.src_id, "target": edge.dst_id,
         "kind": edge.kind.value, "weight": edge.weight, "attrs": edge.attrs,
+        "attribute_sources": {k: pointer_to_dict(v) for k, v in edge.attr_sources.items()},
+        "unresolved": edge.unresolved,
         "valid_from": edge.valid_from.isoformat() if edge.valid_from else None,
         "valid_to": edge.valid_to.isoformat() if edge.valid_to else None,
         "n_sources": len(edge.sources),
     }
-
-
-def pointer_to_dict(p) -> dict:
-    return p.model_dump(mode="json", exclude_none=True)
 
 
 def answer_to_dict(a: GroundedAnswer) -> dict:

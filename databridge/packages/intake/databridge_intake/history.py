@@ -40,7 +40,15 @@ class _Grounded(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    # The pointers for the PATH this result was traversed from — that the walk happened and
+    # reached these entities. They ground the RESULT, not the individual values on it.
     sources: list[SourcePointer] = Field(default_factory=list)
+    # The pointer for each value, by field name. `sources` is a pooled list, so a reader given
+    # only that list can take any pointer in it as supporting any value on the object — an
+    # `issuer_code` read from a node attribute, cited by the pointer that proves the node exists.
+    # These reach the front-desk card, where a wrong value with a valid citation is the worst
+    # outcome available (CLAUDE.md §Hard constraints 2).
+    field_sources: dict[str, SourcePointer] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _must_be_grounded(self) -> "_Grounded":
@@ -48,7 +56,17 @@ class _Grounded(BaseModel):
             raise ValueError(
                 f"{type(self).__name__} REFUSED: no SourcePointer. A graph-derived enrichment must "
                 f"cite the path it was traversed from, exactly like an extracted field.")
+        named = set(type(self).model_fields) - {"sources", "field_sources"}
+        uncited = sorted(f for f in named
+                         if getattr(self, f) is not None and f not in self.field_sources)
+        if uncited:
+            raise ValueError(
+                f"{type(self).__name__} REFUSED: field(s) {uncited} carry a value with no pointer "
+                f"of their own. The pooled `sources` list does not vouch for them.")
         return self
+
+    def source_for(self, field: str) -> Optional[SourcePointer]:
+        return self.field_sources.get(field)
 
 
 class PriorIntake(_Grounded):
