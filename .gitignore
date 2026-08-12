@@ -41,3 +41,11 @@ Thumbs.db
 *.log
 /r.txt
 /*.out.txt
+
+# codex review scratch — the bundles fed to the reviewer are concatenations of tracked
+# sources; the reviews themselves (.reviews/*.review.txt) ARE committed.
+/.review-bundle.txt
+/.review-codex.txt
+/.review-prompt.txt
+/.reviews/*.txt
+!/.reviews/*.review.txt
