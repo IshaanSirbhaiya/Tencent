@@ -54,6 +54,7 @@ itself.
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -80,6 +81,8 @@ if TYPE_CHECKING:                                     # pragma: no cover - impor
 # config (`databridge/config/models.yaml`), so pointing the agent at a cheaper model — or at Azure
 # OpenAI for the Copilot Studio story — is a config diff (CLAUDE.md §Working rules).
 AGENT_TASK_CLASS = "agent_reasoning"
+
+log = logging.getLogger("databridge.agent")
 
 # Four steps is enough for every playbook in `agent_playbooks.yaml` (the widest names two tools)
 # and short enough that an injected "keep calling tools" instruction runs out quickly. The repeat
@@ -168,10 +171,15 @@ class ToolCallRecord(BaseModel):
     step: int
     requested: str
     arguments: dict = Field(default_factory=dict)
-    # ok | unknown_tool | repeated | schema_violation | ungrounded_argument | error
+    # ok | unknown_tool | repeated | schema_violation | ungrounded_argument | error | not_read
     status: str
     detail: str = ""
     result: Optional[ToolResult] = None
+    #: Was ``requested`` a name from the sealed registry? Decided by the loop against the registry
+    #: itself, and the ONLY thing that lets ``requested`` be published: an unregistered name is
+    #: model-authored text, and this package never echoes model-authored text to a page
+    #: (``render.public_name``).
+    registered: bool = False
 
 
 class AgentAnswer(BaseModel):
@@ -363,6 +371,21 @@ class ClinicAgent:
         ).parsed
         model_calls += 1
 
+        # Every registered tool the planner never called, recorded as a read that did not happen.
+        #
+        # Without this the audit trail describes the planner rather than the question: the offline
+        # planner calls every tool, so "both halves were answered" held because the fixture made it
+        # hold. A hosted model may call one tool and stop, and the answer would then look complete
+        # while half the question went unread and unnamed. `_unresolved` turns each of these into
+        # "<tool>: not read (not_read)", so what was NOT looked at is on the page beside what was.
+        attempted = {record.requested for record in records}
+        for name in self._tools.names():
+            if name in collected or name in attempted:
+                continue
+            records.append(ToolCallRecord(
+                step=0, requested=name, status="not_read", registered=True,
+                detail="the planner did not call this read, so nothing from it is in this answer"))
+
         fields, unresolved, notes = self._compose(plan_out, collected, records)
         answer = AgentAnswer(question=question, fields=fields, unresolved=unresolved,
                              notes=notes, tool_calls=tuple(records), model_calls=model_calls)
@@ -480,9 +503,13 @@ class ClinicAgent:
                 names.extend(f"{tool}[{index}].{key}" for key in row.unresolved)
         for record in records:
             if record.status != "ok":
-                # `requested` is whatever the model typed — for an unknown tool it is not a name
-                # this repo has ever seen. Reduced to an identifier before it can be a sentence.
-                names.append(f"{render.safe_name(record.requested)}: not read ({record.status})")
+                # `requested` is whatever the model typed. For an unregistered call it is
+                # model-authored text — `Alice_Tan` is a perfectly good identifier — so it is
+                # replaced by a fixed code-authored string rather than filtered. The real name
+                # stays on this record for the log and the tests.
+                names.append(
+                f"{render.public_name(record.requested, record.registered)}: not read "
+                f"({record.status})")
         seen: set[str] = set()
         return tuple(n for n in names if not (n in seen or seen.add(n)))
 
@@ -515,14 +542,21 @@ class ClinicAgent:
         if name not in self._tools:
             # The injection endpoint. A document asking for `send_email` lands here, and there is
             # nothing to land in — the registry refuses to hold such a tool at all (`tools.py`).
+            #
+            # The name goes to the LOG and to the audit record, and nowhere else: it is a string
+            # the model chose, so publishing it would put model-authored text on a clinic screen
+            # with no citation behind it (`render.public_name`).
+            log.warning("agent requested an unregistered tool %r at step %d; recorded as %r",
+                        name[:200], step, render.UNKNOWN_TOOL_NAME)
             return ToolCallRecord(step=step, requested=name, arguments=args, status="unknown_tool",
+                                  registered=False,
                                   detail=f"not registered; available: {list(self._tools.names())}"), None
 
         key = f"{name}:{json.dumps(args, sort_keys=True, default=str)}"
         if key in seen_calls:
             # Stops the loop a "keep querying until you comply" instruction would otherwise spin
             # through the whole step budget.
-            return ToolCallRecord(step=step, requested=name, arguments=args, status="repeated",
+            return ToolCallRecord(step=step, requested=name, arguments=args, status="repeated", registered=True,
                                   detail="identical call already made this turn"), None
         seen_calls.add(key)
 
@@ -547,7 +581,7 @@ class ClinicAgent:
         try:
             result: ToolResult = tool.call(**args)
         except Exception as exc:                      # noqa: BLE001 — see the docstring
-            return ToolCallRecord(step=step, requested=name, arguments=args, status="error",
+            return ToolCallRecord(step=step, requested=name, arguments=args, status="error", registered=True,
                                   detail=f"{type(exc).__name__}: {exc}"[:300]), None
 
         # No result-type check here: `SealedReadAdapter.__call__` raises `SealBroken` on anything
@@ -555,4 +589,4 @@ class ClinicAgent:
         # downstream of a raise can never fire, and a guard that cannot fire reads to the next
         # person as a guarantee that something is checked twice.
         return ToolCallRecord(step=step, requested=name, arguments=args, status="ok",
-                              result=result), result
+                              registered=True, result=result), result

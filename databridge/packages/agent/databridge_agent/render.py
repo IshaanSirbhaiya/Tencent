@@ -95,17 +95,38 @@ HEADING_CANDIDATES = "Registry candidates — all of them, in a fixed order, not
 CANDIDATE_SCOPE = "candidates"
 
 
-# A tool name the model INVENTED is model-authored text. `ToolCallRecord.requested` is whatever
-# the plan said, so it reaches the report ("x: not read (unknown_tool)") and the public DTO. It is
-# reduced to an identifier-shaped token before either: a name is a name, and a sentence is not.
+# A tool name the model INVENTED is model-authored text, and character-filtering it is not enough.
+# `Alice_Tan` survives `[^A-Za-z0-9_.:-]` intact, so a model could name a tool after a person,
+# make one valid read alongside it, and have that name rendered on the page — visible, uncited,
+# and authored by the model. There is no filter over identifiers that fixes this, because the
+# problem is not the characters, it is the provenance.
+#
+# So a model-supplied identifier is NEVER echoed. An unregistered call is reported as this fixed,
+# code-authored string; the name the model actually asked for stays on `AgentAnswer.tool_calls`
+# (the audit record) and in the server log, where a human reads it.
+UNKNOWN_TOOL_NAME = "an unrecognised tool"
+
 _NAME_SAFE = re.compile(r"[^A-Za-z0-9_.:\-]")
 MAX_NAME_CHARS = 64
 
 
 def safe_name(name: str) -> str:
-    """An identifier-shaped rendering of a tool name, which the model may have invented."""
+    """An identifier-shaped rendering of a REGISTERED tool name.
+
+    Registered names are this repo's own, so this is belt-and-braces rather than a control. It is
+    deliberately not the control for model-authored names — see :func:`public_name`.
+    """
     cleaned = _NAME_SAFE.sub("", name or "")[:MAX_NAME_CHARS]
     return cleaned or "(unnamed)"
+
+
+def public_name(name: str, registered: bool) -> str:
+    """What a page may print for a tool call. Code-authored unless the name is one of ours.
+
+    ``registered`` is decided by the loop against the sealed registry, never by inspecting the
+    string: a name that merely *looks* like one of ours is still the model's to have chosen.
+    """
+    return safe_name(name) if registered else UNKNOWN_TOOL_NAME
 
 
 def note_text(key: str) -> str:
@@ -210,9 +231,11 @@ __all__ = [
     "NOTHING_ANSWERED",
     "REDACTED_VALUE",
     "REFS_NOT_RETURNED",
+    "UNKNOWN_TOOL_NAME",
     "cite",
     "note_text",
     "present",
+    "public_name",
     "render",
     "safe_name",
 ]
