@@ -18,6 +18,9 @@ routing:
   verification_pass:        sonnet_alt      # DIFFERENT model than generator (adversarial separation, C17 §12.3b)
   brain_query:              primary_llm     # T08 — Company-Brain NL answer over the graph context
   brain_analysis:           primary_llm     # T08 — labelled [ANALYSIS] reasoning over the graph
+  # --- Hack4Health Walnut (PLAN.md Phase 1) ---
+  intake_extraction:        sonnet          # referring document → normalized IntakeRecord draft
+  intake_classification:    sonnet          # document-type classification (deterministic today)
 
 aliases:
   sonnet:      {model: "anthropic/claude-sonnet-4-6"}
