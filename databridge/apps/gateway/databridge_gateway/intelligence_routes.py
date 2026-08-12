@@ -176,14 +176,26 @@ def _register_intelligence_routes(app: FastAPI) -> None:
                             status=503)
         if out.get("error"):
             return _refusal("UNKNOWN_ENTITY", out["error"], status=404)
-        sources = {}
+        # R-21. This used to swallow a pointer-lookup failure, set `sources = {}` and return the
+        # nodes anyway — the drill-down that exists to let a figure be CHECKED, rendering values
+        # with the checking apparatus quietly removed. An empty `sources` map is indistinguishable
+        # on the page from "this entity genuinely has no citations", so the failure looked like a
+        # fact about the graph. If the evidence cannot be loaded there is nothing to show.
         try:
             from brain_server import pointer_to_dict           # apps/mcp_server (on pythonpath)
 
+            sources = {}
             for node in out.get("nodes", []):
                 sources[node["id"]] = [pointer_to_dict(p)
                                        for p in brain.store.sources_for(node["id"])]
         except Exception:                                            # noqa: BLE001
             log.exception("pointer lookup failed for %r", entity_id)
-            sources = {}
-        return {**out, "depth": depth, "sources": sources}
+            return _refusal(
+                "EVIDENCE_UNAVAILABLE",
+                "the traversal succeeded but its citations could not be loaded, so the result is "
+                "not checkable and is withheld", status=503)
+        uncited = sorted(n["id"] for n in out.get("nodes", []) if not sources.get(n["id"]))
+        return {**out, "depth": depth, "sources": sources,
+                # Named rather than left to be inferred from a missing key. A node the graph holds
+                # no pointer for is a real state, and it must not look like the failure above.
+                "uncited_entities": uncited}

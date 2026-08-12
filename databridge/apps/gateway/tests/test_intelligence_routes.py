@@ -228,3 +228,53 @@ def test_subgraph_depth_is_bounded(client):
     member = graph["issuer_mix"][0]["issuer_id"]
     assert client.get(f"/intelligence/subgraph/{member}", params={"depth": 99}).json()["depth"] == 3
     assert client.get(f"/intelligence/subgraph/{member}", params={"depth": 0}).json()["depth"] == 1
+
+
+def test_the_drilldown_withholds_the_result_when_its_citations_cannot_be_loaded(client, app):
+    """R-21. The drill-down exists so a figure on the page can be CHECKED. Catching a pointer
+    lookup failure, setting `sources = {}` and returning the nodes anyway renders the values with
+    the checking apparatus quietly removed — and an empty map is indistinguishable from "this
+    entity genuinely has no citations", so the failure reads as a fact about the graph."""
+    brain = app.state.brain
+    entity = brain.store.open_nodes()[0]["id"]
+
+    ok = client.get(f"/intelligence/subgraph/{entity}")
+    assert ok.status_code == 200 and ok.json()["sources"]
+
+    class OnlyPointersBroken:
+        """Everything works EXCEPT the pointer read, so the traversal succeeds and only the
+        evidence is missing — which is precisely the state that used to return values."""
+
+        def __init__(self, real):
+            self._real = real
+
+        def __getattr__(self, name):
+            if name == "sources_for":
+                raise RuntimeError("pointer store is down")
+            return getattr(self._real, name)
+
+    original = brain.store
+    brain.store = OnlyPointersBroken(original)
+    try:
+        broken = client.get(f"/intelligence/subgraph/{entity}")
+    finally:
+        brain.store = original
+
+    # Either guard may fire — `row_to_node` reads pointers during the traversal itself, so the
+    # walk can fail before the citation step. The invariant is the same whichever does: values
+    # never come back without the evidence for them.
+    assert broken.status_code == 503
+    body = broken.json()
+    assert body["refusal"]["code"] in {"EVIDENCE_UNAVAILABLE", "SUBGRAPH_FAILED"}
+    assert "nodes" not in body, "values were returned without the evidence for them"
+
+
+def test_the_drilldown_names_an_uncited_entity_rather_than_leaving_it_to_inference(client, app):
+    """A node the graph holds no pointer for is a real state, and it must not be silently
+    indistinguishable from a citation lookup that failed."""
+    entity = app.state.brain.store.open_nodes()[0]["id"]
+    body = client.get(f"/intelligence/subgraph/{entity}").json()
+    assert "uncited_entities" in body
+    for node in body["nodes"]:
+        if not body["sources"].get(node["id"]):
+            assert node["id"] in body["uncited_entities"]
