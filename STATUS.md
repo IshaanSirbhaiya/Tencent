@@ -4,7 +4,7 @@
 > *where we are*. Updated at the end of every section — see `CLAUDE.md` §Build workflow.
 
 **Last updated:** 2026-08-12 (end of day) · **Phases 0–6a + 6.5 complete. Phase 7 largely built.
-Six scoped codex reviews run: 18 Critical findings open — see [`REMEDIATION.md`](REMEDIATION.md),
+Six scoped codex reviews run: the Critical findings open — see [`REMEDIATION.md`](REMEDIATION.md),
 which is the file to read after `CLAUDE.md` in a fresh session.**
 
 ⚠️ **The next block of work is FIXING, not building.** Six tracks shipped in parallel on
@@ -21,8 +21,9 @@ The e2e suite is now genuinely offline — see Gotchas.
 
 - **Phases 0–5** — fixtures, schemas, extraction + grounding wall, resolution (candidates only),
   config-driven eligibility, questionnaire pre-fill, append-only ledger with SQLite triggers,
-  billing draft, metrics. **Measured: baseline 27.5 min · mean saved 16.4 min (60%) · ~11 h per
-  40-patient morning.**
+  billing draft, metrics. **Measured: baseline 27.5 min · mean saved 16.3 min (59%) · ~11 h per
+  40-patient morning.** (16.3, not the 16.4 several docs carried: `test_submission_figures.py`
+  recomputes it from the corpus and pins it to `SUBMISSION.md`, so that is the checkable one.)
 - **Phase 6a** — the graph is load-bearing. `ClinicHistory` Protocol in `packages/intake`,
   adapter in `packages/graph`, composed at the gateway. `conflicting_document_on_file` comes from
   a traversal: the conflicting insurer appears nowhere in the document being read.
@@ -63,7 +64,7 @@ Both reviewers ran concurrently. **codex: 9 findings (5 Critical). `/code-review
 Six tracks ran in parallel by file ownership: brain UI, OCR/docling, `/evidence`, `/intelligence`,
 the eight earlier findings, and the read-only clinic agent — plus the lead's bi-temporal fix and
 node evidence sheets. All landed green. **Then one scoped `codex exec` review per track found
-18 Critical findings across all six.** Fixed since: `intake_confirm` read `held` outside the lock
+the Critical findings across all six.** Fixed since: `intake_confirm` read `held` outside the lock
 while reading `state` inside it (the wrong-subject attestation bug, fourth instance).
 
 Also: product renamed **Front Desk Copilot → Walnut** (15 files; the competition brief in
