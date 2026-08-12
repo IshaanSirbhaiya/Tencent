@@ -9,7 +9,7 @@
 // `databridge_graph.analytics.compute` (a traversal) or by the confirm gate itself; the browser
 // only renders and links.
 import { GATEWAY } from "./api";
-import type { Refusal } from "./types";
+import type { Refusal, SourcePointer } from "./types";
 
 /** A count and the population it was counted over, plus the ids behind it. Never one without
  *  the others — `members` is what lets a reader walk from the number to the traversal. */
@@ -112,8 +112,62 @@ export interface SubgraphResponse {
   refusal?: Refusal;
 }
 
-async function call<T>(path: string): Promise<T> {
-  const res = await fetch(`${GATEWAY}${path}`, { cache: "no-store" });
+/** One value the agent reported, already RENDERED by the backend.
+ *
+ *  `text`, not `value`: what this page prints is what the backend's renderer produced. An
+ *  instruction-shaped value arrives as a fixed redaction line with `redacted: true` and its
+ *  citation intact — so a withheld line still walks to its evidence, and must be styled as
+ *  deliberate rather than as a hole. */
+export interface AnswerValue {
+  key: string;
+  tool: string;
+  row: number;
+  field: string;
+  scope: string;
+  text: string;
+  redacted: boolean;
+  citation: string;
+  source: SourcePointer;
+}
+
+/** A code-authored sentence, addressed by key. Both halves come from a closed table in the
+ *  backend (`databridge_agent.render.NOTES`) — never from a model. */
+export interface AgentNote {
+  key: string;
+  text: string;
+}
+
+/** One tool call, reduced to what is safe to publish: which read, and how it went. */
+export interface AgentRead {
+  tool: string;
+  status: string;
+}
+
+/** The ONLY shape `POST /intelligence/ask` returns.
+ *
+ *  Note what is absent, and deliberately so: the model's plan, its reasons, its arguments, the
+ *  raw text of any value, and any exception message. The backend projects its audit record onto
+ *  this type precisely so a page cannot render what the renderer withheld. */
+export interface AgentAsk {
+  question: string;
+  /** The rendered report, as one block of text. This page renders `values` instead and keeps
+   *  this for copy-out — the answer is a list with citations, not a paragraph. */
+  answer: string;
+  refused: boolean;
+  refusal_code: string;
+  requires_human_selection: boolean;
+  values: AnswerValue[];
+  unresolved: string[];
+  notes: AgentNote[];
+  reads: AgentRead[];
+  model_calls: number;
+  /** Present only when the surface could not run at all — no graph, no model route, nothing
+   *  grounded. Distinct from `refused`, which is the agent's own answer to the question. */
+  refusal?: Refusal;
+}
+
+async function call<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${GATEWAY}${path}`, { cache: "no-store", ...init });
   const body = await res.json().catch(() => ({}));
   // Refusals ride in the body with a 4xx (house convention) — surface them, do not throw.
   if (!res.ok && !("refusal" in body)) throw new Error(`${path} → ${res.status}`);
@@ -129,7 +183,26 @@ export const intelligenceApi = {
     call<SubgraphResponse>(
       `/intelligence/subgraph/${encodeURIComponent(entityId)}?depth=${depth}`,
     ),
+  ask: (question: string, asOf?: string | null) =>
+    call<AgentAsk>("/intelligence/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, as_of: asOf || null }),
+    }),
 };
+
+/** The graph entity a value's pointer names, or null.
+ *
+ *  Every pointer the agent's tools emit is `kind: "derived"` with a graph entity id in
+ *  `source_id` — which is what makes a citation walkable to `/intelligence/subgraph/{id}`. Any
+ *  other shape is not linked rather than linked hopefully: a citation that 404s is worse than a
+ *  citation rendered as plain text. */
+export function citedEntity(value: AnswerValue): string | null {
+  const id = value.source?.source_id;
+  return value.source?.kind === "derived" && typeof id === "string" && id.includes(":")
+    ? id
+    : null;
+}
 
 /** The label the graph carries for an id, or the id itself. Never a guess, never a prettified
  *  reconstruction — if the backend did not send a label, the raw id is the honest thing to show. */

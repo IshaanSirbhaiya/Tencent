@@ -32,6 +32,7 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import { Topbar } from "@/components/topbar";
+import { AskPanel } from "@/components/intelligence/ask-panel";
 import { FigureCard } from "@/components/intelligence/figure-card";
 import { IssuerMix } from "@/components/intelligence/issuer-mix";
 import { BlockedQueue } from "@/components/intelligence/blocked-queue";
@@ -146,6 +147,12 @@ export default function IntelligencePage() {
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div className="flex flex-col gap-5">
+            {/* The agent sits beside the figures, not instead of them. It reads the same
+                traversal `analytics.compute` renders above, so a line it returns and a card on
+                this page cannot disagree — and every line it returns opens in the same subgraph
+                drawer on the right that the cards open. */}
+            <AskPanel asOf={asOf} onCite={onSelect} />
+
             {graph && (
               <>
                 <section>

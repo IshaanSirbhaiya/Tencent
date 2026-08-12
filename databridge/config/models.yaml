@@ -21,6 +21,7 @@ routing:
   # --- Hack4Health Walnut (PLAN.md Phase 1) ---
   intake_extraction:        sonnet          # referring document → normalized IntakeRecord draft
   intake_classification:    sonnet          # document-type classification (deterministic today)
+  agent_reasoning:          sonnet          # the read-only clinic agent's plan + answer steps
 
 aliases:
   sonnet:      {model: "anthropic/claude-sonnet-4-6"}
