@@ -66,11 +66,19 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import Optional
+import re
+from typing import Literal, Optional
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+
+# Imported at module scope, not lazily, because both are `response_model` types: pydantic needs
+# the real class when the model below is defined, and a string annotation resolved later would
+# make the published schema depend on import order.
+from databridge_agent.response import AgentResponse
+
+from .outbox_routes import ActionCard, BlockedProposal, propose_actions
 
 log = logging.getLogger("databridge.gateway.intelligence")
 
@@ -85,6 +93,17 @@ BAD_AS_OF_MESSAGE = ("the `as of` value is not an ISO-8601 datetime (for example
 #: get document text into the one message that is NOT framed as untrusted data (`frame.py` frames
 #: it anyway — this keeps the prompt bounded as well).
 MAX_QUESTION_CHARS = 500
+
+#: What the figure payload says about itself. A module constant because two routes serve it now —
+#: `GET /intelligence` and the console, when a request asked for figures — and a caveat that
+#: existed on only one of them would be a caveat that stopped applying the moment the page moved.
+FIGURES_NOTE = (
+    "Counts of structural facts, each with its denominator. Time saved is measured separately at "
+    "GET /impact and is never derived from these. These figures and the grounded answer beside "
+    "them are two reads of the graph: within one answer every tool shares one snapshot, but a "
+    "document arriving between the two can leave a card and an answer a moment apart. Both "
+    "report the `as_of` window they were read in; neither claims to have been read at the same "
+    "instant as the other.")
 
 
 class RefusalBody(BaseModel):
@@ -250,6 +269,145 @@ class AskRequest(BaseModel):
     as_of: Optional[str] = None
 
 
+class ConsoleRequest(BaseModel):
+    """What a member of staff types into the console, plus the two things only a human may supply.
+
+    ``intake_id`` names a registration. It is here because the agent **may not choose who a
+    message is about** (`AGENT_CAPABILITIES.md` §The two rules): a request that implies an act is
+    acted on for the registration a person named, and there is no path by which the model, or a
+    document the model read, selects one.
+
+    ``typed_address``/``typed_by`` are door (b) of the recipient rule, passed straight through to
+    ``recipients.recipient_typed_by_human``. They are read only by a clinic rule that declares that
+    door; a rule declaring ``committed_ledger`` refuses a typed address outright
+    (``build_outbound_draft``), so supplying one cannot redirect a message.
+    """
+
+    request: str = Field(default="")
+    as_of: Optional[str] = None
+    intake_id: Optional[str] = None
+    typed_address: Optional[str] = None
+    typed_by: Optional[str] = None
+
+
+#: The console's own code-authored sentences, addressed by key — the same device
+#: ``databridge_agent.render.NOTES`` uses, and for the same reason: a sentence a model could
+#: phrase is a sentence a model could rephrase.
+CONSOLE_NOTES: dict[str, str] = {
+    "proposal_only": (
+        "This is a draft. Nothing has been sent, and nothing here can send: the agent writes into "
+        "an append-only outbox, a named member of staff approves, and a separate process with no "
+        "model in it performs the send. An instruction hidden in a document can at worst cause a "
+        "draft somebody reads."),
+    "needs_an_intake": (
+        "That reads as a request to do something rather than to look something up. Name the "
+        "registration it concerns and the clinic's own rules will say what is worth sending about "
+        "it — the system does not choose which patient a message is about, because choosing that "
+        "is an identity determination."),
+    "no_authentication": (
+        "An approval records who says they approved it. There is no authentication behind that "
+        "name yet: this is a POC and the sign-in screen says the same thing. Building it is the "
+        "next thing that has to happen before this touches a real clinic."),
+    "figures_on_request": (
+        "Figures are shown because this request asked for them. They are counts of structural "
+        "facts, each with the population it was counted over; none of them is a claim about time "
+        "or money."),
+    "answer_is_a_list": (
+        "The answer is a list of values, not a paragraph. The model chooses which values appear "
+        "and writes none of them: each line is printed by code beside the pointer that value "
+        "itself carries."),
+}
+
+
+def echo_request(request: str) -> str:
+    """The staff member's own words, neutralised, for printing under the box they typed them in.
+
+    **Neutralised, not redacted, and the difference is deliberate.**
+    ``databridge_agent.render.present`` replaces an instruction-shaped value with a fixed
+    redaction line, and that rule is exactly right for a value read out of a document: a clinical
+    document talking to an automated reader must not have its payload reproduced in the clinic's
+    own UI.
+
+    It is the wrong rule for this one string. A request that implies an act — "email the patient
+    about the test that is not covered" — is instruction-shaped *by construction*; it is the
+    primary thing this box exists to accept, and it was typed one second ago by the person now
+    reading the response. Echoing it back as "[withheld — this value contains text addressed to an
+    automated reader]" tells that person nothing and makes the propose path unreadable.
+
+    So this applies ``frame.untrusted`` — the same neutraliser used on the way *in* to the model —
+    which strips frame markers, control, zero-width and bidi characters, role headers and
+    chat-template tokens, and caps the length. Nothing here is dropped silently: every replacement
+    leaves a visible marker.
+
+    ``present`` is untouched and still governs every value that came out of a *tool*, and the
+    agent's own ``AgentResponse.question`` on the nested answer is still rendered by it — so both
+    renderings are on the page and the difference between them is visible rather than assumed.
+    """
+    from databridge_agent.frame import untrusted
+
+    text = untrusted(request or "").strip()
+    return text[:MAX_QUESTION_CHARS] if len(text) > MAX_QUESTION_CHARS else text
+
+
+class ConsoleNote(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    key: str
+    text: str
+
+
+def console_note(key: str) -> ConsoleNote:
+    return ConsoleNote(key=key, text=CONSOLE_NOTES[key])
+
+
+#: Requests that are asking for figures. A closed, code-authored set of shapes — never a model
+#: deciding what kind of request this was. The page's whole redesign rests on this: analytics are
+#: one possible ANSWER, so something has to decide when they were asked for, and that something
+#: must be as inspectable as the rest of the surface.
+_FIGURE_REQUESTS = re.compile(
+    r"\b(?:figures?|analytics|dashboard|breakdown|statistics|stats|how many|count|counts|"
+    r"totals?|overview|mix|what(?:'s| is) (?:still )?(?:blocked|outstanding|waiting))\b", re.I)
+
+
+def asks_for_figures(request: str) -> bool:
+    return bool(_FIGURE_REQUESTS.search(request or ""))
+
+
+class ConsoleResponse(BaseModel):
+    """What the console returns. The key set is pinned by ``test_console_routes.py``.
+
+    ``AgentResponse`` for the read half, unchanged and nested rather than flattened — flattening
+    would put this type's fields and that one's in one namespace, and the next field added to
+    either would silently widen the other. ``proposed`` carries ``ActionCard``s, which are held to
+    the same withholding rules as everything else on this page (``outbox_routes``).
+
+    Note what is absent, and deliberately: any field carrying a recipient's address, a patient
+    name, a candidate, a score, a minute or a dollar.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    #: The staff member's own words, neutralised by :func:`echo_request`. Not redacted — see that
+    #: function for why a request box is the one string on this page where the renderer's
+    #: instruction-shaped rule would be a category error.
+    request: str
+    #: Which half of the design ran. Decided by ``databridge_agent.screen_question`` — the
+    #: deterministic gate that already refuses send requests — never by a model.
+    intent: Literal["answer", "propose"]
+    answer: Optional[AgentResponse] = None
+    proposed: tuple[ActionCard, ...] = ()
+    blocked: tuple[BlockedProposal, ...] = ()
+    #: The `/intelligence` figure payload, present only when the request asked for figures.
+    analytics: Optional[dict] = None
+    notes: tuple[ConsoleNote, ...] = ()
+    #: Why the grounded answer is absent, when it is. The console answers with a 200 and this
+    #: field rather than with a 4xx, because one request produces one description of everything
+    #: that happened: the read half can fail while the figures half stands, and an HTTP error
+    #: would throw away the half that worked. The hard failures — an empty request, a malformed
+    #: `as of` — are still statuses, because there is nothing to describe.
+    refusal: Optional[RefusalBody] = None
+
+
 def _reasoning_harness(app: FastAPI):
     """A real model when a key is present, the deterministic planner otherwise. Never `None`.
 
@@ -264,6 +422,78 @@ def _reasoning_harness(app: FastAPI):
 
     detected = getattr(app.state, "llm_meta", None) or detect_llm()
     return build_extraction_harness(detected) or agent_gold_harness()
+
+
+def _run_agent(app: FastAPI, question: str, parsed: Optional[dt.datetime]
+               ) -> tuple[Optional[AgentResponse], Optional[RefusalBody], int]:
+    """The read half, shared by `/intelligence/ask` and `/intelligence/console`.
+
+    Returns ``(response, None, 200)`` or ``(None, refusal, status)``. A tuple rather than a
+    ``JSONResponse``, because the two callers need the failure in different shapes: `/ask` returns
+    it as a status, and the console carries it as a field beside the figures the same request may
+    also have asked for. Written once so the two cannot drift into refusing different things.
+
+    **Fails CLOSED throughout.** An answer is a sentence a member of staff acts on; a thinner one
+    assembled from a graph that would not load is worse than none.
+
+    The question is assumed to have been screened already: both callers run
+    ``databridge_agent.screen_question`` first, before the `as_of` parse and before any of the
+    configuration checks below, so that an identity question is refused with ``model_calls == 0``
+    whatever state the rest of the system is in.
+    """
+    brain = getattr(app.state, "brain", None)
+    if brain is None:
+        return None, RefusalBody(
+            code="GRAPH_UNAVAILABLE",
+            message="the clinic graph is not loaded, so there is nothing to read and nothing to "
+                    "cite"), 503
+
+    from databridge_agent import AGENT_TASK_CLASS
+    from databridge_core import resolve_model
+
+    try:
+        resolve_model(AGENT_TASK_CLASS)
+    except Exception:                                                # noqa: BLE001
+        log.exception("no model route for %r", AGENT_TASK_CLASS)
+        return None, RefusalBody(
+            code="AGENT_MODEL_NOT_CONFIGURED",
+            message=f"no model is routed for '{AGENT_TASK_CLASS}' in config/models.yaml, so this "
+                    f"question cannot be planned. Routing is configuration; adding the line is "
+                    f"the fix."), 503
+
+    from .intelligence_surface import SurfaceTooLarge, check_graph_bounds
+
+    try:
+        check_graph_bounds(brain.store)
+    except SurfaceTooLarge as exc:
+        # Loud, not truncated. Every value this agent reports is a count or a member of one, and a
+        # count computed over part of a graph is a wrong number, not a partial one.
+        return None, RefusalBody(code=exc.code, message=exc.message), 503
+
+    try:
+        from databridge_agent import ClinicAgent
+
+        from .agent_tools import build_structural_registry
+
+        registry = build_structural_registry(brain.store, as_of=parsed)
+        answer = ClinicAgent(registry, _reasoning_harness(app)).ask(question)
+    except Exception:                                                # noqa: BLE001
+        log.exception("the clinic agent failed on %r", question[:120])
+        return None, RefusalBody(
+            code="AGENT_UNAVAILABLE",
+            message="the agent could not complete this read; see server logs. No partial answer "
+                    "is returned, because a partial answer is the one thing worse than none "
+                    "here"), 503
+
+    response = answer.public()
+    if not response.refused and not response.values:
+        # Refuse rather than render an empty answer. The wording is the agent's own code-authored
+        # note, so the same sentence appears whichever path produced it.
+        from databridge_agent.render import NOTHING_ANSWERED, note_text
+
+        return None, RefusalBody(code="NO_GROUNDED_ANSWER",
+                                 message=note_text(NOTHING_ANSWERED)), 422
+    return response, None, 200
 
 
 def _register_intelligence_routes(app: FastAPI) -> None:
@@ -292,13 +522,7 @@ def _register_intelligence_routes(app: FastAPI) -> None:
             "queue_unavailable": queue_unavailable,
             # Said in the payload, not only in the UI copy, so an agent reading this over MCP in
             # Phase 8 inherits the distinction rather than having to be told it.
-            "note": "Counts of structural facts, each with its denominator. Time saved is "
-                    "measured separately at GET /impact and is never derived from these. These "
-                    "figures and POST /intelligence/ask are two requests over two reads of the "
-                    "graph: within one answer every tool shares one snapshot, but a document "
-                    "arriving between the two calls can leave a card and an answer a moment "
-                    "apart. Both report the `as_of` window they were read in; neither claims to "
-                    "have been read at the same instant as the other.",
+            "note": FIGURES_NOTE,
         }
 
     @app.get("/intelligence/subgraph/{entity_id:path}", responses=REFUSAL_RESPONSES)
@@ -421,55 +645,118 @@ def _register_intelligence_routes(app: FastAPI) -> None:
             log.info("rejected a malformed as_of on /intelligence/ask")
             return _refusal("BAD_AS_OF", BAD_AS_OF_MESSAGE)
 
-        brain = getattr(app.state, "brain", None)
-        if brain is None:
-            # Fails CLOSED, unlike the figures above. An answer is a sentence staff act on, and
-            # "the graph was not loaded" is not something a short answer lets them infer.
-            return _refusal("GRAPH_UNAVAILABLE",
-                            "the clinic graph is not loaded, so there is nothing to read and "
-                            "nothing to cite", status=503)
+        answered, refused, status = _run_agent(app, question, parsed)
+        if refused is not None:
+            return JSONResponse(status_code=status,
+                                content=SurfaceRefusal(refusal=refused).model_dump(mode="json"))
+        return answered
 
-        from databridge_agent import AGENT_TASK_CLASS
-        from databridge_core import resolve_model
+    # -- the console ----------------------------------------------------------------
+    @app.post("/intelligence/console", response_model=ConsoleResponse,
+              responses=REFUSAL_RESPONSES)
+    def intelligence_console(payload: ConsoleRequest):
+        """Ask for something in plain language. One response describing everything that happened.
 
-        try:
-            resolve_model(AGENT_TASK_CLASS)
-        except Exception:                                            # noqa: BLE001
-            log.exception("no model route for %r", AGENT_TASK_CLASS)
+        `AGENT_CAPABILITIES.md` gives this surface one shape — *a request box; analytics are one
+        possible answer, not the content of the page* — and one line that decides the design: the
+        agent may **propose** anything and **perform** nothing. This route is where both live.
+
+        **What routes a request, and why it is not a model.** ``databridge_agent.screen_question``
+        already refuses a request to send with ``AGENT_HAS_NO_SEND_CAPABILITY`` — a deterministic
+        pattern match that runs before any model is reached. That refusal is *also the classifier*:
+        a request the screen calls send-shaped is exactly a request that implies an act, so it goes
+        to the propose path instead of dead-ending. Nothing about which half runs is decided by a
+        model, or by anything a document could influence. An identity question still refuses, and
+        refuses first — ``screen_incoming`` checks identity before it checks sending, so a request
+        that is both is refused rather than proposed.
+
+        **The propose path cannot choose a recipient.** It needs ``intake_id``, which a member of
+        staff supplies by naming a registration on this page; with none, it returns zero proposals
+        and the note saying why. From there it is the clinic's own config: the monitors in
+        ``clinic_monitors.yaml`` decide what is worth saying, ``recipients.py``'s two doors decide
+        who it may be said to, and ``build_outbound_draft`` has no parameter through which an
+        address can arrive. What comes back is a DRAFT in the outbox with
+        ``requires_human_approval`` — never a send, and there is no code path here that could
+        become one.
+
+        **Figures only when asked for.** :func:`asks_for_figures` is a closed set of request
+        shapes, code-authored, and it is the whole of the page's redesign: the same counts the
+        cards used to render permanently are now one possible answer among three.
+
+        **Everything new here inherits the page's contract.** A proposed action is rendered by
+        ``outbox_routes.action_card``, which masks the mailbox, publishes the recipient's
+        provenance as a code-authored sentence rather than a derivation string, projects every
+        pointer onto a closed shape and screens the draft's own text for instructions. A card is
+        not a hole in the withholding rules the traversal closed.
+        """
+        request = (payload.request or "").strip()
+        if not request:
+            return _refusal("REQUEST_REQUIRED", "ask for something; there is nothing to do")
+        if len(request) > MAX_QUESTION_CHARS:
             return _refusal(
-                "AGENT_MODEL_NOT_CONFIGURED",
-                f"no model is routed for '{AGENT_TASK_CLASS}' in config/models.yaml, so this "
-                f"question cannot be planned. Routing is configuration; adding the line is the "
-                f"fix.", status=503)
+                "REQUEST_TOO_LONG",
+                f"a request is {MAX_QUESTION_CHARS} characters or fewer. This box is for a "
+                f"request, not for a document — drop documents on /intake, where every value "
+                f"extracted from them is grounded and reviewed by a person.")
 
-        from .intelligence_surface import SurfaceTooLarge, check_graph_bounds
+        # THE SCREEN COMES FIRST, before the `as_of` parse and before the graph — the same order
+        # `/intelligence/ask` uses and for the same reason: the refusal must not depend on the
+        # rest of the system being healthy.
+        from databridge_agent import screen_question
+        from databridge_agent.guardrails import NO_SEND_CODE
+
+        gated = screen_question(request)
+        echoed = echo_request(request)
+
+        if gated is not None and gated.refusal_code != NO_SEND_CODE:
+            # An identity question. It is answered, not routed onward: this system does not decide
+            # who somebody is, and a request to do so is not a request to draft something either.
+            return ConsoleResponse(request=echoed, intent="answer", answer=gated)
 
         try:
-            check_graph_bounds(brain.store)
-        except SurfaceTooLarge as exc:
-            # Loud, not truncated. Every value this agent reports is a count or a member of one,
-            # and a count computed over part of a graph is a wrong number, not a partial one.
-            return _refusal(exc.code, exc.message, status=503)
+            parsed = _parse_as_of(payload.as_of)
+        except ValueError:
+            log.info("rejected a malformed as_of on /intelligence/console")
+            return _refusal("BAD_AS_OF", BAD_AS_OF_MESSAGE)
 
-        try:
-            from databridge_agent import ClinicAgent
+        analytics = None
+        if asks_for_figures(request):
+            graph, graph_unavailable = _graph_analytics(app, parsed)
+            queue, queue_unavailable = _queue_summary(app)
+            analytics = {"as_of": parsed.isoformat() if parsed else None,
+                         "graph": graph, "graph_unavailable": graph_unavailable,
+                         "queue": queue, "queue_unavailable": queue_unavailable,
+                         "note": FIGURES_NOTE}
 
-            from .agent_tools import build_structural_registry
+        notes: list[ConsoleNote] = []
+        if analytics is not None:
+            notes.append(console_note("figures_on_request"))
 
-            registry = build_structural_registry(brain.store, as_of=parsed)
-            answer = ClinicAgent(registry, _reasoning_harness(app)).ask(question)
-        except Exception:                                            # noqa: BLE001
-            log.exception("the clinic agent failed on %r", question[:120])
-            return _refusal("AGENT_UNAVAILABLE",
-                            "the agent could not complete this read; see server logs. No partial "
-                            "answer is returned, because a partial answer is the one thing worse "
-                            "than none here", status=503)
+        if gated is not None:
+            # PROPOSE. The screen called this send-shaped, so it is a request to act.
+            notes.extend([console_note("proposal_only"), console_note("no_authentication")])
+            intake_id = (payload.intake_id or "").strip()
+            if not intake_id:
+                notes.insert(0, console_note("needs_an_intake"))
+                return ConsoleResponse(request=echoed, intent="propose", analytics=analytics,
+                                       notes=tuple(notes))
+            try:
+                proposed, blocked = propose_actions(app, intake_id,
+                                                    typed_address=payload.typed_address,
+                                                    typed_by=payload.typed_by)
+            except Exception:                                        # noqa: BLE001
+                log.exception("could not propose actions for %r", intake_id)
+                return _refusal("PROPOSAL_UNAVAILABLE",
+                                "the clinic's rules could not be evaluated for that "
+                                "registration; see server logs. Nothing was drafted.",
+                                status=503)
+            return ConsoleResponse(request=echoed, intent="propose", proposed=tuple(proposed),
+                                   blocked=tuple(blocked), analytics=analytics,
+                                   notes=tuple(notes))
 
-        response = answer.public()
-        if not response.refused and not response.values:
-            # Refuse rather than render an empty answer. The wording is the agent's own
-            # code-authored note, so the same sentence appears whichever path produced it.
-            from databridge_agent.render import NOTHING_ANSWERED, note_text
-
-            return _refusal("NO_GROUNDED_ANSWER", note_text(NOTHING_ANSWERED))
-        return response
+        # ANSWER.
+        answered, refused, _status = _run_agent(app, request, parsed)
+        if answered is not None:
+            notes.append(console_note("answer_is_a_list"))
+        return ConsoleResponse(request=echoed, intent="answer", answer=answered,
+                               analytics=analytics, notes=tuple(notes), refusal=refused)

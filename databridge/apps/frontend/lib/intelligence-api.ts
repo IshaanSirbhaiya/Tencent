@@ -9,6 +9,7 @@
 // `databridge_graph.analytics.compute` (a traversal) or by the confirm gate itself; the browser
 // only renders and links.
 import { GATEWAY } from "./api";
+import type { ActionCard, BlockedProposal } from "./outbox-api";
 import type { Refusal, SourcePointer } from "./types";
 
 /** A count and the population it was counted over, plus the ids behind it. Never one without
@@ -225,3 +226,65 @@ export function labelOf(graph: GraphAnalytics | null, id: string): string {
 export function kindOf(graph: GraphAnalytics | null, id: string): string | null {
   return graph?.entities?.[id]?.kind ?? null;
 }
+
+// --- the console -----------------------------------------------------------------------
+//
+// `POST /intelligence/console` is the request box. One request, one response describing
+// everything that happened: the grounded answer, any proposed actions, and the figures — but only
+// when the request asked for them.
+//
+// Which half ran is `intent`, and it is decided by a deterministic screen on the backend
+// (`databridge_agent.screen_question`), never by a model. That matters more than it looks: the
+// screen that already refuses "email the blocked list to someone" is the same one that routes a
+// request implying an act to the draft path, so nothing a document could write chooses between
+// "read the graph" and "write to a patient".
+
+
+/** A code-authored sentence, addressed by key. Both halves come from a closed table in
+ *  `intelligence_routes.CONSOLE_NOTES` — never from a model. */
+export interface ConsoleNote {
+  key: string;
+  text: string;
+}
+
+/** The ONLY shape `POST /intelligence/console` returns.
+ *
+ *  `answer` is the same `AgentResponse` the read-only endpoint returns, nested rather than
+ *  flattened: flattening would put the two types' fields in one namespace, and the next field
+ *  added to either would silently widen the other.
+ *
+ *  `refusal` is why the grounded answer is absent, when it is. The console answers with a 200 and
+ *  this field rather than an HTTP error, because one request produces one description of what
+ *  happened — the read half can fail while the figures half stands, and a 4xx would throw away the
+ *  half that worked. */
+export interface ConsoleResponse {
+  request: string;
+  intent: "answer" | "propose";
+  answer: AgentAsk | null;
+  proposed: ActionCard[];
+  blocked: BlockedProposal[];
+  /** The figure payload, present only when the request asked for figures. */
+  analytics: IntelligenceResponse | null;
+  notes: ConsoleNote[];
+  refusal?: Refusal;
+}
+
+export interface ConsoleRequest {
+  request: string;
+  as_of?: string | null;
+  /** Which registration this concerns. Named by a PERSON — the agent may not choose. */
+  intake_id?: string | null;
+  /** Door (b) of the recipient rule: an address a member of staff typed. Read only by a clinic
+   *  rule that declares that door; a rule declaring `committed_ledger` refuses one outright. */
+  typed_address?: string | null;
+  typed_by?: string | null;
+}
+
+export const consoleApi = {
+  request: (body: ConsoleRequest) =>
+    call<ConsoleResponse>("/intelligence/console", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+};

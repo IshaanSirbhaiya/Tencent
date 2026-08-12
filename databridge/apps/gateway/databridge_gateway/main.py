@@ -25,6 +25,7 @@ from databridge_semantic.confirmation import ConfirmationSession, MandatoryRevie
 from . import demo_state as ds
 from .evidence_routes import register_evidence_routes
 from .export_routes import register_export_routes
+from .outbox_routes import register_outbox_routes
 from .mcp_routes import register_mcp_routes
 from .intake_routes import _register_intake_routes
 from .intelligence_routes import _register_intelligence_routes
@@ -116,6 +117,9 @@ def create_app() -> FastAPI:
     register_evidence_routes(app)
     register_mcp_routes(app)
     register_export_routes(app)
+    # The send gate over HTTP: drafts, the two human decisions, and the trigger for the
+    # model-free dispatcher. This process imports no transport — execution is a subprocess.
+    register_outbox_routes(app)
 
     # ---- intelligence: the graph, interpreted ----------------------------------
     # Counts of STRUCTURAL FACTS, each with its denominator and each walkable to the

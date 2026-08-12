@@ -72,3 +72,6 @@ dist/
 *~
 ehthumbs.db
 desktop.ini
+
+# The outbox store the gateway and the dispatcher share. A runtime artefact, not source.
+databridge/var/
