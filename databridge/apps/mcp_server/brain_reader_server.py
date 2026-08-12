@@ -80,19 +80,29 @@ def build_reader_server(brain: Optional[ReadOnlyBrain] = None, *, port: Optional
     # Written out one by one rather than looped, so each tool keeps a real signature for the
     # schema the agent is shown. `seal_registry` below is what stops the list drifting from the
     # allow-list — the explicitness is for the schema, not for the boundary.
-    @mcp.tool()
+    #
+    # The DESCRIPTION comes from the manifest rather than a docstring here. Registering these
+    # without one produced four tools that an aggregator listed with blank descriptions — a model
+    # choosing between `brain_neighbors` and `brain_path` would have had nothing but the names to
+    # go on, which is a broken tool surface even though every test passed. Taking the text from
+    # `READ_CAPABILITIES` also means the description cannot drift from the allow-list entry that
+    # authorises the tool: they are the same object.
+    def _summary(name: str) -> str:
+        return next(c.summary for c in READ_CAPABILITIES if c.name == name)
+
+    @mcp.tool(description=_summary("brain_query"))
     def brain_query(question: str, as_of: Optional[str] = None) -> dict:
         return brain.brain_query(question, as_of)
 
-    @mcp.tool()
+    @mcp.tool(description=_summary("brain_neighbors"))
     def brain_neighbors(entity: str, depth: int = 1) -> dict:
         return brain.brain_neighbors(entity, depth)
 
-    @mcp.tool()
+    @mcp.tool(description=_summary("brain_timeline"))
     def brain_timeline(entity: str) -> dict:
         return brain.brain_timeline(entity)
 
-    @mcp.tool()
+    @mcp.tool(description=_summary("brain_path"))
     def brain_path(from_entity: str, to_entity: str) -> dict:
         return brain.brain_path(from_entity, to_entity)
 

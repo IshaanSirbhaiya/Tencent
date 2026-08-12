@@ -395,3 +395,24 @@ def test_the_capability_record_carries_no_effect_label():
     checks it. Membership of a list that decides a process is what this file can actually test."""
     fields = set(capabilities.Capability.__dataclass_fields__)
     assert fields == {"name", "method", "summary"}
+
+
+def test_every_exposed_tool_carries_the_manifest_description():
+    """A tool with no description is a tool a model cannot choose.
+
+    The reader registered four tools with EMPTY descriptions and every test still passed — the
+    boundary held, the schemas were right, and the surface was unusable: an aggregator listed
+    four bare names. Taking the text from the manifest also means it cannot drift from the
+    allow-list entry that authorises the tool, because they are the same object.
+    """
+    from capabilities import READ_CAPABILITIES
+    from brain_reader_server import build_reader_server
+
+    server = build_reader_server()
+    registered = {t.name: t for t in server._tool_manager.list_tools()}
+    assert set(registered) == {c.name for c in READ_CAPABILITIES}
+    for capability in READ_CAPABILITIES:
+        described = (registered[capability.name].description or "").strip()
+        assert described, f"{capability.name} is exposed with no description"
+        assert described == capability.summary.strip(), (
+            f"{capability.name}'s description has drifted from its manifest entry")
