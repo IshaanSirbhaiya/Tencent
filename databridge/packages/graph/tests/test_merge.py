@@ -1,4 +1,12 @@
-"""merge.py — idempotent upsert, canonical/fuzzy resolution, supersession (T08 §6/§7)."""
+"""merge.py — idempotent upsert, canonical/fuzzy resolution, supersession.
+
+The subject of these tests is ORG nodes, deliberately. Entity merging is the right behaviour for
+organisations — the clinic's own fixtures print "Coral Harbour Pte Ltd", "CORAL HARBOUR PTE
+LIMITED" and "CORAL HARBOUR PTE LTD" across three documents, and they are one employer. It is the
+WRONG behaviour for patients, which is why `resolve.py` matches registry names exactly with no
+fuzzy tolerance and never merges two people. Testing the merge path on orgs keeps that distinction
+visible in the test suite rather than only in prose.
+"""
 from __future__ import annotations
 
 import datetime as dt
@@ -14,17 +22,19 @@ from databridge_graph import (
 from databridge_graph.schema import node_id
 
 _UTC = dt.timezone.utc
-_T0 = dt.datetime(2024, 1, 1, tzinfo=_UTC)
-_LEARN = dt.datetime(2024, 6, 1, tzinfo=_UTC)
+_T0 = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+_LEARN = dt.datetime(2026, 8, 1, tzinfo=_UTC)
+
+CORAL = "org:coral-harbour"
 
 
 def _ptr(src="d"):
     return SourcePointer(source_id=src, kind="doc_span", document_id=src, char_start=0, char_end=5)
 
 
-def _person(label, canonical=None, attrs=None, src="d"):
-    return GraphNode(id=node_id(NodeKind.PERSON, (canonical or label).lower()),
-                     kind=NodeKind.PERSON, label=label, canonical_id=canonical,
+def _org(label, canonical=None, attrs=None, src="d"):
+    return GraphNode(id=node_id(NodeKind.ORG, (canonical or label).lower()),
+                     kind=NodeKind.ORG, label=label, canonical_id=canonical,
                      attrs=attrs or {}, sources=[_ptr(src)], valid_from=_T0, system_from=_LEARN)
 
 
@@ -33,79 +43,94 @@ def _store():
 
 
 def test_token_set_ratio_ranks_real_matches_high():
-    assert token_set_ratio("Acme Corp", "Acme Corporation") >= 0.92
-    assert token_set_ratio("Acme Corp", "Acme Inc") >= 0.92          # legal suffixes folded
-    assert token_set_ratio("Sarah Chen", "David Chen") < 0.92        # only surname overlaps
+    assert token_set_ratio("Coral Harbour Pte Ltd", "Coral Harbour Pte Limited") >= 0.92
+    assert token_set_ratio("Coral Harbour Pte Ltd", "Coral Harbour") >= 0.92
+    assert token_set_ratio("Meridian Life", "Northstar Life") < 0.92     # only "Life" overlaps
 
 
 def test_token_set_ratio_rejects_subset_false_merge():
-    # the BLOCKER the review caught: a short name must NOT be absorbed by a longer one that
-    # merely contains it (size-aware metric, not rapidfuzz subset-leniency).
+    # a short name must NOT be absorbed by a longer one that merely contains it (size-aware
+    # metric, not rapidfuzz's subset leniency).
     assert token_set_ratio("Bank", "Bank of America") < 0.92
-    assert token_set_ratio("Apple", "Apple Computer Systems") < 0.92
+    assert token_set_ratio("Everwell", "Everwell Insurance Group Corporate Solutions") < 0.92
 
 
 def test_subset_label_does_not_false_merge():
     s = _store()
-    upsert_node(s, _person("Bank"))               # PERSON kind reused just for the merge path
-    upsert_node(s, _person("Bank of America"))
+    upsert_node(s, _org("Everwell"))
+    upsert_node(s, _org("Everwell Insurance Group Corporate Solutions"))
     assert s.counts()["nodes"] == 2               # distinct entities kept apart
 
 
 def test_exact_canonical_corroborates():
+    """The same org seen in a second document adds provenance, not a new version."""
     s = _store()
-    upsert_node(s, _person("Sarah Chen", "sarah@x.com", src="email"))
-    o = upsert_node(s, _person("Sarah Chen", "sarah@x.com", src="hr"))   # same facts, new source
+    upsert_node(s, _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_01"))
+    o = upsert_node(s, _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_03"))
     assert o.action == "corroborated" and o.matched_by == "canonical"
     assert s.counts()["nodes"] == 1 and s.counts()["sources"] == 2
 
 
+def test_a_changed_label_supersedes_rather_than_silently_rewriting():
+    """A different printed spelling on the same canonical id is a CHANGED FACT, so it opens a new
+    bi-temporal version and closes the old one (ADR-0003, invalidate-don't-delete). "What did this
+    document call them?" stays answerable — which is why `clinic_seed` merges the three Coral
+    Harbour spellings into one node before upserting rather than upserting each in turn."""
+    s = _store()
+    upsert_node(s, _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_01"))
+    o = upsert_node(s, _org("CORAL HARBOUR PTE LIMITED", "coral-harbour", src="chit_03"))
+    assert o.action == "superseded"
+    assert len(s.all_node_versions(CORAL)) == 2
+
+
 def test_canonical_supersede_on_changed_facts():
     s = _store()
-    upsert_node(s, _person("Sarah Chen", "sarah@x.com", attrs={"role": "VP"}))
-    o = upsert_node(s, _person("Sarah Chen", "sarah@x.com", attrs={"role": "CEO"}))
+    upsert_node(s, _org("Coral Harbour", "coral-harbour", attrs={"kind": "employer"}))
+    o = upsert_node(s, _org("Coral Harbour", "coral-harbour", attrs={"kind": "insurer"}))
     assert o.action == "superseded"
     # one OPEN version (the new one), one closed (the old) — invalidate-don't-delete (ADR-0003)
     assert s.counts()["nodes"] == 1
-    assert len(s.all_node_versions("person:sarah@x.com")) == 2
-    assert s.open_node_row("person:sarah@x.com")["attrs_json"].find("CEO") >= 0
+    assert len(s.all_node_versions(CORAL)) == 2
+    assert s.open_node_row(CORAL)["attrs_json"].find("insurer") >= 0
 
 
 def test_supersede_old_version_has_nonzero_system_interval():
     # even under a PINNED clock the superseded version's system interval is non-zero, so "what we
-    # believed before the correction" stays queryable (review HIGH 2 — zero-width [S,S) bug)
+    # believed before the correction" stays queryable.
     s = _store()
-    upsert_node(s, _person("Sarah Chen", "sarah@x.com", attrs={"role": "VP"}))
-    upsert_node(s, _person("Sarah Chen", "sarah@x.com", attrs={"role": "CEO"}))
-    versions = s.all_node_versions("person:sarah@x.com")
+    upsert_node(s, _org("Coral Harbour", "coral-harbour", attrs={"kind": "employer"}))
+    upsert_node(s, _org("Coral Harbour", "coral-harbour", attrs={"kind": "insurer"}))
+    versions = s.all_node_versions(CORAL)
     old = next(v for v in versions if v["system_to"] is not None)
     assert old["system_from"] < old["system_to"]          # strictly non-zero interval
 
 
-def test_extracted_mention_corroborates_and_preserves_seed_attrs():
-    # a drag-drop fixture re-extracts a seed person with EMPTY attrs + a later valid_from; that must
-    # CORROBORATE (preserve the seed's role/email/valid_from), not supersede-and-wipe them.
+def test_reextraction_corroborates_and_preserves_seed_attrs():
+    # re-extracting a seeded org from a second document yields EMPTY attrs and a later valid_from;
+    # that must CORROBORATE (preserving the seed's attrs and valid_from), not supersede-and-wipe.
     import json as _json
 
     s = _store()
-    upsert_node(s, _person("Sarah Chen", "sarah@x.com", attrs={"role": "CEO", "email": "sarah@x.com"}))
-    poor = GraphNode(id=node_id(NodeKind.PERSON, "sarah@x.com"), kind=NodeKind.PERSON,
-                     label="Sarah Chen", canonical_id="sarah@x.com", attrs={}, sources=[_ptr("doc2")],
-                     valid_from=dt.datetime(2024, 6, 1, tzinfo=_UTC), system_from=_LEARN)
+    upsert_node(s, _org("Coral Harbour", "coral-harbour",
+                        attrs={"kind": "employer", "issuer_code": None}))
+    poor = GraphNode(id=node_id(NodeKind.ORG, "coral-harbour"), kind=NodeKind.ORG,
+                     label="Coral Harbour", canonical_id="coral-harbour", attrs={},
+                     sources=[_ptr("chit_09")],
+                     valid_from=dt.datetime(2026, 8, 1, tzinfo=_UTC), system_from=_LEARN)
     o = upsert_node(s, poor)
     assert o.action == "corroborated"
-    row = s.open_node_row("person:sarah@x.com")
-    assert _json.loads(row["attrs_json"]) == {"role": "CEO", "email": "sarah@x.com"}  # preserved
-    assert row["valid_from"].startswith("2024-01-01")                                 # not bumped
-    assert s.counts()["nodes"] == 1 and s.counts()["sources"] == 2                    # provenance grew
+    row = s.open_node_row(CORAL)
+    assert _json.loads(row["attrs_json"]) == {"kind": "employer", "issuer_code": None}
+    assert row["valid_from"].startswith("2026-01-01")                                 # not bumped
+    assert s.counts()["nodes"] == 1 and s.counts()["sources"] == 2                    # grew
 
 
 def test_idempotent_with_non_json_native_attrs():
-    # attrs that aren't JSON-native (a date) must still compare equal on re-upsert (no endless
-    # supersede loop) — review MEDIUM 3
+    # attrs that aren't JSON-native (a date) must still compare equal on re-upsert, or the node
+    # supersedes itself forever.
     import datetime as _dt
     s = _store()
-    n = _person("Tom Walsh", "tom@x.com", attrs={"hired": _dt.date(2024, 1, 1)})
+    n = _org("Meridian Life Assurance", "MRDEB", attrs={"since": _dt.date(2026, 1, 1)})
     upsert_node(s, n)
     o = upsert_node(s, n)
     assert o.action == "corroborated" and s.counts()["nodes"] == 1
@@ -113,21 +138,24 @@ def test_idempotent_with_non_json_native_attrs():
 
 def test_fuzzy_merge_without_canonical():
     s = _store()
-    upsert_node(s, _person("Acme Corp"))
-    o = upsert_node(s, _person("Acme Corporation"))
+    upsert_node(s, _org("Coral Harbour Pte Ltd"))
+    o = upsert_node(s, _org("Coral Harbour Pte Limited"))
     assert o.matched_by == "fuzzy" and s.counts()["nodes"] == 1
 
 
 def test_distinct_canonical_never_fuzzy_merges():
+    """Two issuers with near-identical names but different codes are different payers — billing
+    the wrong one is a real-money error, so an explicit canonical id always beats name similarity.
+    """
     s = _store()
-    upsert_node(s, _person("Sarah Chen", "sarah@x.com"))
-    upsert_node(s, _person("Sarah Chen", "sarah@y.com"))   # same name, DIFFERENT email
-    assert s.counts()["nodes"] == 2                          # different identities, kept apart
+    upsert_node(s, _org("Everwell Insurance Group", "EVWPA"))
+    upsert_node(s, _org("Everwell Insurance Group", "EVWME"))
+    assert s.counts()["nodes"] == 2                          # different payers, kept apart
 
 
 def test_idempotent_reupsert_is_noop_on_count():
     s = _store()
-    n = _person("Tom Walsh", "tom@x.com")
+    n = _org("Northstar Life Assurance", "NSTNBU")
     upsert_node(s, n)
     upsert_node(s, n)
     upsert_node(s, n)

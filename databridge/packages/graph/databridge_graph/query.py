@@ -23,6 +23,7 @@ from typing import Optional
 from databridge_convert.generate.claim_check import check_claims
 from databridge_core import SourcePointer
 
+from .retrieval import Bm25Index, Candidate
 from .schema import EdgeKind, GraphEdge, GraphNode, NodeKind
 from .store import GraphStore, row_to_edge, row_to_node
 
@@ -228,30 +229,31 @@ def _searchable(node: GraphNode) -> str:
 
 
 def link_entities(store: GraphStore, question: str, *, top_k: int = 3) -> list[GraphNode]:
-    """Deterministic entity linking: rank open nodes by question-token overlap, tiebreaking on
-    LABEL coverage so a question's named entity beats a fact that merely mentions it. No model.
+    """Deterministic entity linking by **BM25** over label + canonical_id + attribute text.
 
-    e.g. "who owns Project Atlas" → the PROJECT 'Project Atlas' (label fully covered) outranks the
-    FACT 'Project Atlas estimated completion' (label half-covered); "who is Sarah Chen" → the
-    PERSON (label fully covered) outranks a decision whose ``made_by`` is 'Sarah Chen'."""
-    qt = set(_q_tokens(question))
-    if not qt:
+    e.g. "what does WELL2 include" → the PACKAGE 'WELL2' (its name is fully accounted for) outranks
+    the COVERAGE_RULE that merely names it.
+
+    This replaced a raw token-overlap scorer that used a **substring** test, under which the token
+    ``life`` matched ``…Life Assurance`` and *"What is the meaning of life?"* returned four
+    insurers. See `retrieval.py` for the scoring, and note that it can now return **nothing**: below
+    `MIN_SCORE` we decline rather than hand back the least-bad node. `packages/evals/e_retrieval.py`
+    measures both directions.
+
+    DOCUMENT nodes stay excluded — they are PROVENANCE (the answer cites them), never the answer
+    entity. Address them by `document_node_id`.
+    """
+    rows = [r for r in store.open_nodes() if r["kind"] != NodeKind.DOCUMENT.value]
+    if not rows:
         return []
-    scored: list[tuple[int, float, GraphNode]] = []
-    for r in store.open_nodes():
-        if r["kind"] == NodeKind.DOCUMENT.value:
-            continue  # documents are PROVENANCE (the answer cites them), never the answer entity
-        node = row_to_node(store, r)
-        text = _searchable(node)
-        overlap = sum(1 for t in qt if t in text)
-        if not overlap:
-            continue
-        label_toks = set(_QTOK.findall(node.label.lower()))
-        # coverage = fraction of the node's OWN name explained by the question (specificity)
-        cov = (sum(1 for t in label_toks if t in qt) / len(label_toks)) if label_toks else 0.0
-        scored.append((overlap, cov, node))
-    scored.sort(key=lambda s: (s[0], s[1]), reverse=True)
-    return [n for _, _, n in scored[:top_k]]
+    nodes = [row_to_node(store, r) for r in rows]
+    index = Bm25Index([
+        Candidate(id=n.id, label=n.label, canonical_id=n.canonical_id,
+                  attr_text=" ".join(str(v) for v in n.attrs.values()))
+        for n in nodes
+    ])
+    by_id = {n.id: n for n in nodes}
+    return [by_id[s.id] for s in index.search(question, top_k=top_k)]
 
 
 def _node_citation(store: GraphStore, node: GraphNode) -> Citation:
@@ -281,15 +283,11 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
     allowed: list[str] = []          # grounded fact forms the answer may use — ALL from cited nodes
 
     def _allow_forms(n: GraphNode) -> list[str]:
-        # every quantity-bearing form a cited node legitimately contributes (label + canonical
-        # rendered fact + a decision's made_at date) — the ONLY source of `allowed` entries, so a
-        # whitelisted token is, by construction, a value of a cited (grounded) node.
-        forms = [n.label]
-        if n.attrs.get("rendered"):
-            forms.append(str(n.attrs["rendered"]))
-        if n.kind == NodeKind.DECISION and n.attrs.get("made_at"):
-            forms.append(str(n.attrs["made_at"]))
-        return forms
+        # Every quantity-bearing form a cited node legitimately contributes: its label and each of
+        # its attribute values. This is the ONLY source of `allowed` entries, so a whitelisted
+        # token is, by construction, a value of a cited (and therefore grounded) node — which is
+        # exactly the property `check_claims` relies on.
+        return [n.label, *(str(v) for v in n.attrs.values() if v is not None)]
 
     def cite(n: GraphNode) -> None:
         if n.id not in cited_ids:
@@ -300,56 +298,75 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
     cite(primary)
 
     # --- intent templates (deterministic) ---------------------------------------
-    if primary.kind == NodeKind.FACT:
-        rendered = primary.attrs.get("rendered", primary.label)
-        sentences.append(f"{primary.label}." if rendered in primary.label
-                         else f"{primary.label}: {rendered}.")
-    elif primary.kind == NodeKind.PERSON:
-        role = primary.attrs.get("role")
-        org = next((node_by_id[e.dst_id] for e in sub.edges
-                    if e.kind == EdgeKind.WORKS_AT and e.src_id == primary.id
-                    and e.dst_id in node_by_id), None)
+    def _linked(kind: EdgeKind, *, incoming: bool) -> list[GraphNode]:
+        end, other = ("dst_id", "src_id") if incoming else ("src_id", "dst_id")
+        return [node_by_id[getattr(e, other)] for e in sub.edges
+                if e.kind == kind and getattr(e, end) == primary.id
+                and getattr(e, other) in node_by_id]
+
+    if primary.kind == NodeKind.PATIENT:
+        # A patient answer describes REGISTRY data and the documents that CLAIM to be about this
+        # person. It never states that identity has been established — the FOR_PATIENT edges below
+        # are claims, and where a document has several candidates it produced several such edges
+        # (ADR-0009; CLAUDE.md §Hard constraints 1).
         bits = [primary.label]
-        if role:
-            bits.append(f"is {role}")
-        if org:
-            cite(org)
-            bits.append(f"at {org.label}")
+        if primary.attrs.get("date_of_birth"):
+            bits.append(f"(registry date of birth {primary.attrs['date_of_birth']})")
         sentences.append(" ".join(bits) + ".")
-        decided = [node_by_id[e.dst_id] for e in sub.edges
-                   if e.kind == EdgeKind.DECIDED and e.src_id == primary.id and e.dst_id in node_by_id]
-        for d in decided:
-            cite(d)
-            sentences.append(f"{primary.label} decided: {d.label}.")
-    elif primary.kind == NodeKind.DECISION:
-        decider = next((node_by_id[e.src_id] for e in sub.edges
-                        if e.kind == EdgeKind.DECIDED and e.dst_id == primary.id
-                        and e.src_id in node_by_id), None)
+        for doc in _linked(EdgeKind.FOR_PATIENT, incoming=True):
+            cite(doc)
+            sentences.append(
+                f"{doc.label} names this patient — a claim on the document, not a verified "
+                f"identity; staff confirm identity in person.")
+    elif primary.kind == NodeKind.ORG:
+        bits = [primary.label]
+        if primary.attrs.get("kind"):
+            bits.append(f"is a {primary.attrs['kind']}")
+        if primary.attrs.get("billing_party"):
+            bits.append(f"billing the {primary.attrs['billing_party']}")
+        sentences.append(" ".join(bits) + ".")
+        for doc in _linked(EdgeKind.ISSUED, incoming=False):
+            cite(doc)
+            sentences.append(f"{primary.label} issued {doc.label}.")
+    elif primary.kind == NodeKind.PACKAGE:
         s = primary.label
-        if decider:
-            cite(decider)
-            s += f" — decided by {decider.label}"
-        made_at = primary.attrs.get("made_at")
-        if made_at:
-            s += f" on {made_at}"          # ISO date already in `allowed` via cite(primary)
+        if primary.attrs.get("name"):
+            s += f" — {primary.attrs['name']}"
+        if primary.attrs.get("eligibility"):
+            s += f" ({primary.attrs['eligibility']})"
         sentences.append(s + ".")
-    elif primary.kind == NodeKind.PROJECT:
-        owner = next((node_by_id[e.src_id] for e in sub.edges
-                      if e.kind == EdgeKind.OWNS and e.dst_id == primary.id
-                      and e.src_id in node_by_id), None)
-        status = primary.attrs.get("status")
-        s = primary.label + (f" (status: {status})" if status else "")
-        if owner:
-            cite(owner)
-            s += f", owned by {owner.label}"
+        included = _linked(EdgeKind.INCLUDES_TEST, incoming=False)
+        for t in included:
+            cite(t)
+        if included:
+            sentences.append(
+                f"{primary.label} includes: {', '.join(t.label for t in included)}.")
+    elif primary.kind == NodeKind.TEST:
+        s = primary.label
+        if primary.attrs.get("category"):
+            s += f" ({primary.attrs['category']})"
         sentences.append(s + ".")
-        affecting = [(e, node_by_id[e.src_id]) for e in sub.edges
-                     if e.kind in (EdgeKind.FUNDS, EdgeKind.BLOCKS, EdgeKind.ENABLES)
-                     and e.dst_id == primary.id and e.src_id in node_by_id]
-        for e, dnode in affecting:
-            cite(dnode)
-            sentences.append(f"{dnode.label} {e.kind.value} this project.")
-    else:  # ORG / DOCUMENT
+        for pkg in _linked(EdgeKind.INCLUDES_TEST, incoming=True):
+            cite(pkg)
+            sentences.append(f"Included in package {pkg.label}.")
+    elif primary.kind == NodeKind.COVERAGE_RULE:
+        s = primary.label
+        if primary.attrs.get("issuer_code"):
+            s += f" — issuer {primary.attrs['issuer_code']}"
+        if primary.attrs.get("billed_to"):
+            s += f", billed to {primary.attrs['billed_to']}"
+        if primary.attrs.get("eligibility"):
+            s += f" ({primary.attrs['eligibility']})"
+        sentences.append(s + ".")
+    elif primary.kind == NodeKind.VISIT:
+        s = primary.label
+        if primary.attrs.get("appointment"):
+            s += f" — appointment {primary.attrs['appointment']}"
+        sentences.append(s + ".")
+        for clinic in _linked(EdgeKind.AT_CLINIC, incoming=False):
+            cite(clinic)
+            sentences.append(f"At {clinic.label}.")
+    else:  # CLINIC / DOCUMENT
         sentences.append(f"{primary.label}.")
 
     answer = " ".join(sentences)

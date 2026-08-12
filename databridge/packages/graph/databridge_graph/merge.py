@@ -34,7 +34,8 @@ FUZZY_THRESHOLD = 0.92
 # --- token-set ratio (size-AWARE; stdlib-only via difflib) ------------------------
 _TOKEN = re.compile(r"[a-z0-9]+")
 # legal-form folding (04_PRD §6): a company's legal suffix must not block a real match, so
-# "Acme Corp" / "Acme Corporation" / "Acme Inc" all normalise to the same core token set.
+# "Coral Harbour Pte Ltd" / "Coral Harbour Pte Limited" / "Coral Harbour" all normalise to the
+# same core token set.
 # Spelled-out forms are folded too (else "corp" folds but "corporation" doesn't → asymmetry).
 _SUFFIXES = {"inc", "incorporated", "ltd", "limited", "llc", "corp", "corporation", "co",
              "company", "pte", "plc", "gmbh", "sa", "ag", "nv", "bv", "holdings", "group"}
@@ -67,14 +68,31 @@ class UpsertOutcome:
     matched_by: str = ""     # "canonical" | "fuzzy" | ""
 
 
+# Kinds for which NAME SIMILARITY MUST NEVER MERGE TWO NODES.
+#
+# Merging by name is right for organisations — "Coral Harbour Pte Ltd" and "Coral Harbour Pte
+# Limited" are one employer. It is catastrophic for patients. The registry holds THREE patients
+# named "Loh Wei Ming" and two named "Devi Hui Min"; fuzzy-merging them collapses different people
+# into one node, and merging an extracted document mention into a registry row is the machine
+# deciding whose record this is — precisely the determination that is reserved for a human, in
+# person (CLAUDE.md §Hard constraints 1; ADR-0009).
+#
+# A PATIENT therefore merges ONLY on an exact canonical_id (the NRIC/FIN/passport, or the derived
+# patient_id). Absent that, a new node is inserted and the duplicate is visible — which is the
+# safe direction: two nodes staff can tell apart beats one node that silently fused two people.
+NEVER_FUZZY_MERGE = frozenset({NodeKind.PATIENT})
+
+
 def _resolve_existing(store: GraphStore, incoming: GraphNode):
     """Return (open_row, matched_by) for the existing node the incoming one resolves to, else
     (None, "")."""
-    # 1) exact canonical match (strongest signal — an email IS the identity)
+    # 1) exact canonical match (strongest signal — an NRIC or an issuer code IS the identity)
     if incoming.canonical_id:
         row = store.find_by_canonical(incoming.kind, incoming.canonical_id)
         if row is not None:
             return row, "canonical"
+    if incoming.kind in NEVER_FUZZY_MERGE:
+        return None, ""
     # 2) fuzzy name+kind fallback within the same kind
     best, best_score = None, 0.0
     for row in store.open_nodes_of_kind(incoming.kind):

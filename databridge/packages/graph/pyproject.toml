@@ -1,14 +1,19 @@
-# packages/graph — the Company Brain (Pillar 1, T08). Bi-temporal knowledge graph over
-# SQLite (stdlib), grounded NL query, demo seed. Reuses convert (claim_check, C15) + harness.
+# packages/graph — the clinic operational brain. Bi-temporal knowledge graph over SQLite
+# (stdlib), grounded NL query, and the clinic seed. Reuses convert (claim_check, C15) + harness.
 [project]
 name = "databridge-graph"
 version = "0.0.0"
-description = "DataBridge graph: bi-temporal Company-Brain knowledge graph (T08)"
+description = "DataBridge graph: bi-temporal clinic knowledge graph (ADR-0009)"
 requires-python = ">=3.11"
 dependencies = [
   "databridge-core",
   "databridge-harness",
   "databridge-convert",
+  # clinic_seed builds the graph from the intake registry, resolver and coverage rules, and is
+  # re-exported from databridge_graph.__init__ — so this is a hard dependency of the package's
+  # primary entry point, not an optional extra. The test suite passes without it declared only
+  # because the root pytest `pythonpath` lists every package; an installed wheel would not.
+  "databridge-intake",
   "pydantic>=2.7",
 ]
 

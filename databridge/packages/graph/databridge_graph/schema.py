@@ -1,4 +1,4 @@
-"""Company-Brain graph schema (T08, 04_PRD §3; closed vocab frozen in ADR-0008).
+"""Clinic knowledge-graph schema (closed vocab frozen in ADR-0009, superseding ADR-0008).
 
 The graph is a **typed, bi-temporal** knowledge graph. Two axes, both MANDATORY (ADR-0003):
 
@@ -23,26 +23,40 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from databridge_core import SourcePointer
 
 
-# --- closed vocabularies (ADR-0008; change ONLY via an ADR amendment) -------------
+# --- closed vocabularies (ADR-0009; change ONLY via an ADR amendment) -------------
+# The *principle* from ADR-0008 is unchanged and is the point: the vocabulary is CLOSED. An
+# unrecognised kind is skipped, never coined on the fly — a graph that invents its own node types
+# to fit incoming data cannot be reasoned about, and "what kinds of thing are in here?" stops
+# having an answer. ADR-0009 replaces the members (the Acme Corp business-intelligence vocabulary)
+# with the clinic's, and nothing else about the model.
 class NodeKind(str, Enum):
-    PERSON = "person"
-    ORG = "org"
-    PROJECT = "project"
-    DECISION = "decision"
-    FACT = "fact"
-    DOCUMENT = "document"
+    PATIENT = "patient"              # a registry row — never an identity assertion
+    ORG = "org"                      # insurer, TPA, government scheme, employer
+    PACKAGE = "package"              # a named screening package (WELL2, PEE226)
+    TEST = "test"                    # a catalogue entry (chest_xray, resting_ecg)
+    DOCUMENT = "document"            # a referring chit letter / voucher / authorisation form
+    VISIT = "visit"                  # one intake occurrence
+    CLINIC = "clinic"                # a Parkway Shenton location
+    COVERAGE_RULE = "coverage_rule"  # one row of coverage_rules.yaml
 
 
 class EdgeKind(str, Enum):
-    WORKS_AT = "works_at"        # person → org (employment)
-    MENTIONED = "mentioned"      # person → person/project/decision
-    DECIDED = "decided"          # person → decision
-    OWNS = "owns"                # person → project
-    FUNDS = "funds"              # decision → project
-    BLOCKS = "blocks"            # decision → project/decision
-    ENABLES = "enables"          # decision → project/decision
-    REFERENCES = "references"    # document → person/project/decision
-    DEPENDS_ON = "depends_on"    # decision → decision / project → project
+    EMPLOYED_BY = "employed_by"        # patient → org
+    COVERED_BY = "covered_by"          # patient → org (the payer named on a document)
+    ISSUED = "issued"                  # org → document
+    AUTHORISES = "authorises"          # document → package / coverage_rule
+    REQUESTS_TEST = "requests_test"    # document → test (printed on the document)
+    INCLUDES_TEST = "includes_test"    # package → test (from the rule definition)
+    FOR_PATIENT = "for_patient"        # document/visit → patient (CLAIMED subject, see below)
+    AT_CLINIC = "at_clinic"            # visit → clinic
+    SCHEDULED_AS = "scheduled_as"      # visit → package
+    REFERENCES = "references"          # document → any node it cites
+
+
+# `FOR_PATIENT` is the one edge worth a warning. It records that a document *claims* to be about a
+# patient — it is built from the resolver's candidates, so a document with two equally-scored
+# candidates yields TWO such edges, and neither is a determination. Nothing downstream may read a
+# single FOR_PATIENT edge as "this is who the patient is" (CLAUDE.md §Hard constraints 1).
 
 
 # --- in-memory record shapes (the store persists these to SQLite) -----------------

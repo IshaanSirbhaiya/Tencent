@@ -195,10 +195,27 @@ def extract_graph(doc, harness: Harness, *, store: Optional[GraphStore] = None,
         out.relations.append(edge)
 
     if store is not None:
+        # A node may RESOLVE to an existing node under a different id (canonical or fuzzy merge).
+        # The edges above were built from the incoming ids, so they must be rewritten to the ids
+        # the store actually settled on — otherwise a merged endpoint leaves the edge pointing at
+        # an id that was never inserted. Nothing raises: the edge is simply invisible to every
+        # traversal, so the relationship silently disappears from the graph it was extracted for.
+        resolved: dict[str, str] = {}
         for node in out.entities:
-            out.upserts.append(upsert_node(store, node))
+            outcome = upsert_node(store, node)
+            out.upserts.append(outcome)
+            resolved[node.id] = outcome.id
+        remapped: list[GraphEdge] = []
         for edge in out.relations:
+            src_id = resolved.get(edge.src_id, edge.src_id)
+            dst_id = resolved.get(edge.dst_id, edge.dst_id)
+            if (src_id, dst_id) != (edge.src_id, edge.dst_id):
+                edge = edge.model_copy(update={
+                    "src_id": src_id, "dst_id": dst_id,
+                    "id": f"{src_id}|{edge.kind.value}|{dst_id}"})
+            remapped.append(edge)
             out.upserts.append(upsert_edge(store, edge))
+        out.relations[:] = remapped
     return out
 
 

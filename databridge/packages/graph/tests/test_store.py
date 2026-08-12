@@ -18,7 +18,7 @@ def _ptr(src="doc1"):
 
 
 def _node(nid="person:a", label="Alice", **kw):
-    return GraphNode(id=nid, kind=kw.pop("kind", NodeKind.PERSON), label=label,
+    return GraphNode(id=nid, kind=kw.pop("kind", NodeKind.PATIENT), label=label,
                      sources=[_ptr()], valid_from=_T0, system_from=_LEARN, **kw)
 
 
@@ -39,13 +39,13 @@ def test_add_node_and_read_back():
 def test_node_without_pointer_is_refused_at_construction():
     # the anti-fabrication wall fires at CONSTRUCTION (P4) — never reaches the store
     with pytest.raises(ValueError, match="anti-fabrication|SourcePointer|REFUSED"):
-        GraphNode(id="x", kind=NodeKind.FACT, label="ghost", sources=[],
+        GraphNode(id="x", kind=NodeKind.TEST, label="ghost", sources=[],
                   valid_from=_T0, system_from=_LEARN)
 
 
 def test_edge_without_pointer_is_refused():
     with pytest.raises(ValueError, match="REFUSED|SourcePointer"):
-        GraphEdge(id="e", src_id="a", dst_id="b", kind=EdgeKind.WORKS_AT, sources=[],
+        GraphEdge(id="e", src_id="a", dst_id="b", kind=EdgeKind.COVERED_BY, sources=[],
                   valid_from=_T0, system_from=_LEARN)
 
 
