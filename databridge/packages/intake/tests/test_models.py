@@ -7,6 +7,7 @@ worked around, every downstream protection is decorative.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 
 import pytest
 from pydantic import ValidationError
@@ -24,6 +25,20 @@ from databridge_intake import (
     SubjectBlock,
 )
 from databridge_intake.models import AuthorisationBlock
+
+
+def _fp(patient_id: str) -> str:
+    """A subject fingerprint for the state-machine tests.
+
+    `ConfirmationState` refuses a selection that cannot name the reading it was made about
+    (R-17), so every selection here needs one. The real digest —
+    `databridge_intake.ledger.subject_fingerprint_for` — needs a document revision and a candidate
+    list, and these tests deliberately have neither: they exercise the state machine, not the
+    pipeline. Derived per patient id so two subjects never share a digest, which is the property
+    that matters here; a constant would let one attestation stand in for another.
+    """
+    return hashlib.sha256(patient_id.encode("utf-8")).hexdigest()
+
 
 NOW = dt.datetime(2026, 8, 11, 9, 0, tzinfo=dt.timezone.utc)
 
@@ -107,14 +122,14 @@ def test_state_is_frozen_so_there_is_no_assignment_back_door():
 def test_select_patient_before_attestation_is_refused_and_leaves_state_untouched():
     s = ConfirmationState(intake_id="i1")
     with pytest.raises(ValidationError, match="verified identity in person"):
-        s.select_patient("pat:abc")
+        s.select_patient("pat:abc", subject_fingerprint=_fp("pat:abc"))
     assert s.selected_patient_id is None        # the original is unchanged, not half-applied
 
 
 def test_transitions_return_new_instances_leaving_the_prior_state_intact():
     s0 = ConfirmationState(intake_id="i1")
     s1 = s0.attest_identity_checked("staff:nurse-01", NOW)
-    s2 = s1.select_patient("pat:abc")
+    s2 = s1.select_patient("pat:abc", subject_fingerprint=_fp("pat:abc"))
     assert s0.identity_checked_in_person_by is None      # s0 untouched
     assert s1.selected_patient_id is None                # s1 untouched
     assert s2.selected_patient_id == "pat:abc"
@@ -144,7 +159,7 @@ def test_the_legitimate_order_works_attest_then_select_then_commit():
     ok, why = s.is_ready_to_commit()
     assert not ok and "no registry candidate has been selected" in why
 
-    s = s.select_patient("pat:abc")
+    s = s.select_patient("pat:abc", subject_fingerprint=_fp("pat:abc"))
     assert s.is_ready_to_commit() == (True, "")
 
     s = s.commit()

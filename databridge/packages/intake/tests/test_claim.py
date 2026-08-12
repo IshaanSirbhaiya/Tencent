@@ -24,7 +24,7 @@ from databridge_core import SourcePointer
 from databridge_intake.claim import (AmbiguousPackageRule, ClaimDraft, ClaimLine, ClaimValue,
                                      ConflictingSelections, NoPayerToClaimFrom,
                                      NothingCommitted, build_claim_draft)
-from databridge_intake.ledger import EvidenceLedger
+from databridge_intake.ledger import EvidenceLedger, subject_fingerprint_for
 from databridge_intake.models import ConfirmationState
 from databridge_intake.paths import fixtures_dir
 from databridge_intake.pipeline import run_intake
@@ -55,14 +55,24 @@ def drafts(texts) -> dict:
 
 
 def _attested(draft) -> ConfirmationState:
+    patient_id = draft.resolution.candidates[0].patient_id
     return (ConfirmationState(intake_id=draft.intake_id)
             .attest_identity_checked(STAFF, NOW)
-            .select_patient(draft.resolution.candidates[0].patient_id))
+            .select_patient(patient_id, subject_fingerprint=_subject(draft, patient_id)))
+
+
+def _subject(draft, patient_id: str = "") -> str:
+    """The digest binding an attestation to the reading it was made about (R-17). Derived from
+    this draft, so the commit below is authorised by a check made against this document revision
+    and this candidate list — which is the whole property, and a shared constant would remove it."""
+    return subject_fingerprint_for(draft.record, draft.resolution,
+                                   patient_id or draft.resolution.candidates[0].patient_id)
 
 
 def _committed_ledger(draft, *, field_paths=None) -> EvidenceLedger:
     ledger = EvidenceLedger()
-    ledger.commit(draft.record, _attested(draft), at=NOW, field_paths=field_paths)
+    ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft),
+                  at=NOW, field_paths=field_paths)
     return ledger
 
 

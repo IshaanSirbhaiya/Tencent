@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import hashlib
 
 import pytest
 
@@ -34,7 +35,12 @@ def _confirmed(patient):
 
     return (ConfirmationState(intake_id="t")
             .attest_identity_checked(STAFF, ATTESTED_AT)
-            .select_patient(patient.patient_id))
+            # A selection must name the reading it was made about (R-17). This unit test has no
+            # document behind it — it exercises the questionnaire, not the pipeline — so there is
+            # no real resolution to digest; derived per patient so two subjects never share one.
+            .select_patient(patient.patient_id,
+                            subject_fingerprint=hashlib.sha256(
+                                patient.patient_id.encode("utf-8")).hexdigest()))
 
 
 def _prefill(kind, patient=None, **kw):

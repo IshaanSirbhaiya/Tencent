@@ -7,11 +7,26 @@ from __future__ import annotations
 
 import csv
 import datetime as dt
+import hashlib
 
 import pytest
 from pydantic import ValidationError
 
 from databridge_core import GroundedValue, SourcePointer
+
+
+def _fp(patient_id: str) -> str:
+    """A subject fingerprint for the state-machine tests.
+
+    `ConfirmationState` refuses a selection that cannot name the reading it was made about
+    (R-17), so every selection here needs one. The real digest —
+    `databridge_intake.ledger.subject_fingerprint_for` — needs a document revision and a candidate
+    list, and these tests deliberately have neither: they exercise the state machine, not the
+    pipeline. Derived per patient id so two subjects never share a digest, which is the property
+    that matters here; a constant would let one attestation stand in for another.
+    """
+    return hashlib.sha256(patient_id.encode("utf-8")).hexdigest()
+
 from databridge_intake import (
     ConfirmationState,
     DocumentRef,
@@ -210,7 +225,7 @@ def test_model_copy_cannot_forge_a_committed_state():
 def test_model_copy_cannot_retract_an_attestation_under_a_live_selection():
     s = (ConfirmationState(intake_id="i1")
          .attest_identity_checked("staff:nurse-01", NOW)
-         .select_patient("pat:one"))
+         .select_patient("pat:one", subject_fingerprint=_fp("pat:one")))
     with pytest.raises(ValidationError, match="verified identity in person"):
         s.model_copy(update={"identity_checked_in_person_by": None})
 
@@ -235,8 +250,8 @@ def test_an_attester_without_a_time_cannot_be_constructed():
 def test_the_gate_stays_closed_once_committed():
     s = (ConfirmationState(intake_id="i1")
          .attest_identity_checked("staff:nurse-01", NOW)
-         .select_patient("pat:one").commit())
-    for action in (lambda: s.select_patient("pat:other"),
+         .select_patient("pat:one", subject_fingerprint=_fp("pat:one")).commit())
+    for action in (lambda: s.select_patient("pat:other", subject_fingerprint=_fp("pat:other")),
                    lambda: s.commit(),
                    lambda: s.confirm_field("f", "staff:1"),
                    lambda: s.attest_identity_checked("staff:2", NOW)):

@@ -38,7 +38,8 @@ from pydantic import BaseModel, Field
 from databridge_intake.guardrails import check_question
 from databridge_intake.id_document_guard import (screen_extracted_text, screen_upload)
 from databridge_intake.ledger import (AlreadyCommitted, EvidenceLedger, IdentityNotVerified,
-                                      LedgerError)
+                                      LedgerError, SubjectChanged, attestation_subject_matches,
+                                      subject_fingerprint_for)
 from databridge_intake.models import ConfirmationState
 from databridge_intake.ocr import (ExtractionUnavailable, MAX_UPLOAD_BYTES, UnsupportedUpload,
                                    extract_upload)
@@ -386,7 +387,11 @@ def _register_intake_routes(app: FastAPI) -> None:
                 "coverage_status": draft.coverage.status.value,
                 "eligibility_flags": draft.coverage.eligibility_flags,
                 "committed": state.committed,
-                "identity_verified": bool(state.identity_checked_in_person_by),
+                # NOT `bool(identity_checked_in_person_by)`. That reports an attestation made
+                # about a previous reading of this document as verification of the draft now in
+                # the queue — the same stale join R-22 found on `/intelligence`.
+                "identity_verified": attestation_subject_matches(
+                    draft.record, draft.resolution, state)[0],
             })
         return {"intakes": out}
 
@@ -397,14 +402,20 @@ def _register_intake_routes(app: FastAPI) -> None:
             return _refusal("UNKNOWN_INTAKE", f"no such intake '{intake_id}'", status=404)
         card = summary_card(held["draft"])
         state = app.state.confirmations.get(intake_id) or ConfirmationState(intake_id=intake_id)
+        # `is_ready_to_commit()` asks whether the STATE is complete; this asks whether it is
+        # complete *about this draft*. A re-upload re-reads the document and deliberately keeps
+        # the existing attestation, so the state stays "ready" over a record the check was never
+        # made against — the card must not offer a confirm button the gate is going to refuse.
+        applies, why = attestation_subject_matches(held["draft"].record, held["draft"].resolution,
+                                                   state)
         card["confirmation"] = {
             "identity_checked_in_person_by": state.identity_checked_in_person_by,
             "identity_checked_at": (state.identity_checked_at.isoformat()
                                     if state.identity_checked_at else None),
             "selected_patient_id": state.selected_patient_id,
             "committed": state.committed,
-            "ready_to_commit": state.is_ready_to_commit()[0],
-            "blocked_because": state.is_ready_to_commit()[1],
+            "ready_to_commit": applies,
+            "blocked_because": why,
         }
         return card
 
@@ -453,11 +464,20 @@ def _register_intake_routes(app: FastAPI) -> None:
                     f"identity was attested by {state.identity_checked_in_person_by!r}; only that "
                     f"staff member may select a candidate for this intake. If someone else is "
                     f"taking over, they must make their own in-person check on a new intake.")
+            # The digest of what this human is looking at RIGHT NOW: this reading of the
+            # document, this candidate list, this row out of it. Computed here, at the moment of
+            # attestation, because that is the only moment at which it is a record of a human
+            # act — computed later it would be a description of whatever the system happens to
+            # hold. `commit` compares it against the same digest recomputed over what is actually
+            # being committed, so an attestation cannot outlive the resolution it was made about
+            # (CLAUDE.md §Hard constraints 1).
             try:
+                fingerprint = subject_fingerprint_for(draft.record, draft.resolution,
+                                                      req.patient_id)
                 if not state.identity_checked_in_person_by:
                     state = state.attest_identity_checked(
                         req.staff_id, dt.datetime.now(dt.timezone.utc))
-                state = state.select_patient(req.patient_id)
+                state = state.select_patient(req.patient_id, subject_fingerprint=fingerprint)
             except ValueError as exc:
                 return _refusal("SELECTION_REFUSED", str(exc))
             # Re-run the pipeline WITH the selection BEFORE storing the state. Without the re-run
@@ -520,6 +540,18 @@ def _register_intake_routes(app: FastAPI) -> None:
                         "this intake changed while the document was being re-read — someone else "
                         "selected a patient or re-uploaded it. Nothing has been changed. Reload "
                         "the card and try again.", status=409)
+                # The re-run above re-extracts the document, so its resolution can differ from the
+                # one the human was shown a moment ago — a live model is not bit-identical run to
+                # run. Check that here rather than storing a state whose fingerprint can never
+                # match the draft beside it: the failure then surfaces while the patient is still
+                # at the counter, instead of as an unexplainable refusal at confirm time.
+                if subject_fingerprint_for(rerun.record, rerun.resolution,
+                                           req.patient_id) != state.subject_fingerprint:
+                    return _refusal(
+                        "SUBJECT_CHANGED",
+                        "re-reading this document produced a different candidate list from the "
+                        "one shown when identity was checked. Nothing has been recorded. Reload "
+                        "the card and check identity against what it shows now.", status=409)
                 # Store BACK into the mapping rather than mutating the dict captured before the
                 # lock. `intake_upload` REPLACES `app.state.intakes[id]`, so a concurrent upload
                 # between the read and this write would have left the post-selection draft in an
@@ -572,10 +604,30 @@ def _register_intake_routes(app: FastAPI) -> None:
                     f"identity was attested by {state.identity_checked_in_person_by!r}; only that "
                     f"staff member may confirm this intake")
             before = app.state.ledger.count(intake_id)
+            # Recomputed from the draft that is ACTUALLY about to be committed, and compared by
+            # the ledger against the digest the human's attestation carries. `state` and
+            # `held["draft"]` were read together above, so this is the pair that commits — the
+            # same discipline, one level down: `intake_id` cannot tell these two apart because it
+            # is derived from the document and survives every re-extraction of it.
+            #
+            # `None` when nothing has been selected, which the ledger refuses on its readiness
+            # check before it ever looks at the digest. It is passed explicitly rather than
+            # omitted: `commit` has no default for it, so no call site can skip the comparison by
+            # forgetting it.
+            subject = (subject_fingerprint_for(held["draft"].record, held["draft"].resolution,
+                                               state.selected_patient_id)
+                       if state.selected_patient_id else None)
             try:
                 entries = app.state.ledger.commit(held["draft"].record, state,
+                                                  subject_fingerprint=subject,
                                                   field_paths=req.field_paths)
                 app.state.confirmations[intake_id] = state.commit()
+            except SubjectChanged as exc:
+                # Its own code, ahead of the `IdentityNotVerified` clause it inherits from: the
+                # counter's next action is different. IDENTITY_NOT_VERIFIED means "nobody has
+                # checked"; this means "someone checked, against something else" — the fix is to
+                # reload the card and check again, not to attest harder.
+                return _refusal("SUBJECT_CHANGED", str(exc))
             except IdentityNotVerified as exc:
                 return _refusal("IDENTITY_NOT_VERIFIED", str(exc))
             except AlreadyCommitted as exc:

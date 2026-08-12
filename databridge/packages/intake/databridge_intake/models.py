@@ -620,6 +620,14 @@ class ConfirmationState(BaseModel):
     identity_checked_in_person_by: Optional[str] = None
     identity_checked_at: Optional[dt.datetime] = None
     selected_patient_id: Optional[str] = None
+    # WHAT the human was actually looking at when they attested — a digest of the document
+    # revision, the candidate list they were offered, and the row they picked out of it
+    # (`databridge_intake.ledger.subject_fingerprint_for`). An attestation is a record of a
+    # person checking an ID against ONE reading of ONE document; `intake_id` is derived from the
+    # document alone and survives every re-extraction, so binding the attestation to it alone let
+    # a check made about one candidate set authorise a record resolved against another. The ledger
+    # recomputes this at commit time and refuses on any difference.
+    subject_fingerprint: Optional[str] = None
     confirmed_fields: dict[str, str] = Field(default_factory=dict)   # field path → staff id
     committed: bool = False
 
@@ -630,6 +638,18 @@ class ConfirmationState(BaseModel):
                 "ConfirmationState REFUSED: selected_patient_id is set but "
                 "identity_checked_in_person_by is not — a registry candidate cannot be selected "
                 "before a human has verified identity in person (CLAUDE.md §Hard constraints 1)")
+        # An attestation names a subject or it names nothing. The two travel together in both
+        # directions: a selection without a fingerprint is an attestation that cannot say WHICH
+        # reading of the document it was made about (so nothing downstream can tell whether it
+        # still applies), and a fingerprint without a selection is a digest of a choice nobody
+        # made. Enforced here, at construction, because that is the only place pydantic's
+        # guarantees are absolute — so an unattributable attestation cannot be brought into
+        # existence at all (CLAUDE.md §Hard constraints 1).
+        if bool(self.selected_patient_id) != bool(self.subject_fingerprint):
+            raise ValueError(
+                "ConfirmationState REFUSED: selected_patient_id and subject_fingerprint must be "
+                "set together — an attestation that cannot name the document revision and "
+                "candidate set it was made against can outlive its subject")
         # An attester with no timestamp is not an audit record. Require them together so the
         # ledger can always answer "who checked, and when".
         if bool(self.identity_checked_in_person_by) != bool(self.identity_checked_at):
@@ -691,12 +711,27 @@ class ConfirmationState(BaseModel):
         return self._evolve(identity_checked_in_person_by=staff_id.strip(),
                             identity_checked_at=at)
 
-    def select_patient(self, patient_id: str) -> "ConfirmationState":
-        """Record the candidate a human picked. Refused before the in-person check."""
+    def select_patient(self, patient_id: str, *, subject_fingerprint: str) -> "ConfirmationState":
+        """Record the candidate a human picked. Refused before the in-person check.
+
+        ``subject_fingerprint`` is what the human was looking at when they picked — the digest of
+        the document revision and the candidate list they were offered, from
+        ``databridge_intake.ledger.subject_fingerprint_for``. It is a REQUIRED keyword argument,
+        not a defaulted one: a default would make "which subject was this attestation about?"
+        answerable with `None`, and a guard that accepts `None` is a guard that fails open.
+
+        Re-selecting recomputes both together, which is the point — after a re-extraction the
+        human makes a fresh check against the fresh reading, and the digest moves with it.
+        """
         self._require_open("select_patient")
         if not patient_id or not patient_id.strip():
             raise ValueError("select_patient requires a patient id")
-        return self._evolve(selected_patient_id=patient_id.strip())
+        if not subject_fingerprint or not subject_fingerprint.strip():
+            raise ValueError(
+                "select_patient requires the subject fingerprint of the resolution the human was "
+                "shown — without it the selection cannot be tied to the reading it was made about")
+        return self._evolve(selected_patient_id=patient_id.strip(),
+                            subject_fingerprint=subject_fingerprint.strip())
 
     def confirm_field(self, field_path: str, staff_id: str) -> "ConfirmationState":
         """Record that a named human accepted one extracted field."""

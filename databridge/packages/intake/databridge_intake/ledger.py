@@ -12,12 +12,19 @@ and refuses unless ``is_ready_to_commit()`` — an in-person identity check by a
 plus a candidate that same human selected. The state class already makes an unattested selection
 unconstructible; this is the second lock on the same door (CLAUDE.md §Hard constraints 1 and 4).
 
+**An attestation is bound to its subject, not to an intake id.** ``intake_id`` is derived from the
+document and survives every re-extraction, so a check made about one reading of a document and one
+candidate list could authorise a record resolved against a different one. ``subject_fingerprint_for``
+digests the document revision, the candidate set and the selected registry row; ``commit`` demands
+that digest as a required keyword argument and refuses on any difference (R-17).
+
 Every row carries the ``SourcePointer`` its value came from. A committed fact that cannot say where
 it came from is not evidence, so ``EvidenceEntry`` requires one and this module never invents one.
 """
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import sqlite3
 import threading
@@ -25,7 +32,7 @@ from typing import Iterable, Optional
 
 from databridge_core import SourcePointer
 
-from .models import ConfirmationState, EvidenceEntry, IntakeRecord
+from .models import ConfirmationState, EvidenceEntry, IntakeRecord, ResolutionResult
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS evidence (
@@ -76,6 +83,85 @@ class IdentityNotVerified(LedgerError):
 
 class AlreadyCommitted(LedgerError):
     """This intake has already been committed. Corrections are new entries, not re-confirmations."""
+
+
+class SubjectChanged(IdentityNotVerified):
+    """The attestation was made about a different reading of this document, or a different
+    candidate list, than the one being committed.
+
+    A subclass of ``IdentityNotVerified`` on purpose: every existing caller that already fails
+    closed on "identity is not verified" keeps failing closed on "identity was verified, but not
+    about THIS record" without being taught a new exception type first.
+    """
+
+
+# --- binding an attestation to the thing it was made about --------------------------
+
+
+#: Bumped if the composition below ever changes. A stored digest from an older scheme then stops
+#: matching, which closes the gate rather than silently comparing two different things.
+_FINGERPRINT_SCHEME = 1
+
+
+def subject_fingerprint_for(record: IntakeRecord,
+                            resolution: ResolutionResult,
+                            selected_patient_id: str) -> str:
+    """Digest of *what the human was actually offered, and what they picked out of it*.
+
+    ``sha256(document_id | extracted_at | selected_patient_id | sorted(candidate patient ids))``.
+
+    Each part is there because changing it changes the thing the attestation was about:
+
+    * **document_id + extracted_at** — the document REVISION. Re-uploading a file re-extracts it
+      under a fresh ``extracted_at``, so an attestation made about the previous reading no longer
+      applies to the new one.
+    * **the candidate set** — the list the human chose from. "I checked this person against these
+      three rows and it is the second" is not the same act as "…against these three OTHER rows".
+    * **selected_patient_id** — which row they picked.
+
+    ``intake_id`` is deliberately NOT in here: it is derived from the document alone and is stable
+    across every one of the changes above, which is exactly why binding an attestation to it was
+    the bug (R-17, CLAUDE.md §Hard constraints 1).
+
+    Candidate ids are sorted so an unrelated re-ranking does not invalidate an attestation; the
+    membership of the set is what the human was offered, not the order it was printed in.
+    """
+    if not selected_patient_id:
+        # No selection means there is no subject to fingerprint. Returning a digest of "nothing"
+        # would produce a value that compares equal to another absent selection — a stable
+        # fingerprint for "no attestation at all".
+        raise ValueError(
+            "subject_fingerprint_for requires the patient id a human selected; there is no "
+            "subject to bind an attestation to without one")
+    payload = json.dumps({
+        "scheme": _FINGERPRINT_SCHEME,
+        "document_id": record.document.document_id,
+        "extracted_at": record.extracted_at.isoformat(),
+        "selected_patient_id": selected_patient_id,
+        "candidates": sorted(c.patient_id for c in resolution.candidates),
+    }, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def attestation_subject_matches(record: IntakeRecord,
+                                resolution: ResolutionResult,
+                                confirmation: ConfirmationState) -> tuple[bool, str]:
+    """Whether ``confirmation``'s attestation is still about THIS record and THIS candidate set.
+
+    ``(True, "")`` or ``(False, why)``. Read by every surface that reports an intake as
+    identity-verified — the confirm gate, the front-desk queue and the ``/intelligence`` queue
+    (R-22) — so that "verified" cannot mean "verified about something else". A single definition,
+    because a second one drifts from the gate and the gate is the one that matters.
+    """
+    ok, why = confirmation.is_ready_to_commit()
+    if not ok:
+        return False, why
+    current = subject_fingerprint_for(record, resolution, confirmation.selected_patient_id)
+    if confirmation.subject_fingerprint != current:
+        return False, ("this document was re-read, or its candidate list changed, since the "
+                       "in-person identity check — the check must be made again against what "
+                       "the counter is looking at now")
+    return True, ""
 
 
 class EvidenceLedger:
@@ -138,12 +224,25 @@ class EvidenceLedger:
                record: IntakeRecord,
                confirmation: ConfirmationState,
                *,
+               subject_fingerprint: Optional[str],
                at: Optional[dt.datetime] = None,
                field_paths: Optional[Iterable[str]] = None) -> list[EvidenceEntry]:
         """Write the record's grounded fields to the ledger. **The gate.**
 
-        Refuses unless a named human has verified identity in person AND selected a candidate.
-        Nothing partial is written on refusal: the check happens before the first insert.
+        Refuses unless a named human has verified identity in person AND selected a candidate AND
+        that attestation was made about THIS record. Nothing partial is written on refusal: every
+        check happens before the first insert.
+
+        ``subject_fingerprint`` is the digest of the resolution the caller is about to commit
+        against — ``subject_fingerprint_for(record, resolution, selected_patient_id)``. It is
+        passed in rather than recomputed here because ``commit`` never sees a ``ResolutionResult``:
+        it is handed a record and a confirmation, and the candidate list lives on neither.
+
+        It has **no default**, and that is load-bearing. A defaulted parameter would let every
+        existing and future call site skip the check by saying nothing, so the guard would protect
+        exactly the callers that already knew about it — a guard that fails open. Passing ``None``
+        explicitly is allowed and still fails closed: `None` cannot equal a stored fingerprint, and
+        a state with no fingerprint has no selection and is refused by the readiness check above.
         """
         ok, why = confirmation.is_ready_to_commit()
         if not ok:
@@ -159,9 +258,30 @@ class EvidenceLedger:
                 f"commit REFUSED: intake {record.intake_id!r} is already committed. The ledger is "
                 f"append-only — record a correction as a new entry rather than re-confirming.")
         if confirmation.intake_id != record.intake_id:
+            # KEPT, and it is not the check below in another form. This one catches a confirmation
+            # for a DIFFERENT document being handed to this record. It cannot catch a stale
+            # attestation for the SAME document, because `intake_id` is derived from the document
+            # (`extract_intake`: sha256(document_id + text sha)) and is therefore identical on both
+            # sides of a re-extraction — the record is re-read, the confirmation is deliberately
+            # retained, and both ids compare equal while the candidate set underneath them has
+            # changed. That is R-17: a guard that looks like it is watching this door and is
+            # structurally incapable of seeing anything move through it.
             raise LedgerError(
                 f"commit REFUSED: confirmation is for intake {confirmation.intake_id!r} but the "
                 f"record is {record.intake_id!r}")
+        if confirmation.subject_fingerprint != subject_fingerprint:
+            # THE check `intake_id` cannot make. The attestation carries a digest of the document
+            # revision, the candidate list and the row the human picked; the caller passes the same
+            # digest recomputed over what is actually being committed. Any difference means the
+            # in-person check was made about a different reading of this document or a different
+            # set of candidates, so it does not authorise this commit (CLAUDE.md §Hard constraints
+            # 1). The digests are not quoted into the message: they are compared, not read.
+            raise SubjectChanged(
+                "commit REFUSED: the in-person identity check was made against a different "
+                "reading of this document, or a different candidate list, than the one being "
+                "committed. Staff must check identity again against what is on the counter now; "
+                "the system never carries an attestation across a re-read "
+                "(CLAUDE.md §Hard constraints 1).")
 
         at = at or dt.datetime.now(dt.timezone.utc)
         grounded = record.grounded_fields()

@@ -229,6 +229,96 @@ def test_the_card_reports_why_the_gate_is_closed(client, uploaded):
     assert "identity" in card["confirmation"]["blocked_because"]
 
 
+# --- R-17: an attestation cannot outlive the reading it was made about -------------------
+
+
+def _reupload(client, document_id, text):
+    """Drop the same file on the counter again. Same `document_id` and same bytes, so it lands on
+    the same `intake_id` — and the route deliberately KEEPS the existing attestation rather than
+    letting a repeated drop rewrite "who checked this ID, and when"."""
+    r = client.post("/intake/upload", json={"document_id": document_id, "text": text})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_a_re_read_document_cannot_be_committed_on_the_old_attestation(client, chit_text,
+                                                                      request):
+    """R-17, end to end. Staff check an ID in person against the document on screen. The file is
+    dropped again, so the document is re-extracted — `intake_id` is derived from the document and
+    does not move, and the attestation is retained on purpose. The record about to be committed is
+    therefore a reading nobody checked anybody against, and the gate must close on it
+    (CLAUDE.md §Hard constraints 1)."""
+    document_id = f"{request.node.name}__chit_02.txt"
+    card = _reupload(client, document_id, chit_text)
+    intake_id = card["intake_id"]
+    assert _select(client, intake_id, card["identity"]["candidates"][0]["patient_id"]).status_code         == 200
+
+    _reupload(client, document_id, chit_text)             # the document is read again
+
+    r = client.post(f"/intake/{intake_id}/confirm",
+                    json={"staff_id": STAFF, "attested_in_person": True})
+    assert r.status_code == 422, r.text
+    assert r.json()["refusal"]["code"] == "SUBJECT_CHANGED"
+    assert client.get(f"/intake/{intake_id}/ledger").json()["rows"] == [], (
+        "a refused commit must write nothing at all")
+
+
+def test_the_card_stops_offering_a_confirm_after_the_document_is_re_read(client, chit_text,
+                                                                        request):
+    """The refusal above must not be a surprise at the last click. `is_ready_to_commit()` asks
+    whether the STATE is complete; the card has to ask whether it is complete about THIS draft."""
+    document_id = f"{request.node.name}__chit_02.txt"
+    card = _reupload(client, document_id, chit_text)
+    intake_id = card["intake_id"]
+    _select(client, intake_id, card["identity"]["candidates"][0]["patient_id"])
+    assert client.get(f"/intake/{intake_id}").json()["confirmation"]["ready_to_commit"] is True
+
+    _reupload(client, document_id, chit_text)
+
+    state = client.get(f"/intake/{intake_id}").json()["confirmation"]
+    assert state["ready_to_commit"] is False
+    assert "re-read" in state["blocked_because"] or "candidate list" in state["blocked_because"]
+    # The attestation itself is NOT erased — it is a record of something a person did.
+    assert state["identity_checked_in_person_by"] == STAFF
+
+
+def test_the_queue_does_not_report_a_stale_attestation_as_verified(client, chit_text, request):
+    """R-22's shape on the front-desk queue: `identity_verified` was
+    `bool(identity_checked_in_person_by)`, which reports a check made about the reading that was
+    replaced as verification of the draft now in the queue."""
+    document_id = f"{request.node.name}__chit_02.txt"
+    card = _reupload(client, document_id, chit_text)
+    intake_id = card["intake_id"]
+    _select(client, intake_id, card["identity"]["candidates"][0]["patient_id"])
+    row = next(i for i in client.get("/intake").json()["intakes"] if i["intake_id"] == intake_id)
+    assert row["identity_verified"] is True
+
+    _reupload(client, document_id, chit_text)
+
+    row = next(i for i in client.get("/intake").json()["intakes"] if i["intake_id"] == intake_id)
+    assert row["identity_verified"] is False, (
+        "the queue is reporting an attestation made about a replaced draft as verification of "
+        "this one")
+
+
+def test_checking_identity_again_reopens_the_gate(client, chit_text, request):
+    """The gate closes on a re-read; it is not welded shut. A fresh in-person check against what
+    the counter is looking at now commits normally — the human act is required again, not routed
+    around."""
+    document_id = f"{request.node.name}__chit_02.txt"
+    card = _reupload(client, document_id, chit_text)
+    intake_id = card["intake_id"]
+    patient_id = card["identity"]["candidates"][0]["patient_id"]
+    _select(client, intake_id, patient_id)
+    _reupload(client, document_id, chit_text)
+
+    assert _select(client, intake_id, patient_id).status_code == 200
+    r = client.post(f"/intake/{intake_id}/confirm",
+                    json={"staff_id": STAFF, "attested_in_person": True})
+    assert r.status_code == 200, r.text
+    assert r.json()["entries_written"] > 0
+
+
 # --- evidence click-through --------------------------------------------------------------
 
 

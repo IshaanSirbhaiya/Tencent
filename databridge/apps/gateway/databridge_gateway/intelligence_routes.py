@@ -82,6 +82,7 @@ def _queue_summary(app: FastAPI) -> tuple[Optional[dict], Optional[str]]:
     if intakes is None:
         return None, "the intake queue is not loaded"
     try:
+        from databridge_intake.ledger import attestation_subject_matches
         from databridge_intake.models import ConfirmationState
 
         lock = getattr(app.state, "intake_lock", None)
@@ -103,6 +104,17 @@ def _queue_summary(app: FastAPI) -> tuple[Optional[dict], Optional[str]]:
                 committed += 1
                 continue
             _, because = state.is_ready_to_commit()
+            # R-22. The confirmation was joined to the current draft by `intake_id` alone — and
+            # `intake_id` is derived from the document, so it is identical before and after a
+            # re-upload re-extracts it. A replaced draft therefore reported `identity_verified:
+            # true` off an attestation made about the reading it replaced. Ask the same question
+            # the confirm gate asks: is this attestation still ABOUT this draft?
+            verified, mismatch = attestation_subject_matches(draft.record, draft.resolution, state)
+            if not verified and not because:
+                # `is_ready_to_commit()` sees a complete state and reports nothing to wait on,
+                # which would put a blocked intake on the board with an empty reason. What it is
+                # waiting on is a fresh in-person check.
+                because = mismatch
             blocked.append({
                 "intake_id": intake_id,
                 "document_id": draft.record.document.document_id,
@@ -112,7 +124,7 @@ def _queue_summary(app: FastAPI) -> tuple[Optional[dict], Optional[str]]:
                 "coverage_status": draft.coverage.status.value,
                 "eligibility_flags": list(draft.coverage.eligibility_flags),
                 "blocked_because": because,
-                "identity_verified": bool(state.identity_checked_in_person_by),
+                "identity_verified": verified,
             })
         blocked.sort(key=lambda b: b["intake_id"])
         return {

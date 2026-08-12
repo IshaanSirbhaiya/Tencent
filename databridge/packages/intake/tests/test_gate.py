@@ -11,7 +11,8 @@ import datetime as dt
 import pytest
 
 from databridge_intake.guardrails import REFUSAL_CODE, REFUSAL_TEXT, check_question
-from databridge_intake.ledger import EvidenceLedger, IdentityNotVerified, LedgerError
+from databridge_intake.ledger import (EvidenceLedger, IdentityNotVerified, LedgerError,
+                                      subject_fingerprint_for)
 from databridge_intake.models import ConfirmationState, CoverageStatus
 from databridge_intake.paths import fixtures_dir
 from databridge_intake.pipeline import evidence_for, run_intake, summary_card
@@ -31,9 +32,21 @@ def drafts():
 
 
 def _attested(draft) -> ConfirmationState:
+    """An attestation made about THIS draft — this reading of the document and this candidate
+    list. The fingerprint is derived per draft on purpose: a shared constant would make every
+    commit below pass while removing the property `test_ledger_subject_binding.py` exists to
+    prove (R-17)."""
+    patient_id = draft.resolution.candidates[0].patient_id
     return (ConfirmationState(intake_id=draft.intake_id)
             .attest_identity_checked(STAFF, NOW)
-            .select_patient(draft.resolution.candidates[0].patient_id))
+            .select_patient(patient_id, subject_fingerprint=subject_fingerprint_for(
+                draft.record, draft.resolution, patient_id)))
+
+
+def _subject(draft, patient_id: str = "") -> str:
+    """The digest recomputed over what is actually being committed — what the route passes."""
+    return subject_fingerprint_for(draft.record, draft.resolution,
+                                   patient_id or draft.resolution.candidates[0].patient_id)
 
 
 # --- THE GATE ---------------------------------------------------------------------------
@@ -44,7 +57,8 @@ def test_the_ledger_refuses_without_an_in_person_attestation(drafts):
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
     with pytest.raises(IdentityNotVerified):
-        ledger.commit(draft.record, ConfirmationState(intake_id=draft.intake_id))
+        ledger.commit(draft.record, ConfirmationState(intake_id=draft.intake_id),
+                      subject_fingerprint=None)
     assert ledger.count() == 0, "a refused commit must write nothing at all"
 
 
@@ -55,7 +69,7 @@ def test_an_attestation_without_a_selection_is_still_refused(drafts):
     ledger = EvidenceLedger()
     partial = ConfirmationState(intake_id=draft.intake_id).attest_identity_checked(STAFF, NOW)
     with pytest.raises(IdentityNotVerified, match="no registry candidate"):
-        ledger.commit(draft.record, partial)
+        ledger.commit(draft.record, partial, subject_fingerprint=None)
     assert ledger.count() == 0
 
 
@@ -70,7 +84,7 @@ def test_a_selection_cannot_even_be_constructed_without_an_attestation(drafts):
 def test_commit_with_an_attestation_writes_every_grounded_field(drafts):
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
-    entries = ledger.commit(draft.record, _attested(draft))
+    entries = ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft))
     assert entries
     assert ledger.count(draft.intake_id) == len(entries)
     for entry in entries:
@@ -83,7 +97,7 @@ def test_a_confirmation_for_another_intake_is_refused(drafts):
     other = drafts["chit_01_meridian_referral.txt"]
     ledger = EvidenceLedger()
     with pytest.raises(LedgerError, match="confirmation is for intake"):
-        ledger.commit(draft.record, _attested(other))
+        ledger.commit(draft.record, _attested(other), subject_fingerprint=_subject(other))
     assert ledger.count() == 0
 
 
@@ -91,7 +105,7 @@ def test_every_ledger_row_has_a_resolvable_pointer(drafts):
     """A committed fact that cannot say where it came from is not evidence."""
     draft = drafts["chit_01_meridian_referral.txt"]
     ledger = EvidenceLedger()
-    ledger.commit(draft.record, _attested(draft))
+    ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft))
     text = _text("chit_01_meridian_referral.txt")
     for row in ledger.entries():
         pointer = ledger.pointer_of(row)
@@ -110,7 +124,7 @@ def test_the_ledger_rejects_an_update_at_the_database_level(drafts):
 
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
-    ledger.commit(draft.record, _attested(draft))
+    ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft))
     with pytest.raises(sqlite3.IntegrityError, match="append-only"):
         ledger.conn.execute("UPDATE evidence SET value_json = '\"tampered\"'")
 
@@ -120,7 +134,7 @@ def test_the_ledger_rejects_a_delete_at_the_database_level(drafts):
 
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
-    ledger.commit(draft.record, _attested(draft))
+    ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft))
     with pytest.raises(sqlite3.IntegrityError, match="append-only"):
         ledger.conn.execute("DELETE FROM evidence")
 
@@ -182,7 +196,7 @@ def test_reads_never_observe_a_partially_inserted_commit_batch(drafts):
 
     reader = threading.Thread(target=hammer)
     reader.start()
-    ledger.commit(draft.record, _attested(draft))
+    ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft))
     stop.set()
     reader.join(timeout=2)
 
@@ -204,10 +218,10 @@ def test_a_second_commit_is_refused_and_writes_nothing(drafts):
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
     state = _attested(draft)
-    ledger.commit(draft.record, state)
+    ledger.commit(draft.record, state, subject_fingerprint=_subject(draft))
     after_first = ledger.count()
     with pytest.raises(AlreadyCommitted):
-        ledger.commit(draft.record, state.commit())
+        ledger.commit(draft.record, state.commit(), subject_fingerprint=_subject(draft))
     assert ledger.count() == after_first, "a refused commit wrote rows"
 
 
@@ -217,7 +231,7 @@ def test_a_commit_records_which_candidate_the_human_selected(drafts):
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
     state = _attested(draft)
-    ledger.commit(draft.record, state)
+    ledger.commit(draft.record, state, subject_fingerprint=_subject(draft))
     for row in ledger.entries():
         assert row["selected_patient_id"] == state.selected_patient_id
 
@@ -226,7 +240,8 @@ def test_committing_an_unknown_field_path_is_refused(drafts):
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
     with pytest.raises(LedgerError, match="not values this document carries"):
-        ledger.commit(draft.record, _attested(draft), field_paths=["issuer.not_a_field"])
+        ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft),
+                      field_paths=["issuer.not_a_field"])
     assert ledger.count() == 0
 
 
@@ -235,7 +250,8 @@ def test_a_selective_commit_writes_only_the_named_fields(drafts):
     asking to commit one approved value got all nineteen and a 200 saying nothing was wrong."""
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
-    entries = ledger.commit(draft.record, _attested(draft), field_paths=["issuer.issuer_code"])
+    entries = ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft),
+                            field_paths=["issuer.issuer_code"])
     assert [e.field_path for e in entries] == ["issuer.issuer_code"]
     assert ledger.count() == 1
 
@@ -244,11 +260,12 @@ def test_a_correction_is_a_new_row_that_supersedes_the_old_one(drafts):
     """Both rows stay readable, which is what makes "what did we believe, and when?" answerable."""
     draft = drafts["chit_02_everwell_voucher.txt"]
     ledger = EvidenceLedger()
-    first = ledger.commit(draft.record, _attested(draft))
+    first = ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft))
     before = ledger.count()
     # A correction arrives as a FRESH attestation (someone re-checking), not as a replay of a
     # committed state — that path is refused outright by the test above.
-    second = ledger.commit(draft.record, _attested(draft), at=NOW + dt.timedelta(hours=1))
+    second = ledger.commit(draft.record, _attested(draft), subject_fingerprint=_subject(draft),
+                           at=NOW + dt.timedelta(hours=1))
     assert ledger.count() == before + len(second) > before
     assert any(e.supersedes is not None for e in second)
     assert all(e.supersedes is None for e in first)

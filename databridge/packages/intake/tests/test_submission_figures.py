@@ -17,6 +17,7 @@ import re
 import pytest
 
 from databridge_intake.metrics import aggregate, baseline, measure
+from databridge_intake.ledger import subject_fingerprint_for
 from databridge_intake.models import ConfirmationState
 from databridge_intake.paths import fixtures_dir
 from databridge_intake.pipeline import run_intake
@@ -42,7 +43,9 @@ def figures():
             selected = draft.resolution.candidates[0].record
             state = (ConfirmationState(intake_id=draft.intake_id)
                      .attest_identity_checked(STAFF, NOW)
-                     .select_patient(selected.patient_id))
+                     .select_patient(selected.patient_id,
+                                     subject_fingerprint=subject_fingerprint_for(
+                                         draft.record, draft.resolution, selected.patient_id)))
             draft = run_intake(text, document_id=path.name, intake_id=draft.intake_id,
                                confirmation=state, selected_patient=selected)
         metrics.append(measure(draft, confirmed=True))

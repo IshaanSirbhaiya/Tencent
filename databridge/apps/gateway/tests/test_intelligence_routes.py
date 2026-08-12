@@ -178,6 +178,41 @@ def test_the_queue_never_names_or_ranks_a_registry_candidate(client, chit):
             assert forbidden not in entry, f"{forbidden} would let a dashboard pick a person"
 
 
+# --- R-22: an attestation cannot outlive its subject on the dashboard --------------
+def test_the_queue_does_not_report_a_replaced_draft_as_identity_verified(client, chit):
+    """R-22. The queue joined a confirmation to the current draft by `intake_id` alone — and
+    `intake_id` is derived from the document, so it is identical before and after the document is
+    re-read. A replaced draft therefore reported `identity_verified: true` off an in-person check
+    made about the reading it replaced, on the one screen a manager reads to decide the counter is
+    keeping up (CLAUDE.md §Hard constraints 1).
+    """
+    payload = {"document_id": "intel__stale_attestation__chit_01.txt", "text": chit}
+    card = client.post("/intake/upload", json=payload).json()
+    intake_id = card["intake_id"]
+
+    sel = client.post(f"/intake/{intake_id}/select-patient", json={
+        "patient_id": card["identity"]["candidates"][0]["patient_id"],
+        "staff_id": "staff:front_desk_01", "attested_in_person": True})
+    assert sel.status_code == 200, sel.text
+
+    def entry():
+        queue = client.get("/intelligence").json()["queue"]
+        return next(b for b in queue["blocked"] if b["intake_id"] == intake_id)
+
+    assert entry()["identity_verified"] is True
+
+    # The same file dropped again: same intake, freshly extracted record, attestation retained.
+    assert client.post("/intake/upload", json=payload).status_code == 200
+
+    stale = entry()
+    assert stale["identity_verified"] is False, (
+        "the dashboard is reporting an identity check made about a replaced draft as verification "
+        "of the one now in the queue")
+    assert stale["blocked_because"], (
+        "an intake nobody can commit must say what it is waiting on — an empty reason beside a "
+        "blocked row is the silent zero this page refuses everywhere else")
+
+
 # --- structural counts are not performance claims ----------------------------------
 def test_the_payload_carries_no_time_saving_claim(client, chit):
     client.post("/intake/upload", json={"document_id": "intel__chit_01c.txt", "text": chit})

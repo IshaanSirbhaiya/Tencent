@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from databridge_gateway.evidence_routes import register_evidence_routes
 from databridge_graph import NodeKind
 from databridge_graph.clinic_seed import fresh_clinic_store
-from databridge_intake.ledger import EvidenceLedger
+from databridge_intake.ledger import EvidenceLedger, subject_fingerprint_for
 from databridge_intake.models import ConfirmationState
 from databridge_intake.paths import fixtures_dir
 from databridge_intake.pipeline import run_intake
@@ -145,10 +145,13 @@ def committed(app, store):
 
     state = ConfirmationState(intake_id=draft.intake_id)
     state = state.attest_identity_checked("staff:evidence_test", dt.datetime.now(dt.timezone.utc))
-    state = state.select_patient(patient_id)
+    # The digest binding the attestation to THIS reading of the document and THIS candidate
+    # list (R-17) — derived from the draft, exactly as `/intake/{id}/select-patient` derives it.
+    subject = subject_fingerprint_for(draft.record, draft.resolution, patient_id)
+    state = state.select_patient(patient_id, subject_fingerprint=subject)
 
     app.state.intakes[draft.intake_id] = {"draft": draft, "text": text}
-    entries = app.state.ledger.commit(draft.record, state)
+    entries = app.state.ledger.commit(draft.record, state, subject_fingerprint=subject)
     assert entries, "commit must write at least one evidence row"
     return {"draft": draft, "patient_id": patient_id, "entries": entries}
 

@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from databridge_intake.metrics import (BaselineError, aggregate, baseline, load_baseline, measure)
+from databridge_intake.ledger import subject_fingerprint_for
 from databridge_intake.models import ConfirmationState
 from databridge_intake.paths import config_dir, fixtures_dir
 from databridge_intake.pipeline import run_intake
@@ -30,7 +31,9 @@ def _confirmed_draft(name: str):
     selected = draft.resolution.candidates[0].record
     state = (ConfirmationState(intake_id=draft.intake_id)
              .attest_identity_checked(STAFF, NOW)
-             .select_patient(selected.patient_id))
+             .select_patient(selected.patient_id,
+                             subject_fingerprint=subject_fingerprint_for(
+                                 draft.record, draft.resolution, selected.patient_id)))
     return run_intake(text, document_id=name, intake_id=draft.intake_id,
                       confirmation=state, selected_patient=selected)
 
