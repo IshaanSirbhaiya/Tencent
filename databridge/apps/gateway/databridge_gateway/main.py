@@ -353,6 +353,17 @@ def create_app() -> FastAPI:
         if llm is not None:
             from .llm import SYSTEM_PROMPT, build_context
             ctx = build_context(app.state.brain, req.question)
+            # An ambiguous reference is refused HERE, before the model is reached — the same
+            # place and for the same reason as the identity screen above. `build_context` returns
+            # no context in that case, so falling through would send an empty prompt; and the
+            # deterministic fallback below would answer the question the LLM branch just declined
+            # to answer, which would make the refusal a formality. `candidates` travels with it so
+            # the caller can ask again with an id (CLAUDE.md §Hard constraints 1).
+            if ctx.get("refusal"):
+                return JSONResponse(status_code=422, content={"refusal": {
+                    "code": "AMBIGUOUS_ENTITY", "message": ctx["refusal"],
+                    "candidates": ctx.get("candidates", []),
+                    "nearest_alternative": "Ask again naming one of the ids in `candidates`."}})
             if not ctx["nodes_used"]:
                 return _refusal("UNGROUNDED_OR_NO_MATCH", "no matching entity in the graph", status=422)
             try:
@@ -369,6 +380,15 @@ def create_app() -> FastAPI:
         out = app.state.brain.brain_query(req.question, req.as_of)
         out["is_real_llm"] = False
         if not out["grounded"]:
+            # `nl_query` returns the candidate ids with its ambiguity refusal, and this handler
+            # was flattening every refusal into one code and dropping them — so the deterministic
+            # branch refused correctly and then withheld the only thing that lets the caller get
+            # an answer. "Ask again with one of these ids" is not advice if the ids never arrive.
+            if out.get("candidates"):
+                return JSONResponse(status_code=422, content={"refusal": {
+                    "code": "AMBIGUOUS_ENTITY", "message": out["refusal"],
+                    "candidates": out["candidates"],
+                    "nearest_alternative": "Ask again naming one of the ids in `candidates`."}})
             return _refusal("UNGROUNDED_OR_NO_MATCH", out["refusal"] or "no grounded answer",
                             status=422)
         return out

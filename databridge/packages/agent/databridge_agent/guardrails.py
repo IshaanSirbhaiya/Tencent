@@ -153,6 +153,21 @@ _SEND_REQUESTS: tuple[tuple[str, re.Pattern], ...] = (
     ("send_to_address", re.compile(
         r"\b(?:send|email|e-mail|mail|forward|post|share)\b[^.?!]{0,50}?"
         r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", re.I)),
+    # A request to COMMUNICATE that never names a transport. "Let the patient know their
+    # questionnaire is outstanding" asks for exactly the same act as "email the patient about
+    # their questionnaire", and matched none of the patterns above, because all three look for a
+    # sending verb. The consequence differed by surface and both were wrong: the read-only agent
+    # answered it as though it were a question (it has no send tool, so the honest reply is "I
+    # cannot"), and `/intelligence` routed it to the READ path instead of drafting an outbox
+    # message for a human to approve — so a request to contact a patient returned
+    # NO_GROUNDED_ANSWER and nothing was drafted.
+    #
+    # Scoped to a named RECIPIENT so "tell me about the package" stays an ordinary question: the
+    # recipient is a third party, never the person asking.
+    ("asked_to_notify", re.compile(
+        r"\b(?:let|tell|inform|remind|notify|update|chase|reach out to|follow up with)\s+"
+        r"(?:the\s+|their\s+|his\s+|her\s+)?"
+        r"(?:patient|employer|hr|insurer|clinic|doctor|him|her|them)\b", re.I)),
 )
 
 # NRIC/FIN shape. Used ONLY to check that an identifier in an answer also appears in what the tools

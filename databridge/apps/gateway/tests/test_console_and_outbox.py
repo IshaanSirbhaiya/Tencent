@@ -646,3 +646,21 @@ def test_the_agents_own_renderer_still_governs_a_refusal(client):
     answer = r.json()["answer"]
     assert answer["refused"] is True
     assert isinstance(answer["question"], str) and answer["question"]
+
+
+# --- 7. a request to act, phrased without a sending verb -----------------------------
+def test_a_request_to_contact_someone_reaches_the_propose_path(client, intake):
+    """Found by clicking the console's own trial chip. "Let the patient know their questionnaire
+    is outstanding" asks for precisely the act that `ACTION_REQUEST` asks for, and matched none of
+    the send patterns — all of which looked for a sending VERB. It fell to the READ path and came
+    back NO_GROUNDED_ANSWER, so a request to contact a patient drafted nothing and said nothing.
+
+    The point is not the phrase. It is that "does this imply an act?" was answered by a list of
+    verbs, and staff do not speak in verbs from a list."""
+    r = client.post("/intelligence/console",
+                    json={"request": "let the patient know their questionnaire is outstanding",
+                          "intake_id": intake.intake_id})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["intent"] == "propose", body
+    assert body["answer"] is None

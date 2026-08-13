@@ -146,3 +146,41 @@ def test_an_identifier_a_tool_returned_is_allowed():
 
 def test_an_answer_with_no_identifier_is_not_examined():
     assert not check_answer_values("Two intakes are blocked.", "").refused
+
+
+# --- a request to communicate that never names a transport ------------------------
+
+
+NOTIFY_REQUESTS = [
+    "let the patient know their questionnaire is outstanding",
+    "tell the patient the test is not covered",
+    "inform HR that the appointment moved",
+    "remind the patient about fasting",
+    "follow up with the employer",
+]
+
+
+@pytest.mark.parametrize("question", NOTIFY_REQUESTS)
+def test_a_request_to_contact_someone_is_recognised_without_a_sending_verb(question):
+    """Every earlier pattern looked for a SEND verb, so "let the patient know…" — the same act,
+    phrased the way people actually phrase it — matched nothing. Both surfaces got it wrong in
+    opposite directions: this read-only agent answered as though it were a question (it has no
+    send tool, so the true reply is "I cannot"), and `/intelligence` routed it to the READ path
+    and returned NO_GROUNDED_ANSWER instead of drafting a message for a human to approve."""
+    result = screen_incoming(question)
+    assert result.refused, f"not recognised as a send request: {question!r}"
+    assert result.code == NO_SEND_CODE
+
+
+ORDINARY_TELLS = [
+    "tell me about the WELL2 package",
+    "let me know which intakes are blocked",
+    "update the figures on the dashboard",
+]
+
+
+@pytest.mark.parametrize("question", ORDINARY_TELLS)
+def test_asking_the_assistant_to_tell_ME_something_is_still_a_question(question):
+    """The scoping half. The recipient must be a third party — refusing "tell me about X" would
+    make the assistant useless, which is the over-broad failure mode review keeps finding."""
+    assert not screen_incoming(question).refused, question

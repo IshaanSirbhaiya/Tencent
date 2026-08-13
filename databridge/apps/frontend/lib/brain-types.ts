@@ -56,6 +56,12 @@ export interface BrainAnswer {
   answer: string;
   grounded: boolean;
   refusal: string;
+  /** Node ids the question could equally have meant. Non-empty ONLY on a refusal: the registry
+   *  holds three "Loh Wei Ming", and both `/brain/query` branches now decline to pick one rather
+   *  than returning whichever the ranker sorted first (CLAUDE.md hard constraint 1). It is the
+   *  way FORWARD, not an error detail — asking again with one of these ids resolves cleanly, so
+   *  a UI should offer them rather than swallow them. */
+  candidates?: string[];
   matched_entities: string[];
   citations: Citation[];
   as_of?: string | null;

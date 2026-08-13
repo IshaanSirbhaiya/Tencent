@@ -119,15 +119,40 @@ def _candidate_phrase(count: Optional[int]) -> str:
 def build_context(brain, question: str, *, top_k: int = 8) -> dict:
     """Serialise the relevant subgraph as the LLM context block + return the cited nodes.
 
-    Returns {context, nodes_used (ids), citations [{entity_id,label,kind,pointers}]}.
+    Returns {context, nodes_used (ids), citations [{entity_id,label,kind,pointers}], candidates,
+    refusal}. A non-empty ``refusal`` means NO context was built and the caller must not call a
+    model — see the ambiguity block below.
+
+    **This is the model-facing twin of ``query.nl_query``, and constraint 1 has to hold on BOTH
+    paths.** `/brain/query` takes the LLM branch whenever a key is present and the deterministic
+    branch otherwise, so a guarantee implemented in only one of them is a guarantee that
+    disappears the moment a key is exported — which is precisely the configuration the product is
+    demonstrated in.
     """
     from databridge_graph import EdgeKind, link_entities, neighbors
+    from databridge_graph.identity import (
+        ambiguous_refusal, identity_caveat, same_label_node_ids)
+    from databridge_graph.query import _named_outright
     from databridge_graph.schema import NodeKind
 
     store = brain.store
+    explicit = _named_outright(store, question)
     matches = link_entities(store, question, top_k=top_k)
     if not matches:
-        return {"context": "", "nodes_used": [], "citations": []}
+        return {"context": "", "nodes_used": [], "citations": [], "candidates": [], "refusal": ""}
+
+    # **A NAME DOES NOT IDENTIFY A PERSON — on this path too.** `nl_query` refuses when the
+    # top-ranked entity shares its label with others; this branch did not, and it is the worse
+    # place for the omission: `top_k=8` puts ALL THREE "Loh Wei Ming" into one prompt and asks a
+    # model to answer about "the patient", which delegates the choice between three people to the
+    # thing least able to say it is not entitled to make it. Same rule, same wording, same way
+    # forward — an id typed into the question wins outright (`_named_outright`), so the refusal
+    # is a fork in the road rather than a wall.
+    if explicit is None:
+        shared = same_label_node_ids(store, matches[0].id)
+        if len(shared) > 1:
+            return {"context": "", "nodes_used": [], "citations": [],
+                    "candidates": shared, "refusal": ambiguous_refusal(question, shared)}
 
     # collect each match + its 1-hop neighbourhood
     by_id: dict = {}
@@ -157,12 +182,23 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         # Documents that CLAIM to be about this patient. Rendered with the caveat inline because
         # this text goes straight into an LLM prompt — a bare "patient X, document Y" line invites
         # the model to narrate it as an established identity (CLAUDE.md §Hard constraints 1).
+        # `src_id` must be a DOCUMENT. FOR_PATIENT also runs VISIT -> PATIENT, so an unguarded
+        # read counts a visit as a document naming the patient — which both overstates the
+        # corroboration and selects the *less* cautious caveat below.
         claims = [(by_id[e.src_id].label, e.attrs.get("candidate_count")) for e in edges_seen
-                  if e.kind == EdgeKind.FOR_PATIENT and e.dst_id == n.id and e.src_id in by_id]
+                  if e.kind == EdgeKind.FOR_PATIENT and e.dst_id == n.id and e.src_id in by_id
+                  and by_id[e.src_id].kind == NodeKind.DOCUMENT]
         if claims:
             rendered = "; ".join(
                 f'"{label}" ({_candidate_phrase(count)} — UNVERIFIED)' for label, count in claims[:4])
             lines.append("    Named by (claimed, not verified): " + rendered)
+        # THE CAVEAT IS KEYED ON THE KIND, NEVER ON `claims`. It used to sit under `if claims:`,
+        # which was invisible while every seeded patient had a document naming them; seeding the
+        # whole registry left 289 patients edge-less, and each of those went into the prompt as a
+        # bare name and a date of birth. Registry presence is not identification — and this is the
+        # text a model paraphrases back to staff (CLAUDE.md §Hard constraints 1).
+        if n.kind == NodeKind.PATIENT:
+            lines.append(f"    IDENTITY: {identity_caveat(claimed=bool(claims))}")
         lines.append(f"    Source: {_source_of(n)}")
 
     rels = []
@@ -194,4 +230,4 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         "entity_id": m.id, "label": m.label, "kind": m.kind.value,
         "pointers": [p.model_dump(mode="json", exclude_none=True) for p in m.sources],
     } for m in matches]
-    return {"context": "\n".join(lines), "nodes_used": [m.id for m in matches], "citations": citations}
+    return {"context": "\n".join(lines), "nodes_used": [m.id for m in matches], "citations": citations, "candidates": [], "refusal": ""}

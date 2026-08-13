@@ -106,6 +106,63 @@ def test_build_context_renders_a_missing_candidate_count_as_unknown_not_none():
     assert "an unknown number of candidates" in ctx["context"]
 
 
+def test_build_context_caveats_a_patient_no_document_names():
+    """The LLM-path twin of the `nl_query` / `node_sheet` bug, and the worst of the three.
+
+    The caveat was emitted only when a FOR_PATIENT edge existed. Seeding the whole registry left
+    289 patients edge-less, so each of them entered the MODEL'S PROMPT as a bare name and date of
+    birth — the one audience that will confidently paraphrase it back to staff as an identity.
+    The caveat is keyed on the KIND now, so there is no branch that can drop it."""
+    from brain_server import BrainTools
+    from databridge_gateway.llm import build_context
+    from databridge_graph import EdgeKind, NodeKind
+
+    t = BrainTools()
+    t.load_seed()
+    # A patient with NO incoming FOR_PATIENT edge — one of the ~289 the registry seed adds.
+    claimed = {e["dst_id"] for e in t.store.open_edges()
+               if e["kind"] == EdgeKind.FOR_PATIENT.value}
+    on_file_only = [r for r in t.store.open_nodes_of_kind(NodeKind.PATIENT)
+                    if r["id"] not in claimed]
+    assert on_file_only, "the seed no longer holds a patient nobody referred"
+    row = on_file_only[0]
+
+    ctx = build_context(t, row["id"])           # by id: never ambiguous, always resolves
+    assert row["id"] in ctx["nodes_used"], ctx
+    assert "IDENTITY:" in ctx["context"], ctx["context"]
+    assert "not a verified identity" in ctx["context"], ctx["context"]
+
+
+def test_build_context_refuses_a_name_that_means_several_people():
+    """`top_k=8` put all three "Loh Wei Ming" in one prompt and asked a model to answer about
+    "the patient" — delegating the choice between three people to the component least able to
+    say it is not entitled to make it. It refuses now, and hands back the ids."""
+    from brain_server import BrainTools
+    from databridge_gateway.llm import build_context
+
+    t = BrainTools()
+    t.load_seed()
+    ctx = build_context(t, "Who is Loh Wei Ming?")
+    assert ctx["refusal"], "an ambiguous name must not build a context"
+    assert ctx["context"] == "" and ctx["nodes_used"] == []
+    assert len(ctx["candidates"]) > 1
+
+    # ...and the refusal is a fork in the road, not a wall: asking again with one of the ids it
+    # returned resolves cleanly. A refusal with no way forward would just be a dead end.
+    again = build_context(t, ctx["candidates"][0])
+    assert again["refusal"] == "" and again["nodes_used"]
+
+
+def test_brain_query_refuses_an_ambiguous_name_before_reaching_a_model(client):
+    """End to end, on whichever branch is live. The deterministic branch already refused; the
+    LLM branch did not, so exporting a key silently removed the guarantee. Both do now."""
+    r = client.post("/brain/query", json={"question": "Who is Loh Wei Ming?"})
+    assert r.status_code == 422, r.text
+    body = r.json()["refusal"]
+    assert len(body.get("candidates", [])) > 1, body
+    assert "will not choose" in body["message"]
+
+
 # -- ingest + schema + SSRF --------------------------------------------------------
 def test_ingest_fixture_ok(client):
     r = client.post("/ingest", json={"source_url": "fintech", "source_type": "fixture"})

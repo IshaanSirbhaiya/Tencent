@@ -107,6 +107,18 @@ _PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
     ("check_passed", re.compile(
         r"\b(?:has|have|did|was|is)\b.{0,40}?\b(?:passed|pass|cleared|clear|completed|done)\b"
         r".{0,25}?\b(?:the )?(?:identity|id) (?:check|verification)\b", re.I)),
+    # A verification VERB aimed straight at an identity document, with no claim about the
+    # document trailing it. `verify_document` above required a validity word within 40 characters
+    # ("verify the passport is genuine"), so the barest and most natural phrasing of the forbidden
+    # request — "validate the insurance e-card" — walked through the screen and reached the model.
+    # Probing nine phrasings found five misses of this shape; "is this e-card valid?" was caught
+    # while "validate the insurance e-card" was not, which is not a distinction anyone asking the
+    # question would recognise. Validating an e-card IS the forbidden act; nothing needs to follow.
+    # The trailing lookahead keeps the transcription questions allowed — checking that an NRIC
+    # NUMBER was copied correctly from a letter is proofreading, not identity verification.
+    ("verify_id_document_bare", re.compile(
+        r"\b(?:verify|validate|authenticate)\b.{0,30}?\b" + _ID_DOC + r"\b"
+        r"(?! (?:number|field|column|value)\b)", re.I)),
     # "skip / bypass / auto-confirm the identity check"
     ("bypass_check", re.compile(
         r"\b(?:skip|bypass|waive|override|auto[- ]?(?:confirm|approve|verify))\b.{0,40}?"
