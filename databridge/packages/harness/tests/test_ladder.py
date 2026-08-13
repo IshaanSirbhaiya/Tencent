@@ -77,3 +77,61 @@ def test_one_event_per_logical_call(out, cfg, invalid_str, valid_str):
     res = h.complete_structured("anth_task", MSGS, out)
     assert fake.call_count == 2
     assert res.event is not None and res.event.tokens == 20   # 2 calls × (5+5)
+
+
+# --- L1 actually instructs something (D-1) ----------------------------------------
+
+
+def test_l1_puts_the_schema_in_the_prompt(out, cfg, valid_str):
+    """The rung that had no content. `caps_for("openai/*").guided_decoding` is False, so L3 is
+    skipped and the backend was sent only `response_format={"type": "json_object"}` — which
+    guarantees the reply is syntactically JSON and says nothing about its FIELD NAMES.
+
+    Measured against the live gateway: gpt-4o returned `patient_name`/`patient_id`/`patient_dob`
+    where `IntakeDraft` declares `claimed_name`/`claimed_id_number`/`claimed_dob`. Pydantic
+    ignores unknown keys, so the model validated cleanly with every field None — no
+    ValidationError, therefore no L2 retry, therefore no error anywhere. All ten chits extracted
+    to a blank card while `/health` reported a live model."""
+    fake = FakeBackend(valid_str)
+    h = Harness(fake, config=cfg, profile="cloud")
+    h.complete_structured("oai_task", MSGS, out)
+
+    sent = fake.calls[0]["messages"]
+    schema_text = "".join(m["content"] for m in sent)
+    assert "label" in schema_text and "score" in schema_text, sent
+    assert "EXACTLY these field names" in schema_text, sent
+
+
+def test_the_document_stays_the_last_message(out, cfg, valid_str):
+    """Ordering is load-bearing, not cosmetic. The fixture-keyed gold backend dispatches on
+    `messages[-1]`, so appending the schema after the document made every gold lookup match the
+    schema instead — the whole offline suite silently extracted empty drafts. Instructions before
+    data is also the ordering that reads correctly to a model."""
+    fake = FakeBackend(valid_str)
+    h = Harness(fake, config=cfg, profile="cloud")
+    h.complete_structured("oai_task", MSGS, out)
+    assert fake.calls[0]["messages"][-1] == MSGS[-1]
+
+
+def test_l3_does_not_repeat_the_schema_in_the_prompt(out, cfg, valid_str):
+    """Under a token-level grammar the schema is already binding; restating it only costs
+    context."""
+    fake = FakeBackend(valid_str)
+    h = Harness(fake, config=cfg, profile="cloud")
+    h.complete_structured("vllm_task", MSGS, out, strict=True)
+    assert fake.calls[0]["messages"] == MSGS
+    assert fake.calls[0]["guided_json"] is not None
+
+
+def test_seed_is_withheld_from_a_backend_that_declares_it_cannot_take_one(out, cfg, valid_str):
+    """`Caps.seed` was declared per provider and then ignored. Anthropic rejects `seed`, so with
+    only ANTHROPIC_API_KEY set every structured call raised `UnsupportedParamsError` — which the
+    gateway caught and quietly degraded to the deterministic backend, leaving `/health` still
+    advertising a live model. A capability that is declared and not honoured is worse than one
+    that was never declared."""
+    fake = FakeBackend(valid_str)
+    h = Harness(fake, config=cfg, profile="cloud")
+    h.complete_structured("anth_task", MSGS, out, seed=7)      # anthropic: seed=False
+    assert fake.calls[0]["seed"] is None
+    h.complete_structured("oai_task", MSGS, out, seed=7)       # openai: seed=True
+    assert fake.calls[-1]["seed"] == 7

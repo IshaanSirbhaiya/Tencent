@@ -220,7 +220,13 @@ def gold_harness() -> Harness:
     payloads = {marker: draft.model_dump_json() for marker, draft in GOLD.values()}
 
     def handler(*, model, messages, guided_json) -> str:
-        doc = messages[-1]["content"] if messages else ""
+        # Every message, not just the last. This used to read `messages[-1]` alone, which quietly
+        # encoded "the document is always the final message" — an assumption the harness broke the
+        # moment it began inserting the JSON schema into the prompt (the L1 rung), and which an
+        # L2 retry would have broken anyway by appending a correction. The failure was silent and
+        # total: no marker matched, so every document extracted to an empty draft and the tests
+        # reported candidate lists of length zero rather than a lookup miss.
+        doc = "\n".join(m.get("content") or "" for m in messages)
         for marker, payload in payloads.items():
             if marker in doc:
                 return payload

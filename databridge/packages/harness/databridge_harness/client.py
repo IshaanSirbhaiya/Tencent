@@ -29,6 +29,38 @@ from .tracking import build_event
 
 Message = dict  # {"role": "system"|"user"|"assistant", "content": str}
 
+
+def schema_instruction(schema: dict) -> Message:
+    """The L1 rung: the schema, IN THE PROMPT, for a backend that cannot be grammar-constrained.
+
+    **This was missing, and its absence was silent.** `caps_for("openai/*").guided_decoding` is
+    `False`, so L3 is skipped and `backends.generate` sent only
+    ``response_format={"type": "json_object"}`` — which guarantees the reply is *syntactically*
+    JSON and says nothing whatever about its field names. The model therefore guessed them:
+    gpt-4o returned ``patient_name`` / ``patient_id`` / ``patient_dob`` where `IntakeDraft` wants
+    ``claimed_name`` / ``claimed_id_number`` / ``claimed_dob``.
+
+    Pydantic ignores unknown keys, so the model validated **cleanly with every field ``None``** —
+    no ``ValidationError``, therefore no L2 retry, therefore no error anywhere. `/health` reported
+    a live model while every chit extracted to a blank card. A guard whose failure mode is silence
+    gets reported as coverage; this one was reported as "the model is wired up".
+
+    Naming the schema is also what makes the ladder's own labels true: "L1" has always meant
+    prompt-level schema instruction in `07_PRD` §3, and until now L1 instructed nothing.
+
+    The wording tells the model to OMIT what the source does not state rather than to invent a
+    plausible filler, which is the same rule the grounding wall enforces afterwards
+    (CLAUDE.md §Hard constraints 2). The wall is still the guarantee; this only stops the model
+    fabricating work for it.
+    """
+    import json
+
+    return {"role": "user", "content": (
+        "Return ONLY a JSON object conforming to this JSON Schema. Use EXACTLY these field "
+        "names — do not rename, abbreviate or invent fields. Any value the source does not "
+        "state must be null; never guess one." + "\n\n"
+        + json.dumps(schema, indent=2, sort_keys=True))}
+
 # Sentinel so `cache=None` (disable) is distinguishable from "use a fresh default cache".
 _DEFAULT_CACHE = object()
 
@@ -152,14 +184,29 @@ class Harness:
 
         use_l3 = strict and caps.has_guided_decoding
         guided = schema if use_l3 else None
-        convo = list(messages)
+        # L3 constrains the tokens themselves, so the schema is already binding and repeating it
+        # in the prompt would only cost context. Every other backend gets it in the prompt or
+        # gets nothing — see `schema_instruction`.
+        # Inserted BEFORE the final message, not appended after it. Two reasons, and the second
+        # is the one that bit: instructions-then-data is the ordering that reads correctly to a
+        # model, and the fixture-keyed gold backend dispatches on `messages[-1]` — appending left
+        # every gold lookup matching the schema instead of the document, so the whole offline
+        # suite extracted empty drafts. Keeping the document last preserves that contract.
+        convo = (list(messages) if use_l3
+                 else [*messages[:-1], schema_instruction(schema), *messages[-1:]])
         attempt = 0
         total_tokens = 0
         total_cost = 0.0
         t0 = perf_counter()
         while True:
+            # `Caps.seed` is declared per provider and was then ignored. Anthropic does not
+            # accept `seed`, so with only ANTHROPIC_API_KEY set every structured call raised
+            # `UnsupportedParamsError` — which the gateway caught and quietly degraded to the
+            # gold backend, leaving `/health` still advertising a live model. Honour the
+            # capability instead of discovering it as an exception.
             raw = self._backend.generate(model=model, messages=convo,
-                                         json_mode=caps.json_mode, guided_json=guided, seed=seed)
+                                         json_mode=caps.json_mode, guided_json=guided,
+                                         seed=seed if caps.seed else None)
             total_tokens += raw.tokens
             total_cost += raw.cost_usd
             try:
@@ -216,7 +263,10 @@ class Harness:
 
         self._check_budget(source_id)
         t0 = perf_counter()
-        raw = self._backend.generate(model=model, messages=list(messages), seed=seed)
+        # Same capability check as the structured path: `/brain/query` runs through here, so an
+        # Anthropic key alone made the narrated answer raise rather than the extraction only.
+        raw = self._backend.generate(model=model, messages=list(messages),
+                                     seed=seed if caps_for(model).seed else None)
         duration_ms = (perf_counter() - t0) * 1000
         self._add_usage(raw.tokens, source_id)
         if self._cache is not None:
