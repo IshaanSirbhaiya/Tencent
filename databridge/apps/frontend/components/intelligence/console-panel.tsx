@@ -14,6 +14,8 @@ import {
 } from "@/lib/intelligence-api";
 import type { ActionCard as ActionCardData, ExecutionResult } from "@/lib/outbox-api";
 import { ActionCard } from "@/components/intelligence/action-card";
+import { TryChips } from "@/components/try-chips";
+import { INTELLIGENCE_TRIALS } from "@/components/try-prompts";
 
 /**
  * The request box — the whole point of this page.
@@ -92,6 +94,15 @@ export function ConsolePanel({
   const result = ask.data as ConsoleResponse | undefined;
   const needsIntake = Boolean(result?.notes?.some((n) => n.key === "needs_an_intake"));
 
+  // One path in, whether a person typed it or picked it. A chip that only filled the box would be
+  // a hint, not a trial — the box would still need a second click nobody knows to make.
+  function run(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || ask.isPending) return;
+    setRequest(trimmed);
+    ask.mutate(trimmed);
+  }
+
   const onCardChanged = React.useCallback(
     (updated: ActionCardData, executed?: ExecutionResult) => {
       setCards((prev) => prev.map((c) => (c.draft_id === updated.draft_id ? updated : c)));
@@ -106,8 +117,7 @@ export function ConsolePanel({
         className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4"
         onSubmit={(e) => {
           e.preventDefault();
-          const text = request.trim();
-          if (text) ask.mutate(text);
+          run(request);
         }}
       >
         <label className="text-sm font-semibold" htmlFor="console-request">
@@ -167,6 +177,18 @@ export function ConsolePanel({
             className="flex-1 rounded border border-border bg-bg px-2 py-1 text-2xs text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
           />
         </div>
+
+        {/* The three tiers, as three labelled rows — the same pills `/brain` uses. Unlike `/brain`
+            these stay on screen after an answer: this form sits above the results rather than
+            sharing a fixed-height panel with them, and the whole point of the row is that a visitor
+            clicks one from each tier and sees three different behaviours out of one box. */}
+        <TryChips
+          groups={INTELLIGENCE_TRIALS}
+          onPick={(chip) => run(chip.payload)}
+          disabled={ask.isPending}
+          testId="console-try-chips"
+          className="pt-1"
+        />
 
         <p className="text-2xs text-subtle">
           Reading happens immediately. Anything that would act on the world becomes a{" "}

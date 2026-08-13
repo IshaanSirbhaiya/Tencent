@@ -17,11 +17,8 @@ import { Search } from "lucide-react";
 import { evidenceApi } from "@/lib/evidence-api";
 import { isRefusal } from "@/lib/intake-types";
 import { EvidenceEmptyState, EvidenceTraceView } from "@/components/evidence/trace-chain";
-
-const EXAMPLES = [
-  "document:chit_01_meridian_referral.txt",
-  "patient:pat:<registry id from a candidate list>",
-];
+import { TryChips } from "@/components/try-chips";
+import { EVIDENCE_TRIALS } from "@/components/try-prompts";
 
 function EvidencePageInner() {
   const router = useRouter();
@@ -46,12 +43,21 @@ function EvidencePageInner() {
     enabled: !!entityId,
   });
 
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    const trimmed = input.trim();
+  // One path in for the typed box and for a chip, so a chip is a whole trial rather than a hint:
+  // it fills the field, runs the trace, and leaves a deep-linkable URL behind exactly as typing
+  // would. `setInput` matters — a chip that traced an id the box did not show would make the next
+  // manual edit start from the wrong string.
+  function trace(id: string) {
+    const trimmed = id.trim();
     if (!trimmed) return;
+    setInput(trimmed);
     setEntityId(trimmed);
     router.replace(`/evidence?entity=${encodeURIComponent(trimmed)}`);
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    trace(input);
   }
 
   return (
@@ -90,14 +96,16 @@ function EvidencePageInner() {
         </button>
       </form>
 
-      <p className="text-2xs text-subtle">
-        Try: {EXAMPLES.map((e, i) => (
-          <span key={e}>
-            {i > 0 && " · "}
-            <code>{e}</code>
-          </span>
-        ))}
-      </p>
+      {/* Was a `Try:` line of two `<code>` examples, one of which was a placeholder nobody could
+          paste (`patient:pat:<registry id from a candidate list>`). These are real ids, they are
+          one click, and they are split by outcome — the second group is the confirmation gate,
+          which is the thing on this page worth showing on purpose. */}
+      <TryChips
+        groups={EVIDENCE_TRIALS}
+        onPick={(chip) => trace(chip.payload)}
+        testId="evidence-try-chips"
+        className="max-w-3xl"
+      />
 
       {!entityId && <EvidenceEmptyState />}
 

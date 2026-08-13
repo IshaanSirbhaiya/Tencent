@@ -27,12 +27,25 @@ import { isRefusal } from "@/lib/intake-types";
 import type { SummaryCard } from "@/lib/intake-types";
 import { ExtractionReport } from "@/components/intake/extraction-report";
 import { UploadFileControl } from "@/components/intake/upload-file-control";
+import { TryChips } from "@/components/try-chips";
+import { INTAKE_TRIALS, type IntakeTrial } from "@/components/try-prompts";
+
+/** The body of the file the "Refuses" chip uploads. Synthetic, one line, and never read: the guard
+ *  fires on the NAME before a byte is parsed, so this text exists only so the upload is a real file
+ *  rather than an empty one. */
+const IDENTITY_TRIAL_FILE_TEXT =
+  "Synthetic placeholder. Nothing real, and nothing here is read — this file is refused on its " +
+  "name before extraction runs.\n";
 
 export default function IntakeUploadPage() {
   const router = useRouter();
   const [documentId, setDocumentId] = useState("");
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Kept apart from `error`, which renders next to the Read button at the foot of the page: a
+  // refusal a chip at the top of the page caused has to appear where the click happened, or it
+  // reads as a chip that did nothing.
+  const [trialRefusal, setTrialRefusal] = useState<string | null>(null);
   // Held rather than navigated past, for file uploads only: the extraction report is the one
   // moment the OCR quality of this reading is on screen. The card does not repeat it.
   const [extracted, setExtracted] = useState<SummaryCard | null>(null);
@@ -56,6 +69,59 @@ export default function IntakeUploadPage() {
     },
     onError: (e: Error) => setError(`Could not load the fixture: ${e.message}`),
   });
+
+  // The chips' version of the fixture buttons: the same two gateway calls, without the click in
+  // between. The buttons above fill the box and stop, which is one click short of an outcome and
+  // leaves a visitor who does not know this page staring at 6 KB of letterhead.
+  const trialRead = useMutation({
+    mutationFn: async (name: string) => {
+      const loaded = await intakeApi.fixtureText(name);
+      if (isRefusal(loaded)) return loaded;
+      // Show what is about to be read before reading it, so the pipeline's input is on screen.
+      setDocumentId(name);
+      setText(loaded.text);
+      return intakeApi.upload(name, loaded.text);
+    },
+    onSuccess: (res) => {
+      if (isRefusal(res)) {
+        setTrialRefusal(res.refusal.message);
+        return;
+      }
+      setTrialRefusal(null);
+      router.push(`/frontdesk/${encodeURIComponent(res.intake_id)}`);
+    },
+    onError: (e: Error) => setTrialRefusal(`Could not read that document: ${e.message}`),
+  });
+
+  // `TRY.md` §E6, without a file picker. The name is the whole payload — `screen_upload` refuses on
+  // it before extraction, so nothing is stored whichever way this lands.
+  const trialIdentityFile = useMutation({
+    mutationFn: (filename: string) =>
+      intakeApi.uploadFile(
+        new File([IDENTITY_TRIAL_FILE_TEXT], filename, { type: "text/plain" }),
+        filename,
+      ),
+    onSuccess: (res) => {
+      if (isRefusal(res)) {
+        setExtracted(null);
+        setTrialRefusal(res.refusal.message);
+        return;
+      }
+      // Not expected, and not swallowed: if the guard ever stops firing, the card it built is
+      // shown rather than a chip that quietly looks like it worked.
+      setTrialRefusal(null);
+      setExtracted(res);
+    },
+    onError: (e: Error) => setTrialRefusal(`Could not reach the gateway: ${e.message}`),
+  });
+
+  function runTrial(trial: IntakeTrial) {
+    setError(null);
+    setTrialRefusal(null);
+    setExtracted(null);
+    if (trial.kind === "fixture") trialRead.mutate(trial.name);
+    else trialIdentityFile.mutate(trial.filename);
+  }
 
   const upload = useMutation({
     mutationFn: () => intakeApi.upload(documentId.trim() || "pasted-document.txt", text),
@@ -123,6 +189,26 @@ export default function IntakeUploadPage() {
           </p>
         </div>
       </div>
+
+      <TryChips
+        groups={INTAKE_TRIALS}
+        onPick={(chip) => runTrial(chip.payload)}
+        disabled={trialRead.isPending || trialIdentityFile.isPending}
+        testId="intake-try-chips"
+        className="max-w-3xl"
+      />
+
+      {trialRefusal && (
+        // Rendered where the click was, in the gateway's own words. `IDENTITY_DOCUMENT_REFUSED` is
+        // the mechanism behind the banner above working, so it is shown as a result, not an error.
+        <p
+          className="max-w-3xl whitespace-pre-line rounded border border-band-review/40 bg-band-review/[0.06] px-3 py-2 text-2xs text-fg"
+          data-testid="intake-trial-refusal"
+          role="status"
+        >
+          {trialRefusal}
+        </p>
+      )}
 
       <UploadFileControl
         onUpload={(file) => {

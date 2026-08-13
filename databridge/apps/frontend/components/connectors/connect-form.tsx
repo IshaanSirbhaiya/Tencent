@@ -17,6 +17,8 @@ import { Bot, Loader2, ShieldCheck } from "lucide-react";
 import type { ConnectRequest, ServerKind } from "@/lib/mcp-api";
 import type { Refusal } from "@/lib/types";
 import { RefusalCard } from "@/components/refusal-card";
+import { TryChips } from "@/components/try-chips";
+import { CONNECTOR_TRIALS } from "@/components/try-prompts";
 import { cn } from "@/lib/utils";
 
 const KIND_META: Record<
@@ -111,6 +113,23 @@ export function ConnectForm({
         </span>
       </div>
       <div className="space-y-3 px-4 py-4">
+        {/* The one chip row in the app that fills and does NOT submit. Submitting would mean
+            choosing READ or ACT for whoever clicked, and this form has no default for that on
+            purpose (R-34) — a capability boundary is not a convenience. It types the parts that
+            are easy to get wrong (`host.docker.internal`, the name rules) and stops there.
+            Deliberately NOT disabled with the rest of the form when the aggregator is down:
+            filling fields never touches the gateway, and a dead-looking chip beside a dead-looking
+            form teaches nothing. */}
+        <TryChips
+          groups={CONNECTOR_TRIALS}
+          onPick={(chip) => {
+            setName(chip.payload.name);
+            setUrl(chip.payload.url);
+            setDescription(chip.payload.description);
+          }}
+          testId="connector-try-chips"
+        />
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="text-2xs font-medium text-subtle">Name</span>
