@@ -52,6 +52,9 @@ stops being true.
 | Work on the code | [`CLAUDE.md`](CLAUDE.md) — the operating rules — then [`REMEDIATION.md`](REMEDIATION.md) |
 | Know where the build stands | [`STATUS.md`](STATUS.md) |
 | See what is planned | [`PLAN.md`](PLAN.md), [`TASKS.md`](TASKS.md) |
+| Try it yourself | [`RUNNING.md`](RUNNING.md), then [`TESTING.md`](TESTING.md) — 66 trials, 63 of them executed against the live system — or [`TRY.md`](TRY.md) for copy-paste commands |
+| Record the demo video | [`SCRIPT.md`](SCRIPT.md) — shot by shot, with the command backing every claim |
+| Move it to Microsoft Copilot Studio | [`docs/hackathon/COPILOT_STUDIO_PORTABILITY.md`](docs/hackathon/COPILOT_STUDIO_PORTABILITY.md) for the mapping, [`docs/hackathon/COPILOT_TRANSITION_GUIDE.md`](docs/hackathon/COPILOT_TRANSITION_GUIDE.md) for the order of work |
 
 `PROJECT_CONTEXT.md` §11 lists the places where two documents in this repo disagree, and which to
 trust. That list is kept rather than tidied away — a repo that hides its own inconsistencies is

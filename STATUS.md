@@ -3,17 +3,14 @@
 > Where the build stands. `PLAN.md` says *what* to build, `TASKS.md` says *what next*, this says
 > *where we are*. Updated at the end of every section — see `CLAUDE.md` §Build workflow.
 
-**Last updated:** 2026-08-12 (end of day) · **Phases 0–6a + 6.5 complete. Phase 7 largely built.
-Six scoped codex reviews run: the Critical findings open — see [`REMEDIATION.md`](REMEDIATION.md),
-which is the file to read after `CLAUDE.md` in a fresh session.**
+**Last updated:** 2026-08-13 · **Phases 0–7 built. The full registry is seeded (300 patients), the
+identity caveat is keyed to the patient KIND on every surface including the model's prompt, the
+harness actually sends its schema, and every surface has one-click trials.**
 
-⚠️ **The next block of work is FIXING, not building.** Six tracks shipped in parallel on
-2026-08-12 and every one came back with Criticals, including both pieces the lead wrote. They are
-five recurring shapes, not eighteen bugs; `REMEDIATION.md` §1 names them and §4 gives the order.
-
-**Green:** `python -m pytest -m "not integration"` → **2131 passed, 5 deselected** ·
-`npx playwright test` → **18 passed** · `npx tsc --noEmit` clean.
-The e2e suite is now genuinely offline — see Gotchas.
+**Green:** `python -m pytest -m "not integration"` → **2474 passed, 2 skipped, 5 deselected** ·
+`npx tsc --noEmit` clean · `npx playwright test` → 14 passed, 6 pre-existing `frontdesk.spec.ts`
+failures when run against a **live-model** gateway (the documented `reuseExistingServer` divergence
+— see Gotchas; they pass on the gold path).
 
 ---
 
@@ -213,26 +210,73 @@ requested tests or add-ons — a scan alone cannot drive the coverage determinat
 
 **2131 passed.**
 
+### 2026-08-13 (late) — the registry is fully seeded, and that exposed one bug in four places
+
+Three tracks ran in parallel by file ownership (graph/MCP · `TESTING.md` · frontend chips), then the
+lead worked what they surfaced. **The whole registry is now seeded — 300 patients, `graph_nodes`
+69 → 358** — with `registry_patients="referenced"` kept and tested so "the graph holds this
+morning's paperwork and nothing else" stays a reachable state. No `FOR_PATIENT` edge is created for
+an on-file patient, asserted by an edge-set-identical test across both options. Seed cost: **+25–35
+ms**, measured.
+
+**The identity caveat was implemented on the EDGE PATH in four separate components**, and seeding
+289 edge-less patients made all four visible at once. It was invisible before because every seeded
+patient happened to have a document naming them:
+
+| Where | What it did |
+|---|---|
+| `query.nl_query` | caveat emitted inside the `FOR_PATIENT` loop → 289 patients answered with a bare name + DOB |
+| `node_sheet` | caveat block gated on `if claims:` — and these sheets go into the **model's** context |
+| `brain_server.node_detail` | no caveat at all; and `brain_neighbors`/`brain_path`/`graph()` return patient nodes that never pass through it |
+| `gateway/llm.build_context` | same `if claims:` gate, on the prompt itself — **the worst one**, because it is the branch that runs whenever a key is present |
+
+Fixed at the KIND, not at each renderer: new `packages/graph/databridge_graph/identity.py` holds
+the caveat wording and the same-label rule; `brain_server` and `nl_query` both delegate to it;
+`node_to_dict` carries it so every tool that returns a patient gets it.
+
+**A name also resolved to one of several people.** The registry holds three "Loh Wei Ming", four
+"Rahman Zhi Hao", four "Tan Mei Ling". Both `/brain/query` branches now refuse and return the
+candidate ids — and `_named_outright` makes asking again with an id work, so the refusal is a fork
+rather than a wall. The LLM branch was the important half: `top_k=8` put all three in one prompt
+and let the model pick.
+
+**D-1 — the product did not work with the model it advertised.** `caps_for("openai/*")
+.guided_decoding` is `False`, so L3 was skipped and `backends.generate` sent only
+`response_format={"type":"json_object"}` — **the schema never reached the prompt.** gpt-4o returned
+`patient_name`/`patient_id`/`patient_dob` against a schema wanting `claimed_name`/
+`claimed_id_number`/`claimed_dob`; Pydantic ignores unknown keys, so `IntakeDraft` validated
+cleanly with **every field `None`** — no `ValidationError`, so no L2 retry, so no error anywhere.
+All ten chits extracted to a blank card while `/health` reported a live model. L1 now puts the
+schema in the prompt (`client.schema_instruction`). Also: `seed` was sent regardless of
+`Caps.seed`, so an Anthropic-only key raised `UnsupportedParamsError` and the gateway silently
+degraded to gold.
+
+**The identity screen was measurably too narrow** — nine phrasings probed, five missed.
+*"Validate the insurance e-card"* walked through while *"is this e-card valid?"* was refused,
+because every pattern required a validity word trailing the document. New rule: a verification
+verb aimed at an identity document, with the transcription carve-out kept.
+
+**Also:** "let the patient know…" reached no send pattern (they all wanted a sending verb), so the
+console routed a request to contact a patient to the READ path and answered `NO_GROUNDED_ANSWER`;
+one-click trial chips on `/intelligence`, `/evidence`, `/intake`, `/connectors`; `TESTING.md`
+rewritten as **66 trials, 63 executed**; OCR builder 2 → 5 chits × 3 shapes (its new page guard
+found chit_07/08 render to two pages, so their "scan" would have shipped half a document);
+`SCRIPT.md` (demo video) and `COPILOT_TRANSITION_GUIDE.md` written.
+
 ## Now
 
-Five tracks in flight, partitioned by file ownership: connectors UI + MCP management, the outbox +
-dispatcher + mail MCP, R-02/R-30 in `packages/graph`, and node-sheet markdown export.
-
-**The last big piece is the `/intelligence` action console** — request box → grounded answer →
-proposed action cards → approve → executed result. It is queued behind the outbox landing, because
-the propose/execute tiers need it.
-
-**Process note, learned the hard way twice today:** `git add -A` is wrong while other tracks are
-writing. It swept another track's in-flight files into two unrelated commits; both were backed out.
-Stage explicit paths.
+Nothing in flight. Working tree is committed; the branch is ahead of `origin/hack4health_v1.0`.
 
 ## Next
 
-1. Land and re-review the agent fixes, then wire `POST /intelligence/ask` — **structural reads
-   only**, no candidate or patient-scoped tools on that page.
-2. Shape C (R-12, R-19), then R-13 (a declined test can still be billed).
-3. Shape D (R-02, R-04, R-05, R-29), then the remainder.
-4. Carried findings R-30…R-32 in `REMEDIATION.md` §2.7.
+1. **Re-verify the pipeline against a real key** now that the schema reaches the prompt. D-1 was
+   found by uploading all ten chits to a live gateway and reading `candidates: 0` — repeat exactly
+   that, and treat an all-`None` draft as an alarm rather than a pass.
+2. Record the demo video from `SCRIPT.md`.
+3. The gateway would need `GET /<surface>/suggested` to serve the trial chips from config the way
+   `/brain/suggested` already does — the intake fixture names and evidence entity ids in
+   `try-prompts.ts` are duplicating server-side facts today.
+4. Carried findings R-30…R-33 in `REMEDIATION.md` §2.7.
 
 ## Known open issues
 
@@ -276,6 +320,18 @@ Stage explicit paths.
    could not fail; one was written the same day.
 8. **A constant written against the old seed still compiles against the new one.** Three of four
    `/brain` defects were this. Derive constants from the data, or assert them against it.
+9. **A caveat attached to a RELATIONSHIP disappears when the relationship does.** The identity
+   caveat rode on the `FOR_PATIENT` edge in four components and looked correct for weeks, because
+   every seeded patient happened to have one. Attach a guarantee to the KIND, never to a branch.
+10. **A guarantee implemented on one branch is gone the moment the other branch runs.** `nl_query`
+    refused ambiguous names; the LLM branch beside it did not — and the LLM branch is the one that
+    runs when a key is present, i.e. in every demo. Fix both, or fix it below both.
+11. **"Valid JSON" is not "the right fields".** `response_format: json_object` guarantees syntax
+    and nothing else; the model renamed every field, Pydantic dropped the unknowns, and an
+    all-`None` object validated cleanly. **An all-null parse must be an alarm, not a pass.**
+12. **Changing what a message list contains breaks whoever was reading position `-1`.** The gold
+    backend dispatched on the last message; inserting the schema after it silently emptied every
+    extraction in the offline suite. 215 failures from one appended list element.
 
 ## Gotchas
 
