@@ -11,11 +11,31 @@ that resolve to something a person can go and read.
 
 **Three deliberate omissions, all about not asserting more than the data supports.**
 
-*Only connected nodes are seeded.* The registry holds 300 patients and the catalogue 33 tests, but
-a patient no document refers to and a test no package includes have no relationship to represent.
-Seeding them would add hundreds of orphans — nodes that answer no question and inflate every count
-on the dashboard. ``load_clinic_seed`` reports how many rows it skipped for this reason, so the
-number is visible rather than quietly dropped.
+*The whole registry is seeded; the catalogue is not.* Those read like the same call and are not.
+A catalogue test no package includes is a row in a price list — nobody searches a clinic graph for
+it and nothing points at it. A registry patient no document refers to is **a person the clinic has
+on file**, and "find me this patient" is the first question anyone asks a clinic system. Seeding 11
+of 300 made the registry look empty, made search miss the other 289, and made the one case the
+product exists to handle — someone who walks in having never been referred — impossible to show.
+So ``registry_patients="all"`` (the DEFAULT) seeds every row. ``"referenced"`` restores the older
+only-connected behaviour; it stays supported and tested, because it is the shape in which the
+graph contains nothing but this morning's paperwork.
+
+*The counts objection to that was correct, and is answered structurally rather than by seeding
+less.* An unreferenced patient IS an orphan, deliberately: **an incoming ``FOR_PATIENT`` edge is
+exactly what tells a patient the clinic has SEEN from one it merely has ON FILE.** That was always
+the real distinction; it was just implicit, because the seed happened to contain only the first
+kind. It is now a first-class output — ``patient_census`` returns both numbers, ``load_clinic_seed``
+reports them, and the tests assert they differ — so "how many patients has this clinic actually
+seen?" stays answerable and cannot quietly decay into "how many rows are in the CSV" without a test
+going red. ``load_clinic_seed`` still reports the catalogue rows it skipped for the reason above.
+
+*Seeding the registry adds no relationships at all.* Not one ``FOR_PATIENT`` edge, and none of any
+other kind. A patient nobody referred has no claim on any document, no insurer and no visit, so
+there is nothing to relate them to; the only thing anyone can honestly say about them is that the
+registry says they exist, which is precisely what their ``table_cell`` pointers say and no more
+(CLAUDE.md constraints 1 and 2). A test asserts the ``FOR_PATIENT`` edge set is byte-identical
+under both options.
 
 *A document that names no subject gets no ``FOR_PATIENT`` edge.* The evidence for such a claim is
 the span the subject was read from, and there is no substitute for it: citing the document-level
@@ -55,6 +75,16 @@ SEED_SYSTEM_TIME = dt.datetime(2026, 8, 11, tzinfo=dt.timezone.utc)
 _EPOCH = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
 
 RULES_SOURCE_ID = "coverage_rules.yaml"
+
+#: How much of the patient registry to seed. See the module docstring for the trade.
+#:   ``"all"``        — every row on file. The default, and what the product needs: the registry
+#:                      is searchable and a never-referred walk-in can be demonstrated.
+#:   ``"referenced"`` — only patients some document names. The pre-existing behaviour, kept so
+#:                      "the graph holds this morning's paperwork and nothing else" stays a
+#:                      reachable, tested state rather than a thing the code used to do.
+REGISTRY_ALL = "all"
+REGISTRY_REFERENCED = "referenced"
+REGISTRY_OPTIONS = (REGISTRY_ALL, REGISTRY_REFERENCED)
 
 # Legal-form suffixes stripped when deciding whether two printed employer names are the same
 # organisation. "Coral Harbour Pte Ltd", "CORAL HARBOUR PTE LIMITED" and "CORAL HARBOUR PTE LTD"
@@ -362,8 +392,46 @@ def document_node_id(document_id: str) -> str:
     return node_id(NodeKind.DOCUMENT, document_id)
 
 
-def _build(intakes, resolutions, table, registry_by_id, texts=None):
-    """Assemble every node and edge. Returns ``(nodes, edges, skipped)``."""
+def _patient_node(patient) -> GraphNode:
+    """One registry row as a PATIENT node — the SAME construction whether a document names this
+    person or not.
+
+    Deliberately one function, called from both paths. They differ in nothing but which loop
+    reaches them: same label, same two identity pointers, same three cited demographics. Two
+    builders would let the ~289 rows nobody ever opens drift into a thinner, less-cited shape than
+    the handful on screen during the demo — and the thin ones are exactly the ones no reviewer
+    would think to check.
+
+    Every attribute carries its OWN pointer into ``patient_registration_synthetic.csv``: a
+    ``table_cell`` for the columns, and a ``derived`` one for the date of birth, whose century the
+    registry resolved from a two-digit year and which therefore was not read off the page as-is.
+    ``_grounded_attrs`` turns anything the CSV does not answer into ``None``, which puts its name
+    in the node's ``unresolved`` rather than into a value nobody can check (constraint 2).
+
+    ``sources`` is the name and the identifier because those are what make this row *this row*.
+    """
+    attrs, attr_ptrs = _grounded_attrs({
+        "sex": (patient.sex.value, patient.sex.pointer),
+        "nationality": (patient.nationality.value, patient.nationality.pointer),
+        "date_of_birth": (str(patient.date_of_birth.value), patient.date_of_birth.pointer)})
+    return _node(NodeKind.PATIENT, patient_key(patient.patient_id),
+                 str(patient.full_name.value),
+                 [patient.full_name.pointer, patient.id_number.pointer],
+                 canonical_id=patient.patient_id,
+                 attrs=attrs, attr_sources=attr_ptrs)
+
+
+def _build(intakes, resolutions, table, registry_by_id, texts=None, *,
+           registry_patients: str = REGISTRY_ALL):
+    """Assemble every node and edge. Returns ``(nodes, edges, skipped)``.
+
+    ``registry_patients`` is checked HERE, before any work, and rejects an unknown value rather
+    than falling through to "referenced". A typo that silently seeded 11 patients instead of 300
+    would look exactly like the feature working.
+    """
+    if registry_patients not in REGISTRY_OPTIONS:
+        raise ValueError(f"registry_patients must be one of {REGISTRY_OPTIONS!r}, "
+                         f"got {registry_patients!r}")
     nodes: dict[str, GraphNode] = {}
     edges: list[GraphEdge] = []
 
@@ -521,21 +589,10 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
             dropped_claims += len(resolution.candidates)
             documents_with_no_subject.append(document_id)
         for candidate in claimable:
-            patient = registry_by_id[candidate.patient_id]
-            # Each registry field carries the `table_cell` pointer it was read from. These were
-            # written with only the name and ID pointers on the node, so an evidence sheet printed
-            # a patient's sex, nationality and date of birth under a citation list that had never
-            # seen them.
-            pat_attrs, pat_ptrs = _grounded_attrs({
-                "sex": (patient.sex.value, patient.sex.pointer),
-                "nationality": (patient.nationality.value, patient.nationality.pointer),
-                "date_of_birth": (str(patient.date_of_birth.value),
-                                  patient.date_of_birth.pointer)})
-            pat_id = add(_node(NodeKind.PATIENT, patient_key(candidate.patient_id),
-                               str(patient.full_name.value),
-                               [patient.full_name.pointer, patient.id_number.pointer],
-                               canonical_id=candidate.patient_id,
-                               attrs=pat_attrs, attr_sources=pat_ptrs))
+            # `_patient_node` is shared with the on-file pass below, so a patient a document
+            # names and one nobody has ever referred are the same node in every respect except
+            # the edge — which is the whole distinction, and the only one.
+            pat_id = add(_patient_node(registry_by_id[candidate.patient_id]))
             # Every one of these is the RESOLVER's output, not the letter's text, so each cites
             # the rule that produced it and keeps the subject span that rule consumed.
             # `candidate_count` matters most: a renderer that cannot cite it falls back to the
@@ -615,8 +672,26 @@ def _build(intakes, resolutions, table, registry_by_id, texts=None):
             edges.append(_edge(visit_id, EdgeKind.AT_CLINIC, clinic_id, [_span_of(location)]))
             edges.append(_edge(doc_id, EdgeKind.REFERENCES, visit_id, [_span_of(location)]))
 
+    # -- the rest of the registry: every patient on file, related to nothing -------
+    # Runs AFTER the document loop on purpose. A patient some document names is already in
+    # `nodes`, and `add` is first-writer-wins, so re-adding the identical node is a no-op — the
+    # two paths cannot disagree about a patient they both reach. Ordering also keeps the
+    # document-connected nodes at the front of the list, so store rowids (and anything that
+    # tie-breaks on them) do not shift for the graph that existed before this option.
+    #
+    # NO EDGE IS CREATED HERE, of any kind. See the module docstring.
+    if registry_patients == REGISTRY_ALL:
+        for patient in registry_by_id.values():
+            add(_patient_node(patient))
+
     skipped = {
         "catalogue_tests_not_referenced": len(table.test_catalogue) - len(referenced_tests),
+        # Zero under the default: every row is seeded. It stays reported rather than deleted
+        # because it is the number that goes non-zero the moment someone passes
+        # `registry_patients="referenced"`, and "how much of the registry is missing?" should
+        # have one answer in one place regardless of which option produced it. The *interesting*
+        # number — patients on file that no document refers to — is `patient_census`, because
+        # that one is a fact about the clinic rather than about this function's arguments.
         "registry_patients_not_referenced": len(registry_by_id) - sum(
             1 for n in nodes.values() if n.kind is NodeKind.PATIENT),
         # A document that names no subject links to no candidate. That is the honest outcome, and
@@ -648,11 +723,16 @@ def _fixture_intakes():
     return intakes, lengths
 
 
-def build_seed(intakes=None, texts=None) -> tuple[list[GraphNode], list[GraphEdge], dict]:
+def build_seed(intakes=None, texts=None, *,
+               registry_patients: str = REGISTRY_ALL
+               ) -> tuple[list[GraphNode], list[GraphEdge], dict]:
     """Nodes, edges and the skipped-row counts, without touching a store.
 
     ``texts`` maps document_id → source length, used only so a document's self-citation spans the
     whole document instead of a placeholder character.
+
+    ``registry_patients`` selects how much of the registry is seeded — ``"all"`` (default) or
+    ``"referenced"``. See the module docstring.
     """
     from databridge_intake.registry import registry
     from databridge_intake.resolve import resolve
@@ -663,25 +743,29 @@ def build_seed(intakes=None, texts=None) -> tuple[list[GraphNode], list[GraphEdg
         texts = texts if texts is not None else fixture_lengths
     resolutions = {name: resolve(record.subject) for name, record in intakes.items()}
     registry_by_id = {r.patient_id: r for r in registry()}
-    return _build(intakes, resolutions, rules(), registry_by_id, texts)
+    return _build(intakes, resolutions, rules(), registry_by_id, texts,
+                  registry_patients=registry_patients)
 
 
-def build_seed_nodes() -> list[GraphNode]:
-    return build_seed()[0]
+def build_seed_nodes(*, registry_patients: str = REGISTRY_ALL) -> list[GraphNode]:
+    return build_seed(registry_patients=registry_patients)[0]
 
 
-def build_seed_edges() -> list[GraphEdge]:
-    return build_seed()[1]
+def build_seed_edges(*, registry_patients: str = REGISTRY_ALL) -> list[GraphEdge]:
+    return build_seed(registry_patients=registry_patients)[1]
 
 
-def load_clinic_seed(store: GraphStore, intakes=None, texts=None) -> dict:
+def load_clinic_seed(store: GraphStore, intakes=None, texts=None, *,
+                     registry_patients: str = REGISTRY_ALL) -> dict:
     """Load the clinic graph into ``store`` (idempotent).
 
-    Returns the created counts plus ``skipped``, which names the registry and catalogue rows that
-    were deliberately not seeded because nothing in the fixture corpus relates to them.
+    Returns the created counts, ``skipped`` (registry and catalogue rows deliberately not seeded),
+    and ``patients`` — the census that keeps "seen here" and "on file" apart. The census is
+    reported at load time rather than left to be derived because the number a dashboard shows for
+    "patients" is the one figure whose meaning this option changes.
     """
     before = store.counts()
-    nodes, edges, skipped = build_seed(intakes, texts)
+    nodes, edges, skipped = build_seed(intakes, texts, registry_patients=registry_patients)
     for node in nodes:
         upsert_node(store, node)
     for edge in edges:
@@ -697,14 +781,58 @@ def load_clinic_seed(store: GraphStore, intakes=None, texts=None) -> dict:
         "attribute_sources_attached": (after["attribute_sources"]
                                        - before["attribute_sources"]),
         "skipped": skipped,
+        "patients": patient_census(nodes, edges),
     }
 
 
-def fresh_clinic_store() -> GraphStore:
+def fresh_clinic_store(*, registry_patients: str = REGISTRY_ALL) -> GraphStore:
     """A new in-memory store with the clinic seed loaded and a pinned system clock."""
     store = GraphStore(clock=lambda: SEED_SYSTEM_TIME)
-    load_clinic_seed(store)
+    load_clinic_seed(store, registry_patients=registry_patients)
     return store
+
+
+def claimed_patient_node_ids(nodes: Iterable[GraphNode],
+                             edges: Iterable[GraphEdge]) -> list[str]:
+    """Patient node ids some DOCUMENT claims — the graph's definition of "seen at this clinic".
+
+    **Both ends are checked against the node kinds, not just one.** ``FOR_PATIENT`` also runs
+    visit → patient in the vocabulary (schema.py), and an earlier version guarded only the
+    destination — so a ``VISIT`` claim would have counted as a document naming this person. That
+    is the same class of error this function exists to prevent, in the direction that inflates
+    "seen here" and picks the *less* cautious identity caveat downstream.
+
+    A claim is still only a CLAIM: an ambiguous document contributes two ids, and neither is a
+    determination of identity (CLAUDE.md constraint 1). "Claimed" is therefore an upper bound on
+    "seen" and is named that way — it is never the count of *people*.
+    """
+    nodes = list(nodes)
+    patients = {n.id for n in nodes if n.kind is NodeKind.PATIENT}
+    documents = {n.id for n in nodes if n.kind is NodeKind.DOCUMENT}
+    return sorted({e.dst_id for e in edges
+                   if e.kind is EdgeKind.FOR_PATIENT
+                   and e.src_id in documents
+                   and e.dst_id in patients})
+
+
+def patient_census(nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]) -> dict:
+    """The two patient numbers, told apart — the answer to the counts objection in the docstring.
+
+    ``on_file``               every registry row the graph holds. Grows to the size of the CSV.
+    ``claimed_by_a_document`` rows a document names. **This is the clinic-activity figure**, and
+                              it is unchanged by seeding the rest of the registry.
+    ``on_file_only``          the difference: people the clinic knows of and has not seen.
+
+    Any consumer that shows a number labelled "patients" should decide which of these it means and
+    say so. `analytics.compute` now does, and carries the denominator with it.
+    """
+    nodes = list(nodes)
+    claimed = claimed_patient_node_ids(nodes, edges)
+    on_file = sum(1 for n in nodes if n.kind is NodeKind.PATIENT)
+    return {"on_file": on_file,
+            "claimed_by_a_document": len(claimed),
+            "on_file_only": on_file - len(claimed),
+            "claimed_node_ids": claimed}
 
 
 def orphan_node_ids(nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]) -> list[str]:

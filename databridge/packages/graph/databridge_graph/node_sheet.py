@@ -38,6 +38,14 @@ section, under a caveat emitted before any untrusted text and outside every line
 any — so there is no string an attacker can supply that lands inside the warning or ahead of it.
 Dropping it would feed the model an identity assertion the rest of the system refuses to make
 (CLAUDE.md §Hard constraints 1).
+
+**And the caveat is keyed on the KIND, not on the claim.** That block was `if claims:`, which was
+indistinguishable from correct while ``clinic_seed`` held only the ~11 patients some document
+names. Seeding the whole registry left 289 patient sheets rendering a name, a date of birth and a
+nationality with nothing anywhere saying "not verified" — the exact assertion the paragraph above
+exists to prevent, reached by having no document rather than by dropping a line. Every PATIENT
+sheet now carries ``PATIENT_CAVEAT``, and a patient no document names gets a *stated* empty claims
+section rather than no section at all.
 """
 from __future__ import annotations
 
@@ -60,6 +68,18 @@ IDENTITY_CAVEAT = (
     "**CLAIMED ON THE DOCUMENT — NOT VERIFIED.** These link a document to registry candidates. "
     "Identity is checked in person by clinic staff; the system never confirms it, and nothing "
     "below may be read as a determination of who this patient is."
+)
+
+#: Emitted on EVERY patient sheet, claims or none. The claims block above used to be the only
+#: place this document said "not verified", so a patient the clinic merely holds on file — 289 of
+#: the 300 once `clinic_seed` seeded the whole registry — rendered a name, a date of birth and a
+#: nationality with no caveat at all. Registry presence is not identification, and the sheet is
+#: read by the MODEL as well as by a person (CLAUDE.md constraint 1).
+PATIENT_CAVEAT = (
+    "**A REGISTRY ROW IS NOT AN IDENTIFICATION.** This sheet describes a row the clinic holds on "
+    "file. It does not establish who any person at the counter is; identity is checked in person "
+    "by clinic staff, and the system never confirms it. Names are not unique in the registry — "
+    "several people on file share one."
 )
 
 # Longest untrusted string reproduced verbatim. A label is a name, a code or a short phrase; a
@@ -303,6 +323,11 @@ def node_markdown(store,
         lines.append(f"**Canonical id:** {_code(node.canonical_id)}")
     lines.append("_Title, id and canonical id are grounded by the entity citations at the foot of "
                  "this sheet. Everything else carries its own citation inline._")
+    if node.kind is NodeKind.PATIENT:
+        # Keyed on the KIND, never on whether a claim edge happens to exist. It is emitted here —
+        # early, on its own line, before any attribute value — for the same reason the claims
+        # caveat is: no supplied label, attribute or id can sit inside it or comment it out.
+        lines += ["", f"> {PATIENT_CAVEAT}"]
     if as_of is not None:
         lines.append(f"**Shown as of:** {_fmt_time(as_of)} (valid time; belief as held today)")
     if superseded:
@@ -364,6 +389,12 @@ def node_markdown(store,
         # inside it, precede it, or comment it out.
         lines += ["", "## Claimed identity — NOT VERIFIED", "", f"> {IDENTITY_CAVEAT}", ""]
         lines += claims
+    elif node.kind is NodeKind.PATIENT:
+        # An empty section rather than none: "no document names this person" is an ANSWER, and
+        # the absence of a heading reads as the question never having been asked.
+        lines += ["", "## Claimed identity — NOT VERIFIED", "",
+                  "_No document on file names this patient. Being on file is not being "
+                  "identified._"]
 
     lines += ["", "## Relationships"]
     lines += relations or ["_No relationships recorded at this point in time._"]

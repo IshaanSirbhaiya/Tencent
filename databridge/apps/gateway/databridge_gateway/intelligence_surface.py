@@ -505,6 +505,12 @@ def sanitise_analytics(payload: dict, names: SurfaceNames) -> dict:
     names — and the page rendered them, because "every figure names the ids it counted" was the
     only rule in play. Both rules are real; when they collide, constraint 1 wins and the collision
     is announced (`members_withheld`) rather than papered over with an empty list.
+
+    `patients` joined that list when it stopped being a bare scalar. It used to pass through here
+    untouched simply because it was an `int` with nothing to sanitise — and an `int` was the
+    problem, since it silently changed meaning ("seen here" → "on file") the moment the seed grew
+    to the whole registry. It is now a `Count` whose members are patient node ids, so it needs the
+    same withholding as `conflicts`, for the same reason.
     """
     out = dict(payload)
 
@@ -517,7 +523,7 @@ def sanitise_analytics(payload: dict, names: SurfaceNames) -> dict:
             shown.append(names.public_id(entity_id))
         return shown, withheld
 
-    for key in ("ambiguity", "unlinked_documents", "conflicts"):
+    for key in ("patients", "ambiguity", "unlinked_documents", "conflicts"):
         figure = out.get(key)
         if not isinstance(figure, dict):
             continue

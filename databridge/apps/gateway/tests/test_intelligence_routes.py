@@ -64,14 +64,19 @@ def test_the_graph_figures_are_present_and_counted_over_the_seed(client):
     body = client.get("/intelligence").json()
     graph = body["graph"]
     assert body["graph_unavailable"] is None
-    assert graph["documents"] > 0 and graph["patients"] > 0
+    assert graph["documents"] > 0
     assert graph["nodes"] > 0 and graph["edges"] > 0
     assert graph["issuer_mix"], "the seed's paperwork came from somewhere"
+    # `patients` is a Count, and both halves are asserted separately because they are different
+    # claims: `n` is the registry rows a document has claimed, `of` is the rows on file. It was a
+    # bare int, which meant whichever the seed happened to produce — and the seed changed.
+    assert graph["patients"]["n"] > 0
+    assert graph["patients"]["of"] > graph["patients"]["n"]
 
 
 def test_every_figure_carries_its_denominator_and_the_ids_behind_it(client):
     graph = client.get("/intelligence").json()["graph"]
-    for key in ("ambiguity", "unlinked_documents", "conflicts"):
+    for key in ("patients", "ambiguity", "unlinked_documents", "conflicts"):
         count = graph[key]
         assert count["label"], f"{key} is a bare number with no label"
         assert count["of"] >= count["n"]
@@ -103,14 +108,35 @@ def test_the_coverage_gap_names_the_tests_no_package_includes(client):
         assert test["id"] and test["label"] and test["kind"] == "test"
 
 
+def test_the_patients_figure_keeps_its_numbers_and_withholds_its_members(client):
+    """`patients` used to pass through the sanitiser untouched — not because it was safe, but
+    because it was an `int` with nothing in it to sanitise. As a `Count` its members are PATIENT
+    node ids, and this page never names a patient (constraint 1). The numbers survive; the ids do
+    not; and the withholding is ANNOUNCED, because an empty `members` with no stated reason reads
+    as a bug or, worse, as a zero."""
+    from databridge_gateway.intelligence_surface import MEMBERS_WITHHELD
+
+    graph = client.get("/intelligence").json()["graph"]
+    patients = graph["patients"]
+    assert patients["n"] > 0 and patients["of"] > patients["n"]
+    assert patients["label"]
+    assert patients["members"] == []
+    assert patients["members_withheld"] == MEMBERS_WITHHELD
+    # …and no patient reached the entity table this page renders labels from, either.
+    assert all(e["kind"] != "patient" for e in graph["entities"].values())
+
+
 # --- the bi-temporal rewind --------------------------------------------------------
 def test_as_of_rewinds_the_graph_figures(client):
     live = client.get("/intelligence").json()["graph"]
     early = client.get("/intelligence", params={"as_of": "2026-01-02"}).json()
     assert early["as_of"].startswith("2026-01-02")
     assert early["graph"]["documents"] == 0 < live["documents"]
-    # the registry and the rule table predate the paperwork
-    assert early["graph"]["patients"] > 0
+    # The registry and the rule table predate the paperwork, so the rows are on file — but nobody
+    # has been claimed yet, because no document exists to claim them. Rewinding must move the two
+    # halves of the Count independently; a single number could not have said this.
+    assert early["graph"]["patients"]["of"] > 0
+    assert early["graph"]["patients"]["n"] == 0
 
 
 def test_as_of_accepts_a_naive_iso_datetime_and_a_z_suffix(client):

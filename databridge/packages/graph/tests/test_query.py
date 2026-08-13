@@ -18,6 +18,7 @@ from databridge_graph import (
     nl_query,
     node_id,
     path,
+    row_to_edge,
     timeline,
 )
 from databridge_graph.clinic_seed import (
@@ -135,17 +136,154 @@ def test_nl_query_test_resolves_to_the_packages_containing_it():
     assert "Chest X-Ray" in a.answer
 
 
+def _patients(store):
+    """(a patient some document claims, a patient nobody has ever referred), both uniquely named.
+
+    Both are needed and neither may be hardcoded: the point of the pair is that the SAME caveat
+    reaches both, and a literal id would stop being either the moment the registry changed.
+    Uniquely named because an ambiguous name is refused before any answer is built — that is the
+    other half of this file's identity story and it has its own tests below.
+    """
+    from databridge_graph import NodeKind, row_to_node
+    from databridge_graph.clinic_seed import claimed_patient_node_ids
+    from databridge_graph.identity import same_label_node_ids
+
+    nodes = [row_to_node(store, r) for r in store.open_nodes()]
+    edges = [row_to_edge(store, r) for r in store.open_edges()]
+    claimed = set(claimed_patient_node_ids(nodes, edges))
+    unique = [n for n in nodes if n.kind is NodeKind.PATIENT
+              and len(same_label_node_ids(store, n.id)) == 1]
+    named = next(n for n in unique if n.id in claimed)
+    on_file_only = next(n for n in unique if n.id not in claimed)
+    return named, on_file_only
+
+
 def test_a_patient_answer_never_claims_identity_is_verified():
     """The load-bearing one. A document names a patient; the graph must present that as a CLAIM
     and say so in the answer text, because the answer is what staff read
     (CLAUDE.md §Hard constraints 1)."""
     s = _seeded()
-    a = nl_query(s, "Who is Loh Wei Ming?")
+    named, _ = _patients(s)
+    a = nl_query(s, f"Who is {named.label}?")
     assert a.grounded, a.refusal
     assert "not a verified identity" in a.answer
     assert "in person" in a.answer
     for forbidden in ("verified identity is", "identity confirmed", "is confirmed to be"):
         assert forbidden not in a.answer.lower()
+
+
+def test_a_patient_no_document_names_still_gets_the_identity_caveat():
+    """The regression this test exists for, and the reason the caveat moved out of the loop.
+
+    `clinic_seed` seeds all 300 registry rows; 289 of them have no `FOR_PATIENT` edge. The caveat
+    used to be appended INSIDE the loop over those edges, so those 289 answered with a bare name
+    and a date of birth and nothing else — a registry row presented as an identification, which is
+    constraint 1 broken by omission rather than by assertion. **Registry presence is not
+    identification**, so the caveat belongs to the KIND.
+    """
+    s = _seeded()
+    _, on_file_only = _patients(s)
+    a = nl_query(s, f"Who is {on_file_only.label}?")
+    assert a.grounded, a.refusal
+    assert on_file_only.label in a.answer
+    assert "not a verified identity" in a.answer
+    assert "in person" in a.answer
+    # and it says WHY it has nothing more to show, rather than looking like a thin answer
+    assert "No document on file names this patient" in a.answer
+
+
+def test_every_patient_in_the_graph_gets_the_caveat_not_just_the_ones_on_screen():
+    """Swept over the whole registry rather than a sample, because the failure mode was a whole
+    CLASS of patient — the ones no demo ever opens — losing the caveat silently."""
+    from databridge_graph import NodeKind, row_to_node
+    from databridge_graph.identity import same_label_node_ids
+
+    s = _seeded()
+    checked = 0
+    for row in s.open_nodes():
+        if row["kind"] != NodeKind.PATIENT.value:
+            continue
+        if len(same_label_node_ids(s, row["id"])) > 1:
+            continue                     # refused outright; covered by the ambiguity tests below
+        a = nl_query(s, row["id"])
+        assert a.grounded, (row["id"], a.refusal)
+        assert "not a verified identity" in a.answer, row["id"]
+        assert "in person" in a.answer, row["id"]
+        checked += 1
+    assert checked > 100, f"only {checked} patients were reachable — the sweep proved little"
+
+
+# --- a name is not an identifier (CLAUDE.md §Hard constraints 1) ----------------------
+
+
+def test_a_name_shared_by_several_patients_is_refused_not_answered_about_one_of_them():
+    """The registry holds three "Loh Wei Ming", four "Rahman Zhi Hao" and four "Tan Mei Ling".
+    `nl_query` used to return whichever of them `link_entities` scored first among equals — the
+    machine choosing between people who share a name, silently, with nothing in the answer saying
+    a choice had been made."""
+    s = _seeded()
+    a = nl_query(s, "Who is Loh Wei Ming?")
+    assert a.grounded is False
+    assert a.answer == ""
+    assert len(a.candidates) == 3
+    assert "will not choose" in a.refusal
+    for candidate in a.candidates:
+        assert s.open_node_row(candidate) is not None
+
+
+def test_the_ambiguity_refusal_is_a_fork_in_the_road_not_a_dead_end():
+    """A refusal with no way forward would just be a wall. Asking again with one of the ids the
+    refusal handed back resolves cleanly — an id is an identifier, and a caller who has one has
+    already made the choice this module will not make for them."""
+    s = _seeded()
+    refused = nl_query(s, "Who is Loh Wei Ming?")
+    assert refused.candidates
+
+    for candidate in refused.candidates:
+        a = nl_query(s, candidate)
+        assert a.grounded, (candidate, a.refusal)
+        assert "Loh Wei Ming" in a.answer
+        assert "not a verified identity" in a.answer
+    # …and they are genuinely different people, so the refusal was not pedantry
+    dobs = {nl_query(s, c).answer for c in refused.candidates}
+    assert len(dobs) == len(refused.candidates)
+
+
+def test_a_visit_claim_is_not_narrated_as_a_document_naming_the_patient():
+    """`FOR_PATIENT` also runs visit → patient. Unfiltered, the answer said "<visit> names this
+    patient" and then chose the caveat that assumes a document exists. A non-document claim leaves
+    the registry-only wording standing, which is the cautious direction to fail in."""
+    import datetime as dt
+
+    from databridge_core import SourcePointer
+    from databridge_graph import GraphEdge, GraphNode
+
+    store = GraphStore(clock=lambda: SEED_SYSTEM_TIME)
+    when = dt.datetime(2026, 1, 1, tzinfo=_UTC)
+    ptr = SourcePointer(source_id="d", kind="doc_span", document_id="d",
+                        char_start=0, char_end=1)
+    store.add_node(GraphNode(id="patient:p", kind=NodeKind.PATIENT, label="Zephyrine Quillon",
+                             sources=[ptr], valid_from=when, system_from=when))
+    store.add_node(GraphNode(id="visit:v", kind=NodeKind.VISIT, label="Visit scheduled by v",
+                             sources=[ptr], valid_from=when, system_from=when))
+    store.add_edge(GraphEdge(id="e", src_id="visit:v", dst_id="patient:p",
+                             kind=EdgeKind.FOR_PATIENT, sources=[ptr],
+                             valid_from=when, system_from=when))
+
+    a = nl_query(store, "Who is Zephyrine Quillon?")
+    assert a.grounded, a.refusal
+    assert "Visit scheduled by v" not in a.answer, "a visit was narrated as naming the patient"
+    assert "No document on file names this patient" in a.answer
+    assert "not a verified identity" in a.answer
+
+
+def test_a_uniquely_named_entity_is_not_refused_by_the_ambiguity_check():
+    """The check must cost nothing where a name really does identify one thing, or every answer
+    on the page disappears."""
+    s = _seeded()
+    a = nl_query(s, "Who is Meridian Life Assurance?")
+    assert a.grounded, a.refusal
+    assert a.candidates == []
 
 
 def test_nl_query_no_match_refuses():
@@ -293,9 +431,14 @@ def test_no_attribute_reaches_the_answer_text_without_its_own_citation():
 
 def test_a_patient_answer_cites_the_registry_row_the_date_of_birth_came_from():
     """The worked example, because this is the one on screen: a registry DOB is a `table_cell` in
-    `patient_registration_synthetic.csv`, not something the entity citations ever saw."""
+    `patient_registration_synthetic.csv`, not something the entity citations ever saw.
+
+    Asked by NAME, of a patient whose name identifies exactly one row. "Loh Wei Ming" is three
+    people and is now refused before any answer is assembled, which is a different test.
+    """
     store = _seeded()
-    a = nl_query(store, "Who is Loh Wei Ming?")
+    named, _ = _patients(store)
+    a = nl_query(store, f"Who is {named.label}?")
     assert a.grounded, a.refusal
     dobs = [v for v in a.values if v.attr == "date_of_birth"]
     assert dobs, "the patient answer printed no date of birth to check"

@@ -29,6 +29,7 @@ from typing import Optional
 from databridge_convert.generate.claim_check import check_claims
 from databridge_core import SourcePointer
 
+from .identity import ambiguous_refusal, identity_caveat, same_label_node_ids
 from .retrieval import Bm25Index, Candidate
 from .schema import EdgeKind, GraphEdge, GraphNode, NodeKind
 from .store import GraphStore, row_to_edge, row_to_node
@@ -241,6 +242,9 @@ class GroundedAnswer:
     values: list[AnswerValue] = field(default_factory=list)
     #: `entity.attr` paths the answer asked for and could not ground, so did NOT print
     unresolved: list[str] = field(default_factory=list)
+    #: on an AMBIGUOUS refusal, the node ids the question could have meant. Asking again with one
+    #: of them resolves cleanly — a refusal with no way forward is a dead end (see `identity.py`).
+    candidates: list[str] = field(default_factory=list)
 
     def pointers(self) -> list[SourcePointer]:
         """Every pointer attached to this answer — entity citations AND per-value citations."""
@@ -300,6 +304,27 @@ def _node_citation(store: GraphStore, node: GraphNode) -> Citation:
                     pointers=node.sources)
 
 
+def _named_outright(store: GraphStore, question: str) -> Optional[GraphNode]:
+    """A node the question names by ID outright, or ``None`` — the way PAST an ambiguity refusal.
+
+    ``nl_query`` takes free text, so the refusal's "ask again with one of these ids" needs a door
+    that accepts one. A token equal to an open node id **is** an identifier, and a caller who
+    typed it has already made the choice this module will not make for them — the same rule, and
+    the same reason, as the node-id branch of `identity.resolve_entity`.
+
+    Deliberately an EXACT id match and nothing looser. A fuzzy version of this would be the silent
+    pick it exists to avoid, wearing a different hat.
+    """
+    for token in re.split(r"\s+", question.strip()):
+        token = token.strip("?.,!;:'\"()[]")
+        if not token:
+            continue
+        row = store.open_node_row(token)
+        if row is not None:
+            return row_to_node(store, row)
+    return None
+
+
 def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
     """Entity-link → 1-hop subgraph → build a GROUNDED answer, every quantity claim-checked.
 
@@ -312,13 +337,39 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
 
     ``claim_check`` then re-verifies that no quantity/date in the answer escapes the grounded set —
     a belt-and-braces anti-fabrication gate (if assembly ever introduced an uncited number, the
-    answer is refused)."""
+    answer is refused).
+
+    **A question that names more than one entity is REFUSED, not answered about one of them.**
+    See ``identity.py``: the registry holds three "Loh Wei Ming", and ranking them returns
+    whichever sorted first among equals. The refusal carries `candidates`, and a question
+    containing one of those ids resolves cleanly."""
+    # An id typed into the question wins outright, and is never ambiguous — that is what makes
+    # the refusal below a fork in the road rather than a wall.
+    explicit = _named_outright(store, question)
     matches = link_entities(store, question)
-    if not matches:
+    if explicit is None and not matches:
         return GroundedAnswer(question, "", grounded=False,
                               refusal="no matching entity in the graph")
 
-    primary = matches[0]
+    primary = explicit if explicit is not None else matches[0]
+    # The entity actually answered about leads, then the rest of the ranking. `/brain` highlights
+    # these on the canvas, and an answer about a node the caller named by id that did not appear
+    # in its own `matched_entities` highlighted everything except the thing it described.
+    matched_ids = [primary.id, *(m.id for m in matches if m.id != primary.id)]
+    if explicit is None:
+        # **A NAME DOES NOT IDENTIFY A PERSON.** The registry holds three "Loh Wei Ming", four
+        # "Rahman Zhi Hao" and four "Tan Mei Ling" (`merge.py` refuses to fuzzy-merge patients for
+        # exactly this reason). `link_entities` ranks them equal and returns whichever sorted
+        # first among equals, so `matches[0]` WAS the machine choosing between people who share a
+        # name — silently, with nothing in the answer saying a choice had been made. It is the
+        # determination reserved for a human, in person (CLAUDE.md constraint 1), so it is refused
+        # and the candidate ids are handed back.
+        shared = same_label_node_ids(store, primary.id)
+        if len(shared) > 1:
+            return GroundedAnswer(question, "", grounded=False,
+                                  matched_entities=matched_ids,
+                                  candidates=shared,
+                                  refusal=ambiguous_refusal(question, shared))
     sub = neighbors(store, primary.id, depth=1)
     node_by_id = {n.id: n for n in sub.nodes} | {primary.id: primary}
 
@@ -382,11 +433,21 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
         if dob:
             bits.append(f"(registry date of birth {dob})")
         sentences.append(" ".join(bits) + ".")
-        for doc in _linked(EdgeKind.FOR_PATIENT, incoming=True):
+        # DOCUMENTS only. `FOR_PATIENT` also runs visit → patient in the vocabulary, and an
+        # unfiltered version narrated a visit as "<visit label> names this patient" and then
+        # chose the *less* cautious caveat on the strength of it. A non-document claim leaves the
+        # registry-only wording standing, which is the cautious direction to fail in.
+        claiming = [n for n in _linked(EdgeKind.FOR_PATIENT, incoming=True)
+                    if n.kind == NodeKind.DOCUMENT]
+        for doc in claiming:
             cite(doc)
-            sentences.append(
-                f"{doc.label} names this patient — a claim on the document, not a verified "
-                f"identity; staff confirm identity in person.")
+            sentences.append(f"{doc.label} names this patient.")
+        # UNCONDITIONAL, and that is the fix. The caveat used to be appended INSIDE the loop
+        # above, so it rode on a document existing. Once `clinic_seed` seeded the whole registry,
+        # 289 of the 300 patients had no `FOR_PATIENT` edge at all and answered with a bare name
+        # and date of birth — no caveat anywhere. Registry presence is not identification
+        # (CLAUDE.md constraint 1); the caveat belongs to the KIND, not to the edge.
+        sentences.append(identity_caveat(claimed=bool(claiming)))
     elif primary.kind == NodeKind.ORG:
         bits = [primary.label]
         org_kind = cited(primary, "kind")
@@ -454,10 +515,10 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
         # A refusal emits no answer text, so it emits no values either — a value list beside an
         # empty answer would be citations for something nobody was shown.
         return GroundedAnswer(question, "", grounded=False, citations=citations,
-                              matched_entities=[m.id for m in matches],
+                              matched_entities=matched_ids,
                               refusal=f"answer refused: ungrounded quantity "
                                       f"{[v.token for v in cc.violations]}",
                               unresolved=sorted(set(unresolved)))
     return GroundedAnswer(question, answer, grounded=True, citations=citations,
-                          matched_entities=[m.id for m in matches],
+                          matched_entities=matched_ids,
                           values=values, unresolved=sorted(set(unresolved)))

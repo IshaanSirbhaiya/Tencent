@@ -11,11 +11,22 @@ from .clinic_seed import (
     build_seed,
     build_seed_edges,
     build_seed_nodes,
+    claimed_patient_node_ids,
     fresh_clinic_store,
     load_clinic_seed,
     orphan_node_ids,
+    patient_census,
 )
 from .extractor import GraphExtractionResult, extract_graph, gold_extraction_handler
+from .identity import (
+    EntityMatch,
+    IDENTITY_CLAIMED_ON_DOCUMENT,
+    IDENTITY_REGISTRY_ONLY,
+    ambiguous_refusal,
+    identity_caveat,
+    resolve_entity,
+    same_label_node_ids,
+)
 from .merge import UpsertOutcome, token_set_ratio, upsert_edge, upsert_node
 from .query import (
     AnswerValue,
@@ -46,7 +57,11 @@ __all__ = [
     "Snapshot", "Subgraph", "GraphPath", "GroundedAnswer", "Citation", "AnswerValue",
     # extractor
     "extract_graph", "GraphExtractionResult", "gold_extraction_handler",
+    # identity (CLAUDE.md constraint 1 — the caveat, and the refusal to pick between namesakes)
+    "EntityMatch", "resolve_entity", "same_label_node_ids", "ambiguous_refusal",
+    "identity_caveat", "IDENTITY_CLAIMED_ON_DOCUMENT", "IDENTITY_REGISTRY_ONLY",
     # clinic seed
     "load_clinic_seed", "fresh_clinic_store", "build_seed", "build_seed_nodes",
-    "build_seed_edges", "orphan_node_ids", "SEED_SYSTEM_TIME",
+    "build_seed_edges", "orphan_node_ids", "patient_census", "claimed_patient_node_ids",
+    "SEED_SYSTEM_TIME",
 ]

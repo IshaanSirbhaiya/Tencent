@@ -17,7 +17,14 @@ import pytest
 from databridge_core import SourcePointer
 
 from databridge_graph.clinic_seed import fresh_clinic_store
-from databridge_graph.node_sheet import IDENTITY_CAVEAT, MAX_TEXT, _text, node_markdown
+from databridge_graph.clinic_seed import claimed_patient_node_ids
+from databridge_graph.node_sheet import (
+    IDENTITY_CAVEAT,
+    MAX_TEXT,
+    PATIENT_CAVEAT,
+    _text,
+    node_markdown,
+)
 from databridge_graph.schema import EdgeKind, GraphEdge, GraphNode, NodeKind
 from databridge_graph.store import GraphStore
 
@@ -271,6 +278,75 @@ def test_a_claimed_patient_link_keeps_its_unverified_caveat(store, node_ids):
                 f"{node_id} renders a for_patient edge WITHOUT the unverified caveat")
             caveated += 1
     assert caveated > 0, "no document sheet exercised the for_patient path"
+
+
+def _split_patients(store):
+    """(a patient some document claims, a patient nobody has ever referred).
+
+    Both come out of the seeded store, because the whole point is that the two are the same node
+    in every respect except the edge — and that the sheet says the same thing about both.
+    """
+    from databridge_graph.store import row_to_edge, row_to_node
+
+    nodes = [row_to_node(store, r) for r in store.open_nodes()]
+    edges = [row_to_edge(store, r) for r in store.open_edges()]
+    claimed = set(claimed_patient_node_ids(nodes, edges))
+    patients = [n.id for n in nodes if n.kind is NodeKind.PATIENT]
+    on_file_only = [nid for nid in patients if nid not in claimed]
+    assert claimed and on_file_only
+    return sorted(claimed)[0], on_file_only[0]
+
+
+def test_every_patient_sheet_carries_the_identity_caveat_claim_or_no_claim(store, node_ids):
+    """The regression this exists for. The caveat block was `if claims:` — indistinguishable from
+    correct while the seed held only the ~11 patients a document names. Seeding the whole registry
+    left 289 sheets rendering a name, a date of birth and a nationality with nothing anywhere
+    saying "not verified", and these sheets are fed to the MODEL.
+
+    **Registry presence is not identification**, so the caveat is keyed on the KIND.
+    """
+    from databridge_graph.store import row_to_node
+
+    checked = 0
+    for node_id in node_ids:
+        node = row_to_node(store, store.open_node_row(node_id))
+        sheet = node_markdown(store, node_id)
+        if node.kind is NodeKind.PATIENT:
+            assert PATIENT_CAVEAT in sheet, f"{node_id} renders a patient with no caveat"
+            assert "## Claimed identity — NOT VERIFIED" in sheet, node_id
+            checked += 1
+        else:
+            assert PATIENT_CAVEAT not in sheet, (
+                f"{node_id} is not a patient and must not carry the patient caveat")
+    assert checked > 100, f"only {checked} patient sheets were rendered — this proved little"
+
+
+def test_a_patient_no_document_names_says_so_rather_than_omitting_the_section(store):
+    """An absent heading reads as "the question was never asked". "No document names this patient"
+    is an ANSWER, and it is the one that matters for a walk-in."""
+    named, on_file_only = _split_patients(store)
+
+    thin = node_markdown(store, on_file_only)
+    assert PATIENT_CAVEAT in thin
+    assert "No document on file names this patient" in thin
+    assert "**for_patient**" not in thin
+
+    thick = node_markdown(store, named)
+    assert PATIENT_CAVEAT in thick
+    assert IDENTITY_CAVEAT in thick, "a claimed patient keeps the claims-block caveat too"
+
+
+def test_the_patient_caveat_precedes_every_untrusted_string_in_the_sheet(store):
+    """Same structural rule as the claims caveat: emitted on its own line, before any attribute
+    value, so no supplied label or value can sit inside it or comment it out. The only untrusted
+    text ahead of it is the title, which is unavoidable and is not part of the warning."""
+    _, on_file_only = _split_patients(store)
+    lines = node_markdown(store, on_file_only).splitlines()
+    caveat_line = next(i for i, ln in enumerate(lines) if PATIENT_CAVEAT in ln)
+    attribute_lines = [i for i, ln in enumerate(lines) if ln.startswith("- `")]
+    assert attribute_lines and all(i > caveat_line for i in attribute_lines)
+    assert lines[caveat_line].startswith("> ")
+    assert lines[caveat_line] == f"> {PATIENT_CAVEAT}"
 
 
 def test_an_uncited_candidate_count_produces_the_more_cautious_wording():

@@ -88,9 +88,28 @@ def test_counts_agree_with_the_store(store, full):
     assert full.nodes == counts["nodes"]
     assert full.edges == counts["edges"]
     assert full.documents == len(store.open_nodes_of_kind(NodeKind.DOCUMENT))
-    assert full.patients == len(store.open_nodes_of_kind(NodeKind.PATIENT))
     assert full.packages == len(store.open_nodes_of_kind(NodeKind.PACKAGE))
     assert full.tests_in_catalogue == len(store.open_nodes_of_kind(NodeKind.TEST))
+
+
+def test_patients_is_seen_here_out_of_on_file_and_the_two_are_not_the_same_number(store, full):
+    """`patients` is a `Count`, not an `int`, and this is why.
+
+    ``of`` is every PATIENT node — rows in the clinic's file. ``n`` is the rows some document
+    claims — an upper bound on people who came through the door. As a bare int the key meant
+    whichever the seed happened to produce, and the seed changed. Asserting them SEPARATELY, and
+    asserting they DIFFER, is what stops the figure quietly becoming the other one again.
+    """
+    on_file = len(store.open_nodes_of_kind(NodeKind.PATIENT))
+    claimed = {r["dst_id"] for r in store.open_edges()
+               if r["kind"] == EdgeKind.FOR_PATIENT.value}
+    assert full.patients.of == on_file
+    assert full.patients.n == len(claimed)
+    assert 0 < full.patients.n < full.patients.of, (
+        "seen-here and on-file must be different numbers, or this Count is decoration")
+    # the members are the ids counted, so a reader can walk to them rather than trust the number
+    assert set(full.patients.members) == claimed
+    assert "registry rows" in full.patients.label
 
 
 def test_issuer_mix_documents_sum_to_the_issued_edges(store, full):
@@ -160,8 +179,12 @@ def test_as_of_before_any_document_exists_shows_the_config_but_no_paperwork(stor
     assert early.documents == 0
     assert early.issuer_mix == []
     assert early.ambiguity.n == 0 and early.ambiguity.of == 0
-    # The rules and the registry predate the paperwork, so they are still there.
-    assert early.patients > 0 and early.packages > 0
+    # The rules and the registry predate the paperwork, so they are still there — on file. But
+    # nobody has been SEEN yet, because no document exists to claim anyone. The two halves of the
+    # Count move independently, which is the property a bare int could not express.
+    assert early.patients.of > 0 and early.packages > 0
+    assert early.patients.n == 0
+    assert early.patients.members == ()
 
 
 def test_documents_accumulate_monotonically_over_the_seed_window(store):

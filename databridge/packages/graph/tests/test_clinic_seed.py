@@ -15,11 +15,14 @@ import pytest
 from databridge_core import GroundedValue, SourcePointer
 from databridge_graph import GraphStore, NodeKind
 from databridge_graph.clinic_seed import (
+    REGISTRY_ALL,
+    REGISTRY_REFERENCED,
     SEED_SYSTEM_TIME,
     _document_date,
     _document_two_digit_year,
     build_seed,
     catalogue_test_node_id,
+    claimed_patient_node_ids,
     document_node_id,
     fresh_clinic_store,
     load_clinic_seed,
@@ -27,6 +30,8 @@ from databridge_graph.clinic_seed import (
     org_node_id,
     orphan_node_ids,
     package_node_id,
+    patient_census,
+    patient_node_id,
     rule_node_id,
 )
 from databridge_graph.schema import EdgeKind
@@ -101,10 +106,44 @@ def test_document_backed_nodes_point_at_a_chit(nodes):
 # --- structural integrity -----------------------------------------------------------
 
 
-def test_there_are_no_orphan_nodes(nodes, edges):
-    """PLAN.md §5 Phase 2 "Done when". An orphan answers no question and inflates every count on
-    the dashboard."""
-    assert orphan_node_ids(nodes, edges) == []
+def _unexpected_orphans(nodes, edges) -> list[str]:
+    """Orphans that are NOT a patient the clinic merely has on file.
+
+    PLAN.md §5 Phase 2's "no orphans" is still the property being defended; what changed is that
+    one class of orphan is now deliberate. Seeding the whole registry puts 289 patients in the
+    graph that no document names, and **an incoming ``FOR_PATIENT`` edge is exactly what tells a
+    patient the clinic has SEEN from one it merely has ON FILE**. Those are unconnected because
+    there is honestly nothing to connect them to — not because a builder dropped an edge.
+
+    Everything else is still a bug, so the exclusion is written as narrowly as it can be: the node
+    must be a PATIENT *and* carry no identity claim. A stranded ORG, a package whose test edges
+    failed to build, or a patient a document names that somehow lost its edge, all still fail.
+    """
+    by_id = {n.id: n for n in nodes}
+    on_file_only = ({n.id for n in nodes if n.kind is NodeKind.PATIENT}
+                    - set(claimed_patient_node_ids(nodes, edges)))
+    return [nid for nid in orphan_node_ids(nodes, edges)
+            if not (by_id[nid].kind is NodeKind.PATIENT and nid in on_file_only)]
+
+
+def test_the_only_orphan_is_a_patient_the_clinic_has_never_seen(nodes, edges):
+    """PLAN.md §5 Phase 2 "Done when", as it now reads. An orphan answers no question — except
+    "does the clinic have anyone by this name on file?", which is the first question anyone asks a
+    clinic system and the one the 289 unreferenced registry rows exist to answer."""
+    assert _unexpected_orphans(nodes, edges) == []
+    # …and the deliberate ones are exactly the census's `on_file_only`, so this cannot quietly
+    # become "any orphan is fine": the number is pinned to a figure computed a different way.
+    census = patient_census(nodes, edges)
+    assert census["on_file_only"] > 0
+    assert len(orphan_node_ids(nodes, edges)) == census["on_file_only"]
+
+
+def test_seeding_only_referenced_patients_leaves_no_orphan_at_all(nodes, edges):
+    """The older shape is still reachable and still perfectly connected — which is the proof that
+    the orphans above come from the option and not from a broken builder."""
+    only_referenced = build_seed(registry_patients=REGISTRY_REFERENCED)
+    assert orphan_node_ids(only_referenced[0], only_referenced[1]) == []
+    assert len(only_referenced[0]) < len(nodes)
 
 
 def test_no_edge_dangles(nodes, edges):
@@ -253,13 +292,33 @@ def test_org_canonical_does_not_merge_genuinely_different_orgs():
 
 
 def test_the_seed_reports_what_it_skipped():
-    """Unreferenced registry rows and catalogue entries are omitted on purpose — but silently
-    omitting them would read as "this is everything"."""
+    """Unreferenced catalogue entries are omitted on purpose — but silently omitting them would
+    read as "this is everything".
+
+    ``registry_patients_not_referenced`` is 0 under the DEFAULT and that is the assertion, not an
+    absence of one: the whole registry is seeded, so nothing is missing, and a non-zero value here
+    would mean rows were lost. The number that used to be interesting moved to ``patients``, which
+    is a fact about the clinic rather than about this function's arguments.
+    """
     store = GraphStore(clock=lambda: SEED_SYSTEM_TIME)
     result = load_clinic_seed(store)
-    assert result["skipped"]["registry_patients_not_referenced"] > 0
+    assert result["skipped"]["registry_patients_not_referenced"] == 0
     assert result["skipped"]["catalogue_tests_not_referenced"] > 0
     assert result["nodes_created"] > 0 and result["edges_created"] > 0
+
+
+def test_the_skipped_registry_count_goes_non_zero_when_the_registry_is_not_seeded():
+    """The same field, under the option that makes it mean something. Reported in one place
+    regardless of which option produced it — otherwise "how much of the registry is missing?" has
+    two answers and neither is checked."""
+    store = GraphStore(clock=lambda: SEED_SYSTEM_TIME)
+    result = load_clinic_seed(store, registry_patients=REGISTRY_REFERENCED)
+    assert result["skipped"]["registry_patients_not_referenced"] > 0
+    # …and under this option every patient in the graph IS one a document names, so the census's
+    # other number goes to zero. The two numbers move in opposite directions and are computed by
+    # different code, which is what stops either being read as the other.
+    assert result["patients"]["on_file_only"] == 0
+    assert result["patients"]["claimed_by_a_document"] == result["patients"]["on_file"] > 0
 
 
 # --- store integration ----------------------------------------------------------------
@@ -441,10 +500,154 @@ def test_a_document_naming_no_subject_produces_no_for_patient_edge():
         "about, and an edge here would assert that we can")
     # Dropping the claim must leave the graph consistent, not merely smaller: the candidate's
     # PATIENT node is built inside the same loop, so a half-applied fix would leave it stranded
-    # or leave some other edge pointing at a node that was never created.
-    assert orphan_node_ids(nodes, edges) == []
+    # or leave some other edge pointing at a node that was never created. The candidate patients
+    # themselves become on-file-only rows — that is the honest outcome of a letter naming nobody,
+    # and `_unexpected_orphans` is what tells it apart from a builder that lost an edge.
+    assert _unexpected_orphans(nodes, edges) == []
     ids = {n.id for n in nodes}
     assert sorted({x for e in edges for x in (e.src_id, e.dst_id)} - ids) == []
+
+
+# --- the registry option: what seeding 300 rows does, and what it must NOT do -----------
+#
+# `clinic_seed`'s module docstring makes four claims about `registry_patients="all"`, and every
+# one of them is a claim about something NOT changing. They are tested here because a docstring
+# that asserts an invariant nothing checks is how the invariant stops being true.
+
+
+def test_the_identity_claims_are_identical_whichever_registry_option_is_used():
+    """The docstring's strongest claim: *seeding the registry adds no relationships at all.*
+
+    Not "roughly the same", not "the same count" — the same `FOR_PATIENT` edges, with the same
+    endpoints, the same attributes and the same evidence. If seeding the other 289 rows could add
+    or move even one identity claim, then who a document is about would depend on how much of the
+    CSV happened to be loaded, which is a determination made by a configuration flag.
+    """
+    all_nodes, all_edges, _ = build_seed(registry_patients=REGISTRY_ALL)
+    ref_nodes, ref_edges, _ = build_seed(registry_patients=REGISTRY_REFERENCED)
+
+    def claims(edges):
+        return sorted(
+            (e.id, e.src_id, e.dst_id, e.valid_from.isoformat(),
+             tuple(sorted((k, str(v)) for k, v in e.attrs.items())),
+             tuple(p.model_dump_json() for p in e.sources))
+            for e in edges if e.kind is EdgeKind.FOR_PATIENT)
+
+    assert claims(all_edges) == claims(ref_edges)
+    assert claims(all_edges), "the corpus must actually produce claims for this to mean anything"
+    # …and NO other relationship appeared either. The registry pass writes nodes only.
+    assert sorted(e.id for e in all_edges) == sorted(e.id for e in ref_edges)
+
+
+def test_a_patient_no_document_names_is_built_exactly_like_one_a_document_names():
+    """`_patient_node` is deliberately shared between the two passes. This proves the sharing, on
+    a patient NO document names — the ~289 nobody would think to open.
+
+    Constraint 2, at the level of the individual value: every attribute on that node carries its
+    OWN pointer into the registry CSV, or it is `None` and its name is in `unresolved`. A thinner,
+    less-cited shape for the rows nobody looks at is exactly the drift a second builder would
+    produce, and exactly what no reviewer would catch.
+    """
+    nodes, edges, _ = build_seed()
+    claimed = set(claimed_patient_node_ids(nodes, edges))
+    on_file_only = [n for n in nodes if n.kind is NodeKind.PATIENT and n.id not in claimed]
+    claimed_nodes = [n for n in nodes if n.id in claimed]
+    assert on_file_only and claimed_nodes
+
+    def shape(node):
+        return (sorted(node.attrs), sorted(node.attr_sources),
+                sorted(p.kind for p in node.sources))
+
+    reference = shape(claimed_nodes[0])
+    for node in on_file_only:
+        assert shape(node) == reference, node.id
+        assert node.unresolved == [], node.id
+        for name, value in node.attrs.items():
+            pointer = node.attr_sources.get(name)
+            if value is None:
+                assert name in node.unresolved, (node.id, name)
+                continue
+            assert pointer is not None, f"{node.id}.{name} is a value nobody can check"
+            assert pointer.kind in {"table_cell", "derived"}, (node.id, name, pointer.kind)
+            assert "patient_registration" in (pointer.source_id or ""), (node.id, name)
+
+
+def test_a_visit_claim_is_not_counted_as_a_document_naming_the_patient():
+    """`FOR_PATIENT` runs visit → patient as well as document → patient (schema.py). Guarding only
+    the DESTINATION let a visit's claim count as "a document names this person" — which inflates
+    "seen here" and, downstream, picks the LESS cautious identity caveat."""
+    import datetime as dt
+
+    from databridge_core import SourcePointer
+    from databridge_graph.schema import GraphEdge, GraphNode
+
+    when = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
+    ptr = SourcePointer(source_id="d", kind="doc_span", document_id="d",
+                        char_start=0, char_end=1)
+    nodes = [
+        GraphNode(id="patient:p", kind=NodeKind.PATIENT, label="P", sources=[ptr],
+                  valid_from=when, system_from=when),
+        GraphNode(id="visit:v", kind=NodeKind.VISIT, label="V", sources=[ptr],
+                  valid_from=when, system_from=when),
+    ]
+    visit_claim = GraphEdge(id="e", src_id="visit:v", dst_id="patient:p",
+                            kind=EdgeKind.FOR_PATIENT, sources=[ptr],
+                            valid_from=when, system_from=when)
+    assert claimed_patient_node_ids(nodes, [visit_claim]) == []
+    assert patient_census(nodes, [visit_claim])["claimed_by_a_document"] == 0
+
+    document = GraphNode(id="document:d", kind=NodeKind.DOCUMENT, label="d", sources=[ptr],
+                         valid_from=when, system_from=when)
+    doc_claim = GraphEdge(id="e2", src_id="document:d", dst_id="patient:p",
+                          kind=EdgeKind.FOR_PATIENT, sources=[ptr],
+                          valid_from=when, system_from=when)
+    assert claimed_patient_node_ids([*nodes, document],
+                                    [visit_claim, doc_claim]) == ["patient:p"]
+
+
+def test_every_registry_row_is_on_file():
+    from databridge_intake.registry import registry
+
+    nodes, _, _ = build_seed()
+    seeded = {n.id for n in nodes if n.kind is NodeKind.PATIENT}
+    expected = {patient_node_id(r.patient_id) for r in registry()}
+    assert seeded == expected
+    assert len(expected) > 200, "the whole registry, not a sample"
+
+
+def test_the_census_numbers_agree_with_each_other():
+    """Three numbers that must add up, and one inequality that is the whole point of reporting
+    them apart: the clinic has seen far fewer people than it holds on file."""
+    nodes, edges, _ = build_seed()
+    census = patient_census(nodes, edges)
+    assert census["on_file"] == sum(1 for n in nodes if n.kind is NodeKind.PATIENT)
+    assert census["claimed_by_a_document"] + census["on_file_only"] == census["on_file"]
+    assert census["claimed_by_a_document"] < census["on_file"]
+    assert census["claimed_by_a_document"] == len(census["claimed_node_ids"]) > 0
+    # every claimed id is a patient node that really does carry an incoming claim
+    by_id = {n.id: n for n in nodes}
+    claimed_edges = {e.dst_id for e in edges if e.kind is EdgeKind.FOR_PATIENT}
+    for nid in census["claimed_node_ids"]:
+        assert by_id[nid].kind is NodeKind.PATIENT
+        assert nid in claimed_edges
+
+
+def test_an_unknown_registry_option_is_refused_rather_than_falling_through():
+    """A typo that silently seeded 11 patients instead of 300 would look exactly like the feature
+    working — which is why the check is at the top of `_build`, before any work."""
+    with pytest.raises(ValueError) as excinfo:
+        build_seed(registry_patients="everyone")
+    assert "everyone" in str(excinfo.value)
+    for option in (REGISTRY_ALL, REGISTRY_REFERENCED):
+        assert option in str(excinfo.value)
+
+
+def test_the_referenced_option_still_seeds_only_the_patients_a_document_names():
+    nodes, edges, skipped = build_seed(registry_patients=REGISTRY_REFERENCED)
+    patients = {n.id for n in nodes if n.kind is NodeKind.PATIENT}
+    assert patients == set(claimed_patient_node_ids(nodes, edges))
+    assert 0 < len(patients) < 50
+    assert skipped["registry_patients_not_referenced"] > 200
 
 
 def test_the_dropped_identity_claims_are_reported_not_silently_missing():

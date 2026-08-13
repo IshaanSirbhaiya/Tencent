@@ -277,3 +277,194 @@ def test_the_mcp_node_payload_cites_each_attribute_and_names_the_rest():
             assert key in payload["attribute_sources"], f"{key} is emitted with no pointer"
             assert payload["attribute_sources"][key]["kind"]
     assert "not the values" in payload["sources_ground"]
+
+
+def test_every_serialised_patient_node_carries_the_caveat_in_every_tool():
+    """`node_detail` is not the only place a registry row reaches a model. `brain_neighbors`,
+    `brain_path` and `graph()` all hand back patient nodes with a name and a date of birth on
+    them, and a patient reached through someone ELSE's 1-hop neighbourhood never passes through
+    `node_detail` at all. The caveat is therefore attached in `node_to_dict`, which is the one
+    place every one of those paths goes through."""
+    from brain_server import PATIENT_NODE_CAVEAT
+
+    tools = _tools()
+    patients = 0
+    for node in tools.graph()["nodes"]:
+        if node["kind"] == "patient":
+            assert node["identity_caveat"] == PATIENT_NODE_CAVEAT, node["id"]
+            assert node["identity_verified"] is False
+            patients += 1
+        else:
+            assert "identity_caveat" not in node, node["id"]
+    assert patients > 100
+
+    # the same node reached sideways, through a DOCUMENT's neighbourhood
+    doc = document_node_id("chit_02_everwell_voucher.txt")
+    sideways = [n for n in tools.brain_neighbors(doc)["nodes"] if n["kind"] == "patient"]
+    assert sideways
+    for node in sideways:
+        assert node["identity_caveat"] == PATIENT_NODE_CAVEAT
+
+
+def test_the_claimed_by_a_document_flag_names_the_documents_it_was_computed_from():
+    """A boolean nobody can check is the same problem as a count with no members. And only a
+    DOCUMENT's claim counts — `FOR_PATIENT` also runs visit → patient, and counting one of those
+    would pick the LESS cautious caveat."""
+    from databridge_graph.clinic_seed import claimed_patient_node_ids
+    from databridge_graph.store import row_to_edge, row_to_node
+
+    tools = _tools()
+    nodes = [row_to_node(tools.store, r) for r in tools.store.open_nodes()]
+    edges = [row_to_edge(tools.store, r) for r in tools.store.open_edges()]
+    claimed = sorted(claimed_patient_node_ids(nodes, edges))
+    assert claimed
+
+    detail = tools.node_detail(claimed[0])
+    assert detail["identity"]["claimed_by_a_document"] is True
+    assert detail["identity"]["claimed_by"]
+    for document_id in detail["identity"]["claimed_by"]:
+        assert tools.store.open_node_row(document_id)["kind"] == "document"
+        # …and it really is one of this node's own connections, not an assertion out of nowhere
+        assert any(c["other_id"] == document_id and c["direction"] == "in"
+                   and c["edge_kind"] == "for_patient" for c in detail["connections"])
+
+
+# --- a name is not an identifier (CLAUDE.md §Hard constraints 1) ----------------------
+#
+# The registry holds three people called "Loh Wei Ming", four "Rahman Zhi Hao" and four
+# "Tan Mei Ling" (`merge.py` refuses to fuzzy-merge patients for exactly this reason). A tool that
+# answered about ONE of them would have made an identity determination — silently, by SQLite rowid
+# order or by whichever scored first among BM25 equals, with nothing in the response saying a
+# choice had been made.
+
+
+def _ambiguous_name(tools):
+    """A patient label the seeded registry holds more than once, and its node ids.
+
+    Derived, never hardcoded: the point is the property, and a literal name would stop testing it
+    the moment the synthetic registry was regenerated.
+    """
+    import collections
+
+    from databridge_graph import NodeKind
+
+    by_label = collections.defaultdict(list)
+    for row in tools.store.open_nodes():
+        if row["kind"] == NodeKind.PATIENT.value:
+            by_label[row["label"]].append(row["id"])
+    label, ids = max(by_label.items(), key=lambda kv: (len(kv[1]), kv[0]))
+    assert len(ids) > 1, "the registry no longer holds a repeated name — this test is now vacuous"
+    return label, sorted(ids)
+
+
+def test_a_name_shared_by_several_patients_is_refused_not_silently_picked():
+    tools = _tools()
+    label, ids = _ambiguous_name(tools)
+
+    ref = tools._resolve(label)
+    assert ref.node_id is None, f"{label!r} resolved to one of {len(ids)} people"
+    assert list(ref.candidates) == ids
+    assert "will not choose" in ref.error
+
+
+def test_the_refusal_reaches_every_tool_in_that_tools_own_payload_shape():
+    """A caller that reads `["nodes"]` without checking `error` must get nothing, not a KeyError —
+    and must not have to make a second round trip to learn which ids it could have meant."""
+    tools = _tools()
+    label, ids = _ambiguous_name(tools)
+
+    neighbors = tools.brain_neighbors(label)
+    assert neighbors["error"] and neighbors["nodes"] == [] and neighbors["edges"] == []
+    assert neighbors["candidates"] == ids
+
+    timeline = tools.brain_timeline(label)
+    assert timeline["error"] and timeline["events"] == []
+    assert timeline["candidates"] == ids
+
+    detail = tools.node_detail(label)
+    assert detail["error"] and detail["candidates"] == ids
+
+    # both endpoints of a path are reported independently, so the caller is never left guessing
+    # which of two arguments was the problem
+    path = tools.brain_path(label, MERIDIAN)
+    assert path["error"] and path["found"] is False and path["candidates"] == ids
+
+
+def test_the_refusal_is_a_fork_in_the_road_not_a_dead_end():
+    """Asking again with one of the ids the refusal handed back resolves cleanly. **A node id is
+    an identifier**, and a caller who has one has already made the choice this layer will not make
+    for them. Without this the refusal would just be a wall."""
+    tools = _tools()
+    label, ids = _ambiguous_name(tools)
+
+    for node_id in ids:
+        ref = tools._resolve(node_id)
+        assert ref.node_id == node_id, ref.error
+        assert ref.candidates == ()
+        detail = tools.node_detail(node_id)
+        assert "error" not in detail
+        assert detail["node"]["label"] == label
+        assert detail["node"]["id"] == node_id
+
+
+def test_an_ambiguous_question_is_refused_by_brain_query_and_carries_the_candidates():
+    """The same rule on the NL surface. `nl_query` and `_resolve` are one implementation
+    (`databridge_graph.identity`) precisely because this was hardened here first and nowhere
+    else."""
+    tools = _tools()
+    label, ids = _ambiguous_name(tools)
+
+    out = tools.brain_query(f"Who is {label}?")
+    assert out["grounded"] is False
+    assert out["answer"] == ""
+    assert out["candidates"] == ids
+
+    resolved = tools.brain_query(ids[0])
+    assert resolved["grounded"], resolved["refusal"]
+    assert resolved["candidates"] == []
+    assert "not a verified identity" in resolved["answer"]
+
+
+# --- registry presence is not identification -----------------------------------------
+
+
+def test_a_patient_node_detail_carries_the_identity_caveat_with_or_without_a_claim():
+    """`claims` is empty for the ~289 registry rows no document names, and an empty list carries
+    no caveat at all — the drawer would have shown a name, a date of birth and a nationality with
+    nothing saying "not verified". The caveat is keyed on the KIND."""
+    from databridge_graph import NodeKind
+    from databridge_graph.clinic_seed import claimed_patient_node_ids
+    from databridge_graph.identity import (
+        IDENTITY_CLAIMED_ON_DOCUMENT,
+        IDENTITY_REGISTRY_ONLY,
+    )
+    from databridge_graph.store import row_to_edge, row_to_node
+
+    tools = _tools()
+    nodes = [row_to_node(tools.store, r) for r in tools.store.open_nodes()]
+    edges = [row_to_edge(tools.store, r) for r in tools.store.open_edges()]
+    claimed = set(claimed_patient_node_ids(nodes, edges))
+    patients = [n for n in nodes if n.kind is NodeKind.PATIENT]
+    on_file_only = [n for n in patients if n.id not in claimed]
+    assert claimed and on_file_only
+
+    # `claims` is OUTGOING only on purpose (a PATIENT node's incoming FOR_PATIENT edges are
+    # DOCUMENTS, and listing them as candidate patients was a real bug), so it is empty on both of
+    # these. That is exactly why the caveat cannot be keyed on it.
+    named = tools.node_detail(sorted(claimed)[0])
+    assert named["claims"] == []
+    assert named["identity"] == {"verified": False, "requires_human_verification": True,
+                                 "claimed_by_a_document": True,
+                                 "claimed_by": named["identity"]["claimed_by"],
+                                 "caveat": IDENTITY_CLAIMED_ON_DOCUMENT}
+    assert named["identity"]["claimed_by"], "the boolean must name what produced it"
+
+    unnamed = tools.node_detail(on_file_only[0].id)
+    assert unnamed["claims"] == []
+    assert unnamed["identity"] == {"verified": False, "requires_human_verification": True,
+                                   "claimed_by_a_document": False, "claimed_by": [],
+                                   "caveat": IDENTITY_REGISTRY_ONLY}
+
+    # nothing that is not a patient acquires an identity verdict it has no business carrying
+    org = tools.node_detail(MERIDIAN)
+    assert "identity" not in org

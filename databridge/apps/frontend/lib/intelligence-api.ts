@@ -42,7 +42,12 @@ export interface IssuerRow {
 
 export interface GraphAnalytics {
   documents: number;
-  patients: number;
+  /** `n` = registry rows a document has claimed (patients this clinic has SEEN);
+   *  `of` = rows the registry holds (patients ON FILE). It was `number`, which meant whichever
+   *  of those the seed happened to produce — the two now differ by ~25x, so the denominator has
+   *  to travel with the number. `members` always arrives empty with `members_withheld` set:
+   *  listing them would name patients. */
+  patients: Count | null;
   packages: number;
   tests_in_catalogue: number;
   nodes: number;

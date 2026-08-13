@@ -28,20 +28,50 @@ through C17's ``claim_check`` so an ungrounded quantity is refused, never narrat
 from __future__ import annotations
 
 import datetime as dt
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from databridge_graph import (
     GraphStore,
     GroundedAnswer,
+    NodeKind,
     extract_graph,
-    link_entities,
     neighbors,
     nl_query,
     path,
+    resolve_entity,
     row_to_node,
+    same_label_node_ids,
     timeline,
 )
 from databridge_graph.clinic_seed import SEED_SYSTEM_TIME, load_clinic_seed
+from databridge_graph.identity import IDENTITY_CLAIMED_ON_DOCUMENT, IDENTITY_REGISTRY_ONLY
+
+
+class EntityReference(NamedTuple):
+    """An :class:`databridge_graph.EntityMatch` plus the MCP payload shape for a refusal.
+
+    The three outcomes — resolved / not found / **ambiguous** — and the rule that produces them
+    live in ``databridge_graph.identity``, because ``nl_query`` needs the same rule and a package
+    cannot import an app. This type adds only ``failure()``: how a refusal is serialised for a
+    tool caller, which is an MCP concern and nothing the graph should know about.
+    """
+
+    node_id: Optional[str] = None
+    error: Optional[str] = None
+    candidates: tuple[str, ...] = ()
+
+    @classmethod
+    def of(cls, match) -> "EntityReference":
+        return cls(node_id=match.node_id, error=match.error, candidates=match.candidates)
+
+    def failure(self, **empty) -> dict:
+        """The refusal payload, shaped like the tool's own success payload.
+
+        Every tool returns ``{"error": ...}`` plus its empty result keys, so a caller that reads
+        ``["nodes"]`` without checking ``error`` gets nothing rather than a KeyError.
+        ``candidates`` is always present so "which ones?" never needs a second round trip.
+        """
+        return {"error": self.error, "candidates": list(self.candidates), **empty}
 
 
 # --- serialisation (graph → JSON the React Flow UI / agents consume) --------------
@@ -50,8 +80,22 @@ def pointer_to_dict(p) -> dict:
     return p.model_dump(mode="json", exclude_none=True)
 
 
+#: Attached to EVERY serialised PATIENT node, in every tool. `node_detail` is not the only place
+#: a registry row reaches a model: `brain_neighbors`, `brain_path` and `graph()` all return
+#: patient nodes with a name and a date of birth on them, and a patient reached through someone
+#: else's 1-hop neighbourhood never passes through `node_detail` at all. Keyed on the KIND here,
+#: which is the one place every one of those paths goes through (CLAUDE.md constraint 1).
+PATIENT_NODE_CAVEAT = ("a registry row, not an identification — this system never verifies "
+                       "identity; clinic staff check it in person")
+
+
 def node_to_dict(node) -> dict:
+    from databridge_graph import NodeKind
+
+    identity = ({"identity_caveat": PATIENT_NODE_CAVEAT, "identity_verified": False}
+                if node.kind is NodeKind.PATIENT else {})
     return {
+        **identity,
         "id": node.id, "kind": node.kind.value, "label": node.label,
         "canonical_id": node.canonical_id, "attrs": node.attrs,
         # A COUNT of entity citations beside a dict of N values is the pooled-citation shape in
@@ -86,6 +130,11 @@ def answer_to_dict(a: GroundedAnswer) -> dict:
     return {
         "question": a.question, "answer": a.answer, "grounded": a.grounded,
         "refusal": a.refusal, "matched_entities": a.matched_entities,
+        # An AMBIGUOUS question is refused, and the ids it could have meant travel with the
+        # refusal — the same contract `EntityReference.failure` gives the other tools, so an
+        # agent that hits "three people are called that" has a next call to make rather than a
+        # dead end. Empty on every other outcome.
+        "candidates": list(a.candidates),
         "citations": [{"entity_id": c.entity_id, "label": c.label, "kind": c.kind,
                        "pointers": [pointer_to_dict(p) for p in c.pointers]} for c in a.citations],
     }
@@ -270,9 +319,10 @@ class BrainTools:
         names, carrying the score and the candidate count, and every one requires an in-person
         check (CLAUDE.md §Hard constraints 1)."""
         from databridge_graph import EdgeKind, row_to_edge
-        nid = self._resolve(entity_id)
-        if nid is None:
-            return {"error": f"no entity matched {entity_id!r}"}
+        ref = self._resolve(entity_id)
+        if ref.node_id is None:
+            return ref.failure()
+        nid = ref.node_id
         row = self.store.open_node_row(nid)
         if row is None:
             return {"error": f"no open node {nid!r}"}
@@ -304,27 +354,53 @@ class BrainTools:
                     "requires_human_verification": True})
         connections.sort(key=lambda c: (c["edge_kind"], c["other_label"]))
         claims.sort(key=lambda c: (-(c.get("match_score") or 0), c["label"]))
-        return {"node": node, "sources": sources, "connections": connections, "claims": claims}
+        out = {"node": node, "sources": sources, "connections": connections, "claims": claims}
+        if node["kind"] == NodeKind.PATIENT.value:
+            # Keyed on the KIND, and emitted for EVERY patient. A registry row no document names
+            # — 289 of the 300 once the whole registry is seeded — otherwise arrived as a name, a
+            # date of birth and a nationality with nothing anywhere saying "not verified". Being
+            # on file is not being identified (CLAUDE.md constraint 1).
+            #
+            # Read off `connections`, not `claims`: `claims` is OUTGOING by construction (see the
+            # direction guard above), so on a PATIENT node it is always empty and would have made
+            # every patient look unclaimed.
+            # …and only a DOCUMENT's claim counts. `FOR_PATIENT` also runs visit → patient in
+            # the vocabulary, and counting one of those would pick the LESS cautious caveat.
+            claimed_by = sorted(c["other_id"] for c in connections
+                                if c["edge_kind"] == EdgeKind.FOR_PATIENT.value
+                                and c["direction"] == "in"
+                                and c["other_kind"] == NodeKind.DOCUMENT.value)
+            out["identity"] = {
+                "verified": False,
+                "requires_human_verification": True,
+                # The boolean travels with the ids it was computed from, so a caller can check it
+                # against `connections` instead of trusting it — the same reason every figure in
+                # `analytics.py` carries its members.
+                "claimed_by_a_document": bool(claimed_by),
+                "claimed_by": claimed_by,
+                "caveat": (IDENTITY_CLAIMED_ON_DOCUMENT if claimed_by
+                           else IDENTITY_REGISTRY_ONLY)}
+        return out
 
     # -- entity reference resolution ---------------------------------------------
-    def _resolve(self, ref: str) -> Optional[str]:
-        """Accept a node id OR a natural-language name; return the node id (or None).
+    # Both of these are now thin. The rule lives in ``databridge_graph.identity``, where
+    # ``nl_query`` can reach it too — it was implemented HERE first and only here, which is
+    # precisely how ``nl_query("Who is Loh Wei Ming?")`` went on silently answering about one of
+    # three people while this layer refused to. One constraint, two surfaces, one of them
+    # hardened. A package cannot import an app, so the shared half moved down rather than across.
+    def _same_label_ids(self, node_id: str) -> list[str]:
+        """Every open node of the same kind carrying the same label as ``node_id``. See
+        ``databridge_graph.identity.same_label_node_ids``."""
+        return same_label_node_ids(self.store, node_id)
 
-        `link_entities` deliberately skips DOCUMENT nodes — they are provenance, never the answer
-        entity — so a document referred to by filename would fall through to whichever unrelated
-        node happened to share a token, and every tool would then answer confidently about the
-        wrong thing. Documents are therefore resolved by an explicit exact lookup on label /
-        canonical_id first, and an unmatched document-shaped reference returns None rather than
-        drifting to a neighbour.
+    def _resolve(self, ref: str) -> EntityReference:
+        """A node id OR a natural-language name → resolved / not found / **ambiguous**.
+
+        ``databridge_graph.identity.resolve_entity`` decides — including that a node id always
+        wins and is never ambiguous, which is what keeps the refusal from being a dead end. This
+        wraps the outcome in the type that knows how to serialise a refusal for a tool caller.
         """
-        if self.store.open_node_row(ref) is not None:
-            return ref
-        needle = ref.strip().lower()
-        for row in self.store.open_nodes():
-            if (row["label"] or "").lower() == needle or (row["canonical_id"] or "").lower() == needle:
-                return row["id"]
-        linked = link_entities(self.store, ref, top_k=1)
-        return linked[0].id if linked else None
+        return EntityReference.of(resolve_entity(self.store, ref))
 
     # -- the tools ----------------------------------------------------------------
     # Four reads and one write. Which process exposes which is decided in ``capabilities.py``,
@@ -338,17 +414,19 @@ class BrainTools:
         return out
 
     def brain_neighbors(self, entity: str, depth: int = 1) -> dict:
-        nid = self._resolve(entity)
-        if nid is None:
-            return {"error": f"no entity matched {entity!r}", "nodes": [], "edges": []}
+        ref = self._resolve(entity)
+        if ref.node_id is None:
+            return ref.failure(nodes=[], edges=[])
+        nid = ref.node_id
         sub = neighbors(self.store, nid, depth=depth)
         return {"root": nid, "nodes": [node_to_dict(n) for n in sub.nodes],
                 "edges": [edge_to_dict(e) for e in sub.edges]}
 
     def brain_timeline(self, entity: str) -> dict:
-        nid = self._resolve(entity)
-        if nid is None:
-            return {"error": f"no entity matched {entity!r}", "events": []}
+        ref = self._resolve(entity)
+        if ref.node_id is None:
+            return ref.failure(events=[])
+        nid = ref.node_id
         evs = timeline(self.store, nid)
         return {"entity": nid, "events": [{
             "kind": e.kind, "label": e.label,
@@ -360,10 +438,14 @@ class BrainTools:
 
     def brain_path(self, from_entity: str, to_entity: str) -> dict:
         src, dst = self._resolve(from_entity), self._resolve(to_entity)
-        if src is None or dst is None:
-            return {"error": "endpoint not found", "found": False, "steps": []}
-        gp = path(self.store, src, dst)
-        return {"from": src, "to": dst, "found": gp.found,
+        # Reported per endpoint. A single "endpoint not found" for two arguments makes the caller
+        # guess which one, and would flatten "I could not find it" and "it names four people"
+        # into the same sentence.
+        for ref in (src, dst):
+            if ref.node_id is None:
+                return ref.failure(found=False, steps=[])
+        gp = path(self.store, src.node_id, dst.node_id)
+        return {"from": src.node_id, "to": dst.node_id, "found": gp.found,
                 "steps": [{"edge_kind": s.edge.kind.value, "to": s.to_node.id,
                            "to_label": s.to_node.label,
                            "pointers": [pointer_to_dict(p) for p in s.edge.sources]}

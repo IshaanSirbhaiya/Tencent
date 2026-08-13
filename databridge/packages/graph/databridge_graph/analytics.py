@@ -19,6 +19,12 @@ version of that claim we are entitled to make is Phase 5's per-intake, stage-com
   to the subgraph that produced it instead of trusting the number. A count whose members cannot be
   named is indistinguishable from a literal.
 
+`patients` is the figure that proves why the second rule is not decoration. The clinic's registry
+holds 300 rows and `clinic_seed` seeds all of them, so "how many patients?" has two true answers —
+**seen here** (a document names them) and **on file** (the CSV has a row) — that differ by a factor
+of twenty-five. As a bare `int` it silently meant whichever one the seed happened to produce. As a
+`Count` it means `n` of `of`, and cannot be read as the other.
+
 ## Why this reads the graph rather than the pipeline
 
 `ambiguity_rate` is the clearest case. A document with two `FOR_PATIENT` edges is one the resolver
@@ -114,7 +120,9 @@ class IssuerDocuments:
 @dataclass
 class GraphAnalytics:
     documents: int = 0
-    patients: int = 0
+    # A `Count`, not an int, and that is the point — see `compute`. `n` is the patients this
+    # clinic has actually seen; `of` is how many it has on file.
+    patients: Count | None = None
     issuer_mix: list[IssuerDocuments] = field(default_factory=list)
     ambiguity: Count | None = None
     unlinked_documents: Count | None = None
@@ -134,7 +142,7 @@ class GraphAnalytics:
             return None if x is None else x.to_dict()
         return {
             "documents": self.documents,
-            "patients": self.patients,
+            "patients": c(self.patients),
             "packages": self.packages,
             "tests_in_catalogue": self.tests_in_catalogue,
             "nodes": self.nodes,
@@ -232,6 +240,25 @@ def compute(store: GraphStore, *, as_of: dt.datetime | None = None) -> GraphAnal
     requested = {e["dst_id"] for e in edges if e["kind"] == EdgeKind.REQUESTS_TEST.value}
     orphans = [entities[t] for t in sorted(requested - in_packages) if t in entities]
 
+    # --- patients: SEEN HERE, out of ON FILE --------------------------------------------
+    # This was a bare `int` — the count of PATIENT nodes — and it was the one figure in this
+    # module that broke the module's own rule three paragraphs into the docstring: no denominator,
+    # no members, nothing to walk to. That went unnoticed while the seed held only patients some
+    # document named, because then the two readings happened to be the same number.
+    #
+    # They are not the same number any more. `clinic_seed` now seeds the whole registry, so a
+    # count of PATIENT nodes is "rows in the clinic's file", while the figure a dashboard means by
+    # "patients" is "people who came through the door". Same key, same type, a completely
+    # different claim — which is exactly the failure `Count` exists to make impossible: the
+    # denominator travels with the number, so the reading cannot drift.
+    #
+    # `docs_by_patient` is already the honest numerator, built above and already used as the
+    # `conflicts` denominator. A claim is still a CLAIM (constraint 1) — an ambiguous document
+    # contributes two rows and neither is settled — so this is an upper bound on distinct people,
+    # and the label says "registry rows", never "people".
+    seen_patients = Count("registry rows a document has claimed",
+                          len(docs_by_patient), by_kind.get(NodeKind.PATIENT.value, 0),
+                          tuple(sorted(docs_by_patient)))
     ambiguity = Count("documents naming more than one candidate",
                       len(ambiguous), len(linked), tuple(ambiguous))
     unlinked_count = Count("documents matching no registry row",
@@ -243,14 +270,14 @@ def compute(store: GraphStore, *, as_of: dt.datetime | None = None) -> GraphAnal
     # Only the ids actually named above travel with the payload. Shipping the whole node table
     # would make the response grow with the graph rather than with the figures on it.
     named: set[str] = {*(i.issuer_id for i in mix), *(e.id for e in orphans)}
-    for cnt in (ambiguity, unlinked_count, conflicts):
+    for cnt in (seen_patients, ambiguity, unlinked_count, conflicts):
         named.update(cnt.members)
     for issuer in mix:
         named.update(issuer.documents)
 
     return GraphAnalytics(
         documents=len(doc_ids),
-        patients=by_kind.get(NodeKind.PATIENT.value, 0),
+        patients=seen_patients,
         packages=by_kind.get(NodeKind.PACKAGE.value, 0),
         tests_in_catalogue=by_kind.get(NodeKind.TEST.value, 0),
         nodes=len(node_rows),
