@@ -48,6 +48,7 @@ stops being true.
 
 | If you want to… | Read |
 |---|---|
+| **Explore it as a graph** | **[`docs/vault/`](docs/vault/)** — a 50-note Obsidian vault: open that folder as a vault and start at `00 START HERE` |
 | **Understand how it works, and how to read the UI** | **[`SYSTEM.md`](SYSTEM.md)** — the ontology, the pipeline, the agent, every restriction, and a screen-by-screen guide to what each surface means |
 | Understand the whole project, end to end | [`docs/hackathon/PROJECT_CONTEXT.md`](docs/hackathon/PROJECT_CONTEXT.md) |
 | Work on the code | [`CLAUDE.md`](CLAUDE.md) — the operating rules — then [`REMEDIATION.md`](REMEDIATION.md) |
