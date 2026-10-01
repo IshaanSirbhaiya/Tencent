@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000183",
+  "filename": "IMG-2013-000183.jpg",
+  "image_present": false,
+  "captured_at": "2013-07-05T08:48:06+00:00",
+  "captured_by": "OFF-0042",
+  "inspection_id": "INS-2013-000559",
+  "application_id": "APP-2013-000699",
+  "parcel_id": "PCL-AR-00951",
+  "photo_batch_ref": "PHB-2013-000559",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-261771"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 439404,
+    "northing": 1183697,
+    "accuracy_m": 9.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2218,
+          120,
+          275,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-967967",
+        "confidence": 0.889,
+        "bbox": [
+          2021,
+          263,
+          621,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "31 NETHERFIELD TERRACE, ISK HARBOUR AM8 6GK",
+        "confidence": 0.766,
+        "bbox": [
+          289,
+          386,
+          1118,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-07-05",
+        "confidence": 0.758,
+        "bbox": [
+          882,
+          408,
+          928,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0042",
+        "confidence": 0.79,
+        "bbox": [
+          2377,
+          652,
+          416,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

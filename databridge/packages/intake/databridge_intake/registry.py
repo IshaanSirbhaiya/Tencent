@@ -18,6 +18,7 @@ from typing import Iterable, Optional
 
 from databridge_core import GroundedValue, SourcePointer
 
+from .clock import resolve_today
 from .models import IdType, PatientRecord
 from .paths import PATIENT_REGISTRY_CSV, patient_registry_csv
 
@@ -47,13 +48,18 @@ _NRIC_FIN = re.compile(r"^[STFGM]\d{7}[A-Z]$", re.IGNORECASE)
 # (formats vary by country) but not a catch-all — see classify_id_type.
 _PASSPORT_SHAPED = re.compile(r"^[A-Z0-9]{6,12}$", re.IGNORECASE)
 
-# The clinic "today" every derived age is computed against. Fixed rather than read from the system
-# clock so ages, eligibility flags and the demo's numbers are reproducible on any machine and in
-# CI. The sample chit letters and questionnaires are dated across mid-2026; this sits just after
-# the latest of them. Bump it only alongside the fixture data.
+# The FIXTURE date: the day the synthetic chit letters and questionnaires were written against
+# (they are dated across mid-2026; this sits just after the latest of them).
+#
+# HC1 (2026-10-01, SWEEP hardcode audit #3): this is NOT a default any more. It used to be the
+# default `today` for the pipeline, eligibility, resolution and the DOB pivot, so every live card
+# computed ages and validity windows against a frozen date and presented them as current. The
+# default is now the clock in the deployment's zone (`clock.deployment_today`). A test whose
+# expectation was derived against the fixtures passes `today=DATASET_TODAY` explicitly.
 DATASET_TODAY = dt.date(2026, 8, 11)
 
-# Pivot for two-digit years: `YY <= DOB_PIVOT_YEAR` means 20xx, otherwise 19xx.
+# The two-digit-year pivot AT THE FIXTURE DATE. The live pivot is `today.year % 100` for whatever
+# `today` a call runs against; this constant names the fixture's, for tests that reason about it.
 DOB_PIVOT_YEAR = DATASET_TODAY.year % 100
 
 
@@ -61,7 +67,7 @@ class RegistryError(RuntimeError):
     """The registry CSV is missing, malformed, or has drifted from COLUMN_MAP."""
 
 
-def parse_dob_two_digit_year(raw: str, *, today: dt.date = DATASET_TODAY) -> dt.date:
+def parse_dob_two_digit_year(raw: str, *, today: Optional[dt.date] = None) -> dt.date:
     """Parse ``DD/MM/YY`` into a real date, resolving the century so the result is never future.
 
     The source CSV stores two-digit years, so ``25/01/05`` is genuinely ambiguous: 1905 or 2005.
@@ -85,6 +91,7 @@ def parse_dob_two_digit_year(raw: str, *, today: dt.date = DATASET_TODAY) -> dt.
     if len(year_s) != 2 or not year_s.isdigit():
         raise ValueError(f"expected a two-digit year in {raw!r}, got {year_s!r}")
     yy = int(year_s)
+    today = resolve_today(today)
     candidate = dt.date(2000 + yy, int(month_s), int(day_s))
     if candidate > today:
         candidate = candidate.replace(year=1900 + yy)
@@ -130,17 +137,19 @@ def _derived_pointer(base: SourcePointer, derivation: str, source_id: str) -> So
         source_id=source_id, kind="derived", derivation=derivation, derived_from=[base])
 
 
-def _row_to_record(row: dict[str, str], row_id: str, source_id: str) -> PatientRecord:
+def _row_to_record(row: dict[str, str], row_id: str, source_id: str, *,
+                   today: dt.date) -> PatientRecord:
     values: dict[str, GroundedValue] = {}
     for column, field in COLUMN_MAP.items():
         raw = (row.get(column) or "").strip()
         ptr = _cell_pointer(column, row_id, source_id)
         if field == "date_of_birth":
-            parsed = parse_dob_two_digit_year(raw)
+            parsed = parse_dob_two_digit_year(raw, today=today)
             values[field] = GroundedValue(
                 value=parsed,
                 pointer=_derived_pointer(
-                    ptr, f"two-digit-year pivot at {DOB_PIVOT_YEAR}: {raw!r} -> {parsed.isoformat()}",
+                    ptr, f"two-digit-year pivot at {today.year % 100} (as of {today.isoformat()}): "
+                         f"{raw!r} -> {parsed.isoformat()}",
                     source_id),
                 confidence=1.0)
         else:
@@ -166,13 +175,18 @@ def _row_to_record(row: dict[str, str], row_id: str, source_id: str) -> PatientR
     return PatientRecord(patient_id=patient_id_for(id_number), **values)
 
 
-def load_registry(path=None) -> list[PatientRecord]:
+def load_registry(path=None, *, today: Optional[dt.date] = None) -> list[PatientRecord]:
     """Load every patient in the registry CSV, fully grounded.
+
+    ``today`` is the date two-digit years are pivoted against (never a future birth date). It
+    defaults to the clock in the deployment's zone; pass ``DATASET_TODAY`` to read the registry as
+    the fixtures were written.
 
     ``row_id`` is the 1-based **data** row, header excluded — i.e. "record 3 of 300", which is one
     less than the spreadsheet line number. Error messages spell out both so a pointer stays
     followable by a person, not just by a program.
     """
+    today = resolve_today(today)
     csv_path = path or patient_registry_csv()
     if not csv_path.exists():
         raise RegistryError(f"patient registry not found at {csv_path}")
@@ -189,7 +203,7 @@ def load_registry(path=None) -> list[PatientRecord]:
         records = []
         for i, row in enumerate(reader, start=1):
             try:
-                records.append(_row_to_record(row, str(i), source_id))
+                records.append(_row_to_record(row, str(i), source_id, today=today))
             except Exception as exc:  # noqa: BLE001 — re-raised with location below
                 # One bad cell in 300 rows should say WHICH row and WHICH file. A bare
                 # "expected a two-digit year in '07/10/1990'" is unactionable against a CSV.
@@ -201,10 +215,22 @@ def load_registry(path=None) -> list[PatientRecord]:
     return records
 
 
-@functools.lru_cache(maxsize=1)
-def registry() -> tuple[PatientRecord, ...]:
-    """Process-wide cached registry. Immutable tuple so callers cannot mutate the shared copy."""
-    return tuple(load_registry())
+@functools.lru_cache(maxsize=4)
+def _registry_on(today: dt.date) -> tuple[PatientRecord, ...]:
+    return tuple(load_registry(today=today))
+
+
+def registry(today: Optional[dt.date] = None) -> tuple[PatientRecord, ...]:
+    """The registry as of ``today`` (default: the deployment clock), cached per date.
+
+    Keyed by date rather than cached once per process: a gateway that runs across midnight must
+    pivot two-digit years against the new day, not the day it booted. Immutable tuple so callers
+    cannot mutate the shared copy.
+    """
+    return _registry_on(resolve_today(today))
+
+
+registry.cache_clear = _registry_on.cache_clear          # type: ignore[attr-defined]
 
 
 def by_patient_id(records: Optional[Iterable[PatientRecord]] = None) -> dict[str, PatientRecord]:

@@ -1,0 +1,27 @@
+# The write-capable table an agent's declared write action inserts into (R-022 f1 #8).
+#
+# Behaviour lives in pack YAML, not engine code: `databridge_mcp_ingest.tabular.writer` is a
+# GENERIC renderer — it names no table, role, database or column. This spec is the synthetic demo
+# database's follow-up-task table (the "log a follow-up task in the CRM" action).
+#
+# Secrets: there is NO password here. The role is created LOGIN without one; the password is set
+# at apply time from the environment variable named in `password_env` through
+# `writer.apply_writer_password`, which executes it and never returns or logs the text (#9).
+name: follow_up_tasks
+action: log_followup_task
+database: larkspur
+schema: public
+table: follow_up_tasks
+role: walnut_agent_writer
+reader_role: walnut_reader
+password_env: WALNUT_DEMO_PG_WRITER_PASSWORD
+columns:
+  - {name: task_id,        type: BIGSERIAL,    primary_key: true}
+  - {name: customer_id,    type: VARCHAR(12),  not_null: true, insert: true}
+  - {name: invoice_no,     type: VARCHAR(20),  insert: true}
+  - {name: title,          type: VARCHAR(200), not_null: true, insert: true}
+  - {name: due_on,         type: DATE,         insert: true}
+  - {name: created_by,     type: VARCHAR(120), not_null: true, insert: true}
+  - {name: agent_run_id,   type: VARCHAR(80),  insert: true}
+  - {name: source_pointer, type: TEXT,         insert: true}
+  - {name: created_at,     type: TIMESTAMPTZ,  not_null: true, default: now()}

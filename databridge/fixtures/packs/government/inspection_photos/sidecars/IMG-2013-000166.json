@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000166",
+  "filename": "IMG-2013-000166.jpg",
+  "image_present": false,
+  "captured_at": "2013-10-20T09:55:30+00:00",
+  "captured_by": "OFF-0031",
+  "inspection_id": "INS-2013-000449",
+  "application_id": "APP-2013-000583",
+  "parcel_id": "PCL-KF-01972",
+  "photo_batch_ref": "PHB-2013-000449",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-206529"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445517,
+    "northing": 1195662,
+    "accuracy_m": 17.5
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2602,
+          120,
+          264,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-84677B",
+        "confidence": 0.784,
+        "bbox": [
+          443,
+          244,
+          891,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "72 SALTMARSH STREET, SABLE QUAY AM3 4NX",
+        "confidence": 0.789,
+        "bbox": [
+          806,
+          344,
+          1053,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-10-20",
+        "confidence": 0.724,
+        "bbox": [
+          2791,
+          525,
+          957,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0031",
+        "confidence": 0.975,
+        "bbox": [
+          798,
+          680,
+          480,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

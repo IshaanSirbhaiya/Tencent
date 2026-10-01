@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2026-000028",
+  "filename": "IMG-2026-000028.jpg",
+  "image_present": false,
+  "captured_at": "2026-07-31T13:23:24+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2026-000346",
+  "application_id": "APP-2025-000446",
+  "parcel_id": "PCL-CB-02591",
+  "photo_batch_ref": "PHB-2026-000346",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-522072"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 430877,
+    "northing": 1206740,
+    "accuracy_m": 9.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1362,
+          120,
+          374,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2026-909744",
+        "confidence": 0.815,
+        "bbox": [
+          1412,
+          220,
+          864,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "3 ROPEWALK ROAD, CORRISBECK AMZ 6EP",
+        "confidence": 0.773,
+        "bbox": [
+          375,
+          334,
+          875,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2026-07-31",
+        "confidence": 0.891,
+        "bbox": [
+          1829,
+          435,
+          696,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.947,
+        "bbox": [
+          1447,
+          616,
+          368,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

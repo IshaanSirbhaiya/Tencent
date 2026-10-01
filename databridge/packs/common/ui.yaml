@@ -1,0 +1,63 @@
+# packs/common — the pack's OPERATOR-SURFACE vocabulary (Layer 1, presentation half).
+#
+# `ontology.yaml` says what KINDS this pack has. `GET /packs` (pack_routes.py) reads every pack
+# directory under `packs/` and expects this sibling file, so `common` carries one too — but it is
+# not a vertical, and this file says that honestly rather than inventing a persona for it:
+#
+#   * `surfaces` is deliberately EMPTY. `common` has no front desk, no queue, no operator screen of
+#     its own — it is a vocabulary other packs build on, not a product a shift signs into. Leaving
+#     `surfaces` empty means `entry["available"]` (pack_routes.build_registry) can never become
+#     True for it, even if a future deployment binds it in `packs/deployment.yaml` — which is the
+#     correct behaviour: binding `common` widens what a vertical's graph MAY use, it does not open
+#     a new place to click.
+#   * `nouns` still needs real values: `GET /ontology` and this pack's own kind descriptions read
+#     fine without them, but the pack registry's own contract (`pack_routes.UI_KEYS`,
+#     `apps/frontend/lib/packs.ts`'s `isRegistry`) expects every pack to carry a non-empty `nouns`
+#     object, and a blank one would report `ui_incomplete` for no reason — the words below are true
+#     of this pack (it names entities, mentions and roles in general terms), just not vertical.
+#
+# Synthetic and general throughout: nothing here names an industry.
+
+pack: common
+label: Common
+tagline: General node and edge kinds other packs build on — not an operator surface.
+nouns:
+  subject: entity
+  subject_plural: entities
+  subject_title: Entity
+  subject_plural_title: Entities
+  org: organisation
+  org_plural: organisations
+  org_title: Organisation
+  registry: general vocabulary
+  record: node
+  graph: knowledge graph
+  workspace: Ontology library
+  counterparty: organisation
+  counterparty_plural: organisations
+  document: document
+  determination: relation
+  operator_surface: Ontology
+  operator_role: operator
+  queue: proposals
+  identifier: "n/a — no subject kind is declared by this pack"
+  credential: "n/a — no subject kind is declared by this pack"
+  document_examples: a letter, form, filing, record or message
+  pitch: >
+    The general kinds most verticals reach for — person, organisation, document, event, location,
+    account, transaction — and the relations between them. A library, not a workspace: it has no
+    operator surface of its own.
+roster: []
+surfaces: []
+trials:
+  intelligence: []
+  evidence: []
+  intake: []
+demo_steps: []
+demo_focus_node: ""
+demo_as_of: ""
+demo_question: ""
+graph_vocabulary:
+  node_kinds: {}
+  edge_labels: {}
+brain_suggested_fallback: []

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2011-000345",
+  "filename": "IMG-2011-000345.jpg",
+  "image_present": false,
+  "captured_at": "2011-12-27T10:38:38+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2011-000644",
+  "application_id": "APP-2011-000783",
+  "parcel_id": "PCL-OH-02561",
+  "photo_batch_ref": "PHB-2011-000644",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-155752"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 424392,
+    "northing": 1215419,
+    "accuracy_m": 9.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1974,
+          120,
+          341,
+          72
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2011-500586",
+        "confidence": 0.911,
+        "bbox": [
+          1553,
+          233,
+          837,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "140 TANNERY WAY, OLD HARROWGATE AM9 8LT",
+        "confidence": 0.754,
+        "bbox": [
+          464,
+          364,
+          1092,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2011-12-27",
+        "confidence": 0.939,
+        "bbox": [
+          965,
+          432,
+          899,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.829,
+        "bbox": [
+          1081,
+          636,
+          528,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,98 @@
+# Microsoft SQL Server / Azure SQL dialect template (W4). DRAFT — UNVERIFIED: written from the
+# documented sys.* catalogue, never run against SQL Server here. `draft_dialect` live-probes it
+# before anyone can approve it for a connection. Shape: tabular/dialect_draft.py.
+name: sqlserver
+engine: sqlserver
+title: Microsoft SQL Server / Azure SQL
+status: draft
+unverified: >-
+  Not run against SQL Server. Known risks: sys.* metadata is visible only for objects the login
+  holds a permission on (SELECT suffices on the table; VIEW DEFINITION is NOT required for keys);
+  COUNT(DISTINCT) over NVARCHAR(MAX) is slow on wide text columns.
+detect:
+  priority: 5
+  tool_hints: [execute_sql, read_data, list_tables, describe_table]
+  probes:
+    - {sql: "SELECT @@VERSION AS v", match: '(?i)microsoft sql server|azure sql'}
+mcp:
+  rows: auto
+  error_prefixes: ["Error:", "Error executing"]
+# R-022 f1 #4: engine functions (beyond the generic allow-list in dialect_draft.py) that these
+# statements call. Each is a pure READ; a function not listed here is refused before any probe.
+read_functions: [count_big, len, schema_name]
+quote: '[]'
+list_tables: >-
+  SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES
+  WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME
+describe: >-
+  SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = {schema|literal} AND TABLE_NAME = {table|literal} ORDER BY ORDINAL_POSITION
+keys: >-
+  SELECT c.name AS column_name, 'PRIMARY KEY' AS constraint_type, NULL AS ref_schema,
+         NULL AS ref_table, NULL AS ref_column
+  FROM sys.indexes i
+  JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+  JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+  JOIN sys.tables t ON t.object_id = i.object_id
+  WHERE i.is_primary_key = 1 AND SCHEMA_NAME(t.schema_id) = {schema|literal}
+    AND t.name = {table|literal}
+  UNION ALL
+  SELECT pc.name, 'FOREIGN KEY', SCHEMA_NAME(rt.schema_id), rt.name, rc.name
+  FROM sys.foreign_key_columns fkc
+  JOIN sys.tables t ON t.object_id = fkc.parent_object_id
+  JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
+  JOIN sys.tables rt ON rt.object_id = fkc.referenced_object_id
+  JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id
+   AND rc.column_id = fkc.referenced_column_id
+  WHERE SCHEMA_NAME(t.schema_id) = {schema|literal} AND t.name = {table|literal}
+keys_alternatives:
+  - name: information_schema
+    note: the SQL-standard views (same permission rule as sys.*)
+    sql: >-
+      SELECT kcu.COLUMN_NAME AS column_name, tc.CONSTRAINT_TYPE AS constraint_type,
+             ccu.TABLE_SCHEMA AS ref_schema, ccu.TABLE_NAME AS ref_table,
+             ccu.COLUMN_NAME AS ref_column
+      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+      JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+        ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA
+      LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+        ON rc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME AND rc.CONSTRAINT_SCHEMA = tc.TABLE_SCHEMA
+      LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE ccu
+        ON ccu.CONSTRAINT_NAME = rc.UNIQUE_CONSTRAINT_NAME
+       AND ccu.ORDINAL_POSITION = kcu.ORDINAL_POSITION
+      WHERE tc.TABLE_SCHEMA = {schema|literal} AND tc.TABLE_NAME = {table|literal}
+        AND tc.CONSTRAINT_TYPE IN ('PRIMARY KEY', 'FOREIGN KEY')
+count: >-
+  SELECT COUNT_BIG(*) AS n FROM {schema|ident}.{table|ident}
+row_estimate: >-
+  SELECT SUM(p.rows) AS n FROM sys.partitions p JOIN sys.tables t ON t.object_id = p.object_id
+  WHERE p.index_id IN (0, 1) AND SCHEMA_NAME(t.schema_id) = {schema|literal}
+    AND t.name = {table|literal}
+select: >-
+  SELECT TOP ({limit|int}) * FROM {schema|ident}.{table|ident} ORDER BY {order_by}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by}
+  OFFSET {offset|int} ROWS FETCH NEXT {limit|int} ROWS ONLY
+column_stats: >-
+  SELECT COUNT_BIG(*) AS n, COUNT_BIG({column|ident}) AS non_null,
+         COUNT_BIG(DISTINCT CAST({column|ident} AS NVARCHAR(4000))) AS distinct_n,
+         AVG(CAST(LEN(CAST({column|ident} AS NVARCHAR(4000))) AS FLOAT)) AS avg_len,
+         MAX(LEN(CAST({column|ident} AS NVARCHAR(4000)))) AS max_len,
+         AVG(CAST(LEN(CAST({column|ident} AS NVARCHAR(4000)))
+             - LEN(REPLACE(CAST({column|ident} AS NVARCHAR(4000)), ' ', '')) AS FLOAT)) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+table_stats: >-
+  SELECT COUNT_BIG(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT_BIG({column|ident}) AS {p}_non_null,
+  COUNT_BIG(DISTINCT CAST({column|ident} AS NVARCHAR(4000))) AS {p}_distinct_n,
+  AVG(CAST(LEN(CAST({column|ident} AS NVARCHAR(4000))) AS FLOAT)) AS {p}_avg_len,
+  MAX(LEN(CAST({column|ident} AS NVARCHAR(4000)))) AS {p}_max_len,
+  AVG(CAST(LEN(CAST({column|ident} AS NVARCHAR(4000))) - LEN(REPLACE(CAST({column|ident} AS NVARCHAR(4000)), ' ', '')) AS FLOAT)) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+aggregate: >-
+  SELECT {group_cols}, COUNT_BIG(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}

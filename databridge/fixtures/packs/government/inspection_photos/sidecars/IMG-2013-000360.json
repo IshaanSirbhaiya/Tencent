@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000360",
+  "filename": "IMG-2013-000360.jpg",
+  "image_present": false,
+  "captured_at": "2013-11-07T12:37:54+00:00",
+  "captured_by": "OFF-0037",
+  "inspection_id": "INS-2013-000659",
+  "application_id": "APP-2013-000800",
+  "parcel_id": "PCL-AR-02055",
+  "photo_batch_ref": "PHB-2013-000659",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-825767"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 433151,
+    "northing": 1183625,
+    "accuracy_m": 10.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1114,
+          120,
+          253,
+          72
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-002200",
+        "confidence": 0.766,
+        "bbox": [
+          1904,
+          252,
+          594,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "197 IRONMONGER LANE, ASHCOMBE REACH AM6 5BN",
+        "confidence": 0.789,
+        "bbox": [
+          860,
+          414,
+          1161,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-11-07",
+        "confidence": 0.794,
+        "bbox": [
+          1698,
+          405,
+          986,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0037",
+        "confidence": 0.915,
+        "bbox": [
+          1326,
+          628,
+          448,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

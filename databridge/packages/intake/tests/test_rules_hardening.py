@@ -275,9 +275,9 @@ def test_no_issuer_code_appears_in_a_branch_condition():
     This is what "no `if code == 'MRDEB'`" actually means, and unlike a raw-text scan it holds
     even for modules that legitimately quote codes as data (CLAUDE.md §Hard constraints 3).
     """
-    from databridge_intake.paths import config_dir
+    from databridge_intake.paths import package_root
 
-    pkg_root = config_dir().parent
+    pkg_root = package_root()
     offenders = [f"{py.relative_to(pkg_root)}: {tok}"
                  for py in pkg_root.rglob("*.py")
                  for tok in _codes()
@@ -294,9 +294,9 @@ def test_no_issuer_branching():
     module, it certainly is not being special-cased. Declarative fixture tables are exempt and
     listed explicitly above.
     """
-    from databridge_intake.paths import config_dir
+    from databridge_intake.paths import package_root
 
-    pkg_root = config_dir().parent
+    pkg_root = package_root()
     offenders: list[str] = []
     for py in pkg_root.rglob("*.py"):
         if py.name in _DECLARATIVE_FIXTURE_MODULES:
@@ -315,9 +315,9 @@ def test_no_issuer_branching():
 def test_gold_fixture_module_is_data_not_logic():
     """Guards the exemption above: `gold.py` may quote codes only inside literal data, never in
     a comparison. Without this, the exclusion list would be a loophole."""
-    from databridge_intake.paths import config_dir
+    from databridge_intake.paths import package_root
 
-    gold = (config_dir().parent / "gold.py").read_text(encoding="utf-8")
+    gold = (package_root() / "gold.py").read_text(encoding="utf-8")
     conditions = _condition_strings(gold)
     leaked = [t for t in _codes() if any(t in s for s in conditions)]
     assert not leaked, f"gold.py branches on {leaked} — it must remain a declarative table"

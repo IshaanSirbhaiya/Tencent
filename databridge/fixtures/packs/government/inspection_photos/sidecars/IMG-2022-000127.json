@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000127",
+  "filename": "IMG-2022-000127.jpg",
+  "image_present": false,
+  "captured_at": "2022-07-17T14:38:11+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2022-000218",
+  "application_id": "APP-2022-000296",
+  "parcel_id": "PCL-AR-00651",
+  "photo_batch_ref": "PHB-2022-000218",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-853376"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 424742,
+    "northing": 1188883,
+    "accuracy_m": 9.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          3348,
+          120,
+          297,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-302241",
+        "confidence": 0.875,
+        "bbox": [
+          2141,
+          239,
+          648,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "156A OSTLER CLOSE, ASHCOMBE REACH AM4 8BL",
+        "confidence": 0.916,
+        "bbox": [
+          1488,
+          342,
+          902,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2022-07-17",
+        "confidence": 0.878,
+        "bbox": [
+          2253,
+          435,
+          986,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.929,
+        "bbox": [
+          674,
+          652,
+          384,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,52 @@
+ Xanthe Utilities LLC
+
+Financial Statements for the financial year ended 31 December 2024
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Xanthe Utilities LLC
+  Registration number   SYN-CRN-5130430
+  Country of incorporation   NL
+  Principal activity   Food and Agriculture
+  Reporting currency   SGD
+  Date of incorporation   2005-02-18
+
+ Directors' commentary
+
+Demand in the Group's principal market softened, offset in part by a full year contribution from the contract logistics division acquired in the prior period.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2024   FY2023
+------:---:|
+  Revenue   17   16
+  Gross profit   7   6
+  EBITDA   3   2
+  Depreciation and amortisation   -1   -1
+  Finance costs   -0   -0
+  Profit after tax   2   2
+  Total assets   12   12
+  Total borrowings   5   5
+  Cash and cash equivalents   1   0
+  Total equity   6   6
+
+ Key ratios
+
+  Ratio   FY2024   Covenant reference
+------:---|
+  Net debt / EBITDA   1.66x   Tested quarterly under the syndicated facility
+  Interest cover   9.67x   Tested quarterly
+  Current ratio   2.35x   -
+
+ Banking arrangements
+
+Borrowings are held with Northgate Mercantile Bank and one other lender. The Group has provided a fixed and floating charge over its assets.
+
+ Auditor's note
+
+The comparative figures for the prior period were restated following a reclassification of contract assets.

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000056",
+  "filename": "IMG-2022-000056.jpg",
+  "image_present": false,
+  "captured_at": "2022-02-06T10:19:38+00:00",
+  "captured_by": "OFF-0031",
+  "inspection_id": "INS-2022-000416",
+  "application_id": "APP-2021-000541",
+  "parcel_id": "PCL-CB-01871",
+  "photo_batch_ref": "PHB-2022-000416",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-980899"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 447731,
+    "northing": 1201517,
+    "accuracy_m": 14.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          636,
+          120,
+          363,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-206657",
+        "confidence": 0.849,
+        "bbox": [
+          229,
+          220,
+          891,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "39 MARROW PASSA6E, PELLlNG GREEN AM1 7WR",
+        "confidence": 0.815,
+        "bbox": [
+          97,
+          354,
+          1120,
+          72
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF IN5PECTION 2022-02-06",
+        "confidence": 0.84,
+        "bbox": [
+          684,
+          492,
+          725,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0031",
+        "confidence": 0.754,
+        "bbox": [
+          713,
+          564,
+          464,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

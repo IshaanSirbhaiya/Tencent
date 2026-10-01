@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000394",
+  "filename": "IMG-2014-000394.jpg",
+  "image_present": false,
+  "captured_at": "2014-04-30T14:54:31+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2014-000370",
+  "application_id": "APP-2013-000484",
+  "parcel_id": "PCL-MB-02990",
+  "photo_batch_ref": "PHB-2014-000370",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-881352"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 428804,
+    "northing": 1219855,
+    "accuracy_m": 2.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1267,
+          120,
+          341,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-458552",
+        "confidence": 0.763,
+        "bbox": [
+          416,
+          227,
+          918,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "87 OSTLER RISE, MIREBROOK AM4 8ED",
+        "confidence": 0.684,
+        "bbox": [
+          859,
+          318,
+          1056,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-04-30",
+        "confidence": 0.741,
+        "bbox": [
+          701,
+          492,
+          812,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.854,
+        "bbox": [
+          120,
+          512,
+          416,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000302",
+  "filename": "IMG-2022-000302.jpg",
+  "image_present": false,
+  "captured_at": "2022-08-20T14:23:26+00:00",
+  "captured_by": "OFF-0031",
+  "inspection_id": "INS-2022-000148",
+  "application_id": "APP-2022-000211",
+  "parcel_id": "PCL-KF-00088",
+  "photo_batch_ref": "PHB-2022-000148",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-388970"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 421717,
+    "northing": 1185812,
+    "accuracy_m": 9.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1793,
+          120,
+          275,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-582554",
+        "confidence": 0.846,
+        "bbox": [
+          2447,
+          253,
+          729,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "235 BELLROPE ROAD, KELDER FLATS AM1 2RR",
+        "confidence": 0.772,
+        "bbox": [
+          2384,
+          418,
+          858,
+          48
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2022-08-20",
+        "confidence": 0.701,
+        "bbox": [
+          2538,
+          423,
+          667,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0031",
+        "confidence": 0.854,
+        "bbox": [
+          3327,
+          708,
+          384,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

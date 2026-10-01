@@ -40,19 +40,51 @@ from serving import (
     serve_streamable_http,
 )
 
-SERVER_NAME = "databridge-clinic-writer"
+SERVER_NAME = "databridge-writer"
+
+
+def writer_harness():
+    """The extraction harness this process ingests with: the REAL model (routed through
+    ``packages/harness`` by ``build_extraction_harness``) when the model ROUTED for extraction is
+    reachable, and the deterministic gold backend only when it is not or ``DATABRIDGE_FORCE_GOLD=1``.
+    The same decision the gateway's ``/brain/ingest`` makes, taken from the same function, so the
+    two write paths cannot disagree about which model reads a document."""
+    return writer_extraction()[0]
+
+
+def writer_extraction() -> tuple:
+    """``(harness, route)`` — the harness, and the record of which model extraction runs on and
+    why. Routing is decided per EXTRACTION alias, independently of the brain-query model (Codex f2
+    #7), and the route travels with every ingestion result (``extraction_route``) instead of being
+    discarded here."""
+    from databridge_evals.e_intake import gold_harness
+    from databridge_gateway.llm import build_extraction_harness, detect_llm
+
+    detected = detect_llm()
+    harness = build_extraction_harness(detected)
+    route = {"backend": "real" if harness is not None else "gold",
+             "routing": detected.get("routing", {})}
+    return (harness or gold_harness()), route
 
 
 def default_writer_tools() -> BrainTools:
-    """A seeded ``BrainTools`` with the gold extraction harness and the demo source registered.
+    """A ``BrainTools`` over the SHARED graph store (``WALNUT_GRAPH_DB_PATH``), so what this process
+    ingests is what the gateway and the reader serve. The ENABLED packs' declared demo seeds and
+    demo sources (``demo_seed.yaml``) are loaded only when ``WALNUT_LOAD_CLINIC_SEED=1``; this
+    process names no pack's seed or fixture itself (Codex f2 #6).
 
     ``sources`` is an ALLOW-LIST of ingestable documents, not a directory: ``brain_ingest`` never
     opens a caller-supplied path.
     """
-    from databridge_evals.e_intake import FIXTURE_TEXT, gold_harness
+    from brain_server import demo_seed_enabled, demo_seed_sources, open_shared_store
 
-    tools = BrainTools(harness=gold_harness(), sources={"demo_sample.txt": FIXTURE_TEXT})
-    tools.load_seed()
+    seeded = demo_seed_enabled()
+    sources: dict = demo_seed_sources() if seeded else {}
+    harness, route = writer_extraction()
+    tools = BrainTools(open_shared_store(), harness=harness, sources=sources,
+                       extraction_route=route)
+    if seeded:
+        tools.load_seed()
     return tools
 
 

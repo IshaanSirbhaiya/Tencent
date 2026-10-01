@@ -1,0 +1,33 @@
+# Layer 2 of the three-layer schema (00_SPINE.md §4) — the **deployment binding**.
+#
+# Which packs this checkout has enabled. Extraction is closed to the UNION of these packs' kinds:
+# a kind no enabled pack declares is skipped, never coined on the fly.
+#
+# Nothing is enabled by default and nothing is enabled implicitly. Binding "every pack on disk"
+# would make the vocabulary open, which is the property the closure exists to deny — so the loader
+# refuses a deployment with no binding rather than guessing one.
+#
+# Override without editing this file:
+#   DATABRIDGE_PACKS=finance,government        (env, comma-separated)
+#   bind_deployment(["finance"])               (programmatic)
+#   with deployment("finance"): ...            (scoped; used by tests)
+
+enabled_packs:
+  # All three, as of 2026-08-16. This file used to enable `healthcare` alone, with the note
+  # "enable them when their estates and adapters land (PHASE_PLAN Phase 3)". Phase 3 has landed:
+  # both synthetic estates are provisioned, four adapters read them, the government graph builds
+  # to 46,346 nodes / 52,747 edges and the finance graph builds from its own seed map. The
+  # condition this file set for itself has been met, so the binding follows it.
+  #
+  # Binding all three is also the honest configuration for what this product IS. The engine knows
+  # no domain — `test_no_domain_branching` enforces it — and a deployment bound to one vertical
+  # made the UI read as that vertical's product, which is the opposite of the claim. Three packs
+  # bound together is the demonstration: 79 node kinds and 8 subject kinds coexisting, with no
+  # engine code that knows which is which.
+  #
+  # Order is NOT load-bearing. Two packs declaring the same subject kind with different identity
+  # guarantees now RAISE (`packs.py`, Packs finding 5) rather than letting list position decide
+  # which identifiers a human may check. These three were verified to bind without conflict.
+  - finance
+  - government
+  - healthcare

@@ -79,8 +79,10 @@ import subprocess
 import sys
 from typing import Any, Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
+
+from .auth import install_auth_handler, require_principal
 from pydantic import BaseModel, ConfigDict, Field
 
 log = logging.getLogger("databridge.gateway.outbox")
@@ -104,8 +106,12 @@ MAX_BODY_CHARS = 2_000
 MAX_SUBJECT_CHARS = 240
 
 #: Config files this repo authored and committed. A pointer into one of these resolves to a file a
-#: human can open, so its identifiers print. Everything else is digested to a handle.
-REPO_CONFIG_SOURCES = frozenset({"clinic_monitors.yaml", "coverage_rules.yaml"})
+#: human can open, so its identifiers print. Everything else is digested to a handle. Read from
+#: the outbox package and the rule-table id below rather than restated (HC1, 2026-10-01).
+def _repo_config_sources() -> frozenset:
+    from databridge_outbox.monitors import MONITORS_SOURCE_ID
+
+    return frozenset({MONITORS_SOURCE_ID, RULES_SOURCE_ID})
 
 #: Ledger pointers name the intake, which this surface already publishes, and nothing else.
 LEDGER_SOURCE_PREFIX = "evidence_ledger:"
@@ -115,14 +121,14 @@ FRONT_DESK_SOURCE_PREFIX = "front_desk_entry:"
 #: row's structured ``recipient_origin``, never assembled from a pointer's free text.
 RECIPIENT_ORIGIN_TEXT: dict[str, str] = {
     "committed_ledger": (
-        "The address the clinic already held for the patient a named member of staff selected in "
+        "The address already on file for the subject a named member of staff selected in "
         "person, on a committed evidence-ledger row. No part of that identity check was "
         "automatic, nothing chose between candidates, and this system never read an address off a "
         "document."),
     "typed_by_human": (
         "A named member of staff typed this address. The system did not take it from a document: "
-        "an address printed on a referral letter is a claim about identity made by whoever wrote "
-        "the letter, and acting on it would be an identity determination."),
+        "an address printed on an incoming document is a claim about identity made by whoever "
+        "wrote it, and acting on it would be an identity determination."),
 }
 
 #: The staff-facing sentence for each refusal this surface can give. Code-authored, so a refusal
@@ -159,6 +165,11 @@ REFUSALS: dict[str, str] = {
 
 
 # --- refusals ---------------------------------------------------------------------------
+#: INT1 (2026-10-01): every route in this module requires an authenticated principal — the gateway
+#: serves nothing anonymously except `/health` (`test_every_route_on_the_app_is_gated`).
+_AUTH = [Depends(require_principal)]
+
+
 class RefusalBody(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -296,7 +307,7 @@ class Citation(BaseModel):
 
 
 def _public_source(source_id: str) -> tuple[str, bool]:
-    if source_id in REPO_CONFIG_SOURCES:
+    if source_id in _repo_config_sources():
         return source_id, True
     for prefix in (LEDGER_SOURCE_PREFIX, FRONT_DESK_SOURCE_PREFIX):
         if source_id.startswith(prefix):
@@ -446,10 +457,10 @@ class RejectRequest(BaseModel):
 
 
 LISTING_NOTE = (
-    "Drafts, not messages. Nothing here has left the clinic and nothing here can send itself: a "
+    "Drafts, not messages. Nothing here has left this system and nothing here can send itself: a "
     "row becomes `sent` only after a named member of staff approves it and a separate, model-free "
     "process performs it. Addresses are masked on this screen — the mailbox is visible at the "
-    "counter, where the patient is.")
+    "counter, where the person is.")
 
 EXECUTION_NOTE = (
     "Performed by apps/dispatcher, in its own process, with no model in it and no way back into "
@@ -570,8 +581,8 @@ PROPOSAL_BLOCKED: dict[str, str] = {
         "no intake with that id is in front of the counter. A proposal is about a registration a "
         "member of staff named; nothing here searches for one."),
     "NOTHING_DUE": (
-        "no clinic rule applies to this registration right now. The rules live in "
-        "clinic_monitors.yaml and each one names the condition it fires on — a rule that does not "
+        "no monitor rule applies to this registration right now. The rules live in the bound "
+        "pack's monitors.yaml and each one names the condition it fires on — a rule that does not "
         "hold is not a message worth sending."),
     "NO_COMMITTED_SELECTION": (
         "nothing has been committed for this registration, so there is nobody this message is "
@@ -579,20 +590,20 @@ PROPOSAL_BLOCKED: dict[str, str] = {
         "against the person, in person, and confirms; until then there is no address, because "
         "there is no established recipient. Nothing is drafted to nobody."),
     "CONFLICTING_SELECTIONS": (
-        "the committed evidence for this registration names more than one selected patient. No "
+        "the committed evidence for this registration names more than one selected subject. No "
         "message is addressed until a human establishes which record this encounter belongs to; "
         "the system does not choose between them, and picking the most recent one would be "
         "choosing who somebody is."),
     "NO_ADDRESS_ON_FILE": (
-        "the patient a member of staff selected has no address on file. Somebody at the counter "
+        "the subject a member of staff selected has no address on file. Somebody at the counter "
         "can ask for one and type it, and the record will then say who entered it — nothing here "
         "guesses one from a name or reads one off a document."),
     "ADDRESS_MUST_BE_TYPED": (
-        "this clinic rule addresses its message to an address a member of staff types, because "
+        "this rule addresses its message to an address a member of staff types, because "
         "the situation it fires on is usually one where identity is not yet established. Type an "
         "address and name yourself; until then there is no draft."),
     "NOT_GROUNDED": (
-        "the message could not be built from grounded values alone. A sentence a patient reads is "
+        "the message could not be built from grounded values alone. A sentence a recipient reads is "
         "held to the same rule as an extracted field: if it is not in a source, it is not "
         "emitted."),
     "RECIPIENT_REFUSED": (
@@ -683,10 +694,10 @@ def observe_intake(draft: Any) -> Any:
                 pointer=SourcePointer(
                     source_id=RULES_SOURCE_ID, kind="derived",
                     derivation=(
-                        "the questionnaire this rule requires still has fields only the patient "
-                        "can answer, and this clinic has no channel through which a completed "
-                        "questionnaire arrives — so 'outstanding' means 'not yet answered here', "
-                        "not 'we asked and were ignored'"),
+                        "the form this rule requires still has fields only the subject can "
+                        "answer, and this deployment has no channel through which a completed "
+                        "form arrives — so 'outstanding' means 'not yet answered here', not 'we "
+                        "asked and were ignored'"),
                     derived_from=[rule_pointer]))
 
     return Observation(intake_id=draft.intake_id, facts=facts)
@@ -808,12 +819,22 @@ class ProposalResponse(BaseModel):
 
 # --- the routes ---------------------------------------------------------------------------
 def register_outbox_routes(app: FastAPI) -> None:
-    """Attach `/outbox/*`. Adds no capability the outbox package does not already have."""
+    """Attach `/outbox/*`. Adds no capability the outbox package does not already have.
+
+    Only when a bound pack declares the ``outbox`` route group (HC1; see
+    ``intake_routes.pack_declared_routes``): the monitors that propose drafts are a pack's rules.
+    """
+    from .intake_routes import pack_declared_routes
+
+    if "outbox" not in pack_declared_routes():
+        log.info("no bound pack declares the outbox routes; /outbox is not mounted")
+        return
+    install_auth_handler(app)
 
     def _store():
         return get_store(app)
 
-    @app.get("/outbox", response_model=OutboxListing, response_model_exclude_none=False)
+    @app.get("/outbox", dependencies=_AUTH, response_model=OutboxListing, response_model_exclude_none=False)
     def outbox_list():
         """Every draft the clinic holds, newest state first, with the evidence behind each field."""
         try:
@@ -830,7 +851,7 @@ def register_outbox_routes(app: FastAPI) -> None:
         return OutboxListing(drafts=tuple(cards), counts=counts,
                              database=outbox_db_path(app), note=LISTING_NOTE)
 
-    @app.post("/outbox/propose", response_model=ProposalResponse, responses=REFUSAL_RESPONSES)
+    @app.post("/outbox/propose", dependencies=_AUTH, response_model=ProposalResponse, responses=REFUSAL_RESPONSES)
     def outbox_propose(payload: ProposeRequest):
         """Ask the clinic's own rules what is worth saying about one registration. **Drafts only.**
 
@@ -853,7 +874,7 @@ def register_outbox_routes(app: FastAPI) -> None:
         return ProposalResponse(intake_id=intake_id, proposed=tuple(cards),
                                 blocked=tuple(blocked))
 
-    @app.get("/outbox/{draft_id}", response_model=ActionCard, responses=REFUSAL_RESPONSES)
+    @app.get("/outbox/{draft_id}", dependencies=_AUTH, response_model=ActionCard, responses=REFUSAL_RESPONSES)
     def outbox_draft(draft_id: str):
         """One draft: what it would do, to whom, why, and what stands behind each field."""
         try:
@@ -865,7 +886,7 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("UNKNOWN_DRAFT", status=404)
         return action_card(entry)
 
-    @app.post("/outbox/{draft_id}/approve", response_model=ActionCard,
+    @app.post("/outbox/{draft_id}/approve", dependencies=_AUTH, response_model=ActionCard,
               responses=REFUSAL_RESPONSES)
     def outbox_approve(draft_id: str, payload: ApproveRequest):
         """A named member of staff agrees this may go out. **The gate.**
@@ -893,7 +914,7 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("OUTBOX_UNAVAILABLE", status=503)
         return action_card(entry)
 
-    @app.post("/outbox/{draft_id}/reject", response_model=ActionCard, responses=REFUSAL_RESPONSES)
+    @app.post("/outbox/{draft_id}/reject", dependencies=_AUTH, response_model=ActionCard, responses=REFUSAL_RESPONSES)
     def outbox_reject(draft_id: str, payload: RejectRequest):
         """A named member of staff says no, and says why. The draft stays in the record."""
         from databridge_outbox.models import NotApproved, OutboxError
@@ -917,7 +938,7 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("OUTBOX_UNAVAILABLE", status=503)
         return action_card(entry)
 
-    @app.post("/outbox/{draft_id}/execute", responses=REFUSAL_RESPONSES)
+    @app.post("/outbox/{draft_id}/execute", dependencies=_AUTH, responses=REFUSAL_RESPONSES)
     def outbox_execute(draft_id: str):
         """Trigger the dispatcher, then report what actually happened.
 

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000398",
+  "filename": "IMG-2022-000398.jpg",
+  "image_present": false,
+  "captured_at": "2022-07-01T17:58:21+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2022-000651",
+  "application_id": "APP-2021-000789",
+  "parcel_id": "PCL-ND-02421",
+  "photo_batch_ref": "PHB-2022-000651",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-317416"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445884,
+    "northing": 1206363,
+    "accuracy_m": 8.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2542,
+          120,
+          363,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-021506",
+        "confidence": 0.934,
+        "bbox": [
+          380,
+          214,
+          864,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "15Z MALLOW STREET, NORTH DUNMOOR AM9 6EY",
+        "confidence": 0.756,
+        "bbox": [
+          1735,
+          366,
+          1200,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2022-07-01",
+        "confidence": 0.748,
+        "bbox": [
+          151,
+          426,
+          957,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.893,
+        "bbox": [
+          2522,
+          612,
+          368,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

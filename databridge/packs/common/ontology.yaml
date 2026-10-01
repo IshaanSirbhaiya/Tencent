@@ -1,0 +1,131 @@
+# packs/common — the general-purpose starter vocabulary.
+#
+# Layer 1 of the three-layer schema (00_SPINE.md §4), same as every other pack — `common` is not
+# special to the loader and carries no privilege packs.py doesn't already give any pack. What makes
+# it worth having is what it is FOR: every vertical pack that has shipped so far (healthcare today;
+# finance and government as ontology-only peers) rediscovers the same handful of shapes — something
+# with an identity, something that issued or received a document, something that happened, somewhere
+# it happened, an account, a transaction — and writes its own name for each one. That is fine when
+# the name carries real domain meaning (`patient`, `party`, `resident`); it is not fine when a
+# reviewer looking at three packs sees three unrelated-looking vocabularies and cannot tell that
+# they all reach for the same seven or eight underlying shapes.
+#
+# This pack exists to answer the founder's objection directly: "the ontological relations are so
+# bad" read, in the running product, as "every kind on screen looks like it was invented for one
+# hospital's paperwork." The engine has never known a domain name (`test_no_domain_branching`); this
+# is the missing half — a vocabulary that does not read as one either.
+#
+# WHERE THIS LIVES, AND WHY (the choice this file's existence records):
+#
+# The two honest options were a `packs/common/ontology.yaml` that other packs build on, or a
+# declared `extends:`/base section read by the loader itself. The loader
+# (`databridge_graph/packs.py`) closes `ontology.yaml`'s top-level keys to exactly
+# `{pack, title, version, node_kinds, edge_kinds, subject_kinds}` and has no `extends:` concept —
+# and that loader is explicitly another workstream's file to change, not this one's. Adding
+# `extends:` would also be the wrong shape for what a `Vocabulary` already IS: Layer 2 is already
+# the MERGE of every enabled pack's declarations (`build_vocabulary`), including two packs sharing
+# an edge kind by name (`references`, `supersedes` already do this across the shipped packs, with
+# their endpoint lists unioned). A pack that "extends" another is just two packs in the same
+# `enabled_packs:` list. So `common` is a real, independent, loadable pack — nothing about the
+# loader changes, and a deployment adopts it the ordinary way: name it in `enabled_packs:` beside
+# its vertical pack(s), or view it on its own via `GET /ontology?pack=common`.
+#
+# It ships UNBOUND from `packs/deployment.yaml` here (healthcare stays the sole enabled pack) —
+# deliberately: enabling it would fold its kinds into the live product's extraction vocabulary,
+# which is a call for whoever owns that binding, not something this vocabulary-library workstream
+# should decide by editing a shared deployment file. `/ontology?pack=common` and the growth
+# guardrail (which now evaluates a proposal against the union of the pack it targets and whatever
+# the deployment binds — see `ontology_routes._guardrail_vocab`) both work against it exactly as
+# they do for `healthcare`, `finance` or `government`, whether or not it is bound.
+#
+# WHAT IS DELIBERATELY NOT HERE: no `subject_kinds`. A subject is the entity a deployment attests
+# identity for in person (spine D4b), and which entity that is — a patient, a borrowing party, a
+# resident — is exactly the decision a vertical pack exists to make. `common` declaring `person` a
+# subject would pre-empt that decision for every pack that builds on it, and a pack sharing this
+# kind name for a *different* purpose (say, a document's named signatory, never resolved against a
+# registry) would inherit an identity guarantee it never asked for. Verticals declare their own
+# subject over their own kind name (`patient`, `party`, ...); `common`'s `person` stays exactly what
+# its description says — a natural person mentioned somewhere — and nothing downstream may read it
+# as more than that.
+
+pack: common
+title: General starter vocabulary
+version: "1.0"
+
+node_kinds:
+  - name: person
+    binds_to: entity
+    description: >
+      A natural person, as a mention or a record — never an identity assertion by itself. A pack
+      that wants this person to be a resolvable, attested SUBJECT declares its OWN kind and its own
+      `subject_kinds` entry (e.g. healthcare's `patient`); this kind carries no such guarantee.
+
+  - name: organisation
+    binds_to: organisation
+    description: >
+      A company, agency, employer or other collective actor named in the data — the general form of
+      what verticals often narrow to `org`, `party` or `issuer`.
+
+  - name: document
+    binds_to: document
+    description: A captured artefact — a letter, form, filing or record — the thing pointers resolve into.
+
+  - name: event
+    binds_to: event
+    description: Something that happened at a time. The general shape a `visit`, a `filing` or a `claim` narrows.
+
+  - name: location
+    binds_to: location
+    description: A place — physical or postal — something else is located at or occurred at.
+
+  - name: account
+    binds_to: entity
+    description: >
+      A holding with a persistent identity of its own — a bank account, a policy number, a case
+      file — distinct from the person or organisation it belongs to.
+
+  - name: transaction
+    binds_to: event
+    description: A discrete, dated exchange or action — a payment, a submission, a status change.
+
+edge_kinds:
+  - name: mentions
+    binds_to: references
+    src: ["*"]
+    dst: ["*"]
+    description: A cites b, with no stronger claim than "this appears in that". The general form of healthcare's `references`.
+
+  - name: about_subject
+    binds_to: about
+    src: [document, event]
+    dst: ["*"]
+    description: >
+      An artefact CLAIMS to concern an entity — never a determination. Two equally-scored
+      candidates yield two `about_subject` edges and neither is an answer (CLAUDE.md §Hard
+      constraints 1). This binds to the `about` meta-kind, one of two edge shapes that are never
+      auto-approvable through the growth protocol regardless of policy (`growth.STRUCTURAL_ESCALATIONS`)
+      and are never addable as an ordinary kind through this pack's own edit surface either.
+
+  - name: part_of
+    binds_to: part_of
+    src: ["*"]
+    dst: ["*"]
+    description: Whole → part containment or composition.
+
+  - name: located_at
+    binds_to: at
+    src: [person, organisation, account]
+    dst: [location]
+    description: Where something with an identity is sited — a registered address, a branch, a residence.
+
+  - name: occurred_at
+    binds_to: at
+    src: [event, transaction]
+    dst: [location]
+    description: Where something that happened, happened. Same meta-kind as `located_at`; a different question about a different kind of source.
+
+  - name: acts_as
+    binds_to: role_of
+    src: [person, organisation]
+    dst: [organisation, account]
+    description: An entity holds a role with respect to another — the general form of healthcare's `employed_by`.

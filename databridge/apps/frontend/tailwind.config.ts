@@ -1,7 +1,11 @@
 import type { Config } from "tailwindcss";
 
-// Design law (D-FE-3): near-neutral gray scale + ONE accent (#2563EB). The 3-stop confidence
-// scale is the only other semantic colour. No rainbow palettes, no gradients.
+// Design law (D-FE-3): near-neutral gray scale + ONE accent. The 3-stop confidence scale is the
+// only other semantic colour. No rainbow palettes, no gradients.
+//
+// Semantic colours are CSS variables, defined per theme in `app/globals.css`, because their JOB is
+// to stay distinguishable — and the hex that reads well on a near-black ground does not read well
+// on a white one. A literal here would look fine in one theme and fail in the other.
 const config: Config = {
   darkMode: "class",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
@@ -15,18 +19,30 @@ const config: Config = {
         muted: "hsl(var(--muted))",
         fg: "hsl(var(--fg))",
         subtle: "hsl(var(--subtle))",
-        accent: "#2563EB",
-        "accent-fg": "#ffffff",
+        // `<alpha-value>` so `bg-band-review/10` and `border-accent/40` keep working: without it
+        // Tailwind cannot apply an opacity modifier to a var-backed colour and every tint would
+        // render fully opaque.
+        accent: "hsl(var(--accent) / <alpha-value>)",
+        "accent-fg": "hsl(var(--accent-fg) / <alpha-value>)",
         // single 3-stop confidence scale (auto / spot_check / review)
-        "band-auto": "#16a34a",
-        "band-spot": "#d97706",
-        "band-review": "#dc2626",
+        "band-auto": "hsl(var(--band-auto) / <alpha-value>)",
+        "band-spot": "hsl(var(--band-spot) / <alpha-value>)",
+        "band-review": "hsl(var(--band-review) / <alpha-value>)",
         // table roles (muted, not neon)
-        "role-entity": "#2563EB",
-        "role-event": "#d97706",
-        "role-log": "#6b7280",
-        "role-relationship": "#7c3aed",
-        "role-lookup": "#16a34a",
+        "role-entity": "hsl(var(--role-entity) / <alpha-value>)",
+        "role-event": "hsl(var(--role-event) / <alpha-value>)",
+        "role-log": "hsl(var(--role-log) / <alpha-value>)",
+        "role-relationship": "hsl(var(--role-relationship) / <alpha-value>)",
+        "role-lookup": "hsl(var(--role-lookup) / <alpha-value>)",
+        // `/graph` canvas — one fixed dark palette, not theme-swapped (see globals.css note by the
+        // token definitions).
+        "graph-bg": "hsl(var(--graph-bg) / <alpha-value>)",
+        "graph-surface": "hsl(var(--graph-surface) / <alpha-value>)",
+        "graph-elevated": "hsl(var(--graph-elevated) / <alpha-value>)",
+        "graph-border": "hsl(var(--graph-border) / <alpha-value>)",
+        "graph-muted": "hsl(var(--graph-muted) / <alpha-value>)",
+        "graph-fg": "hsl(var(--graph-fg) / <alpha-value>)",
+        "graph-subtle": "hsl(var(--graph-subtle) / <alpha-value>)",
         // Company-Brain node types (T08). Reuse the role scale; project adds one teal token.
         // Disciplined, token-derived — NOT a rainbow category palette (D-FE-3).
         "node-person": "#2563EB",

@@ -1,0 +1,52 @@
+ Lanthorn Foods Pte. Ltd.
+
+Financial Statements for the financial year ended 31 December 2024
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Lanthorn Foods Pte. Ltd.
+  Registration number   SYN-CRN-5981557
+  Country of incorporation   US
+  Principal activity   Construction Materials
+  Reporting currency   EUR
+  Date of incorporation   2013-02-11
+
+ Directors' commentary
+
+The Board notes continued pressure on freight rates and has renegotiated the Group's principal charter commitments.
+
+ Financial summary
+
+All figures in EUR thousands unless stated.
+
+  Line item   FY2024   FY2023
+------:---:|
+  Revenue   810   883
+  Gross profit   180   150
+  EBITDA   79   79
+  Depreciation and amortisation   -26   -25
+  Finance costs   -18   -21
+  Profit after tax   28   22
+  Total assets   1,798   1,847
+  Total borrowings   557   484
+  Cash and cash equivalents   99   105
+  Total equity   928   908
+
+ Key ratios
+
+  Ratio   FY2024   Covenant reference
+------:---|
+  Net debt / EBITDA   5.78x   Tested quarterly under the syndicated facility
+  Interest cover   2.94x   Tested quarterly
+  Current ratio   0.82x   -
+
+ Banking arrangements
+
+Facilities were renewed during the year on substantially the same terms.
+
+ Auditor's note
+
+We draw attention to note 14, which describes a material uncertainty related to the renewal of the Group's principal facility. Our opinion is not modified in this respect.

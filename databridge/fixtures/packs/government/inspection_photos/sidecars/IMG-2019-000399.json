@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000399",
+  "filename": "IMG-2019-000399.jpg",
+  "image_present": false,
+  "captured_at": "2019-07-10T16:00:31+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2019-000345",
+  "application_id": "APP-2019-000445",
+  "parcel_id": "PCL-KF-01480",
+  "photo_batch_ref": "PHB-2019-000345",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-674931"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 412137,
+    "northing": 1201109,
+    "accuracy_m": 16.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1060,
+          120,
+          374,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-376943",
+        "confidence": 0.782,
+        "bbox": [
+          1103,
+          247,
+          702,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "41 GASWORKS LANE, ASHCOMBE REACH AM6 9BH",
+        "confidence": 0.727,
+        "bbox": [
+          348,
+          342,
+          1320,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2019-07-10",
+        "confidence": 0.813,
+        "bbox": [
+          544,
+          453,
+          986,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.904,
+        "bbox": [
+          482,
+          588,
+          432,
+          48
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

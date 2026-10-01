@@ -1,0 +1,44 @@
+# packs/government — the closed PURPOSE vocabulary (spine D5, ADAPTER_AGENT_SPEC §2).
+#
+# See packs/healthcare/purposes.yaml for the field meanings. Ids are unique across the enabled
+# packs, so government namespaces under benefits.*, permits.* and register.*.
+#
+# Note the interaction with 00_SPINE.md O1b: this pack's access model is where "withheld" and
+# "absent" were found to be a membership oracle at OBJECT level. Purpose does not fix that — an
+# object-level indistinguishability declaration does — but a caseload-scoped purpose is what makes
+# the oracle question askable at all, so it is spelled out rather than folded into a generic read.
+
+pack: government
+
+purposes:
+  - id: benefits.eligibility
+    description: >
+      Determine a claimant's entitlement from the case file and supporting register reads. The
+      read behind an eligibility determination draft.
+    subject_scoped: true
+    lawful_basis: public task - statutory benefits administration
+
+  - id: benefits.case_review
+    description: A caseworker reading a case file within their own caseload.
+    subject_scoped: true
+    lawful_basis: public task - statutory benefits administration
+
+  - id: permits.assessment
+    description: Assess a permit application against the register and its supporting documents.
+    subject_scoped: true
+    lawful_basis: public task - statutory permitting
+
+  - id: register.graph_build
+    description: Scheduled build-time crawl staging evidence into the graph. Not subject-scoped.
+    subject_scoped: false
+    lawful_basis: public task - operating the register
+
+  - id: register.pointer_verification
+    description: Re-resolve an existing pointer to answer "is this citation still good?".
+    subject_scoped: false
+    lawful_basis: public task - audit and integrity
+
+  - id: register.source_health
+    description: Metadata-only reads (describe/plan) that touch no subject data.
+    subject_scoped: false
+    lawful_basis: public task - system operation

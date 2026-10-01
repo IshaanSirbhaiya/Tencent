@@ -1,0 +1,14 @@
+Deploy notes — forecasting service (internal)
+Author: Ines Marchetti-Holm
+
+The staging box is reached through the bastion. Someone pasted the deploy key below while
+debugging; it must be removed and rotated. (Planted for the screening demo: this is NOT a real
+key — the body is filler text — but the header alone must block the file.)
+
+-----BEGIN OPENSSH PRIVATE KEY-----
+RkFLRS1LRVktRk9SLVRIRS1XQUxOVVQtU0NSRUVOSU5HLURFTU8tTk9ULUEtUkVBTC1L
+RVktTk9ULUEtUkVBTC1LRVktTk9ULUEtUkVBTC1LRVktTk9ULUEtUkVBTC1LRVktRkFL
+RS1GQUtFLUZBS0UtRkFLRS1GQUtFLUZBS0UtRkFLRS1GQUtFLUZBS0UtRkFLRS1GQUtF
+-----END OPENSSH PRIVATE KEY-----
+
+Service restarts cleanly after the config change on 2026-09-03.

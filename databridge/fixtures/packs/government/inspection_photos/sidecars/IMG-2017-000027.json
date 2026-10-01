@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2017-000027",
+  "filename": "IMG-2017-000027.jpg",
+  "image_present": false,
+  "captured_at": "2017-12-18T11:57:46+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2017-000529",
+  "application_id": "APP-2017-000669",
+  "parcel_id": "PCL-PG-02542",
+  "photo_batch_ref": "PHB-2017-000529",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-308847"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 431807,
+    "northing": 1186378,
+    "accuracy_m": 12.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1842,
+          120,
+          253,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2017-038984",
+        "confidence": 0.872,
+        "bbox": [
+          1378,
+          228,
+          810,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "171 VINTNER5 LANE, CORRISBECK AM2 9LK",
+        "confidence": 0.857,
+        "bbox": [
+          1068,
+          394,
+          814,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2017-12-18",
+        "confidence": 0.748,
+        "bbox": [
+          82,
+          471,
+          870,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.919,
+        "bbox": [
+          116,
+          524,
+          464,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

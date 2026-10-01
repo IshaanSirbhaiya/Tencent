@@ -379,7 +379,9 @@ def test_the_reader_process_has_no_ingestion_capability_configured():
     assert tools.harness is None and tools.sources == {}
     refusal = tools.brain_ingest(DEMO_SOURCE)
     assert refusal["error"] and refusal["entities_added"] == 0
-    assert tools.store.counts()["nodes"] > 0            # it is seeded, so this is a real refusal
+    # The reader no longer seeds its store (Codex f1 #4: seeding is a write, and the writers own
+    # it), so the refusal is checked against the store being left exactly as it was: empty.
+    assert tools.store.counts()["nodes"] == 0
 
 
 def test_the_combined_server_builder_is_gone():

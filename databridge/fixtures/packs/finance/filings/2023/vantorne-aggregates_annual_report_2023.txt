@@ -1,0 +1,52 @@
+ Vantorne Aggregates B.V.
+
+Annual Report for the financial year ended 31 December 2023
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Vantorne Aggregates B.V.
+  Registration number   SYN-CRN-6272357
+  Country of incorporation   GB
+  Principal activity   Precision Engineering
+  Reporting currency   USD
+  Date of incorporation   1998-07-10
+
+ Directors' commentary
+
+The Group completed the consolidation of its two operating sites, which carried a one-off cost in the first half but is expected to reduce fixed overhead from the next financial year.
+
+ Financial summary
+
+All figures in USD thousands unless stated.
+
+  Line item   FY2023   FY2022
+------:---:|
+  Revenue   325   306
+  Gross profit   115   128
+  EBITDA   51   59
+  Depreciation and amortisation   -11   -10
+  Finance costs   -5   -5
+  Profit after tax   29   30
+  Total assets   489   444
+  Total borrowings   269   231
+  Cash and cash equivalents   58   59
+  Total equity   151   156
+
+ Key ratios
+
+  Ratio   FY2023   Covenant reference
+------:---|
+  Net debt / EBITDA   4.14x   Tested quarterly under the syndicated facility
+  Interest cover   8.81x   Tested quarterly
+  Current ratio   2.56x   -
+
+ Banking arrangements
+
+The Group's principal banker is Northgate Mercantile Bank. Facilities comprise a revolving credit line and a trade finance line, both secured.
+
+ Auditor's note
+
+Our opinion on the financial statements is unmodified.

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000357",
+  "filename": "IMG-2014-000357.jpg",
+  "image_present": false,
+  "captured_at": "2014-12-06T13:58:10+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2014-000261",
+  "application_id": "APP-2013-000351",
+  "parcel_id": "PCL-CB-01931",
+  "photo_batch_ref": "PHB-2014-000261",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-820561"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 433928,
+    "northing": 1191241,
+    "accuracy_m": 4.6
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          738,
+          120,
+          352,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-274444",
+        "confidence": 0.889,
+        "bbox": [
+          72,
+          249,
+          675,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "74 SEDGE STREET, CORRISBECK AM4 8BY",
+        "confidence": 0.922,
+        "bbox": [
+          472,
+          318,
+          1085,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-12-06",
+        "confidence": 0.794,
+        "bbox": [
+          323,
+          462,
+          754,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.936,
+        "bbox": [
+          419,
+          592,
+          512,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

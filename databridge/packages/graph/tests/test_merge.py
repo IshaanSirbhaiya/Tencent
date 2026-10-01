@@ -69,12 +69,41 @@ def test_subset_label_does_not_false_merge():
 
 
 def test_exact_canonical_corroborates():
-    """The same org seen in a second document adds provenance, not a new version."""
+    """The same org seen in a second document adds provenance, not a new version.
+
+    `_org` derives the node id from `canonical or label`, so two sightings sharing a canonical id
+    also share an id — and since 2026-08-16 `_resolve_existing` matches an equal id FIRST, which
+    would report `matched_by="id"` and never reach the canonical branch. The canonical branch is
+    what this test is about, so the second sighting is given a DIFFERENT id (the same company
+    printed with a different legal suffix, which is exactly how the fixtures spell it) and the
+    canonical id is the only thing that can join them. The LABEL is left unchanged, because a
+    changed label is a real fact conflict and supersedes rather than corroborating — a different
+    property, tested by `test_a_changed_label_supersedes_rather_than_silently_rewriting`.
+    """
     s = _store()
     upsert_node(s, _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_01"))
-    o = upsert_node(s, _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_03"))
+    second = _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_03")
+    second = second.model_copy(update={"id": "org:coral-harbour-second-sighting"})
+    o = upsert_node(s, second)
     assert o.action == "corroborated" and o.matched_by == "canonical"
     assert s.counts()["nodes"] == 1 and s.counts()["sources"] == 2
+
+
+def test_re_applying_the_very_same_node_corroborates_by_id():
+    """Idempotency's floor, and it must not depend on a `canonical_id`.
+
+    `id` is `f"{kind}:{slug}"` and is computed by whoever wrote it, so two upserts of one id are
+    two sightings of one record. Before this was checked first, a SUBJECT kind carrying no
+    canonical id inserted a duplicate row on EVERY re-apply — the exact-canonical branch had
+    nothing to match on and the fuzzy fallback is (correctly) unreachable for a subject, so the
+    one operation this module documents as idempotent was not, for the kinds it protects most.
+    """
+    s = _store()
+    node = _org("Some Body", src="chit_01")
+    assert upsert_node(s, node).action == "inserted"
+    again = upsert_node(s, node)
+    assert again.action == "corroborated" and again.matched_by == "id"
+    assert s.counts()["nodes"] == 1
 
 
 def test_a_changed_label_supersedes_rather_than_silently_rewriting():
@@ -84,7 +113,17 @@ def test_a_changed_label_supersedes_rather_than_silently_rewriting():
     Harbour spellings into one node before upserting rather than upserting each in turn."""
     s = _store()
     upsert_node(s, _org("Coral Harbour Pte Ltd", "coral-harbour", src="chit_01"))
-    o = upsert_node(s, _org("CORAL HARBOUR PTE LIMITED", "coral-harbour", src="chit_03"))
+    # INT5 (R-022 build cross-track 2a, deliberate): a spelling is a changed fact only when the
+    # incoming label is grounded by a pointer of ITS OWN. Ungrounded, it is one more sighting —
+    # the node keeps the label it has, and the sighting's pointer is appended (so "what did this
+    # document call them?" is still answered by that pointer). See test_int5_merge.py.
+    seen = upsert_node(s, _org("CORAL HARBOUR PTE LTD", "coral-harbour", src="chit_02"))
+    assert seen.action == "corroborated"
+    assert s.open_node_row(CORAL)["label"] == "Coral Harbour Pte Ltd"
+    relabel = _org("CORAL HARBOUR PTE LIMITED", "coral-harbour", src="chit_03")
+    relabel = relabel.model_copy(update={"attr_sources": {**relabel.attr_sources,
+                                                          "label": _ptr("chit_03")}})
+    o = upsert_node(s, relabel)
     assert o.action == "superseded"
     assert len(s.all_node_versions(CORAL)) == 2
 

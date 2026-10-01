@@ -1,0 +1,52 @@
+ Broadhelm Bioworks PTE LTD
+
+Annual Report for the financial year ended 31 December 2025
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Broadhelm Bioworks PTE LTD
+  Registration number   SYN-CRN-9516847
+  Country of incorporation   HK
+  Principal activity   Textiles and Apparel
+  Reporting currency   SGD
+  Date of incorporation   1990-09-24
+
+ Directors' commentary
+
+Demand in the Group's principal market softened, offset in part by a full year contribution from the contract logistics division acquired in the prior period.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2025   FY2024
+------:---:|
+  Revenue   722   594
+  Gross profit   125   103
+  EBITDA   63   67
+  Depreciation and amortisation   -14   -14
+  Finance costs   -13   -13
+  Profit after tax   29   32
+  Total assets   1,628   1,587
+  Total borrowings   734   692
+  Cash and cash equivalents   130   97
+  Total equity   628   633
+
+ Key ratios
+
+  Ratio   FY2025   Covenant reference
+------:---|
+  Net debt / EBITDA   9.53x   Tested quarterly under the syndicated facility
+  Interest cover   3.64x   Tested quarterly
+  Current ratio   0.96x   -
+
+ Banking arrangements
+
+The Group's principal banker is Northgate Mercantile Bank. Facilities comprise a revolving credit line and a trade finance line, both secured.
+
+ Auditor's note
+
+We draw attention to note 14, which describes a material uncertainty related to the renewal of the Group's principal facility. Our opinion is not modified in this respect.

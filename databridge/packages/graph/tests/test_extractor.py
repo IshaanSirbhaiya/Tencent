@@ -16,6 +16,7 @@ from databridge_harness import FakeBackend, Harness
 
 from databridge_graph import GraphStore, extract_graph, gold_extraction_handler
 from databridge_graph.clinic_seed import SEED_SYSTEM_TIME
+from databridge_graph.packs import deployment
 
 _UTC = dt.timezone.utc
 _TEXT = ("Meridian Life Assurance refers Loh Wei Ming for examination. "
@@ -75,10 +76,15 @@ def test_unknown_kind_is_skipped_never_coined():
 def test_a_retired_vocabulary_member_is_no_longer_accepted():
     """ADR-0009 replaced the Acme vocabulary. `person` was a valid kind under ADR-0008 and must
     now be refused — otherwise the old vocabulary lives on wherever a model happens to emit it."""
-    ents = [{"name": "Loh Wei Ming", "kind": "person", **_at("Loh Wei Ming")}]
-    res = extract_graph(_doc(), _harness(ents, []))
-    assert res.entities == []
-    assert any("unknown kind 'person'" in r for r in res.refused)
+    # SCOPED to healthcare, because that is the pack whose vocabulary retired `person`. The
+    # government pack declares `person` as a subject kind of its own, so once the deployment binds
+    # all three (2026-08-16) the bare assertion below is false for a good reason. The rule under
+    # test is "a kind THIS pack retired is refused", not "the string `person` is always invalid".
+    with deployment("healthcare"):
+        ents = [{"name": "Loh Wei Ming", "kind": "person", **_at("Loh Wei Ming")}]
+        res = extract_graph(_doc(), _harness(ents, []))
+        assert res.entities == []
+        assert any("unknown kind 'person'" in r for r in res.refused)
 
 
 def test_relation_to_ungrounded_endpoint_is_refused():
@@ -115,7 +121,10 @@ def test_relation_endpoints_must_co_occur():
              **_at("Meridian Life Assurance", text)}]
     rels = [{"src_name": "Loh Wei Ming", "rel_type": "covered_by",
              "dst_name": "Meridian Life Assurance",
-             "evidence_char_start": 0, "evidence_char_end": 5}]
+             # R-017 #4: the nominated passage must itself mention both endpoints (a 0..5 span
+             # used to be ignored and replaced by first occurrences — now refused; see
+             # test_f5_extractor_review.py). The emitted pointer is the tightest span inside it.
+             "evidence_char_start": 0, "evidence_char_end": len(text)}]
     res = extract_graph(doc, _harness(ents, rels))
     assert len(res.relations) == 1
     p = res.relations[0].sources[0]

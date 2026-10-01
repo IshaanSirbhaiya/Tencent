@@ -1,0 +1,52 @@
+ Oakenshade Offshore LLC
+
+Annual Report for the financial year ended 31 December 2025
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Oakenshade Offshore LLC
+  Registration number   SYN-CRN-9886705
+  Country of incorporation   AU
+  Principal activity   Specialty Chemicals
+  Reporting currency   SGD
+  Date of incorporation   2012-04-08
+
+ Directors' commentary
+
+Trading conditions were mixed across the year. Volumes recovered in the second half while input costs remained elevated, and the Group continued to prioritise working capital discipline over headline growth.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2025   FY2024
+------:---:|
+  Revenue   833   735
+  Gross profit   163   161
+  EBITDA   58   59
+  Depreciation and amortisation   -9   -8
+  Finance costs   -12   -12
+  Profit after tax   34   38
+  Total assets   753   811
+  Total borrowings   360   341
+  Cash and cash equivalents   98   86
+  Total equity   305   307
+
+ Key ratios
+
+  Ratio   FY2025   Covenant reference
+------:---|
+  Net debt / EBITDA   4.48x   Tested quarterly under the syndicated facility
+  Interest cover   4.15x   Tested quarterly
+  Current ratio   1.95x   -
+
+ Banking arrangements
+
+Borrowings are held with Northgate Mercantile Bank and one other lender. The Group has provided a fixed and floating charge over its assets.
+
+ Auditor's note
+
+The comparative figures for the prior period were restated following a reclassification of contract assets.

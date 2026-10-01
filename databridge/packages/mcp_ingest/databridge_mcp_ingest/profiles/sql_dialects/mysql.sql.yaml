@@ -1,0 +1,93 @@
+# MySQL / MariaDB dialect template (W4). DRAFT — UNVERIFIED: written from the engine's documented
+# catalogue, never run against a MySQL server or a MySQL MCP server here. `draft_dialect` live-probes
+# it before anyone can approve it for a connection. Shape: tabular/dialect_draft.py.
+name: mysql
+engine: mysql
+title: MySQL / MariaDB
+status: draft
+unverified: >-
+  Not run against MySQL. Known risks: many MySQL MCP servers return CSV text, not JSON (set
+  mcp.rows: csv if the probe reports unparseable rows); `'` literals are escaped by doubling, which
+  MySQL accepts unless NO_BACKSLASH_ESCAPES interplay matters for backslash-bearing names.
+detect:
+  priority: 5
+  tool_hints: [mysql_query, execute_sql, run_sql_query]
+  probes:
+    - {sql: "SELECT @@version_comment AS v", match: '(?i)mysql|mariadb|percona'}
+mcp:
+  rows: auto
+  error_prefixes: ["Error:", "Error executing query"]
+# R-022 f1 #4: the probe first switches the session to READ ONLY and checks it took; the result
+# (enforced by the database, or by the statement allow-list only) is in the probe report.
+read_only_session:
+  sql: SET SESSION TRANSACTION READ ONLY
+  check: SELECT @@SESSION.transaction_read_only AS v
+  expect: '^1$'
+quote: '`'
+list_tables: >-
+  SELECT table_schema AS table_schema, table_name AS table_name FROM information_schema.tables
+  WHERE table_type = 'BASE TABLE'
+    AND table_schema NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys')
+  ORDER BY table_schema, table_name
+describe: >-
+  SELECT column_name AS column_name, data_type AS data_type FROM information_schema.columns
+  WHERE table_schema = {schema|literal} AND table_name = {table|literal} ORDER BY ordinal_position
+# MySQL lists constraints in information_schema for any table the user holds ANY privilege on
+# (SELECT suffices) — unlike PostgreSQL. key_column_usage carries the referenced columns itself.
+keys: >-
+  SELECT k.column_name AS column_name,
+         CASE WHEN t.constraint_type = 'PRIMARY KEY' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END
+           AS constraint_type,
+         k.referenced_table_schema AS ref_schema, k.referenced_table_name AS ref_table,
+         k.referenced_column_name AS ref_column
+  FROM information_schema.table_constraints t
+  JOIN information_schema.key_column_usage k
+    ON k.constraint_schema = t.constraint_schema AND k.constraint_name = t.constraint_name
+   AND k.table_name = t.table_name
+  WHERE t.table_schema = {schema|literal} AND t.table_name = {table|literal}
+    AND t.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+  ORDER BY t.constraint_type DESC, k.ordinal_position
+keys_alternatives:
+  - name: key_column_usage_only
+    note: without table_constraints (some managed MySQL builds restrict it)
+    sql: >-
+      SELECT column_name AS column_name,
+             CASE WHEN constraint_name = 'PRIMARY' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END
+               AS constraint_type,
+             referenced_table_schema AS ref_schema, referenced_table_name AS ref_table,
+             referenced_column_name AS ref_column
+      FROM information_schema.key_column_usage
+      WHERE table_schema = {schema|literal} AND table_name = {table|literal}
+        AND (constraint_name = 'PRIMARY' OR referenced_table_name IS NOT NULL)
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+row_estimate: >-
+  SELECT table_rows AS n FROM information_schema.tables
+  WHERE table_schema = {schema|literal} AND table_name = {table|literal}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int} OFFSET {offset|int}
+column_stats: >-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         COUNT(DISTINCT CAST({column|ident} AS CHAR)) AS distinct_n,
+         AVG(CHAR_LENGTH(CAST({column|ident} AS CHAR))) AS avg_len,
+         MAX(CHAR_LENGTH(CAST({column|ident} AS CHAR))) AS max_len,
+         AVG(CHAR_LENGTH(CAST({column|ident} AS CHAR))
+             - CHAR_LENGTH(REPLACE(CAST({column|ident} AS CHAR), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+table_stats: >-
+  SELECT COUNT(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT({column|ident}) AS {p}_non_null,
+  COUNT(DISTINCT CAST({column|ident} AS CHAR)) AS {p}_distinct_n,
+  AVG(CHAR_LENGTH(CAST({column|ident} AS CHAR))) AS {p}_avg_len,
+  MAX(CHAR_LENGTH(CAST({column|ident} AS CHAR))) AS {p}_max_len,
+  AVG(CHAR_LENGTH(CAST({column|ident} AS CHAR)) - CHAR_LENGTH(REPLACE(CAST({column|ident} AS CHAR), ' ', ''))) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}

@@ -106,6 +106,11 @@ class QuarantineView(BaseModel):
     rate: float = 0.0
     over_threshold: bool = False
     records: list[dict] = []          # per-row payload + reason_code + detail (Panel 4 needs these)
+    #: The threshold the converter APPLIED to decide `over_threshold`, and its rule, when the
+    #: producer reports them (R-021 Data-page #3). Optional and never defaulted here: an absent
+    #: value means "not reported", which the page says, rather than a number this model guessed.
+    threshold: Optional[float] = None
+    threshold_rule: Optional[str] = None
 
 
 class ConvertResponse(BaseModel):

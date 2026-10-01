@@ -7,21 +7,37 @@ from databridge_core.config import (
     ConfigError,
     UnknownTaskClass,
     active_profile,
+    load_model_config,
     resolve_model,
 )
+
+
+def _alias_model(task_class: str) -> str:
+    """The model the CLOUD profile must give ``task_class``: derived from models.yaml itself
+    (routing -> alias -> model), never written down here. INT3: the founder moved the aliases to
+    the current generation on 2026-10-01 (sonnet-5-5 / opus-5-5, see the comment in
+    config/models.yaml); a hardcoded model name went red on that deliberate change (CLAUDE.md
+    rule 6)."""
+    cfg = load_model_config()
+    alias = cfg["routing"][task_class]
+    model = cfg["aliases"][alias]["model"]
+    assert isinstance(model, str) and model                            # non-vacuous
+    return model
 
 
 def test_resolution_differs_cloud_vs_airgapped():
     # The TASK 1 Done-when: same task_class resolves to different models per profile.
     cloud = resolve_model("schema_annotation", profile="cloud")
     airgapped = resolve_model("schema_annotation", profile="airgapped")
-    assert cloud == "anthropic/claude-sonnet-4-6"
+    assert cloud == _alias_model("schema_annotation")
     assert airgapped == "ollama_chat/qwen3:72b"
     assert cloud != airgapped
 
 
 def test_frontier_routes_to_local_when_airgapped():
-    assert resolve_model("cross_table_inference", profile="cloud") == "anthropic/claude-fable-5"
+    assert load_model_config()["routing"]["cross_table_inference"] == "frontier"
+    assert resolve_model("cross_table_inference", profile="cloud") == \
+        _alias_model("cross_table_inference")
     assert resolve_model("cross_table_inference", profile="airgapped") == "ollama_chat/qwen3:72b"
 
 
@@ -52,4 +68,4 @@ def test_env_profile_is_honoured(monkeypatch):
 def test_default_profile_is_cloud(monkeypatch):
     monkeypatch.delenv("DATABRIDGE_PROFILE", raising=False)
     assert active_profile() == "cloud"
-    assert resolve_model("schema_annotation") == "anthropic/claude-sonnet-4-6"
+    assert resolve_model("schema_annotation") == _alias_model("schema_annotation")

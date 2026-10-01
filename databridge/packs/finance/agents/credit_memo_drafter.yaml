@@ -1,0 +1,167 @@
+# =====================================================================
+# packs/finance/agents/credit_memo_drafter.yaml
+#
+# An **agent declaration** (AGENT_PLANE.md D11). It declares the EVIDENCE
+# CONTRACT -- purpose, capabilities, trust ceiling, citation rule, risk
+# budget, actions -- and nothing about behaviour. There is no prompt in
+# this file and there is no model name: behaviour is what remains after
+# the contract compiles.
+#
+# `databridge_agentdef.compile_agent` turns this into four artefacts --
+# a capability grant set, a sink policy, a budget admission record and an
+# eval binding -- or refuses. There is no flag that runs it anyway.
+#
+# SYNTHETIC. Every source this agent reaches is a synthetic fixture
+# estate (`fixtures/packs/finance/`). No real borrower, facility or
+# filing is represented.
+# =====================================================================
+
+agent: credit_memo_drafter
+version: 3
+supersedes: 2
+pack: finance
+title: Credit memo drafter
+description: >-
+  Drafts the exposure, covenant and recommendation paragraphs of an
+  underwriting memo from the lending book, the filings drop and the
+  memo archive. It proposes; it never writes and never decides who the
+  borrower is.
+
+# ---------------------------------------------------------------------
+# Purpose (spine D5). ONE purpose, drawn from the pack's closed
+# vocabulary in packs/finance/purposes.yaml. It becomes a field of the
+# Principal on every read this agent makes and lands in the ledger as
+# the lawful basis, so it is declared here and reviewed here rather than
+# chosen at call time.
+#
+# `lending.underwriting` is declared `subject_scoped: true`, which means
+# every read under it carries a SUBJECT-READ GRANT -- minted after a
+# named human attests to a candidate in person. That is a different
+# thing from the capability grants below, and the compiler refuses an
+# attempt to pass one for the other.
+# ---------------------------------------------------------------------
+purpose: lending.underwriting
+
+# ---------------------------------------------------------------------
+# Capabilities. `<source_id>.<capability>`, and every entry is checked
+# against what the ESTATE advertises in fixtures/packs/finance/sources.yaml
+# -- not against a list in this file. A capability the adapter does not
+# advertise refuses compilation.
+#
+# NO AMBIENT AUTHORITY: a capability not listed here cannot be requested
+# at runtime, and there is no escalation path that adds one without a
+# new `version:` of this file, reviewed and recompiled.
+#
+# Note what is absent. `snapshot_present` is advertised by core_banking
+# and is NOT taken: this agent never needs to pin a present instant, and
+# an unused capability is an unused permission.
+# ---------------------------------------------------------------------
+capabilities:
+  - core_banking.plan
+  - core_banking.resolve
+  - core_banking.verify
+  - filings.resolve
+  - credit_memos.resolve
+  - credit_memos.verify_against_capture
+
+# ---------------------------------------------------------------------
+# Trust ceiling (spine D3). `untrusted` means this agent MAY READ
+# untrusted cells -- relationship-manager notes, transaction narratives,
+# memo free text. It does not mean it may act on them: the compiled sink
+# policy bars every value it holds from all of TRUSTED_SINKS, so an
+# untrusted cell is quotable, citable and displayable, and can never
+# select a source, a purpose, a filter, a capability or an action
+# argument.
+# ---------------------------------------------------------------------
+trust_ceiling: untrusted
+
+# Every emitted field carries a SourcePointer. `required_per_field` is
+# checked for coherence against the `grounding` gate below: the compiler
+# refuses this rule beside a grounding gate under 1.0, because "every
+# field resolves to its source" has no acceptable failure rate.
+citation: required_per_field
+
+# ---------------------------------------------------------------------
+# The risk budget (spine D9). `abstain_when` alone is a wish; the block
+# below is what makes it a budget.
+#
+# Kotte (arXiv:2606.29054): for base risk mu above target alpha, any
+# distribution-free selective predictor must abstain on at least
+# (mu - alpha) / (1 - alpha) of examples. Here
+#
+#     (0.11 - 0.08) / (1 - 0.08) = 0.0326
+#
+# which sits inside the 0.25 this desk says it can absorb, so the target
+# is feasible. Had it not been, the compiler would refuse the number
+# rather than record an intention.
+#
+# `golden_set_digest` pins WHICH set mu was measured on. A base risk
+# measured on one file and a gate enforced on another share only a name.
+# ---------------------------------------------------------------------
+abstention:
+  abstain_when: "certificate.risk > 0.08"
+  target_alpha: 0.08
+  max_abstention_rate: 0.25
+  task_class: document_qa
+  measured_base_risk: 0.11
+  measured_on: "2026-08-14"
+  measured_by: >-
+    Offline harness run over the bound golden set, two task_class-routed
+    models, 15 cases scored by the grounding checker. Synthetic estate;
+    no live model in the compiler.
+  golden_set_digest: "sha256:444bf7b1b1107849c339fbfd89d5ee8795a5479406eb736c824a955af024a7f2"
+
+# ---------------------------------------------------------------------
+# Actions -- the ONLY write path (D12). An agent may propose; it may
+# never write. Each action declares `automation.mode`, and the mode is
+# enforced structurally at the commit path, not documented.
+#
+# `touches_subject: true` means the action decides, records or narrows
+# WHICH SUBJECT something concerns. The compiler refuses any mode but
+# `human_required` for such an action, and no setting anywhere in the
+# build changes that answer.
+# ---------------------------------------------------------------------
+actions:
+  - draft_credit_memo:
+      description: >-
+        Emit a memo draft against a named party's file. It concerns one
+        borrower, so it is subject-touching by construction.
+      touches_subject: true
+      automation:
+        mode: human_required
+
+  - refresh_exposure_cache:
+      description: >-
+        Recompute the desk's exposure roll-up from pointers already
+        resolved under this agent's grants. Touches no subject: it names
+        facilities, decides nothing about who holds them, and emits no
+        determination.
+      touches_subject: false
+      automation:
+        mode: autonomous
+      reversal: >-
+        The prior roll-up is retained under its own plan hash and is
+        restored by re-materialising it; the cache is a derived artefact
+        with no ledger entry of its own, so restoring it leaves no
+        orphaned citation.
+
+# ---------------------------------------------------------------------
+# Budget. Admitted at compile time and enforced by the harness. All
+# three ceilings are required: the axis you leave unbounded is the one
+# that fails.
+# ---------------------------------------------------------------------
+budget:
+  tokens_per_run: 40000
+  escalations_per_day: 25
+  cost_ceiling_usd_per_day: 12.00
+
+# ---------------------------------------------------------------------
+# Evals. The golden set must pass before this agent may run. The set is
+# pinned by digest in the compiled binding, so editing a case after the
+# fact is visible rather than silent.
+# ---------------------------------------------------------------------
+evals:
+  golden_set: packs/finance/evals/credit_memo_v3.jsonl
+  gates:
+    grounding: 1.0
+    abstention_calibration: 0.95

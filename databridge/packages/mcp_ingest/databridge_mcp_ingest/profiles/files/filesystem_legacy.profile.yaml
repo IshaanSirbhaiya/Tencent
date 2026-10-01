@@ -1,0 +1,33 @@
+# Older @modelcontextprotocol/server-filesystem releases: `read_file` only (no read_text_file /
+# read_media_file). Binary documents cannot be fetched as bytes through this tool set, so only
+# text types are collected; everything else is excluded with rule `no_extractor` by scope.
+id: mcp-server-filesystem-legacy
+title: MCP filesystem server (legacy read_file)
+group: filesystem
+priority: 1
+verified: ""
+match:
+  all_tools: [list_directory, read_file]
+step:
+  strategy: documents
+  roots:
+    tool: list_allowed_directories
+    args: {}
+    parse:
+      mode: lines
+      patterns:
+        - regex: '^(?!Allowed directories)(?P<path>.+)$'
+  list:
+    tool: list_directory
+    args: {path: "{path}"}
+    recurse: true
+    parse:
+      mode: lines
+      patterns:
+        - regex: '^\[DIR\]\s+(?P<name>.+)$'
+          set: {type: dir}
+        - regex: '^\[FILE\]\s+(?P<name>.+)$'
+          set: {type: file}
+  read:
+    text_tool: read_file
+    text_args: {path: "{path}"}

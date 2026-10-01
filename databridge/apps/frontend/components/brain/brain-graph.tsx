@@ -112,15 +112,16 @@ function ObsidianNode({ data }: { data: NodeData }) {
           height: size,
           background: data.color,
           boxShadow: `0 0 ${blur}px ${data.color}66`,
-          border: data.emphasize ? "1.5px solid rgba(255,255,255,0.9)" : "1px solid rgba(0,0,0,0.35)",
+          border: data.emphasize ? "1.5px solid hsl(var(--fg))" : "1px solid hsl(var(--border))",
         }}
       />
       <span
         className={cn(
-          "pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap font-mono text-[9px] leading-none text-white/90 transition-opacity duration-150",
+          "pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap font-mono text-[9px] leading-none text-fg transition-opacity duration-150",
           data.hub || data.emphasize ? "opacity-100" : "opacity-0 group-hover:opacity-100",
         )}
-        style={{ textShadow: "0 1px 3px #000" }}
+        // A halo in the CANVAS colour rather than black: on a light ground a black halo is a smudge.
+        style={{ textShadow: "0 1px 3px hsl(var(--bg))" }}
       >
         {data.label}
       </span>
@@ -177,7 +178,7 @@ function FloatingEdge({ id, source, target, markerEnd, style, data }: EdgeProps)
           y={(y1 + y2) / 2 - 3}
           textAnchor="middle"
           className="pointer-events-none select-none"
-          style={{ fill: HIGHLIGHT, fontSize: 8, fontFamily: "var(--font-mono, monospace)", paintOrder: "stroke", stroke: "#0d0d0d", strokeWidth: 3 }}
+          style={{ fill: HIGHLIGHT, fontSize: 8, fontFamily: "var(--font-mono, monospace)", paintOrder: "stroke", stroke: "hsl(var(--bg))", strokeWidth: 3 }}
         >
           {label.label}
         </text>
@@ -256,7 +257,7 @@ function GraphInner({
   const colorOf = React.useCallback(
     (id: string) => {
       const n = byId.get(id);
-      return n ? nodeStyle(n.kind).color : "#7d8492";
+      return n ? nodeStyle(n.kind).color : "hsl(var(--subtle))";
     },
     [byId],
   );
@@ -359,16 +360,16 @@ function GraphInner({
   }, [highlightKey, focusNode, layout, rf]);
 
   return (
-    <div ref={containerRef} className="relative h-full w-full" style={{ background: "#0d0d0d" }}>
+    <div ref={containerRef} className="relative h-full w-full bg-bg">
       <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/40" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-subtle" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search nodes…"
             aria-label="Search graph nodes"
-            className="h-8 w-56 rounded-full border border-white/10 bg-black/60 pl-8 pr-3 text-xs text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
+            className="h-8 w-56 rounded-full border border-border bg-surface pl-8 pr-3 text-xs text-fg outline-none placeholder:text-subtle focus:border-accent"
           />
         </div>
       </div>
@@ -387,14 +388,14 @@ function GraphInner({
         nodesConnectable={false}
         elementsSelectable
       >
-        <Background color="#1a1a1a" gap={22} size={1} />
-        <Controls showInteractive={false} className="!border-white/10 !bg-black/70 [&_button]:!border-white/10 [&_button]:!bg-black/60 [&_button]:!fill-white/70" />
+        <Background color="hsl(var(--border))" gap={22} size={1} />
+        <Controls showInteractive={false} className="!border-border !bg-surface [&_button]:!border-border [&_button]:!bg-surface [&_button]:!fill-fg" />
         <MiniMap
           pannable
           zoomable
-          className="!bottom-3 !right-3 !border !border-white/10 !bg-black/70"
+          className="!bottom-3 !right-3 !border !border-border !bg-surface"
           style={{ width: 160, height: 100 }}
-          maskColor="rgba(0,0,0,0.6)"
+          maskColor="hsl(var(--bg) / 0.6)"
           nodeColor={(n) => colorOf(n.id)}
           nodeStrokeWidth={0}
         />

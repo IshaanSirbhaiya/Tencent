@@ -1,0 +1,1080 @@
+# packs/government/seed_map.yaml — the estate, bound to the predefined ontology.
+#
+# This file is the *government* half of the deterministic graph build. The engine half is
+# `packages/graph/databridge_graph/estate_seed.py`, which knows nothing about any of this: it reads
+# rows, renders keys, and constructs grounded nodes and edges from whatever a map declares. All the
+# domain knowledge — which table holds what, which column is an identifier, which relationship a
+# foreign key represents — is here, in the pack, which is where a domain's vocabulary belongs
+# (00_SPINE.md §4, and `test_no_domain_branching` enforces it).
+#
+# ------------------------------------------------------------------------------------------------
+# What this file is, and what it is emphatically not
+# ------------------------------------------------------------------------------------------------
+# It is a BINDING: "the column named there becomes an attribute named here, grounded by a pointer
+# at that cell." Every node and every edge is COMPUTED from rows that are actually read. There is
+# no table anywhere that turns an input into a prepared output — delete a row from a fixture and
+# the graph is one node smaller, change a value and the attribute changes with it, add a row and it
+# appears. That is the difference between a deterministic pathway and a hardcoded answer, and it is
+# the property the whole deliverable rests on.
+#
+# Every `kind` below is declared in `ontology.yaml`. The builder refuses any that is not, by name,
+# at build time — because the point of the government graph is that it is built from the
+# PREDEFINED library. Something the library has no kind for goes through the growth protocol
+# (`growth.py`), where a human is asked; it is never coined here.
+#
+# ------------------------------------------------------------------------------------------------
+# Three rules the bindings below obey without exception
+# ------------------------------------------------------------------------------------------------
+# 1. **Identity claims are `about`-shaped and nothing else.** Not one `resolved_to` or `same_as`
+#    edge appears in this file, and the builder would refuse it if it did: those record a
+#    DETERMINATION of who somebody is, and only a named human's attestation can write one
+#    (CLAUDE.md §Hard constraints 1). What the estate supports is `about_subject` — "this artefact
+#    concerns this person" — and `mentions`, which is weaker still.
+#
+# 2. **Untrusted sources are labelled untrusted.** Correspondence headers, OCR text and legacy
+#    records are attacker-influenceable or lossy; their pointers carry `untrusted`, which means the
+#    values may be stored, cited and displayed and may never influence control flow (spine D3).
+#    The two case systems and the survey are the deployment's own systems of record and are
+#    trusted.
+#
+# 3. **A NULL is an absence, never a default.** A row whose key column is NULL contributes no node
+#    at all and is counted in the build report; an attribute whose column is NULL is written as
+#    `None` and lands in the node's `unresolved`. Nothing is inferred, and nothing is filled in.
+#
+# The `Person` / role split is the ontology's, not this file's: `permits.applicants` yields BOTH a
+# `person` (the register row) and an `applicant` (the role it plays), joined by `acts_as`, so that
+# "which human is this?" stays a question with a visible answer rather than an assumption baked
+# into one node.
+
+pack: government
+title: The Aldermoor estate, bound to the government ontology
+version: "1.0"
+
+# Relative to this file. Resolved and containment-checked by the loader.
+fixtures_root: "../../fixtures/packs/government"
+
+# When the deployment LEARNED this corpus (system time). Fixed so counts and screenshots are
+# reproducible on any machine and in CI.
+system_time: "2026-08-16T00:00:00+00:00"
+
+# Valid-time floor for standing records whose own start date the source does not supply. Chosen
+# before the oldest record in the estate, so nothing is dated after the fact it describes.
+default_valid_from: "1985-01-01T00:00:00+00:00"
+
+datasets:
+
+  # ============================================================================================
+  # PERMITWORKS — the case system. Trusted: it is the agency's own system of record.
+  # ============================================================================================
+  - id: permit_types
+    reader: sql_insert
+    table: permits.permit_types
+    trust: trusted
+    row_key: "{permit_type_code}"
+    path: "permits_registry/seed/010_permit_types.sql"
+    nodes:
+      - kind: permit_type
+        key: "{permit_type_code}"
+        label: "{title}"
+        canonical_id: permit_type_code
+        sources: [permit_type_code, title]
+        valid_from: introduced_on
+        attrs:
+          category: category
+          standard_fee_cents: standard_fee_cents
+          target_decision_days: target_decision_days
+          requires_inspection: requires_inspection
+          retired_on: retired_on
+      # The statutory provision every catalogue entry cites. A node rather than a string, because
+      # "which decisions rest on the provision that changed?" is the question a government graph
+      # exists to answer, and a string cannot be traversed.
+      - kind: statute
+        key: "{statutory_reference}"
+        label: "{statutory_reference}"
+        canonical_id: statutory_reference
+        sources: [statutory_reference]
+    edges:
+      - kind: cites
+        src: "permit_type:{permit_type_code}"
+        dst: "statute:{statutory_reference}"
+        evidence: [statutory_reference]
+
+  - id: officers
+    reader: sql_insert
+    table: permits.officers
+    trust: trusted
+    row_key: "{officer_ref}"
+    path: "permits_registry/seed/020_officers.sql"
+    nodes:
+      - kind: officer
+        key: "{officer_ref}"
+        label: "{display_name}"
+        canonical_id: officer_ref
+        sources: [officer_ref, display_name]
+        valid_from: started_on
+        attrs:
+          unit: unit
+          role_code: role_code
+          active: active
+          ended_on: ended_on
+      - kind: agency
+        key: "dcsp"
+        label: "Department of Community Services and Permitting"
+        sources: [unit]
+    # Note what is NOT declared here: no `person` node and no `acts_as` edge for staff. An
+    # `officer` is a human in the world and an administrative record WITH a key, so it is held
+    # apart from the subject population on purpose. Folding staff into `person` would put them
+    # into identity resolution, where a fuzzy match would silently reassign a caseload — and
+    # because assignment is an access predicate, that would rewrite who may READ the case.
+
+  - id: applicant_records
+    reader: sql_insert
+    table: permits.applicants
+    trust: trusted
+    row_key: "{applicant_id}"
+    path: "permits_registry/seed/030_applicants.sql"
+    nodes:
+      # The register row: a human as PERMITWORKS holds them. A subject.
+      - kind: person
+        key: "{applicant_id}"
+        label: "{given_names} {family_name}"
+        canonical_id: applicant_id
+        sources: [applicant_id, family_name]
+        valid_from: created_at
+        attrs:
+          family_name: family_name
+          given_names: given_names
+          date_of_birth: date_of_birth
+          # NULLABLE and frequently wrong — transposed digits, OCR confusions, missing dashes. It
+          # looks like a key and is not one, so it is an attribute with its own pointer and never
+          # the node key.
+          national_id_ref: national_id_ref
+          preferred_language: preferred_language
+          record_source: record_source
+      # The role the register row plays. A separate node joined by `acts_as`, per the ontology.
+      - kind: applicant
+        key: "{applicant_id}"
+        label: "Applicant {applicant_id}"
+        canonical_id: applicant_id
+        sources: [applicant_id]
+        valid_from: created_at
+      # The address AS RECORDED. Kept unmerged on purpose: a stale or abbreviated address is a
+      # matching signal, and collapsing two of them destroys the evidence that somebody moved.
+      - kind: address
+        key: "{address_line1}-{address_postcode}"
+        label: "{address_line1}, {address_postcode}"
+        sources: [address_line1, address_postcode]
+        attrs:
+          line1: address_line1
+          locality: address_locality
+          postcode: address_postcode
+    edges:
+      - kind: acts_as
+        src: "person:{applicant_id}"
+        dst: "applicant:{applicant_id}"
+        evidence: [applicant_id]
+      - kind: resides_at
+        src: "person:{applicant_id}"
+        dst: "address:{address_line1}-{address_postcode}"
+        evidence: [address_line1, address_postcode]
+
+  - id: applications
+    reader: sql_insert
+    table: permits.applications
+    trust: trusted
+    row_key: "{application_id}"
+    path: "permits_registry/seed/040_applications.sql"
+    nodes:
+      - kind: application
+        key: "{application_id}"
+        label: "{application_id}"
+        canonical_id: application_id
+        sources: [application_id, permit_type_code]
+        valid_from: submitted_at
+        attrs:
+          status: status
+          received_channel: received_channel
+          fee_charged_cents: fee_charged_cents
+          fee_paid_cents: fee_paid_cents
+          site_description: site_description
+          withdrawn_on: withdrawn_on
+      # The bundle an officer works from. One per case, so "everything on this case" is one
+      # traversal rather than a join a reader has to remember to make.
+      - kind: case_file
+        key: "{application_id}"
+        label: "Case file {application_id}"
+        canonical_id: application_id
+        sources: [application_id]
+        valid_from: submitted_at
+      # A land reference PERMITWORKS holds. It is deliberately not a foreign key in the source —
+      # the survey is a different system on a different release train — so a fraction of these
+      # resolve to nothing, and those edges are dropped and COUNTED as dangling rather than kept.
+      - kind: organisation
+        key: "{agent_of_record}"
+        label: "{agent_of_record}"
+        sources: [agent_of_record]
+        when: {agent_of_record: not_null}
+    edges:
+      - kind: submitted
+        src: "applicant:{applicant_id}"
+        dst: "application:{application_id}"
+        evidence: [applicant_id]
+      - kind: of_type
+        src: "application:{application_id}"
+        dst: "permit_type:{permit_type_code}"
+        evidence: [permit_type_code]
+      - kind: attached_to
+        src: "application:{application_id}"
+        dst: "parcel:{parcel_id}"
+        evidence: [parcel_id]
+        when: {parcel_id: not_null}
+      # OBSERVATION ONLY. `assigned_officer` is a current-value column with no assignment events,
+      # so the graph knows "observed assigned to X when we looked" and not when that became true
+      # or whom it superseded. Manufacturing an interval by differencing two reads would fabricate
+      # a transition date the source never asserted.
+      - kind: assigned_to
+        src: "officer:{assigned_officer}"
+        dst: "application:{application_id}"
+        evidence: [assigned_officer]
+        when: {assigned_officer: not_null}
+      - kind: part_of_case
+        src: "application:{application_id}"
+        dst: "case_file:{application_id}"
+        evidence: [application_id]
+      # A PROPOSAL, not an assertion. `agent_of_record` is free text keyed at a counter and is
+      # untrusted; the ontology's description says it is never traversed for access or for a
+      # determination, and binding it to `role_of` rather than to anything stronger is how that
+      # stays true under a domain-free renderer.
+      - kind: claims_agent_for
+        src: "organisation:{agent_of_record}"
+        dst: "application:{application_id}"
+        evidence: [agent_of_record]
+        when: {agent_of_record: not_null}
+      - kind: about_subject
+        src: "application:{application_id}"
+        dst: "person:{applicant_id}"
+        evidence: [applicant_id]
+
+  - id: decisions
+    reader: sql_insert
+    table: permits.decisions
+    trust: trusted
+    row_key: "{decision_id}"
+    path: "permits_registry/seed/050_decisions.sql"
+    nodes:
+      - kind: decision
+        key: "{decision_id}"
+        label: "{outcome} on {application_id}"
+        canonical_id: decision_id
+        sources: [decision_id, outcome]
+        valid_from: decided_at
+        attrs:
+          outcome: outcome
+          rationale: rationale
+          appeal_deadline: appeal_deadline
+      # The instrument, and NOT the same node as the decision that created it: a permit persists,
+      # can be revoked, and outlives the case. Only rows that actually carry a number become one.
+      - kind: permit
+        key: "{permit_number}"
+        label: "{permit_number}"
+        canonical_id: permit_number
+        sources: [permit_number]
+        valid_from: valid_from
+        when: {permit_number: not_null}
+        attrs:
+          valid_until: valid_until
+    edges:
+      - kind: decides
+        src: "decision:{decision_id}"
+        dst: "application:{application_id}"
+        evidence: [application_id]
+      - kind: decided_by
+        src: "officer:{decided_by}"
+        dst: "decision:{decision_id}"
+        evidence: [decided_by]
+        when: {decided_by: not_null}
+      - kind: grants
+        src: "decision:{decision_id}"
+        dst: "permit:{permit_number}"
+        evidence: [permit_number]
+        when: {permit_number: not_null}
+      # Corrections are new rows pointing back, never UPDATEs — the only history the case system
+      # keeps natively, and a distinct kind from the benefits chain so nothing can traverse out of
+      # one into the other.
+      - kind: supersedes_decision
+        src: "decision:{decision_id}"
+        dst: "decision:{superseded_by}"
+        evidence: [superseded_by]
+        when: {superseded_by: not_null}
+      - kind: part_of_case
+        src: "decision:{decision_id}"
+        dst: "case_file:{application_id}"
+        evidence: [application_id]
+
+  - id: conditions
+    reader: sql_insert
+    table: permits.permit_conditions
+    trust: trusted
+    row_key: "{condition_id}"
+    path: "permits_registry/seed/060_permit_conditions.sql"
+    nodes:
+      - kind: condition
+        key: "{condition_id}"
+        label: "{condition_text}"
+        canonical_id: condition_id
+        sources: [condition_id, condition_text]
+        attrs:
+          ordinal: ordinal
+          compliance_due: compliance_due
+          discharged_on: discharged_on
+
+  - id: inspections
+    reader: sql_insert
+    table: permits.inspections
+    trust: trusted
+    row_key: "{inspection_id}"
+    path: "permits_registry/seed/070_inspections.sql"
+    nodes:
+      - kind: inspection
+        key: "{inspection_id}"
+        label: "Inspection {inspection_id}"
+        canonical_id: inspection_id
+        sources: [inspection_id]
+        valid_from: performed_at
+        attrs:
+          # NULL is a real state here: a visit where no access was obtained is a fact, not a gap.
+          outcome: outcome
+          scheduled_for: scheduled_for
+          notes: notes
+    edges:
+      - kind: inspects
+        src: "inspection:{inspection_id}"
+        dst: "application:{application_id}"
+        evidence: [application_id]
+        when: {application_id: not_null}
+      - kind: inspected_by
+        src: "officer:{inspector_ref}"
+        dst: "inspection:{inspection_id}"
+        evidence: [inspector_ref]
+        when: {inspector_ref: not_null}
+      - kind: at_parcel
+        src: "inspection:{inspection_id}"
+        dst: "parcel:{parcel_id}"
+        evidence: [parcel_id]
+        when: {parcel_id: not_null}
+      - kind: part_of_case
+        src: "inspection:{inspection_id}"
+        dst: "case_file:{application_id}"
+        evidence: [application_id]
+        when: {application_id: not_null}
+
+  - id: appeals
+    reader: sql_insert
+    table: permits.appeals
+    trust: trusted
+    row_key: "{appeal_id}"
+    path: "permits_registry/seed/080_appeals.sql"
+    nodes:
+      - kind: appeal
+        key: "{appeal_id}"
+        label: "Appeal {appeal_id}"
+        canonical_id: appeal_id
+        sources: [appeal_id]
+        valid_from: lodged_at
+        attrs:
+          grounds: grounds
+          hearing_date: hearing_date
+          outcome: outcome
+          # A policy state, not an absence: a sealed appeal is WITHHELD from some principals, and
+          # withheld is a different fact from missing (spine D4).
+          sealed: sealed
+    edges:
+      - kind: appeals
+        src: "appeal:{appeal_id}"
+        dst: "decision:{decision_id}"
+        evidence: [decision_id]
+
+  - id: case_events
+    reader: sql_insert
+    table: permits.case_events
+    trust: trusted
+    row_key: "{event_id}"
+    paths: ["permits_registry/seed/090_case_events_part*.sql"]
+    nodes:
+      - kind: case_event
+        key: "{event_id}"
+        label: "{event_type}"
+        canonical_id: event_id
+        # `occurred_at` is VALID time and routinely precedes `recorded_at` by days, because counter
+        # staff key in batches. The node's valid_from is therefore the occurrence, and the
+        # recording clock is kept as an attribute rather than promoted into the temporal axis.
+        valid_from: occurred_at
+        sources: [event_id, event_type]
+        attrs:
+          event_type: event_type
+          recorded_at: recorded_at
+          actor_kind: actor_kind
+          channel: channel
+          detail: detail
+    edges:
+      - kind: event_on
+        src: "case_event:{event_id}"
+        dst: "application:{application_id}"
+        evidence: [application_id]
+
+  # ============================================================================================
+  # CLAIMLINE — the assistance case system. Also the agency's own, also trusted.
+  # ============================================================================================
+  - id: programs
+    reader: sql_insert
+    table: benefits.benefit_programs
+    trust: trusted
+    row_key: "{program_code}"
+    path: "benefits_case_management/seed/010_benefit_programs.sql"
+    nodes:
+      - kind: benefit_program
+        key: "{program_code}"
+        label: "{name}"
+        canonical_id: program_code
+        sources: [program_code, name]
+        valid_from: opened_on
+        attrs:
+          max_monthly_cents: max_monthly_cents
+          means_tested: means_tested
+          review_interval_months: review_interval_months
+          closed_on: closed_on
+      - kind: statute
+        key: "{statutory_reference}"
+        label: "{statutory_reference}"
+        canonical_id: statutory_reference
+        sources: [statutory_reference]
+    edges:
+      - kind: cites
+        src: "benefit_program:{program_code}"
+        dst: "statute:{statutory_reference}"
+        evidence: [statutory_reference]
+
+  - id: caseworkers
+    reader: sql_insert
+    table: benefits.caseworkers
+    trust: trusted
+    row_key: "{caseworker_ref}"
+    path: "benefits_case_management/seed/020_caseworkers.sql"
+    nodes:
+      - kind: officer
+        key: "{caseworker_ref}"
+        label: "{display_name}"
+        canonical_id: caseworker_ref
+        sources: [caseworker_ref, display_name]
+        valid_from: started_on
+        attrs:
+          team: team
+          role_code: role_code
+          active: active
+          ended_on: ended_on
+      - kind: agency
+        key: "atba"
+        label: "Assistance and Transitional Benefit Agency"
+        sources: [team]
+
+  - id: claimant_records
+    reader: sql_insert
+    table: benefits.claimants
+    trust: trusted
+    row_key: "{claimant_id}"
+    path: "benefits_case_management/seed/030_claimants.sql"
+    nodes:
+      # A DIFFERENT register's row for (often) the same human. Deliberately a different node:
+      # deciding that this row and a PERMITWORKS row denote one person is an identity
+      # determination, and only a named human may make it. Until then the graph holds both, which
+      # is the honest state.
+      - kind: person
+        key: "{claimant_id}"
+        label: "{forenames} {surname}"
+        canonical_id: claimant_id
+        sources: [claimant_id, surname]
+        valid_from: registered_on
+        attrs:
+          surname: surname
+          forenames: forenames
+          date_of_birth: date_of_birth
+          resident_number: resident_number
+          benefits_ref: benefits_ref
+          household_size: household_size
+          deceased_flag: deceased_flag
+          correspondence_pref: correspondence_pref
+      - kind: claimant
+        key: "{claimant_id}"
+        label: "Claimant {benefits_ref}"
+        canonical_id: benefits_ref
+        sources: [claimant_id, benefits_ref]
+        valid_from: registered_on
+      - kind: address
+        key: "{address_line}-{address_postcode}"
+        label: "{address_line}, {address_postcode}"
+        sources: [address_line, address_postcode]
+        attrs:
+          line1: address_line
+          locality: address_locality
+          postcode: address_postcode
+    edges:
+      - kind: acts_as
+        src: "person:{claimant_id}"
+        dst: "claimant:{claimant_id}"
+        evidence: [claimant_id]
+      - kind: resides_at
+        src: "person:{claimant_id}"
+        dst: "address:{address_line}-{address_postcode}"
+        evidence: [address_line, address_postcode]
+
+  - id: claims
+    reader: sql_insert
+    table: benefits.claims
+    trust: trusted
+    row_key: "{claim_id}"
+    path: "benefits_case_management/seed/040_claims.sql"
+    nodes:
+      - kind: claim
+        key: "{claim_id}"
+        label: "{claim_id}"
+        canonical_id: claim_id
+        sources: [claim_id, program_code]
+        valid_from: opened_on
+        attrs:
+          status: status
+          intake_channel: intake_channel
+          priority_flag: priority_flag
+          closed_on: closed_on
+      - kind: case_file
+        key: "{claim_id}"
+        label: "Case file {claim_id}"
+        canonical_id: claim_id
+        sources: [claim_id]
+        valid_from: opened_on
+    edges:
+      - kind: submitted
+        src: "claimant:{claimant_id}"
+        dst: "claim:{claim_id}"
+        evidence: [claimant_id]
+      - kind: of_type
+        src: "claim:{claim_id}"
+        dst: "benefit_program:{program_code}"
+        evidence: [program_code]
+      # Observation only, exactly as `assigned_to`: a current-value column with no transfer events.
+      - kind: caseworked_by
+        src: "officer:{caseworker_ref}"
+        dst: "claim:{claim_id}"
+        evidence: [caseworker_ref]
+        when: {caseworker_ref: not_null}
+      - kind: part_of_case
+        src: "claim:{claim_id}"
+        dst: "case_file:{claim_id}"
+        evidence: [claim_id]
+      - kind: about_subject
+        src: "claim:{claim_id}"
+        dst: "person:{claimant_id}"
+        evidence: [claimant_id]
+      # The loose join to a permit case. A reference and nothing stronger: the source does not
+      # enforce it, so it is a citation rather than a containment.
+      - kind: references
+        src: "claim:{claim_id}"
+        dst: "application:{linked_application_id}"
+        evidence: [linked_application_id]
+        when: {linked_application_id: not_null}
+
+  - id: determinations
+    reader: sql_insert
+    table: benefits.eligibility_determinations
+    trust: trusted
+    row_key: "{determination_id}"
+    path: "benefits_case_management/seed/050_eligibility_determinations.sql"
+    nodes:
+      - kind: determination
+        key: "{determination_id}"
+        label: "{outcome} on {claim_id}"
+        canonical_id: determination_id
+        # Valid time is when the outcome took effect in the world; `determined_on` is the recording
+        # clock and is kept as an attribute. Conflating them is how a graph starts answering "what
+        # did we know on date D" with a confidence it has not earned.
+        valid_from: effective_from
+        sources: [determination_id, outcome]
+        attrs:
+          outcome: outcome
+          basis_code: basis_code
+          monthly_entitlement_cents: monthly_entitlement_cents
+          effective_to: effective_to
+          determined_on: determined_on
+          evidence_ref: evidence_ref
+    edges:
+      - kind: decides
+        src: "determination:{determination_id}"
+        dst: "claim:{claim_id}"
+        evidence: [claim_id]
+      - kind: decided_by
+        src: "officer:{determined_by}"
+        dst: "determination:{determination_id}"
+        evidence: [determined_by]
+        when: {determined_by: not_null}
+      - kind: supersedes_determination
+        src: "determination:{determination_id}"
+        dst: "determination:{supersedes}"
+        evidence: [supersedes]
+        when: {supersedes: not_null}
+      - kind: part_of_case
+        src: "determination:{determination_id}"
+        dst: "case_file:{claim_id}"
+        evidence: [claim_id]
+
+  - id: payments
+    reader: sql_insert
+    table: benefits.payments
+    trust: trusted
+    row_key: "{payment_id}"
+    paths: ["benefits_case_management/seed/060_payments_part*.sql"]
+    nodes:
+      - kind: payment
+        key: "{payment_id}"
+        label: "{method} {amount_cents}"
+        canonical_id: payment_id
+        valid_from: period_start
+        sources: [payment_id, amount_cents]
+        attrs:
+          amount_cents: amount_cents
+          method: method
+          reference: reference
+          period_end: period_end
+          paid_on: paid_on
+          posted_at: posted_at
+    edges:
+      - kind: pays
+        src: "payment:{payment_id}"
+        dst: "claim:{claim_id}"
+        evidence: [claim_id]
+      # A reversal is a NEW payment pointing back at the one it undoes, never an update.
+      - kind: reverses
+        src: "payment:{payment_id}"
+        dst: "payment:{reversal_of}"
+        evidence: [reversal_of]
+        when: {reversal_of: not_null}
+
+  - id: reviews
+    reader: sql_insert
+    table: benefits.reviews
+    trust: trusted
+    row_key: "{review_id}"
+    path: "benefits_case_management/seed/070_reviews.sql"
+    nodes:
+      - kind: review
+        key: "{review_id}"
+        label: "{review_type} review"
+        canonical_id: review_id
+        valid_from: scheduled_for
+        sources: [review_id, review_type]
+        attrs:
+          review_type: review_type
+          completed_on: completed_on
+          result: result
+          notes: notes
+    edges:
+      - kind: reviews
+        src: "review:{review_id}"
+        dst: "claim:{claim_id}"
+        evidence: [claim_id]
+      - kind: reviewed_by
+        src: "officer:{reviewer_ref}"
+        dst: "review:{review_id}"
+        evidence: [reviewer_ref]
+        when: {reviewer_ref: not_null}
+
+  - id: claim_events
+    reader: sql_insert
+    table: benefits.claim_events
+    trust: trusted
+    row_key: "{event_id}"
+    paths: ["benefits_case_management/seed/090_claim_events_part*.sql"]
+    nodes:
+      - kind: case_event
+        key: "{event_id}"
+        label: "{event_type}"
+        canonical_id: event_id
+        valid_from: occurred_at
+        sources: [event_id, event_type]
+        attrs:
+          event_type: event_type
+          recorded_at: recorded_at
+          actor_kind: actor_kind
+          channel: channel
+          detail: detail
+    edges:
+      - kind: event_on
+        src: "case_event:{event_id}"
+        dst: "claim:{claim_id}"
+        evidence: [claim_id]
+
+  # ============================================================================================
+  # The survey. Trusted (it is a surveyed fact), current-cut only (no retained prior cuts).
+  # ============================================================================================
+  - id: zoning_codes
+    reader: csv
+    table: gis_parcels.zoning_codes
+    trust: trusted
+    row_key: "{zoning_code}"
+    path: "gis_parcels/zoning_codes.csv"
+    nodes:
+      - kind: zoning_code
+        key: "{zoning_code}"
+        label: "{description}"
+        canonical_id: zoning_code
+        sources: [zoning_code, description]
+        attrs:
+          max_height_m: max_height_m
+          consultation_required: consultation_required
+
+  - id: parcels
+    reader: csv
+    table: gis_parcels.parcels
+    trust: trusted
+    row_key: "{parcel_id}"
+    paths: ["gis_parcels/parcels_part*.csv"]
+    nodes:
+      - kind: parcel
+        key: "{parcel_id}"
+        label: "{street_number} {street_name}, {locality}"
+        canonical_id: parcel_id
+        sources: [parcel_id, street_name]
+        attrs:
+          ward_code: ward_code
+          locality: locality
+          land_use: land_use
+          area_sqm: area_sqm
+          postcode: postcode
+          title_status: title_status
+          heritage_flag: heritage_flag
+          flood_zone: flood_zone
+          last_survey_on: last_survey_on
+    edges:
+      # Observation only: the survey ships a current cut with no retained prior cuts, so successive
+      # reads are observations and not a rezoning history.
+      - kind: zoned
+        src: "parcel:{parcel_id}"
+        dst: "zoning_code:{zoning_code}"
+        evidence: [zoning_code]
+
+  - id: address_points
+    reader: csv
+    table: gis_parcels.address_points
+    trust: trusted
+    row_key: "{address_id}"
+    paths: ["gis_parcels/address_points_part*.csv"]
+    nodes:
+      - kind: address_point
+        key: "{address_id}"
+        label: "{unit} {street_number} {street_name}"
+        canonical_id: address_id
+        sources: [address_id, street_name]
+        attrs:
+          unit: unit
+          street_number: street_number
+          street_name: street_name
+          locality: locality
+          postcode: postcode
+          positional_quality: positional_quality
+          verified_on: verified_on
+    edges:
+      - kind: on_parcel
+        src: "address_point:{address_id}"
+        dst: "parcel:{parcel_id}"
+        evidence: [parcel_id]
+
+  # ============================================================================================
+  # The public registry. A captured API with no as-at parameter — current state only.
+  # ============================================================================================
+  - id: business_registrations
+    reader: json_pages
+    table: public_registry.businesses
+    trust: trusted
+    row_key: "{registration_number}"
+    paths: ["public_registry/snapshots/2026-08-01/businesses_page_*.json"]
+    nodes:
+      - kind: organisation
+        key: "{registration_number}"
+        label: "{legal_name}"
+        canonical_id: registration_number
+        sources: [registration_number, legal_name]
+        valid_from: registered_on
+        attrs:
+          trading_name: trading_name
+          status: status
+          dissolved_on: dissolved_on
+          activity_code: activity.code
+          activity_description: activity.description
+          last_filing_on: last_filing_on
+      - kind: business_registration
+        key: "{registration_number}"
+        label: "Registration {registration_number}"
+        canonical_id: registration_number
+        sources: [registration_number]
+        valid_from: registered_on
+      - kind: address
+        key: "{registered_address.line1}-{registered_address.postcode}"
+        label: "{registered_address.line1}, {registered_address.postcode}"
+        sources: [registration_number]
+        attrs:
+          locality: registered_address.locality
+          postcode: registered_address.postcode
+    edges:
+      - kind: registered_as
+        src: "organisation:{registration_number}"
+        dst: "business_registration:{registration_number}"
+        evidence: [registration_number]
+      - kind: resides_at
+        src: "organisation:{registration_number}"
+        dst: "address:{registered_address.line1}-{registered_address.postcode}"
+        evidence: [registration_number]
+      - kind: attached_to
+        src: "business_registration:{registration_number}"
+        dst: "parcel:{registered_address.parcel_id}"
+        evidence: [registration_number]
+        when: {registration_number: not_null}
+
+  - id: licences
+    reader: json_pages
+    table: public_registry.licences
+    trust: trusted
+    row_key: "{licence_number}"
+    paths: ["public_registry/snapshots/2026-08-01/licences_page_*.json"]
+    nodes:
+      - kind: licence
+        key: "{licence_number}"
+        label: "{licence_type.description}"
+        canonical_id: licence_number
+        sources: [licence_number]
+        valid_from: issued_on
+        attrs:
+          licence_type_code: licence_type.code
+          status: status
+          issued_on: issued_on
+          expires_on: expires_on
+    edges:
+      - kind: licensed
+        src: "licence:{licence_number}"
+        dst: "organisation:{business_registration_number}"
+        evidence: [licence_number]
+      - kind: at_parcel
+        src: "licence:{licence_number}"
+        dst: "parcel:{premises.parcel_id}"
+        evidence: [licence_number]
+
+  # ============================================================================================
+  # UNTRUSTED SOURCES. Everything below carries `untrusted` pointers: the values may be stored,
+  # cited and displayed, and may never influence control flow (spine D3). That includes access
+  # control — an OCR'd name is a hypothesis, and a case reference read off an inbound header is
+  # attacker-controlled.
+  # ============================================================================================
+  - id: case_documents
+    reader: csv
+    table: case_files.documents
+    trust: untrusted
+    row_key: "{document_id}"
+    path: "case_files/INDEX.csv"
+    nodes:
+      - kind: document
+        key: "{document_id}"
+        label: "{doc_kind} {form_number}"
+        canonical_id: document_id
+        sources: [document_id, relative_path]
+        valid_from: scanned_on
+        attrs:
+          doc_kind: doc_kind
+          form_number: form_number
+          pages: pages
+          ocr_engine: ocr_engine
+          # The OCR confidence is part of why this source is untrusted, so it is recorded rather
+          # than used: a low-confidence read is still a read, and hiding the number would leave a
+          # reader unable to weigh the mention it produced.
+          mean_confidence: mean_confidence
+          content_digest: content_sha256_16
+    edges:
+      # A PROPOSAL. The case reference was read off a scanned form, so it may be wrong or planted;
+      # `claims_case_ref` is stored, citable and displayable, and never traversed for access,
+      # routing or a determination. `evidences` is the trusted counterpart and is not written here,
+      # because nothing in this index establishes the binding.
+      - kind: claims_case_ref
+        src: "document:{document_id}"
+        dst: "application:{case_ref}"
+        evidence: [case_ref]
+        when: {case_ref: not_null}
+      - kind: claims_case_ref
+        src: "document:{document_id}"
+        dst: "claim:{case_ref}"
+        evidence: [case_ref]
+        when: {case_ref: not_null}
+
+  - id: correspondence
+    reader: csv
+    table: correspondence.emails
+    trust: untrusted
+    row_key: "{email_id}"
+    path: "correspondence/INDEX.csv"
+    nodes:
+      - kind: message
+        key: "{email_id}"
+        label: "{subject}"
+        canonical_id: message_id
+        sources: [email_id, message_id]
+        valid_from: sent_at
+        attrs:
+          subject: subject
+          from_address: from_address
+          to_address: to_address
+          thread_id: thread_id
+          has_attachment: has_attachment
+          content_digest: content_sha256_16
+    edges:
+      # Again a PROPOSAL and not a binding: the reference comes from an inbound header, which is
+      # attacker-controlled. `corresponds_on` — the trusted counterpart — requires an agency
+      # outbound-thread record or a human attestation, and neither is in this index.
+      - kind: claims_case_ref
+        src: "message:{email_id}"
+        dst: "application:{case_ref}"
+        evidence: [case_ref]
+        when: {case_ref: not_null}
+      - kind: claims_case_ref
+        src: "message:{email_id}"
+        dst: "claim:{case_ref}"
+        evidence: [case_ref]
+        when: {case_ref: not_null}
+
+  - id: inspection_photos
+    reader: csv
+    table: inspection_photos.sidecars
+    trust: untrusted
+    row_key: "{image_id}"
+    path: "inspection_photos/INDEX.csv"
+    nodes:
+      - kind: photo
+        key: "{image_id}"
+        label: "{image_id}"
+        canonical_id: image_id
+        sources: [image_id]
+        valid_from: captured_at
+        attrs:
+          captured_at: captured_at
+          captured_by: captured_by
+          photo_batch_ref: photo_batch_ref
+    edges:
+      - kind: evidenced_by
+        src: "inspection:{inspection_id}"
+        dst: "photo:{image_id}"
+        evidence: [inspection_id]
+        when: {inspection_id: not_null}
+      - kind: at_parcel
+        src: "photo:{image_id}"
+        dst: "parcel:{parcel_id}"
+        evidence: [parcel_id]
+        when: {parcel_id: not_null}
+
+  - id: legacy_records
+    reader: fixed_width
+    table: legacy_records.LEGACY-MASTER
+    trust: untrusted
+    row_key: "{legacy_key}"
+    paths: ["legacy_records/data/LEGACY_MASTER_part*.dat"]
+    reader_options:
+      # The layout is DATA, mirroring `legacy_records/LAYOUT.md`. Adding a field is an edit to this
+      # file, never to the engine — which is the same rule the ontology follows.
+      layout:
+        - {name: record_type, start: 1, end: 2}
+        - {name: legacy_key, start: 3, end: 14}
+        - {name: surname, start: 15, end: 44}
+        - {name: forename, start: 45, end: 68}
+        - {name: dob_cymd, start: 69, end: 76}
+        - {name: address_line1, start: 77, end: 116}
+        - {name: address_town, start: 117, end: 136}
+        - {name: postcode, start: 137, end: 144}
+        - {name: parcel_ref, start: 145, end: 156}
+        - {name: permit_ref, start: 157, end: 170}
+        - {name: benefit_ref, start: 171, end: 182}
+        - {name: status_code, start: 183, end: 184}
+        - {name: amount_val, start: 185, end: 193}
+        - {name: amount_sign, start: 194, end: 194}
+        - {name: opened_cymd, start: 195, end: 202}
+        - {name: last_upd_cymd, start: 203, end: 210}
+        - {name: src_office, start: 211, end: 214}
+    nodes:
+      # A node kind rather than "a source of attributes", deliberately: a legacy row is often the
+      # ONLY evidence that something happened, and a meaningful fraction of them resolve to nobody
+      # at all. Dissolving them into attributes would silently discard exactly those.
+      - kind: legacy_record
+        key: "{legacy_key}"
+        label: "{record_type} {legacy_key}"
+        canonical_id: legacy_key
+        sources: [legacy_key, record_type]
+        attrs:
+          record_type: record_type
+          surname: surname
+          forename: forename
+          # Hard-truncated at 30 and 24 characters respectively by the source, so a long or
+          # hyphenated name lost its tail before this graph ever saw it. Recorded as read.
+          dob_cymd: dob_cymd
+          status_code: status_code
+          amount_val: amount_val
+          amount_sign: amount_sign
+          src_office: src_office
+          opened_cymd: opened_cymd
+    edges:
+      - kind: at_parcel
+        src: "legacy_record:{legacy_key}"
+        dst: "parcel:{parcel_ref}"
+        evidence: [parcel_ref]
+        when: {parcel_ref: not_null}
+
+  # ============================================================================================
+  # LEGACY_RECORDS, READ THROUGH THE ADAPTER FLEET instead of directly off the .dat shards above.
+  # ============================================================================================
+  # Same estate, same bytes, a DIFFERENT reader: `reader: adapter` has no file behind it at all —
+  # `estate_seed.build_pack_graph` refuses to build this dataset unless the caller supplies an
+  # `adapter_rows["legacy_records_adapter"]` producer (see `government_seed.legacy_records_via_
+  # adapter`), which reads it through `DocumentCore` (`packages/adapter/.../sources/document.py`),
+  # behind a real `PolicyEngine.admit()`. NEVER built by default: `build_government_graph()` with
+  # no `adapter_rows=` argument — what the pinned 46,346/52,747 test calls — never reaches this
+  # dataset id at all, because nothing routes it without an explicit producer.
+  #
+  # The field names are DocumentCore's, not this file's: it derives them from the estate's own
+  # `legacy_records/COPYBOOK.cpy` (`LM-SURNAME` -> `lm_surname`), which is a different, independent
+  # transcription of the same 220-byte layout from the hand-written `layout:` above. Both name the
+  # same bytes; neither is derived from the other, which is why the column names differ.
+  #
+  # No `at_parcel` edge here (unlike the dataset above): this dataset is built in isolation in the
+  # proof-of-mechanism test, without `gis_parcels` loaded alongside it, so every such edge would be
+  # dangling by construction — correctly counted, but noise this demonstration does not need.
+  - id: legacy_records_adapter
+    reader: adapter
+    table: legacy_records.LEGACY-MASTER
+    trust: untrusted
+    row_key: "{lm_legacy_key}"
+    # WHICH purpose and role read this dataset is a pack-owned policy decision, declared here as
+    # data rather than as a literal in `government_seed.py` — see `finance_seed.py`'s
+    # `cb_facility_adapter` for the same pattern and the reasoning
+    # (`test_no_domain_branching`: an estate purpose id is domain vocabulary too).
+    # `on_behalf_of` is intentionally absent: `register.pointer_verification` is not
+    # subject-scoped, so this read names no human.
+    reader_options:
+      adapter_purpose: register.pointer_verification
+      adapter_role: auditor
+    nodes:
+      - kind: legacy_record
+        key: "{lm_legacy_key}"
+        label: "{lm_rec_type} {lm_legacy_key}"
+        canonical_id: lm_legacy_key
+        sources: [lm_legacy_key, lm_rec_type]
+        attrs:
+          record_type: lm_rec_type
+          surname: lm_surname
+          forename: lm_forename
+          dob_cymd: lm_dob_cymd
+          status_code: lm_status_cd
+          amount_val: lm_amount_val
+          amount_sign: lm_amount_sign
+          src_office: lm_src_office
+          opened_cymd: lm_opened_cymd

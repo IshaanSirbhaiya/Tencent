@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000182",
+  "filename": "IMG-2020-000182.jpg",
+  "image_present": false,
+  "captured_at": "2020-01-10T09:22:16+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2020-000248",
+  "application_id": "APP-2019-000333",
+  "parcel_id": "PCL-PG-01366",
+  "photo_batch_ref": "PHB-2020-000248",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-930361"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 424823,
+    "northing": 1216081,
+    "accuracy_m": 8.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1261,
+          120,
+          363,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-333932",
+        "confidence": 0.829,
+        "bbox": [
+          330,
+          262,
+          594,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "145 WINDLASS YARD, PELLING GREEN AM7 4PJ",
+        "confidence": 0.859,
+        "bbox": [
+          1041,
+          408,
+          920,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-01-10",
+        "confidence": 0.826,
+        "bbox": [
+          970,
+          459,
+          870,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.793,
+        "bbox": [
+          616,
+          708,
+          352,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

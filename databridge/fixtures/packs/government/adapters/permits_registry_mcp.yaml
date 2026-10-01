@@ -1,0 +1,205 @@
+# =====================================================================
+# packs/government/adapters/permits_registry_mcp.yaml
+#
+# The **Adapter Builder declaration** (AGENT_PLANE.md §6.2), in engine
+# form. This file plus a pinned MCP server is a governed adapter: the
+# loader in `databridge_adapter/sources/mcp.py` compiles it, or refuses.
+#
+# SYNTHETIC FIXTURE. The Aldermoor Territory, its permit office and every
+# record its MCP server serves are invented.
+#
+# ---------------------------------------------------------------------
+# The strategic point, stated once so nobody has to reconstruct it:
+# Walnut does not build 2,000 connectors. It compiles somebody else's
+# MCP server plus THIS file into an adapter that emits pointers, stamps
+# trust per field, resolves under policy, and captures what it read.
+# The four layers around the server are the product; the server is
+# interchangeable.
+#
+# The declaration is REVIEWED. Every `trusted` below required a written
+# justification before the loader would accept it, because a third-party
+# server's field is untrusted until a named human says otherwise and
+# says why.
+# =====================================================================
+
+adapter: permits_registry_mcp
+source_id: permits_registry_mcp
+title: PERMITWORKS register, over its vendored MCP server
+estate: aldermoor-government-mcp-synthetic
+
+# ---------------------------------------------------------------------
+# 1. The server. PINNED, VENDORED, NEVER RESOLVED AT RUNTIME.
+#
+# `server_ref` is recorded provenance and nothing else — the loader never
+# dereferences it. "A server you fetch at runtime is a server you did not
+# review" (AGENT_PLANE §10), and 41.6% of audited public MCP servers
+# vanish within three days (arXiv 2608.00150).
+#
+# TWO digests, because one of them is not enough and this fixture proves
+# it: `digest` pins the vendored ARTEFACT, and `declaration_digest` pins
+# the TOOL DECLARATIONS the server actually serves. The rug-pull variant
+# of the fixture server changes a tool description with the artefact
+# byte-identical, so `digest` alone would not notice. Only the second pin
+# catches it, and it is re-checked on every connect.
+#
+# `declaration_digest` covers the server's WHOLE advertised tool
+# declaration now (finding 2, phase3-adapters-mcp review) — every key it
+# sends over the wire, not only name/description/inputSchema — so this
+# value moved when that landed even though this fixture server's own
+# tools did not change. Recompute with
+# `declaration_digest(StdioMcpTransport(...).list_tools())` after editing
+# `fixtures/mcp/permits_mcp/server.py`.
+# ---------------------------------------------------------------------
+mcp:
+  server_ref: "oci://registry.internal/aldermoor-permits-mcp:1.4.2"
+  vendored_path: fixtures/mcp/permits_mcp/server.py
+  digest: "sha256:0c9f07be34f395f2cbfd8aac762d3c5e24468b049b8db3bfd904a261f5e28dc1"
+  declaration_digest: "sha256:29c7124e0a31e856ad60896a0f57a7c03f3b0862bd9d1f28f4f054e92415bfb8"
+  transport: stdio
+  protocol_version: "2026-07-28"
+
+  # `microvm` is what §6.2 asks for and this deployment cannot provide
+  # one, so it does not claim one. The loader REFUSES `microvm` or
+  # `container` unless a launcher is supplied, for the same reason a T0
+  # claim needs a retention window: an unenforceable declaration is worse
+  # than an honest weaker one.
+  sandbox: subprocess
+  sandbox_note: >-
+    A child process with an explicitly constructed environment: no
+    inherited credentials, no inherited API keys, cwd pinned to the
+    vendored directory. That is credential scoping, NOT isolation. It
+    does not stop a compromised server from opening a socket; only an
+    egress firewall does, and this deployment has none. Stated rather
+    than implied.
+
+# ---------------------------------------------------------------------
+# 2. Pinning. T3 BY DEFAULT — MCP exposes tools, not snapshots or
+#    cursors, so `snapshot()` raises CannotPinPast and capture is
+#    MANDATORY rather than a later refinement. A citation into a live
+#    tool call is a promise this adapter cannot keep.
+# ---------------------------------------------------------------------
+pinning_tier: T3
+pinning_proof: null
+pinning_note: >-
+  There is no cursor, no snapshot id and no version handle in this tool
+  surface. Calling permit_search twice may return two different sets with
+  nothing to say that it did. Every pointer therefore resolves against
+  the Capture Store, and the best verdict this adapter can ever return is
+  VERIFIED_AS_OF_CAPTURE. It never returns VERIFIED, and its
+  reachable_verdicts say so.
+
+capture:
+  when: ledger_bound
+  store: "file://captures/permits_registry_mcp"
+  retention: bound_to_ledger_entry
+
+# ---------------------------------------------------------------------
+# 3. Projection — what may be read AT ALL. A field the server returns and
+#    this list omits is dropped before it reaches a cell.
+# ---------------------------------------------------------------------
+projection:
+  entity: permit_application
+  key: [application_id]
+  fields:
+    - application_id
+    - submitted_at
+    - status
+    - applicant_name
+    - applicant_notes
+
+field_types:
+  application_id: varchar
+  submitted_at: timestamp
+  status: varchar
+  applicant_name: text
+  applicant_notes: text
+
+# ---------------------------------------------------------------------
+# 4. Trust, PER FIELD (spine D3). The DEFAULT for an MCP source is
+#    `untrusted`: a field absent from this map is stamped untrusted, and
+#    that is not a gap, it is the declared position. Ownership of the
+#    server is irrelevant; what matters is who could write the bytes.
+#
+#    `trusted` requires a justification. The loader refuses one without.
+# ---------------------------------------------------------------------
+trust_class:
+  application_id: trusted
+  submitted_at: trusted
+  status: trusted
+  applicant_name: untrusted
+  applicant_notes: untrusted
+
+trusted_justification:
+  application_id: >-
+    Minted by the register's own sequence on submission. No external
+    party, including the applicant, can write or choose it.
+  submitted_at: >-
+    Stamped by the register at receipt from its own clock, not from the
+    submission payload.
+  status: >-
+    Written only by a named case officer through the register's decision
+    workflow; the applicant-facing forms cannot set it.
+
+untrusted_note:
+  applicant_name: >-
+    Applicant-supplied on the submission form and never normalised
+    against a register of legal entities. It is a claim about a name, not
+    a verified identity, and it may never select a branch.
+  applicant_notes: >-
+    Free text, applicant- and objector-supplied. The classic injection
+    and PII sink: R06a found free-text notes columns to be exactly where
+    national identifiers end up, and this estate's own fixture plants two
+    prompt-injection payloads in it.
+
+# ---------------------------------------------------------------------
+# 5. Redaction. Applied by the Core as a REGISTERED, REPLAYABLE
+#    derivation, so the emitted value carries a `derived` pointer citing
+#    the raw cell rather than a citation that vouches for something the
+#    source never said (ADAPTER_AGENT_SPEC §4a).
+# ---------------------------------------------------------------------
+redaction:
+  applicant_notes: [email, phone, national_id]
+
+# ---------------------------------------------------------------------
+# 6. Capabilities. The read set is a closed allowlist of tool names; a
+#    tool the server advertises and this list omits can never be invoked.
+#    `write` is EMPTY and this build refuses a non-empty one outright:
+#    a write is an ActionType with a human gate (AGENT_PLANE §6.4), not a
+#    checkbox on a read adapter.
+# ---------------------------------------------------------------------
+capabilities:
+  read: [permit_lookup, permit_search]
+  write: []
+
+# ---------------------------------------------------------------------
+# 6a. How `verify()` addresses ONE row again.
+#
+# Declared, because an MCP tool surface has no convention for it and
+# guessing which of the advertised tools takes a primary key is exactly
+# the sort of inference this design refuses. Without this block the live
+# half of verification is unavailable and `verify()` says so in its note,
+# which is better than an adapter inventing a lookup.
+#
+# The capture half of verification needs none of this and always runs:
+# the capture is where a T3 citation actually resolves.
+# ---------------------------------------------------------------------
+verification:
+  lookup_capability: permit_lookup
+  lookup_argument: application_id
+
+# ---------------------------------------------------------------------
+# 7. Egress. The server reaches nothing outbound. Non-empty requires an
+#    enforcing proxy, which this deployment does not have — so a
+#    non-empty allowlist is refused rather than recorded as an intention.
+# ---------------------------------------------------------------------
+egress:
+  allow: []
+
+egress_class: RESTRICTED_INTERNAL
+
+deletes_detectable: none
+deletes_note: >-
+  A tool that stops returning a row is not a tombstone. This adapter
+  never reports VANISHED for an absent row; it reports VANISHED only when
+  the CAPTURE that a pointer cites has been destroyed under an erasure
+  request, which is a fact it can substantiate.

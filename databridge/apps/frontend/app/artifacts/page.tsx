@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import Link from "next/link";
 import { Topbar } from "@/components/topbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +9,17 @@ import type { ArtifactSummary } from "@/lib/types";
 import { CheckCircle2, Play, ShieldCheck } from "lucide-react";
 
 export default function ArtifactsPage() {
-  const [artifacts, setArtifacts] = React.useState<ArtifactSummary[]>([]);
+  // null = not loaded yet; [] = loaded, none. The gateway no longer pre-builds a demo artifact at
+  // boot (removed 2026-10-01): the list holds only what a real `/convert` run registered.
+  const [artifacts, setArtifacts] = React.useState<ArtifactSummary[] | null>(null);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [selected, setSelected] = React.useState<Record<string, unknown> | null>(null);
   const [replay, setReplay] = React.useState<Record<string, { deterministic: boolean; checksum_ok: boolean; error?: string }>>({});
 
   React.useEffect(() => {
-    api.artifacts().then((r) => setArtifacts(r.artifacts));
+    api.artifacts()
+      .then((r) => setArtifacts(r.artifacts ?? []))
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "could not load artifacts"));
   }, []);
 
   async function doReplay(id: string) {
@@ -43,8 +49,21 @@ export default function ArtifactsPage() {
     <>
       <Topbar title="Artifact Browser" />
       <div className="min-w-0 flex-1 overflow-auto p-5">
+        {loadError && (
+          <div className="mb-3 rounded border border-band-review/40 bg-band-review/10 p-2 text-2xs text-band-review">
+            {loadError}
+          </div>
+        )}
+        {artifacts === null && !loadError && <div className="text-xs text-subtle">Loading…</div>}
+        {artifacts !== null && artifacts.length === 0 && (
+          <div className="rounded border border-border bg-surface p-4 text-xs text-subtle" data-testid="artifacts-empty">
+            No artifacts yet. Every run on{" "}
+            <Link href="/convert" className="text-accent underline">Convert</Link>{" "}
+            registers a replayable, checksummed artifact here.
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {artifacts.map((a) => {
+          {(artifacts ?? []).map((a) => {
             const rp = replay[a.artifact_id];
             return (
               <div key={a.artifact_id} className="rounded border border-border bg-surface p-4">

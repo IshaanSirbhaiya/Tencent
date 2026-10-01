@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000257",
+  "filename": "IMG-2014-000257.jpg",
+  "image_present": false,
+  "captured_at": "2014-02-19T17:29:14+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2014-000051",
+  "application_id": "APP-2013-000069",
+  "parcel_id": "PCL-PG-00370",
+  "photo_batch_ref": "PHB-2014-000051",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-690078"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 412209,
+    "northing": 1216383,
+    "accuracy_m": 13.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          490,
+          120,
+          264,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-931109",
+        "confidence": 0.81,
+        "bbox": [
+          391,
+          213,
+          648,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "82 FERRYMAN ROW, PELLING GREEN AM6 9GP",
+        "confidence": 0.902,
+        "bbox": [
+          331,
+          330,
+          874,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-02-19",
+        "confidence": 0.931,
+        "bbox": [
+          788,
+          543,
+          696,
+          48
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.777,
+        "bbox": [
+          1161,
+          712,
+          368,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

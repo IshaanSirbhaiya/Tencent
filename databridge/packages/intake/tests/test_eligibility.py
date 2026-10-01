@@ -38,12 +38,12 @@ def coverage(intakes) -> dict[str, "CoverageDetermination"]:
     the state the summary card is built in, before staff have verified anyone."""
     out = {}
     for name, record in intakes.items():
-        out[name] = determine_coverage(record, candidates=resolve(record.subject).candidates)
+        out[name] = determine_coverage(record, candidates=resolve(record.subject).candidates, today=DATASET_TODAY)
     return out
 
 
 def _patient(id_number: str):
-    return next(r for r in registry() if r.id_number.value == id_number)
+    return next(r for r in registry(DATASET_TODAY) if r.id_number.value == id_number)
 
 
 # --- the two headline cases from PLAN.md §5 Phase 2 ---------------------------------------
@@ -133,7 +133,7 @@ def test_an_unknown_issuer_is_undetermined_not_defaulted(intakes):
     stripped = record.model_copy(update={
         "issuer": record.issuer.model_copy(update={
             "issuer_code": record.issuer.issuer_code.model_copy(update={"value": "NOSUCH1"})})})
-    cov = determine_coverage(stripped)
+    cov = determine_coverage(stripped, today=DATASET_TODAY)
     assert cov.status is CoverageStatus.UNDETERMINED
     assert cov.matched_rule_id is None
     assert any("coverage_rules.yaml" in r for r in cov.reasoning)
@@ -143,7 +143,7 @@ def test_a_document_with_no_issuer_code_is_undetermined(intakes):
     record = intakes["chit_01_meridian_referral.txt"]
     stripped = record.model_copy(update={
         "issuer": record.issuer.model_copy(update={"issuer_code": None})})
-    cov = determine_coverage(stripped)
+    cov = determine_coverage(stripped, today=DATASET_TODAY)
     assert cov.status is CoverageStatus.UNDETERMINED
     assert any("does not carry an issuer code" in r for r in cov.reasoning)
 
@@ -156,7 +156,7 @@ def test_a_package_code_absent_from_the_table_is_undetermined(intakes):
         "authorisation": record.authorisation.model_copy(update={
             "package_code": record.authorisation.package_code.model_copy(
                 update={"value": "WELL99"})})})
-    cov = determine_coverage(stripped)
+    cov = determine_coverage(stripped, today=DATASET_TODAY)
     assert cov.status is CoverageStatus.UNDETERMINED
     assert cov.package_code is None
     assert any("has no such package" in r for r in cov.reasoning)
@@ -171,7 +171,12 @@ def test_package_contents_are_included_even_when_the_document_lists_them(coverag
     cov = coverage["chit_05_bluepeak_wellness_voucher.txt"]
     canonicals = [t.canonical for t in cov.authorised_tests]
     assert len(canonicals) == len(set(canonicals)), f"duplicate authorised tests: {canonicals}"
-    assert len(canonicals) == 11
+    # Derived from the rule table (HC1, rule 6): the package's own test list, not a count.
+    from databridge_intake.rules import rules
+
+    package = rules().package(cov.issuer_code, cov.package_code)
+    assert package is not None and len(package.includes_tests) >= 1
+    assert len(canonicals) == len(package.includes_tests)
     assert all(t.in_package for t in cov.authorised_tests)
 
 
@@ -230,7 +235,7 @@ def test_an_unrecognised_test_is_surfaced_not_dropped_or_invented(intakes):
     tweaked = record.model_copy(update={
         "authorisation": record.authorisation.model_copy(update={
             "requested_tests": [*record.authorisation.requested_tests, invented]})})
-    cov = determine_coverage(tweaked)
+    cov = determine_coverage(tweaked, today=DATASET_TODAY)
     assert "Cranial Aura Scan" in cov.unmatched_tests
     assert FLAG_UNMATCHED_TESTS in cov.eligibility_flags
     assert cov.status is CoverageStatus.PARTIAL
@@ -245,7 +250,7 @@ def test_an_unrecognised_test_is_surfaced_not_dropped_or_invented(intakes):
 def test_a_selected_patient_takes_precedence_over_candidates(intakes):
     """Once staff have picked someone, the band is checked against that person alone."""
     record = intakes["chit_05_bluepeak_wellness_voucher.txt"]
-    cov = determine_coverage(record, selected_patient=_patient("S8536477Z"))  # Loh Amir, aged 21
+    cov = determine_coverage(record, selected_patient=_patient("S8536477Z"), today=DATASET_TODAY)  # Loh Amir, aged 21
     assert FLAG_AGE_OUTSIDE_BAND in cov.eligibility_flags
     assert any("selected patient is 21" in r for r in cov.reasoning)
 
@@ -254,7 +259,7 @@ def test_a_band_is_not_silently_skipped_when_there_is_no_patient(intakes):
     """With no patient and no candidates, the age band is unchecked — and says so. Silence here
     would read as "eligibility confirmed"."""
     record = intakes["chit_05_bluepeak_wellness_voucher.txt"]
-    cov = determine_coverage(record)
+    cov = determine_coverage(record, today=DATASET_TODAY)
     assert FLAG_AGE_UNKNOWN in cov.eligibility_flags
     assert cov.status is CoverageStatus.PARTIAL
 
@@ -265,12 +270,12 @@ def test_candidates_disagreeing_on_eligibility_is_reported_as_such(intakes):
     from databridge_intake.models import ResolutionCandidate
 
     record = intakes["chit_05_bluepeak_wellness_voucher.txt"]
-    candidates = resolve(record.subject).candidates      # both outside the band (21 and 30)
+    candidates = resolve(record.subject, today=DATASET_TODAY).candidates      # both outside the band (21 and 30)
     in_band = _patient("S7501626C")                      # aged 52 — inside WELL2's 40-59
     assert in_band.age_at(DATASET_TODAY) == 52
     mixed = (*candidates, ResolutionCandidate(patient_id=in_band.patient_id, score=0.1,
                                               matched_on=["name"], record=in_band))
-    cov = determine_coverage(record, candidates=mixed)
+    cov = determine_coverage(record, candidates=mixed, today=DATASET_TODAY)
     assert FLAG_AGE_PENDING_IDENTITY in cov.eligibility_flags
     assert FLAG_AGE_OUTSIDE_BAND not in cov.eligibility_flags
     assert any("depends on which patient staff select" in r for r in cov.reasoning)
@@ -287,7 +292,7 @@ def test_the_walk_in_path_is_a_rule_in_the_table_not_a_branch_in_code(intakes):
     assert files, "the walk-in fixture is missing"
     record = extract_intake("", document_id=files[0].name, harness=harness,
                             channel="walk_in")
-    cov = determine_coverage(record)
+    cov = determine_coverage(record, today=DATASET_TODAY)
     assert cov.matched_rule_id == "rule_self_pay"
     assert cov.status is CoverageStatus.DETERMINED
     assert cov.package_code is None
@@ -324,7 +329,7 @@ def test_a_brand_new_issuer_resolves_with_no_source_change(intakes, tmp_path):
     swapped = record.model_copy(update={
         "issuer": record.issuer.model_copy(update={
             "issuer_code": record.issuer.issuer_code.model_copy(update={"value": "ZZTEST1"})})})
-    cov = determine_coverage(swapped, table=load_rules(path))
+    cov = determine_coverage(swapped, table=load_rules(path), today=DATASET_TODAY)
     assert cov.status is CoverageStatus.DETERMINED
     assert cov.matched_rule_id == "rule_zz_referral"
     assert cov.questionnaire is QuestionnaireKind.GENERAL_HEALTH

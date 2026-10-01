@@ -1,0 +1,267 @@
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import {
+  ACTIVITY_KINDS,
+  NOT_RECORDED,
+  actorText,
+  coverageWarning,
+  decisionText,
+  formatDuration,
+  formatTokens,
+  itemTone,
+  mergePages,
+  producerText,
+  refusalText,
+  runIdOf,
+  subtaskTone,
+  viewFromParam,
+  ACTIVITY_VIEWS,
+  type ActivityItem,
+  type DelegationTree,
+  type SubtaskNode,
+} from "../lib/activity-api";
+import { adaptGatewayTrace, type GatewayTrace, type GatewayTraceStep } from "../lib/trace-adapt";
+
+/**
+ * `/trace` — Activity & trace. Live specs run against the REAL gateway and derive every expectation
+ * from the gateway's own `/activity` answer; they are skipped when no gateway answers. They are
+ * NON-MUTATING: nothing is run, approved or fired.
+ *
+ * The `@unit` block tests the pure helpers with no gateway and no page. Run it alone with a config
+ * that has no webServer and `grep: /@unit/`.
+ */
+const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY_URL ?? "http://127.0.0.1:8000";
+const TOKEN = process.env.NEXT_PUBLIC_WALNUT_TOKEN ?? "dev-local-only";
+const H = { Authorization: `Bearer ${TOKEN}` };
+
+async function gatewayUp(request: APIRequestContext): Promise<boolean> {
+  try {
+    return (await request.get(`${GATEWAY}/health`, { timeout: 5_000 })).ok();
+  } catch {
+    return false;
+  }
+}
+
+test.describe("activity (live)", () => {
+  test.beforeEach(async ({ page, request }) => {
+    test.skip(!(await gatewayUp(request)), "no gateway answering");
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem(
+        "walnut.staff.session.v1",
+        JSON.stringify({ staffId: "PS-FD-014", name: "Nurul Aisyah", signedInAt: new Date().toISOString() }),
+      );
+    });
+  });
+
+  test("the sidebar entry is Activity, and a bare /trace still opens the per-request view", async ({ page }) => {
+    await page.goto("/trace");
+    await expect(page.getByRole("link", { name: "Activity" })).toBeVisible();
+    await expect(page.getByTestId("activity-tab-request")).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("the timeline shows what GET /activity returns, or its error — never example rows", async ({ page, request }) => {
+    const res = await request.get(`${GATEWAY}/activity?limit=50`, { headers: H });
+    await page.goto("/trace?view=timeline");
+    if (!res.ok()) {
+      await expect(page.getByTestId("activity-error")).toBeVisible({ timeout: 30_000 });
+      return;
+    }
+    const body = (await res.json()) as { items: ActivityItem[] };
+    if (body.items.length === 0) {
+      await expect(page.getByTestId("activity-empty")).toBeVisible({ timeout: 30_000 });
+      return;
+    }
+    const rows = page.getByTestId("activity-row");
+    await expect(rows).toHaveCount(body.items.length, { timeout: 30_000 });
+    await expect(page.locator('[data-testid="activity-row"][data-loud="true"]')).toHaveCount(
+      body.items.filter((i) => i.loud).length,
+    );
+    await rows.first().click();
+    await expect(page.getByTestId("activity-inspector")).toBeVisible();
+  });
+
+  test("a delegated question opens its delegation tree with one node per recorded sub-task", async ({ page, request }) => {
+    const res = await request.get(`${GATEWAY}/activity?kinds=federated_run&limit=1`, { headers: H });
+    test.skip(!res.ok(), "the gateway refused /activity");
+    const [fed] = ((await res.json()) as { items: ActivityItem[] }).items;
+    test.skip(!fed, "no delegated question visible on this gateway");
+    const run = await (await request.get(`${GATEWAY}/activity/runs/${fed.run_id}`, { headers: H })).json();
+    await page.goto("/trace?view=timeline");
+    await page.getByTestId("activity-kind-federated_run").click();
+    await page.getByTestId("activity-row").first().click();
+    await expect(page.getByTestId("delegation-tree")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("delegation-subtask")).toHaveCount(run.delegation_tree.subtasks.length);
+    await expect(page.getByTestId("delegation-reduced")).toHaveCount(coverageWarning(run.delegation_tree) ? 1 : 0);
+  });
+
+  test("automations show each recorded firing", async ({ page, request }) => {
+    const res = await request.get(`${GATEWAY}/activity/automations`, { headers: H });
+    await page.goto("/trace?view=automations");
+    if (!res.ok()) {
+      await expect(page.getByTestId("automations-error")).toBeVisible({ timeout: 30_000 });
+      return;
+    }
+    const body = (await res.json()) as { automations: { firings: unknown[] }[] };
+    if (!body.automations.length) {
+      await expect(page.getByTestId("automations-empty")).toBeVisible({ timeout: 30_000 });
+      return;
+    }
+    await expect(page.getByTestId("automation-firing")).toHaveCount(
+      body.automations.reduce((n, s) => n + s.firings.length, 0),
+      { timeout: 30_000 },
+    );
+  });
+});
+
+// =============================================================================================
+// @unit — pure helpers (no gateway, no page)
+// =============================================================================================
+const item = (over: Partial<ActivityItem>): ActivityItem =>
+  ({
+    id: "agent_run:r", kind: "agent_run", at: null, sort_key: "", cursor: "", title: "t", status: null,
+    actor: { type: "agent", id: "a" }, produced_by: null, models_used: null, tokens: null,
+    duration_ms: null, loud: false, ...over,
+  }) as ActivityItem;
+
+const sub = (status: SubtaskNode["status"], agent = "crm_agent"): SubtaskNode => ({
+  id: agent, adapter_agent: agent, connection: null, connection_basis: "not recorded", request: {},
+  decision: null, method: null, pushed_down: null, query: null, delegate_note: null,
+  rows_returned: null, rows_basis: "", pointers_recorded: 0, skipped: [], status, ms: null,
+  produced_by: null,
+});
+
+test.describe("@unit activity helpers", () => {
+  test("a missing measurement is 'not recorded', never zero", () => {
+    expect(formatDuration(null)).toBe(NOT_RECORDED);
+    expect(formatDuration(undefined)).toBe(NOT_RECORDED);
+    expect(formatTokens(null)).toBe(NOT_RECORDED);
+    expect(formatDuration(0)).toBe("0 ms");                      // a MEASURED zero is still shown
+    expect(formatTokens(0)).toContain("0");
+    expect(producerText(null)).toBe(NOT_RECORDED);
+    expect(actorText(null)).toBe(NOT_RECORDED);
+    expect(decisionText(undefined)).toBe(NOT_RECORDED);
+  });
+
+  test("the producer names the model it recorded, and never invents one for a rules step", () => {
+    expect(producerText({ agent: "followup", model: "m/x" })).toBe("followup · m/x");
+    expect(producerText({ by: "rules" })).toBe("rules (no model)");
+    expect(producerText({ agent: "planner" })).toContain(NOT_RECORDED);
+    expect(producerText({ agent: "planner" })).not.toContain("rules");
+  });
+
+  test("a failure is bad whatever the loud flag says; a loud row is at least a warning", () => {
+    for (const s of ["failed", "refused", "execution_failed", "dead_lettered"]) {
+      expect(itemTone(item({ status: s, loud: false }))).toBe("bad");
+    }
+    expect(itemTone(item({ status: "completed", loud: true }))).toBe("warn");
+    expect(itemTone(item({ status: "completed", loud: false }))).toBe("good");
+    expect(itemTone(item({ status: null, loud: false }))).toBe("neutral");
+  });
+
+  test("a delegation tree warns loudly for every sub-task that did not answer, and only then", () => {
+    const clean = { subtasks: [sub("answered"), sub("answered", "docs")], combine: null,
+      coverage: { searched: [], skipped: [], reasons: [], reduced: false } } as Pick<DelegationTree, "subtasks" | "coverage" | "combine">;
+    expect(coverageWarning(clean)).toBeNull();
+    const bad = { ...clean, subtasks: [sub("answered"), sub("refused", "docs")] };
+    const w = coverageWarning(bad)!;
+    expect(w).toContain("1 of 2");
+    expect(w).toContain("docs refused");
+    const reducedOnly = { ...clean, coverage: { ...clean.coverage, reduced: true } };
+    expect(coverageWarning(reducedOnly)).not.toBeNull();
+    for (const s of ["answered", "reduced", "refused", "failed"] as const) {
+      expect(subtaskTone(s)).toBe(s === "answered" ? "good" : s === "reduced" ? "warn" : "bad");
+    }
+  });
+
+  test("merging pages keeps newest first and never repeats a row", () => {
+    const a = item({ id: "x:1", sort_key: "2026-01-03" });
+    const b = item({ id: "x:2", sort_key: "2026-01-02" });
+    const c = item({ id: "x:3", sort_key: "2026-01-01" });
+    const merged = mergePages([a, b], [b, c]);
+    expect(merged.map((i) => i.id)).toEqual(["x:1", "x:2", "x:3"]);
+  });
+
+  test("an ontology proposal opens no run; every other kind opens the run it names", () => {
+    for (const k of ACTIVITY_KINDS) {
+      const got = runIdOf(item({ kind: k, run_id: "r1" }));
+      expect(got).toBe(k === "ontology_proposal" ? null : "r1");
+    }
+  });
+
+  test("an unknown or missing view falls back to the per-request view", () => {
+    for (const v of ACTIVITY_VIEWS) expect(viewFromParam(v)).toBe(v);
+    expect(viewFromParam(null)).toBe("request");
+    expect(viewFromParam("nope")).toBe("request");
+  });
+
+  test("a refusal names its code; a 401 says the credential was refused", () => {
+    expect(refusalText(404, { refusal: { code: "UNKNOWN_RUN", message: "m" } })).toBe("UNKNOWN_RUN: m");
+    expect(refusalText(401, {})).toContain("credential");
+    expect(refusalText(500, null)).toBe("the gateway answered 500");
+  });
+});
+
+// Codex f1 #3 / #4 — the per-request projection never fills a gap with 0, "absent" or "covered".
+const step = (seq: number, kind: string, detail: Record<string, unknown>): GatewayTraceStep => ({
+  seq, at: "", kind, summary: kind, detail,
+});
+const gwTrace = (steps: GatewayTraceStep[], answer: Record<string, unknown> = {}): GatewayTrace => ({
+  request_id: "req-000001-abcd1234", surface: "s", agent: "a", version: "v1", started_at: "",
+  ended_at: null, outcome: "answered", principal: null, steps: steps.length, grounded: 0,
+  withheld: 0, absent: 0, escalations: 0,
+  integrity: { complete: true, defect_count: 0, defect_codes: [] },
+  step_list: steps, defect_list: [],
+  view: { request: {}, branches: [], results: [], answer },
+});
+
+test.describe("@unit per-request trace projection", () => {
+  test("pointer, verdict and cell messages carry no invented rows / cells / capture counts", () => {
+    const t = adaptGatewayTrace(gwTrace([
+      step(1, "capability", { source_id: "src", capability: "read" }),
+      step(2, "pointer", { origin: "live_source", source_id: "src" }),
+      step(3, "verdict", { verdict: "verified", source_id: "src" }),
+      step(4, "cell", { state: "grounded", source_id: "src", field_path: "a.b" }),
+    ]), "e");
+    const kinds = new Set(["pointer", "verify", "grounded"]);
+    const checked = (t.edges ?? []).filter((e) => [...kinds].some((k) => e.label.includes(k)));
+    expect(checked.length).toBe(kinds.size);                     // non-vacuous
+    for (const e of checked) expect(e.detail.pulled).toBeNull();
+  });
+
+  test("citations the recorder did not report are derived from released steps, else unknown — never 0", () => {
+    const released = [step(1, "released", { field_path: "f", source_id: "s", ledger_covered: false, covered_by: null })];
+    expect(adaptGatewayTrace(gwTrace(released, { citations: 7 }), "e").answer.citations).toBe(7);
+    expect(adaptGatewayTrace(gwTrace(released), "e").answer.citations).toBe(released.length);
+    const noSteps = { ...gwTrace([]), step_list: undefined } as unknown as GatewayTrace;
+    expect(Number.isNaN(adaptGatewayTrace(noSteps, "e").answer.citations)).toBe(true);
+  });
+
+  test("a cell with no recorded state is not drawn as absent", () => {
+    const t = adaptGatewayTrace(gwTrace([
+      step(1, "cell", { state: "grounded", field_path: "a" }),
+      step(2, "cell", { state: null, field_path: "b" }),
+    ]), "e");
+    expect((t.cells ?? []).map((c) => c.path)).toEqual(["a"]);
+    expect(t.cells_note).toContain("1 cell recorded with no valid state");
+  });
+
+  test("a release is certified only when the recorder names the covering ledger entry", () => {
+    const edgeFor = (detail: Record<string, unknown>) =>
+      (adaptGatewayTrace(gwTrace([step(1, "released", { field_path: "f", source_id: "s", ...detail })]), "e").edges ?? [])
+        .find((e) => e.kind === "answer");
+    for (const d of [{}, { ledger_covered: true }, { ledger_covered: false, covered_by: null }]) {
+      expect(edgeFor(d)?.detail.decided?.reason_code).toBe("LEDGER_APPEND_NOT_RECORDED");
+    }
+    const ok = edgeFor({ ledger_covered: true, covered_by: "e-1" });
+    expect(ok?.detail.decided).toBeNull();
+    expect(ok?.detail.notes.join(" ")).toContain("e-1");
+  });
+});
+
+test.describe("@unit activity nulls (Codex f1 #3)", () => {
+  test("coverage the record did not carry is neither 'reduced' nor 'not reduced'", () => {
+    const unrecorded = { subtasks: [sub("answered")], combine: null,
+      coverage: { searched: null, skipped: null, reasons: null, reduced: null } } as Pick<DelegationTree, "subtasks" | "coverage" | "combine">;
+    expect(coverageWarning(unrecorded)).toBeNull();
+    expect(actorText(null)).toBe(NOT_RECORDED);                 // a starter nobody recorded
+  });
+});

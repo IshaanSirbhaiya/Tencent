@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000416",
+  "filename": "IMG-2012-000416.jpg",
+  "image_present": false,
+  "captured_at": "2012-12-28T17:04:12+00:00",
+  "captured_by": "OFF-0037",
+  "inspection_id": "INS-2012-000173",
+  "application_id": "APP-2011-000243",
+  "parcel_id": "PCL-KF-00304",
+  "photo_batch_ref": "PHB-2012-000173",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-125245"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 449540,
+    "northing": 1195584,
+    "accuracy_m": 3.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1194,
+          120,
+          374,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-407440",
+        "confidence": 0.935,
+        "bbox": [
+          265,
+          248,
+          864,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "199 SEDGE LANE, KELDER FLATS AM7 8NJ",
+        "confidence": 0.939,
+        "bbox": [
+          287,
+          334,
+          828,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2012-12-28",
+        "confidence": 0.825,
+        "bbox": [
+          632,
+          555,
+          957,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0037",
+        "confidence": 0.95,
+        "bbox": [
+          250,
+          684,
+          416,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

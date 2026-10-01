@@ -283,10 +283,14 @@ def link_entities(store: GraphStore, question: str, *, top_k: int = 3) -> list[G
     `MIN_SCORE` we decline rather than hand back the least-bad node. `packages/evals/e_retrieval.py`
     measures both directions.
 
-    DOCUMENT nodes stay excluded — they are PROVENANCE (the answer cites them), never the answer
-    entity. Address them by `document_node_id`.
+    DOCUMENT-shaped nodes stay excluded — they are PROVENANCE (the answer cites them), never the
+    answer entity. Address them by id. "Document-shaped" is every kind the bound packs bind to the
+    `document` META-kind, never one pack's kind name: `NodeKind.DOCUMENT` raises under a binding
+    that calls its documents something else, and an `invoice` (workspace) is as much provenance
+    as a `document` is.
     """
-    rows = [r for r in store.open_nodes() if r["kind"] != NodeKind.DOCUMENT.value]
+    doc_kinds = _document_kinds()
+    rows = [r for r in store.open_nodes() if r["kind"] not in doc_kinds]
     if not rows:
         return []
     nodes = [row_to_node(store, r) for r in rows]
@@ -297,6 +301,44 @@ def link_entities(store: GraphStore, question: str, *, top_k: int = 3) -> list[G
     ])
     by_id = {n.id: n for n in nodes}
     return [by_id[s.id] for s in index.search(question, top_k=top_k)]
+
+
+def _document_kinds() -> frozenset[str]:
+    """Every bound node kind whose meta-kind is DOCUMENT (derived from the packs, never named)."""
+    from .meta import NodeMetaKind
+    from .packs import active_vocabulary
+
+    return frozenset(str(k) for k in active_vocabulary().nodes_binding_to(NodeMetaKind.DOCUMENT))
+
+
+def _claim_edge_kinds() -> frozenset[str]:
+    """Every bound edge kind that records a CLAIM about which entity an artefact concerns."""
+    from .meta import CLAIM_META_KINDS
+    from .packs import active_vocabulary
+
+    vocab = active_vocabulary()
+    return frozenset(str(k) for meta in CLAIM_META_KINDS for k in vocab.edges_binding_to(meta))
+
+
+#: How many of a node's own attributes an answer prints, and how long one may be. A value longer
+#: than this is not a fact a sentence can carry; it stays on the node sheet.
+_MAX_ATTRS = 8
+_MAX_ATTR_CHARS = 80
+#: How many linked entities one relationship line names before it says how many more there are.
+_MAX_LINKED = 12
+
+
+def _words(kind: str) -> str:
+    return str(kind).replace("_", " ")
+
+
+def _linked_by(edges, node_id: str, node_by_id: dict, kinds: frozenset[str], *,
+               incoming: bool) -> list[GraphNode]:
+    """The nodes joined to ``node_id`` by an edge whose kind is in ``kinds``, one direction."""
+    end, other = ("dst_id", "src_id") if incoming else ("src_id", "dst_id")
+    return [node_by_id[getattr(e, other)] for e in edges
+            if str(e.kind) in kinds and getattr(e, end) == node_id
+            and getattr(e, other) in node_by_id]
 
 
 def _node_citation(store: GraphStore, node: GraphNode) -> Citation:
@@ -416,97 +458,78 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
 
     cite(primary)
 
-    # --- intent templates (deterministic) ---------------------------------------
-    def _linked(kind: EdgeKind, *, incoming: bool) -> list[GraphNode]:
-        end, other = ("dst_id", "src_id") if incoming else ("src_id", "dst_id")
-        return [node_by_id[getattr(e, other)] for e in sub.edges
-                if e.kind == kind and getattr(e, end) == primary.id
-                and getattr(e, other) in node_by_id]
+    # --- the answer, assembled from META-kinds (never one pack's kind names) ---------------
+    # These templates used to be one branch per healthcare kind (`NodeKind.PATIENT`, `.ORG`,
+    # `.PACKAGE`, …). Under any other binding (`DATABRIDGE_PACKS=workspace`) the first of those
+    # attribute lookups raised AttributeError, so `/brain/query` answered every question with a
+    # 500. The rules below are the same rules, stated over what a kind IS rather than what one
+    # pack calls it:
+    #   * a SUBJECT kind (the pack's `subject_kinds`) gets its own cited attributes minus the
+    #     identifiers a human checks, the documents that CLAIM to be about it, and the identity
+    #     caveat — unconditionally, because the caveat belongs to the kind, not to the edge;
+    #   * every other kind gets its own cited attributes and its open relationships, each linked
+    #     entity cited.
+    from .packs import active_vocabulary
 
-    if primary.kind == NodeKind.PATIENT:
-        # A patient answer describes REGISTRY data and the documents that CLAIM to be about this
-        # person. It never states that identity has been established — the FOR_PATIENT edges below
-        # are claims, and where a document has several candidates it produced several such edges
-        # (ADR-0009; CLAUDE.md §Hard constraints 1).
-        bits = [primary.label]
-        dob = cited(primary, "date_of_birth")
-        if dob:
-            bits.append(f"(registry date of birth {dob})")
-        sentences.append(" ".join(bits) + ".")
-        # DOCUMENTS only. `FOR_PATIENT` also runs visit → patient in the vocabulary, and an
-        # unfiltered version narrated a visit as "<visit label> names this patient" and then
-        # chose the *less* cautious caveat on the strength of it. A non-document claim leaves the
-        # registry-only wording standing, which is the cautious direction to fail in.
-        claiming = [n for n in _linked(EdgeKind.FOR_PATIENT, incoming=True)
-                    if n.kind == NodeKind.DOCUMENT]
+    vocab = active_vocabulary()
+    doc_kinds = _document_kinds()
+    claim_kinds = _claim_edge_kinds()
+    subject = vocab.is_subject(str(primary.kind))
+    hidden = set(vocab.identifiers_for(str(primary.kind))) if subject else set()
+
+    shown: list[str] = []
+    for attr in sorted(primary.attrs):
+        if attr in hidden or len(shown) >= _MAX_ATTRS:
+            continue
+        raw = primary.attrs[attr]
+        if isinstance(raw, (dict, list, tuple, set, bool)):
+            continue
+        if raw is not None and len(str(raw)) > _MAX_ATTR_CHARS:
+            continue
+        value = cited(primary, attr)
+        if value is not None and value != "":
+            shown.append(f"{_words(attr)}: {value}")
+            allowed.append(_words(attr))          # a key may carry a digit; it is not a claim
+    sentences.append(primary.label + (f" ({'; '.join(shown)})" if shown else "") + ".")
+
+    if subject:
+        # DOCUMENTS only. A claim edge also runs from non-document kinds (a visit "for" a
+        # patient), and narrating that as "<visit> names this person" both overstates the
+        # corroboration and selects the less cautious caveat below.
+        claiming = sorted((n for n in _linked_by(sub.edges, primary.id, node_by_id, claim_kinds,
+                                                 incoming=True)
+                           if str(n.kind) in doc_kinds), key=lambda n: n.label)
         for doc in claiming:
             cite(doc)
-            sentences.append(f"{doc.label} names this patient.")
-        # UNCONDITIONAL, and that is the fix. The caveat used to be appended INSIDE the loop
-        # above, so it rode on a document existing. Once `clinic_seed` seeded the whole registry,
-        # 289 of the 300 patients had no `FOR_PATIENT` edge at all and answered with a bare name
-        # and date of birth — no caveat anywhere. Registry presence is not identification
-        # (CLAUDE.md constraint 1); the caveat belongs to the KIND, not to the edge.
+            sentences.append(f"{doc.label} names this {_words(primary.kind)}.")
         sentences.append(identity_caveat(claimed=bool(claiming)))
-    elif primary.kind == NodeKind.ORG:
-        bits = [primary.label]
-        org_kind = cited(primary, "kind")
-        if org_kind:
-            bits.append(f"is a {org_kind}")
-        billing_party = cited(primary, "billing_party")
-        if billing_party:
-            bits.append(f"billing the {billing_party}")
-        sentences.append(" ".join(bits) + ".")
-        for doc in _linked(EdgeKind.ISSUED, incoming=False):
-            cite(doc)
-            sentences.append(f"{primary.label} issued {doc.label}.")
-    elif primary.kind == NodeKind.PACKAGE:
-        s = primary.label
-        name = cited(primary, "name")
-        if name:
-            s += f" — {name}"
-        eligibility = cited(primary, "eligibility")
-        if eligibility:
-            s += f" ({eligibility})"
-        sentences.append(s + ".")
-        included = _linked(EdgeKind.INCLUDES_TEST, incoming=False)
-        for t in included:
-            cite(t)
-        if included:
-            sentences.append(
-                f"{primary.label} includes: {', '.join(t.label for t in included)}.")
-    elif primary.kind == NodeKind.TEST:
-        s = primary.label
-        category = cited(primary, "category")
-        if category:
-            s += f" ({category})"
-        sentences.append(s + ".")
-        for pkg in _linked(EdgeKind.INCLUDES_TEST, incoming=True):
-            cite(pkg)
-            sentences.append(f"Included in package {pkg.label}.")
-    elif primary.kind == NodeKind.COVERAGE_RULE:
-        s = primary.label
-        issuer_code = cited(primary, "issuer_code")
-        if issuer_code:
-            s += f" — issuer {issuer_code}"
-        billed_to = cited(primary, "billed_to")
-        if billed_to:
-            s += f", billed to {billed_to}"
-        eligibility = cited(primary, "eligibility")
-        if eligibility:
-            s += f" ({eligibility})"
-        sentences.append(s + ".")
-    elif primary.kind == NodeKind.VISIT:
-        s = primary.label
-        appointment = cited(primary, "appointment")
-        if appointment:
-            s += f" — appointment {appointment}"
-        sentences.append(s + ".")
-        for clinic in _linked(EdgeKind.AT_CLINIC, incoming=False):
-            cite(clinic)
-            sentences.append(f"At {clinic.label}.")
-    else:  # CLINIC / DOCUMENT
-        sentences.append(f"{primary.label}.")
+    else:
+        groups: dict[tuple[str, bool], list[GraphNode]] = {}
+        for e in sub.edges:
+            if primary.id not in (e.src_id, e.dst_id) or e.src_id == e.dst_id:
+                continue
+            outgoing = e.src_id == primary.id
+            other = node_by_id.get(e.dst_id if outgoing else e.src_id)
+            if other is None:
+                continue
+            bucket = groups.setdefault((str(e.kind), outgoing), [])
+            if all(o.id != other.id for o in bucket):
+                bucket.append(other)
+        for (kind, outgoing), linked in sorted(groups.items()):
+            linked.sort(key=lambda n: (n.label, n.id))
+            named = linked[:_MAX_LINKED]
+            for n in named:
+                cite(n)
+            labels = ", ".join(n.label for n in named)
+            if len(linked) > len(named):
+                labels += f" and {len(linked) - len(named)} more"
+            line = (f"{primary.label} {_words(kind)} {labels}." if outgoing
+                    else f"{labels} {_words(kind)} {primary.label}.")
+            # A claim edge reaching a SUBJECT is a claim about who someone is, and it never
+            # reaches a reader as a bare fact (CLAUDE.md §Hard constraints 1).
+            if kind in claim_kinds and any(vocab.is_subject(str(n.kind)) for n in named):
+                line = line[:-1] + " (a claim on the document, not a verified identity)."
+            sentences.append(line)
 
     answer = " ".join(sentences)
     # the anti-fabrication gate: every quantity/date must be a cited node value (`allowed`)

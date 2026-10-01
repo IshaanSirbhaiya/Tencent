@@ -10,7 +10,10 @@ agent has to as well: the whole suite runs under `DATABRIDGE_FORCE_GOLD=1`, and 
 the guardrails are byte-for-byte the code that runs against a real model. What it replaces is only
 the two judgement calls the model makes:
 
-* **the plan step** — call each registered tool once, in catalogue order, then stop;
+* **the plan step** — call each registered tool once, the ones whose declared purpose best
+  overlaps the question first, then stop. A tool that declares required arguments is called only
+  when the question itself supplies them, as quoted phrases (`"Platform Team"`), in the order the
+  tool declares them; otherwise it is skipped, never called with a guess;
 * **the answer step** — report every value the tools actually returned, ordered by how well each
   tool's declared purpose overlaps the question that was asked.
 
@@ -94,17 +97,71 @@ def _question(messages: list[dict]) -> str:
     return ""
 
 
+#: A phrase the question marks as a name: double quotes, curly quotes or backticks. Single quotes
+#: are not used — an apostrophe ("what's") would open a phrase nobody meant.
+_QUOTED = re.compile(r'"([^"\n]{1,200})"|“([^”\n]{1,200})”|`([^`\n]{1,200})`')
+
+
+def _quoted_phrases(question: str) -> list[str]:
+    return [next(g for g in m.groups() if g is not None).strip()
+            for m in _QUOTED.finditer(question or "")]
+
+
+def _attempted(messages: list[dict]) -> set[str]:
+    """Every tool the conversation shows a result OR an error for — both count as read."""
+    out: set[str] = set()
+    for kind, body in _frames(messages):
+        if kind.startswith("tool_result:"):
+            out.add(kind.split(":", 1)[1])
+        elif kind == "tool_error":
+            try:
+                requested = json.loads(body).get("requested")
+            except (ValueError, AttributeError):
+                requested = None
+            if requested:
+                out.add(str(requested))
+    return out
+
+
+def _arguments_for(spec: dict, phrases: list[str]) -> Optional[dict]:
+    """The call's arguments, filled from the question's quoted phrases — or `None` when the tool
+    needs more than the question supplied. Never a default, never a guess."""
+    parameters = spec.get("parameters") or {}
+    required = [str(n) for n in (parameters.get("required") or [])]
+    if len(required) > len(phrases):
+        return None
+    return dict(zip(required, phrases))
+
+
 def _plan(messages: list[dict]) -> str:
-    """Next unread tool, in catalogue order; `null` once every one has been read."""
-    read = {kind.split(":", 1)[1] for kind, _ in _frames(messages)
-            if kind.startswith("tool_result:")}
-    for spec in _catalogue(messages):
+    """Next unread tool, most relevant to the question first; `null` once none is left."""
+    done = _attempted(messages)
+    question = _question(messages)
+    words = _tokens(question)
+    phrases = _quoted_phrases(question)
+    catalogue = _catalogue(messages)
+    relevance = [len(words & _tokens(f"{spec.get('name', '')} {spec.get('description', '')}"))
+                 for spec in catalogue]
+    # Read what the question is about. Only when NO tool's declared purpose overlaps the question
+    # does it fall back to reading every tool — an answer to an unrecognised question is the
+    # figures, not nothing. Tools left unread are recorded by the agent loop as `not_read`.
+    anything_relevant = any(relevance)
+    order = sorted(range(len(catalogue)), key=lambda i: (-relevance[i], i))
+    for index in order:
+        spec = catalogue[index]
         name = spec.get("name")
-        if name and name not in read:
-            return json.dumps({"tool": name, "arguments": {},
-                               "reason": "read every structural tool once, in catalogue order"})
+        if not name or name in done:
+            continue
+        if anything_relevant and relevance[index] == 0:
+            continue
+        arguments = _arguments_for(spec, phrases)
+        if arguments is None:
+            continue
+        return json.dumps({"tool": name, "arguments": arguments,
+                           "reason": "the unread tool whose declared purpose best overlaps the "
+                                     "question"})
     return json.dumps({"tool": None, "arguments": {},
-                       "reason": "every structural read has been made"})
+                       "reason": "every read the question can supply arguments for has been made"})
 
 
 def _refs_by_tool(messages: list[dict]) -> list[tuple[str, list[dict]]]:

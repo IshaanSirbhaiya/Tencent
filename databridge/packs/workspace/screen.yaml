@@ -1,0 +1,192 @@
+# packs/workspace/screen.yaml — the deterministic content screen for workspace ingestion.
+#
+# DATA ONLY. No code lives here and no model is consulted: this file is read by the ingestion
+# pipeline's screen stage (packages/mcp_ingest) BEFORE any text reaches the harness, embeddings or
+# the graph (KNOWLEDGE_SYSTEM_PRINCIPLES.md P1, P2, P3, P13). It runs per document and again per
+# stored chunk.
+#
+# ─── SCHEMA (version 1) ───────────────────────────────────────────────────────────────────────
+#
+#   version: 1                         schema version of this file (int)
+#   pack: <name>                       the pack this screen belongs to (must equal the directory)
+#   thresholds:
+#     block: <int>                     score >= block  → decision "block"
+#     review: <int>                    review <= score < block → decision "review"
+#                                      (exclude, but LIST for owner override — P2's third outcome)
+#                                      score < review → decision "allow"
+#     min_signals_to_block: <int>      a score-based block also needs at least this many DISTINCT
+#                                      signals (corroboration). Decisive rules ignore this.
+#   decisive:                          any single match blocks the document outright
+#     - id: <snake_case>               stable rule id, written into the exclusions ledger
+#       description: <text>
+#       pattern: <Python `re` regex>   inline flags (e.g. (?im)) go at the start of the pattern
+#       reverse: <text>                what an owner must do to reverse the exclusion (P3)
+#   signals:                           each contributes `weight` ONCE per document/chunk when it
+#                                      matches at least `min_count` times (default 1)
+#     - id: <snake_case>
+#       description: <text>
+#       pattern: <Python `re` regex>
+#       weight: <int, 1..2>            no single signal may reach `block` alone (P2: signals, not vetoes)
+#       min_count: <int>               optional; occurrences needed before the signal counts
+#       reverse: <text>
+#   redactions:                        applied IN ORDER to text that is allowed through (IBAN runs
+#                                      before card so an IBAN's digit run is never read as a card)
+#     - id: <snake_case>
+#       description: <text>
+#       pattern: <Python `re` regex>
+#       validate: none | luhn | mod97  mask only when the checksum passes. SHAPE IS NOT ENOUGH (P13):
+#                                      an IBAN-shaped part number that fails mod-97 is left alone.
+#                                      `luhn`/`mod97` run over the match with spaces/dashes removed.
+#       replacement: <text>            what the masked span becomes, e.g. "[EMAIL]"
+#
+# Semantics the consumer must honour:
+#   - Decisive rules are evaluated first; a decisive hit is `block` with that rule id, full stop.
+#   - "Ordinary prose is not a marking" (P2): the confidentiality MARKING rule only matches the
+#     phrase standing alone on its own line (optionally after a `Classification:` label). The same
+#     words inside a sentence score only the weak `confidential_word` signal.
+#   - Rules key on WORDING, not magnitude (P2): there is deliberately no "large number" signal.
+#   - Every block / review / redaction is written to the exclusions ledger with the rule id(s)
+#     and the `reverse` text, at the moment it happens (P3).
+#   - Unknown keys are an error, not a shrug (same stance as the pack loader).
+
+version: 1
+pack: workspace
+
+thresholds:
+  block: 3
+  review: 2
+  min_signals_to_block: 2
+
+decisive:
+  - id: private_key_block
+    description: PEM private key material (RSA, EC, DSA, OpenSSH, PKCS#8, encrypted).
+    pattern: '-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----'
+    reverse: Remove the key from the file (and rotate it). Key material is never ingested; there is no override.
+
+  - id: credential_assignment
+    description: >
+      A password, API key, secret or token assigned a DEMONSTRABLY secret-shaped value on one line
+      (key = value, or key: value), 8+ characters with no spaces, either (a) carrying a digit, a
+      symbol (! @ # $ % ^ & * + = / ~ ? | \) or an inner capital, quoted or not, or (b) a lowercase
+      token joined by - . or _ that is the WHOLE value on its line (api_key=sk-proj-abcdefghijklmnop).
+      Never matched (R-021): placeholders, quoted or not (********, ••••••••, xxxxxxxx, a run of
+      three mask characters, ${VAR}, $VAR, %(var)s, <…>, {{…}}, [REDACTED]); policy prose ("Password:
+      minimum-length requirements apply", where the hyphenated word is followed by more words); and
+      a quoted value with spaces or of plain words, which cannot be told apart from quoted prose and
+      goes to the credential_like_assignment signal (review) instead.
+    pattern: '(?m)\b(?i:password|passwd|pwd|api[_-]?key|secret[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token)\b["'']?[ \t]*[:=][ \t]*(?:"(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)")(?![^"\n]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*(?:[0-9]|[!@#$%^&*+=/~?|\\]|[a-z][^\s"''<>{}\[\]]*[A-Z]))[^\s"''<>{}\[\]]{8,}"|''(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)'')(?![^''\n]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*(?:[0-9]|[!@#$%^&*+=/~?|\\]|[a-z][^\s"''<>{}\[\]]*[A-Z]))[^\s"''<>{}\[\]]{8,}''|(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)(?![^\s,;]))(?![^\s"''<>{}\[\]]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*(?:[0-9]|[!@#$%^&*+=/~?|\\]|[a-z][^\s"''<>{}\[\]]*[A-Z]))[^\s"''<>{}\[\]]{8,}|(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)(?![^\s,;]))(?![^\s"''<>{}\[\]]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*[-._])[^\s"''<>{}\[\]]{8,}(?=[ \t]*[,;]?[ \t]*(?:#.*)?\r?$))'
+    reverse: Move the credential to a secret store and replace it with a reference; re-run the source.
+
+  - id: cloud_access_key_id
+    description: A cloud access-key identifier (AKIA… style), which is credential material on its own.
+    pattern: '\b(?:AKIA|ASIA)[0-9A-Z]{16}\b'
+    reverse: Remove and rotate the key; re-run the source.
+
+  - id: confidentiality_marking
+    description: >
+      An owner-applied top-tier marking — "STRICTLY CONFIDENTIAL" (or "RESTRICTED - INTERNAL ONLY")
+      standing on its own line, optionally after "Classification:". Prose use does not match.
+    pattern: '(?im)^[ \t#*_>-]*(?:classification[ \t]*:[ \t]*)?(?:strictly[ \t]+confidential|restricted[ \t]*[-–][ \t]*internal[ \t]+only)[ \t*_.]*$'
+    reverse: The data owner removes or lowers the marking, or approves the document by id in the owner register.
+
+signals:
+  - id: confidential_word
+    description: The word "confidential" anywhere (prose). Weak on its own by design.
+    pattern: '(?i)\bconfidential(?:ity)?\b'
+    weight: 1
+    reverse: Owner approves the document in the register.
+
+  - id: pricing_heading
+    description: A heading that introduces pricing, a rate card or a discount schedule.
+    pattern: '(?im)^[ \t#*]*(?:pricing|price[ \t]+list|rate[ \t]+card|discount[ \t]+schedule|fee[ \t]+schedule)\b'
+    weight: 1
+    reverse: Owner approves the document in the register.
+
+  - id: currency_table
+    description: Table rows carrying currency amounts — a price list, not a single boilerplate figure.
+    pattern: '(?m)^\|.*(?:£|\$|€|\bGBP|\bUSD|\bEUR)[ \t]?\d[\d,]*(?:\.\d{2})?.*\|[ \t]*$'
+    weight: 2
+    min_count: 3
+    reverse: Owner approves the document in the register.
+
+  - id: contract_value_wording
+    description: Headline-value phrasing ("total contract value", "notice of award", "fees not to exceed").
+    pattern: '(?i)\b(?:total[ \t]+contract[ \t]+value|notice[ \t]+of[ \t]+award|(?:aggregate[ \t]+)?fees?[ \t]+(?:shall[ \t]+)?not[ \t]+(?:to[ \t]+)?exceed)\b'
+    weight: 2
+    reverse: Owner approves the document in the register.
+
+  - id: compensation_terms
+    description: Pay and compensation vocabulary.
+    pattern: '(?i)\b(?:salary|salaries|compensation[ \t]+bands?|bonus[ \t]+pool|pay[ \t]+grade)\b'
+    weight: 1
+    reverse: Owner approves the document in the register.
+
+  - id: personal_data_terms
+    description: Labels that introduce personal data about an individual.
+    pattern: '(?i)\b(?:date[ \t]+of[ \t]+birth|home[ \t]+address|national[ \t]+insurance[ \t]+number|passport[ \t]+number)\b'
+    weight: 1
+    reverse: Owner approves the document in the register.
+
+  - id: credential_like_assignment
+    description: >
+      A password / API key / secret / token assigned a QUOTED value that is not demonstrably
+      secret-shaped (it has spaces, or is all ordinary words). A passphrase and quoted policy
+      prose (Password: "minimum-length requirements apply") look the same, so this is a signal,
+      not a veto: weight 2 reaches review on its own (excluded, listed for the owner) and needs
+      corroboration to block. Placeholders ("********", "${VAR}", "<...>", "[REDACTED]")
+      never match.
+    pattern: '\b(?i:password|passwd|pwd|api[_-]?key|secret[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token)\b["'']?[ \t]*[:=][ \t]*(?:"(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)")(?![^"\n]*[*\u2022\u00b7]{3})[^"\n<>{}\[\]]{8,}"|''(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)'')(?![^''\n]*[*\u2022\u00b7]{3})[^''\n<>{}\[\]]{8,}'')'
+    weight: 2
+    reverse: >
+      If the quoted value is prose, the owner approves the document in the register; if it is a
+      secret, move it to a secret store and re-run the source.
+
+  - id: bank_details_terms
+    description: Labels that introduce bank payment details.
+    pattern: '(?i)\b(?:sort[ \t]+code|account[ \t]+number|IBAN|SWIFT|BIC)\b'
+    weight: 1
+    reverse: Owner approves the document in the register.
+
+redactions:
+  - id: email
+    description: Email addresses.
+    pattern: '(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b'
+    validate: none
+    replacement: '[EMAIL]'
+
+  - id: iban
+    description: >
+      IBANs, masked only if the ISO 13616 mod-97 check passes (part numbers share the shape).
+      Country + check digits, then the BBAN written EITHER compact (11–30 characters: the ISO
+      lengths 15 to 34) OR in space-separated groups of 4 with an optional 1–3 character tail —
+      never a mix, so a compact IBAN cannot swallow the word after it as a "tail"; the validator
+      bounds the length. Case-insensitive (R-021): `gb82 west 1234 …` is the same account as
+      `GB82 WEST 1234 …`, and the mod97 validator upper-cases before checking. A spaced tail must
+      start with a digit or a CAPITAL letter, so "… 1332 by Friday" never reads "by" as part of
+      the account (known limit: a fully lower-case, spaced IBAN whose last group is letters only,
+      e.g. Mauritius "… 000m ur", is left unmasked).
+    pattern: '(?i)\b[A-Z]{2}\d{2}(?:[A-Z0-9]{11,30}|(?: [A-Z0-9]{4}){2,7}(?: (?:\d|(?-i:[A-Z]))[A-Z0-9]{0,2})?)\b'
+    validate: mod97
+    replacement: '[IBAN]'
+
+  - id: iban_whole_groups
+    description: >
+      The second reading of a SPACED IBAN that ends on a whole group of 4 and is followed by a short
+      number ("… 0005 1332 12 items"): the iban rule above reads " 12" as the tail, fails mod-97
+      and leaves it; this rule reads whole groups only. Same checksum, same mask. Runs after iban,
+      so an IBAN the first rule masked is never seen twice.
+    pattern: '(?i)\b[A-Z]{2}\d{2}(?: [A-Z0-9]{4}){2,7}\b'
+    validate: mod97
+    replacement: '[IBAN]'
+
+  - id: card_number
+    description: Payment card numbers (13–19 digits, optional space/dash groups), masked only if Luhn-valid.
+    pattern: '(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)'
+    validate: luhn
+    replacement: '[CARD]'
+
+  - id: phone
+    description: Phone numbers written with an international prefix or a leading trunk zero.
+    pattern: '(?<![\w+])(?:\+\d{1,3}[ -]?|0)\d{2,4}[ -]?\d{3,4}[ -]?\d{3,4}(?!\w)'
+    validate: none
+    replacement: '[PHONE]'

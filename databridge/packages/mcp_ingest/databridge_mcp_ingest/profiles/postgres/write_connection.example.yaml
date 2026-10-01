@@ -1,0 +1,47 @@
+# The write-capable declaration for read-write agents — add to infra/mcp_servers.yaml (servers:).
+# It is NOT a profile (no `.profile.yaml` suffix), so the crawl planner never loads it.
+# Apply profiles/postgres/agent_writer.sql to the demo DB first (as the owner role).
+#
+# Rules it encodes:
+#   * a DISTINCT connection id (larkspur_db_writer) — the agent's action tool is
+#     `source.write:larkspur_db_writer:execute_sql`, never `source.query:larkspur_db`;
+#   * a DISTINCT role (walnut_agent_writer): INSERT on public.follow_up_tasks only, no SELECT —
+#     so even a mistaken crawl of this connection fails on its first statement;
+#   * access-mode=unrestricted because restricted mode refuses every INSERT (measured).
+#   * `purpose: agent_write` — needs the connections/import change named in the S2 report so the
+#     runner refuses to crawl it; until then do NOT import it with import_declarations(route=…)
+#     without `only=`.
+- id: larkspur_db_writer
+  title: Larkspur CRM — agent write (follow-up tasks only)
+  description: INSERT-only access to public.follow_up_tasks for read-write agents. Never ingested.
+  source_class: database
+  purpose: agent_write
+  writes_for: [larkspur_db]      # the ingest connection whose data this writer changes (R-017-t03)
+  trust: untrusted
+  package:
+    registry: pypi
+    name: postgres-mcp
+    verified: >-
+      2026-10-01 — scratch schema test (tests/test_s2_integration.py): INSERT through execute_sql
+      succeeds; SELECT/DELETE/UPDATE on the same table and SELECT on invoices are refused by the
+      role.
+  direct:
+    transport: stdio
+    command: uvx
+    args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=unrestricted"]
+    env:
+      DATABASE_URI: "postgresql://walnut_agent_writer:${WALNUT_DEMO_PG_WRITER_PASSWORD:-walnut_agent_writer_synthetic}@127.0.0.1:${WALNUT_DEMO_PG_PORT:-5433}/larkspur"
+  mcpjungle:
+    transport: stdio
+    command: uvx
+    args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=unrestricted"]
+    env:
+      DATABASE_URI: "postgresql://walnut_agent_writer:walnut_agent_writer_synthetic@walnut_demo_pg:5432/larkspur"
+  scope:
+    roots: []
+  tools_hint:
+    write: execute_sql            # one INSERT INTO public.follow_up_tasks (...) per approved action
+  notes: >
+    Declared as an ACTION tool only (automation_mode human_required in the overdue-invoice
+    example). The ingest connection larkspur_db re-reads follow_up_tasks on its next sync
+    (walnut_reader has SELECT on it), closing the loop.

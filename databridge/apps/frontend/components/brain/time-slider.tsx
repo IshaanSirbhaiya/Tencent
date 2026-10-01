@@ -5,7 +5,7 @@ import type { BrainGraph } from "@/lib/brain-types";
 import { ExportSheetsButton } from "./export-sheets-button";
 
 /**
- * The bi-temporal time slider: "show me the clinic as the graph knew it on <date>".
+ * The bi-temporal time slider: "show me the world as the graph knew it on <date>".
  *
  * It only changes the VISIBILITY of bi-temporal truth the backend already sent — `valid_from` /
  * `valid_to` come from the graph, and this derives nothing (D-FE-2).
@@ -13,7 +13,7 @@ import { ExportSheetsButton } from "./export-sheets-button";
  * ## The bug this file used to be
  *
  * The range was hardcoded `MIN = 2024-01-01`, `MAX = 2024-06-01`, left over from the Acme seed. The
- * clinic graph's earliest `valid_from` is **2026-01-01**. So every position on the slider except the
+ * graph's earliest `valid_from` is **2026-01-01**. So every position on the slider except the
  * far right resolved to a date about two years before anything in the graph existed, every node
  * failed the `valid_from <= t` test, and the canvas went **completely blank**. Dragging it looked
  * like a broken control rather than like time travel.
@@ -71,7 +71,7 @@ export function TimeSlider({
   // At 100% this used to emit `null`, and `visibleAt` reads a null `asOf` as "show everything" — so
   // the position labelled "now" actually meant "ignore temporal validity entirely", and a rule that
   // had EXPIRED would still be displayed as current. Emitting the real instant makes the label
-  // true. (Latent today because every `valid_to` in the clinic seed is null, but the slider is the
+  // true. (Latent today because every `valid_to` in the current seed is null, but the slider is the
   // bi-temporal claim we make to judges; it should not be quietly lying at its default position.)
   React.useEffect(() => {
     if (ts === null) {
@@ -105,7 +105,7 @@ export function TimeSlider({
         value={pct}
         disabled={domain === null}
         onChange={(e) => setPct(Number(e.target.value))}
-        aria-label="Time slider — view the graph as the clinic knew it on a date"
+        aria-label="Time slider — view the graph as it was known on a date"
         data-testid="time-slider"
         className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-accent disabled:cursor-not-allowed disabled:opacity-40"
       />

@@ -14,6 +14,8 @@ import re
 
 import pytest
 
+from databridge_intake.registry import DATASET_TODAY
+
 from databridge_core import SourcePointer
 from databridge_intake.eligibility import FLAG_CONFLICTING_DOCUMENT
 from databridge_intake.history import ClinicHistory, NoHistory, PriorIntake, PriorTest
@@ -57,7 +59,7 @@ class ExplodingHistory:
 
 def _draft(name="chit_01_meridian_referral.txt", **kw):
     path = fixtures_dir() / "chits" / name
-    return run_intake(path.read_text(encoding="utf-8"), document_id=name, **kw)
+    return run_intake(path.read_text(encoding="utf-8"), document_id=name, **kw, today=DATASET_TODAY)
 
 
 # --- THE SEAM ---------------------------------------------------------------------------

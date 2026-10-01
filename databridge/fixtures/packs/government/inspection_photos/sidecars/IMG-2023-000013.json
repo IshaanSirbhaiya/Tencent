@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2023-000013",
+  "filename": "IMG-2023-000013.jpg",
+  "image_present": false,
+  "captured_at": "2023-01-29T11:42:57+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2023-000523",
+  "application_id": "APP-2022-000661",
+  "parcel_id": "PCL-KF-00592",
+  "photo_batch_ref": "PHB-2023-000523",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-976495"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 419676,
+    "northing": 1192320,
+    "accuracy_m": 17.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1961,
+          120,
+          286,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2023-619067",
+        "confidence": 0.924,
+        "bbox": [
+          1640,
+          247,
+          621,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "196 COLDHARBOUR WALK, WEND HILL AM6 4HN",
+        "confidence": 0.712,
+        "bbox": [
+          390,
+          416,
+          1092,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2023-01-29",
+        "confidence": 0.774,
+        "bbox": [
+          739,
+          393,
+          841,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.76,
+        "bbox": [
+          2415,
+          612,
+          496,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

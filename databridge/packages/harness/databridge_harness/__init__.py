@@ -25,6 +25,15 @@ from .client import (
     StructuredResult,
     TextResult,
 )
+from .embedding import (
+    OFFLINE_EMBED_DIM,
+    OFFLINE_EMBED_MODEL,
+    OFFLINE_LABEL,
+    EmbeddingResult,
+    RawEmbedding,
+    embedding_key_present,
+    hashing_embed,
+)
 from .testing import FakeBackend, valid_json
 from .tracking import build_event
 
@@ -52,4 +61,12 @@ __all__ = [
     "valid_json",
     # tracking
     "build_event",
+    # embeddings (task_class: embed)
+    "EmbeddingResult",
+    "RawEmbedding",
+    "hashing_embed",
+    "embedding_key_present",
+    "OFFLINE_EMBED_MODEL",
+    "OFFLINE_EMBED_DIM",
+    "OFFLINE_LABEL",
 ]

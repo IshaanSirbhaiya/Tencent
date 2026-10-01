@@ -1,0 +1,601 @@
+action_id,entity_name_as_reported,agency,action_date,prior_rating,new_rating,outlook,action_type,rationale
+RA-000001,Quillane Precision B.V.,Northwold Analytics,2026-08-03,AAA-s,BBB-s,STABLE,UPGRADE,Issuer request
+RA-000002,Amberfell Packaging,Northwold Analytics,2025-05-12,CCC-s,D-s,NEGATIVE,UPGRADE,Periodic review
+RA-000003,Marlowe Metals B.V.,Northwold Analytics,2025-04-04,B-s,BB-s,STABLE,OUTLOOK_CHANGE,
+RA-000004,Silvercrag Textiles Limited,Cassiopeia Credit,2025-03-11,B-s,AA-s,STABLE,AFFIRMED,Periodic review
+RA-000005,VELLACOTT FREIGHT PTE LTD,Meridian Ratings,2024-09-18,BB-s,B-s,POSITIVE,UPGRADE,Periodic review
+RA-000006,Marlowe Aggregates Limited,Meridian Ratings,2025-02-13,B-s,BB-s,NEGATIVE,UPGRADE,Event driven
+RA-000007,"JARNWICK FABRICATION CO., LTD.",Meridian Ratings,2025-11-15,D-s,AAA-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000008,Galewood Bioworks Pte. Ltd.,Cassiopeia Credit,2025-06-01,A-s,AAA-s,DEVELOPING,WITHDRAWN,Event driven
+RA-000009,WESTERLIN METALS SDN BHD,Cassiopeia Credit,2026-01-27,BB-s,AAA-s,DEVELOPING,AFFIRMED,Event driven
+RA-000010,Ambervale Foods Sdn Bhd,Northwold Analytics,2026-04-26,AA-s,AAA-s,DEVELOPING,UPGRADE,Issuer request
+RA-000011,WINDERMOOR CAPITAL GROUP PLC,Meridian Ratings,2025-10-24,BBB-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000012,Kestrel Agritech,Northwold Analytics,2024-08-16,B-s,BBB-s,DEVELOPING,DOWNGRADE,Event driven
+RA-000013,Hollowmere Automotive LLC,Northwold Analytics,2026-07-15,AA-s,BBB-s,POSITIVE,AFFIRMED,
+RA-000014,"ALDERMOOR MINING CO., LTD.",Northwold Analytics,2025-12-16,D-s,D-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000015,Yewbank Bioworks Ltd,Meridian Ratings,2025-11-24,CCC-s,BB-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000016,EVERLEY OFFSHORE LTD,Cassiopeia Credit,2026-07-12,BB-s,AAA-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000017,Zarrowby Diagnostics PTE LTD,Northwold Analytics,2024-08-08,AA-s,B-s,STABLE,AFFIRMED,Event driven
+RA-000018,Eastvane Utilities LLC,Meridian Ratings,2026-05-17,BBB-s,CCC-s,STABLE,DOWNGRADE,
+RA-000019,Dellamar Diagnostics,Meridian Ratings,2024-08-09,BBB-s,BB-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000020,Amberfell Packaging Ltd,Northwold Analytics,2025-06-27,AAA-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000021,Lanthorn Nutrition Ltd,Northwold Analytics,2025-01-02,AA-s,AAA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000022,Ilexa Packaging PTE LTD,Meridian Ratings,2025-12-29,AA-s,CCC-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000023,VANTORNE SEMICONDUCTORS LLC,Northwold Analytics,2025-09-13,CCC-s,D-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000024,Hollowmere Automotive LLC,Cassiopeia Credit,2025-06-25,BBB-s,B-s,STABLE,DOWNGRADE,Issuer request
+RA-000025,Galewood Bioworks Pte. Ltd.,Cassiopeia Credit,2025-08-27,BB-s,BBB-s,STABLE,UPGRADE,
+RA-000026,MARLOWE WATER SYSTEMS PTE LTD,Cassiopeia Credit,2026-01-24,BBB-s,BBB-s,DEVELOPING,OUTLOOK_CHANGE,Event driven
+RA-000027,Northgale Semiconductors Sdn Bhd,Meridian Ratings,2024-10-18,AA-s,BB-s,DEVELOPING,AFFIRMED,Issuer request
+RA-000028,Zarrowby Metals PTE LTD,Cassiopeia Credit,2026-07-22,A-s,D-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000029,Redbourne Water Systems,Meridian Ratings,2024-11-21,A-s,BB-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000030,Quillane Diagnostics,Northwold Analytics,2024-12-28,BBB-s,D-s,POSITIVE,UPGRADE,Event driven
+RA-000031,Amberfell Automotive,Northwold Analytics,2025-12-26,CCC-s,BB-s,POSITIVE,DOWNGRADE,Periodic review
+RA-000032,"EVERLEY NUTRITION CO., LTD.",Meridian Ratings,2024-10-23,BB-s,D-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000033,Tidewater Pharma Supply B.V.,Meridian Ratings,2026-07-12,A-s,AAA-s,POSITIVE,UPGRADE,Event driven
+RA-000034,Foxhollow Terminals,Northwold Analytics,2026-05-07,A-s,A-s,POSITIVE,AFFIRMED,Periodic review
+RA-000035,VANTORNE ENERGY LTD,Meridian Ratings,2024-10-23,B-s,AA-s,NEGATIVE,UPGRADE,Issuer request
+RA-000036,Yarrowmede Mining Ltd,Meridian Ratings,2026-08-06,D-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000037,Marlowe Aggregates Limited,Northwold Analytics,2026-06-23,BBB-s,BB-s,DEVELOPING,AFFIRMED,Periodic review
+RA-000038,Brightwake Utilities,Cassiopeia Credit,2026-04-30,A-s,A-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000039,QUILLANE MINING GROUP PLC,Cassiopeia Credit,2025-04-04,CCC-s,BBB-s,POSITIVE,UPGRADE,Event driven
+RA-000040,LARKSPIREE TEXTILES GROUP PLC,Northwold Analytics,2024-12-07,BBB-s,AA-s,STABLE,WITHDRAWN,Periodic review
+RA-000041,Zephrine Inds Pte Ltd,Meridian Ratings,2026-07-02,D-s,BB-s,DEVELOPING,AFFIRMED,
+RA-000042,Whitmarsh Wire and Cable Pte. Ltd.,Northwold Analytics,2024-10-17,D-s,BBB-s,STABLE,WITHDRAWN,Periodic review
+RA-000043,Merriscourt Metals LLC,Cassiopeia Credit,2025-06-09,BB-s,AAA-s,STABLE,AFFIRMED,
+RA-000044,Palliser Water Systems Limited,Cassiopeia Credit,2024-08-27,A-s,BB-s,NEGATIVE,DOWNGRADE,Issuer request
+RA-000045,Ulmara Energy,Northwold Analytics,2025-02-04,CCC-s,BB-s,POSITIVE,UPGRADE,Event driven
+RA-000046,Broadhelm Diagnostics,Cassiopeia Credit,2025-04-15,CCC-s,BBB-s,DEVELOPING,AFFIRMED,Event driven
+RA-000047,Foxhollow Semiconductors Pte. Ltd.,Northwold Analytics,2026-03-13,A-s,BB-s,POSITIVE,UPGRADE,Issuer request
+RA-000048,Oakenshade Offshore LLC,Cassiopeia Credit,2026-06-03,BB-s,B-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000049,Ambervale Packaging Ltd,Meridian Ratings,2025-11-02,A-s,B-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000050,"VERRANT PACKAGING CO., LTD.",Cassiopeia Credit,2025-02-20,CCC-s,CCC-s,POSITIVE,UPGRADE,Periodic review
+RA-000051,Umberly Diagnostics,Northwold Analytics,2025-08-04,BB-s,BBB-s,POSITIVE,WITHDRAWN,
+RA-000052,Ulverbay Precision Limited,Northwold Analytics,2025-04-04,B-s,AAA-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000053,Palliser Automotive LLC,Meridian Ratings,2025-04-24,BBB-s,D-s,DEVELOPING,UPGRADE,Event driven
+RA-000054,Verrant Fabrication Pte Ltd,Northwold Analytics,2025-01-07,B-s,B-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000055,VONDREL LOGISTICS GROUP PLC,Northwold Analytics,2025-07-18,B-s,D-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000056,Tidewater Utilities Pte. Ltd.,Meridian Ratings,2024-09-30,AA-s,D-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000057,Juniperton Utilities,Cassiopeia Credit,2026-01-06,CCC-s,AAA-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000058,Quillane Diagnostics,Northwold Analytics,2025-12-13,A-s,CCC-s,NEGATIVE,OUTLOOK_CHANGE,Periodic review
+RA-000059,ILEXA CHEMICALS LTD,Cassiopeia Credit,2025-10-15,BB-s,CCC-s,POSITIVE,DOWNGRADE,Event driven
+RA-000060,"ILEXA ENERGY CO., LTD.",Meridian Ratings,2024-09-21,D-s,AA-s,STABLE,DOWNGRADE,Periodic review
+RA-000061,Thornbury Automotive,Meridian Ratings,2025-08-15,BBB-s,D-s,STABLE,AFFIRMED,Event driven
+RA-000062,Aldermoor Foods Group PLC,Cassiopeia Credit,2024-08-21,AA-s,A-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000063,CINDERVALE DIAGNOSTICS LTD,Meridian Ratings,2026-06-13,CCC-s,D-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000064,Rushmoor Foods Limited,Cassiopeia Credit,2024-09-12,CCC-s,CCC-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000065,Ambervale Composites,Cassiopeia Credit,2025-06-13,AAA-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Event driven
+RA-000066,Galewood Bioworks Pte. Ltd.,Meridian Ratings,2026-01-16,B-s,AAA-s,NEGATIVE,UPGRADE,
+RA-000067,Greyfen Chemicals,Meridian Ratings,2026-07-14,B-s,BBB-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000068,"Calidon Logistics Co., Ltd.",Northwold Analytics,2025-06-19,CCC-s,AAA-s,NEGATIVE,OUTLOOK_CHANGE,Periodic review
+RA-000069,Northgale Logistics S.A.,Northwold Analytics,2024-12-27,A-s,BBB-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000070,Belmoray Biowoorks,Northwold Analytics,2025-05-06,AA-s,AAA-s,POSITIVE,WITHDRAWN,
+RA-000071,BELMORAY INDUSTRIES PTE. LTD.,Cassiopeia Credit,2026-02-08,D-s,AA-s,NEGATIVE,UPGRADE,Issuer request
+RA-000072,Fairmont Reach Cold Chain S.A.,Northwold Analytics,2025-04-16,BB-s,D-s,POSITIVE,UPGRADE,Event driven
+RA-000073,Harrowby Mining B.V.,Meridian Ratings,2026-07-13,BB-s,BBB-s,STABLE,AFFIRMED,
+RA-000074,Merriscourt Foods Limited,Cassiopeia Credit,2025-08-29,BB-s,BBB-s,POSITIVE,WITHDRAWN,Event driven
+RA-000075,ELVERMERE SOLAR PTE. LTD.,Meridian Ratings,2025-03-17,B-s,B-s,NEGATIVE,UPGRADE,Periodic review
+RA-000076,Ulmara Diagnostics,Meridian Ratings,2025-10-10,A-s,BB-s,NEGATIVE,UPGRADE,Periodic review
+RA-000077,FOXHOLLOW SEMICONDUCTORS PTE. LTD.,Northwold Analytics,2025-12-06,BBB-s,CCC-s,DEVELOPING,WITHDRAWN,Event driven
+RA-000078,Bracklind Cold Chain B.V.,Northwold Analytics,2025-02-23,B-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000079,YARROWMEDE MINING LTD,Cassiopeia Credit,2025-12-06,D-s,D-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000080,DELLAMAR DIAGNOSTICS PTE LTD,Northwold Analytics,2026-03-13,A-s,A-s,POSITIVE,UPGRADE,
+RA-000081,Ulverbay Precision,Northwold Analytics,2025-07-04,B-s,AAA-s,NEGATIVE,UPGRADE,
+RA-000082,REDBOURNE UTILITIES GROUP PLC,Northwold Analytics,2026-07-17,AA-s,AAA-s,STABLE,UPGRADE,
+RA-000083,MORROWFIELD PHARMA SUPPLY PTE LTD,Meridian Ratings,2026-01-13,AA-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000084,Larkspire Freight Pte. Ltd.,Cassiopeia Credit,2025-01-30,A-s,CCC-s,STABLE,UPGRADE,
+RA-000085,Inverwold Offshore,Northwold Analytics,2025-02-02,BBB-s,CCC-s,NEGATIVE,UPGRADE,Event driven
+RA-000086,Everley Pharma Supply Sdn Bhd,Northwold Analytics,2025-12-06,BB-s,B-s,STABLE,AFFIRMED,Issuer request
+RA-000087,"Orrinshaw Wire and Cable Co., Ltd.",Northwold Analytics,2024-10-18,AA-s,AA-s,POSITIVE,DOWNGRADE,Event driven
+RA-000088,Vantorne Aggregates,Northwold Analytics,2024-12-14,BB-s,BB-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000089,Yarrowmede Utilities,Cassiopeia Credit,2025-09-15,CCC-s,D-s,STABLE,WITHDRAWN,
+RA-000090,Fairmont Reach Capital,Northwold Analytics,2024-11-27,BB-s,BB-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000091,QUILLANE SOLAR PTE LTD,Cassiopeia Credit,2026-03-02,AA-s,CCC-s,STABLE,AFFIRMED,Issuer request
+RA-000092,Cindervale Fabrication Pte. Ltd.,Meridian Ratings,2025-07-13,D-s,A-s,STABLE,OUTLOOK_CHANGE,Issuer request
+RA-000093,Foxhollow Property,Cassiopeia Credit,2025-05-19,B-s,CCC-s,POSITIVE,UPGRADE,Issuer request
+RA-000094,LARKSPIRE FREIGHT PTE. LTD.,Northwold Analytics,2026-08-14,B-s,D-s,STABLE,DOWNGRADE,Issuer request
+RA-000095,Silvrecrag Textiles Pte Ltd,Meridian Ratings,2025-10-18,AA-s,BB-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000096,MERRISCOURT PRECISION LLC,Meridian Ratings,2024-11-29,AA-s,BB-s,POSITIVE,UPGRADE,Issuer request
+RA-000097,Ambervale Wire and Cable,Cassiopeia Credit,2025-09-02,AAA-s,A-s,STABLE,OUTLOOK_CHANGE,Issuer request
+RA-000098,Ambervale Marine Pte. Ltd.,Northwold Analytics,2025-08-02,BB-s,B-s,STABLE,WITHDRAWN,Issuer request
+RA-000099,"INVERWOLD COMPOSITES CO., LTD.",Meridian Ratings,2024-08-25,CCC-s,AA-s,STABLE,DOWNGRADE,Periodic review
+RA-000100,NETHERBY MINING LLC,Meridian Ratings,2024-10-01,B-s,BB-s,STABLE,WITHDRAWN,Issuer request
+RA-000101,Larkspire Textiles,Cassiopeia Credit,2025-08-29,AAA-s,BBB-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000102,REDBOURNE UTILITIES GROUP PLC,Cassiopeia Credit,2026-03-09,D-s,D-s,POSITIVE,WITHDRAWN,Event driven
+RA-000103,ASHCOMBE PHARMA SUPPLY SDN BHD,Meridian Ratings,2026-05-13,B-s,AA-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000104,Ulmara Aggregates PTE LTD,Meridian Ratings,2025-03-23,BBB-s,B-s,STABLE,WITHDRAWN,
+RA-000105,FAIRMONT REACH AVIATION FABRICATION GMBH,Northwold Analytics,2026-02-13,CCC-s,CCC-s,NEGATIVE,OUTLOOK_CHANGE,Periodic review
+RA-000106,Corvane Holdings,Meridian Ratings,2025-06-19,D-s,A-s,STABLE,UPGRADE,
+RA-000107,Rushmoor Chemicals,Meridian Ratings,2026-05-09,D-s,D-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000108,Bracklind Cold Chain B.V.,Cassiopeia Credit,2025-10-19,BB-s,A-s,DEVELOPING,WITHDRAWN,Issuer request
+RA-000109,Ambervale Foods Sdn Bhd,Northwold Analytics,2026-04-28,A-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000110,Tidewater Textiles Sdn Bhd,Meridian Ratings,2026-08-03,AA-s,AA-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000111,Dellamar Robotics Pte. Ltd.,Northwold Analytics,2025-06-28,B-s,AAA-s,STABLE,WITHDRAWN,Issuer request
+RA-000112,Amberfell Packaging Ltd,Cassiopeia Credit,2024-09-08,AA-s,CCC-s,POSITIVE,UPGRADE,Issuer request
+RA-000113,XANTHE HOLDINGS PTE LTD,Cassiopeia Credit,2025-07-13,D-s,AA-s,STABLE,AFFIRMED,
+RA-000114,Loamfield Precision GmbH,Cassiopeia Credit,2024-12-31,A-s,B-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000115,Zarrowby Metals,Northwold Analytics,2025-05-06,D-s,B-s,POSITIVE,UPGRADE,Event driven
+RA-000116,Quarrenden Property Pte Ltd,Meridian Ratings,2025-05-10,A-s,A-s,DEVELOPING,WITHDRAWN,Event driven
+RA-000117,Westerlin Water Systems,Northwold Analytics,2026-04-27,A-s,D-s,NEGATIVE,WITHDRAWN,
+RA-000118,Eastvane Energy,Northwold Analytics,2026-07-21,A-s,A-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000119,Westerlin Pharma Supply,Northwold Analytics,2025-04-28,AAA-s,A-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000120,Hexbury Ventures GmbH,Northwold Analytics,2024-09-26,A-s,AAA-s,POSITIVE,UPGRADE,Event driven
+RA-000121,Merriscourt Foods,Meridian Ratings,2025-01-13,BBB-s,D-s,POSITIVE,WITHDRAWN,
+RA-000122,Foxhollow Hldgs Ltd,Cassiopeia Credit,2026-05-18,B-s,AAA-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000123,Marlowe Automotive Pte Ltd,Meridian Ratings,2025-03-18,B-s,BBB-s,POSITIVE,UPGRADE,Issuer request
+RA-000124,Everley Nutrition,Northwold Analytics,2026-07-17,BB-s,BB-s,STABLE,DOWNGRADE,Issuer request
+RA-000125,Everley Robotics,Meridian Ratings,2026-01-13,BBB-s,BB-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000126,STONECREST CAPITAL PTE LTD,Cassiopeia Credit,2025-05-25,BB-s,A-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000127,Silvercrag Metals LLC,Meridian Ratings,2025-09-11,D-s,BBB-s,STABLE,WITHDRAWN,Issuer request
+RA-000128,SILVERCRAG TEXTILES LIMITED,Cassiopeia Credit,2026-01-30,BBB-s,AA-s,POSITIVE,UPGRADE,Event driven
+RA-000129,Dunmarch Optics,Northwold Analytics,2024-12-17,AA-s,BBB-s,NEGATIVE,UPGRADE,Issuer request
+RA-000130,OSTRANDER PRECISION LIMITED,Cassiopeia Credit,2025-02-27,AAA-s,AAA-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000131,Hollowmere Metals,Meridian Ratings,2026-07-20,CCC-s,AAA-s,STABLE,WITHDRAWN,Issuer request
+RA-000132,Whitmarsh Wire and Cable Pte. Ltd.,Meridian Ratings,2026-05-11,AAA-s,AAA-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000133,CINDERVALE SOLAR LTD,Northwold Analytics,2026-07-14,A-s,BB-s,POSITIVE,AFFIRMED,Issuer request
+RA-000134,"Inverwold Composites Co., Ltd.",Meridian Ratings,2026-04-15,AAA-s,D-s,DEVELOPING,UPGRADE,
+RA-000135,QUINTRELL GRAIN GROUP PLC,Cassiopeia Credit,2024-09-18,BB-s,B-s,POSITIVE,OUTLOOK_CHANGE,
+RA-000136,Netherby Solar S.A.,Meridian Ratings,2025-12-27,D-s,AA-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000137,EVERLEY ROBOTICS SDN BHD,Cassiopeia Credit,2024-10-02,B-s,BB-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000138,Netherby Diagnostics B.V.,Northwold Analytics,2025-05-28,AAA-s,AAA-s,STABLE,AFFIRMED,
+RA-000139,"Calidon Logistics Co., Ltd.",Meridian Ratings,2026-06-17,A-s,CCC-s,POSITIVE,DOWNGRADE,Periodic review
+RA-000140,Pellaton Metals GmbH,Cassiopeia Credit,2026-03-18,D-s,D-s,STABLE,DOWNGRADE,Issuer request
+RA-000141,FENNMARK AVIATION SERVICES S.A.,Cassiopeia Credit,2025-11-05,B-s,A-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000142,ZARROWBY DIAGNOSTICS PTE LTD,Northwold Analytics,2024-11-15,AAA-s,AAA-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000143,Amberfell Instruments PTE LTD,Northwold Analytics,2026-02-03,B-s,AAA-s,NEGATIVE,AFFIRMED,Event driven
+RA-000144,VONDREL ENERGY PTE. LTD.,Northwold Analytics,2026-07-12,B-s,D-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000145,Kelbrooke Solar Sdn Bhd,Northwold Analytics,2025-12-09,BB-s,AA-s,NEGATIVE,OUTLOOK_CHANGE,Periodic review
+RA-000146,Ashcombe Term. PTE LTD,Meridian Ratings,2025-05-02,D-s,BB-s,DEVELOPING,UPGRADE,Periodic review
+RA-000147,AMBERFELL ROBOTICS B.V.,Meridian Ratings,2026-01-22,AAA-s,A-s,POSITIVE,DOWNGRADE,
+RA-000148,Ashcombe Ventures Ltd,Northwold Analytics,2026-06-23,CCC-s,D-s,STABLE,WITHDRAWN,Periodic review
+RA-000149,EASTVANE OFFSHORE PTE LTD,Meridian Ratings,2024-08-06,B-s,AAA-s,DEVELOPING,DOWNGRADE,Event driven
+RA-000150,Yarrowmede Mining Ltd,Meridian Ratings,2026-08-07,AAA-s,B-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000151,HEXBURY BIOWORKS S.A.,Meridian Ratings,2024-09-30,CCC-s,B-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000152,Yarrowmede Mining Ltd,Meridian Ratings,2024-12-17,AA-s,B-s,STABLE,AFFIRMED,Issuer request
+RA-000153,Ravenhurst Aviation Marine B.V.,Cassiopeia Credit,2025-03-16,AAA-s,A-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000154,AMBERFELL AUTOMOTIVE PTE LTD,Meridian Ratings,2025-10-28,D-s,CCC-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000155,ZARROWBY SEMICONDUCTORS B.V.,Meridian Ratings,2025-08-06,D-s,D-s,DEVELOPING,UPGRADE,Event driven
+RA-000156,Cindervale Fabrication Pte. Ltd.,Northwold Analytics,2025-03-12,BBB-s,AAA-s,POSITIVE,UPGRADE,
+RA-000157,Kirkhaven Ventures Limited,Meridian Ratings,2024-08-10,D-s,A-s,DEVELOPING,UPGRADE,
+RA-000158,Larkspire Precision,Cassiopeia Credit,2025-03-05,AAA-s,B-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000159,Ashcombe Shipping Ltd,Meridian Ratings,2026-02-14,B-s,BBB-s,STABLE,WITHDRAWN,Periodic review
+RA-000160,Kelbrokoe Shipping GmbH,Cassiopeia Credit,2024-10-23,D-s,D-s,NEGATIVE,UPGRADE,Event driven
+RA-000161,Yewbank Automotive Ltd,Meridian Ratings,2025-07-21,BBB-s,BBB-s,DEVELOPING,UPGRADE,Event driven
+RA-000162,Kirkhaven Ventures Limited,Northwold Analytics,2025-12-03,D-s,AAA-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000163,Amberfell Aviation Services Pte. Ltd.,Northwold Analytics,2026-01-23,A-s,BB-s,NEGATIVE,UPGRADE,Issuer request
+RA-000164,AMBERVALE MARINE PTE. LTD.,Northwold Analytics,2025-11-13,AA-s,AAA-s,STABLE,DOWNGRADE,Issuer request
+RA-000165,Larkspiree Textiles Group PLC,Meridian Ratings,2026-05-01,AA-s,BB-s,NEGATIVE,AFFIRMED,Event driven
+RA-000166,OAKENSHADE OFFSHORE LLC,Cassiopeia Credit,2025-08-20,A-s,A-s,POSITIVE,UPGRADE,Periodic review
+RA-000167,Hollowmere Automotive LLC,Northwold Analytics,2026-03-22,AA-s,AA-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000168,Fennmark Textiles,Meridian Ratings,2024-09-05,AAA-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000169,Vondrel Term. Limited,Northwold Analytics,2025-02-14,AAA-s,D-s,DEVELOPING,AFFIRMED,Event driven
+RA-000170,Jessamy Wire and Cable LLC,Meridian Ratings,2026-04-09,AA-s,BB-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000171,ORRINSHAW DIAGNOSTICS SDN BHD,Cassiopeia Credit,2024-09-12,BB-s,A-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000172,Galewood Offshore Pte Ltd,Northwold Analytics,2025-11-16,BBB-s,B-s,POSITIVE,UPGRADE,Issuer request
+RA-000173,Belmoray Analytics B.V.,Meridian Ratings,2026-01-26,BB-s,AAA-s,POSITIVE,UPGRADE,
+RA-000174,Silvercrag Textiles Limited,Cassiopeia Credit,2026-07-07,A-s,D-s,DEVELOPING,WITHDRAWN,
+RA-000175,Glenholt Property PTE LTD,Meridian Ratings,2026-03-24,A-s,D-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000176,Quarrenden Textiles LLC,Cassiopeia Credit,2025-12-30,AAA-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000177,Ironvale Grain Limited,Cassiopeia Credit,2025-06-29,BB-s,A-s,STABLE,OUTLOOK_CHANGE,Issuer request
+RA-000178,SILVERCRAG CHEMICALS LTD,Northwold Analytics,2026-01-29,BBB-s,CCC-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000179,KESTREL METALS PTE LTD,Meridian Ratings,2025-02-06,AA-s,B-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000180,Marlowe Metals,Cassiopeia Credit,2025-07-04,BB-s,BB-s,NEGATIVE,UPGRADE,Event driven
+RA-000181,PELLATON INDUSTRIES PTE. LTD.,Meridian Ratings,2026-07-23,CCC-s,A-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000182,JUNIPERTON AGRITECH S.A.,Cassiopeia Credit,2025-06-16,BBB-s,BBB-s,STABLE,DOWNGRADE,
+RA-000183,Silvercrag Chemicals Ltd,Cassiopeia Credit,2025-09-29,D-s,BB-s,DEVELOPING,WITHDRAWN,Event driven
+RA-000184,SILVERCRAG PACKAGING PTE. LTD.,Cassiopeia Credit,2025-10-19,AAA-s,B-s,NEGATIVE,AFFIRMED,
+RA-000185,Netherby Solar S.A.,Meridian Ratings,2026-01-08,B-s,B-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000186,Redbourne Utilities Group PLC,Cassiopeia Credit,2024-08-09,CCC-s,BB-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000187,Ilexa Chemicals Ltd,Northwold Analytics,2025-12-22,AAA-s,AAA-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000188,YEWBANK TEXTILES PTE. LTD.,Cassiopeia Credit,2025-08-05,B-s,BB-s,DEVELOPING,AFFIRMED,Issuer request
+RA-000189,Zephrine Industries,Cassiopeia Credit,2025-12-07,A-s,BB-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000190,Whitmarsh Grain LLC,Meridian Ratings,2024-08-20,AAA-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000191,HEXBURY VENTURES GMBH,Northwold Analytics,2026-01-22,A-s,CCC-s,STABLE,DOWNGRADE,Issuer request
+RA-000192,RUSHMOOR MARINE LLC,Meridian Ratings,2025-06-28,B-s,BBB-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000193,Quillane Solar Pte Ltd,Northwold Analytics,2026-05-23,D-s,D-s,STABLE,AFFIRMED,Issuer request
+RA-000194,Oakenshade Inds S.A.,Northwold Analytics,2024-09-18,CCC-s,BBB-s,NEGATIVE,DOWNGRADE,
+RA-000195,AMBERFELL ROBOTICS B.V.,Cassiopeia Credit,2025-04-13,BBB-s,AAA-s,POSITIVE,DOWNGRADE,
+RA-000196,EVERLEY ROBOTICS SDN BHD,Cassiopeia Credit,2026-03-21,BBB-s,AAA-s,STABLE,AFFIRMED,
+RA-000197,Hexbury Ventures GmbH,Northwold Analytics,2026-07-27,D-s,B-s,POSITIVE,UPGRADE,Issuer request
+RA-000198,Brightwake Utilities PTE LTD,Meridian Ratings,2026-01-08,AA-s,CCC-s,POSITIVE,DOWNGRADE,Issuer request
+RA-000199,Yarrowmede Inds PTE LTD,Northwold Analytics,2024-12-10,AA-s,A-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000200,VELLACOTT MINING LTD,Cassiopeia Credit,2024-09-17,CCC-s,CCC-s,STABLE,UPGRADE,
+RA-000201,ORRINSHAW DIAGNOSTICS SDN BHD,Meridian Ratings,2026-05-04,BB-s,AA-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000202,AMBERFELL LOGISTICS PTE LTD,Northwold Analytics,2025-07-18,BBB-s,D-s,DEVELOPING,DOWNGRADE,Event driven
+RA-000203,HEXBURY BIOWORKS S.A.,Meridian Ratings,2025-07-24,B-s,D-s,NEGATIVE,AFFIRMED,
+RA-000204,GALEWOOD DIAGNOSTICS LTD,Meridian Ratings,2026-02-21,BBB-s,AA-s,STABLE,AFFIRMED,Issuer request
+RA-000205,"Everley Nutrition Co., Ltd.",Cassiopeia Credit,2025-03-10,A-s,BB-s,DEVELOPING,UPGRADE,Periodic review
+RA-000206,Yarrowmede Mining Ltd,Cassiopeia Credit,2025-10-09,A-s,CCC-s,POSITIVE,DOWNGRADE,Event driven
+RA-000207,Silvercrag Textiles Limited,Meridian Ratings,2025-08-05,AA-s,B-s,STABLE,OUTLOOK_CHANGE,
+RA-000208,Greyfen Chemicals Sdn Bhd,Northwold Analytics,2026-05-06,B-s,BB-s,NEGATIVE,AFFIRMED,
+RA-000209,Everley Solar,Cassiopeia Credit,2025-03-14,A-s,AAA-s,STABLE,OUTLOOK_CHANGE,Issuer request
+RA-000210,Jessamy Marine Pte. Ltd.,Northwold Analytics,2025-03-31,AAA-s,B-s,POSITIVE,AFFIRMED,Issuer request
+RA-000211,MARLOWE PRECISION LIMITED,Meridian Ratings,2024-11-18,B-s,D-s,POSITIVE,OUTLOOK_CHANGE,
+RA-000212,Jarnwick Textiles Pte Ltd,Meridian Ratings,2025-03-03,D-s,CCC-s,DEVELOPING,DOWNGRADE,
+RA-000213,Ostrander Utilities PTE LTD,Cassiopeia Credit,2025-02-20,A-s,CCC-s,STABLE,WITHDRAWN,Periodic review
+RA-000214,WESTERLIN INDUSTRIES PTE LTD,Meridian Ratings,2025-07-15,AA-s,CCC-s,STABLE,AFFIRMED,
+RA-000215,Silvercrag Chemicals Ltd,Northwold Analytics,2025-01-23,B-s,CCC-s,DEVELOPING,UPGRADE,Issuer request
+RA-000216,Zarrowby Water Systems B.V.,Northwold Analytics,2025-05-14,A-s,BB-s,STABLE,DOWNGRADE,Issuer request
+RA-000217,CINDERVALE FABRICATION PTE. LTD.,Meridian Ratings,2024-08-18,BB-s,AAA-s,DEVELOPING,AFFIRMED,Event driven
+RA-000218,WINDERMOOR CAPITAL GROUP PLC,Meridian Ratings,2025-11-16,CCC-s,BBB-s,DEVELOPING,UPGRADE,Event driven
+RA-000219,WESTERLIN FREIGHT PTE LTD,Meridian Ratings,2024-09-13,BB-s,BBB-s,STABLE,DOWNGRADE,Event driven
+RA-000220,JUNIPERTON UTILITIES B.V.,Cassiopeia Credit,2025-01-17,AAA-s,AAA-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000221,Ambervale Wire and Cable Group PLC,Cassiopeia Credit,2025-07-31,AA-s,BBB-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000222,Amberfell Automotive Pte Ltd,Cassiopeia Credit,2024-12-19,B-s,AAA-s,POSITIVE,WITHDRAWN,Event driven
+RA-000223,Yarrowmede Industries PTE LTD,Cassiopeia Credit,2025-10-19,CCC-s,BBB-s,DEVELOPING,AFFIRMED,Event driven
+RA-000224,"Inverwold Composites Co., Ltd.",Cassiopeia Credit,2026-03-18,A-s,B-s,POSITIVE,AFFIRMED,Event driven
+RA-000225,Ironvale Grain Limited,Northwold Analytics,2024-11-21,D-s,BBB-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000226,WHITMARSH UTILITIES LIMITED,Cassiopeia Credit,2025-04-17,BB-s,AAA-s,STABLE,AFFIRMED,
+RA-000227,BELMORAY ANALYTICS B.V.,Cassiopeia Credit,2026-03-22,B-s,CCC-s,NEGATIVE,AFFIRMED,
+RA-000228,LOAMFIELD PRECISION GMBH,Northwold Analytics,2024-11-25,CCC-s,D-s,DEVELOPING,WITHDRAWN,
+RA-000229,Fennmark Aviation Services S.A.,Northwold Analytics,2024-08-25,CCC-s,D-s,STABLE,DOWNGRADE,Periodic review
+RA-000230,Yarrowmede Precision PTE LTD,Meridian Ratings,2024-11-14,AAA-s,CCC-s,DEVELOPING,WITHDRAWN,
+RA-000231,Dumnarch Analytics,Northwold Analytics,2024-11-27,CCC-s,A-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000232,Ilexa Packaging PTE LTD,Northwold Analytics,2025-02-20,CCC-s,A-s,POSITIVE,UPGRADE,
+RA-000233,RAVENHURST AVIATION MARINE B.V.,Northwold Analytics,2025-10-03,CCC-s,B-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000234,Pellaton Industries Pte. Ltd.,Cassiopeia Credit,2025-11-24,AA-s,BB-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000235,VANTORNE SEMICONDUCTORS LLC,Cassiopeia Credit,2025-02-14,BBB-s,AA-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000236,GLENHOLT PROPERTY PTE LTD,Cassiopeia Credit,2025-03-17,D-s,BBB-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000237,Pellaton Metals GmbH,Meridian Ratings,2024-08-16,AAA-s,CCC-s,DEVELOPING,UPGRADE,Issuer request
+RA-000238,Yewbank Inds Sdn Bhd,Cassiopeia Credit,2025-08-20,AA-s,B-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000239,Galewood Bioworks Pte. Ltd.,Northwold Analytics,2026-08-06,BB-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000240,Quintrell Grain Group PLC,Northwold Analytics,2024-12-10,B-s,D-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000241,Quarrenden Property Pte Ltd,Meridian Ratings,2026-08-11,BBB-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000242,Inverwold Aggregates,Northwold Analytics,2026-07-28,D-s,AA-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000243,Foxhollow Holdings Ltd,Cassiopeia Credit,2026-03-24,B-s,B-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000244,Whitmarsh Grain LLC,Cassiopeia Credit,2026-03-18,A-s,D-s,NEGATIVE,WITHDRAWN,
+RA-000245,Xanthe Holdings,Cassiopeia Credit,2025-06-16,D-s,BBB-s,DEVELOPING,UPGRADE,Periodic review
+RA-000246,EVERLEY ROBOTICS SDN BHD,Meridian Ratings,2026-05-03,BB-s,BBB-s,STABLE,DOWNGRADE,Periodic review
+RA-000247,Amberfell Cold Chain,Northwold Analytics,2026-05-15,A-s,BB-s,STABLE,AFFIRMED,
+RA-000248,Belmoray Biowoorks,Cassiopeia Credit,2025-11-20,CCC-s,D-s,DEVELOPING,AFFIRMED,Event driven
+RA-000249,Merriscourt Metals LLC,Northwold Analytics,2025-05-17,AA-s,AAA-s,POSITIVE,AFFIRMED,
+RA-000250,"Greyfen Solar Co., Ltd.",Northwold Analytics,2025-09-09,A-s,A-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000251,Pellaton Inds Pte. Ltd.,Northwold Analytics,2025-07-31,D-s,BB-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000252,Rushmoor Foods Limited,Meridian Ratings,2024-10-01,AAA-s,AA-s,STABLE,UPGRADE,Periodic review
+RA-000253,VONDREL INSTRUMENTS GMBH,Northwold Analytics,2026-04-26,CCC-s,BB-s,DEVELOPING,WITHDRAWN,
+RA-000254,Dellamar Diagnostics,Northwold Analytics,2024-09-19,BB-s,CCC-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000255,Bracklind Cold Chain B.V.,Northwold Analytics,2025-02-13,CCC-s,D-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000256,Vondrel Instruments GmbH,Meridian Ratings,2026-05-30,AA-s,BB-s,STABLE,WITHDRAWN,
+RA-000257,XERALT PHARMA SUPPLY LTD,Meridian Ratings,2025-06-10,BBB-s,AAA-s,DEVELOPING,AFFIRMED,
+RA-000258,Xeralt Fabrication,Northwold Analytics,2024-09-17,BBB-s,D-s,STABLE,WITHDRAWN,Event driven
+RA-000259,Vantorne Energy Ltd,Meridian Ratings,2025-04-25,AAA-s,AA-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000260,Everley Robotics Sdn Bhd,Cassiopeia Credit,2026-07-28,A-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000261,Vondrel Logistics Group PLC,Meridian Ratings,2025-03-30,A-s,CCC-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000262,Ostrander Mining,Meridian Ratings,2026-03-26,CCC-s,CCC-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000263,Quillane Precision,Northwold Analytics,2025-04-07,B-s,CCC-s,DEVELOPING,WITHDRAWN,Issuer request
+RA-000264,Dellamar Robotics Pte. Ltd.,Meridian Ratings,2024-12-01,AA-s,CCC-s,POSITIVE,DOWNGRADE,Event driven
+RA-000265,EASTVANE OFFSHORE PTE LTD,Meridian Ratings,2025-05-27,BBB-s,AAA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000266,ZARROWBY SEMICONDUCTORS B.V.,Cassiopeia Credit,2026-01-12,CCC-s,CCC-s,NEGATIVE,WITHDRAWN,
+RA-000267,YARROWMEDE FREIGHT LTD,Cassiopeia Credit,2026-05-11,D-s,A-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000268,Elvermere Bioworks,Cassiopeia Credit,2026-04-25,AAA-s,A-s,DEVELOPING,WITHDRAWN,
+RA-000269,"HEXBURY COLD CHAIN CO., LTD.",Northwold Analytics,2025-05-08,BB-s,A-s,STABLE,DOWNGRADE,Issuer request
+RA-000270,Eastvane Offshore Pte Ltd,Cassiopeia Credit,2026-03-19,BBB-s,D-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000271,KESTREL OPTICS LLC,Meridian Ratings,2025-03-17,A-s,A-s,POSITIVE,UPGRADE,Event driven
+RA-000272,Quintrell Log. Limited,Meridian Ratings,2024-10-13,BB-s,AA-s,DEVELOPING,AFFIRMED,Event driven
+RA-000273,"Verrant Packaging Co., Ltd.",Meridian Ratings,2025-07-15,D-s,A-s,STABLE,AFFIRMED,Event driven
+RA-000274,Broadhelm Shipping,Meridian Ratings,2025-12-26,BBB-s,AA-s,STABLE,DOWNGRADE,Event driven
+RA-000275,Xeralt Fabrication,Cassiopeia Credit,2025-04-16,A-s,BB-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000276,Northgale Semiconductors,Cassiopeia Credit,2026-04-20,BB-s,A-s,STABLE,UPGRADE,
+RA-000277,Rushmoor Chemicals Limited,Meridian Ratings,2026-03-23,A-s,B-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000278,JUNIPERTON AGRITECH LTD,Cassiopeia Credit,2025-07-09,B-s,BBB-s,STABLE,DOWNGRADE,Periodic review
+RA-000279,Quillane Metals Sdn Bhd,Cassiopeia Credit,2025-05-27,BBB-s,CCC-s,STABLE,AFFIRMED,Periodic review
+RA-000280,Ulverbay Precision Limited,Cassiopeia Credit,2026-04-05,BBB-s,D-s,POSITIVE,AFFIRMED,Issuer request
+RA-000281,Rushmoor Chemicals Limited,Northwold Analytics,2024-10-25,A-s,BB-s,POSITIVE,AFFIRMED,Event driven
+RA-000282,"PENTRELEW CAPITAL CO., LTD.",Meridian Ratings,2026-07-29,AAA-s,BB-s,STABLE,OUTLOOK_CHANGE,
+RA-000283,Redbourne Water Systems Sdn Bhd,Meridian Ratings,2025-06-26,BB-s,BB-s,DEVELOPING,DOWNGRADE,
+RA-000284,"Inverwold Composites Co., Ltd.",Cassiopeia Credit,2026-03-04,A-s,AAA-s,POSITIVE,WITHDRAWN,Event driven
+RA-000285,Jarnwick Textiles,Cassiopeia Credit,2026-02-26,B-s,AAA-s,STABLE,DOWNGRADE,Issuer request
+RA-000286,BROADHELM DIAGNOSTICS PTE LTD,Cassiopeia Credit,2026-01-02,D-s,D-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000287,Inverwold Offshore Limited,Meridian Ratings,2026-07-28,B-s,B-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000288,Brightwake Utilities PTE LTD,Meridian Ratings,2026-01-30,A-s,CCC-s,DEVELOPING,UPGRADE,Issuer request
+RA-000289,Kelbrooke Solar Sdn Bhd,Cassiopeia Credit,2025-03-20,BB-s,AAA-s,NEGATIVE,UPGRADE,Issuer request
+RA-000290,Bracklind Cold Chain B.V.,Cassiopeia Credit,2025-11-15,BBB-s,D-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000291,Elvermere Freight GmbH,Meridian Ratings,2025-01-04,CCC-s,D-s,NEGATIVE,UPGRADE,Issuer request
+RA-000292,Quintrell Grain Group PLC,Meridian Ratings,2026-02-04,A-s,AAA-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000293,Jarnwick Textiles,Northwold Analytics,2025-11-16,AAA-s,BBB-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000294,Calidon Logistics,Meridian Ratings,2025-12-11,AA-s,B-s,NEGATIVE,UPGRADE,Periodic review
+RA-000295,Netherby Pharma Supply,Meridian Ratings,2025-10-29,AA-s,B-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000296,Whitmarsh Wire and Cable,Cassiopeia Credit,2024-10-16,BB-s,BBB-s,STABLE,DOWNGRADE,
+RA-000297,Juniperton Chemicals GmbH,Cassiopeia Credit,2026-03-13,A-s,B-s,NEGATIVE,AFFIRMED,
+RA-000298,Kelbrooke Property B.V.,Meridian Ratings,2026-07-14,BB-s,CCC-s,POSITIVE,DOWNGRADE,Issuer request
+RA-000299,Marlowe Water Systems,Meridian Ratings,2025-12-13,AAA-s,AA-s,POSITIVE,DOWNGRADE,Event driven
+RA-000300,YOLANDE MINING PTE LTD,Northwold Analytics,2025-01-16,BB-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000301,"PENTRELEW CAPITAL CO., LTD.",Northwold Analytics,2025-04-16,B-s,A-s,STABLE,UPGRADE,Issuer request
+RA-000302,Marlowe Precision Limited,Northwold Analytics,2025-08-20,CCC-s,D-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000303,Yewbank Automotive,Cassiopeia Credit,2024-08-02,AAA-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000304,Windermoor Capital Group PLC,Meridian Ratings,2025-09-26,AA-s,B-s,DEVELOPING,UPGRADE,
+RA-000305,Merriscourt Wire and Cable S.A.,Northwold Analytics,2026-04-26,BB-s,A-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000306,Zarrowby Agritech,Meridian Ratings,2025-06-22,AAA-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000307,The Northgale Semiconductors,Northwold Analytics,2025-01-11,BBB-s,D-s,STABLE,DOWNGRADE,Issuer request
+RA-000308,Galewood Diagnostics Ltd,Northwold Analytics,2024-10-09,D-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,
+RA-000309,ASHCOMBE PHARMA SUPPLY SDN BHD,Meridian Ratings,2025-08-03,D-s,AAA-s,STABLE,UPGRADE,Issuer request
+RA-000310,FAIRMONT REACH COLD CHAIN S.A.,Meridian Ratings,2026-02-25,CCC-s,D-s,NEGATIVE,UPGRADE,Periodic review
+RA-000311,Fennmark Aviation Services,Northwold Analytics,2025-07-28,BBB-s,BB-s,STABLE,OUTLOOK_CHANGE,Issuer request
+RA-000312,Glenholt Nutrition Ltd,Meridian Ratings,2025-02-13,AA-s,D-s,POSITIVE,DOWNGRADE,Periodic review
+RA-000313,Ambervale Packaging Ltd,Cassiopeia Credit,2024-09-05,BBB-s,B-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000314,VERRANT TERMINALS SDN BHD,Northwold Analytics,2025-08-08,BB-s,B-s,NEGATIVE,DOWNGRADE,
+RA-000315,Elvermere Water Systems S.A.,Northwold Analytics,2025-03-26,D-s,A-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000316,BRIGHTWAKE UTILITIES PTE LTD,Cassiopeia Credit,2026-02-27,B-s,CCC-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000317,Kytherra Nutrition B.V.,Cassiopeia Credit,2024-10-23,AA-s,B-s,STABLE,WITHDRAWN,Event driven
+RA-000318,Nordvale Energy,Meridian Ratings,2024-12-09,AA-s,AAA-s,DEVELOPING,AFFIRMED,
+RA-000319,Inverwold Aggregates Limited,Northwold Analytics,2025-03-04,CCC-s,D-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000320,Amberfell Robotics B.V.,Cassiopeia Credit,2026-03-17,D-s,D-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000321,OSTRANDER BIOWORKS PTE. LTD.,Meridian Ratings,2025-09-08,AAA-s,B-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000322,Ravenhurst Aviation Marine,Northwold Analytics,2024-09-20,B-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000323,Xeralt Fabrication PTE LTD,Meridian Ratings,2025-09-15,BB-s,A-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000324,Stonecrest Composites Pte Ltd,Northwold Analytics,2026-04-23,AA-s,AA-s,NEGATIVE,WITHDRAWN,
+RA-000325,Oakenshade Industries S.A.,Northwold Analytics,2025-11-20,B-s,AAA-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000326,Cindervale Shipping B.V.,Meridian Ratings,2025-11-05,D-s,BBB-s,STABLE,UPGRADE,Issuer request
+RA-000327,ULMARA DIAGNOSTICS PTE LTD,Cassiopeia Credit,2024-11-10,AAA-s,CCC-s,NEGATIVE,AFFIRMED,
+RA-000328,GREYFEN OFFSHORE LIMITED,Northwold Analytics,2024-12-30,D-s,A-s,POSITIVE,UPGRADE,
+RA-000329,ILEXA MARINE PTE LTD,Cassiopeia Credit,2025-05-19,AAA-s,B-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000330,Glenholt Energy,Meridian Ratings,2026-02-01,AA-s,CCC-s,DEVELOPING,WITHDRAWN,Issuer request
+RA-000331,ULVERBAY PRECISION LIMITED,Cassiopeia Credit,2024-12-07,AAA-s,BB-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000332,"Greyfen Solar Co., Ltd.",Northwold Analytics,2026-06-25,AAA-s,AA-s,POSITIVE,WITHDRAWN,
+RA-000333,WESTERLIN WIRE AND CABLE LIMITED,Northwold Analytics,2025-02-09,AAA-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000334,DUNMARCH COMPOSITES LIMITED,Cassiopeia Credit,2025-01-08,B-s,AAA-s,NEGATIVE,DOWNGRADE,
+RA-000335,Vellacott Ventures Sdn Bhd,Meridian Ratings,2025-05-12,CCC-s,D-s,NEGATIVE,UPGRADE,Periodic review
+RA-000336,Ilexa Chemicals,Northwold Analytics,2025-01-19,AA-s,D-s,POSITIVE,DOWNGRADE,Issuer request
+RA-000337,Marlowe Aggregates Limited,Northwold Analytics,2024-09-20,CCC-s,B-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000338,NETHERBY SOLAR S.A.,Cassiopeia Credit,2026-04-06,CCC-s,D-s,POSITIVE,UPGRADE,Periodic review
+RA-000339,Ravenhurst Water Systems Pte Ltd,Cassiopeia Credit,2025-08-03,AA-s,AA-s,POSITIVE,WITHDRAWN,Event driven
+RA-000340,Yarrowmede Industries,Meridian Ratings,2026-07-20,D-s,B-s,NEGATIVE,UPGRADE,
+RA-000341,RAVENHURST FOODS LLC,Northwold Analytics,2026-03-04,CCC-s,D-s,DEVELOPING,WITHDRAWN,Issuer request
+RA-000342,Quintrell Logistics Limited,Meridian Ratings,2025-04-06,AA-s,AAA-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000343,Amberfell Packaging Ltd,Cassiopeia Credit,2025-09-26,CCC-s,AA-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000344,Ilexa Marine PTE LTD,Northwold Analytics,2025-04-02,CCC-s,BBB-s,STABLE,UPGRADE,Periodic review
+RA-000345,Quillane Solar Pte Ltd,Cassiopeia Credit,2025-04-04,B-s,CCC-s,STABLE,AFFIRMED,Event driven
+RA-000346,Jarnwick Freight Pte. Ltd.,Northwold Analytics,2025-03-05,B-s,BB-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000347,Galewood Diagnostics,Cassiopeia Credit,2026-04-05,CCC-s,A-s,STABLE,UPGRADE,
+RA-000348,Yewbank Textiles Pte. Ltd.,Cassiopeia Credit,2024-08-15,CCC-s,BBB-s,NEGATIVE,UPGRADE,Issuer request
+RA-000349,Vantorne Semiconductors LLC,Northwold Analytics,2025-08-15,CCC-s,A-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000350,Ironvale Nutrition,Meridian Ratings,2026-02-25,CCC-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000351,Amberfell Instruments,Northwold Analytics,2024-08-24,BB-s,BBB-s,DEVELOPING,WITHDRAWN,Event driven
+RA-000352,Merriscourt Wire and Cable,Northwold Analytics,2025-11-17,A-s,AA-s,POSITIVE,WITHDRAWN,Event driven
+RA-000353,Yarrowmede Industries,Cassiopeia Credit,2025-12-09,A-s,B-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000354,Kelbrooke Solar,Cassiopeia Credit,2025-05-29,AAA-s,AA-s,DEVELOPING,AFFIRMED,Event driven
+RA-000355,Westerlin Metals Sdn Bhd,Cassiopeia Credit,2026-03-16,BB-s,CCC-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000356,NORTHGALE LOGISTICS S.A.,Cassiopeia Credit,2026-01-06,D-s,AA-s,DEVELOPING,DOWNGRADE,Event driven
+RA-000357,Elvermere Nutrition Group PLC,Meridian Ratings,2024-11-27,D-s,D-s,DEVELOPING,AFFIRMED,Issuer request
+RA-000358,Oakenshade Optics,Meridian Ratings,2024-10-14,BB-s,B-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000359,Netherby Pharma Supply,Northwold Analytics,2024-09-25,AA-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000360,Ostrander Foods Group PLC,Northwold Analytics,2025-01-22,A-s,AAA-s,NEGATIVE,UPGRADE,
+RA-000361,Quillane Diagnostics,Cassiopeia Credit,2025-09-29,D-s,CCC-s,STABLE,WITHDRAWN,Issuer request
+RA-000362,Amberfell Automotive,Cassiopeia Credit,2024-10-22,B-s,AAA-s,NEGATIVE,UPGRADE,Issuer request
+RA-000363,Fairmont Reach Property LLC,Meridian Ratings,2025-08-30,BB-s,AA-s,POSITIVE,AFFIRMED,Periodic review
+RA-000364,Ambervale Water Systems LLC,Meridian Ratings,2024-12-18,BB-s,BBB-s,STABLE,DOWNGRADE,
+RA-000365,DRUMMORE ENERGY B.V.,Meridian Ratings,2025-01-24,AAA-s,CCC-s,DEVELOPING,UPGRADE,
+RA-000366,Everley Analytics B.V.,Meridian Ratings,2024-12-28,A-s,AA-s,STABLE,AFFIRMED,
+RA-000367,Kirkhaven Holdings,Cassiopeia Credit,2026-04-08,B-s,B-s,STABLE,DOWNGRADE,Periodic review
+RA-000368,Vantorne Semiconductors LLC,Northwold Analytics,2025-12-11,CCC-s,BB-s,POSITIVE,DOWNGRADE,
+RA-000369,Loamfield Utilities LLC,Cassiopeia Credit,2025-09-21,D-s,B-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000370,Inverwold Aviation Services Limited,Cassiopeia Credit,2025-08-30,AAA-s,AAA-s,DEVELOPING,WITHDRAWN,Periodic review
+RA-000371,Tidewater Pharma Supply B.V.,Meridian Ratings,2024-08-01,BBB-s,BB-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000372,Juniperton Utilities B.V.,Meridian Ratings,2026-04-21,A-s,CCC-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000373,Zarrowby Semiconductors B.V.,Meridian Ratings,2025-06-21,B-s,BBB-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000374,Kirkhaven Holdings Pte Ltd,Northwold Analytics,2025-09-24,AAA-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000375,Oakenshade Utilities Pte Ltd,Meridian Ratings,2025-07-19,AA-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000376,Quintrell Logistics Limited,Northwold Analytics,2024-08-01,B-s,CCC-s,STABLE,DOWNGRADE,
+RA-000377,"Jarnwick Fabrication Co., Ltd.",Meridian Ratings,2025-08-25,AAA-s,A-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000378,Broadhelm Shipping Ltd,Northwold Analytics,2026-05-07,BB-s,BB-s,STABLE,DOWNGRADE,Event driven
+RA-000379,Amberfell Automotive,Meridian Ratings,2025-08-20,BBB-s,BB-s,POSITIVE,WITHDRAWN,
+RA-000380,Ravenhurst Water Systems Pte Ltd,Meridian Ratings,2024-09-10,CCC-s,CCC-s,NEGATIVE,UPGRADE,
+RA-000381,EASTVANE OFFSHORE PTE LTD,Northwold Analytics,2025-11-14,BB-s,B-s,STABLE,UPGRADE,Event driven
+RA-000382,Belmoray Analytics B.V.,Cassiopeia Credit,2026-08-13,AA-s,AA-s,STABLE,AFFIRMED,
+RA-000383,FENNMARK AVIATION SERVICES S.A.,Cassiopeia Credit,2024-08-04,CCC-s,BBB-s,NEGATIVE,AFFIRMED,Event driven
+RA-000384,Vellacott Freight,Meridian Ratings,2025-05-24,BBB-s,AAA-s,DEVELOPING,UPGRADE,Issuer request
+RA-000385,NETHERBY SOLAR S.A.,Meridian Ratings,2024-08-30,CCC-s,D-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000386,Belmoray Metals Sdn Bhd,Meridian Ratings,2024-10-25,AAA-s,AA-s,POSITIVE,AFFIRMED,
+RA-000387,Quintrell Log. Limited,Meridian Ratings,2025-02-10,BBB-s,AAA-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000388,Dunmarch Optics Pte. Ltd.,Meridian Ratings,2025-11-10,BBB-s,B-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000389,ASHCOMBE TERMINALS PTE LTD,Meridian Ratings,2024-08-12,D-s,B-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000390,Northgale Log. S.A.,Northwold Analytics,2025-11-10,CCC-s,BB-s,NEGATIVE,WITHDRAWN,
+RA-000391,ZEPHRINE INDUSTRIES PTE LTD,Cassiopeia Credit,2025-09-13,BB-s,BBB-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000392,Stonecrest Capital PTE LTD,Cassiopeia Credit,2026-07-12,CCC-s,BB-s,STABLE,OUTLOOK_CHANGE,
+RA-000393,"Calidon Logistics Co., Ltd.",Meridian Ratings,2026-06-21,AA-s,AAA-s,STABLE,UPGRADE,Issuer request
+RA-000394,Glenholt Property PTE LTD,Cassiopeia Credit,2025-10-04,AAA-s,AAA-s,NEGATIVE,UPGRADE,
+RA-000395,DELLAMAR ROBOTICS PTE. LTD.,Northwold Analytics,2024-11-16,CCC-s,B-s,POSITIVE,AFFIRMED,
+RA-000396,Zarrowby Agritech,Meridian Ratings,2025-06-04,BB-s,AA-s,DEVELOPING,UPGRADE,Periodic review
+RA-000397,Juniperton Chemicals,Meridian Ratings,2025-11-26,BBB-s,BB-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000398,Fennmark Textiles Pte Ltd,Northwold Analytics,2025-06-23,A-s,BBB-s,POSITIVE,OUTLOOK_CHANGE,
+RA-000399,Harrowby Property B.V.,Cassiopeia Credit,2026-05-06,CCC-s,CCC-s,STABLE,DOWNGRADE,Event driven
+RA-000400,Vondrel Energy,Northwold Analytics,2026-02-11,CCC-s,BBB-s,POSITIVE,AFFIRMED,
+RA-000401,Netherby Terminals Ltd,Northwold Analytics,2025-01-03,BB-s,D-s,STABLE,WITHDRAWN,Periodic review
+RA-000402,Ashcombe Ventures,Cassiopeia Credit,2026-02-03,B-s,AA-s,STABLE,UPGRADE,
+RA-000403,EVERLEY SOLAR LLC,Meridian Ratings,2026-05-27,A-s,B-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000404,Galewood Diagnostics Ltd,Northwold Analytics,2025-10-02,AA-s,BBB-s,STABLE,DOWNGRADE,Event driven
+RA-000405,Vantorne Energy,Cassiopeia Credit,2024-11-26,CCC-s,BBB-s,POSITIVE,UPGRADE,Periodic review
+RA-000406,AMBERFELL COLD CHAIN PTE. LTD.,Cassiopeia Credit,2025-09-08,AA-s,A-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000407,Tidewater Utilities Pte. Ltd.,Northwold Analytics,2025-03-03,BB-s,A-s,NEGATIVE,AFFIRMED,Event driven
+RA-000408,Ambervale Foods Sdn Bhd,Cassiopeia Credit,2025-06-03,D-s,AA-s,NEGATIVE,UPGRADE,Event driven
+RA-000409,Ulverbay Precision Limited,Northwold Analytics,2025-12-25,CCC-s,B-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000410,Quillane Metals Sdn Bhd,Meridian Ratings,2025-06-05,BBB-s,CCC-s,DEVELOPING,WITHDRAWN,Periodic review
+RA-000411,Hollowmere Metals Pte Ltd,Northwold Analytics,2025-10-21,A-s,BBB-s,NEGATIVE,DOWNGRADE,
+RA-000412,Ashcombe Terminals PTE LTD,Northwold Analytics,2025-09-10,BB-s,BBB-s,STABLE,UPGRADE,Periodic review
+RA-000413,Vantorne Utilities Sdn Bhd,Northwold Analytics,2026-04-14,AA-s,D-s,STABLE,UPGRADE,
+RA-000414,Oakenshade Aviation Services LLC,Northwold Analytics,2025-04-22,AAA-s,AAA-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000415,Lanthorn Nutrition Ltd,Meridian Ratings,2025-07-01,AA-s,BBB-s,DEVELOPING,UPGRADE,Event driven
+RA-000416,Yarrowmede Mining Ltd,Northwold Analytics,2026-02-19,AA-s,BBB-s,STABLE,AFFIRMED,Periodic review
+RA-000417,Kirkhaven Capital Group PLC,Northwold Analytics,2025-08-28,AAA-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Issuer request
+RA-000418,EASTVANE OFFSHORE PTE LTD,Meridian Ratings,2025-02-18,CCC-s,B-s,DEVELOPING,DOWNGRADE,
+RA-000419,Oakenshade Precision Ltd,Meridian Ratings,2025-06-11,AA-s,CCC-s,STABLE,AFFIRMED,Issuer request
+RA-000420,OSTRANDER BIOWORKS PTE. LTD.,Meridian Ratings,2025-09-27,AAA-s,D-s,NEGATIVE,AFFIRMED,
+RA-000421,MORROWFIELD PHARMA SUPPLY PTE LTD,Meridian Ratings,2024-09-06,BBB-s,AAA-s,STABLE,AFFIRMED,Event driven
+RA-000422,Tidewater Textiles,Northwold Analytics,2025-11-17,BB-s,BBB-s,NEGATIVE,UPGRADE,Event driven
+RA-000423,HOLLOWMERE AUTOMOTIVE LLC,Northwold Analytics,2026-04-20,A-s,AA-s,POSITIVE,AFFIRMED,Issuer request
+RA-000424,Ulmara Diagnostics,Cassiopeia Credit,2026-03-23,AAA-s,BB-s,POSITIVE,AFFIRMED,Periodic review
+RA-000425,Kirkhaven Terminals,Northwold Analytics,2025-09-29,AAA-s,D-s,STABLE,DOWNGRADE,
+RA-000426,"Everley Nutrition Co., Ltd.",Meridian Ratings,2026-06-24,AAA-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Event driven
+RA-000427,Palliser Automotive LLC,Northwold Analytics,2026-03-20,CCC-s,AA-s,STABLE,WITHDRAWN,
+RA-000428,Silvercrag Cold Chain PTE LTD,Meridian Ratings,2025-11-26,AA-s,BB-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000429,The Northgale Semiconductors Group PLC,Cassiopeia Credit,2025-10-14,D-s,D-s,DEVELOPING,UPGRADE,Event driven
+RA-000430,Quillane Precision B.V.,Cassiopeia Credit,2025-05-16,BB-s,AAA-s,DEVELOPING,UPGRADE,
+RA-000431,Greyfen Chemicals Sdn Bhd,Meridian Ratings,2026-07-18,BB-s,AA-s,POSITIVE,UPGRADE,Periodic review
+RA-000432,Dunmarch Optics,Northwold Analytics,2026-06-17,AA-s,AAA-s,DEVELOPING,AFFIRMED,Periodic review
+RA-000433,STONECREST COMPOSITES PTE LTD,Northwold Analytics,2025-10-27,A-s,D-s,DEVELOPING,AFFIRMED,
+RA-000434,Cindervale Fabrication Pte. Ltd.,Cassiopeia Credit,2025-01-08,AAA-s,A-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000435,Zarrowby Agritech Limited,Cassiopeia Credit,2024-09-01,D-s,D-s,STABLE,UPGRADE,Periodic review
+RA-000436,AMBERFELL LOGISTICS PTE LTD,Northwold Analytics,2026-02-04,BB-s,AAA-s,NEGATIVE,WITHDRAWN,
+RA-000437,Vantorne Energy,Meridian Ratings,2026-07-28,CCC-s,AA-s,NEGATIVE,AFFIRMED,Issuer request
+RA-000438,WESTERLIN PACKAGING SDN BHD,Cassiopeia Credit,2025-06-29,D-s,AA-s,STABLE,AFFIRMED,Periodic review
+RA-000439,Ulmara Energy,Northwold Analytics,2025-10-27,B-s,BB-s,POSITIVE,DOWNGRADE,Periodic review
+RA-000440,RUSHMOOR UTILITIES PTE LTD,Northwold Analytics,2026-05-14,BBB-s,BBB-s,NEGATIVE,AFFIRMED,
+RA-000441,Everley Grain Group PLC,Cassiopeia Credit,2026-08-01,D-s,CCC-s,DEVELOPING,DOWNGRADE,
+RA-000442,YARROWMEDE FREIGHT LTD,Cassiopeia Credit,2026-03-13,D-s,BBB-s,STABLE,AFFIRMED,Periodic review
+RA-000443,Kirkhaven Terminals,Meridian Ratings,2025-07-14,BB-s,AA-s,POSITIVE,DOWNGRADE,Issuer request
+RA-000444,OAKENSHADE OPTICS LLC,Cassiopeia Credit,2024-11-24,A-s,BBB-s,DEVELOPING,AFFIRMED,Event driven
+RA-000445,WESTERLIN METALS SDN BHD,Northwold Analytics,2025-03-23,D-s,A-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000446,Everley Utilities,Meridian Ratings,2024-12-18,BB-s,BBB-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000447,Vantorne Semiconductors,Meridian Ratings,2024-10-12,BBB-s,BBB-s,DEVELOPING,UPGRADE,Periodic review
+RA-000448,Yewbank Aggregates Pte. Ltd.,Cassiopeia Credit,2026-08-02,AA-s,BB-s,POSITIVE,AFFIRMED,Issuer request
+RA-000449,Jarnwick Textiles Pte Ltd,Northwold Analytics,2025-09-28,D-s,AA-s,DEVELOPING,UPGRADE,Issuer request
+RA-000450,Silvercrag Textiles Limited,Meridian Ratings,2024-08-18,CCC-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000451,Broadhelm Shipping Ltd,Northwold Analytics,2025-04-15,CCC-s,B-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000452,Broadhelm Shipping Ltd,Northwold Analytics,2024-10-27,BB-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000453,NETHERBY PHARMA SUPPLY GMBH,Meridian Ratings,2026-05-22,CCC-s,D-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000454,Kytherra Fabrication LLC,Northwold Analytics,2026-05-05,CCC-s,CCC-s,STABLE,UPGRADE,
+RA-000455,Ashcombe Ventures Ltd,Cassiopeia Credit,2025-03-25,BBB-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000456,Quintrell Marine B.V.,Northwold Analytics,2025-10-11,AA-s,AAA-s,DEVELOPING,WITHDRAWN,Issuer request
+RA-000457,Amberfell Packaging Ltd,Northwold Analytics,2026-05-31,A-s,AA-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000458,Everley Grain Group PLC,Northwold Analytics,2026-03-30,CCC-s,BBB-s,STABLE,UPGRADE,Periodic review
+RA-000459,Ostrander Utilities,Meridian Ratings,2025-01-02,BBB-s,AAA-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000460,Corvane Holdings,Northwold Analytics,2025-04-10,B-s,AAA-s,DEVELOPING,AFFIRMED,Periodic review
+RA-000461,UMBERLY PHARMA SUPPLY LIMITED,Meridian Ratings,2026-03-28,CCC-s,AAA-s,POSITIVE,UPGRADE,Event driven
+RA-000462,Dunmarch Analytics Limited,Meridian Ratings,2026-07-23,CCC-s,AA-s,STABLE,UPGRADE,Periodic review
+RA-000463,Amberfell Logistics,Meridian Ratings,2025-08-08,BBB-s,D-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000464,Ulmara Aggregates PTE LTD,Northwold Analytics,2025-03-19,CCC-s,BB-s,POSITIVE,UPGRADE,Issuer request
+RA-000465,Oakenshade Industries S.A.,Meridian Ratings,2025-06-01,D-s,D-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000466,ELVERMERE FREIGHT GMBH,Northwold Analytics,2025-10-28,AA-s,D-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000467,Dellamar Pharma Supply LLC,Meridian Ratings,2026-03-24,AA-s,AAA-s,POSITIVE,OUTLOOK_CHANGE,
+RA-000468,BRACKLIND GRAIN GROUP PLC,Cassiopeia Credit,2026-07-04,AAA-s,B-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000469,Everley Analytics B.V.,Northwold Analytics,2025-12-09,BB-s,AA-s,STABLE,OUTLOOK_CHANGE,Event driven
+RA-000470,SILVERCRAG VENTURES GROUP PLC,Cassiopeia Credit,2024-10-08,BB-s,AA-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000471,Amberfell Cold Chain Pte. Ltd.,Cassiopeia Credit,2026-04-08,AA-s,BBB-s,NEGATIVE,UPGRADE,Issuer request
+RA-000472,Elvermere Bioworks,Northwold Analytics,2026-03-29,D-s,CCC-s,POSITIVE,DOWNGRADE,Issuer request
+RA-000473,WESTERLIN INDUSTRIES PTE LTD,Northwold Analytics,2025-10-04,B-s,BB-s,DEVELOPING,AFFIRMED,Event driven
+RA-000474,Yarrowmede Industries,Cassiopeia Credit,2026-02-10,AA-s,B-s,NEGATIVE,AFFIRMED,Periodic review
+RA-000475,Cindervale Diagnostics Ltd,Cassiopeia Credit,2026-01-17,AA-s,A-s,POSITIVE,AFFIRMED,Issuer request
+RA-000476,KELBROKOE SHIPPING GMBH,Meridian Ratings,2025-02-07,BB-s,AA-s,NEGATIVE,WITHDRAWN,Event driven
+RA-000477,Silvrecrag Textiles Pte Ltd,Cassiopeia Credit,2026-03-17,D-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000478,Dunmarch Semiconductors GmbH,Cassiopeia Credit,2026-07-06,B-s,AA-s,POSITIVE,AFFIRMED,Periodic review
+RA-000479,Pellaton Logistics,Meridian Ratings,2024-08-28,BB-s,CCC-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000480,XERALT FABRICATION PTE LTD,Meridian Ratings,2025-12-03,BB-s,AAA-s,STABLE,DOWNGRADE,Issuer request
+RA-000481,BRACKLIND CAPITAL LIMITED,Northwold Analytics,2025-12-15,D-s,A-s,NEGATIVE,UPGRADE,Issuer request
+RA-000482,Everley Analytics B.V.,Northwold Analytics,2026-04-01,B-s,B-s,STABLE,AFFIRMED,Periodic review
+RA-000483,Kytherra Fabrication LLC,Northwold Analytics,2025-04-25,B-s,D-s,STABLE,UPGRADE,Periodic review
+RA-000484,VELLACOTT VENTURES SDN BHD,Meridian Ratings,2025-08-31,D-s,AAA-s,DEVELOPING,AFFIRMED,Issuer request
+RA-000485,Ulmara Diagnostics,Northwold Analytics,2026-04-26,BBB-s,BB-s,POSITIVE,AFFIRMED,Issuer request
+RA-000486,FOXHOLLOW HOLDINGS LTD,Meridian Ratings,2024-10-22,B-s,BB-s,POSITIVE,WITHDRAWN,
+RA-000487,"GLENHOLT ENERGY CO., LTD.",Northwold Analytics,2026-02-28,AA-s,CCC-s,STABLE,WITHDRAWN,Event driven
+RA-000488,Calidon Industries Limited,Cassiopeia Credit,2026-02-06,D-s,B-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000489,Dellamar Diagnostics,Northwold Analytics,2025-05-21,A-s,A-s,STABLE,WITHDRAWN,
+RA-000490,MORROWFIELD PHARMA SUPPLY PTE LTD,Northwold Analytics,2025-09-04,A-s,B-s,NEGATIVE,DOWNGRADE,Issuer request
+RA-000491,Hexbury Ventures GmbH,Cassiopeia Credit,2026-03-11,B-s,AAA-s,DEVELOPING,AFFIRMED,Issuer request
+RA-000492,Quintrell Marine,Cassiopeia Credit,2025-11-29,AAA-s,AA-s,STABLE,DOWNGRADE,Issuer request
+RA-000493,REDBOURNE UTILITIES GROUP PLC,Cassiopeia Credit,2025-01-31,BBB-s,AA-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000494,Quarrenden Solar Pte. Ltd.,Cassiopeia Credit,2026-06-05,AAA-s,BB-s,POSITIVE,UPGRADE,
+RA-000495,Ashcombe Terminals,Cassiopeia Credit,2026-02-13,AA-s,A-s,NEGATIVE,AFFIRMED,
+RA-000496,Oakenshade Aviation Services,Meridian Ratings,2025-06-05,D-s,AA-s,POSITIVE,DOWNGRADE,Event driven
+RA-000497,ELVERMERE WATER SYSTEMS S.A.,Cassiopeia Credit,2026-05-13,CCC-s,BB-s,NEGATIVE,UPGRADE,Periodic review
+RA-000498,Loamfield Utilities LLC,Meridian Ratings,2025-12-24,AAA-s,A-s,NEGATIVE,UPGRADE,Issuer request
+RA-000499,KIRKHAVEN VENTURES LIMITED,Cassiopeia Credit,2024-10-20,AAA-s,B-s,DEVELOPING,OUTLOOK_CHANGE,Event driven
+RA-000500,Oakenshade Optics LLC,Northwold Analytics,2025-08-11,BB-s,BB-s,POSITIVE,WITHDRAWN,Event driven
+RA-000501,CINDERVALE SHHIPPING PTE. LTD.,Northwold Analytics,2026-06-20,BBB-s,AA-s,DEVELOPING,DOWNGRADE,Periodic review
+RA-000502,Xanthe Hldgs Pte Ltd,Northwold Analytics,2025-02-27,B-s,B-s,POSITIVE,WITHDRAWN,Event driven
+RA-000503,Cindervale Diagnostics Ltd,Northwold Analytics,2025-01-05,BB-s,CCC-s,NEGATIVE,UPGRADE,Event driven
+RA-000504,XERALT PHARMA SUPPLY LTD,Cassiopeia Credit,2025-06-13,A-s,CCC-s,NEGATIVE,UPGRADE,Issuer request
+RA-000505,Ambervale Marine,Cassiopeia Credit,2026-05-29,CCC-s,AA-s,STABLE,UPGRADE,Issuer request
+RA-000506,Vondrel Term. Limited,Northwold Analytics,2024-08-31,B-s,AA-s,STABLE,UPGRADE,Event driven
+RA-000507,Umberly Diagnostics Group PLC,Cassiopeia Credit,2025-04-28,BBB-s,D-s,POSITIVE,WITHDRAWN,Event driven
+RA-000508,Loamfield Chemicals,Cassiopeia Credit,2026-07-20,CCC-s,CCC-s,STABLE,WITHDRAWN,
+RA-000509,Dunmarch Composites Limited,Meridian Ratings,2025-04-13,D-s,D-s,POSITIVE,DOWNGRADE,
+RA-000510,HEXBURY VENTURES GMBH,Meridian Ratings,2025-03-28,AA-s,D-s,NEGATIVE,AFFIRMED,Event driven
+RA-000511,Kelbrooke Packaging,Northwold Analytics,2025-11-23,BB-s,D-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000512,Dunmarch Composites Limited,Cassiopeia Credit,2024-12-24,BB-s,AA-s,DEVELOPING,UPGRADE,Issuer request
+RA-000513,Westerlin Freight Pte Ltd,Meridian Ratings,2025-06-11,AAA-s,AAA-s,NEGATIVE,UPGRADE,
+RA-000514,Fennmark Textiles Pte Ltd,Meridian Ratings,2024-12-03,A-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000515,"Eevrley Grain Co., Ltd.",Cassiopeia Credit,2025-03-12,A-s,BBB-s,DEVELOPING,AFFIRMED,Issuer request
+RA-000516,Ashcombe Pharma Supply Sdn Bhd,Cassiopeia Credit,2024-11-18,AAA-s,BB-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000517,Juniperton Optics,Northwold Analytics,2025-07-09,A-s,A-s,DEVELOPING,UPGRADE,Event driven
+RA-000518,RAVENHURST FOODS LLC,Northwold Analytics,2026-03-08,AAA-s,AAA-s,DEVELOPING,WITHDRAWN,Event driven
+RA-000519,NORDVALE ENERGY PTE LTD,Meridian Ratings,2024-10-15,BBB-s,BB-s,DEVELOPING,DOWNGRADE,Issuer request
+RA-000520,BELMORAY ANALYTICS B.V.,Meridian Ratings,2026-05-06,A-s,B-s,POSITIVE,DOWNGRADE,Event driven
+RA-000521,Palliser Water Systems Limited,Northwold Analytics,2024-11-30,BBB-s,A-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000522,Foxhollow Term. Pte Ltd,Northwold Analytics,2025-12-04,BB-s,AAA-s,STABLE,DOWNGRADE,
+RA-000523,Tidewater Textiles Sdn Bhd,Northwold Analytics,2024-08-13,A-s,B-s,DEVELOPING,UPGRADE,Periodic review
+RA-000524,Yarrowmede Mining Ltd,Northwold Analytics,2024-09-21,D-s,AA-s,STABLE,WITHDRAWN,Periodic review
+RA-000525,Ironvale Nutrition Sdn Bhd,Cassiopeia Credit,2026-08-11,AAA-s,AA-s,STABLE,AFFIRMED,Periodic review
+RA-000526,NORTHGALE LOGISTICS S.A.,Meridian Ratings,2025-01-01,AA-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Event driven
+RA-000527,Cindervale Shipping B.V.,Northwold Analytics,2025-11-21,AAA-s,D-s,DEVELOPING,UPGRADE,
+RA-000528,Jarnwick Freight Pte. Ltd.,Northwold Analytics,2024-09-18,CCC-s,AAA-s,POSITIVE,AFFIRMED,
+RA-000529,Ravenhurst Water Systems,Meridian Ratings,2026-06-03,CCC-s,BB-s,NEGATIVE,UPGRADE,Event driven
+RA-000530,Kelbrooke Property,Cassiopeia Credit,2025-03-10,AA-s,CCC-s,POSITIVE,UPGRADE,Event driven
+RA-000531,Everley Textiles Limited,Meridian Ratings,2026-03-27,CCC-s,BB-s,NEGATIVE,AFFIRMED,Event driven
+RA-000532,HARROWBY AGGREGATES GROUP PLC,Northwold Analytics,2025-10-29,A-s,B-s,POSITIVE,WITHDRAWN,
+RA-000533,FAIRMONT REACH AVIATION FABRICATION GMBH,Cassiopeia Credit,2025-03-07,CCC-s,BB-s,STABLE,AFFIRMED,Issuer request
+RA-000534,Quillane Bioworks LLC,Northwold Analytics,2024-10-16,CCC-s,AA-s,POSITIVE,DOWNGRADE,
+RA-000535,Dumnarch Analytics,Cassiopeia Credit,2024-08-02,BB-s,AA-s,NEGATIVE,UPGRADE,
+RA-000536,QUILLANE DIAGNOSTICS PTE LTD,Northwold Analytics,2025-01-22,BB-s,BB-s,NEGATIVE,UPGRADE,Issuer request
+RA-000537,Hollowmere Automotive LLC,Meridian Ratings,2026-06-22,AA-s,AA-s,NEGATIVE,DOWNGRADE,
+RA-000538,Zarrowby Water Systems B.V.,Cassiopeia Credit,2025-08-31,D-s,AA-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000539,Dunmarch Composites,Meridian Ratings,2024-09-28,BB-s,B-s,STABLE,AFFIRMED,
+RA-000540,BELMORAY ANALYTICS B.V.,Northwold Analytics,2026-07-28,D-s,BB-s,POSITIVE,AFFIRMED,Event driven
+RA-000541,AMBERVALE PACKAGING LTD,Cassiopeia Credit,2026-03-17,D-s,BBB-s,NEGATIVE,WITHDRAWN,Issuer request
+RA-000542,Marlowe Automotive,Cassiopeia Credit,2024-09-03,CCC-s,BBB-s,NEGATIVE,OUTLOOK_CHANGE,Periodic review
+RA-000543,NORDVALE PROPERTY B.V.,Northwold Analytics,2025-11-26,D-s,AA-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000544,Netherby Diagnostics,Northwold Analytics,2025-08-31,BBB-s,A-s,NEGATIVE,AFFIRMED,Event driven
+RA-000545,Ashcombe Shipping,Northwold Analytics,2026-01-13,D-s,A-s,DEVELOPING,UPGRADE,Issuer request
+RA-000546,"Harrowby Grain Co., Ltd.",Cassiopeia Credit,2026-03-04,B-s,B-s,POSITIVE,UPGRADE,Issuer request
+RA-000547,FAIRMONT REACH PROPERTY LLC,Northwold Analytics,2026-07-11,BB-s,A-s,NEGATIVE,WITHDRAWN,Periodic review
+RA-000548,Galewood Offshore,Cassiopeia Credit,2024-10-18,D-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000549,Foxhollow Holdings Ltd,Cassiopeia Credit,2025-01-21,AAA-s,BBB-s,NEGATIVE,DOWNGRADE,Event driven
+RA-000550,VELLACOTT FREIGHT PTE LTD,Northwold Analytics,2025-06-30,BB-s,A-s,NEGATIVE,UPGRADE,Periodic review
+RA-000551,Everley Offshore Ltd,Cassiopeia Credit,2026-02-22,AA-s,D-s,NEGATIVE,OUTLOOK_CHANGE,
+RA-000552,Foxhollow Semiconductors Pte. Ltd.,Cassiopeia Credit,2024-10-26,A-s,B-s,DEVELOPING,AFFIRMED,Event driven
+RA-000553,Fennmark Energy Limited,Cassiopeia Credit,2026-03-28,AAA-s,B-s,STABLE,UPGRADE,Event driven
+RA-000554,Jessamy Mining,Northwold Analytics,2026-01-15,AA-s,AA-s,NEGATIVE,OUTLOOK_CHANGE,Event driven
+RA-000555,TIDEWATER TEXTILES SDN BHD,Cassiopeia Credit,2024-09-02,AAA-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000556,Ulmara Diagnostics Pte Ltd,Northwold Analytics,2026-07-03,A-s,BB-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000557,Inverwold Offshore Limited,Northwold Analytics,2025-05-04,BBB-s,CCC-s,STABLE,OUTLOOK_CHANGE,
+RA-000558,JARNWICK TEXTILES PTE LTD,Northwold Analytics,2026-03-31,BBB-s,AAA-s,POSITIVE,UPGRADE,Periodic review
+RA-000559,Quillane Bioworks LLC,Cassiopeia Credit,2025-06-24,D-s,A-s,STABLE,DOWNGRADE,Periodic review
+RA-000560,Everley Analytics,Northwold Analytics,2025-10-23,AAA-s,BBB-s,POSITIVE,AFFIRMED,Event driven
+RA-000561,Whitmarsh Shipping Ltd,Northwold Analytics,2024-10-16,BBB-s,A-s,DEVELOPING,AFFIRMED,Periodic review
+RA-000562,Everley Robotics,Meridian Ratings,2026-03-30,AA-s,A-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000563,Morrowfield Pharma Supply Pte Ltd,Cassiopeia Credit,2024-10-07,BBB-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000564,"Glenholt Energy Co., Ltd.",Meridian Ratings,2025-01-21,BB-s,D-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request
+RA-000565,Whitmarsh Shipping Ltd,Cassiopeia Credit,2024-12-15,A-s,AAA-s,STABLE,UPGRADE,Event driven
+RA-000566,Ambervale Packaging,Cassiopeia Credit,2024-09-01,B-s,CCC-s,NEGATIVE,DOWNGRADE,
+RA-000567,Merriscourt Foods Limited,Northwold Analytics,2025-11-05,CCC-s,A-s,DEVELOPING,AFFIRMED,
+RA-000568,Drummore Energy B.V.,Meridian Ratings,2026-02-22,AAA-s,AAA-s,POSITIVE,WITHDRAWN,Periodic review
+RA-000569,Jarnwick Freight Pte. Ltd.,Northwold Analytics,2025-04-06,A-s,B-s,DEVELOPING,UPGRADE,Periodic review
+RA-000570,Vantorne Utilities,Cassiopeia Credit,2026-07-12,A-s,BBB-s,POSITIVE,AFFIRMED,Issuer request
+RA-000571,ZARROWBY AGRITECH LIMITED,Northwold Analytics,2024-09-02,B-s,B-s,POSITIVE,AFFIRMED,Event driven
+RA-000572,Ambervale Packaging Ltd,Northwold Analytics,2025-12-12,AA-s,BB-s,DEVELOPING,OUTLOOK_CHANGE,
+RA-000573,"HARROWBY GRAIN CO., LTD.",Meridian Ratings,2025-07-15,B-s,BB-s,STABLE,DOWNGRADE,Event driven
+RA-000574,Tidewater Utilities,Northwold Analytics,2024-12-25,BBB-s,AA-s,DEVELOPING,OUTLOOK_CHANGE,Event driven
+RA-000575,Yarrowmede Industries,Northwold Analytics,2024-10-20,BBB-s,D-s,STABLE,OUTLOOK_CHANGE,Periodic review
+RA-000576,Vantorne Aggregates B.V.,Cassiopeia Credit,2025-03-02,BB-s,CCC-s,POSITIVE,OUTLOOK_CHANGE,Issuer request
+RA-000577,MORROWFIELD PHARMA SUPPLY PTE LTD,Meridian Ratings,2025-11-06,AAA-s,CCC-s,POSITIVE,WITHDRAWN,Issuer request
+RA-000578,Kirkhaven Capital,Cassiopeia Credit,2025-12-31,A-s,BBB-s,STABLE,OUTLOOK_CHANGE,
+RA-000579,VANTORNE ENERGY LTD,Northwold Analytics,2025-06-13,AAA-s,D-s,POSITIVE,OUTLOOK_CHANGE,
+RA-000580,LARKSPIRE VENTURES PTE. LTD.,Cassiopeia Credit,2026-03-28,AAA-s,AA-s,DEVELOPING,WITHDRAWN,Issuer request
+RA-000581,Oakenshade Agritech Limited,Northwold Analytics,2026-04-11,BB-s,BBB-s,NEGATIVE,DOWNGRADE,Periodic review
+RA-000582,KELBROOKE AGGREGATES B.V.,Meridian Ratings,2025-01-17,AAA-s,AAA-s,POSITIVE,AFFIRMED,Issuer request
+RA-000583,Xanthe Utilities LLC,Meridian Ratings,2025-12-11,A-s,AA-s,STABLE,OUTLOOK_CHANGE,
+RA-000584,Kestrel Optics,Cassiopeia Credit,2025-02-09,D-s,A-s,NEGATIVE,AFFIRMED,Event driven
+RA-000585,Tidewater Textiles Sdn Bhd,Cassiopeia Credit,2026-07-31,D-s,CCC-s,NEGATIVE,UPGRADE,
+RA-000586,Lanthorn Utilities B.V.,Northwold Analytics,2025-09-04,A-s,A-s,DEVELOPING,UPGRADE,Issuer request
+RA-000587,QUILLANE PRECISION B.V.,Meridian Ratings,2025-02-13,AAA-s,CCC-s,POSITIVE,DOWNGRADE,
+RA-000588,Marlowe Water Systems PTE LTD,Meridian Ratings,2024-08-02,AAA-s,CCC-s,POSITIVE,UPGRADE,Issuer request
+RA-000589,WINDERMOOR CAPITAL GROUP PLC,Cassiopeia Credit,2024-09-23,CCC-s,B-s,STABLE,OUTLOOK_CHANGE,Issuer request
+RA-000590,LANTHORN AVIATION SERVICES LIMITED,Cassiopeia Credit,2026-03-12,BBB-s,A-s,POSITIVE,WITHDRAWN,
+RA-000591,Zephrine Grain Pte Ltd,Cassiopeia Credit,2026-06-23,AAA-s,AAA-s,STABLE,AFFIRMED,Issuer request
+RA-000592,Northgale Semiconductors Sdn Bhd,Meridian Ratings,2025-03-05,AA-s,A-s,DEVELOPING,AFFIRMED,
+RA-000593,Amberfell Aivation Services,Northwold Analytics,2026-02-04,AA-s,BB-s,STABLE,UPGRADE,Issuer request
+RA-000594,Ambervale Marine,Meridian Ratings,2025-03-30,D-s,A-s,POSITIVE,WITHDRAWN,Event driven
+RA-000595,Quarrenden Solar Pte. Ltd.,Northwold Analytics,2025-11-25,BBB-s,CCC-s,DEVELOPING,OUTLOOK_CHANGE,Periodic review
+RA-000596,Sablewick Robotics,Cassiopeia Credit,2026-01-18,AA-s,AAA-s,POSITIVE,UPGRADE,Issuer request
+RA-000597,GLENHOLT NUTRITION LTD,Cassiopeia Credit,2025-08-10,D-s,AA-s,STABLE,WITHDRAWN,Periodic review
+RA-000598,Kelbrokoe Shipping GmbH,Cassiopeia Credit,2025-02-06,BB-s,AA-s,POSITIVE,OUTLOOK_CHANGE,Periodic review
+RA-000599,Harrowby Cold Chain PTE LTD,Northwold Analytics,2024-09-16,A-s,BBB-s,POSITIVE,OUTLOOK_CHANGE,Event driven
+RA-000600,KELBROOKE AGGREGATES B.V.,Meridian Ratings,2024-10-01,D-s,CCC-s,DEVELOPING,OUTLOOK_CHANGE,Issuer request

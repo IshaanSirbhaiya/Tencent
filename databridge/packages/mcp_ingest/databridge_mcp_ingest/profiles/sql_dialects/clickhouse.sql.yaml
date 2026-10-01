@@ -1,0 +1,76 @@
+# ClickHouse dialect template (W4). DRAFT — UNVERIFIED: written from the documented system.*
+# tables, never run against ClickHouse here. `draft_dialect` live-probes it before anyone can
+# approve it for a connection. Shape: tabular/dialect_draft.py. A "schema" is a database.
+name: clickhouse
+engine: clickhouse
+title: ClickHouse
+status: draft
+unverified: >-
+  Not run against ClickHouse. KNOWN GAPS: ClickHouse has NO foreign keys (the keys probe will find
+  0 relationships — that is the engine, not a hidden catalogue); its PRIMARY KEY is a sort key and
+  is NOT unique, so the profiler's measured uniqueness decides identifiers; types arrive wrapped
+  (Nullable(DateTime64(3)), LowCardinality(String)) — the type classes below allow for that.
+detect:
+  priority: 5
+  tool_hints: [run_select_query, list_databases, list_tables]
+  probes:
+    - {sql: "SELECT version() AS v", match: '^\d+\.\d+\.\d+\.\d+$'}
+mcp:
+  rows: auto
+  error_prefixes: ["Error:", "Error running query", "Code:"]
+# R-022 f1 #4: engine functions (beyond the generic allow-list in dialect_draft.py) that these
+# statements call. Each is a pure READ; a function not listed here is refused before any probe.
+read_functions: [lengthUTF8, replaceAll, toString, uniqExact]
+quote: '"'
+list_tables: >-
+  SELECT database AS table_schema, name AS table_name FROM system.tables
+  WHERE database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
+    AND is_temporary = 0 AND engine NOT IN ('View', 'MaterializedView', 'LiveView')
+  ORDER BY database, name
+describe: >-
+  SELECT name AS column_name, type AS data_type FROM system.columns
+  WHERE database = {schema|literal} AND table = {table|literal} ORDER BY position
+keys: >-
+  SELECT name AS column_name, 'PRIMARY KEY' AS constraint_type, NULL AS ref_schema,
+         NULL AS ref_table, NULL AS ref_column
+  FROM system.columns
+  WHERE database = {schema|literal} AND table = {table|literal} AND is_in_primary_key = 1
+  ORDER BY position
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+row_estimate: >-
+  SELECT total_rows AS n FROM system.tables WHERE database = {schema|literal} AND name = {table|literal}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int} OFFSET {offset|int}
+column_stats: >-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         uniqExact(toString({column|ident})) AS distinct_n,
+         avg(lengthUTF8(toString({column|ident}))) AS avg_len,
+         max(lengthUTF8(toString({column|ident}))) AS max_len,
+         avg(lengthUTF8(toString({column|ident}))
+             - lengthUTF8(replaceAll(toString({column|ident}), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+table_stats: >-
+  SELECT COUNT(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT({column|ident}) AS {p}_non_null,
+  uniqExact(toString({column|ident})) AS {p}_distinct_n,
+  avg(lengthUTF8(toString({column|ident}))) AS {p}_avg_len,
+  max(lengthUTF8(toString({column|ident}))) AS {p}_max_len,
+  avg(lengthUTF8(toString({column|ident})) - lengthUTF8(replaceAll(toString({column|ident}), ' ', ''))) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}
+tabular_policy:
+  type_classes:
+    temporal: ['date', 'time', '^interval']
+    numeric: ['int', 'float', 'decimal', '^numeric']
+    boolean: ['^bool', 'nullable\(bool']
+    json: ['json', '^object']
+    text: ['string', 'fixedstring', 'uuid', '^enum']

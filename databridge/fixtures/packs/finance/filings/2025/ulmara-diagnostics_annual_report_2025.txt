@@ -1,0 +1,52 @@
+ Ulmara Diagnostics Pte Ltd
+
+Annual Report for the financial year ended 31 December 2025
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Ulmara Diagnostics Pte Ltd
+  Registration number   SYN-CRN-9808314
+  Country of incorporation   HK
+  Principal activity   Energy and Utilities
+  Reporting currency   USD
+  Date of incorporation   1999-05-06
+
+ Directors' commentary
+
+The Group completed the consolidation of its two operating sites, which carried a one-off cost in the first half but is expected to reduce fixed overhead from the next financial year.
+
+ Financial summary
+
+All figures in USD thousands unless stated.
+
+  Line item   FY2025   FY2024
+------:---:|
+  Revenue   646   632
+  Gross profit   244   258
+  EBITDA   147   169
+  Depreciation and amortisation   -57   -62
+  Finance costs   -15   -15
+  Profit after tax   65   47
+  Total assets   1,530   1,590
+  Total borrowings   422   424
+  Cash and cash equivalents   257   357
+  Total equity   983   919
+
+ Key ratios
+
+  Ratio   FY2025   Covenant reference
+------:---|
+  Net debt / EBITDA   1.12x   Tested quarterly under the syndicated facility
+  Interest cover   5.85x   Tested quarterly
+  Current ratio   2.35x   -
+
+ Banking arrangements
+
+Borrowings are held with Northgate Mercantile Bank and one other lender. The Group has provided a fixed and floating charge over its assets.
+
+ Auditor's note
+
+Our opinion on the financial statements is unmodified.

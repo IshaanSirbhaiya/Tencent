@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2021-000213",
+  "filename": "IMG-2021-000213.jpg",
+  "image_present": false,
+  "captured_at": "2021-02-28T17:23:17+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2021-000420",
+  "application_id": "APP-2020-000548",
+  "parcel_id": "PCL-CB-02123",
+  "photo_batch_ref": "PHB-2021-000420",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-897927"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 449407,
+    "northing": 1180666,
+    "accuracy_m": 5.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1233,
+          120,
+          275,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2021-883313",
+        "confidence": 0.754,
+        "bbox": [
+          689,
+          222,
+          702,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "90C SALTMARSH TERRACE, CORRISBECK AM8 8QN",
+        "confidence": 0.902,
+        "bbox": [
+          381,
+          356,
+          1025,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2021-02-28",
+        "confidence": 0.762,
+        "bbox": [
+          1109,
+          537,
+          812,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.837,
+        "bbox": [
+          376,
+          504,
+          448,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

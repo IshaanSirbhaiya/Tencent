@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000076",
+  "filename": "IMG-2013-000076.jpg",
+  "image_present": false,
+  "captured_at": "2013-03-30T08:20:42+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2013-000373",
+  "application_id": "APP-2012-000489",
+  "parcel_id": "PCL-IH-02376",
+  "photo_batch_ref": "PHB-2013-000373",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-522930"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 439249,
+    "northing": 1186186,
+    "accuracy_m": 3.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          107,
+          120,
+          374,
+          72
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-330694",
+        "confidence": 0.778,
+        "bbox": [
+          293,
+          253,
+          675,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "14 PATERNOSTER RISE, ASHCOMBE REACH AM8 6RP",
+        "confidence": 0.816,
+        "bbox": [
+          273,
+          354,
+          1075,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-03-30",
+        "confidence": 0.942,
+        "bbox": [
+          1012,
+          423,
+          667,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.814,
+        "bbox": [
+          880,
+          668,
+          352,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

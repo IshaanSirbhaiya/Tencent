@@ -64,8 +64,10 @@ from typing import Any, Callable, Iterable, Optional
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import Body, FastAPI, Request
+from fastapi import Body, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+
+from .auth import install_auth_handler, require_principal
 
 log = logging.getLogger("databridge.gateway.mcp")
 
@@ -100,6 +102,11 @@ KIND_CONSEQUENCE = {
             "recorded for the model-free dispatcher and is never registered into the aggregator, "
             "so the agent cannot reach it at all."),
 }
+
+
+#: INT1 (2026-10-01): every route in this module requires an authenticated principal — the gateway
+#: serves nothing anonymously except `/health` (`test_every_route_on_the_app_is_gated`).
+_AUTH = [Depends(require_principal)]
 
 
 def registry_url() -> str:
@@ -510,6 +517,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
                         act_registry: Optional[ActRegistry] = None,
                         reader_probe: Optional[Callable[[], dict]] = None) -> FastAPI:
     """Mount ``/mcp/*``. Every collaborator is injectable so the suite needs no Docker."""
+    install_auth_handler(app)
     app.state.mcp_client = client or MCPJungleClient()
     app.state.mcp_act_registry = (
         act_registry if act_registry is not None else ActRegistry(act_registry_path()))
@@ -522,7 +530,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
         return request.app.state.mcp_act_registry
 
     # -- status ---------------------------------------------------------------------------
-    @app.get("/mcp/status")
+    @app.get("/mcp/status", dependencies=_AUTH)
     def mcp_status(request: Request) -> Any:
         """What is actually up. Answers 200 even when everything is down — that IS the answer."""
         api = _client(request)
@@ -540,7 +548,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
                 "act_recorded": len(_acts(request).names()), "checked_at": _now()}
 
     # -- servers --------------------------------------------------------------------------
-    @app.get("/mcp/servers")
+    @app.get("/mcp/servers", dependencies=_AUTH)
     def mcp_servers(request: Request) -> Any:
         api, acts = _client(request), _acts(request)
         try:
@@ -569,7 +577,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
             "checked_at": _now(),
         }
 
-    @app.get("/mcp/tools")
+    @app.get("/mcp/tools", dependencies=_AUTH)
     def mcp_tools(request: Request) -> Any:
         api = _client(request)
         try:
@@ -585,7 +593,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
                          "aggregator, so the agent's whole callable surface is this list."),
                 "checked_at": _now()}
 
-    @app.post("/mcp/servers", status_code=201)
+    @app.post("/mcp/servers", dependencies=_AUTH, status_code=201)
     def mcp_connect(request: Request, body: dict = Body(...)) -> Any:
         """Connect a server. ``kind`` decides which process fronts it — read the two branches."""
         api, acts = _client(request), _acts(request)
@@ -669,7 +677,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
                 "registered_into_aggregator": True,
                 "consequence": KIND_CONSEQUENCE["read"]}
 
-    @app.delete("/mcp/servers/{name}")
+    @app.delete("/mcp/servers/{name}", dependencies=_AUTH)
     def mcp_disconnect(request: Request, name: str) -> Any:
         api, acts = _client(request), _acts(request)
         if acts.get(name) is not None:
@@ -697,7 +705,7 @@ def register_mcp_routes(app: FastAPI, *, client: Optional[MCPJungleClient] = Non
         return {"disconnected": name, "kind": "read", "was_in_aggregator": True}
 
     # -- invoke ---------------------------------------------------------------------------
-    @app.post("/mcp/tools/{name}/invoke")
+    @app.post("/mcp/tools/{name}/invoke", dependencies=_AUTH)
     def mcp_invoke(request: Request, name: str, body: dict = Body(default={})) -> Any:
         """Run a READ tool, because a human clicked "try it".
 

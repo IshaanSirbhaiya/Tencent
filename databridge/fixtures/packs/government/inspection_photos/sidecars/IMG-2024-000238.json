@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2024-000238",
+  "filename": "IMG-2024-000238.jpg",
+  "image_present": false,
+  "captured_at": "2024-10-29T17:47:13+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2024-000018",
+  "application_id": "APP-2023-000021",
+  "parcel_id": "PCL-KF-01300",
+  "photo_batch_ref": "PHB-2024-000018",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-776407"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445932,
+    "northing": 1209238,
+    "accuracy_m": 16.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          186,
+          120,
+          330,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2024-817621",
+        "confidence": 0.811,
+        "bbox": [
+          489,
+          254,
+          621,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "26 WINDLASS TERRACE, KELDER FLATS AM3 2YW",
+        "confidence": 0.932,
+        "bbox": [
+          1595,
+          312,
+          1066,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2024-10-29",
+        "confidence": 0.869,
+        "bbox": [
+          2434,
+          453,
+          696,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.819,
+        "bbox": [
+          3118,
+          696,
+          496,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

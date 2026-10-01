@@ -13,7 +13,7 @@
 // The second thing the types protect: **"cannot reach the registry" is not "nothing is
 // connected"**. Every read returns `Ok<T> | Refusal`, so a caller cannot accidentally render a
 // down aggregator as an empty list — there is no shape here that lets it.
-import { GATEWAY } from "./api";
+import { GATEWAY, authHeaders } from "./api";
 import type { Refusal } from "./types";
 
 export type ServerKind = "read" | "act";
@@ -110,7 +110,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<Result<T>> {
   try {
     res = await fetch(`${GATEWAY}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
       cache: "no-store",
     });
   } catch (err) {

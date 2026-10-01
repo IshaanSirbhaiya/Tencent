@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000080",
+  "filename": "IMG-2019-000080.jpg",
+  "image_present": false,
+  "captured_at": "2019-08-18T14:20:38+00:00",
+  "captured_by": "OFF-0031",
+  "inspection_id": "INS-2019-000462",
+  "application_id": "APP-2019-000597",
+  "parcel_id": "PCL-PG-00910",
+  "photo_batch_ref": "PHB-2019-000462",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-449909"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 411773,
+    "northing": 1195949,
+    "accuracy_m": 9.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          200,
+          120,
+          275,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-301433",
+        "confidence": 0.768,
+        "bbox": [
+          619,
+          261,
+          756,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "162 VINTNERS STREET, PELLING GREEN AM6 8LA",
+        "confidence": 0.865,
+        "bbox": [
+          449,
+          358,
+          1302,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "OATE OF INSPECTION 2019-08-18",
+        "confidence": 0.743,
+        "bbox": [
+          244,
+          429,
+          899,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0031",
+        "confidence": 0.797,
+        "bbox": [
+          1171,
+          500,
+          480,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

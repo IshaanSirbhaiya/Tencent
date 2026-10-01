@@ -28,11 +28,30 @@ import hashlib
 import json
 import sqlite3
 import threading
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Protocol, runtime_checkable
 
 from databridge_core import SourcePointer
 
 from .models import ConfirmationState, EvidenceEntry, IntakeRecord, ResolutionResult
+
+
+@runtime_checkable
+class EmissionSink(Protocol):
+    """Where a committed ledger row registers itself with the reverse pointer index.
+
+    A `Protocol`, not an import — the same seam `history.py` uses for `ClinicHistory`, and for the
+    same structural reason. `packages/graph` imports `packages/intake` (`clinic_seed` uses the
+    registry, resolver and rules table), so importing `databridge_graph` from here would be
+    circular; `test_packages_intake_never_imports_the_graph` enforces that this module never does.
+
+    `databridge_graph.ptr_index.ReverseIndex.record_emission` already has exactly this shape, so a
+    real `GraphStore.reverse_index()` satisfies this Protocol with no dependency in either
+    direction — composition happens at the gateway, which constructs the ledger with one.
+    """
+
+    def record_emission(self, kind: str, ref: str, pointers: Iterable[SourcePointer], *,
+                        plan_hash: Optional[str] = None, ledger_bound: bool = False,
+                        emitted_at: Optional[dt.datetime] = None) -> int: ...
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS evidence (
@@ -167,7 +186,8 @@ def attestation_subject_matches(record: IntakeRecord,
 class EvidenceLedger:
     """Append-only SQLite store of confirmed facts."""
 
-    def __init__(self, path: str = ":memory:") -> None:
+    def __init__(self, path: str = ":memory:", *,
+                emission_sink: Optional[EmissionSink] = None) -> None:
         # NOTE: the default is in-memory, so the ledger does not survive a restart and multiple
         # workers would each hold their own. That is a POC deployment property, not a design
         # choice — pass a file path for anything durable. Recorded in STATUS.md.
@@ -179,6 +199,10 @@ class EvidenceLedger:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.commit()
+        # `None` is the honest default: a ledger built with no sink (every existing call site,
+        # today) commits exactly as it always has. Wired in, it makes each committed row
+        # discoverable through the reverse index's `impact_of` — the whole point of registering.
+        self._emission_sink = emission_sink
 
     # -- reads --------------------------------------------------------------------
     def entries(self, intake_id: Optional[str] = None) -> list[dict]:
@@ -312,8 +336,9 @@ class EvidenceLedger:
                     confirmed_at=at,
                     selected_patient_id=confirmation.selected_patient_id,
                     supersedes=prior["rowid_pk"] if prior else None))
+            rowids: list[int] = []
             for entry in entries:
-                self.conn.execute(
+                cur = self.conn.execute(
                     "INSERT INTO evidence (intake_id, field_path, value_json, "
                     "source_pointer_json, extracted_at, confirmed_by, confirmed_at, "
                     "selected_patient_id, supersedes) "
@@ -323,6 +348,33 @@ class EvidenceLedger:
                      entry.pointer.model_dump_json(exclude_none=True),
                      entry.extracted_at.isoformat(), entry.confirmed_by,
                      entry.confirmed_at.isoformat(), entry.selected_patient_id, entry.supersedes))
+                rowids.append(int(cur.lastrowid))
+            # Registration is the LAST thing this transaction does, and it is inside the same
+            # `with self._lock, self.conn:` block as the inserts above: if the sink refuses (or
+            # raises for any reason), the exception propagates out of the block before it commits,
+            # and sqlite3's own context-manager semantics roll every INSERT above back with it — a
+            # ledger row can never exist un-registered. `rowid_pk` is the ref: it is assigned by
+            # this same INSERT, is never reused (the table is append-only and AUTOINCREMENT), and
+            # survives a correction superseding this row, so each physical evidence row — not each
+            # field path — gets exactly one emission.
+            #
+            # This is NOT a single ACID transaction spanning both databases — the ledger and the
+            # graph's reverse index are two independent SQLite connections/files, and SQLite has no
+            # cross-connection transaction. What this ordering guarantees is weaker but real: the
+            # sink is called synchronously, inside this critical section, as the final step before
+            # commit, so a registration failure fails the whole commit (nothing partially written),
+            # and nothing after it can fail and leave a registered-but-unwritten row. The residual
+            # gap is narrower than "best effort afterwards": only a failure of the ledger's own
+            # `conn.commit()` itself, occurring AFTER the sink's internal commit already succeeded,
+            # could leave an emission registered for a row that did not, in the end, land — and
+            # that window exists for any two independently-committed stores, not for a design choice
+            # made here.
+            if self._emission_sink is not None:
+                for entry, rowid in zip(entries, rowids):
+                    self._emission_sink.record_emission(
+                        kind="ledger_evidence", ref=f"evidence:{rowid}",
+                        pointers=[entry.pointer], ledger_bound=True,
+                        emitted_at=entry.confirmed_at)
         return entries
 
     def pointer_of(self, row: dict) -> SourcePointer:

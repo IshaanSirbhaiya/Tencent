@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2023-000232",
+  "filename": "IMG-2023-000232.jpg",
+  "image_present": false,
+  "captured_at": "2023-06-09T15:37:44+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2023-000096",
+  "application_id": "APP-2022-000138",
+  "parcel_id": "PCL-KF-00580",
+  "photo_batch_ref": "PHB-2023-000096",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-581816"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 438796,
+    "northing": 1201741,
+    "accuracy_m": 9.5
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          3285,
+          120,
+          253,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2023-369191",
+        "confidence": 0.806,
+        "bbox": [
+          2377,
+          226,
+          702,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "171C PATERNOSTER RISE, KELDER FLATS AM6 6HE",
+        "confidence": 0.838,
+        "bbox": [
+          2562,
+          380,
+          1376,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2023-06-09",
+        "confidence": 0.777,
+        "bbox": [
+          2981,
+          483,
+          986,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.782,
+        "bbox": [
+          3517,
+          668,
+          432,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

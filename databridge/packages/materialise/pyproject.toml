@@ -1,0 +1,38 @@
+# packages/materialise — the Materialisation Plan, its compiler, the data agent (PHASE_PLAN 6).
+#
+# The plan is the dataset's identity and the bytes are a cache (SYSTEM_DESIGN §6.1). This package
+# owns the plan, the compiler that refuses a leaky one, the materialiser that executes an accepted
+# one against the adapter fleet, and the Receipt that says which of the two pathways produced the
+# bytes.
+#
+# It CONSUMES `packages/adapter` and does not modify it: reads go through the five-verb port, so
+# every cell in an emitted dataset is a `GroundedValue`, a `Withheld` or an `Absent` before this
+# package ever sees it. There is no driver, no credential and no SQL anywhere below.
+[project]
+name = "databridge-materialise"
+version = "0.0.0"
+description = "MaterialisationPlan, the plan compiler, the data agent, Receipt + Croissant 1.1"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-adapter",
+  # The data agent reaches a model ONLY through the harness, and passes a `task_class`, never a
+  # model name (CLAUDE.md). Offline it runs on a deterministic backend.
+  "databridge-harness",
+  "pydantic>=2.7",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+# Parquet is the de facto interchange half of "Parquet + Croissant JSON-LD" (R05 §6.2). It is
+# optional because a dataset whose cells are `Withheld`/`Absent` is emitted honestly as JSONL
+# without it; `output.format: parquet` refuses when pyarrow is absent rather than silently
+# writing something else.
+parquet = ["pyarrow>=15"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_materialise"]

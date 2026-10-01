@@ -1,0 +1,2114 @@
+# =====================================================================
+# roles.yaml -- who may read what, in the synthetic government estate
+#
+# SYNTHETIC FIXTURE. The agency, the roles and the people are invented.
+#
+# This file is the POLICY an adapter's Policy layer enforces. It is
+# declarative on purpose: adding a role, a column restriction or a whole
+# source must never require a code change.
+#
+# Four rules from the spine govern how it is read:
+#
+#   D3  -- untrusted values may be stored, cited and displayed. They may NEVER
+#          influence control flow. That includes access control: an untrusted
+#          field may not appear in a row predicate. See
+#          `untrusted_fields_forbidden_in_predicates`.
+#
+#   D4  -- `policy_withheld` is a state distinct from `unresolved`.
+#          "Not present in the source" and "present, not permitted to you" are
+#          different facts. A withheld field is present in the record with
+#          value None, carries a WithholdingRecord (field path, policy id,
+#          reason code, principal), and is REMOVED from `unresolved`.
+#          IMPORTANT: this holds at FIELD level, and only once the principal is
+#          authorised to know the object exists. See `existence_disclosure`.
+#
+#   D4a -- the enforcement point is pointer resolution, not graph query.
+#          Everything below is evaluated when a pointer resolves to a value,
+#          which is the one choke point every read path passes through.
+#
+#   D5  -- purpose is part of the principal. A role alone grants nothing; the
+#          (role, purpose) pair does -- and it does so PER GRANT, not per role.
+#
+# Note on predicates: the `predicate` strings below are DECLARATIVE SCOPE
+# DEFINITIONS that the Policy layer compiles. They are written in SQL-like
+# syntax for readability only. Nothing in this system generates SQL from
+# natural language, and nothing executes these strings as submitted text
+# (ADAPTER_AGENT_SPEC section 6).
+# =====================================================================
+
+version: 2
+pack: government
+notice: "SYNTHETIC FIXTURE -- no real person, agency or record is represented."
+supersedes: "version 1, revised against review phase1-rev-C. Disposition log: wiki/40-reviews/R-002-government-estate-fixes.md"
+
+# =====================================================================
+# 1. EVALUATION ORDER -- the schema-level definition (review finding H6)
+#
+# Version 1 had a real contradiction: `permits.appeals` carried
+# `row_filter: sealed = false` AND `withheld_when: sealed = true`. If filtering
+# runs first the withholding can never fire, and the demo assertion that
+# depends on it ("disclosure admits existence") was unreachable. Order is now
+# defined once, here, and every grant is written against it.
+#
+# A single stage may only ever make the answer MORE restrictive. No later
+# stage can re-admit what an earlier one refused.
+# =====================================================================
+evaluation_order:
+  - stage: 1_role_context
+    does: "select exactly one active role context. See `combination_semantics`."
+    on_failure: {verdict: FORBIDDEN, reason: POLICY_NO_ACTIVE_CONTEXT}
+
+  - stage: 2_purpose
+    does: "validate the request's declared purpose against `purposes` AND against the specific grant's `purposes` list."
+    on_failure: {verdict: FORBIDDEN, reason: POLICY_PURPOSE_MISMATCH}
+
+  - stage: 3_deny
+    does: "apply the role's `denied` list. DENY WINS, always, over every grant in every role."
+    on_failure: {verdict: FORBIDDEN, reason: "the denial's own reason code"}
+
+  - stage: 4_object
+    does: "find a grant in the active context covering this object."
+    on_failure: {reason: POLICY_ROLE_SCOPE}
+
+  - stage: 5_egress
+    does: "compare the object's egress_class (sources.yaml) to the role's egress_ceiling."
+    on_failure: {verdict: FORBIDDEN, reason: POLICY_EGRESS_CEILING}
+
+  - stage: 6_row_scope
+    does: >-
+      Evaluate the grant's `row_scope`. This does NOT produce a filtered row
+      set; it produces a row DISPOSITION, one of `disclosed`,
+      `contents_withheld` or `existence_not_disclosed`. See
+      `existence_disclosure` below -- this is the stage that decides whether a
+      reader is even permitted to learn that a row exists.
+
+  - stage: 7_column_projection
+    does: >-
+      Keep only the columns in the grant's `columns` list. EVERY other column
+      of the object is emitted as a Withheld cell with a reason code -- never
+      silently dropped. The default code is POLICY_DATA_MINIMIZATION; a
+      `withheld:` entry may name a more specific one.
+    closed_world: true
+    on_unclassified_column: deny
+    on_unclassified_column_note: >-
+      Review finding M24. A column present in the source but absent from BOTH
+      the grant's `columns` list AND `column_classification` below is a schema
+      addition nobody has reviewed. It fails CLOSED: Withheld with
+      POLICY_UNCLASSIFIED_COLUMN. Schema evolution must not be a silent
+      access-control change.
+
+  - stage: 8_sensitive_overlay
+    does: >-
+      Apply the `sensitive` overlay. It runs AFTER grants and can only subtract.
+      Its exceptions are predicate-bound and are listed in the overlay itself.
+
+  - stage: 9_free_text
+    does: "apply `free_text_policy`. All free text and OCR is withheld unless the grant names an explicit exception."
+
+  - stage: 10_transform
+    does: >-
+      Apply masks. A masked cell is emitted as Withheld carrying a
+      `transform` record (transform id + reason code), NOT as a GroundedValue.
+      A masked string does not appear in the source and must never pass the
+      grounding wall or be citable as evidence. See `masks`.
+
+  - stage: 11_aggregate
+    does: "apply small-cell and differencing controls for aggregate objects. See `aggregate_policy`."
+
+  - stage: 12_ledger
+    does: "append the read to the ledger -- role context, purpose, object, row disposition, every withholding -- BEFORE the value returns (D4a)."
+
+# =====================================================================
+# 2. ROLE COMBINATION SEMANTICS (review finding C3)
+#
+# Version 1 said nothing about this, and "nothing" is read by an implementer
+# as "union". A naive union combines the auditor's estate-wide row scope with
+# a caseworker's unmasked column set and produces estate-wide unmasked
+# personal data -- an escalation neither role was granted.
+# =====================================================================
+combination_semantics:
+
+  active_context: exactly_one
+  active_context_rule: >-
+    A request activates EXACTLY ONE role context, bound at request time as
+    (role_id, purpose, on_behalf_of). A principal holding three roles makes
+    three separate requests and each is separately logged. There is no implicit
+    union, no "best matching role", and no fallback to a second role when the
+    first refuses.
+  active_context_selection: >-
+    The context is chosen by the CALLER and validated, never inferred from what
+    would return the most data. A request that names no role context is
+    FORBIDDEN, not defaulted.
+
+  grant_atomicity: >-
+    THE CENTRAL RULE. A grant is an indivisible tuple:
+      (object, row_scope, columns, transformations, purposes, egress_ceiling).
+    A cell is disclosed if and only if ONE SINGLE grant authorises the whole
+    tuple. Row scopes and column sets are NEVER unioned independently. There is
+    no path by which grant A's rows meet grant B's columns.
+
+  within_one_context: >-
+    A role may hold two grants covering the same object (for example, a
+    narrower one for its own caseload and a broader metadata-only one). Where
+    both match a cell, the MOST RESTRICTIVE outcome wins:
+      withheld > transformed > raw.
+    Restrictiveness is compared per cell, not per grant.
+
+  deny_precedence: >-
+    Deny beats grant, unconditionally, in the active context and in every other
+    role the principal holds. A `denied` entry anywhere on the principal is a
+    hard stop -- this is the one place where roles DO combine, and they combine
+    only in the restrictive direction.
+
+  extends: >-
+    `extends` copies the parent's grants, then applies the child's overrides.
+    An override may narrow a grant. An override that WIDENS one must restate
+    the whole grant tuple, so that widening is always visible in the diff.
+
+  mutually_exclusive_roles:
+    # Segregation of duties. Holding both is a provisioning error, not a
+    # runtime one: it is refused at grant time, not silently resolved.
+    - {roles: [auditor, permits_caseworker], reason: "an auditor must not audit their own caseload"}
+    - {roles: [auditor, benefits_caseworker], reason: "an auditor must not audit their own caseload"}
+    - {roles: [auditor, benefits_team_lead], reason: "an auditor must not audit their own team"}
+    - {roles: [public_records_officer, permits_caseworker], reason: "disclosure decisions must not be made by the officer holding the case"}
+    - {roles: [public_records_officer, benefits_caseworker], reason: "as above"}
+    - {roles: [adapter_service, "*"], reason: "a machine principal is never combined with a human role"}
+  on_mutually_exclusive: refuse_provisioning
+
+  no_escalation_invariant: >-
+    For every principal P and every pair of roles P holds, the set of cells
+    disclosable to P must equal the union over each role's INDEPENDENTLY
+    evaluated disclosable set -- never more. Any implementation whose combined
+    result exceeds that union has broken grant atomicity.
+
+# =====================================================================
+# 3. PURPOSE (review findings C4 and D5)
+#
+# Version 1 attached purposes to roles. Once a principal supplied any purpose
+# the role listed, every grant in that role activated -- so a benefits
+# caseworker declaring `correspondence` received payments, medical basis codes
+# and claim notes. Purpose is now (a) declared per grant, and (b) a VALIDATED
+# request attribute rather than a free-form assertion by the principal.
+# =====================================================================
+purposes:
+
+  - id: case_determination
+    description: "Deciding a permit application the principal is assigned to."
+    validated_by: assignment
+    validation: "permits.applications.assigned_officer = :principal.officer_ref for the named application"
+
+  - id: site_inspection
+    description: "Attending and recording a site inspection."
+    validated_by: assignment
+    validation: "permits.inspections.inspector_ref = :principal.officer_ref for the named inspection"
+
+  - id: eligibility_determination
+    description: "Deciding entitlement on a claim the principal is assigned to."
+    validated_by: assignment
+    validation: "benefits.claims.caseworker_ref = :principal.caseworker_ref for the named claim"
+
+  - id: payment_administration
+    description: "Issuing, reversing or reconciling a payment on an assigned claim."
+    validated_by: assignment
+    validation: "benefits.claims.caseworker_ref = :principal.caseworker_ref for the named claim"
+
+  - id: correspondence
+    description: "Writing to, or reading correspondence from, a person on an assigned case."
+    validated_by: assignment
+    validation: "the named case is in the principal's caseload"
+    note: "Contact details and case status only. Never a determination basis, never a payment, never a note."
+
+  - id: service_delivery
+    description: "Answering a counter or telephone enquiry about a case."
+    validated_by: assignment
+    note: "The narrowest operational purpose. Status and next step only."
+
+  - id: quality_assurance
+    description: "Reviewing a team member's decision for correctness and consistency."
+    validated_by: team_membership
+    validation: "benefits.claims.caseworker_ref IN (the principal's team)"
+    note: "Seniority is not a purpose. QA reads the decision, not the person."
+
+  - id: audit
+    description: "Establishing that a process was followed. Never who a person was."
+    validated_by: engagement
+    validation: "an open audit engagement id supplied by the request and present in the engagement register"
+    binds: "the engagement id is the pseudonymisation key scope -- see masks.pseudonym_engagement"
+
+  - id: control_testing
+    description: "Sampling cases to test a specific control."
+    validated_by: engagement
+
+  - id: statutory_disclosure
+    description: "Answering a disclosure request under the access-to-information procedure."
+    validated_by: disclosure_request
+    validation: "an open disclosure_request_id supplied by the request and present in the disclosure register"
+
+  - id: ingest
+    description: "A machine principal reading a source into the graph."
+    validated_by: source_binding
+    validation: ":principal.bound_source_id must equal the grant's source id, and must come from the CREDENTIAL, not the request"
+
+purpose_binding_rules:
+  - "Purpose is an attribute of the PRINCIPAL for the duration of the request, not a field the principal fills in freely."
+  - "A purpose whose `validated_by` check fails is FORBIDDEN. It is never downgraded to a narrower purpose that would pass."
+  - "Every grant declares its own `purposes` list. A grant with no `purposes` list is INVALID and must fail the policy loader, not default to the role's list."
+  - "Holding data lawfully for one purpose is not permission to use it for another. This is the whole point of D5."
+
+# =====================================================================
+# 4. SUBJECT KINDS (review finding H14, spine D4b)
+#
+# Version 1 declared `applicant` and `claimant` as subject kinds, while
+# ONTOLOGY_NOTES.md declared both to be ROLES of the single `Person` kind.
+# That disagreement left appellants, correspondents, company officers and
+# legacy subjects outside the guardrail entirely, and left `Organisation` --
+# which the ontology marks never_fuzzy_merge -- unprotected by policy.
+#
+# Protected identity is now declared at the ONTOLOGY level. Relationship roles
+# describe access; they do not define who is protected.
+# =====================================================================
+subject_kinds:
+  - kind: Person
+    ontology_kind: Person
+    covers: [applicant, claimant, appellant, correspondent, company_officer, legacy_subject]
+    identifiers:
+      # Every one of these is partial, unreliable, or both. None is universal.
+      - resident_number        # AM-nnnn-nnnn-X; ~1/3 coverage in benefits, hand-keyed
+      - benefits_ref           # Bnnnnnnn; CLAIMLINE-local
+      - applicant_id           # PERMITWORKS-local
+      - claimant_id            # CLAIMLINE-local
+      - legacy_key             # LEGACY-MASTER; blank on some records
+      - email_address          # a contact point, not an identity
+    not_identifiers:
+      - id: application_id
+        why: "identifies a CASE, not a person. One person has many; one application can involve several. Version 1 listed it as an applicant identifier -- review finding H14."
+      - id: claim_id
+        why: "identifies a case."
+      - id: national_id_ref
+        why: "present, nullable and frequently WRONG in permits.applicants. It looks like a key and is not one."
+    never_fuzzy_merge: true
+    attestation: [in_person, verified_channel]
+    grant_type: PersonReadGrant
+
+  - kind: Organisation
+    ontology_kind: Organisation
+    covers: [applicant_organisation, agent, contractor, advocacy_service, licensee, consultee]
+    identifiers: [business_registration_number, registered_name]
+    identifier_note: >-
+      Officer records in the public registry carry NO identifier at all -- name
+      and address are the whole basis for a match, which is precisely why
+      merging must not be automatic.
+    never_fuzzy_merge: true
+    attestation: [registry_document, verified_channel]
+    attestation_note: "`in_person` is not meaningful for an organisation; the attestable evidence is a registry document."
+    grant_type: OrganisationReadGrant
+
+relationship_roles:
+  # These describe HOW a Person relates to a case. They are what grants filter
+  # on. They are NOT subject kinds and confer no identity guarantee.
+  applicant:        {subject_kind: Person, edge: APPLIED_FOR,    grant_type: PersonReadGrant}
+  claimant:         {subject_kind: Person, edge: CLAIMS_UNDER,   grant_type: PersonReadGrant}
+  appellant:        {subject_kind: Person, edge: LODGED_BY,      grant_type: PersonReadGrant}
+  correspondent:    {subject_kind: Person, edge: SENT_BY,        grant_type: PersonReadGrant}
+  company_officer:  {subject_kind: Person, edge: OFFICER_OF,     grant_type: PersonReadGrant}
+  legacy_subject:   {subject_kind: Person, edge: LEGACY_FOR,     grant_type: PersonReadGrant}
+
+identity_guardrail:
+  applies_to: [Person, Organisation]
+  rule: >-
+    The system presents CANDIDATES. A named human attests.
+    `requires_human_selection` stays `Literal[True]`. There is no code path
+    that sets it False, for either kind. A pack that declares no subject kind
+    gets NO identity-resolution capability at all.
+
+# =====================================================================
+# 5. EXISTENCE DISCLOSURE (review finding H7)
+#
+# Version 1 promised a per-row POLICY_CASELOAD_SCOPE withholding for every row
+# outside a caseworker's caseload. To emit those, the system must first reveal
+# that those rows EXIST -- their count, and often their keys. That is itself
+# the disclosure, and it makes the whole estate enumerable one refusal at a
+# time.
+#
+# There are three states, not two, and the default for caseload isolation is
+# the third.
+# =====================================================================
+existence_disclosure:
+
+  states:
+    disclosed:
+      meaning: "the object exists, the principal may know it exists, and its fields are readable subject to column policy"
+    contents_withheld:
+      meaning: "the object exists, the principal is TOLD it exists, and its contents are withheld with a reason code"
+      when: "an explicit, deliberate policy choice -- for example, statutory disclosure, where 'this record exists and is exempt' is the honest and required answer"
+    existence_not_disclosed:
+      meaning: "the principal may not learn whether the object exists"
+      requirement: >-
+        A request for an out-of-scope object and a request for an object that
+        does not exist MUST return byte-identical responses: same reason code
+        (POLICY_SCOPE_UNDISCLOSED), same shape, no count, no key, no field
+        path, and no timing difference that separates the two. Anything else
+        turns the refusal into an oracle and lets a caller enumerate the estate
+        by probing keys.
+      default_for: [caseload_isolation, role_scope_denial]
+
+  relation_to_D4: >-
+    D4's "withheld is distinguishable from absent" is a FIELD-level guarantee,
+    and it holds once the principal is authorised to know the object exists.
+    At OBJECT level, distinguishing withheld from absent is sometimes itself
+    the leak, and there the two must be indistinguishable. Applying D4
+    uniformly at object level would make every caseload boundary enumerable.
+    This tension is a gap in D4 as written; it is recorded in
+    wiki/40-reviews/R-002-government-estate-fixes.md.
+
+  aggregate_scope_note: >-
+    A response over an `existence_not_disclosed` object carries a CONSTANT
+    scope declaration -- "this response is limited to your caseload", policy id
+    and reason code attached -- and never a count of what was excluded. A count
+    is cardinality, and cardinality is the leak.
+
+# =====================================================================
+# 6. REASON CODES. Closed set: a withholding with no code in this list is a
+# bug, not a policy. Every exclusion path in this file terminates in one.
+# =====================================================================
+reason_codes:
+  POLICY_NO_ACTIVE_CONTEXT: "the request named no valid role context"
+  POLICY_ROLE_SCOPE: "the role does not extend to this object"
+  POLICY_SCOPE_UNDISCLOSED: "if such a record exists, this principal is not authorised to know. Emitted identically for out-of-scope and non-existent."
+  POLICY_CASELOAD_SCOPE: "the row is outside this principal's caseload, and the principal is already authorised to know the row exists"
+  POLICY_PURPOSE_MISMATCH: "the declared purpose does not cover this read"
+  POLICY_DATA_MINIMIZATION: "the column is not within the minimum necessary for this grant's purpose"
+  POLICY_UNCLASSIFIED_COLUMN: "the column is not in column_classification: a schema addition that has not been reviewed. Fails closed."
+  POLICY_SENSITIVE_BASIS: "statutory basis code carrying health or household meaning"
+  POLICY_SENSITIVE_IDENTIFIER: "a direct identifier of a protected subject"
+  POLICY_FREE_TEXT_UNREVIEWED: "unstructured text or OCR that no column-level rule can inspect"
+  POLICY_SEALED_RECORD: "record sealed under the case protection procedure"
+  POLICY_DISCLOSURE_EXEMPT: "not within the statutory disclosable subset"
+  POLICY_SMALL_CELL: "aggregate below the small-cell suppression threshold, or suppressed complementarily"
+  POLICY_QUERY_SURFACE: "the aggregate requested is not on the approved query surface"
+  POLICY_THIRD_PARTY_DATA: "personal data of a person other than the subject of the case"
+  POLICY_INFERENCE_CONTROL: "individually innocuous, but re-identifying in combination with what this role already sees"
+  POLICY_EGRESS_CEILING: "the object's egress class exceeds this role's ceiling"
+  POLICY_UNTRUSTED_PREDICATE: "the requested filter names a field that may not influence control flow (D3)"
+  POLICY_MASKED: "disclosed in transformed form only. Carries a transform record; not a grounded value."
+
+# =====================================================================
+# 7. UNTRUSTED FIELDS MAY NOT DECIDE ACCESS (review finding H12, spine D3)
+#
+# Version 1 filtered correspondence and case files on `case_ref`, which is
+# derived from the inbound `X-Case-Reference` header and from OCR of a form the
+# public filled in. A forged header could therefore route hostile content into
+# another person's case AND decide who was entitled to read it. That is
+# untrusted input deciding control flow, which D3 forbids -- and the estate
+# was MODELLING the forbidden flow rather than testing it.
+# =====================================================================
+untrusted_fields_forbidden_in_predicates:
+  enforcement: "policy loader rejects any grant whose row_scope predicate names one of these. Runtime returns POLICY_UNTRUSTED_PREDICATE."
+  fields:
+    - correspondence.claimed_case_ref        # from X-Case-Reference; attacker-controlled
+    - case_files.claimed_case_ref            # from OCR of a public-submitted form
+    - inspection_photos.ocr.blocks[].text    # a photographed placard
+    - permits.applications.agent_of_record   # free text keyed at the counter
+    - permits.applications.site_description  # free text keyed at the counter
+    - permits.applicants.notes
+    - permits.case_events.detail
+    - permits.appeals.grounds
+    - permits.decisions.rationale
+    - permits.inspections.notes
+    - benefits.claim_notes.body
+    - benefits.claim_events.detail
+    - benefits.reviews.notes
+    - benefits.payments.reference
+    - benefits.eligibility_determinations.evidence_ref
+
+trusted_case_bindings:
+  # What MAY decide access. Each is either agency-produced or human-attested.
+  correspondence:
+    field: case_ref
+    established_by:
+      - {id: agency_outbound_thread, rule: "the message replies (In-Reply-To/References) to a message the agency sent from the case system; the association comes from the agency's own outbound spool record"}
+      - {id: human_attestation, rule: "a named officer binds the message to a case; principal and timestamp recorded"}
+    until_established: "the message is out of every caseload scope. It is visible only to a principal holding an unbound-correspondence triage grant."
+  case_files:
+    field: case_ref
+    established_by:
+      - {id: agency_intake_mapping, rule: "the scanning batch was registered against a case by the officer who scanned it"}
+      - {id: human_attestation, rule: "as above"}
+    until_established: "out of every caseload scope."
+  inspection_photos:
+    field: application_id
+    established_by:
+      - {id: photo_batch_join, rule: "photo_batch_ref -> permits.inspections.photo_batch_ref -> permits.inspections.application_id. Agency-assigned throughout; OCR text binds nothing."}
+
+# =====================================================================
+# 8. NAMED SCOPES. Referenced by grants as @name, so that a relationship filter
+# is written once and cannot be forgotten (review finding C2).
+# =====================================================================
+scopes:
+  "@permits.my_caseload":
+    returns: application_id
+    definition: "SELECT application_id FROM permits.applications WHERE assigned_officer = :principal.officer_ref"
+  "@permits.my_decisions":
+    returns: decision_id
+    definition: "SELECT decision_id FROM permits.decisions WHERE application_id IN @permits.my_caseload"
+  "@permits.my_inspections":
+    returns: inspection_id
+    definition: "SELECT inspection_id FROM permits.inspections WHERE application_id IN @permits.my_caseload"
+  "@permits.inspector_inspections":
+    returns: inspection_id
+    definition: "SELECT inspection_id FROM permits.inspections WHERE inspector_ref = :principal.officer_ref"
+  "@permits.inspector_applications":
+    returns: application_id
+    definition: "SELECT application_id FROM permits.inspections WHERE inspector_ref = :principal.officer_ref AND application_id IS NOT NULL"
+  "@permits.inspector_decisions":
+    returns: decision_id
+    definition: "SELECT decision_id FROM permits.decisions WHERE application_id IN @permits.inspector_applications"
+  "@permits.inspector_parcels":
+    returns: parcel_id
+    definition: "SELECT parcel_id FROM permits.inspections WHERE inspector_ref = :principal.officer_ref AND parcel_id IS NOT NULL"
+  "@benefits.my_caseload":
+    returns: claim_id
+    definition: "SELECT claim_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref"
+  "@benefits.team_caseload":
+    returns: claim_id
+    definition: "SELECT claim_id FROM benefits.claims WHERE caseworker_ref IN (SELECT caseworker_ref FROM benefits.caseworkers WHERE team = :principal.team)"
+
+# =====================================================================
+# 9. THE SENSITIVE OVERLAY (review finding C5)
+#
+# Version 1 said listed sensitive columns were "never disclosable as-is to
+# anyone but the owning caseworker", then granted `benefits.claimants: "*"` to
+# the team lead -- full resident numbers, dates of birth and sensitive basis
+# codes for the whole team's claimants. It was also unclear whether the block
+# was an enforced layer or documentation.
+#
+# It is now an ENFORCED DENY-BY-DEFAULT OVERLAY with declared precedence, and
+# its only exceptions are ROW PREDICATES. "Owning caseworker" is never inferred
+# from a role name.
+# =====================================================================
+sensitive:
+  enforcement: enforced_overlay
+  stage: 8
+  precedence: overlay_subtracts_from_grants
+  precedence_note: >-
+    Runs after every grant, and can only remove or transform. No grant, however
+    broad, and no role, however senior, can re-admit what the overlay withholds
+    except through an exception predicate written here.
+  exception_form: row_predicate_only
+  exception_rule: >-
+    An exception is a predicate over the ROW BEING READ. It may not name a role
+    id, a role title, a seniority level or a team. If the predicate is false for
+    this row, the overlay applies -- even to the role the exception was written
+    for.
+
+  columns:
+    - column: benefits.claimants.resident_number
+      classification: direct_identifier_of_protected_subject
+      default: withheld
+      default_reason: POLICY_SENSITIVE_IDENTIFIER
+      exception:
+        predicate: "claimant_id IN (SELECT claimant_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref)"
+        allows: raw
+        purposes: [eligibility_determination, payment_administration]
+
+    - column: benefits.claimants.date_of_birth
+      classification: direct_identifier_of_protected_subject
+      default: withheld
+      default_reason: POLICY_SENSITIVE_IDENTIFIER
+      exception:
+        predicate: "claimant_id IN (SELECT claimant_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref)"
+        allows: raw
+        purposes: [eligibility_determination]
+
+    - column: permits.applicants.national_id_ref
+      classification: direct_identifier_of_protected_subject
+      default: withheld
+      default_reason: POLICY_SENSITIVE_IDENTIFIER
+      exception:
+        predicate: "applicant_id IN (SELECT applicant_id FROM permits.applications WHERE assigned_officer = :principal.officer_ref)"
+        allows: raw
+        purposes: [case_determination]
+      note: >-
+        No role in this estate receives a masked tail of this column. A tail
+        plus a name plus a locality is re-identifying, and the field is unreliable
+        anyway -- it is not a join key. Withheld or raw; nothing in between.
+
+    - column: permits.applicants.date_of_birth
+      classification: direct_identifier_of_protected_subject
+      default: withheld
+      default_reason: POLICY_SENSITIVE_IDENTIFIER
+      exception:
+        predicate: "applicant_id IN (SELECT applicant_id FROM permits.applications WHERE assigned_officer = :principal.officer_ref)"
+        allows: raw
+        purposes: [case_determination]
+
+    - column: benefits.eligibility_determinations.basis_code
+      classification: special_category_when_in_sensitive_values
+      applies_when: "basis_code IN sensitive.values['benefits.eligibility_determinations.basis_code']"
+      default: withheld
+      default_reason: POLICY_SENSITIVE_BASIS
+      exception:
+        predicate: "claim_id IN (SELECT claim_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref)"
+        allows: raw
+        purposes: [eligibility_determination]
+      note: >-
+        This is the predicate that stops a team lead. Under
+        `quality_assurance` over a team member's claim the predicate is FALSE,
+        so the medical and household basis codes are withheld -- which is
+        exactly what "seniority is not a purpose" has to mean in enforcement
+        rather than in prose.
+
+    - column: benefits.claim_notes.body
+      classification: free_text
+      default: withheld
+      default_reason: POLICY_FREE_TEXT_UNREVIEWED
+      exception:
+        predicate: "claim_id IN (SELECT claim_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref) AND sensitivity <> 'sealed'"
+        allows: raw
+        purposes: [eligibility_determination, payment_administration]
+      sealed_exception:
+        predicate: "claim_id IN (SELECT claim_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref) AND sensitivity = 'sealed' AND author_ref = :principal.caseworker_ref"
+        allows: raw
+        reason_when_false: POLICY_SEALED_RECORD
+
+  values:
+    benefits.eligibility_determinations.basis_code:
+      - BC-MEDICAL-A
+      - BC-MEDICAL-B
+      - BC-HOUSEHOLD-A
+
+# =====================================================================
+# 10. FREE TEXT AND OCR (review finding H9)
+#
+# `sensitivity` is a label a human applied, and a label cannot be the sole
+# protection for text nobody has read. A `routine` claim note can still quote a
+# GP letter, a third party's phone number, or a household's circumstances.
+# =====================================================================
+free_text_policy:
+  default: withheld
+  default_reason: POLICY_FREE_TEXT_UNREVIEWED
+  rationale: >-
+    All free text and all OCR is treated as sensitive AND untrusted by default,
+    regardless of any sensitivity label carried beside it. Access is by narrow,
+    named exception, and every exception is bound to the owning-caseworker
+    predicate or to explicit human review -- never to a role title.
+  covered_fields:
+    - permits.applicants.notes
+    - permits.applications.site_description
+    - permits.applications.agent_of_record
+    - permits.decisions.rationale
+    - permits.permit_conditions.condition_text
+    - permits.inspections.notes
+    - permits.appeals.grounds
+    - permits.case_events.detail
+    - benefits.claim_notes.body
+    - benefits.claim_events.detail
+    - benefits.reviews.notes
+    - case_files.content
+    - correspondence.subject
+    - correspondence.body
+    - inspection_photos.ocr.blocks[].text
+  derived_summary_alternative: >-
+    A role denied the text may receive a CLASSIFICATION of it -- categories
+    present, length, whether it contains an identifier -- as a Withheld cell
+    carrying a transform record. A classification is a derived assertion and is
+    never a grounded value.
+  ocr_note: >-
+    Inspection-photo OCR was unrestricted in version 1 for three roles. It is
+    the text a member of the public wrote on a placard, photographed by an
+    officer, and machine-read: untrusted three times over. It is now withheld by
+    default like every other free-text surface.
+
+# =====================================================================
+# 11. MASKS AND TRANSFORMS (review finding H6)
+#
+# A masked value is NOT a grounded value: the emitted string does not appear in
+# the source and cannot pass the grounding wall. It is not an absent value
+# either. Every mask therefore emits a Withheld cell carrying a transform
+# record, so no reader and no downstream join can mistake it for evidence.
+# =====================================================================
+masks:
+  pseudonym_engagement:
+    emit: "PSN-{hmac(value, engagement_key)[:10]}"
+    cell: Withheld
+    reason: POLICY_MASKED
+    stable_within: audit_engagement
+    stable_across: never
+    note: >-
+      Join-preserving inside one engagement so a process can be traced, and
+      NOT correlatable across engagements or against any other dataset. The key
+      lives with the engagement record and is destroyed when it closes.
+  month_only:
+    emit: "2026-08"
+    cell: Withheld
+    reason: POLICY_MASKED
+    note: "exact event timestamps plus a stable case id are re-identifying against the public register; the month is not"
+  year_only:
+    emit: "1979"
+    cell: Withheld
+    reason: POLICY_MASKED
+  initial_surname:
+    emit: "{initial}. {surname}"
+    cell: Withheld
+    reason: POLICY_MASKED
+  classify_only:
+    emit: "{has_personal_data: true, categories: [phone, national_id], length: 214}"
+    cell: Withheld
+    reason: POLICY_FREE_TEXT_UNREVIEWED
+    note: "the free-text substitute. A classification OF the text, never the text."
+  band:
+    emit: "500-1000"
+    cell: Withheld
+    reason: POLICY_MASKED
+
+# =====================================================================
+# 12. AGGREGATE POLICY (review finding H10)
+#
+# A single small_cell_threshold is too reassuring: two permitted aggregates
+# over overlapping filters, adjacent periods or a published total reveal a
+# suppressed cell by subtraction. Suppression alone is not a control.
+# =====================================================================
+aggregate_policy:
+  objects: [benefits.v_program_caseload]
+  approved_query_surface: fixed
+  approved_query_surface_note: >-
+    Only the projections listed below may be requested. Free-form predicates
+    over an aggregate object are refused with POLICY_QUERY_SURFACE. A fixed
+    surface is what makes differencing analysable at all -- with arbitrary
+    predicates, no threshold is defensible.
+  approved_projections:
+    - {id: caseload_by_program_month, group_by: [program_code, opened_month], measures: [claims_opened, still_active]}
+    - {id: caseload_by_program_year, group_by: [program_code, opened_year], measures: [claims_opened]}
+  cohort_rule: >-
+    Cohorts are fixed and non-overlapping within a projection. Adjacent periods
+    may not be re-cut on request, because a re-cut boundary is a difference
+    query wearing a different hat.
+  small_cell_threshold: 5
+  on_small_cell: refuse
+  on_small_cell_note: "refused, never rounded and never perturbed. A perturbed value does not appear in the source and would break the grounding wall."
+  complementary_suppression:
+    enabled: true
+    rule: >-
+      When a cell is suppressed, suppress the next-smallest cell in the same
+      row AND in the same column, so the suppressed value cannot be recovered
+      from the published margins. Recurse until no margin identifies a single
+      suppressed cell.
+  margins_published: false
+  margins_note: "totals are NOT published alongside suppressed cells. A total plus n-1 cells is the nth cell."
+  query_budget:
+    per: [principal, projection]
+    window: P1D
+    max_queries: 20
+    on_exhausted: refuse
+    note: >-
+      A blunt instrument, and declared as one. It bounds repeated-query
+      differencing; it is not a privacy budget and must not be described as
+      one. A formal epsilon-based mechanism is deliberately NOT built here --
+      see the disposition log.
+  residual_risk_declared: >-
+    Fixed surface + complementary suppression + no margins + a query cap bounds
+    the obvious differencing attacks. It does not eliminate inference from
+    external knowledge (an analyst who already knows one claimant's programme
+    learns something from a cell of 5). That residual is accepted and stated
+    rather than hidden behind a threshold number.
+
+# =====================================================================
+# 13. ROLES
+# =====================================================================
+roles:
+
+  # -------------------------------------------------------------------
+  - id: permits_caseworker
+    title: "Permits caseworker"
+    binds_to: permits.officers.officer_ref
+    egress_ceiling: RESTRICTED_INTERNAL
+    description: >-
+      Sees the whole permits case, and ONLY for applications assigned to them.
+      In version 1 the parent row was filtered while conditions, inspections,
+      photos and appeals were granted globally, so the caseload boundary was
+      decorative. Every dependent object now carries a relationship filter back
+      to an authorised application, and the filter is in the POLICY -- not in
+      the client's memory to join through a filtered parent.
+    default_excluded_column_reason: POLICY_DATA_MINIMIZATION
+
+    grants:
+      - object: permits.applications
+        purposes: [case_determination, correspondence, service_delivery]
+        row_scope: {predicate: "assigned_officer = :principal.officer_ref", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [application_id, applicant_id, permit_type_code, parcel_id, submitted_at,
+                  received_channel, status, fee_charged_cents, fee_paid_cents,
+                  assigned_officer, last_event_at, withdrawn_on]
+        withheld:
+          - {column: site_description, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - column: agent_of_record
+            reason: POLICY_FREE_TEXT_UNREVIEWED
+            transform: classify_only
+            note: "untrusted free text; also the source of the CLAIMS_AGENT_FOR proposal edge, which is never traversed for access"
+
+      - object: permits.applicants
+        purposes: [case_determination, correspondence, service_delivery]
+        row_scope: {predicate: "applicant_id IN (SELECT applicant_id FROM permits.applications WHERE assigned_officer = :principal.officer_ref)",
+                    outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [applicant_id, family_name, given_names, date_of_birth, national_id_ref,
+                  primary_email, primary_phone, address_line1, address_locality,
+                  address_postcode, preferred_language, record_source]
+        sensitive_exception_applies: true
+        sensitive_exception_note: >-
+          date_of_birth and national_id_ref are in the sensitive overlay. They
+          resolve raw HERE and only here, because the overlay's exception
+          predicate -- "this applicant is on an application assigned to me" --
+          is true, and only under purpose case_determination. Under
+          `correspondence` or `service_delivery` the overlay withholds them.
+        withheld:
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: created_at, reason: POLICY_DATA_MINIMIZATION}
+          - {column: updated_at, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: permits.decisions
+        purposes: [case_determination, service_delivery]
+        row_scope: {predicate: "application_id IN @permits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [decision_id, application_id, outcome, decided_at, decided_by,
+                  permit_number, valid_from, valid_until, appeal_deadline, superseded_by]
+        withheld:
+          - {column: rationale, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: permits.permit_conditions
+        purposes: [case_determination, service_delivery]
+        # Review finding C2: version 1 granted every condition in the estate.
+        row_scope: {predicate: "decision_id IN @permits.my_decisions", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [condition_id, decision_id, ordinal, condition_text, compliance_due, discharged_on]
+        free_text_exception:
+          column: condition_text
+          why: >-
+            A permit condition is agency-authored, published to the applicant,
+            and appears on the public register. It is the one free-text field in
+            the estate that is neither third-party nor confidential, and a
+            caseworker cannot work the case without it.
+
+      - object: permits.inspections
+        purposes: [case_determination, service_delivery]
+        # Review finding C2: version 1 granted every inspection in the estate.
+        row_scope: {predicate: "application_id IN @permits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [inspection_id, application_id, parcel_id, scheduled_for, performed_at,
+                  inspector_ref, outcome, photo_batch_ref]
+        withheld:
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: permits.case_events
+        purposes: [case_determination, service_delivery]
+        row_scope: {predicate: "application_id IN @permits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [event_id, application_id, occurred_at, recorded_at, event_type,
+                  actor_ref, actor_kind, channel, correlation_ref]
+        withheld:
+          - {column: detail, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: permits.appeals
+        purposes: [case_determination]
+        # Review finding H6: version 1 filtered `sealed = false` AND declared a
+        # withholding for `sealed = true`, so the withholding could never fire.
+        # The seal is now handled at the COLUMN stage, after the row stage, and
+        # the row stage carries only the relationship filter.
+        row_scope: {predicate: "decision_id IN @permits.my_decisions", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [appeal_id, decision_id, lodged_at, lodged_by, hearing_date, outcome, closed_at, sealed]
+        withheld:
+          - {column: grounds, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: lodged_by, when: "sealed = true", reason: POLICY_SEALED_RECORD}
+          - {column: outcome, when: "sealed = true", reason: POLICY_SEALED_RECORD}
+          - {column: hearing_date, when: "sealed = true", reason: POLICY_SEALED_RECORD}
+        existence_note: >-
+          A sealed appeal ON THE PRINCIPAL'S OWN CASE is `contents_withheld`,
+          not `existence_not_disclosed`: the caseworker already knows the case,
+          and hiding that an appeal exists would make the case record actively
+          misleading. Its contents are withheld with POLICY_SEALED_RECORD.
+
+      - object: permits.permit_types
+        purposes: [case_determination, service_delivery, correspondence]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "reference catalogue. No personal data, no free text about a person, no rows about individuals. Twelve rows, all published."
+
+      - object: permits.officers
+        purposes: [case_determination, service_delivery]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [officer_ref, display_name, unit, role_code, active]
+        withheld:
+          - {column: work_email, reason: POLICY_DATA_MINIMIZATION}
+          - {column: started_on, reason: POLICY_DATA_MINIMIZATION}
+          - {column: ended_on, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: gis_parcels.parcels
+        purposes: [case_determination, site_inspection, service_delivery]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "PUBLIC egress class; open parcel and zoning data with no personal content. The JOIN to a case is what is restricted, and that restriction lives on the case object."
+
+      - object: case_files
+        purposes: [case_determination]
+        # Review finding H12: version 1 filtered on `case_ref`, which is OCR of
+        # a form the public filled in. The predicate now names the TRUSTED
+        # binding only.
+        row_scope: {predicate: "case_ref_trusted IN @permits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        predicate_note: "`case_ref_trusted` exists only where trusted_case_bindings.case_files established it. `claimed_case_ref` may never appear here."
+        columns: [document_id, doc_kind, form_number, scanned_on, pages, mean_confidence, case_ref_trusted]
+        withheld:
+          - {column: content, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - column: claimed_case_ref
+            reason: POLICY_FREE_TEXT_UNREVIEWED
+            note: "displayable to the caseworker as untrusted evidence, but only via an explicit triage read that records it as unbound"
+
+      - object: correspondence
+        purposes: [correspondence, case_determination]
+        row_scope: {predicate: "case_ref_trusted IN @permits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        predicate_note: "trusted binding only -- see trusted_case_bindings.correspondence. A forged X-Case-Reference reaches no caseload."
+        columns: [email_id, message_id, thread_id, sent_at, has_attachment, case_ref_trusted]
+        withheld:
+          - {column: subject, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: body, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: from_address, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: to_address, reason: POLICY_THIRD_PARTY_DATA}
+        free_text_review_path: >-
+          A caseworker plainly must read mail on their own case. That read is a
+          separate, explicitly-logged action -- open_correspondence(email_id)
+          -- which returns the body with a standing untrusted stamp and an
+          injection-surfacing pass, and appends its own ledger entry. It is not
+          a column in a bulk projection, because a bulk projection is how
+          third-party content reaches a model without anyone deciding it should.
+
+      - object: inspection_photos
+        purposes: [case_determination]
+        # Review finding C2: version 1 granted every photo in the estate.
+        row_scope: {predicate: "inspection_id IN @permits.my_inspections", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [image_id, inspection_id, application_id, parcel_id, captured_at, captured_by, ocr_block_count, mean_confidence]
+        withheld:
+          - {column: "ocr.blocks[].text", reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+    denied:
+      - {object: "benefits.*", reason: POLICY_ROLE_SCOPE, existence: existence_not_disclosed}
+      - object: legacy_records.LEGACY-MASTER
+        reason: POLICY_ROLE_SCOPE
+        existence: contents_withheld
+        note: >-
+          Legacy records mix permits and benefits data in one flat 220-byte
+          record with no way to project one out, so the whole source is out of
+          scope for this role. A real consequence of the file layout, not an
+          arbitrary restriction -- and `contents_withheld` rather than
+          `existence_not_disclosed`, because the source's existence is not a
+          secret; only its contents are.
+      - {object: public_registry_api, reason: POLICY_ROLE_SCOPE}
+      - {object: public_registry_captures, reason: POLICY_ROLE_SCOPE}
+
+  # -------------------------------------------------------------------
+  - id: permits_inspector
+    title: "Inspector"
+    binds_to: permits.officers.officer_ref
+    egress_ceiling: RESTRICTED_INTERNAL
+    description: >-
+      Needs the site, the permit conditions and the photo record FOR THE
+      INSPECTIONS ASSIGNED TO THEM. Version 1's description said the inspector
+      "does not need the applicant's identifiers, and so does not get them" and
+      then granted every application, every applicant name, every condition,
+      every parcel and every photo in the estate, plus a masked tail of the
+      national identifier. The grants now match the sentence.
+    default_excluded_column_reason: POLICY_DATA_MINIMIZATION
+
+    grants:
+      - object: permits.inspections
+        purposes: [site_inspection]
+        row_scope: {predicate: "inspector_ref = :principal.officer_ref", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [inspection_id, application_id, parcel_id, scheduled_for, performed_at,
+                  inspector_ref, outcome, notes, photo_batch_ref]
+        free_text_exception:
+          column: notes
+          why: "the inspector's own notes on their own inspection. Read and write by the same principal."
+          predicate: "inspector_ref = :principal.officer_ref"
+
+      - object: permits.applications
+        purposes: [site_inspection]
+        row_scope: {predicate: "application_id IN @permits.inspector_applications", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [application_id, permit_type_code, parcel_id, status, submitted_at]
+        withheld:
+          - {column: site_description, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: applicant_id, reason: POLICY_DATA_MINIMIZATION, note: "the inspector reaches the applicant through the grant below; the raw foreign key would let them enumerate applications they do not inspect"}
+          - {column: agent_of_record, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: fee_charged_cents, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: fee_paid_cents, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: assigned_officer, reason: POLICY_DATA_MINIMIZATION}
+          - {column: received_channel, reason: POLICY_DATA_MINIMIZATION}
+          - {column: last_event_at, reason: POLICY_DATA_MINIMIZATION}
+          - {column: withdrawn_on, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: permits.applicants
+        purposes: [site_inspection]
+        row_scope: {predicate: "applicant_id IN (SELECT applicant_id FROM permits.applications WHERE application_id IN @permits.inspector_applications)",
+                    outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [applicant_id, family_name, given_names]
+        columns_justification: >-
+          A name, and only for the sites they are attending, because an
+          inspector announces themselves to a named person at a door. Nothing
+          else about the person is needed to inspect a building.
+        withheld:
+          - column: national_id_ref
+            reason: POLICY_SENSITIVE_IDENTIFIER
+            note: "version 1 masked this to a tail. A tail plus a name plus a locality re-identifies, so it is withheld outright. The sensitive overlay would withhold it here regardless: the exception predicate is about assignment, and an inspector is not the assigned officer."
+          - {column: date_of_birth, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: primary_email, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: primary_phone, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: address_line1, reason: POLICY_PURPOSE_MISMATCH, note: "the inspector is given the PARCEL, which is the site. The applicant's home address is a different fact."}
+          - {column: address_locality, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: address_postcode, reason: POLICY_PURPOSE_MISMATCH}
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: preferred_language, reason: POLICY_DATA_MINIMIZATION}
+          - {column: record_source, reason: POLICY_DATA_MINIMIZATION}
+          - {column: created_at, reason: POLICY_DATA_MINIMIZATION}
+          - {column: updated_at, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: permits.permit_conditions
+        purposes: [site_inspection]
+        # Review finding C2: version 1 granted every condition in the estate.
+        row_scope: {predicate: "decision_id IN @permits.inspector_decisions", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [condition_id, decision_id, ordinal, condition_text, compliance_due, discharged_on]
+        free_text_exception: {column: condition_text, why: "agency-authored and published; the thing being inspected against"}
+
+      - object: gis_parcels.parcels
+        purposes: [site_inspection]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "PUBLIC egress class; open parcel and zoning data. An inspector navigating to a site needs the map."
+
+      - object: inspection_photos
+        purposes: [site_inspection]
+        row_scope: {predicate: "inspection_id IN @permits.inspector_inspections", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [image_id, inspection_id, application_id, parcel_id, captured_at, captured_by, ocr_block_count, mean_confidence]
+        withheld:
+          - column: "ocr.blocks[].text"
+            reason: POLICY_FREE_TEXT_UNREVIEWED
+            transform: classify_only
+            note: "review finding H9. Version 1 gave this role unrestricted OCR of every photo in the estate. One of the ten planted injections is on a photographed placard."
+
+    denied:
+      - {object: "benefits.*", reason: POLICY_ROLE_SCOPE, existence: existence_not_disclosed}
+      - {object: permits.case_events, reason: POLICY_PURPOSE_MISMATCH}
+      - {object: permits.decisions, reason: POLICY_PURPOSE_MISMATCH, note: "an inspector reaches conditions through @permits.inspector_decisions without reading the decision itself"}
+      - {object: permits.appeals, reason: POLICY_PURPOSE_MISMATCH}
+      - {object: case_files, reason: POLICY_PURPOSE_MISMATCH}
+      - {object: correspondence, reason: POLICY_PURPOSE_MISMATCH}
+      - {object: legacy_records.LEGACY-MASTER, reason: POLICY_ROLE_SCOPE}
+
+  # -------------------------------------------------------------------
+  - id: benefits_caseworker
+    title: "Benefits caseworker"
+    binds_to: benefits.caseworkers.caseworker_ref
+    egress_ceiling: RESTRICTED_INTERNAL
+    description: >-
+      Owns a caseload. Sees sensitive basis codes and restricted notes for
+      their OWN claims -- the one role for which those are ordinary working
+      data -- and nothing at all for anyone else's. Version 1 said exactly this
+      and then granted every determination, payment, review, claim event and
+      most notes in the estate. Every dependent object is now filtered to
+      @benefits.my_caseload.
+    default_excluded_column_reason: POLICY_DATA_MINIMIZATION
+
+    grants:
+      - object: benefits.claims
+        purposes: [eligibility_determination, payment_administration, correspondence, service_delivery]
+        row_scope: {predicate: "caseworker_ref = :principal.caseworker_ref", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [claim_id, claimant_id, program_code, opened_on, closed_on, status,
+                  caseworker_ref, intake_channel, priority_flag]
+        withheld:
+          - column: linked_application_id
+            reason: POLICY_DATA_MINIMIZATION
+            note: "a hand-keyed hint on ~12% of claims, mistyped on a quarter of those. It is a resolution CANDIDATE, surfaced through the resolver with its confidence, never as a fact on the row."
+
+      - object: benefits.claimants
+        purposes: [eligibility_determination, payment_administration, correspondence]
+        row_scope: {predicate: "claimant_id IN (SELECT claimant_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref)",
+                    outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [claimant_id, benefits_ref, surname, forenames, date_of_birth, resident_number,
+                  contact_email, contact_phone, address_line, address_locality, address_postcode,
+                  household_size, registered_on, last_contact_on, deceased_flag, correspondence_pref]
+        sensitive_exception_applies: true
+        sensitive_exception_note: >-
+          resident_number and date_of_birth resolve raw here because the
+          overlay's exception predicate is TRUE for these rows -- the row
+          relationship, not the role name, is doing the work. Under purpose
+          `correspondence` the overlay still withholds date_of_birth, because
+          its exception names only eligibility_determination.
+
+      - object: benefits.eligibility_determinations
+        purposes: [eligibility_determination]
+        row_scope: {predicate: "claim_id IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [determination_id, claim_id, determined_on, outcome, basis_code,
+                  monthly_entitlement_cents, effective_from, effective_to, determined_by, supersedes]
+        sensitive_exception_applies: true
+        withheld:
+          - {column: evidence_ref, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: benefits.payments
+        purposes: [payment_administration, eligibility_determination]
+        row_scope: {predicate: "claim_id IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [payment_id, claim_id, paid_on, amount_cents, method, period_start,
+                  period_end, reversal_of, posted_at]
+        withheld:
+          - {column: reference, reason: POLICY_FREE_TEXT_UNREVIEWED, note: "a free-text remittance field; carries bank details and occasionally a third party's name"}
+
+      - object: benefits.reviews
+        purposes: [eligibility_determination]
+        row_scope: {predicate: "claim_id IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [review_id, claim_id, review_type, scheduled_for, completed_on, result, reviewer_ref]
+        withheld:
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: benefits.claim_notes
+        purposes: [eligibility_determination, payment_administration]
+        row_scope: {predicate: "claim_id IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [note_id, claim_id, authored_at, author_ref, sensitivity, source_channel, body]
+        sensitive_exception_applies: true
+        sensitive_exception_note: >-
+          `body` is in the sensitive overlay AND in free_text_policy. It
+          resolves raw only where the overlay's exception is true: the claim is
+          in this caseload AND sensitivity is not 'sealed'. A sealed note
+          resolves only for its own author. Everything else is
+          POLICY_SEALED_RECORD -- which no seniority overrides.
+
+      - object: benefits.claim_events
+        purposes: [eligibility_determination, payment_administration, service_delivery]
+        row_scope: {predicate: "claim_id IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [event_id, claim_id, occurred_at, recorded_at, event_type, actor_ref, actor_kind, channel, correlation_ref]
+        withheld:
+          - {column: detail, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: benefits.benefit_programs
+        purposes: [eligibility_determination, payment_administration, service_delivery, correspondence]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "statutory programme catalogue. Published; no personal data; no free text about a person."
+
+      - object: benefits.caseworkers
+        purposes: [eligibility_determination, service_delivery]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [caseworker_ref, display_name, team, role_code, active]
+
+      - object: case_files
+        purposes: [eligibility_determination]
+        row_scope: {predicate: "case_ref_trusted IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        predicate_note: "trusted binding only -- review finding H12."
+        columns: [document_id, doc_kind, form_number, scanned_on, pages, mean_confidence, case_ref_trusted]
+        withheld:
+          - {column: content, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: claimed_case_ref, reason: POLICY_FREE_TEXT_UNREVIEWED}
+
+      - object: correspondence
+        purposes: [correspondence, eligibility_determination]
+        row_scope: {predicate: "case_ref_trusted IN @benefits.my_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [email_id, message_id, thread_id, sent_at, has_attachment, case_ref_trusted]
+        withheld:
+          - {column: subject, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: body, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+          - {column: from_address, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: to_address, reason: POLICY_THIRD_PARTY_DATA}
+        free_text_review_path: "open_correspondence(email_id), separately logged, as for permits_caseworker."
+
+      - object: benefits.v_program_caseload
+        purposes: [eligibility_determination]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: >-
+          An aggregate VIEW with three columns, none of them about an
+          individual. The control on this object is `aggregate_policy`, not a
+          column list: what matters is which PROJECTIONS may be requested and
+          what happens to a small cell, and a column allowlist over an
+          already-aggregated view would give false comfort about neither.
+        aggregate_policy_applies: true
+
+    denied:
+      - object: "permits.*"
+        reason: POLICY_ROLE_SCOPE
+        existence: existence_not_disclosed
+        note: >-
+          A benefits caseworker who needs a permits fact asks for it through
+          the orchestrator with a declared purpose. They do not get a standing
+          grant over another agency's system of record.
+      - {object: legacy_records.LEGACY-MASTER, reason: POLICY_ROLE_SCOPE}
+      - {object: inspection_photos, reason: POLICY_ROLE_SCOPE}
+      - {object: public_registry_api, reason: POLICY_ROLE_SCOPE}
+      - {object: public_registry_captures, reason: POLICY_ROLE_SCOPE}
+
+  # -------------------------------------------------------------------
+  - id: benefits_team_lead
+    title: "Benefits team lead"
+    binds_to: benefits.caseworkers.caseworker_ref
+    egress_ceiling: RESTRICTED_INTERNAL
+    extends: benefits_caseworker
+    description: >-
+      A caseworker's grants, widened from one caseload to one TEAM's caseload
+      -- and no further. Version 1 widened the ROW scope while leaving
+      `claimants: "*"` and every determination, payment and review in the
+      estate ungated: the team lead received full resident numbers, dates of
+      birth and sensitive basis codes for everybody. That was the review's
+      Critical 5. The row scope is now @benefits.team_caseload throughout, and
+      the sensitive overlay bites, because its exception predicate names the
+      OWNING caseworker and a team lead is not the owning caseworker on a team
+      member's claim.
+    purposes_note: >-
+      This role's operative purpose is `quality_assurance`. Under it the
+      overlay withholds resident_number, date_of_birth, sensitive basis codes
+      and every note body. A team lead who also holds their own caseload uses
+      the benefits_caseworker context for it -- a separate request, separately
+      logged (see combination_semantics.active_context).
+
+    overrides:
+      # Each override restates the whole grant tuple, per combination_semantics.extends.
+      - object: benefits.claims
+        purposes: [quality_assurance]
+        row_scope: {predicate: "caseworker_ref IN (SELECT caseworker_ref FROM benefits.caseworkers WHERE team = :principal.team)",
+                    outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [claim_id, claimant_id, program_code, opened_on, closed_on, status, caseworker_ref, intake_channel, priority_flag]
+
+      - object: benefits.claimants
+        purposes: [quality_assurance]
+        row_scope: {predicate: "claimant_id IN (SELECT claimant_id FROM benefits.claims WHERE claim_id IN @benefits.team_caseload)",
+                    outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [claimant_id, benefits_ref, surname, forenames, address_locality,
+                  household_size, registered_on, last_contact_on, deceased_flag]
+        sensitive_exception_applies: false
+        withheld:
+          - {column: resident_number, reason: POLICY_SENSITIVE_IDENTIFIER, source: sensitive_overlay}
+          - {column: date_of_birth, reason: POLICY_SENSITIVE_IDENTIFIER, source: sensitive_overlay}
+          - {column: contact_email, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: contact_phone, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: address_line, reason: POLICY_DATA_MINIMIZATION}
+          - {column: address_postcode, reason: POLICY_DATA_MINIMIZATION}
+          - {column: correspondence_pref, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: benefits.eligibility_determinations
+        purposes: [quality_assurance]
+        row_scope: {predicate: "claim_id IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [determination_id, claim_id, determined_on, outcome, basis_code,
+                  monthly_entitlement_cents, effective_from, effective_to, determined_by, supersedes]
+        sensitive_exception_applies: false
+        sensitive_overlay_effect: >-
+          basis_code resolves raw for non-sensitive codes and is withheld with
+          POLICY_SENSITIVE_BASIS for BC-MEDICAL-A, BC-MEDICAL-B and
+          BC-HOUSEHOLD-A. QA can see THAT a determination rested on a code and
+          whether the process was followed, without learning that a claimant
+          has a medical condition.
+        withheld:
+          - {column: evidence_ref, reason: POLICY_FREE_TEXT_UNREVIEWED}
+
+      - object: benefits.payments
+        purposes: [quality_assurance]
+        row_scope: {predicate: "claim_id IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [payment_id, claim_id, paid_on, amount_cents, method, period_start, period_end, reversal_of, posted_at]
+        withheld:
+          - {column: reference, reason: POLICY_FREE_TEXT_UNREVIEWED}
+
+      - object: benefits.reviews
+        purposes: [quality_assurance]
+        row_scope: {predicate: "claim_id IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [review_id, claim_id, review_type, scheduled_for, completed_on, result, reviewer_ref]
+        withheld:
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: benefits.claim_notes
+        purposes: [quality_assurance]
+        row_scope: {predicate: "claim_id IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [note_id, claim_id, authored_at, author_ref, sensitivity, source_channel]
+        sensitive_exception_applies: false
+        withheld:
+          - column: body
+            reason: POLICY_FREE_TEXT_UNREVIEWED
+            source: free_text_policy
+            note: >-
+              Review finding H9. Version 1 withheld the body only when
+              sensitivity was 'restricted' or 'sealed', so every note a
+              caseworker had labelled 'routine' -- which is most of them, and
+              which is where two of the estate's planted injections were
+              pasted -- was readable in bulk. A label a human applied cannot
+              be the sole protection for text nobody has read.
+
+      - object: benefits.claim_events
+        purposes: [quality_assurance]
+        row_scope: {predicate: "claim_id IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [event_id, claim_id, occurred_at, recorded_at, event_type, actor_ref, actor_kind, channel, correlation_ref]
+        withheld:
+          - {column: detail, reason: POLICY_FREE_TEXT_UNREVIEWED, transform: classify_only}
+
+      - object: case_files
+        purposes: [quality_assurance]
+        row_scope: {predicate: "case_ref_trusted IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [document_id, doc_kind, form_number, scanned_on, pages, mean_confidence, case_ref_trusted]
+        withheld:
+          - {column: content, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: claimed_case_ref, reason: POLICY_FREE_TEXT_UNREVIEWED}
+
+      - object: correspondence
+        purposes: [quality_assurance]
+        row_scope: {predicate: "case_ref_trusted IN @benefits.team_caseload", outside: existence_not_disclosed, outside_reason: POLICY_SCOPE_UNDISCLOSED}
+        columns: [email_id, message_id, thread_id, sent_at, has_attachment, case_ref_trusted]
+        withheld:
+          - {column: subject, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: body, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: from_address, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: to_address, reason: POLICY_THIRD_PARTY_DATA}
+
+    denied:
+      - {object: "permits.*", reason: POLICY_ROLE_SCOPE, existence: existence_not_disclosed}
+      - {object: legacy_records.LEGACY-MASTER, reason: POLICY_ROLE_SCOPE}
+      - {object: inspection_photos, reason: POLICY_ROLE_SCOPE}
+
+  # -------------------------------------------------------------------
+  - id: auditor
+    title: "Auditor"
+    egress_ceiling: INTERNAL
+    description: >-
+      Establishes that a PROCESS was followed. Version 1 said the auditor sees
+      "almost no identifiers" and then granted `permits.*` and `benefits.*`
+      with `columns: "*"` and four masks -- leaving names, addresses, case ids,
+      exact event timestamps, ordinary note bodies and full photo OCR readable
+      (review findings H8, H9). Direct masking is not inference control: exact
+      dates plus a stable case id plus the public register re-identify a person
+      whose date of birth and national id were masked.
+      The wide grant is now an EXPLICIT AUDIT PROJECTION.
+    audit_projection:
+      principle: "process fields, pseudonymous subjects, generalised time, no free text, no OCR, no contact data, no addresses."
+      subject_ids: pseudonym_engagement
+      subject_ids_note: >-
+        Case and person identifiers are pseudonymised with a key scoped to the
+        audit engagement: joinable within the audit, not correlatable outside
+        it, destroyed when the engagement closes. `columns: "*"` appears nowhere
+        in this role.
+      timestamps: month_only
+      timestamps_note: >-
+        Exact decision and event timestamps are a re-identification vector
+        against the public register, which publishes decision dates. The audit
+        question -- "was the statutory target met" -- is answerable from a
+        DURATION, which is disclosed as a derived measure, and from the month.
+      derived_measures_disclosed: [days_to_decision, days_to_inspection, determination_to_payment_days,
+                                   superseded_count, review_overdue_flag, target_met_flag]
+    default_excluded_column_reason: POLICY_DATA_MINIMIZATION
+
+    grants:
+      - object: permits.applications
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [permit_type_code, status, received_channel, assigned_officer, withdrawn_on]
+        masked:
+          application_id: pseudonym_engagement
+          applicant_id: pseudonym_engagement
+          parcel_id: pseudonym_engagement
+          submitted_at: month_only
+        withheld:
+          - {column: site_description, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: agent_of_record, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: fee_charged_cents, reason: POLICY_DATA_MINIMIZATION}
+          - {column: fee_paid_cents, reason: POLICY_DATA_MINIMIZATION}
+          - {column: last_event_at, reason: POLICY_DATA_MINIMIZATION}
+        parcel_note: >-
+          `parcel_id` is pseudonymised rather than disclosed even though the
+          parcel table is PUBLIC. A real parcel id joined to a case is a
+          street address joined to a case -- review finding H8, and the egress
+          combination rule in sources.yaml.
+
+      - object: permits.applicants
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [record_source, preferred_language]
+        masked: {applicant_id: pseudonym_engagement}
+        withheld:
+          - {column: family_name, reason: POLICY_INFERENCE_CONTROL}
+          - {column: given_names, reason: POLICY_INFERENCE_CONTROL}
+          - {column: date_of_birth, reason: POLICY_SENSITIVE_IDENTIFIER}
+          - {column: national_id_ref, reason: POLICY_SENSITIVE_IDENTIFIER}
+          - {column: primary_email, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: primary_phone, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: address_line1, reason: POLICY_INFERENCE_CONTROL}
+          - {column: address_locality, reason: POLICY_INFERENCE_CONTROL}
+          - {column: address_postcode, reason: POLICY_INFERENCE_CONTROL}
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: created_at, reason: POLICY_DATA_MINIMIZATION}
+          - {column: updated_at, reason: POLICY_DATA_MINIMIZATION}
+        note: >-
+          Version 1 masked the name to an initial for legacy records and left
+          it raw here. An auditor testing whether decisions were made within
+          target does not need to know whose they were. If a specific case must
+          be opened by name, that is an escalation with its own attestation --
+          not a standing column.
+
+      - object: permits.decisions
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [outcome, decided_by, valid_from, valid_until, appeal_deadline]
+        masked:
+          decision_id: pseudonym_engagement
+          application_id: pseudonym_engagement
+          permit_number: pseudonym_engagement
+          superseded_by: pseudonym_engagement
+          decided_at: month_only
+        withheld:
+          - {column: rationale, reason: POLICY_FREE_TEXT_UNREVIEWED}
+        permit_number_note: "the permit number appears on the PUBLIC register beside a parcel and a date. Unmasked, it is a join key straight back to a named person."
+
+      - object: permits.inspections
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [inspector_ref, outcome]
+        masked:
+          inspection_id: pseudonym_engagement
+          application_id: pseudonym_engagement
+          parcel_id: pseudonym_engagement
+          scheduled_for: month_only
+          performed_at: month_only
+        withheld:
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: photo_batch_ref, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: permits.appeals
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [outcome, sealed]
+        masked:
+          appeal_id: pseudonym_engagement
+          decision_id: pseudonym_engagement
+          lodged_at: month_only
+          hearing_date: month_only
+          closed_at: month_only
+        withheld:
+          - {column: grounds, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: lodged_by, reason: POLICY_THIRD_PARTY_DATA}
+        sealed_note: >-
+          The auditor sees THAT an appeal is sealed and its outcome -- that is
+          the control being tested -- and nothing about who lodged it or why.
+
+      - object: permits.case_events
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [event_type, actor_kind, channel]
+        masked:
+          event_id: pseudonym_engagement
+          application_id: pseudonym_engagement
+          actor_ref: pseudonym_engagement
+          occurred_at: month_only
+          recorded_at: month_only
+        withheld:
+          - column: detail
+            reason: POLICY_FREE_TEXT_UNREVIEWED
+            note: "review finding H9. Case-event detail is free text and routinely carries names, phone numbers and quoted third-party statements."
+          - {column: correlation_ref, reason: POLICY_DATA_MINIMIZATION}
+        timestamp_note: >-
+          Both clocks are generalised to a month. The audit question -- does
+          `occurred_at` trail `recorded_at`, and by how much -- is answered by
+          the derived measure `recording_lag_days`, which is disclosed. A lag
+          is not a timestamp and does not re-identify.
+
+      - object: permits.permit_types
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "reference catalogue; twelve published rows; no personal data."
+
+      - object: permits.officers
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [officer_ref, unit, role_code, active]
+        withheld:
+          - {column: display_name, reason: POLICY_DATA_MINIMIZATION, note: "staff identity is administrative and is disclosed on escalation, not as a standing column. The audit tests the process, not the person -- until it does, deliberately."}
+          - {column: work_email, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: benefits.claims
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [program_code, status, intake_channel, priority_flag]
+        masked:
+          claim_id: pseudonym_engagement
+          claimant_id: pseudonym_engagement
+          caseworker_ref: pseudonym_engagement
+          opened_on: month_only
+          closed_on: month_only
+        withheld:
+          - column: linked_application_id
+            reason: POLICY_INFERENCE_CONTROL
+            note: "review finding H8 named this explicitly: an unmasked cross-agency hint links a pseudonymised claim to a pseudonymised application and undoes both pseudonyms."
+
+      - object: benefits.claimants
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [household_size, deceased_flag, correspondence_pref]
+        masked:
+          claimant_id: pseudonym_engagement
+          benefits_ref: pseudonym_engagement
+          registered_on: month_only
+          last_contact_on: month_only
+        withheld:
+          - {column: surname, reason: POLICY_INFERENCE_CONTROL}
+          - {column: forenames, reason: POLICY_INFERENCE_CONTROL}
+          - {column: date_of_birth, reason: POLICY_SENSITIVE_IDENTIFIER}
+          - {column: resident_number, reason: POLICY_SENSITIVE_IDENTIFIER}
+          - {column: contact_email, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: contact_phone, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: address_line, reason: POLICY_INFERENCE_CONTROL}
+          - {column: address_locality, reason: POLICY_INFERENCE_CONTROL}
+          - {column: address_postcode, reason: POLICY_INFERENCE_CONTROL}
+
+      - object: benefits.eligibility_determinations
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [outcome, monthly_entitlement_cents]
+        masked:
+          determination_id: pseudonym_engagement
+          claim_id: pseudonym_engagement
+          determined_by: pseudonym_engagement
+          supersedes: pseudonym_engagement
+          determined_on: month_only
+          effective_from: month_only
+          effective_to: month_only
+        withheld:
+          - column: basis_code
+            reason: POLICY_SENSITIVE_BASIS
+            note: >-
+              Version 1 withheld only the three codes in sensitive.values and
+              disclosed the rest. The auditor now receives a derived
+              `basis_category` (statutory group, not the code) instead: the
+              non-sensitive codes are a small enumeration, so knowing which
+              ones a claimant does NOT have narrows the sensitive set by
+              elimination. That is inference control, not squeamishness.
+          - {column: evidence_ref, reason: POLICY_FREE_TEXT_UNREVIEWED}
+        derived_measures_disclosed: [basis_category]
+
+      - object: benefits.payments
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [method]
+        masked:
+          payment_id: pseudonym_engagement
+          claim_id: pseudonym_engagement
+          reversal_of: pseudonym_engagement
+          amount_cents: band
+          paid_on: month_only
+          posted_at: month_only
+          period_start: month_only
+          period_end: month_only
+        withheld:
+          - {column: reference, reason: POLICY_FREE_TEXT_UNREVIEWED, note: "carries bank references and payee names"}
+
+      - object: benefits.reviews
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [review_type, result]
+        masked:
+          review_id: pseudonym_engagement
+          claim_id: pseudonym_engagement
+          reviewer_ref: pseudonym_engagement
+          scheduled_for: month_only
+          completed_on: month_only
+        withheld:
+          - {column: notes, reason: POLICY_FREE_TEXT_UNREVIEWED}
+
+      - object: benefits.claim_notes
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [sensitivity, source_channel]
+        masked:
+          note_id: pseudonym_engagement
+          claim_id: pseudonym_engagement
+          author_ref: pseudonym_engagement
+          authored_at: month_only
+        withheld:
+          - column: body
+            reason: POLICY_FREE_TEXT_UNREVIEWED
+            note: >-
+              Review finding H9. Version 1 withheld the body only for
+              'restricted' and 'sealed'. Ordinary notes carry health, contact,
+              household and quoted third-party data, and a sensitivity label
+              applied by a busy caseworker is not a control. The auditor's
+              question -- were notes recorded, at what rate, on which channel
+              -- is answered by the metadata.
+
+      - object: benefits.claim_events
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [event_type, actor_kind, channel]
+        masked:
+          event_id: pseudonym_engagement
+          claim_id: pseudonym_engagement
+          actor_ref: pseudonym_engagement
+          occurred_at: month_only
+          recorded_at: month_only
+        withheld:
+          - {column: detail, reason: POLICY_FREE_TEXT_UNREVIEWED}
+          - {column: correlation_ref, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: benefits.benefit_programs
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "statutory programme catalogue; published; no personal data."
+
+      - object: benefits.caseworkers
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [caseworker_ref, team, role_code, active]
+        withheld:
+          - {column: display_name, reason: POLICY_DATA_MINIMIZATION}
+          - {column: work_email, reason: POLICY_DATA_MINIMIZATION}
+
+      - object: legacy_records.LEGACY-MASTER
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [LM-REC-TYPE, LM-STATUS, LM-PROGRAM-CD, LM-LAST-UPD-CYMD]
+        masked:
+          LM-KEY: pseudonym_engagement
+          LM-SURNAME: initial_surname
+          LM-DOB-CYMD: year_only
+        withheld_default_reason: POLICY_DATA_MINIMIZATION
+        note: >-
+          A 220-byte fixed-width record cannot be projected safely field by
+          field with confidence, because the layout has changed twice and some
+          fields are reused. This is the minimum set the layout guarantees.
+
+      - object: gis_parcels.parcels
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "PUBLIC egress class, open data, read on its own. The auditor's join key into it is pseudonymised, so parcels cannot be walked back to cases."
+
+      - object: benefits.v_program_caseload
+        purposes: [audit, control_testing]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "aggregate view; governed by aggregate_policy rather than by a column list."
+        aggregate_policy_applies: true
+
+    denied:
+      - object: case_files
+        reason: POLICY_FREE_TEXT_UNREVIEWED
+        existence: contents_withheld
+        note: "a scanned case file is one undifferentiated OCR blob. It cannot be redacted field by field, and shipping a best-effort redaction to a reader who would over-trust it is worse than withholding. Metadata is available through the aggregate audit projection; the content is not."
+      - {object: correspondence, reason: POLICY_THIRD_PARTY_DATA, existence: contents_withheld}
+      - object: inspection_photos
+        reason: POLICY_FREE_TEXT_UNREVIEWED
+        existence: contents_withheld
+        note: "review finding H9: version 1 granted this role every photo sidecar with unrestricted OCR, including the one carrying a planted instruction."
+      - object: public_registry_api
+        reason: POLICY_INFERENCE_CONTROL
+        note: "the public register is the strongest re-identification aid in the estate: name, address and licence, joinable to a parcel and a date. An auditor holding a pseudonymised case set must not also hold the key that breaks it."
+      - {object: public_registry_captures, reason: POLICY_INFERENCE_CONTROL}
+
+    obligations:
+      - log_every_read_with_purpose_and_engagement_id
+      - expire_pseudonymisation_key_on_engagement_close
+      - no_export_outside_engagement_workspace
+      - four_eyes_on_any_de_pseudonymisation_escalation
+
+  # -------------------------------------------------------------------
+  - id: public_records_officer
+    title: "Public records officer"
+    egress_ceiling: PUBLIC
+    description: >-
+      Handles disclosure requests. Sees the statutory public register and
+      approved aggregate figures, and nothing that identifies a person. This is
+      the one role that deliberately DISCLOSES EXISTENCE while withholding
+      contents, because "this record exists and is exempt" is the honest and
+      statutorily required answer -- and that is an explicit policy choice
+      here, not a universal consequence of D4.
+    existence_default: contents_withheld
+    default_excluded_column_reason: POLICY_DISCLOSURE_EXEMPT
+
+    grants:
+      - object: permits.v_public_register
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: >-
+          This VIEW is the statutory disclosable projection. Its column list IS
+          the policy, defined in permits_registry/schema.sql, and a wildcard
+          over it is a wildcard over a set that was designed to be published.
+          If a column is added to the view, `on_unclassified_column: deny`
+          still applies until it is classified.
+
+      - object: permits.permit_types
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "published catalogue."
+
+      - object: permits.decisions
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [decision_id, application_id, outcome, decided_at, permit_number, valid_from, valid_until]
+        withheld:
+          - {column: rationale, reason: POLICY_DISCLOSURE_EXEMPT}
+          - {column: decided_by, reason: POLICY_DISCLOSURE_EXEMPT}
+          - {column: appeal_deadline, reason: POLICY_DISCLOSURE_EXEMPT}
+          - {column: superseded_by, reason: POLICY_DISCLOSURE_EXEMPT}
+
+      - object: permits.appeals
+        purposes: [statutory_disclosure]
+        # Review finding H6: the same ordering contradiction as the caseworker
+        # grant. The seal is a COLUMN-stage rule (stage 7-8), evaluated after
+        # the row stage, so the withholding can actually fire -- which is what
+        # the `disclosure_admits_existence` demo assertion depends on.
+        row_scope: {predicate: null, outside: n/a}
+        existence: contents_withheld
+        columns: [appeal_id, decision_id, lodged_at, hearing_date, outcome, sealed]
+        withheld:
+          - {column: outcome, when: "sealed = true", reason: POLICY_SEALED_RECORD}
+          - {column: hearing_date, when: "sealed = true", reason: POLICY_SEALED_RECORD}
+          - {column: lodged_at, when: "sealed = true", reason: POLICY_SEALED_RECORD}
+          - {column: grounds, reason: POLICY_DISCLOSURE_EXEMPT}
+          - {column: lodged_by, reason: POLICY_THIRD_PARTY_DATA}
+          - {column: closed_at, reason: POLICY_DISCLOSURE_EXEMPT}
+        disclosure_note: >-
+          A sealed appeal returns its appeal_id and `sealed: true` with
+          POLICY_SEALED_RECORD on every substantive column. The record's
+          existence is disclosed; its content is not. That is the statutory
+          answer and it is a deliberate choice for THIS role only.
+
+      - object: benefits.v_program_caseload
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "aggregate view; governed by aggregate_policy rather than by a column list."
+        aggregate_policy_applies: true
+        aggregate_note: "the full aggregate_policy block applies: fixed query surface, complementary suppression, no published margins, query budget. A single threshold of 5 was the review's finding H10 and is not on its own a control."
+
+      - object: gis_parcels.parcels
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: [parcel_id, ward_code, locality, zoning_code, land_use, area_sqm,
+                  postcode, heritage_flag, flood_zone]
+
+      - object: gis_parcels.zoning_codes
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "published reference table."
+
+      - object: public_registry_api
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "already public at source and published by another agency. Untrusted, and stamped as such -- never obeyed, only cited."
+        trust: untrusted
+
+      - object: public_registry_captures
+        purposes: [statutory_disclosure]
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: "captures of an already-public register published by another agency. Untrusted and stamped as such -- cited, never obeyed."
+        trust: untrusted
+
+    denied:
+      # Existence is disclosed for these -- that IS the statutory answer -- but
+      # nothing else is.
+      - {object: permits.applicants, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: permits.case_events, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: permits.inspections, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: permits.permit_conditions, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.claimants, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.claims, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.claim_notes, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.eligibility_determinations, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.payments, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.reviews, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: benefits.claim_events, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: case_files, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: correspondence, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: inspection_photos, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+      - {object: legacy_records.LEGACY-MASTER, reason: POLICY_DISCLOSURE_EXEMPT, existence: contents_withheld}
+
+  # -------------------------------------------------------------------
+  # Review finding H11. Version 1 had ONE `adapter_service` role granting both
+  # PostgreSQL estates and every other source, while its description claimed
+  # the grant was "per source". A leaked permits-adapter credential could
+  # therefore read benefits data. The isolation is now represented: the role is
+  # a TEMPLATE, instantiated once per source, and every grant is conditional on
+  # a source binding that comes from the CREDENTIAL.
+  # -------------------------------------------------------------------
+  - id: adapter_service
+    title: "Adapter service principal (machine) -- template"
+    machine: true
+    template: true
+    egress_ceiling: RESTRICTED_INTERNAL
+    description: >-
+      The credential an adapter runs under. It reads for ingest only. One
+      instance exists per source; an instance may read exactly the source it is
+      bound to and nothing else.
+    requires_binding:
+      claim: bound_source_id
+      supplied_by: credential
+      supplied_by_detail: >-
+        A workload-identity attribute -- an mTLS SAN, or a signed workload
+        token. NEVER a request field, a header, or a config value the adapter
+        process can choose. An unbound instance is refused at authentication,
+        not at authorisation.
+      enforcement: "every grant below carries `condition: :principal.bound_source_id == <source id>`. A grant whose condition is false is not merely filtered -- it does not exist for that instance."
+    instances:
+      - {id: "adapter_service:permits_registry", bound_source_id: permits_registry}
+      - {id: "adapter_service:benefits_case_management", bound_source_id: benefits_case_management}
+      - {id: "adapter_service:case_files", bound_source_id: case_files}
+      - {id: "adapter_service:legacy_records", bound_source_id: legacy_records}
+      - {id: "adapter_service:correspondence", bound_source_id: correspondence}
+      - {id: "adapter_service:gis_parcels", bound_source_id: gis_parcels}
+      - {id: "adapter_service:public_registry", bound_source_id: public_registry_api}
+      - {id: "adapter_service:inspection_photos", bound_source_id: inspection_photos}
+    cross_source_rule: >-
+      No adapter instance holds two bindings, and no instance may read a second
+      source to resolve a reference it found in its own. Cross-source joins
+      happen in the graph, above the adapters, where the pointers meet -- never
+      inside one adapter holding two credentials.
+
+    grants:
+      - object: "permits.*"
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'permits_registry'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        wildcard_justification: >-
+          An ingest principal reads the whole source by definition -- it is
+          building the graph. `on_unclassified_column: deny` does NOT apply to
+          an ingest grant; instead a newly seen column is ingested, stamped
+          unclassified, and made unreadable to every HUMAN role until it is
+          classified. That is where the schema-drift gate belongs: at
+          disclosure, not at ingest, so the drift is visible rather than silent.
+        capabilities: [describe, snapshot_present, plan, resolve, verify]
+        trust_default: trusted
+        untrusted_field_overrides: "sources.yaml: permits_registry.untrusted_fields"
+
+      - object: "benefits.*"
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'benefits_case_management'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, snapshot_present, plan, resolve, verify]
+        trust_default: trusted
+        untrusted_field_overrides: "sources.yaml: benefits_case_management.untrusted_fields"
+        trust_note: >-
+          Review finding M23. Version 1 stamped all of `benefits.*` `trusted`
+          in one line, which would have laundered `claim_notes.body` -- where
+          two of the estate's ten planted injections live, pasted in from
+          email by a caseworker. Passing through a system of record does not
+          promote trust. The default is trusted; the listed fields are not; and
+          every assertion derived from one of them inherits untrusted.
+
+      - object: "gis_parcels.*"
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'gis_parcels'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, plan, resolve, verify]
+        trust_default: trusted
+
+      - object: public_registry_api
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'public_registry_api'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, plan, resolve]
+        trust_default: untrusted
+        note: "third-party API content; may be cited, never obeyed"
+
+      - object: public_registry_captures
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'public_registry_api'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, snapshot, plan, resolve, verify]
+        trust_default: untrusted
+        note: "the same adapter instance owns the live API and its Capture Store, but the two are separate resources with separate pointer namespaces (sources.yaml, review finding MH18)."
+
+      - object: legacy_records.LEGACY-MASTER
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'legacy_records'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, plan, resolve]
+        trust_default: trusted
+        note: "verify unavailable: T3, re-cut in full nightly, offsets not stable across cuts."
+
+      - object: case_files
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'case_files'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, plan, resolve, verify_against_capture]
+        trust_default: untrusted
+
+      - object: correspondence
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'correspondence'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, plan, resolve, verify_against_capture]
+        trust_default: untrusted
+        emits_claimed_only: [claimed_case_ref]
+        emits_claimed_only_note: "the adapter emits `claimed_case_ref`, never a trusted `case_ref`. Binding happens above it -- review finding H12."
+
+      - object: inspection_photos
+        purposes: [ingest]
+        condition: ":principal.bound_source_id == 'inspection_photos'"
+        row_scope: {predicate: null, outside: n/a}
+        columns: "*"
+        capabilities: [describe, plan, resolve, verify_against_capture]
+        trust_default: untrusted
+        trusted_field_overrides: "sources.yaml: inspection_photos.trusted_fields -- inspection_id, photo_batch_ref, captured_by, captured_at are agency-produced. OCR text is not."
+
+    forbidden:
+      - {action: write, note: "adapters never write. Actions are the only write path."}
+      - {action: cross_source_read, note: "one binding per instance; see cross_source_rule."}
+      - {action: policy_evaluation, note: "an adapter enforces policy at resolve(); it never authors or amends it."}
+      - action: identity_confirmation
+        note: >-
+          No machine principal may set identity as verified, for a Person or an
+          Organisation. The resolver returns candidates; a named human attests.
+          There is no code path that sets requires_human_selection to False.
+
+# =====================================================================
+# 14. COLUMN CLASSIFICATION -- independent of any role.
+# A policy engine must be able to answer "what IS this column" before it
+# answers "who may see it". A column present in a source and absent from this
+# block is unclassified and fails closed (POLICY_UNCLASSIFIED_COLUMN).
+# =====================================================================
+column_classification:
+
+  direct_identifier_of_protected_subject:
+    - permits.applicants.national_id_ref
+    - permits.applicants.date_of_birth
+    - permits.applicants.family_name
+    - permits.applicants.given_names
+    - benefits.claimants.resident_number
+    - benefits.claimants.date_of_birth
+    - benefits.claimants.benefits_ref
+    - benefits.claimants.surname
+    - benefits.claimants.forenames
+    - legacy_records.LM-SURNAME
+    - legacy_records.LM-DOB-CYMD
+    - legacy_records.LM-KEY
+
+  contact_data:
+    - permits.applicants.primary_email
+    - permits.applicants.primary_phone
+    - benefits.claimants.contact_email
+    - benefits.claimants.contact_phone
+    - correspondence.from_address
+    - correspondence.to_address
+    - permits.officers.work_email
+    - benefits.caseworkers.work_email
+
+  location_data:
+    - permits.applicants.address_line1
+    - permits.applicants.address_locality
+    - permits.applicants.address_postcode
+    - benefits.claimants.address_line
+    - benefits.claimants.address_locality
+    - benefits.claimants.address_postcode
+
+  special_category:
+    - {column: benefits.eligibility_determinations.basis_code, when: "value IN sensitive.values"}
+    - benefits.claimants.household_size
+    - benefits.claimants.deceased_flag
+
+  free_text_may_contain_personal_data:
+    - permits.applicants.notes
+    - permits.applications.site_description
+    - permits.applications.agent_of_record
+    - permits.decisions.rationale
+    - permits.inspections.notes
+    - permits.appeals.grounds
+    - permits.case_events.detail
+    - benefits.claim_notes.body
+    - benefits.claim_events.detail
+    - benefits.reviews.notes
+    - benefits.payments.reference
+    - benefits.eligibility_determinations.evidence_ref
+    - case_files.content
+    - correspondence.subject
+    - correspondence.body
+    - inspection_photos.ocr.blocks[].text
+
+  untrusted_third_party_text:
+    # D3: read-only data a model will see. Never an instruction, never a filter.
+    - case_files.content
+    - case_files.claimed_case_ref
+    - correspondence.subject
+    - correspondence.body
+    - correspondence.claimed_case_ref
+    - inspection_photos.ocr.blocks[].text
+    - public_registry_api.*
+    - public_registry_captures.*
+    - benefits.claim_notes.body
+    - benefits.claim_events.detail
+    - permits.applicants.notes
+    - permits.applications.agent_of_record
+    - permits.applications.site_description
+    - permits.decisions.rationale
+    - permits.inspections.notes
+    - permits.appeals.grounds
+    - permits.case_events.detail
+    - benefits.reviews.notes
+    - benefits.payments.reference
+    - benefits.eligibility_determinations.evidence_ref
+
+  quasi_identifier:
+    # Individually innocuous; re-identifying in combination. This is the class
+    # the auditor's projection exists to control (review finding H8).
+    - permits.applications.application_id
+    - permits.applications.parcel_id
+    - permits.applications.submitted_at
+    - permits.decisions.decided_at
+    - permits.decisions.permit_number
+    - permits.case_events.occurred_at
+    - permits.case_events.recorded_at
+    - benefits.claims.claim_id
+    - benefits.claims.linked_application_id
+    - benefits.claims.opened_on
+    - benefits.payments.paid_on
+    - benefits.payments.amount_cents
+  quasi_identifier_note: >-
+    An exact decision date plus a parcel id is a row in the PUBLIC register,
+    and the public register carries a name. That is the re-identification path
+    the review named, and it is why the audit projection pseudonymises case ids
+    and generalises timestamps rather than masking a date of birth and calling
+    it de-identified.
+
+  process_metadata:
+    # Safe by construction: no personal content, and the audit projection is
+    # built almost entirely from this class.
+    - permits.applications.status
+    - permits.applications.permit_type_code
+    - permits.applications.received_channel
+    - permits.decisions.outcome
+    - permits.inspections.outcome
+    - permits.appeals.sealed
+    - permits.case_events.event_type
+    - permits.case_events.actor_kind
+    - benefits.claims.status
+    - benefits.claims.program_code
+    - benefits.claims.intake_channel
+    - benefits.eligibility_determinations.outcome
+    - benefits.reviews.review_type
+    - benefits.reviews.result
+    - benefits.claim_notes.sensitivity
+    - benefits.claim_events.event_type
+
+  public_open_data:
+    - gis_parcels.parcels.*
+    - gis_parcels.zoning_codes.*
+    - gis_parcels.address_points.*
+    - permits.permit_types.*
+    - benefits.benefit_programs.*
+    - permits.v_public_register.*
+
+# =====================================================================
+# 15. WHAT THE DEMO IS SUPPOSED TO SHOW
+# =====================================================================
+demo_assertions:
+
+  - id: caseload_differs
+    statement: >-
+      Two permits_caseworker principals running the identical CapabilityRequest
+      receive different row sets. Each response carries a CONSTANT scope
+      declaration -- policy id, POLICY_SCOPE_UNDISCLOSED, "limited to your
+      caseload" -- and NO count of what was excluded and no keys.
+    revised_from_v1: >-
+      Version 1 promised a per-row POLICY_CASELOAD_SCOPE withholding for every
+      row outside the caseload. That would have leaked the existence,
+      cardinality and keys of every other caseworker's cases -- review finding
+      H7. Caseload isolation now uses `existence_not_disclosed`.
+
+  - id: out_of_scope_is_indistinguishable_from_absent
+    statement: >-
+      A permits_caseworker resolving a pointer to an application assigned to
+      SOMEONE ELSE, and the same principal resolving a pointer to an
+      application id that has never existed, receive byte-identical responses.
+      No count, no key, no timing difference. This is the property that stops
+      caseload boundaries being enumerated one probe at a time.
+
+  - id: withheld_is_not_unresolved
+    statement: >-
+      For the auditor, benefits.claimants.contact_email is present with value
+      None, carries a WithholdingRecord with POLICY_THIRD_PARTY_DATA, and does
+      NOT appear in `unresolved`. This is the FIELD-level D4 guarantee, and it
+      applies because the auditor is authorised to know the row exists.
+
+  - id: masked_is_not_grounded
+    statement: >-
+      The auditor's `application_id` comes back as a Withheld cell carrying
+      transform `pseudonym_engagement` and reason POLICY_MASKED. It is not a
+      GroundedValue: `PSN-3f9a1c...` appears nowhere in the source and must
+      fail the grounding wall if anything tries to cite it as evidence.
+
+  - id: sensitive_basis_hidden_from_team_lead_visible_to_owner
+    statement: >-
+      basis_code BC-MEDICAL-A on claim X resolves raw for the benefits_caseworker
+      whose caseworker_ref owns claim X, under purpose eligibility_determination,
+      and is withheld with POLICY_SENSITIVE_BASIS for that person's TEAM LEAD
+      under quality_assurance -- same column, same row, and the difference is a
+      row predicate, not a role name. This is the review's Critical 5 made
+      testable.
+
+  - id: purpose_narrows_within_one_role
+    statement: >-
+      The SAME benefits_caseworker principal, on the SAME claim, receives
+      payments and sensitive basis codes under purpose
+      eligibility_determination, and receives neither under purpose
+      `correspondence` -- which reaches only claim status and contact details.
+      One role, two purposes, two different answers. This is the review's
+      Critical 4 made testable.
+
+  - id: role_combination_does_not_escalate
+    statement: >-
+      A principal holding both benefits_team_lead and (hypothetically) auditor
+      is REFUSED AT PROVISIONING as mutually exclusive. For any permitted pair
+      of roles, the disclosable cell set equals the union of each role's
+      independently evaluated set -- never the cross product of one role's rows
+      with another's columns.
+
+  - id: disclosure_admits_existence
+    statement: >-
+      A public_records_officer request over a sealed appeal returns the
+      appeal_id and `sealed: true` with POLICY_SEALED_RECORD on every
+      substantive column -- not an empty set, and not a filtered-away row. The
+      existence is disclosed; the content is not. Note that this is the
+      OPPOSITE choice from caseload isolation, and both are deliberate: which
+      one applies is declared per object, per role.
+
+  - id: forged_case_reference_reaches_no_caseload
+    statement: >-
+      A message whose `X-Case-Reference` names APP-2023-000252 -- a case the
+      sender has nothing to do with -- does NOT appear in that case's
+      caseworker's correspondence scope, does NOT create a traversable
+      CORRESPONDS_ON edge, and does NOT influence any determination. It is
+      stored, citable and displayable as `claimed_case_ref`, untrusted, with a
+      pointer to the header span. This is the review's finding H12: the estate
+      was previously MODELLING the flow D3 forbids.
+
+  - id: injection_changes_nothing
+    statement: >-
+      Every planted payload in correspondence/INJECTIONS.md is ingested,
+      stored, citable and displayable, and alters no grant, decision, route or
+      plan. Including the two laundered through PostgreSQL as claim notes:
+      passing through a system of record does not promote trust.
+
+  - id: unclassified_column_fails_closed
+    statement: >-
+      A column added to benefits.claimants after this file was written is
+      ingested by the adapter, stamped unclassified, and returned to EVERY
+      human role as Withheld with POLICY_UNCLASSIFIED_COLUMN until it appears
+      in column_classification. Schema evolution is not a silent access-control
+      change (review finding M24).
+
+  - id: small_cell_and_differencing
+    statement: >-
+      An aggregate over benefits.v_program_caseload with a cell below 5 refuses
+      that cell AND its complementary cells, publishes no margins, and refuses
+      any projection not on the approved query surface. Two permitted
+      aggregates cannot recover a suppressed cell by subtraction.
+
+  - id: adapter_credential_is_source_bound
+    statement: >-
+      The adapter_service instance bound to permits_registry, presented with a
+      request for benefits.claims, returns FORBIDDEN -- because the grant's
+      condition on `:principal.bound_source_id` is false and the grant does not
+      exist for that instance. A leaked permits credential reads no benefits
+      data (review finding H11).

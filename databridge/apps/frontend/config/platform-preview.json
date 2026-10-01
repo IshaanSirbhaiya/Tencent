@@ -1,0 +1,3193 @@
+{
+  "$comment": [
+    "Illustrative payloads for the four platform surfaces, in the exact shape the gateway will",
+    "serve in Phase 5 (PHASE_PLAN.md §Phase 5, Foundational Research/design/DEMO_AND_FRONTEND.md).",
+    "",
+    "These exist so the surfaces can be BUILT and reviewed now, and so the swap to live data is a",
+    "change of data source in `lib/platform-preview.ts` rather than a rewrite of four pages. Every",
+    "page that renders them says on its face that they are a preview — a placeholder that does not",
+    "announce itself is indistinguishable from a lie.",
+    "",
+    "Synthetic throughout. No figure here is a measurement."
+  ],
+  "trace": {
+    "endpoint": "GET /trace/{request_id}",
+    "request_id": "req_7f3c19",
+    "request": {
+      "agent": "credit_memo_drafter",
+      "version": "v4",
+      "purpose": "lending.underwriting",
+      "on_behalf_of": "j.tan",
+      "grant": "core_banking.account_read",
+      "budget_used": 12400,
+      "budget_total": 40000
+    },
+    "pointer_provenance": {
+      "total": 47,
+      "from_history": 41,
+      "needed_source": 6,
+      "from_capture": 1,
+      "withheld": 1,
+      "absent": 1
+    },
+    "nodes": [
+      {
+        "id": "agent",
+        "kind": "agent",
+        "label": "credit_memo_drafter",
+        "sublabel": "v4 · compiled",
+        "col": 1,
+        "row": 0,
+        "detail": {
+          "summary": "The declared agent. It never receives a value it did not ask for, and never a value at all until the policy checkpoint has run.",
+          "requested": {
+            "capability": "core_banking.account_read",
+            "projection": [
+              "party.legal_name",
+              "facility.limit",
+              "facility.drawn",
+              "account.balance",
+              "covenant.dscr_floor",
+              "party.applicant_notes"
+            ],
+            "predicate": "facility.status = active AND party.id = :subject",
+            "purpose": "lending.underwriting",
+            "principal": "actor=credit_memo_drafter · on_behalf_of=j.tan",
+            "as_of": "valid 2026-06-30 · system 2026-06-30"
+          },
+          "decided": null,
+          "pulled": null,
+          "cost": {
+            "tokens": 12400,
+            "ms": 8140
+          },
+          "notes": [
+            "Receives pointers, not values (AGENT_PLANE §7, property 1)."
+          ]
+        }
+      },
+      {
+        "id": "orchestrator",
+        "kind": "orchestrator",
+        "label": "ORCHESTRATOR",
+        "sublabel": "main agent",
+        "col": 1,
+        "row": 1,
+        "detail": {
+          "summary": "Checks the grant covers the capability and the purpose, admits against budget, resolves what it can from the graph, and asks an adapter only for what is left.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "grant core_banking.account_read covers the capability; purpose lending.underwriting is on the grant; 12.4k of 40k tokens admitted"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 2100,
+            "ms": 310
+          },
+          "notes": [
+            "Holds the taint map: an untrusted value is quotable and may never reach a sink."
+          ]
+        }
+      },
+      {
+        "id": "graph",
+        "kind": "graph",
+        "label": "GRAPH",
+        "sublabel": "as_of 2026-06-30T00:00:00Z",
+        "col": 0,
+        "row": 2,
+        "detail": {
+          "summary": "Stores pointers, never values. Bi-temporal, so a past instant is a query rather than a copy.",
+          "requested": null,
+          "decided": null,
+          "pulled": {
+            "rows": 47,
+            "cells": 0,
+            "tier": "-",
+            "from_history": 41,
+            "from_source": 6,
+            "from_capture": 0,
+            "verdicts": []
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 42
+          },
+          "notes": [
+            "41 of 47 pointers were answerable from history: no adapter call, no source load, no new disclosure."
+          ]
+        }
+      },
+      {
+        "id": "adapter.core_banking",
+        "kind": "adapter",
+        "label": "ADAPTER",
+        "sublabel": "core_banking · T1",
+        "col": 2,
+        "row": 2,
+        "detail": {
+          "summary": "The adapter agent for one source. Policy, ledger and core run inside it in that order — the ledger row precedes the value.",
+          "requested": {
+            "capability": "core_banking.account_read",
+            "projection": [
+              "facility.limit",
+              "facility.drawn",
+              "account.balance",
+              "covenant.dscr_floor",
+              "party.trading_name",
+              "party.applicant_notes"
+            ],
+            "predicate": "facility.status = active AND party.id = :subject",
+            "purpose": "lending.underwriting",
+            "principal": "actor=credit_memo_drafter · on_behalf_of=j.tan",
+            "as_of": "system 2026-06-30 (T1 — forward-only cursor; a past instant would raise CannotPinPast)"
+          },
+          "decided": {
+            "decision": "withheld",
+            "reason_code": "P-14",
+            "note": "5 of 6 fields released; party.applicant_notes withheld — purpose_not_permitted for lending.underwriting"
+          },
+          "pulled": {
+            "rows": 1,
+            "cells": 5,
+            "tier": "T1",
+            "from_history": 0,
+            "from_source": 4,
+            "from_capture": 1,
+            "verdicts": [
+              {
+                "verdict": "VERIFIED",
+                "count": 4,
+                "tone": "good"
+              },
+              {
+                "verdict": "VERIFIED_AS_OF_CAPTURE",
+                "count": 1,
+                "tone": "warn"
+              }
+            ]
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 612
+          },
+          "notes": [
+            "Withheld is a policy decision with a reason code. It is not the same state as absent and must never render as one."
+          ]
+        }
+      },
+      {
+        "id": "capture",
+        "kind": "capture",
+        "label": "CAPTURE STORE",
+        "sublabel": "content-addressed · WORM",
+        "col": 2,
+        "row": 3,
+        "detail": {
+          "summary": "Anything ledger-bound is captured. T3 pointers — email parts, OCR boxes, unversioned drops — resolve here and never against the live source.",
+          "requested": null,
+          "decided": null,
+          "pulled": {
+            "rows": 1,
+            "cells": 1,
+            "tier": "T3",
+            "from_history": 0,
+            "from_source": 0,
+            "from_capture": 1,
+            "verdicts": [
+              {
+                "verdict": "VERIFIED_AS_OF_CAPTURE",
+                "count": 1,
+                "tone": "warn"
+              }
+            ]
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 88
+          },
+          "notes": [
+            "The one untrusted cell in this request came from here: an attachment the borrower sent. Quotable, not actionable."
+          ]
+        }
+      },
+      {
+        "id": "ledger",
+        "kind": "ledger",
+        "label": "LEDGER",
+        "sublabel": "append-only",
+        "col": 2,
+        "row": 4,
+        "detail": {
+          "summary": "Append-only. The read entry is written BEFORE the adapter returns, so the audit cannot lag the disclosure.",
+          "requested": null,
+          "decided": null,
+          "pulled": {
+            "rows": 2,
+            "cells": 0,
+            "tier": "-",
+            "from_history": 0,
+            "from_source": 0,
+            "from_capture": 0,
+            "verdicts": []
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 21
+          },
+          "notes": [
+            "#40219 read entry — who read what, for what purpose, under which grant.",
+            "#40220 commit entry — written only after the human attestation."
+          ]
+        }
+      },
+      {
+        "id": "answer",
+        "kind": "answer",
+        "label": "ANSWER",
+        "sublabel": "certificate 0.031 / 0.08",
+        "col": 1,
+        "row": 5,
+        "detail": {
+          "summary": "Per-field citations and a calibrated risk certificate — not a confidence score.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "certificate risk 0.031 is inside the declared budget 0.08 — admitted"
+          },
+          "pulled": {
+            "rows": 0,
+            "cells": 5,
+            "tier": "-",
+            "from_history": 0,
+            "from_source": 0,
+            "from_capture": 0,
+            "verdicts": []
+          },
+          "cost": {
+            "tokens": 3800,
+            "ms": 1960
+          },
+          "notes": [
+            "The untrusted cell appears with its pointer and is excluded from every value the determination turns on."
+          ]
+        }
+      },
+      {
+        "id": "human",
+        "kind": "human",
+        "label": "HUMAN GATE",
+        "sublabel": "j.tan · in person",
+        "col": 1,
+        "row": 6,
+        "detail": {
+          "summary": "The proposed action is presented as a decision with citations. Nothing reaches the ledger as a commit until a named human attests.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "attested by j.tan — the attestation is the write path, not the score"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 46000
+          },
+          "notes": [
+            "There is no code path that sets requires_human_selection to False."
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "s1",
+        "step": 1,
+        "from": "agent",
+        "to": "orchestrator",
+        "kind": "request",
+        "label": "task + Principal",
+        "detail": {
+          "summary": "The ask, carrying its own authority: who is acting, on whose behalf, and for what purpose.",
+          "requested": {
+            "capability": "core_banking.account_read",
+            "projection": [
+              "6 fields"
+            ],
+            "predicate": "facility.status = active AND party.id = :subject",
+            "purpose": "lending.underwriting",
+            "principal": "actor=credit_memo_drafter · on_behalf_of=j.tan",
+            "as_of": "valid 2026-06-30 · system 2026-06-30"
+          },
+          "decided": null,
+          "pulled": null,
+          "cost": {
+            "tokens": 1200,
+            "ms": 40
+          },
+          "notes": [
+            "Purpose is principal, not metadata — it is what the policy layer decides against."
+          ]
+        }
+      },
+      {
+        "id": "s2",
+        "step": 2,
+        "from": "orchestrator",
+        "to": "orchestrator",
+        "kind": "policy",
+        "label": "grant + purpose · budget admission",
+        "detail": {
+          "summary": "Admission runs before anything is read. A refusal here costs nothing; a refusal after the call has already disclosed.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "grant covers (capability, purpose); 12,400 of 40,000 tokens admitted"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 12
+          },
+          "notes": []
+        }
+      },
+      {
+        "id": "s3",
+        "step": 3,
+        "from": "orchestrator",
+        "to": "graph",
+        "kind": "request",
+        "label": "as_of(valid, system)",
+        "detail": {
+          "summary": "Ask the graph first. Anything it already holds is answered without a new disclosure.",
+          "requested": {
+            "capability": "graph.read",
+            "projection": [
+              "47 pointers"
+            ],
+            "predicate": "party.id = :subject",
+            "purpose": "lending.underwriting",
+            "principal": "actor=credit_memo_drafter · on_behalf_of=j.tan",
+            "as_of": "valid 2026-06-30 · system 2026-06-30"
+          },
+          "decided": null,
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 8
+          },
+          "notes": []
+        }
+      },
+      {
+        "id": "s4",
+        "step": 4,
+        "from": "graph",
+        "to": "orchestrator",
+        "kind": "rows",
+        "label": "47 pointers · 0 values",
+        "detail": {
+          "summary": "Pointers come back carrying their trust label. No value has materialised yet.",
+          "requested": null,
+          "decided": null,
+          "pulled": {
+            "rows": 47,
+            "cells": 0,
+            "tier": "-",
+            "from_history": 41,
+            "from_source": 6,
+            "from_capture": 0,
+            "verdicts": []
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 34
+          },
+          "notes": [
+            "41 answered from history, 6 need live bytes. This ratio is the difference between a graph and a slow proxy."
+          ]
+        }
+      },
+      {
+        "id": "s5",
+        "step": 5,
+        "from": "orchestrator",
+        "to": "adapter.core_banking",
+        "kind": "request",
+        "label": "CapabilityRequest(resolve=[6])",
+        "detail": {
+          "summary": "Only the six pointers history could not answer are sent, and they are sent as pointers.",
+          "requested": {
+            "capability": "core_banking.account_read",
+            "projection": [
+              "facility.limit",
+              "facility.drawn",
+              "account.balance",
+              "covenant.dscr_floor",
+              "party.trading_name",
+              "party.applicant_notes"
+            ],
+            "predicate": "facility.status = active AND party.id = :subject",
+            "purpose": "lending.underwriting",
+            "principal": "actor=credit_memo_drafter · on_behalf_of=j.tan",
+            "as_of": "system 2026-06-30"
+          },
+          "decided": null,
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 6
+          },
+          "notes": []
+        }
+      },
+      {
+        "id": "s6",
+        "step": 6,
+        "from": "adapter.core_banking",
+        "to": "adapter.core_banking",
+        "kind": "policy",
+        "label": "POLICY screen",
+        "detail": {
+          "summary": "The single choke point that exists because the graph stores references: grant, purpose, budget, egress — evaluated per field.",
+          "requested": null,
+          "decided": {
+            "decision": "withheld",
+            "reason_code": "P-14",
+            "note": "grant ✓ · purpose ✓ · egress ∅ · party.applicant_notes withheld: purpose_not_permitted"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 19
+          },
+          "notes": [
+            "A denied field is withheld, never unresolved (ADAPTER_AGENT_SPEC §10)."
+          ]
+        }
+      },
+      {
+        "id": "s7",
+        "step": 7,
+        "from": "adapter.core_banking",
+        "to": "capture",
+        "kind": "request",
+        "label": "resolve email_part (T3)",
+        "detail": {
+          "summary": "One pointer is T3 and cannot be re-read from a live source. It resolves against the capture instead.",
+          "requested": {
+            "capability": "capture.read",
+            "projection": [
+              "party.trading_name"
+            ],
+            "predicate": "digest = sha256:9c2f…",
+            "purpose": "lending.underwriting",
+            "principal": "actor=core_banking adapter · on_behalf_of=j.tan",
+            "as_of": "captured 2026-05-02T14:11Z"
+          },
+          "decided": null,
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 5
+          },
+          "notes": []
+        }
+      },
+      {
+        "id": "s8",
+        "step": 8,
+        "from": "capture",
+        "to": "adapter.core_banking",
+        "kind": "rows",
+        "label": "1 cell · untrusted",
+        "detail": {
+          "summary": "The capture answers by digest. The content came from outside the institution, so it is untrusted by default.",
+          "requested": null,
+          "decided": null,
+          "pulled": {
+            "rows": 1,
+            "cells": 1,
+            "tier": "T3",
+            "from_history": 0,
+            "from_source": 0,
+            "from_capture": 1,
+            "verdicts": [
+              {
+                "verdict": "VERIFIED_AS_OF_CAPTURE",
+                "count": 1,
+                "tone": "warn"
+              }
+            ]
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 83
+          },
+          "notes": [
+            "Trust propagates by least-upper-bound: everything derived from this cell is untrusted too."
+          ]
+        }
+      },
+      {
+        "id": "s9",
+        "step": 9,
+        "from": "adapter.core_banking",
+        "to": "ledger",
+        "kind": "ledger",
+        "label": "append read entry #40219",
+        "detail": {
+          "summary": "Written BEFORE the rows are returned, so no value can be disclosed that the ledger has not already recorded.",
+          "requested": null,
+          "decided": null,
+          "pulled": {
+            "rows": 1,
+            "cells": 0,
+            "tier": "-",
+            "from_history": 0,
+            "from_source": 0,
+            "from_capture": 0,
+            "verdicts": []
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 14
+          },
+          "notes": [
+            "Append-only: a correction is a new row, never an update."
+          ]
+        }
+      },
+      {
+        "id": "s10",
+        "step": 10,
+        "from": "adapter.core_banking",
+        "to": "orchestrator",
+        "kind": "rows",
+        "label": "5 GroundedRows + 1 Withheld",
+        "detail": {
+          "summary": "What came back, and what deliberately did not.",
+          "requested": null,
+          "decided": {
+            "decision": "withheld",
+            "reason_code": "P-14",
+            "note": "1 of 6 withheld: purpose_not_permitted"
+          },
+          "pulled": {
+            "rows": 1,
+            "cells": 5,
+            "tier": "T1",
+            "from_history": 0,
+            "from_source": 4,
+            "from_capture": 1,
+            "verdicts": [
+              {
+                "verdict": "VERIFIED",
+                "count": 4,
+                "tone": "good"
+              },
+              {
+                "verdict": "VERIFIED_AS_OF_CAPTURE",
+                "count": 1,
+                "tone": "warn"
+              }
+            ]
+          },
+          "cost": {
+            "tokens": 0,
+            "ms": 9
+          },
+          "notes": [
+            "4 trusted · 1 untrusted.",
+            "A seventh field, party.trading_name_registered, was asked for and is present in no source: absent, not withheld."
+          ]
+        }
+      },
+      {
+        "id": "s11",
+        "step": 11,
+        "from": "orchestrator",
+        "to": "answer",
+        "kind": "answer",
+        "label": "5 citations · risk 0.031",
+        "detail": {
+          "summary": "Every emitted field carries its own SourcePointer; the certificate is calibrated, not a confidence score.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "0.031 inside budget 0.08 — admitted"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 3800,
+            "ms": 1960
+          },
+          "notes": []
+        }
+      },
+      {
+        "id": "s12",
+        "step": 12,
+        "from": "answer",
+        "to": "human",
+        "kind": "human",
+        "label": "human_required — decision + citations",
+        "detail": {
+          "summary": "The agent proposes; it does not act. What reaches the human is a decision with its citations attached.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "action draft_credit_memo declared automation.mode = human_required"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 4
+          },
+          "notes": []
+        }
+      },
+      {
+        "id": "s13",
+        "step": 13,
+        "from": "human",
+        "to": "ledger",
+        "kind": "ledger",
+        "label": "attestation → commit #40220",
+        "detail": {
+          "summary": "The commit records what was read, by whom, for what purpose, and what changed.",
+          "requested": null,
+          "decided": {
+            "decision": "allowed",
+            "reason_code": null,
+            "note": "attested by j.tan"
+          },
+          "pulled": null,
+          "cost": {
+            "tokens": 0,
+            "ms": 17
+          },
+          "notes": []
+        }
+      }
+    ],
+    "cells": [
+      {
+        "path": "facility.limit",
+        "state": "grounded",
+        "trust": "trusted",
+        "source": "live_source",
+        "tier": "T1",
+        "verdict": "VERIFIED",
+        "reason_code": null,
+        "note": null
+      },
+      {
+        "path": "facility.drawn",
+        "state": "grounded",
+        "trust": "trusted",
+        "source": "live_source",
+        "tier": "T1",
+        "verdict": "VERIFIED",
+        "reason_code": null,
+        "note": null
+      },
+      {
+        "path": "account.balance",
+        "state": "grounded",
+        "trust": "trusted",
+        "source": "live_source",
+        "tier": "T1",
+        "verdict": "VERIFIED",
+        "reason_code": null,
+        "note": null
+      },
+      {
+        "path": "covenant.dscr_floor",
+        "state": "grounded",
+        "trust": "trusted",
+        "source": "live_source",
+        "tier": "T1",
+        "verdict": "VERIFIED",
+        "reason_code": null,
+        "note": null
+      },
+      {
+        "path": "party.trading_name",
+        "state": "grounded",
+        "trust": "untrusted",
+        "source": "capture",
+        "tier": "T3",
+        "verdict": "VERIFIED_AS_OF_CAPTURE",
+        "reason_code": null,
+        "note": "borrower-supplied attachment — quotable, not actionable"
+      },
+      {
+        "path": "party.applicant_notes",
+        "state": "withheld",
+        "trust": null,
+        "source": "live_source",
+        "tier": "T1",
+        "verdict": null,
+        "reason_code": "P-14 purpose_not_permitted",
+        "note": "the field exists and was not released for this purpose"
+      },
+      {
+        "path": "party.trading_name_registered",
+        "state": "absent",
+        "trust": null,
+        "source": null,
+        "tier": null,
+        "verdict": null,
+        "reason_code": null,
+        "note": "asked for and present in no source — never guessed, never defaulted"
+      }
+    ],
+    "cells_note": "The seven fields the answer asked for. The other 41 pointers were answered from the graph's history and are counted under the GRAPH node.",
+    "branches": [
+      {
+        "kind": "graph",
+        "title": "GRAPH",
+        "subtitle": "as_of 2026-06-30T00:00:00Z",
+        "rows": [
+          {
+            "label": "pointers resolved",
+            "value": "47",
+            "tone": "neutral"
+          },
+          {
+            "label": "values stored",
+            "value": "0",
+            "tone": "neutral"
+          },
+          {
+            "label": "answered from history",
+            "value": "41",
+            "tone": "good"
+          },
+          {
+            "label": "needed live bytes",
+            "value": "6",
+            "tone": "warn"
+          }
+        ]
+      },
+      {
+        "kind": "adapter",
+        "title": "ADAPTER",
+        "subtitle": "core_banking",
+        "rows": [
+          {
+            "label": "POLICY grant",
+            "value": "✓",
+            "tone": "good"
+          },
+          {
+            "label": "POLICY purpose",
+            "value": "✓",
+            "tone": "good"
+          },
+          {
+            "label": "POLICY applicant_notes",
+            "value": "withheld · P-14",
+            "tone": "bad"
+          },
+          {
+            "label": "LEDGER",
+            "value": "appended #40219",
+            "tone": "neutral"
+          },
+          {
+            "label": "CORE",
+            "value": "6 cells · T1 · txn",
+            "tone": "neutral"
+          }
+        ]
+      }
+    ],
+    "results": [
+      {
+        "kind": "grounded",
+        "count": 5,
+        "detail": "4 trusted · 1 untrusted",
+        "tone": "good"
+      },
+      {
+        "kind": "withheld",
+        "count": 1,
+        "detail": "P-14 purpose_not_permitted — the field exists and was not released",
+        "tone": "bad"
+      },
+      {
+        "kind": "absent",
+        "count": 1,
+        "detail": "present in no source — not withheld, not guessed",
+        "tone": "neutral"
+      }
+    ],
+    "answer": {
+      "citations": 5,
+      "certificate_risk": 0.031,
+      "risk_budget": 0.08,
+      "admitted": true
+    }
+  },
+  "builder": {
+    "endpoint": "POST /builder/compile",
+    "declaration": "agent: credit_memo_drafter\nversion: v4\npurpose: lending.underwriting\nreads:\n  — core_banking.account_read\nactions:\n  — draft_credit_memo\nabstain_when: 0.02\n",
+    "verdict": "REFUSED",
+    "summary": "credit_memo_drafter v4 cannot deploy",
+    "findings": [
+      {
+        "code": "NO_CITATION_RULE",
+        "line": "no citation rule declared",
+        "because": "every emitted field must carry a SourcePointer (D3)"
+      },
+      {
+        "code": "UNCERTIFIABLE_ABSTENTION",
+        "line": "abstain_when 0.02 is UNCERTIFIABLE for this golden set",
+        "because": "base risk μ=0.11 → minimum abstention (μ−α)/(1−α) = 9.2%  [Kotte, arXiv:2606.29054]"
+      },
+      {
+        "code": "MISSING_AUTOMATION_MODE",
+        "line": "action draft_credit_memo requires automation.mode; none declared",
+        "because": "an action with no declared mode has no human gate to compile"
+      }
+    ],
+    "compiles_to": [
+      {
+        "label": "capability grants",
+        "value": "core_banking.account_read (read, T1)"
+      },
+      {
+        "label": "sink policy",
+        "value": "egress: ∅"
+      },
+      {
+        "label": "budget admission",
+        "value": "40k tokens · risk 0.08"
+      },
+      {
+        "label": "eval binding",
+        "value": "golden set: lending.underwriting.v3"
+      }
+    ]
+  },
+  "ontology": {
+    "endpoint": "GET /ontology?pack={pack}",
+    "mutation_endpoints": {
+      "upsert_kind": "PUT /ontology/{pack}/kinds/{node|edge}/{kind}",
+      "remove_kind": "DELETE /ontology/{pack}/kinds/{node|edge}/{kind}",
+      "decide_proposal": "POST /ontology/{pack}/proposals/{id}/{approve|reject}",
+      "auto_approve": "PUT /ontology/{pack}/auto_approve"
+    },
+    "auto_approve": false,
+    "escalation_policy": {
+      "always_escalates_meta_kinds": [
+        "resolved_to",
+        "about"
+      ],
+      "always_escalates_when_touching_subject": true,
+      "note": "A proposal that writes a determination, makes an identity claim, or touches a declared subject escalates to a named human regardless of the auto-approve setting. Auto-approve widens what may land without review; it never widens what may decide who someone is."
+    },
+    "by_pack": {
+      "healthcare": {
+        "pack": "healthcare",
+        "title": "Clinical intake",
+        "version": "1.0",
+        "subject_kinds": [
+          "patient"
+        ],
+        "node_kinds": [
+          {
+            "kind": "patient",
+            "binds_to": "entity",
+            "description": "A registry row — never an identity assertion. Being on file is not being identified. Declared a subject below, which is what makes name similarity unable to merge two of them.",
+            "subject": true,
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "declared a subject (D4b) — identity attestation and the never-fuzzy-merge rule attach to this kind",
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "org",
+            "binds_to": "organisation",
+            "description": "An insurer, TPA, government scheme or employer named on a referring document.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "package",
+            "binds_to": "agreement",
+            "description": "A named screening package (WELL2, PEE226) — the bundle a document authorises, and the thing a visit is scheduled as.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "test",
+            "binds_to": "entity",
+            "description": "A catalogue entry (chest_xray, resting_ecg).",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "document",
+            "binds_to": "document",
+            "description": "A referring chit letter, health-check voucher or authorisation form.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "visit",
+            "binds_to": "event",
+            "description": "One intake occurrence.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "clinic",
+            "binds_to": "location",
+            "description": "A clinic location.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "coverage_rule",
+            "binds_to": "rule",
+            "description": "One row of the pack's coverage rules — config as a graph object.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          }
+        ],
+        "edge_kinds": [
+          {
+            "kind": "employed_by",
+            "binds_to": "role_of",
+            "from": [
+              "patient"
+            ],
+            "to": [
+              "org"
+            ],
+            "description": "The patient holds the employee role with respect to the organisation.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "covered_by",
+            "binds_to": "party_to",
+            "from": [
+              "patient"
+            ],
+            "to": [
+              "org"
+            ],
+            "description": "The payer named on a document — participation in a payment arrangement.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "issued",
+            "binds_to": "issued",
+            "from": [
+              "org"
+            ],
+            "to": [
+              "document"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "authorises",
+            "binds_to": "authorises",
+            "from": [
+              "document"
+            ],
+            "to": [
+              "package",
+              "coverage_rule"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "requests_test",
+            "binds_to": "references",
+            "from": [
+              "document"
+            ],
+            "to": [
+              "test"
+            ],
+            "description": "A test printed on the document. Citing it is not authorising it.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "includes_test",
+            "binds_to": "part_of",
+            "from": [
+              "package"
+            ],
+            "to": [
+              "test"
+            ],
+            "description": "Whole → part. The test is a component of the package, per the rule definition.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "for_patient",
+            "binds_to": "about",
+            "from": [
+              "document",
+              "visit"
+            ],
+            "to": [
+              "patient"
+            ],
+            "description": "The CLAIMED subject, and the one edge worth a warning. It records that a document *claims* to be about a patient — it is built from the resolver's candidates, so a document with two equally-scored candidates yields TWO such edges and neither is a determination. Nothing downstream may read a single one as \"this is who the patient is\" (CLAUDE.md §Hard constraints 1). The `about` meta-kind is what makes that rule enforceable without the engine knowing the word \"patient\".",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the identity-claim meta-kind — two candidates yield two edges and neither decides anything",
+            "touches": [
+              "identity-claim",
+              "subject"
+            ]
+          },
+          {
+            "kind": "at_clinic",
+            "binds_to": "at",
+            "from": [
+              "visit"
+            ],
+            "to": [
+              "clinic"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "scheduled_as",
+            "binds_to": "references",
+            "from": [
+              "visit"
+            ],
+            "to": [
+              "package"
+            ],
+            "description": "The visit cites the package it was booked under. Not a claim about a person.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "references",
+            "binds_to": "references",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ],
+            "description": "A document cites a node, with no stronger claim.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "resolved_to",
+            "binds_to": "resolved_to",
+            "from": [
+              "document",
+              "visit"
+            ],
+            "to": [
+              "patient"
+            ],
+            "description": "THE determination: this document/visit is about THIS person. Written only on the far side of a named human's in-person attestation against a declared identifier, and never produced by a score, a similarity, or a model. This kind was missing until 2026-08-16, which is worth recording rather than quietly fixing. The pack declared a subject and an attestation mode, and the engine enforced that a determination requires attestation — but the pack whose entire product IS an identity determination had no edge kind to write one on. `for_patient` binds to `about`: it is a CLAIM, two candidates yield two of them, and neither decides anything. Overloading it would have made the claim indistinguishable from the determination, which is the single distinction this system exists to hold. Found by the agent implementing attestation enforcement — the gap was invisible while nothing could write a determination at all.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the determination meta-kind — the one edge a human attestation writes",
+            "touches": [
+              "determination",
+              "subject"
+            ]
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-hc-1",
+            "target": "edge",
+            "kind": "test_supersedes",
+            "binds_to": "supersedes",
+            "from": [
+              "test"
+            ],
+            "to": [
+              "test"
+            ],
+            "proposed_by": "lab_catalogue adapter agent",
+            "proposed_at": "2026-08-15T09:14:00Z",
+            "rationale": "the catalogue replaced resting_ecg with a successor code and nothing in the library records that one test replaces another",
+            "status": "pending",
+            "escalates": false,
+            "escalation_reason": null,
+            "auto_approvable": true,
+            "auto_approvable_because": "binds to an existing meta-kind, touches no subject and no determination"
+          },
+          {
+            "id": "prop-hc-2",
+            "target": "edge",
+            "kind": "identified_as",
+            "binds_to": "resolved_to",
+            "from": [
+              "document"
+            ],
+            "to": [
+              "patient"
+            ],
+            "proposed_by": "intake adapter agent",
+            "proposed_at": "2026-08-15T11:02:00Z",
+            "rationale": "the agent wants to write which candidate the document is about once scoring is confident",
+            "status": "escalated",
+            "escalates": true,
+            "escalation_reason": "writes a determination about a declared subject — escalates regardless of the auto-approve setting, and the score that motivated it is not a basis anything may act on",
+            "auto_approvable": false,
+            "auto_approvable_because": null
+          }
+        ]
+      },
+      "finance": {
+        "pack": "finance",
+        "title": "Lending and underwriting",
+        "version": "1.0",
+        "subject_kinds": [
+          "party"
+        ],
+        "node_kinds": [
+          {
+            "kind": "party",
+            "binds_to": "entity",
+            "description": "The KYC subject — a borrower, guarantor or beneficial owner, natural person or company. Declared a subject below: identity is attested at onboarding by a named human, never by a score.",
+            "subject": true,
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "declared a subject (D4b) — identity attestation and the never-fuzzy-merge rule attach to this kind",
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "institution",
+            "binds_to": "organisation",
+            "description": "A bank, fund, insurer or agent — an organisation acting in its own name.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "relationship_manager",
+            "binds_to": "entity",
+            "description": "The banker who owns the relationship. An entity, not an agent object: a named human whose attestations and approvals are attributable.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "account",
+            "binds_to": "agreement",
+            "description": "A deposit, loan or securities account — a standing arrangement with a party.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "facility",
+            "binds_to": "agreement",
+            "description": "A committed credit line: term loan, revolver, guarantee or trade facility.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "collateral",
+            "binds_to": "entity",
+            "description": "A pledged asset — property, receivable, security or cash — with its own identity.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "covenant",
+            "binds_to": "rule",
+            "description": "A testable condition on a facility (leverage ceiling, DSCR floor, reporting deadline). A rule, so a breach determination is a graph object with a citation, not a spreadsheet cell.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "transaction",
+            "binds_to": "event",
+            "description": "One posting: drawdown, repayment, fee, interest accrual, transfer.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "credit_memo",
+            "binds_to": "document",
+            "description": "The underwriting write-up put to a credit committee.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "filing",
+            "binds_to": "document",
+            "description": "A statutory or exchange filing (annual accounts, registry extract, disclosure). Captured, because anything ledger-bound is captured.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "rating_action",
+            "binds_to": "event",
+            "description": "An internal or agency rating assignment, upgrade or downgrade, at a point in time.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "branch",
+            "binds_to": "location",
+            "description": "The booking office a facility or account sits in.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "credit_policy",
+            "binds_to": "rule",
+            "description": "A lending-policy row — limits, exclusions, delegated authority thresholds.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "approval_action",
+            "binds_to": "action_type",
+            "description": "A declared write path: the committee decision that may change a facility's state. Actions are the only write path, so the action type is itself an ontology object.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          }
+        ],
+        "edge_kinds": [
+          {
+            "kind": "holds_account",
+            "binds_to": "party_to",
+            "from": [
+              "party"
+            ],
+            "to": [
+              "account"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "borrower_of",
+            "binds_to": "party_to",
+            "from": [
+              "party"
+            ],
+            "to": [
+              "facility"
+            ],
+            "description": "The party obligated under the facility. A guarantor gets its own role edge.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "guarantor_of",
+            "binds_to": "role_of",
+            "from": [
+              "party"
+            ],
+            "to": [
+              "facility"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "manages",
+            "binds_to": "role_of",
+            "from": [
+              "relationship_manager"
+            ],
+            "to": [
+              "party"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "posted_to",
+            "binds_to": "part_of",
+            "from": [
+              "transaction"
+            ],
+            "to": [
+              "account",
+              "facility"
+            ],
+            "description": "Part → whole. The posting is a component of the account's ledger.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "secures",
+            "binds_to": "references",
+            "from": [
+              "collateral"
+            ],
+            "to": [
+              "facility"
+            ],
+            "description": "The pledge cites the exposure it backs. Deliberately `references`, not `authorises` — whether the security is perfected is a determination, not a graph shape.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "governs",
+            "binds_to": "authorises",
+            "from": [
+              "covenant",
+              "credit_policy"
+            ],
+            "to": [
+              "facility",
+              "account"
+            ],
+            "description": "The condition under which the exposure may remain drawn.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "booked_at",
+            "binds_to": "at",
+            "from": [
+              "facility",
+              "account"
+            ],
+            "to": [
+              "branch"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "issued_by",
+            "binds_to": "issued",
+            "from": [
+              "institution",
+              "party"
+            ],
+            "to": [
+              "credit_memo",
+              "filing"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "memo_about",
+            "binds_to": "about",
+            "from": [
+              "credit_memo",
+              "filing",
+              "rating_action"
+            ],
+            "to": [
+              "party"
+            ],
+            "description": "A CLAIM that the document concerns this party. Two candidate parties yield two edges and neither is a determination — the `about` meta-kind carries that rule for every pack. The destination is the SUBJECT only: an `about` edge pointing at a facility would attach the identity caveat to an arrangement, which is noise where the rule needs to be loud.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the identity-claim meta-kind — two candidates yield two edges and neither decides anything",
+            "touches": [
+              "identity-claim",
+              "subject"
+            ]
+          },
+          {
+            "kind": "concerns_facility",
+            "binds_to": "references",
+            "from": [
+              "credit_memo",
+              "filing",
+              "rating_action"
+            ],
+            "to": [
+              "facility",
+              "account"
+            ],
+            "description": "The exposure a document discusses. No identity claim, so not `about`.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "resolved_to",
+            "binds_to": "resolved_to",
+            "from": [
+              "credit_memo",
+              "filing"
+            ],
+            "to": [
+              "party"
+            ],
+            "description": "The determination, written only on the far side of a named human's attestation at onboarding. Never produced by a score.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the determination meta-kind — the one edge a human attestation writes",
+            "touches": [
+              "determination",
+              "subject"
+            ]
+          },
+          {
+            "kind": "derived_from",
+            "binds_to": "derived_from",
+            "from": [
+              "credit_memo",
+              "rating_action"
+            ],
+            "to": [
+              "filing",
+              "transaction"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "supersedes",
+            "binds_to": "supersedes",
+            "from": [
+              "credit_memo",
+              "filing",
+              "covenant"
+            ],
+            "to": [
+              "credit_memo",
+              "filing",
+              "covenant"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "amends",
+            "binds_to": "part_of",
+            "from": [
+              "facility"
+            ],
+            "to": [
+              "facility"
+            ],
+            "description": "An amended-and-restated facility as a part of the original arrangement.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "references",
+            "binds_to": "references",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-fin-1",
+            "target": "node",
+            "kind": "syndicate_participant",
+            "binds_to": "organisation",
+            "from": [],
+            "to": [],
+            "proposed_by": "core_banking adapter agent",
+            "proposed_at": "2026-08-15T08:40:00Z",
+            "rationale": "syndicated facilities name lenders that are neither the booking institution nor a party",
+            "status": "pending",
+            "escalates": false,
+            "escalation_reason": null,
+            "auto_approvable": true,
+            "auto_approvable_because": "binds to an existing meta-kind, touches no subject and no determination"
+          },
+          {
+            "id": "prop-fin-2",
+            "target": "edge",
+            "kind": "beneficial_owner_of",
+            "binds_to": "about",
+            "from": [
+              "party"
+            ],
+            "to": [
+              "party"
+            ],
+            "proposed_by": "kyc adapter agent",
+            "proposed_at": "2026-08-15T10:26:00Z",
+            "rationale": "ownership chains in the filings run party to party and there is no edge for it",
+            "status": "escalated",
+            "escalates": true,
+            "escalation_reason": "binds to the identity-claim meta-kind between two declared subjects — escalates regardless of the auto-approve setting",
+            "auto_approvable": false,
+            "auto_approvable_because": null
+          }
+        ]
+      },
+      "government": {
+        "pack": "government",
+        "title": "Permits, benefits and case files",
+        "version": "2.0",
+        "subject_kinds": [
+          "applicant",
+          "claimant",
+          "organisation",
+          "person"
+        ],
+        "node_kinds": [
+          {
+            "kind": "person",
+            "binds_to": "entity",
+            "description": "A human being as some register holds them: an applicant, a claimant, an appellant, a correspondent, a company officer, a subject of a legacy record. ONE kind, not four — the proceeding a person is in is a ROLE (see `applicant`, `claimant`, `acts_as`), and modelling roles as species of person is how an estate loses the ability to answer \"is this the same human?\". Use this for the register row itself; use a role kind for what the row is doing in a case. A subject (D4b): candidates only, never an automatic merge.",
+            "subject": true,
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "declared a subject (D4b) — identity attestation and the never-fuzzy-merge rule attach to this kind",
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "organisation",
+            "binds_to": "organisation",
+            "description": "A registered business, contractor, advocacy service or other body that is not the deciding agency. A subject (D4b) for a stronger reason than `person` is: public-registry officer records carry NO identifier at all, so name and address are the entire basis for a match. Use `agency` instead when the body is the one deciding, inspecting or paying.",
+            "subject": true,
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "declared a subject (D4b) — identity attestation and the never-fuzzy-merge rule attach to this kind",
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "applicant",
+            "binds_to": "entity",
+            "description": "The ROLE a person or organisation occupies in a permit application. A separate node from `person` on purpose, joined by `acts_as`: \"which human is this applicant?\" is then a question with a visible answer rather than an assumption baked into one node. Use this as the source of `submitted`; never as the thing you resolve identity onto.",
+            "subject": true,
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "declared a subject (D4b) — identity attestation and the never-fuzzy-merge rule attach to this kind",
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "claimant",
+            "binds_to": "entity",
+            "description": "The ROLE a person occupies in a benefit claim. Same construction as `applicant`, and a distinct kind because the two roles are attested at different moments and carry different identifiers (a claim reference is not an application reference).",
+            "subject": true,
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "declared a subject (D4b) — identity attestation and the never-fuzzy-merge rule attach to this kind",
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "officer",
+            "binds_to": "entity",
+            "description": "An agency staff member whose decisions, inspections and assignments are attributable. A human in the world, held apart from `person` on purpose: staff identity is administrative and IS keyed (`officer_ref`), so it merges exactly and never fuzzily. Fuzzy-merging two staff records would silently reassign a caseload — and because assignment is an access predicate, it would rewrite who may READ the case too.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "agency",
+            "binds_to": "organisation",
+            "description": "The department, statutory board or external consultee body that decides, inspects, pays or is consulted. Use this rather than `organisation` whenever the body is acting in an official capacity in the process; `organisation` is for the governed party.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "application",
+            "binds_to": "document",
+            "description": "A submitted request for a permit, licence or registration, in progress or concluded. The spine of the permits half of the graph. Bound to `document` because that is what pointers resolve into — the row, the scanned form and the case file all cite the same thing.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "claim",
+            "binds_to": "document",
+            "description": "A submitted request for assistance under a benefit programme. The spine of the benefits half of the graph.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "appeal",
+            "binds_to": "document",
+            "description": "A challenge to a decision. May be sealed, which is a POLICY state and not an absence: a sealed appeal is withheld, and withheld is distinct from missing (spine D4).",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "case_file",
+            "binds_to": "document",
+            "description": "The bundle an officer works from — the container that makes \"everything on this case\" one traversal. Use `part_of_case` to attach members. In a T3 document drop it is the only thing that can be re-read at all.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "permit",
+            "binds_to": "agreement",
+            "description": "The instrument that exists once an application is granted: a licence, permit or registration with conditions and a validity window. NOT the same node as the `decision` that created it — a permit persists, can be revoked, and outlives the case that produced it.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "licence",
+            "binds_to": "agreement",
+            "description": "A premises or activity licence held by an organisation, as the public registry publishes it. Distinct from `permit`: this one is sourced from the registry rather than from the case system, and the two do not share an identifier space.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "decision",
+            "binds_to": "event",
+            "description": "A determination made on an application at an instant. Immutable: a correction is a NEW decision node pointing back through `supersedes_decision`, never an edit.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "determination",
+            "binds_to": "event",
+            "description": "An eligibility outcome on a claim at an instant, with its own effective window. Kept as a distinct kind from `decision`, with its own supersession edge, so that nothing can traverse out of a permit decision chain into a benefits chain — a union signature over two unrelated chains is an invitation to do exactly that.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "condition",
+            "binds_to": "rule",
+            "description": "One obligation attached to a permit, with its own lifecycle (a compliance date, a discharge date). A `rule` rather than an attribute, so \"which permits still carry an undischarged condition?\" is a graph question with citations.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "inspection",
+            "binds_to": "event",
+            "description": "An attended site or desk visit with an outcome. May exist with NO outcome (no access obtained), which is itself a recorded fact and not a gap.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "payment",
+            "binds_to": "event",
+            "description": "Money moved on a claim — a disbursement or a recovery. A reversal is a NEW payment node pointing back through `reverses`, never an update to the original.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "review",
+            "binds_to": "event",
+            "description": "A scheduled or triggered re-examination of a claim.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "case_event",
+            "binds_to": "event",
+            "description": "Something that happened on a case at a time. The highest-cardinality kind in the estate by an order of magnitude, and the kind that carries the bi-temporal disagreement worth seeing: it occurred days before it was recorded, because counter staff key in batches.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "parcel",
+            "binds_to": "location",
+            "description": "A unit of land with a boundary and a zoning classification. Never merged by similarity: parcels are renumbered and subdivided, and two parcels with adjacent ids and similar geometry are DIFFERENT land. Join by exact id or by a declared renumbering lineage.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "address_point",
+            "binds_to": "location",
+            "description": "An addressable unit on a parcel, as surveyed. A fact about the world. Use this as the destination of `addresses` when a typed address string resolves.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "address",
+            "binds_to": "location",
+            "description": "An address AS RECORDED on some record — abbreviated, stale, unit-prefixed or mistyped. It exists to PRESERVE that evidence: merging two of these destroys the signal that a person moved, which is a matching signal rather than noise. Resolve it onto an `address_point` with `addresses`; that resolution may fail, and its failure is informative.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "office",
+            "binds_to": "location",
+            "description": "The agency office a case is handled at.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "document",
+            "binds_to": "document",
+            "description": "A scanned case document with an OCR text layer — a form, a statutory declaration, a home visit record. Use this for anything captured as pages; use `message` for correspondence and `photo` for a site image.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "message",
+            "binds_to": "document",
+            "description": "One item of correspondence, inbound or outbound. Its headers are attacker-controlled: a case reference read off an inbound header is a PROPOSAL (`claims_case_ref`), never a binding.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "photo",
+            "binds_to": "document",
+            "description": "A site photograph, held as metadata plus an OCR text layer. A document rather than an event because what is citable is the capture, not the visit; the visit is the `inspection`.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "legacy_record",
+            "binds_to": "document",
+            "description": "One fixed-width record from the pre-migration system. A node kind rather than \"a source of attributes\" on purpose: it is often the ONLY evidence that something happened, and a meaningful fraction of them resolve to nobody at all — dissolving them into attributes would silently discard exactly those.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "business_registration",
+            "binds_to": "document",
+            "description": "The registration record of an organisation. An organisation may hold SEVERAL over time (they re-register, change legal form, register in more than one jurisdiction); the historical ones must stay reachable, because a permit granted years ago cites the registration that existed then.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "permit_type",
+            "binds_to": "rule",
+            "description": "The catalogue entry an application is made under — fee, target decision time, whether an inspection is required.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "benefit_program",
+            "binds_to": "rule",
+            "description": "The programme a claim is made under — its ceiling, whether it is means tested, its review interval.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "zoning_code",
+            "binds_to": "rule",
+            "description": "A zoning classification, with the constraints that follow from it.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "statute",
+            "binds_to": "rule",
+            "description": "The statutory provision a permit type, programme, condition or decision rests on. It earns a kind because \"which decisions rest on the provision that changed?\" is the question a government graph exists to answer.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "eligibility_rule",
+            "binds_to": "rule",
+            "description": "One testable condition on an application or claim — config as a graph object, so that a determination can cite the rule it applied.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "determination_action",
+            "binds_to": "action_type",
+            "description": "The declared write path by which an eligibility or permit determination may change a case's state. Actions are the only write path, so the action type is itself an ontology object with an automation mode.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "case_handling_action",
+            "binds_to": "action_type",
+            "description": "A declared write path for routine case handling — assignment, scheduling, requesting information. Lower stakes than a determination, and still declared.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "agent",
+            "binds_to": "agent",
+            "description": "An agent as an ontology object (spine D10) — versioned, grounded in the pack file that declares it, and invalidated rather than deleted when replaced.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "adapter",
+            "binds_to": "adapter",
+            "description": "A source connector as an ontology object: which source it reads, at which pinning tier, under which capture policy.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "capability_grant",
+            "binds_to": "capability_grant",
+            "description": "A minted capability (spine D11) — what an attestation or a compiled declaration produced, bound to one adapter and one purpose.",
+            "subject": false,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          }
+        ],
+        "edge_kinds": [
+          {
+            "kind": "acts_as",
+            "binds_to": "role_of",
+            "from": [
+              "person",
+              "organisation"
+            ],
+            "to": [
+              "applicant",
+              "claimant"
+            ],
+            "description": "The register row and the proceeding role are DIFFERENT nodes joined by an explicit edge, so that \"which person is this applicant?\" is a question with a visible answer rather than an assumption baked into one node.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "officer_of",
+            "binds_to": "role_of",
+            "from": [
+              "person"
+            ],
+            "to": [
+              "organisation"
+            ],
+            "description": "A person appointed to an organisation, with appointment and resignation dates. In the public registry these records carry no identifier at all.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "handled_by",
+            "binds_to": "role_of",
+            "from": [
+              "officer"
+            ],
+            "to": [
+              "case_file",
+              "application",
+              "claim",
+              "appeal",
+              "review"
+            ],
+            "description": "The officer accountable for the item. Use `assigned_to` / `caseworked_by` where the source supplies only a current value with no assignment events.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "assigned_to",
+            "binds_to": "role_of",
+            "from": [
+              "officer"
+            ],
+            "to": [
+              "application"
+            ],
+            "description": "OBSERVATION ONLY. The source is a current-value column with no assignment events, so this records \"observed assigned to X when we looked\", with valid time open at both ends. It must NOT be given a manufactured interval by differencing two reads — that fabricates a transition date the source never asserted and loses every change between the reads.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "caseworked_by",
+            "binds_to": "role_of",
+            "from": [
+              "officer"
+            ],
+            "to": [
+              "claim"
+            ],
+            "description": "Observation only, exactly as `assigned_to`. Caseload transfers happen and the source keeps no transfer events.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "decided_by",
+            "binds_to": "role_of",
+            "from": [
+              "officer"
+            ],
+            "to": [
+              "decision",
+              "determination"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "inspected_by",
+            "binds_to": "role_of",
+            "from": [
+              "officer"
+            ],
+            "to": [
+              "inspection"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "reviewed_by",
+            "binds_to": "role_of",
+            "from": [
+              "officer"
+            ],
+            "to": [
+              "review"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "claims_agent_for",
+            "binds_to": "role_of",
+            "from": [
+              "organisation"
+            ],
+            "to": [
+              "application"
+            ],
+            "description": "PROPOSAL, not assertion. Derived from a free-text \"agent of record\" field keyed at a counter: untrusted, displayable, citable, and never traversed for access or for a determination. It becomes an assertion only when a named officer confirms it, at which point it is re-emitted carrying the attesting principal.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "submitted",
+            "binds_to": "issued",
+            "from": [
+              "applicant",
+              "claimant",
+              "person",
+              "organisation"
+            ],
+            "to": [
+              "application",
+              "claim",
+              "appeal"
+            ],
+            "description": "The role that lodged the document. Bound to `issued` (actor → artefact) rather than to `party_to`, so the direction the meta-kind promises is the direction the edge actually runs.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "issued_by",
+            "binds_to": "issued",
+            "from": [
+              "agency"
+            ],
+            "to": [
+              "permit",
+              "decision",
+              "determination",
+              "payment",
+              "licence",
+              "message",
+              "document"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "sent_by",
+            "binds_to": "issued",
+            "from": [
+              "person",
+              "organisation",
+              "agency",
+              "officer"
+            ],
+            "to": [
+              "message"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "decides",
+            "binds_to": "references",
+            "from": [
+              "decision",
+              "determination"
+            ],
+            "to": [
+              "application",
+              "claim",
+              "appeal"
+            ],
+            "description": "Deliberately NOT `about`. `about` carries the identity-claim rule, and a decision citing the application it disposed of is not a claim about a person — binding it there would make every decision render an unresolved-identity caveat under a domain-free renderer.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "grants",
+            "binds_to": "authorises",
+            "from": [
+              "decision",
+              "determination",
+              "eligibility_rule"
+            ],
+            "to": [
+              "permit",
+              "payment"
+            ],
+            "description": "The determination or rule under which the instrument or payment is permitted. Only a granting decision creates a permit.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "governs",
+            "binds_to": "authorises",
+            "from": [
+              "eligibility_rule",
+              "condition",
+              "permit_type",
+              "benefit_program",
+              "zoning_code"
+            ],
+            "to": [
+              "application",
+              "claim",
+              "permit",
+              "payment",
+              "parcel"
+            ],
+            "description": "The declarative row that constrains the item. A breach or a discharge is then a graph object with a citation rather than a spreadsheet cell.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "licensed",
+            "binds_to": "authorises",
+            "from": [
+              "licence"
+            ],
+            "to": [
+              "organisation"
+            ],
+            "description": "The licence and the body it permits to trade. Issue and expiry are its valid-time window.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "of_type",
+            "binds_to": "references",
+            "from": [
+              "application",
+              "claim",
+              "permit",
+              "licence"
+            ],
+            "to": [
+              "permit_type",
+              "benefit_program"
+            ],
+            "description": "The catalogue entry the case was made under. A closed reference vocabulary: a new code is a new code, and merging it into a similar one hides a statutory change.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "has_condition",
+            "binds_to": "part_of",
+            "from": [
+              "condition"
+            ],
+            "to": [
+              "permit"
+            ],
+            "description": "Part → whole. The condition is a component of the instrument, and is discharged on its own clock.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "inspects",
+            "binds_to": "references",
+            "from": [
+              "inspection"
+            ],
+            "to": [
+              "application",
+              "permit"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "appeals",
+            "binds_to": "references",
+            "from": [
+              "appeal"
+            ],
+            "to": [
+              "decision",
+              "determination"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "pays",
+            "binds_to": "references",
+            "from": [
+              "payment"
+            ],
+            "to": [
+              "claim"
+            ],
+            "description": "The claim a payment moved money on. Its valid time is the period paid for; its recording clock is when it was posted, and those are different clocks.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "reverses",
+            "binds_to": "supersedes",
+            "from": [
+              "payment"
+            ],
+            "to": [
+              "payment"
+            ],
+            "description": "A reversal is a new payment pointing back at the one it undoes. Never an update.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "reviews",
+            "binds_to": "references",
+            "from": [
+              "review"
+            ],
+            "to": [
+              "claim"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "event_on",
+            "binds_to": "references",
+            "from": [
+              "case_event"
+            ],
+            "to": [
+              "application",
+              "claim"
+            ],
+            "description": "The case an event happened on. Valid time trails the recording clock by days here; getting the two the wrong way round loses rows.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "supersedes_decision",
+            "binds_to": "supersedes",
+            "from": [
+              "decision"
+            ],
+            "to": [
+              "decision"
+            ],
+            "description": "A correction chain within the permits half. A DISTINCT kind from `supersedes_determination` rather than one union signature over two unrelated chains — which would be an invitation to traverse from a permit decision into a benefits chain.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "supersedes_determination",
+            "binds_to": "supersedes",
+            "from": [
+              "determination"
+            ],
+            "to": [
+              "determination"
+            ],
+            "description": "The correction chain within the benefits half. See `supersedes_decision`.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "supersedes",
+            "binds_to": "supersedes",
+            "from": [
+              "permit",
+              "licence",
+              "business_registration",
+              "legacy_record",
+              "application",
+              "claim"
+            ],
+            "to": [
+              "permit",
+              "licence",
+              "business_registration",
+              "legacy_record",
+              "application",
+              "claim"
+            ],
+            "description": "Replacement of a standing instrument or record by a later one. The two decision chains have their own kinds; this is for everything else.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "about_subject",
+            "binds_to": "about",
+            "from": [
+              "application",
+              "claim",
+              "case_file",
+              "inspection",
+              "appeal",
+              "document",
+              "message",
+              "photo",
+              "legacy_record",
+              "business_registration"
+            ],
+            "to": [
+              "person",
+              "applicant",
+              "claimant",
+              "organisation"
+            ],
+            "description": "A CLAIM that the artefact concerns this person, role or body. Two candidates yield two edges and neither is a determination — the `about` meta-kind carries that rule for every pack, and every surface that renders one must attach the caveat.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the identity-claim meta-kind — two candidates yield two edges and neither decides anything",
+            "touches": [
+              "identity-claim",
+              "subject"
+            ]
+          },
+          {
+            "kind": "mentions",
+            "binds_to": "about",
+            "from": [
+              "document",
+              "message",
+              "photo",
+              "legacy_record"
+            ],
+            "to": [
+              "person",
+              "organisation"
+            ],
+            "description": "A name recovered from OCR or from free text. UNTRUSTED and weaker than `about_subject`: it is a hypothesis with a pointer, storable, citable and displayable, and it may never influence control flow — including access control.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the identity-claim meta-kind — two candidates yield two edges and neither decides anything",
+            "touches": [
+              "identity-claim",
+              "subject"
+            ]
+          },
+          {
+            "kind": "legacy_for",
+            "binds_to": "about",
+            "from": [
+              "legacy_record"
+            ],
+            "to": [
+              "person"
+            ],
+            "description": "The person a pre-migration record appears to concern. Often ABSENT by design: a meaningful fraction of legacy records resolve to nobody, and that absence is a fact the graph keeps rather than a row it drops.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the identity-claim meta-kind — two candidates yield two edges and neither decides anything",
+            "touches": [
+              "identity-claim",
+              "subject"
+            ]
+          },
+          {
+            "kind": "claims_case_ref",
+            "binds_to": "references",
+            "from": [
+              "message",
+              "document"
+            ],
+            "to": [
+              "application",
+              "claim"
+            ],
+            "description": "PROPOSAL, not assertion. A case reference taken from an inbound header or OCR'd off a scanned form — attacker-controlled. Stored, citable, displayable; never traversed for access, routing or a determination. `corresponds_on` is the trusted counterpart.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "corresponds_on",
+            "binds_to": "references",
+            "from": [
+              "message"
+            ],
+            "to": [
+              "application",
+              "claim"
+            ],
+            "description": "The case a message genuinely belongs to. Requires a TRUSTED binding — an agency outbound thread record or a human attestation — and is never created from an inbound header.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "resolved_to",
+            "binds_to": "resolved_to",
+            "from": [
+              "application",
+              "claim",
+              "case_file",
+              "document",
+              "message",
+              "legacy_record",
+              "business_registration"
+            ],
+            "to": [
+              "person",
+              "applicant",
+              "claimant",
+              "organisation"
+            ],
+            "description": "THE determination: this artefact is about THIS subject. Written only on the far side of a named human's attestation against a declared identifier, and never produced by a score, a similarity or a model. The engine enforces this: an edge bound to `resolved_to` refuses construction without a valid `Attestation`.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the determination meta-kind — the one edge a human attestation writes",
+            "touches": [
+              "determination",
+              "subject"
+            ]
+          },
+          {
+            "kind": "same_as",
+            "binds_to": "resolved_to",
+            "from": [
+              "person",
+              "organisation"
+            ],
+            "to": [
+              "person",
+              "organisation"
+            ],
+            "description": "The output of identity resolution between two subject records, generalised over BOTH protected subject kinds rather than written once for people. A machine may propose it; only a named human may assert it, and it never crosses kinds — a person is never `same_as` an organisation, however a sole trader appears in the data. An unattested proposal is a candidate held outside the graph, never an edge.",
+            "source": "predefined",
+            "locked": true,
+            "locked_reason": "binds to the determination meta-kind — the one edge a human attestation writes",
+            "touches": [
+              "determination",
+              "subject"
+            ]
+          },
+          {
+            "kind": "attached_to",
+            "binds_to": "at",
+            "from": [
+              "application",
+              "permit",
+              "licence"
+            ],
+            "to": [
+              "parcel",
+              "address_point"
+            ],
+            "description": "The land or premises the instrument attaches to. MAY DANGLE: a small tail of parcel references resolve to nothing in the survey, and a dangling reference is a finding.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "at_parcel",
+            "binds_to": "at",
+            "from": [
+              "inspection",
+              "photo",
+              "address_point",
+              "legacy_record"
+            ],
+            "to": [
+              "parcel"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "handled_at",
+            "binds_to": "at",
+            "from": [
+              "application",
+              "claim",
+              "case_event",
+              "inspection"
+            ],
+            "to": [
+              "office"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "resides_at",
+            "binds_to": "at",
+            "from": [
+              "person",
+              "organisation"
+            ],
+            "to": [
+              "address"
+            ],
+            "description": "The most temporal edge in the estate. Stale addresses are everywhere and are a MATCHING SIGNAL rather than noise, so old ones are invalidated and kept, never overwritten.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "addresses",
+            "binds_to": "references",
+            "from": [
+              "address"
+            ],
+            "to": [
+              "address_point"
+            ],
+            "description": "The resolution of a typed string onto a surveyed point. It may fail, and its failure is informative — it is usually the trace of a move or a rename.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "on_parcel",
+            "binds_to": "part_of",
+            "from": [
+              "address_point"
+            ],
+            "to": [
+              "parcel"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "zoned",
+            "binds_to": "references",
+            "from": [
+              "parcel"
+            ],
+            "to": [
+              "zoning_code"
+            ],
+            "description": "Observation only. The survey ships a current cut with no retained prior cuts, so successive reads are observations and not a rezoning history.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "part_of_case",
+            "binds_to": "part_of",
+            "from": [
+              "application",
+              "claim",
+              "decision",
+              "determination",
+              "inspection",
+              "appeal",
+              "payment",
+              "review",
+              "case_event",
+              "condition",
+              "document",
+              "message",
+              "photo"
+            ],
+            "to": [
+              "case_file"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "in_thread",
+            "binds_to": "part_of",
+            "from": [
+              "message"
+            ],
+            "to": [
+              "message"
+            ],
+            "description": "Reply threading, from the message headers that name a parent.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "evidences",
+            "binds_to": "references",
+            "from": [
+              "document",
+              "photo",
+              "legacy_record"
+            ],
+            "to": [
+              "application",
+              "claim",
+              "inspection"
+            ],
+            "description": "The artefact offered as evidence for the case. Distinct from `about_subject`, which is a claim about a person rather than about the case.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "evidenced_by",
+            "binds_to": "references",
+            "from": [
+              "inspection",
+              "decision",
+              "determination"
+            ],
+            "to": [
+              "photo",
+              "document"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "sent_to",
+            "binds_to": "references",
+            "from": [
+              "message"
+            ],
+            "to": [
+              "person",
+              "organisation",
+              "agency",
+              "officer"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "registered_as",
+            "binds_to": "references",
+            "from": [
+              "organisation"
+            ],
+            "to": [
+              "business_registration"
+            ],
+            "description": "NOT 1:1. Organisations re-register and change legal form; at most one registration is current per jurisdiction and the rest are historical and must stay reachable.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": [
+              "subject"
+            ]
+          },
+          {
+            "kind": "cites",
+            "binds_to": "references",
+            "from": [
+              "decision",
+              "determination",
+              "permit_type",
+              "benefit_program",
+              "eligibility_rule",
+              "condition"
+            ],
+            "to": [
+              "statute"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "derived_from",
+            "binds_to": "derived_from",
+            "from": [
+              "decision",
+              "determination",
+              "payment",
+              "case_file",
+              "permit",
+              "eligibility_rule"
+            ],
+            "to": [
+              "application",
+              "claim",
+              "inspection",
+              "document",
+              "legacy_record",
+              "eligibility_rule"
+            ],
+            "description": "Provenance WITHIN the graph: this node was computed from those. Not a citation of a source span — that is what `sources` on the node itself carries.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "granted_capability",
+            "binds_to": "authorises",
+            "from": [
+              "agent"
+            ],
+            "to": [
+              "capability_grant"
+            ],
+            "description": "The capability an agent holds (spine D11). Its own bi-temporal history, so \"when did this widen, and who authorised it?\" is answerable.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "may_invoke",
+            "binds_to": "authorises",
+            "from": [
+              "agent"
+            ],
+            "to": [
+              "determination_action",
+              "case_handling_action"
+            ],
+            "description": "The declared write paths an agent may propose through. A capability not declared here cannot be requested at runtime; there is no escalation path that adds one.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "resolved_through",
+            "binds_to": "references",
+            "from": [
+              "capability_grant"
+            ],
+            "to": [
+              "adapter"
+            ],
+            "description": null,
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "reads_from",
+            "binds_to": "references",
+            "from": [
+              "adapter"
+            ],
+            "to": [
+              "application",
+              "claim",
+              "document",
+              "message",
+              "legacy_record",
+              "business_registration",
+              "licence",
+              "parcel",
+              "case_event"
+            ],
+            "description": "Which kinds an adapter is the writer for. The reverse index that answers \"if this source drifted, what in the graph moves?\".",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          },
+          {
+            "kind": "references",
+            "binds_to": "references",
+            "from": [
+              "*"
+            ],
+            "to": [
+              "*"
+            ],
+            "description": "a cites b, with no stronger claim. The fallback when nothing more specific is true — and if it is being used often, that is the signal to run the growth protocol.",
+            "source": "predefined",
+            "locked": false,
+            "locked_reason": null,
+            "touches": []
+          }
+        ],
+        "proposals": [
+          {
+            "id": "prop-gov-1",
+            "target": "node",
+            "kind": "inspection_finding",
+            "binds_to": "event",
+            "from": [],
+            "to": [],
+            "proposed_by": "case_drop adapter agent",
+            "proposed_at": "2026-08-15T07:55:00Z",
+            "rationale": "an inspection carries findings that are dated separately from the inspection itself",
+            "status": "pending",
+            "escalates": false,
+            "escalation_reason": null,
+            "auto_approvable": true,
+            "auto_approvable_because": "binds to an existing meta-kind, touches no subject and no determination"
+          },
+          {
+            "id": "prop-gov-2",
+            "target": "edge",
+            "kind": "matched_to_register",
+            "binds_to": "resolved_to",
+            "from": [
+              "application"
+            ],
+            "to": [
+              "person"
+            ],
+            "proposed_by": "register adapter agent",
+            "proposed_at": "2026-08-15T12:10:00Z",
+            "rationale": "the register match is currently recorded as a claim and the officer wants it recorded as decided",
+            "status": "escalated",
+            "escalates": true,
+            "escalation_reason": "writes a determination about a declared subject — escalates regardless of the auto-approve setting; only a named official's attestation may write it",
+            "auto_approvable": false,
+            "auto_approvable_because": null
+          }
+        ]
+      }
+    }
+  },
+  "materialise": {
+    "endpoint": "POST /materialise/plan",
+    "shapes": [
+      "tabular (XGBoost)",
+      "graph-tensor",
+      "chunked",
+      "conversational"
+    ],
+    "selected_shape": "tabular (XGBoost)",
+    "plan": [
+      {
+        "label": "entity",
+        "value": "party"
+      },
+      {
+        "label": "features",
+        "value": "as_of  system_time = 2026-06-30",
+        "note": "features cut on SYSTEM time"
+      },
+      {
+        "label": "label",
+        "value": "default_90d · valid_time ≤ 2026-03-31, maturity lag 90d",
+        "note": "labels cut on VALID time"
+      },
+      {
+        "label": "policy",
+        "value": "lending.model_training"
+      }
+    ],
+    "receipt": {
+      "plan_hash": "3f9a…c21",
+      "rows": 18442,
+      "pointers": 221304,
+      "withheld": 1207,
+      "verdicts": [
+        {
+          "verdict": "VERIFIED",
+          "count": 219881,
+          "tone": "good"
+        },
+        {
+          "verdict": "VERIFIED_AS_OF_CAPTURE",
+          "count": 1423,
+          "tone": "warn"
+        },
+        {
+          "verdict": "DRIFT_MATERIAL",
+          "count": 0,
+          "tone": "bad"
+        }
+      ],
+      "outputs": [
+        "facility_default.parquet",
+        "receipt.json",
+        "croissant.json"
+      ]
+    }
+  },
+  "evidence": {
+    "endpoint": "POST /evidence/verify",
+    "verdicts": [
+      {
+        "verdict": "VERIFIED",
+        "tone": "good",
+        "meaning": "re-reading the source returns the same bytes under the same snapshot identity"
+      },
+      {
+        "verdict": "VERIFIED_AS_OF_CAPTURE",
+        "tone": "warn",
+        "meaning": "the source no longer answers, but a pinned capture does"
+      },
+      {
+        "verdict": "DRIFT_BENIGN",
+        "tone": "warn",
+        "meaning": "the source changed in a way the projection does not read"
+      },
+      {
+        "verdict": "DRIFT_MATERIAL",
+        "tone": "bad",
+        "meaning": "the cited value itself changed — every determination citing it is listed"
+      },
+      {
+        "verdict": "UNVERIFIABLE",
+        "tone": "bad",
+        "meaning": "no live source and no capture; the pointer can be quoted, never re-executed"
+      }
+    ]
+  }
+}

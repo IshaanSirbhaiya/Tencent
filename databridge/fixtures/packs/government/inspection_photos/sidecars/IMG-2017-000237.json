@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2017-000237",
+  "filename": "IMG-2017-000237.jpg",
+  "image_present": false,
+  "captured_at": "2017-01-14T08:24:33+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2017-000132",
+  "application_id": "APP-2016-000195",
+  "parcel_id": "PCL-XX-90777",
+  "photo_batch_ref": "PHB-2017-000132",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-709059"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 422219,
+    "northing": 1186864,
+    "accuracy_m": 16.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1661,
+          120,
+          264,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-Z017-548455",
+        "confidence": 0.83,
+        "bbox": [
+          1813,
+          241,
+          891,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "203 PELLET STREET, A5HCOMBE REACH AM1 6ZT",
+        "confidence": 0.91,
+        "bbox": [
+          94,
+          314,
+          1353,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2017-01-14",
+        "confidence": 0.73,
+        "bbox": [
+          1170,
+          519,
+          783,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.799,
+        "bbox": [
+          1916,
+          504,
+          464,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

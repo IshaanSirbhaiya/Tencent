@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000112",
+  "filename": "IMG-2020-000112.jpg",
+  "image_present": false,
+  "captured_at": "2020-08-12T08:55:20+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2020-000200",
+  "application_id": "APP-2019-000276",
+  "parcel_id": "PCL-WH-02612",
+  "photo_batch_ref": "PHB-2020-000200",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-112047"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 442270,
+    "northing": 1206702,
+    "accuracy_m": 16.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1802,
+          120,
+          363,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-992178",
+        "confidence": 0.87,
+        "bbox": [
+          2474,
+          268,
+          675,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "181 SALTMARSH TERRACE, ISK HARBOUR AM5 2EV",
+        "confidence": 0.734,
+        "bbox": [
+          1562,
+          400,
+          966,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-O8-12",
+        "confidence": 0.845,
+        "bbox": [
+          1023,
+          522,
+          754,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.794,
+        "bbox": [
+          1620,
+          524,
+          528,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

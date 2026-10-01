@@ -1,0 +1,13 @@
+zoning_code,description,max_height_m,consultation_required
+R1,Residential -- low density,9.0,N
+R2,Residential -- medium density,14.0,N
+R3,Residential -- high density,26.0,N
+C1,Commercial -- neighbourhood,12.0,N
+C2,Commercial -- district centre,22.0,N
+I1,Light industrial,15.0,N
+I2,General industrial,20.0,Y
+MU,Mixed use,18.0,N
+OS,Open space and recreation,6.0,N
+HC,Heritage conservation,10.0,Y
+AG,Agricultural reserve,8.0,N
+SP,Special purpose -- civic,24.0,Y

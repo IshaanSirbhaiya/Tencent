@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000411",
+  "filename": "IMG-2022-000411.jpg",
+  "image_present": false,
+  "captured_at": "2022-02-25T11:17:29+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2022-000254",
+  "application_id": "APP-2022-000346",
+  "parcel_id": "PCL-WH-01592",
+  "photo_batch_ref": "PHB-2022-000254",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-191492"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 439269,
+    "northing": 1204112,
+    "accuracy_m": 10.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1112,
+          120,
+          264,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-B11252",
+        "confidence": 0.781,
+        "bbox": [
+          144,
+          249,
+          918,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "168 QUARRY WAY, NORTH DUNMOOR AM1 9AR",
+        "confidence": 0.838,
+        "bbox": [
+          484,
+          332,
+          1036,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 202Z-02-25",
+        "confidence": 0.899,
+        "bbox": [
+          250,
+          438,
+          928,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.796,
+        "bbox": [
+          357,
+          604,
+          512,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

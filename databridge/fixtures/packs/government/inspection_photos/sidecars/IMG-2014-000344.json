@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000344",
+  "filename": "IMG-2014-000344.jpg",
+  "image_present": false,
+  "captured_at": "2014-04-17T13:12:55+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2014-000574",
+  "application_id": "APP-2013-000713",
+  "parcel_id": "PCL-PG-00514",
+  "photo_batch_ref": "PHB-2014-000574",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-338714"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 430918,
+    "northing": 1215388,
+    "accuracy_m": 16.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          390,
+          120,
+          319,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-893477",
+        "confidence": 0.749,
+        "bbox": [
+          1555,
+          250,
+          675,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "43 GASWORKS ROW, PELLING GREEN AM8 2XH",
+        "confidence": 0.89,
+        "bbox": [
+          206,
+          364,
+          1254,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-04-17",
+        "confidence": 0.779,
+        "bbox": [
+          2816,
+          489,
+          812,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.906,
+        "bbox": [
+          1776,
+          600,
+          416,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

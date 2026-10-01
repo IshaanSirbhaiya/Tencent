@@ -12,10 +12,11 @@
  *     they are exactly what makes the rest of the card believable.
  */
 import { useEffect, useState } from "react";
-import { FileSearch, Info, Network, XCircle } from "lucide-react";
+import { FileSearch, FlaskConical, Info, Network, XCircle } from "lucide-react";
 import { intakeApi } from "@/lib/intake-api";
-import { isRefusal, type SummaryCard } from "@/lib/intake-types";
+import { isRefusal, type BillingDraft, type SummaryCard } from "@/lib/intake-types";
 import { cn } from "@/lib/utils";
+import { useNouns } from "@/lib/pack-context";
 
 function StatusPill({ status }: { status: string }) {
   const tone =
@@ -29,6 +30,85 @@ function StatusPill({ status }: { status: string }) {
       {status.replace(/_/g, " ")}
     </span>
   );
+}
+
+/**
+ * How this card's values were read — the first thing on the card (HC1/HC2, SWEEP #1).
+ *
+ * With no extraction model configured, the gateway serves a bundled sample extraction for a known
+ * fixture. Those values were RECALLED, not read, and a card built from them is otherwise
+ * indistinguishable from a live read. So an offline card says so in a banner that cannot be
+ * missed, and a card whose read was not recorded says that too, rather than defaulting to "live".
+ */
+export function ReadSourceBanner({ card }: { card: Pick<SummaryCard, "offline_gold"> }) {
+  if (card.offline_gold === false) {
+    return (
+      <p data-testid="read-source" data-read-source="live" className="text-2xs text-subtle">
+        Read from this document by the live extraction model.
+      </p>
+    );
+  }
+  const offline = card.offline_gold === true;
+  return (
+    <div
+      role="status"
+      data-testid="read-source"
+      data-read-source={offline ? "offline_gold" : "unrecorded"}
+      className="flex items-start gap-2 rounded-lg border-2 border-band-spot/60 bg-band-spot/[0.07] px-3 py-2"
+    >
+      <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-band-spot" />
+      <div className="text-xs">
+        <p className="font-semibold text-band-spot">
+          {offline ? "Offline sample, not a live read" : "How this card was read was not recorded"}
+        </p>
+        <p className="mt-0.5 text-2xs text-subtle">
+          {offline
+            ? "No extraction model is configured, so these values come from a bundled sample " +
+              "extraction for this known document. They were not read from it just now. Every " +
+              "value still carries its source pointer — check it before relying on it."
+            : "The gateway did not say whether a live model or the offline sample produced " +
+              "these values. Treat them as unverified until you have checked each source."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** A billing amount as the API declares it (SWEEP #15, HC3). The gateway sends currency-neutral
+ *  amounts (`estimated_patient_payable`, `known_subtotal`) plus `currency`, which the pack's
+ *  rules table declares. No currency is written into this file. A gateway older than HC3 sends
+ *  only the DEPRECATED `<name>_<ccy>` keys; for that case alone the unit is read from the key's
+ *  suffix. Remove that fallback when the deprecated keys are dropped. */
+export function billingAmounts(b: BillingDraft): {
+  currency: string | null;
+  payable: string | null;
+  subtotal: string | null;
+} {
+  const rec = b as unknown as Record<string, unknown>;
+  const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+  const declared = str(rec.currency);
+  if ("estimated_patient_payable" in rec || "known_subtotal" in rec) {
+    return {
+      currency: declared,
+      payable: str(rec.estimated_patient_payable),
+      subtotal: str(rec.known_subtotal),
+    };
+  }
+  const pick = (prefix: string): [string | null, string | null] => {
+    for (const [key, value] of Object.entries(rec)) {
+      const m = key.match(new RegExp(`^${prefix}_([a-z]{3})$`));
+      if (m) return [m[1].toUpperCase(), typeof value === "string" ? value : null];
+    }
+    return [null, null];
+  };
+  const [payCcy, payable] = pick("estimated_patient_payable");
+  const [subCcy, subtotal] = pick("known_subtotal");
+  return { currency: declared ?? payCcy ?? subCcy, payable, subtotal };
+}
+
+function money(currency: string | null, amount: string): string {
+  // No currency declared → the number alone. Guessing one would be a fabricated unit.
+  return currency ? `${currency} ${amount}` : amount;
 }
 
 /** Click-through to the source span. The evidence path is the product; make it visible. */
@@ -84,6 +164,7 @@ function EvidenceLink({ intakeId, fieldPath }: { intakeId: string; fieldPath: st
 
 export function CoverageSection({ card }: { card: SummaryCard }) {
   const c = card.coverage;
+  const nouns = useNouns();
   return (
     <section className="rounded-lg border border-border bg-surface p-4">
       <header className="mb-2 flex items-center gap-2">
@@ -123,7 +204,7 @@ export function CoverageSection({ card }: { card: SummaryCard }) {
         <dd>{c.questionnaire}</dd>
       </dl>
 
-      {/* Graph-derived findings, called out separately and labelled as coming from the clinic
+      {/* Graph-derived findings, called out separately and labelled as coming from the
           record rather than from this document. The distinction matters: staff reading "another
           document disagrees" need to know it is not something the letter in their hand says. */}
       {c.history_findings?.length > 0 && (
@@ -132,7 +213,7 @@ export function CoverageSection({ card }: { card: SummaryCard }) {
           className="mb-3 rounded border border-band-spot/40 bg-band-spot/[0.06] px-3 py-2"
         >
           <p className="mb-1 flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-band-spot">
-            <Network className="h-3 w-3" /> from the clinic record, not this document
+            <Network className="h-3 w-3" /> from the {nouns.record}, not this document
           </p>
           <ul className="flex flex-col gap-1">
             {c.history_findings.map((f, i) => (
@@ -206,7 +287,9 @@ export function CoverageSection({ card }: { card: SummaryCard }) {
 }
 
 export function BillingSection({ card }: { card: SummaryCard }) {
+  const nouns = useNouns();
   const b = card.billing;
+  const amounts = billingAmounts(b);
   const lowerBound = b.caveats.includes("TOTAL_IS_LOWER_BOUND");
   return (
     <section className="rounded-lg border border-border bg-surface p-4">
@@ -220,18 +303,16 @@ export function BillingSection({ card }: { card: SummaryCard }) {
       <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         <dt className="text-subtle">Billed to</dt>
         <dd className="font-medium">{b.billed_to}</dd>
-        <dt className="text-subtle">Patient payable</dt>
+        <dt className="text-subtle">{nouns.subject_title} payable</dt>
         <dd className="tnum font-medium">
-          {b.estimated_patient_payable_sgd === null
-            ? "unknown"
-            : `SGD ${b.estimated_patient_payable_sgd}`}
+          {amounts.payable === null ? "unknown" : money(amounts.currency, amounts.payable)}
           {lowerBound && <span className="ml-1 text-band-review">(lower bound)</span>}
           {/* The gateway sends this ONLY when the total is unknown. Showing it as "so far"
               rather than as a total is the whole point: staff need the figure they can already
               quote, and must not read it as the amount owed. */}
-          {b.estimated_patient_payable_sgd === null && b.known_subtotal_sgd !== null && (
+          {amounts.payable === null && amounts.subtotal !== null && (
             <div className="text-2xs text-subtle">
-              SGD {b.known_subtotal_sgd} priced so far — not a total
+              {money(amounts.currency, amounts.subtotal)} priced so far — not a total
             </div>
           )}
         </dd>
@@ -254,6 +335,7 @@ export function BillingSection({ card }: { card: SummaryCard }) {
 }
 
 export function QuestionnaireSection({ card }: { card: SummaryCard }) {
+  const nouns = useNouns();
   const q = card.questionnaire;
   const prefilled = q.fields.filter((f) => f.status === "prefilled");
   return (
@@ -261,13 +343,13 @@ export function QuestionnaireSection({ card }: { card: SummaryCard }) {
       <header className="mb-2 flex items-center gap-2">
         <h2 className="text-sm font-semibold">Questionnaire pre-fill</h2>
         <span className="text-2xs text-subtle">
-          {q.prefilled} pre-filled · {q.patient_must_answer} for the patient
+          {q.prefilled} pre-filled · {q.patient_must_answer} for the {nouns.subject}
         </span>
       </header>
 
       {q.prefilled === 0 ? (
         <p className="text-xs text-subtle">
-          Nothing is pre-filled until staff select a patient. That is the gate, not a gap.
+          Nothing is pre-filled until staff select a {nouns.subject}. That is the gate, not a gap.
         </p>
       ) : (
         <>
@@ -278,7 +360,7 @@ export function QuestionnaireSection({ card }: { card: SummaryCard }) {
                 <span className="flex-1 truncate">{String(f.value)}</span>
                 {f.requires_confirmation && (
                   <span className="rounded bg-band-spot/15 px-1.5 py-0.5 text-2xs text-band-spot">
-                    patient confirms
+                    {nouns.subject} confirms
                   </span>
                 )}
               </li>

@@ -1,0 +1,61 @@
+# @modelcontextprotocol/server-filesystem — local folders.
+#
+# Output formats read from the published package (2026.8.31, dist/index.js):
+#   list_allowed_directories -> "Allowed directories:\n<abs path>\n<abs path>"
+#   list_directory(path)     -> one line per entry, "[FILE] name" or "[DIR] name"
+#   read_text_file(path)     -> text content
+#   read_media_file(path)    -> image/audio block; for every other type the handler builds an
+#                               embedded resource {uri, mimeType, blob} ...
+#
+# MEASURED 2026-10-01 (stdio, mcp python SDK 1.27, Larkspur corpus): ... and that embedded
+# resource is REJECTED by the server's own SDK — read_media_file on .pdf/.docx returns
+# `MCP error -32602: Invalid tools/call result` (invalid_union on `type`). The server declares no
+# `resources` capability (resources/list → "Method not found"), so there is no second route to the
+# bytes. Through THIS server, text types ingest and PDF/DOCX/PPTX/XLSX land in failed.jsonl with
+# that error (recorded, never silent). For binary documents use Walnut's own server — profile
+# `walnut-files-blob` (walnut_files_blob.profile.yaml), which delivers original bytes.
+#
+# WRITE TOOLS. This server also exposes write_file, edit_file, create_directory and move_file (all
+# within its allowed directories). An ingestion connection must never call them: `deny_tools`
+# below is the declared list, and tests/test_s1_files_blob.py proves every name in it is refused
+# by the engine (plans.WRITE_VERB at plan validation, client.ReadOnlyClient at call time). A
+# read-write agent that needs to save a file uses a SEPARATE connection to a server launched on
+# the one writable root (profiles/files/connections/larkspur-followups.connection.yaml).
+# Paths are the SERVER's absolute paths; identity is the hash of the source-qualified full path.
+id: mcp-server-filesystem
+title: MCP filesystem server (@modelcontextprotocol/server-filesystem)
+group: filesystem
+priority: 10
+verified: "2026-10-01 — 2026.8.31 live over stdio: listing + read_text_file OK; read_media_file -32602 for pdf/docx"
+match:
+  all_tools: [list_directory, read_text_file, read_media_file]
+  # Declarative only (the matcher reads all_tools/any_tools/resources); enforcement is by name
+  # pattern in the engine, and a test keeps this list and that pattern in agreement.
+  deny_tools: [write_file, edit_file, create_directory, move_file]
+step:
+  strategy: documents
+  roots:
+    tool: list_allowed_directories
+    args: {}
+    parse:
+      mode: lines
+      patterns:
+        - regex: '^(?!Allowed directories)(?P<path>.+)$'
+  list:
+    tool: list_directory
+    args: {path: "{path}"}
+    recurse: true
+    parse:
+      mode: lines
+      patterns:
+        - regex: '^\[DIR\]\s+(?P<name>.+)$'
+          set: {type: dir}
+        - regex: '^\[FILE\]\s+(?P<name>.+)$'
+          set: {type: file}
+  read:
+    text_tool: read_text_file
+    text_args: {path: "{path}"}
+    binary_tool: read_media_file
+    binary_args: {path: "{path}"}
+    binary_extensions: [.pdf, .docx, .pptx, .xlsx, .xls, .doc, .ppt, .png, .jpg, .jpeg, .tif,
+                        .tiff, .bmp, .webp, .gif]

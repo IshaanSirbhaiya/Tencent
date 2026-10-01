@@ -1,0 +1,40 @@
+# packages/agent_runtime — runs a user-defined agent (BUILD_PLAN_KNOWLEDGE_PLATFORM.md §6 H).
+#
+# An agent is TWO halves: a WorkflowSpec (behaviour: instructions, sources, tools, trigger — §5.6,
+# `packages/workflow_spec`) and an agentdef declaration (governance: purpose, capability grants,
+# actions with automation modes, budget, citation — `packages/agentdef`). This package refuses to
+# run one unless `compile_agent` accepts the declaration, admits every tool call against the
+# compiled grants, routes every model call through `packages/harness` (task_class `agent`), turns
+# every write into an ActionProposal gated by its automation mode, and writes a run record (§5.7).
+[project]
+name = "databridge-agent-runtime"
+version = "0.0.0"
+description = "Walnut agent runtime: governed planner loop over graph, retrieval and MCP sources"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-harness",
+  "databridge-graph",
+  "databridge-agentdef",
+  "databridge-adapter",
+  "databridge-outbox",
+  "databridge-workflow-spec",
+  "pydantic>=2.7",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+# Live sources and hybrid retrieval are wired when these packages are importable; without them the
+# corresponding tools report "not available" (reduced coverage) rather than failing the run.
+mcp = ["databridge-mcp-ingest"]
+retrieval = ["databridge-retrieval"]
+
+[project.scripts]
+walnut-agent = "databridge_agent_runtime.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_agent_runtime"]

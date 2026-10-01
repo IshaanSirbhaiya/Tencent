@@ -1,0 +1,63 @@
+# packs/healthcare — the closed PURPOSE vocabulary (spine D5, ADAPTER_AGENT_SPEC §2).
+#
+# Every read carries (who, on-behalf-of, WHY). The why is declared here, by the pack, because
+# purpose limitation is a domain statement about lawful basis — the engine has no domain and
+# therefore no opinion about which purposes exist. A purpose absent from this file is refused;
+# there is no fallback and no "unspecified".
+#
+# subject_scoped: true  => the read is about a named subject, and `Principal.grant_id` is
+#                          REQUIRED. A subject-scoped read without a grant is refused, never
+#                          defaulted (ADAPTER_AGENT_SPEC §1).
+# subject_scoped: false => not subject-scoped; typically a scheduled build-time crawl, where
+#                          `on_behalf_of` is None because no human asked.
+#
+# Purpose ids are UNIQUE ACROSS THE ENABLED PACKS - two packs sharing one id would carry two
+# lawful bases behind one name and the ledger could not say which applied. So each pack
+# namespaces its purposes under its own first segments (here: intake.*, care.*, clinic.*).
+#
+# lawful_basis is recorded, never interpreted. Singapore's PDPA / Health Information Act 2026 is
+# this pack's regulatory anchor (00_SPINE.md O1a).
+
+pack: healthcare
+
+purposes:
+  - id: intake.eligibility
+    description: >
+      Determine coverage and package for a presenting subject from a referring document and the
+      registry. The read that produces a determination draft.
+    subject_scoped: true
+    lawful_basis: PDPA s13 consent at registration
+
+  - id: intake.registration
+    description: Pre-fill the registration questionnaire for a subject about to be seen.
+    subject_scoped: true
+    lawful_basis: PDPA s13 consent at registration
+
+  - id: intake.identity_candidates
+    description: >
+      Retrieve registry CANDIDATES for a human to select from. Never a determination: the
+      selection itself is an in-person attestation, and requires_human_selection stays True.
+    subject_scoped: true
+    lawful_basis: PDPA s13 consent at registration
+
+  - id: care.record_review
+    description: Retrieve a subject's own record for a clinician reviewing their care.
+    subject_scoped: true
+    lawful_basis: Health Information Act 2026 - care provision
+
+  - id: clinic.graph_build
+    description: >
+      Scheduled build-time crawl that stages evidence into the graph. Not subject-scoped, which
+      is exactly why it may not carry a subject grant.
+    subject_scoped: false
+    lawful_basis: legitimate interests - operating the record system
+
+  - id: clinic.pointer_verification
+    description: Re-resolve an existing pointer to answer "is this citation still good?".
+    subject_scoped: false
+    lawful_basis: legitimate interests - audit and integrity
+
+  - id: clinic.source_health
+    description: Metadata-only reads (describe/plan) that touch no subject data.
+    subject_scoped: false
+    lawful_basis: legitimate interests - system operation

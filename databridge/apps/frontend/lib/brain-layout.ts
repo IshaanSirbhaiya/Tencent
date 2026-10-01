@@ -1,11 +1,11 @@
-// Graph layout + node visual encoding for the Company Brain (T08, Obsidian redesign 16.5d Part 3).
+// Graph layout + node visual encoding for the knowledge graph (Obsidian redesign 16.5d Part 3).
 //
 // Layout is d3-force, but run DETERMINISTICALLY to a settled state: initial positions are seeded by
 // sorted node index (golden-angle spiral — never Math.random) and the simulation is ticked a fixed
 // number of times with .stop(). Same (nodes, edges) → identical picture every render (skill §7.2),
 // while still looking organically force-directed (and clustering Engineering / Sales / C-suite /
-// Customers / Documents). Node colour = EntityType, size = connection count — encodings of backend
-// truth, not derived values (D-FE-2).
+// Documents). Node colour = node kind, size = connection count — encodings of backend truth, not
+// derived values (D-FE-2).
 import {
   forceCenter,
   forceLink,
@@ -16,7 +16,8 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from "d3-force";
-import type { BrainEdge, BrainNode, NodeKind } from "./brain-types";
+import type { BrainEdge, BrainNode } from "./brain-types";
+import { onLiveRegistry, type Pack, type PackRegistry } from "./packs";
 
 export interface NodeStyle {
   color: string; // glowing Obsidian palette
@@ -24,32 +25,50 @@ export interface NodeStyle {
   dim?: boolean; // documents glow dimmer
 }
 
-// Clinic vocabulary (ADR-0009). Must stay in step with `NodeKind` in databridge_graph/schema.py —
-// a kind missing here used to dereference `undefined` and take the whole /brain page down on
-// first render, so unknown kinds now fall back through `nodeStyle()` instead of crashing.
-// Muted, not neon. The first palette was full-saturation tailwind-500s (#4a9eff, #a855f7, #10b981,
-// #ef4444) each with a coloured glow behind it, which on a near-black canvas reads as a nightclub
-// rather than a clinic tool — and at 70 nodes the glows bleed into each other until you cannot see
-// the edges. These are the same hues pulled toward grey: still distinguishable at 8px, no longer
-// competing with the highlight colour that actually means something.
-export const NODE_STYLE: Record<NodeKind, NodeStyle> = {
-  patient: { color: "#6f9fd8", label: "Patient" },
-  org: { color: "#9a86c4", label: "Org" },
-  package: { color: "#5fa98d", label: "Package" },
-  test: { color: "#c2a163", label: "Test" },
-  visit: { color: "#c088a4", label: "Visit" },
-  clinic: { color: "#63a3a3", label: "Clinic" },
-  coverage_rule: { color: "#c4827a", label: "Coverage rule" },
-  document: { color: "#7d8492", label: "Document", dim: true },
-};
+// The graph vocabulary is PACK CONFIG, not a constant in this file (`graph_vocabulary` in each
+// pack's `ui.yaml`, served by `GET /packs`). HC1 (2026-10-01): it used to be read from the BUNDLED
+// `config/packs.json` and never from the live registry, so a deployment's own colours and labels
+// could not reach the graph. It is now filled from the live registry when one arrives; until then
+// every kind renders in the neutral placeholder style, which is honest about not knowing. One vertical's node kinds compiled into the platform's layout module is the
+// exact coupling Phase 1 removes — and it would break the first time two packs disagreed about
+// what a kind is called.
+//
+// Muted, not neon. The first palette was full-saturation tailwind-500s each with a coloured glow
+// behind it, which on a near-black canvas reads as a nightclub rather than a tool — and at 70 nodes
+// the glows bleed into each other until you cannot see the edges. The palette lives in config with
+// the labels because a colour that does not survive a pack switch is not an encoding of anything.
+
+/** Every pack's node styles, merged. Used where the caller has a kind but no pack in hand.
+ *  Filled IN PLACE from the live registry, so existing imports see the update. */
+export const NODE_STYLE: Record<string, NodeStyle> = {};
+
+function refill<T>(
+  target: Record<string, T>,
+  packs: readonly Pack[],
+  pick: (p: Pack) => Record<string, T> | undefined,
+): void {
+  for (const key of Object.keys(target)) delete target[key];
+  for (const pack of packs) Object.assign(target, pick(pack) ?? {});
+}
+
+function applyRegistry(registry: PackRegistry): void {
+  refill(NODE_STYLE, registry.packs, (p) => p.graph_vocabulary?.node_kinds);
+  refill(EDGE_LABEL, registry.packs, (p) => p.graph_vocabulary?.edge_labels);
+}
+
+/** One pack's node styles, in declaration order — what a legend should render. */
+export function nodeStylesFor(pack: Pack): Record<string, NodeStyle> {
+  return pack.graph_vocabulary?.node_kinds ?? {};
+}
 
 const UNKNOWN_STYLE: NodeStyle = { color: "#7d8492", label: "Unknown", dim: true };
 
 /** Style for a node kind, degrading to a neutral placeholder rather than throwing.
- *  The graph vocabulary is closed, but the frontend is deployed separately from the backend and
- *  must not white-screen if it is a version behind. */
+ *  A kind missing here used to dereference `undefined` and take the whole /brain page down on
+ *  first render; the frontend is deployed separately from the backend and must not white-screen
+ *  when it is a version — or a pack — behind. */
 export function nodeStyle(kind: string): NodeStyle {
-  return NODE_STYLE[kind as NodeKind] ?? UNKNOWN_STYLE;
+  return NODE_STYLE[kind] ?? UNKNOWN_STYLE;
 }
 
 export function degreeMap(edges: BrainEdge[]): Map<string, number> {
@@ -66,14 +85,12 @@ export function nodeRadius(degree: number): number {
   return Math.min(8 + degree * 2.5, 32);
 }
 
-// Every relationship in the clinic vocabulary (ADR-0009) is directional: a coverage rule
-// `authorises` a package, a document is `for_patient`, an org `issued` a document. So an arrowhead
-// is the DEFAULT, and this set names the exceptions.
+// Every relationship in every pack vocabulary is directional, so an arrowhead is the DEFAULT and
+// this set names the exceptions.
 //
-// This used to be an allow-list reading `{"decided", "blocks"}` — kinds from the retired Acme
-// vocabulary. After ADR-0009 renamed everything, it matched nothing, so all 114 edges rendered
-// undirected and the graph became a hairball you could not read a direction out of. An allow-list
-// of relationship kinds is the wrong shape here: adding a kind to the vocabulary would silently
+// This used to be an allow-list of relationship kinds. After a vocabulary rename it matched
+// nothing, so every edge rendered undirected and the graph became a hairball you could not read a
+// direction out of. An allow-list is the wrong shape here: adding a kind to a pack would silently
 // make it undirected. A deny-list fails the other way, which is the safe way.
 const UNDIRECTED_KINDS = new Set<string>([]);
 
@@ -81,16 +98,11 @@ export function hasArrow(kind: string): boolean {
   return !UNDIRECTED_KINDS.has(kind);
 }
 
-/** Human-readable edge label. The raw kind (`includes_test`) is a wire format, not a caption. */
-export const EDGE_LABEL: Record<string, string> = {
-  includes_test: "includes",
-  requests_test: "requests",
-  authorises: "authorises",
-  for_patient: "for patient",
-  issued: "issued",
-  references: "references",
-  at_clinic: "at clinic",
-};
+/** Human-readable edge label. The raw kind (`includes_test`) is a wire format, not a caption.
+ *  Sourced from pack config for the same reason the node palette is. */
+export const EDGE_LABEL: Record<string, string> = {};
+
+onLiveRegistry(applyRegistry);
 
 export function edgeLabel(kind: string): string {
   return EDGE_LABEL[kind] ?? kind.replace(/_/g, " ");

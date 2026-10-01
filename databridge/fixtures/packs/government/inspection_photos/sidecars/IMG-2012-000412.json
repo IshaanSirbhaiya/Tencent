@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000412",
+  "filename": "IMG-2012-000412.jpg",
+  "image_present": false,
+  "captured_at": "2012-12-26T12:37:21+00:00",
+  "captured_by": "OFF-0042",
+  "inspection_id": "INS-2012-000432",
+  "application_id": "APP-2012-000565",
+  "parcel_id": "PCL-SQ-02778",
+  "photo_batch_ref": "PHB-2012-000432",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-612373"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 431714,
+    "northing": 1201634,
+    "accuracy_m": 10.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          442,
+          120,
+          319,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-613269",
+        "confidence": 0.786,
+        "bbox": [
+          204,
+          228,
+          756,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "200 NETHERFIELD PASSAGE, SABLE QUAY AM1 4AJ",
+        "confidence": 0.833,
+        "bbox": [
+          266,
+          384,
+          1204,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2012-12-26",
+        "confidence": 0.934,
+        "bbox": [
+          56,
+          462,
+          841,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0042",
+        "confidence": 0.976,
+        "bbox": [
+          936,
+          628,
+          352,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

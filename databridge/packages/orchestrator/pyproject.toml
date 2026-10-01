@@ -1,0 +1,24 @@
+# packages/orchestrator — the main agent. Closes the loop `ADAPTER_AGENT_SPEC` left open:
+# a question goes in, the orchestrator chooses which adapters can answer it from their OWN
+# declared capability matrix (never by asking a model to pick from the whole fleet), hands each
+# one's Shell a brief, takes the CapabilityRequest or the escalation the Shell produces, and lets
+# the Core execute under its own Policy admission. No I/O of its own beyond that: no driver, no
+# credential, no LLM call except the one the Shell already makes on its behalf.
+[project]
+name = "databridge-orchestrator"
+version = "0.0.0"
+description = "DataBridge main agent: question -> adapter selection -> Shell proposal -> Policy/Core execution -> grounded cells"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-adapter",
+  "databridge-harness",
+  "pydantic>=2.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_orchestrator"]

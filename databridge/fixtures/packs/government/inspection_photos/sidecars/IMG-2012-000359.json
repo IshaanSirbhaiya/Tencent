@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000359",
+  "filename": "IMG-2012-000359.jpg",
+  "image_present": false,
+  "captured_at": "2012-09-21T08:17:18+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2012-000210",
+  "application_id": "APP-2012-000285",
+  "parcel_id": "PCL-SQ-02946",
+  "photo_batch_ref": "PHB-2012-000210",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-639130"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 412251,
+    "northing": 1186530,
+    "accuracy_m": 6.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1403,
+          120,
+          374,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-443011",
+        "confidence": 0.732,
+        "bbox": [
+          435,
+          258,
+          864,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "192 SEDGE ROAD, PELLING GREEN AM4 5RT",
+        "confidence": 0.864,
+        "bbox": [
+          109,
+          344,
+          1221,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2012-09-21",
+        "confidence": 0.71,
+        "bbox": [
+          1543,
+          399,
+          986,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.968,
+        "bbox": [
+          1508,
+          580,
+          528,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

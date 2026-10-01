@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2021-000067",
+  "filename": "IMG-2021-000067.jpg",
+  "image_present": false,
+  "captured_at": "2021-05-21T10:52:06+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2021-000274",
+  "application_id": "APP-2020-000369",
+  "parcel_id": "PCL-WH-00344",
+  "photo_batch_ref": "PHB-2021-000274",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-526180"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 448396,
+    "northing": 1187886,
+    "accuracy_m": 7.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          461,
+          120,
+          374,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2021-095635",
+        "confidence": 0.834,
+        "bbox": [
+          1100,
+          224,
+          675,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "95 VINTNERS WALK, NORTH DUNMOOR AM4 GLA",
+        "confidence": 0.912,
+        "bbox": [
+          687,
+          330,
+          1014,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2021-05-21",
+        "confidence": 0.768,
+        "bbox": [
+          1061,
+          435,
+          667,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.8,
+        "bbox": [
+          180,
+          668,
+          528,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

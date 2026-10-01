@@ -1,0 +1,46 @@
+# purpose_bindings.yaml -- the government estate's join between the PACK's declared purpose
+# vocabulary (packs/government/purposes.yaml) and the ESTATE's access model (roles.yaml).
+#
+# `packages/adapter/databridge_adapter/rolemodel.py::PURPOSE_BINDINGS_FILE` packages a bindings
+# file for `walnut-finance-synthetic` only, and its own header says why: "This file belongs in the
+# pack. It lives under packages/adapter/ because the pack fixture is another workstream's scope;
+# move it to fixtures/packs/<estate>/purpose_bindings.yaml when that scope allows." A test-only
+# equivalent for this estate already existed at packages/adapter/tests/government_purpose_bindings
+# .yaml; this is that file's real home, so a caller building the government graph THROUGH the
+# adapter fleet (packages/graph/databridge_graph/adapter_ingest.py, government_seed.py) does not
+# depend on another package's test fixture.
+#
+# `load_purpose_bindings("government", path=<this file>, known_estate_purposes=...)` reads it.
+# `role_model.estate` for fixtures/packs/government/roles.yaml resolves to `"government"` (the
+# file declares no explicit `estate:` key, so the loader falls back to the parent directory name)
+# -- verified directly against `load_role_model`, not assumed.
+#
+# Deliberately partial. Only the two bindings the adapter-ingest proof-of-mechanism actually uses
+# are declared here; a complete binding for every government pack purpose is a separate scope (and
+# the two existing test-only translations of this file disagree with each other on
+# `benefits.case_review`'s target, which is a real open question for the estate's data owner, not
+# one this file should quietly resolve by picking a side).
+version: 1
+
+estates:
+  government:
+    pack: government
+    bindings:
+      # The pack's own intended build-time crawl purpose. Declared for completeness even though it
+      # is CURRENTLY UNREACHABLE through the real PolicyEngine: `roles.yaml`'s `adapter_service`
+      # role writes every one of its grants as `condition: ":principal.bound_source_id == '...'"`,
+      # and `rolemodel.py`'s own docstring says why that role compiles to an EMPTY `allow` today —
+      # "this build cannot evaluate a credential binding, so it cannot find the condition true; the
+      # grant is kept on `Grant.condition` and left OUT of `allow`". Confirmed empirically:
+      # `load_role_model(...).roles["adapter_service"].allow == {}`. That is a real engine gap
+      # (per-instance conditional-grant evaluation is not implemented), not something to route
+      # around here — see adapter_ingest.py's module docstring and the tests that pin this finding.
+      register.graph_build: ingest
+
+      # What this module actually demonstrates end to end: a real, ALREADY-REACHABLE, non-subject-
+      # scoped purpose. `auditor` holds `audit`/`control_testing` unconditionally over
+      # `legacy_records.LEGACY-MASTER` (row_filters: {}, in `unscoped_objects`), so a read under
+      # this purpose is admitted for real by the current PolicyEngine — proof that the MECHANISM
+      # (Core -> Policy -> GroundedRows -> AdapterRow -> graph pointer) works, using a purpose the
+      # estate already grants rather than one invented for the occasion.
+      register.pointer_verification: audit

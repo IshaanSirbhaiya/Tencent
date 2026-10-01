@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2015-000206",
+  "filename": "IMG-2015-000206.jpg",
+  "image_present": false,
+  "captured_at": "2015-07-19T16:05:58+00:00",
+  "captured_by": "OFF-0039",
+  "inspection_id": "INS-2015-000381",
+  "application_id": "APP-2014-000505",
+  "parcel_id": "PCL-XX-97199",
+  "photo_batch_ref": "PHB-2015-000381",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-110171"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 418041,
+    "northing": 1185946,
+    "accuracy_m": 6.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1139,
+          120,
+          253,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2015-21920B",
+        "confidence": 0.808,
+        "bbox": [
+          270,
+          229,
+          864,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "236 THREADNEEDLE ROW, OLD HARROWGATE AM9 3RF",
+        "confidence": 0.761,
+        "bbox": [
+          130,
+          318,
+          1364,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2015-07-19",
+        "confidence": 0.74,
+        "bbox": [
+          184,
+          486,
+          696,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0039",
+        "confidence": 0.755,
+        "bbox": [
+          585,
+          704,
+          448,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

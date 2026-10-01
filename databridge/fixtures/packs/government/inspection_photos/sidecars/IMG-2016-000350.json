@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2016-000350",
+  "filename": "IMG-2016-000350.jpg",
+  "image_present": false,
+  "captured_at": "2016-07-01T10:32:57+00:00",
+  "captured_by": "OFF-0039",
+  "inspection_id": "INS-2016-000568",
+  "application_id": "APP-2015-000707",
+  "parcel_id": "PCL-MB-02474",
+  "photo_batch_ref": "PHB-2016-000568",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-846285"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 428403,
+    "northing": 1201551,
+    "accuracy_m": 13.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          3097,
+          120,
+          253,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2016-837290",
+        "confidence": 0.745,
+        "bbox": [
+          2263,
+          251,
+          864,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "74 VINTNERS WALK, OLD HARROWGATE AM1 9SR",
+        "confidence": 0.732,
+        "bbox": [
+          2792,
+          340,
+          1080,
+          48
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2016-07-01",
+        "confidence": 0.825,
+        "bbox": [
+          1678,
+          498,
+          696,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0039",
+        "confidence": 0.924,
+        "bbox": [
+          263,
+          696,
+          528,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

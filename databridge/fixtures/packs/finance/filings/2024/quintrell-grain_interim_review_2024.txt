@@ -1,0 +1,52 @@
+ Quintrell Grain Group PLC
+
+Interim Review for the financial year ended 31 December 2024
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Quintrell Grain Group PLC
+  Registration number   SYN-CRN-6102889
+  Country of incorporation   ID
+  Principal activity   Textiles and Apparel
+  Reporting currency   SGD
+  Date of incorporation   2010-04-13
+
+ Directors' commentary
+
+The Group completed the consolidation of its two operating sites, which carried a one-off cost in the first half but is expected to reduce fixed overhead from the next financial year.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2024   FY2023
+------:---:|
+  Revenue   122   127
+  Gross profit   51   57
+  EBITDA   36   34
+  Depreciation and amortisation   -11   -12
+  Finance costs   -11   -11
+  Profit after tax   13   13
+  Total assets   214   198
+  Total borrowings   111   121
+  Cash and cash equivalents   31   23
+  Total equity   51   47
+
+ Key ratios
+
+  Ratio   FY2024   Covenant reference
+------:---|
+  Net debt / EBITDA   2.21x   Tested quarterly under the syndicated facility
+  Interest cover   2.27x   Tested quarterly
+  Current ratio   1.96x   -
+
+ Banking arrangements
+
+Borrowings are held with Northgate Mercantile Bank and one other lender. The Group has provided a fixed and floating charge over its assets.
+
+ Auditor's note
+
+Our opinion on the financial statements is unmodified.

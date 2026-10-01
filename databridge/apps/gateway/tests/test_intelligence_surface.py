@@ -32,6 +32,8 @@ from fastapi.testclient import TestClient
 
 from databridge_gateway.intelligence_routes import _register_intelligence_routes
 
+from conftest import AUTH_HEADERS
+
 BUSINESS_QUESTION = ("which issuers sent the most documents this week, and what is still "
                      "blocked?")
 
@@ -71,7 +73,7 @@ def app():
 
 @pytest.fixture(scope="module")
 def client(app):
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         yield c
 
 
@@ -156,7 +158,10 @@ def test_a_registry_row_is_not_reachable_by_asking_for_it_directly(client, app):
 
     patient = app.state.brain.store.open_nodes_of_kind(NodeKind.PATIENT)[0]["id"]
     r = client.get(f"/intelligence/subgraph/{patient}")
-    assert r.status_code == 422
+    # R-015: 403, not 422 — this entity EXISTS and is not releasable here, which is the same shape
+    # of refusal `/evidence/trace/{id}` gives `AWAITING_HUMAN_CONFIRMATION` (403), not a "bad
+    # request" (422). One existence-oracle policy applied uniformly across both surfaces.
+    assert r.status_code == 403
     assert r.json()["refusal"]["code"] == "NOT_ON_THIS_SURFACE"
     assert not _offenders(r.json(), _registry_names(app))
 
@@ -207,20 +212,22 @@ def test_a_filename_carrying_a_persons_name_appears_nowhere_on_this_surface(clie
             assert not _offenders(body, filenames), _offenders(body, filenames)
 
 
-def test_a_document_is_reported_as_a_handle_and_a_closed_vocabulary_type(client, answered):
+def test_a_document_is_reported_as_a_handle_and_a_closed_vocabulary_kind(client, answered):
     """The trade, asserted. A wholly opaque handle would be useless to staff; this is one step
-    short of that — the kind of document is a `DocumentType` member, which is our vocabulary."""
-    from databridge_intake.models import DocumentType
+    short of that — the prefix is the node's KIND, a member of the bound packs' closed
+    vocabulary, never anything the document wrote."""
+    from databridge_graph.meta import NodeMetaKind
+    from databridge_graph.packs import active_vocabulary
 
+    document_kinds = set(active_vocabulary().nodes_binding_to(NodeMetaKind.DOCUMENT))
     documents = [v for v in answered["values"]
                  if v["tool"] == "documents_needing_a_person" and v["field"] == "document"]
     assert documents, "nothing was blocked, so this asserts nothing"
     for value in documents:
         text = value["text"]
-        handle = text.split("·")[-1].strip()
+        kind, _, handle = (part.strip() for part in text.partition("·"))
         assert handle.startswith("doc-"), text
-        if "·" in text:
-            assert text.split("·")[0].strip() in {t.value for t in DocumentType}
+        assert kind in document_kinds, text
 
 
 def test_a_handle_walks_back_to_the_entity_it_names(client, answered):

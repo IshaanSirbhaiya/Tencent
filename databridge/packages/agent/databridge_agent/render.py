@@ -35,7 +35,7 @@ Three properties follow mechanically rather than by inspection:
    paraphrasable by it, and present whether or not the model cooperates.
 3. **Injected prose does not reach staff.** A value whose text is instruction-shaped is replaced by
    a fixed redaction line that keeps the citation, so a reviewer can still click through to the
-   document without the payload being reproduced in the clinic's own UI.
+   document without the payload being reproduced in the system's own UI.
 
 What is lost: fluency. The answer is a list of values, not a paragraph. That is the trade this
 project makes everywhere else too — ``unresolved`` over a plausible default, candidates over a
@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from types import MappingProxyType
 from typing import Any, Iterable
 
 from databridge_core import SourcePointer
@@ -67,29 +68,40 @@ INJECTION_SEEN = "injection_seen"
 REFS_NOT_RETURNED = "refs_not_returned"
 NOTHING_ANSWERED = "nothing_answered"
 
-NOTES: dict[str, str] = {
-    HUMAN_SELECTION: (
-        "Identity is decided in person. The registry candidates above are every candidate the "
-        "registry returned, listed in a fixed order this system chose and not in any order of "
-        "likelihood: a named member of clinic staff checks the NRIC, FIN or passport against the "
-        "person at the counter and selects one. Nothing in this report is a ranking, a score or a "
-        "recommendation, and this system has no way to make that choice."),
-    INJECTION_SEEN: (
-        "At least one value read for this answer contains text addressed to an automated reader — "
-        "an instruction inside a clinical document. It was not followed, and it is not reproduced "
-        "above. The citation still resolves, so a human can open the source and see it in place."),
-    REFS_NOT_RETURNED: (
-        "Some values this report was asked to carry were not returned by any tool. They are "
-        "listed as not found rather than filled in."),
-    NOTHING_ANSWERED: (
-        "Nothing in the clinic graph answered that. I would rather say so than fill the gap."),
-}
+# The TEXT of each note, and the three headings, are the bound pack's (`wording.py`,
+# `packs/<pack>/agent_wording.yaml`; HC1 2026-10-01, SWEEP hardcode audit #4). They used to be
+# literals here naming the clinic graph and the NRIC, printed under every pack. The KEYS stay code
+# and stay closed — `AgentWording` refuses a pack that adds, drops or empties one — so R-10 holds:
+# no sentence here is model-authored, and none can be removed by config.
+_NOTE_KEY_ORDER = (HUMAN_SELECTION, INJECTION_SEEN, REFS_NOT_RETURNED, NOTHING_ANSWERED)
+_HEADINGS = {"HEADING_VALUES": "values", "HEADING_UNRESOLVED": "unresolved",
+             "HEADING_CANDIDATES": "candidates"}
 
-HEADING_VALUES = "What the clinic graph holds:"
-HEADING_UNRESOLVED = "Asked for, not found:"
-# Its own heading, because the guarantee it carries is different from the block above it: this one
-# is complete and code-ordered, that one is what the model chose to surface.
-HEADING_CANDIDATES = "Registry candidates — all of them, in a fixed order, not a ranking:"
+
+def notes() -> "MappingProxyType[str, str]":
+    """Key → fixed sentence, in the bound pack's wording."""
+    from .wording import wording
+
+    text = wording().notes
+    return MappingProxyType({key: text[key] for key in _NOTE_KEY_ORDER})
+
+
+def heading(key: str) -> str:
+    """One of ``values`` / ``unresolved`` / ``candidates``, in the bound pack's wording."""
+    from .wording import wording
+
+    return wording().headings[key]
+
+
+def __getattr__(name: str):
+    # `NOTES` and `HEADING_*` keep their names for every caller written against the constants, but
+    # are read from the bound pack on each access rather than frozen in one pack's voice.
+    if name == "NOTES":
+        return notes()
+    if name in _HEADINGS:
+        return heading(_HEADINGS[name])
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 #: ``GroundedField.scope`` for a value that came from a candidate-returning capability.
 CANDIDATE_SCOPE = "candidates"
@@ -131,13 +143,14 @@ def public_name(name: str, registered: bool) -> str:
 
 def note_text(key: str) -> str:
     """The fixed sentence for a note key. Raises on an unknown key — see ``NOTES``."""
+    table = notes()
     try:
-        return NOTES[key]
+        return table[key]
     except KeyError:
         raise KeyError(
             f"unknown note {key!r}: staff-facing wording comes from this table and from nowhere "
             f"else, so that identity language cannot be authored by a model (R-10). "
-            f"Known: {sorted(NOTES)}") from None
+            f"Known: {sorted(table)}") from None
 
 
 def cite(pointer: SourcePointer) -> str:
@@ -162,7 +175,7 @@ def present(value: Any) -> tuple[str, bool]:
 
     Text values pass through ``frame.untrusted`` — the same neutraliser used on the way *in* to the
     model — because the answer is a second place attacker-controlled text is rendered, and a role
-    marker or a bidi override is no more welcome in a clinic UI than in a prompt.
+    marker or a bidi override is no more welcome in a staff UI than in a prompt.
     """
     if value is None:
         return "not found", False
@@ -197,19 +210,19 @@ def render(fields: Iterable[Any], unresolved: Iterable[str], notes: Iterable[str
     candidates = [f for f in fields if getattr(f, "scope", "") == CANDIDATE_SCOPE]
     others = [f for f in fields if getattr(f, "scope", "") != CANDIDATE_SCOPE]
 
-    for heading, block in ((HEADING_CANDIDATES, candidates), (HEADING_VALUES, others)):
+    for title, block in ((heading("candidates"), candidates), (heading("values"), others)):
         if not block:
             continue
         if lines:
             lines.append("")
-        lines.append(heading)
+        lines.append(title)
         for field in block:
             text, _ = present(field.value)
             lines.append(f"- {field.key}: {text}  [source: {cite(field.source)}]")
     if unresolved:
         if lines:
             lines.append("")
-        lines.append(HEADING_UNRESOLVED)
+        lines.append(heading("unresolved"))
         lines.extend(f"- {key}" for key in unresolved)
     for key in notes:
         if lines:
@@ -233,7 +246,9 @@ __all__ = [
     "REFS_NOT_RETURNED",
     "UNKNOWN_TOOL_NAME",
     "cite",
+    "heading",
     "note_text",
+    "notes",
     "present",
     "public_name",
     "render",

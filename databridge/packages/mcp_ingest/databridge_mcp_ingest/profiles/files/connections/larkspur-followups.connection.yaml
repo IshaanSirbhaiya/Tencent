@@ -1,0 +1,31 @@
+# WRITE-capable connection for read-write agents — the `save_followup_draft` action.
+# SEPARATE from the ingestion connection on purpose: a different server PROCESS in write mode,
+# scoped to ONE declared writable root (the Follow-ups folder). It cannot read the corpus (the
+# server refuses --root together with --write-root) and it can only CREATE new .md/.txt files in
+# folders that already exist under that root — never overwrite, never delete, never make folders —
+# so the reversal of an autonomous save is exactly "delete the written file".
+#
+# The writable root lives under var/ (runtime), NOT under fixtures/workspace_demo/files: the demo
+# corpus is ground truth for expected_outcomes.yaml and must not grow drafts. To have drafts
+# ingested too, declare this folder as an extra --root on a reader connection.
+#
+# No crawl profile matches this server (it has no read_bytes), so proposing a crawl plan for it
+# yields no steps — it is a tool connection for agents, not a source to ingest.
+# WorkflowSpec tool reference: `source.write:larkspur-followups:write_file`.
+id: larkspur-followups
+title: Larkspur Follow-ups folder (write, create-only)
+transport:
+  type: stdio
+  command: "${WALNUT_PYTHON:-python}"
+  args:
+    - "${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py"
+    - "--write-root"
+    - "${WALNUT_FOLLOWUPS_DIR:-var/workspace_demo/Follow-ups}"
+    - "--create-write-root"
+    - "--write-ext"
+    - ".md"
+    - "--write-ext"
+    - ".txt"
+  cwd: "${WALNUT_ROOT}"
+via: direct
+auto_approve: false

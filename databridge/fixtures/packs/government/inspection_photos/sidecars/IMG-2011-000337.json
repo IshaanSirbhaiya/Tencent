@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2011-000337",
+  "filename": "IMG-2011-000337.jpg",
+  "image_present": false,
+  "captured_at": "2011-09-22T08:48:58+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2011-000264",
+  "application_id": "APP-2011-000359",
+  "parcel_id": "PCL-CB-01499",
+  "photo_batch_ref": "PHB-2011-000264",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-522509"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 427559,
+    "northing": 1207456,
+    "accuracy_m": 15.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          806,
+          120,
+          297,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-201l-470303",
+        "confidence": 0.924,
+        "bbox": [
+          120,
+          228,
+          864,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "210 ROPEWALK ROAD, KELDER FLATS AM6 1KA",
+        "confidence": 0.851,
+        "bbox": [
+          914,
+          366,
+          897,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2011-09-22",
+        "confidence": 0.701,
+        "bbox": [
+          1814,
+          408,
+          928,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.954,
+        "bbox": [
+          1909,
+          712,
+          528,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,14 @@
+# @modelcontextprotocol/server-gdrive: files are MCP resources `gdrive:///<fileId>`; reading one
+# exports Google Docs as Markdown, Sheets as CSV, Slides as text, and other files as base64 blobs.
+# The `search` tool's text output carries names but not ids, so the crawl walks resources.
+id: mcp-server-gdrive
+title: Google Drive (@modelcontextprotocol/server-gdrive)
+group: gdrive
+priority: 5
+verified: ""
+match:
+  all_tools: [search]
+  resources: true
+step:
+  strategy: resources
+  uri_prefix: "gdrive:///"

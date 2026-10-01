@@ -9,8 +9,12 @@ import of ``litellm`` is lazy so the package loads (and FakeBackend works) witho
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Union
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Union
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .embedding import RawEmbedding
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,26 @@ def caps_for(model: str) -> Caps:
     return CAPABILITIES.get(f"{provider_of(model)}/*", _UNKNOWN_CAPS)
 
 
+#: Models that accept NO sampling override — a reviewed fact, like ``CAPABILITIES``: a live call
+#: with ``temperature=0`` returned 400 "Only temperature=1 is supported" (2026-10-01) for Claude
+#: Opus 5.5 / Sonnet 5.5 and Fable 5.x. Matched anywhere in the model id so a proxied route
+#: (e.g. ``bedrock/anthropic.claude-opus-5-5``) is covered too. Adding a model is a line here.
+NO_SAMPLING_OVERRIDE = (
+    re.compile(r"claude-(opus|sonnet)-5[-.]5"),
+    re.compile(r"fable-5"),
+)
+
+
+#: The sampling controls such a model rejects. They are removed AFTER every argument is combined,
+#: so no caller keyword can put one back (R-019 round 3, High #7).
+REJECTED_SAMPLING_CONTROLS = ("temperature", "top_p", "top_k")
+
+
+def accepts_sampling_override(model: str) -> bool:
+    """False when ``model`` rejects any temperature other than its default."""
+    return not any(p.search(model) for p in NO_SAMPLING_OVERRIDE)
+
+
 def is_hosted(model: str) -> bool:
     """True if the model would call out of the customer perimeter (hosted API)."""
     return provider_of(model) in HOSTED_PROVIDERS
@@ -100,6 +124,9 @@ class Backend(Protocol):
         **kwargs: Any,
     ) -> RawCompletion: ...
 
+    # Optional (additive): ``embed(*, model, inputs) -> RawEmbedding``. A backend without it
+    # makes ``Harness.embed`` fall back to the labelled offline embedding rather than fail.
+
 
 class LiteLLMBackend:
     """Real backend: every provider through one LiteLLM call (P2). Lazy vendor import."""
@@ -118,7 +145,13 @@ class LiteLLMBackend:
     ) -> RawCompletion:
         import litellm  # lazy: the only vendor import in the codebase lives behind this
 
-        call: dict[str, Any] = {"model": model, "messages": messages, "temperature": 0}
+        # temperature=0 where the model accepts a sampling override (determinism); OMITTED for
+        # the models the reviewed table says reject one. Not LiteLLM ``drop_params``: that drops
+        # unsupported parameter NAMES, and temperature is a supported name whose allowed VALUE
+        # is restricted — and dropping globally would hide an unsupported control elsewhere.
+        call: dict[str, Any] = {"model": model, "messages": messages}
+        if accepts_sampling_override(model):
+            call["temperature"] = 0
         if seed is not None:
             call["seed"] = seed
         if guided_json is not None:
@@ -128,6 +161,11 @@ class LiteLLMBackend:
             call["response_format"] = {"type": "json_object"}
         for k, v in kwargs.items():
             call.setdefault(k, v)
+        if not accepts_sampling_override(model):
+            # applied last: a caller-supplied ``temperature=`` (or top_p/top_k) never reaches a
+            # model that answers it with a 400
+            for name in REJECTED_SAMPLING_CONTROLS:
+                call.pop(name, None)
 
         resp = litellm.completion(**call)
         text = resp.choices[0].message.content or ""
@@ -140,3 +178,21 @@ class LiteLLMBackend:
             cost = 0.0
         return RawCompletion(text=text, tokens_in=tin, tokens_out=tout,
                              cost_usd=cost, model_used=model)
+
+    def embed(self, *, model: str, inputs: list[str], **kwargs: Any) -> "RawEmbedding":
+        """One embedding batch through LiteLLM (``task_class: embed``). Lazy vendor import."""
+        import litellm  # lazy: same single vendor import site as generate()
+
+        from .embedding import RawEmbedding
+
+        resp = litellm.embedding(model=model, input=list(inputs), **kwargs)
+        data = resp.data if hasattr(resp, "data") else resp["data"]
+        rows = sorted(data, key=lambda d: (d["index"] if isinstance(d, dict) else d.index))
+        vectors = [list(d["embedding"] if isinstance(d, dict) else d.embedding) for d in rows]
+        usage = getattr(resp, "usage", None)
+        tokens = (getattr(usage, "prompt_tokens", 0) or 0) if usage is not None else 0
+        try:
+            cost = float(litellm.completion_cost(completion_response=resp) or 0.0)
+        except Exception:
+            cost = 0.0
+        return RawEmbedding(vectors=vectors, tokens=tokens, cost_usd=cost, model_used=model)

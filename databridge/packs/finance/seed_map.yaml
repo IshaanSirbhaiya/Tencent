@@ -1,0 +1,1040 @@
+# packs/finance/seed_map.yaml — the finance estate, bound to the predefined ontology.
+#
+# This is the finance half of the deterministic-graph deliverable, mirroring
+# `packs/government/seed_map.yaml`. The engine half is `packages/graph/databridge_graph/
+# estate_seed.py`, which knows nothing about this file's content: it reads rows, renders keys,
+# and constructs grounded nodes and edges from whatever a map declares. Every domain fact — which
+# table holds what, which column is an identifier, which relationship a foreign key represents —
+# lives here, in the pack (00_SPINE.md §4; `test_no_domain_branching` enforces it).
+#
+# ------------------------------------------------------------------------------------------------
+# What this file is, and what it is emphatically not
+# ------------------------------------------------------------------------------------------------
+# A BINDING, computed from rows the builder actually reads — never a lookup table from input to a
+# prepared answer. Delete a row from a fixture and the graph is one node smaller; edit a value and
+# the attribute changes with it. See `packs/government/seed_map.yaml` for the fuller statement of
+# this rule; it applies here without exception.
+#
+# ------------------------------------------------------------------------------------------------
+# THE NINTH SOURCE — bound last, and loaded independently of the other eight
+# ------------------------------------------------------------------------------------------------
+# `sanctions_watchlist` is the finance estate's ninth source (`fixtures/packs/finance/SOURCES.md`
+# #9). It was HELD OUT of this map while the other eight sources were designed and built, so that
+# joining it later would be a meaningful test of the claim it exists to prove: a ninth source joins
+# an already-built eight-source graph with no rebuild, and no dataset, node, edge or comment above
+# this point ever named a `sanctions_watchlist` row while that graph was designed.
+#
+# It is bound below as its OWN dataset, `wl_watchlist`, for exactly one reason: `estate_seed.py`'s
+# `only=` parameter selects datasets DECLARED here, so a source with no entry in this file cannot
+# be loaded at all, incrementally or otherwise. Binding it is not the same as building it eagerly —
+# `build_pack_graph(PACK, only=[... the eight sources' dataset ids ...])` never reads this dataset,
+# never opens `sanctions_watchlist/`, and contributes nothing from it, exactly as before. Only a
+# caller that explicitly asks for `only=["wl_watchlist"]` (or omits `only` entirely) reads it. The
+# incremental-join test builds the eight-source graph with the former, then loads the ninth alone
+# with the latter, into the SAME store, and asserts the first eight sources' nodes are untouched.
+#
+# `wl_watchlist` builds ONLY the `watchlist_entry` node — "one entry on a restriction list, as
+# published" (ontology.yaml) — never a `screening_result` / `screened_against` / `memo_about`
+# claim. A claim that a published entry concerns a PARTY already in the graph is the outcome of a
+# deterministic name + jurisdiction/date-of-birth comparison against nodes the STORE already
+# holds, which this row-at-a-time template language cannot express: it renders one row into one
+# node or edge, and has no way to ask what else the graph already believes. That comparison is
+# `estate_seed.resolve_incoming`, driven entirely by this dataset's own `resolve:` block below —
+# see that function's docstring for the two-signal rule it always applies and the two failure
+# modes (fusing a subject, deciding on name alone) it exists to avoid. `finance_seed.
+# join_watchlist_dataset` is the one-line call that runs it, once these `watchlist_entry` nodes
+# are in the store.
+#
+# ------------------------------------------------------------------------------------------------
+# WHY THIS MAP BINDS FIVE OF THE REMAINING EIGHT SOURCES, NOT EIGHT — NAMED RATHER THAN FORCED
+# ------------------------------------------------------------------------------------------------
+# `estate_seed.py` reads four shapes and only four: `sql_insert`, `csv`, `json_pages`,
+# `fixed_width` (see its own docstring). That inventory is fixed for this deliverable — this map
+# may only say what the executor already knows how to do; widening the reader inventory is outside
+# what a pack's data map is allowed to change. Three of the estate's remaining eight sources do not
+# fit any of the four shapes, and rather than force a bad fit — a synthetic index file this map has
+# no business inventing, or a reader repurposed to half-parse a format it was not built for — they
+# are left unbound and named here:
+#
+#   * `filings`       — a document drop (`.md`/`.txt`) with NO structured per-row index anywhere in
+#                        the fixture (unlike `fixtures/packs/government/case_files/INDEX.csv`, which
+#                        is exactly what let the government map bind its own untrusted document
+#                        drop). There is nothing here a `csv`/`sql_insert`/`json_pages` reader can
+#                        turn into rows without this map inventing the index itself — fabricating
+#                        fixture data is not this map's job.
+#   * `credit_memos`   — the same shape, the same absence of an index, the same reason.
+#   * `payments`       — ships as JSONL (`payments/events/events_*.jsonl`, one JSON object per
+#                        line). `json_pages` reads one `{"data": [...]}` document per file, which
+#                        this is not, and `csv` cannot parse it either. No declared reader fits.
+#
+# `spreadsheets.risk_model_pd_lgd` (one of the four spreadsheet exports) is bound out for the same
+# reason at a finer grain: `borrower_name` is the only per-row identifier and it is UNTRUSTED
+# free text with no accompanying id (`sources.yaml: spreadsheets.untrusted_fields`) — building a
+# node keyed on it would be exactly the "merge/link by an untrusted name" this deliverable's hard
+# constraints forbid. `borrower` in `covenant_tracker.csv` has the same problem, which is why that
+# dataset below cites the facility it is about rather than a borrower node built from a name.
+#
+# What IS bound below — `core_banking`, `crm`, `mailbox` (via its `listing.csv`), `market_data`
+# (all CSV), `spreadsheets` (the three exports with a real id) — is bound in full, honestly
+# grounded, with nothing invented to plug a reader gap.
+#
+# ------------------------------------------------------------------------------------------------
+# Rules this map obeys without exception (same three as the government map; see it for the
+# fuller statement of each)
+# ------------------------------------------------------------------------------------------------
+# 1. Identity claims would be `about`-shaped; none appear here at all (see the per-field-trust note
+#    below for why), and no `resolved_to` / `same_as` edge appears or could survive the builder —
+#    it refuses a kind bound to an ATTESTED meta-kind before constructing the edge.
+# 2. Trust is declared per DATASET here (the builder has no per-cell trust axis; see below).
+# 3. A NULL key or a NULL grounding column contributes no node/edge, counted, never defaulted.
+#
+# ------------------------------------------------------------------------------------------------
+# PER-FIELD TRUST vs. THE BUILDER'S PER-DATASET TRUST — how this map honours `sources.yaml`
+# ------------------------------------------------------------------------------------------------
+# `sources.yaml` (hard requirement 6) declares trust PER FIELD: `core_banking` and `crm` are
+# `trust_class: trusted` overall but each carries specific free-text columns in `untrusted_fields`
+# (`party.notes`, `facility.notes`, `collateral.notes`, `collateral.description`, `txn.narrative`,
+# `txn.counterparty_name`, `interaction.summary`, `interaction.subject`, `opportunity.lost_reason`,
+# `market_data.instruments.issuer_name_as_reported`, three `spreadsheets` columns). `estate_seed.py`
+# grounds every pointer at the DATASET's single `trust:` value — there is no per-column override,
+# and this map may not invent one without editing the executor, which is out of scope here.
+#
+# So every one of those specific columns is EXCLUDED from `attrs`/`sources` in this map — never
+# emitted under a `trusted` pointer it has not earned. A free-text column that is still safe to
+# show is used ONLY as `label` text where it appears at all (`instrument.issuer_name_as_reported`):
+# `_label` renders it with no pointer of its own, so nothing here CITES it as trusted — it is
+# exactly the "may be stored, cited and displayed, never for control flow" case, and it never
+# appears in a `key`, a `when`, or an edge endpoint. The one column this rules out entirely is
+# `txn.counterparty_name`: the `counterparty` node below is keyed and labelled on
+# `counterparty_party_id` alone, never on the name, which is also why it never collides with a
+# `party` node — the ontology's own point about `counterparty` (`ontology.yaml`).
+#
+# `mailbox` is bound at `trust: untrusted` in full (matching `sources.yaml` exactly: the whole
+# source is `untrusted_fields: ["*"]`), so no per-field carve-out is needed there.
+
+pack: finance
+title: >-
+  The finance estate, bound to the finance ontology (nine sources named, six of nine readable by
+  the executor's four shapes; see notes above)
+version: "1.1"
+
+# Relative to this file. Resolved and containment-checked by the loader.
+fixtures_root: "../../fixtures/packs/finance"
+
+# Fixed for reproducible counts and screenshots, same convention as the government map.
+system_time: "2026-08-16T00:00:00+00:00"
+
+# Valid-time floor for records whose own start date the source does not supply. Before the oldest
+# incorporation_date seen in the core_banking.party fixture.
+default_valid_from: "1985-01-01T00:00:00+00:00"
+
+datasets:
+
+  # ============================================================================================
+  # CORE_BANKING — the lending book. Trusted (sources.yaml: trust_class trusted), less the
+  # free-text columns named `untrusted_fields` above, which this map omits rather than mislabels.
+  # ============================================================================================
+  - id: cb_party
+    reader: sql_insert
+    table: core_banking.party
+    trust: trusted
+    row_key: "{party_id}"
+    path: "core_banking/seed/01_party_01.sql"
+    nodes:
+      # The KYC subject (ontology `party`, subject_kinds). Keyed on the bank's own party_id, which
+      # never collides with crm.account_org's crm_org_id below — two registers, two nodes, exactly
+      # as the ontology's `party`/`counterparty` split intends until a human attests otherwise.
+      - kind: party
+        key: "{party_id}"
+        label: "{legal_name}"
+        canonical_id: party_id
+        sources: [party_id, legal_name]
+        valid_from: relationship_since
+        attrs:
+          party_type: party_type
+          trading_name: trading_name
+          registration_no: registration_no
+          incorporation_date: incorporation_date
+          date_of_birth: date_of_birth
+          country_code: country_code
+          industry_code: industry_code
+          risk_grade: risk_grade
+          primary_rm_code: primary_rm_code
+          kyc_status: kyc_status
+          kyc_review_due: kyc_review_due
+          source_system: source_system
+          updated_at: updated_at
+          deleted_at: deleted_at
+          # `notes` is UNTRUSTED (sources.yaml) and deliberately absent — see the header note.
+    edges:
+      # `primary_rm_code` is an UNDECLARED cross-source FK into crm.relationship_manager with a
+      # ~6% orphan rate (sources.yaml); a dangling `manages` edge here is that orphan rate made
+      # visible, not an error. The relationship_manager node itself is created only by `crm_rm`.
+      - kind: manages
+        src: "relationship_manager:{primary_rm_code}"
+        dst: "party:{party_id}"
+        evidence: [primary_rm_code]
+        when: {primary_rm_code: not_null}
+
+  - id: cb_party_address
+    reader: sql_insert
+    table: core_banking.party_address
+    trust: trusted
+    row_key: "{address_id}"
+    path: "core_banking/seed/02_party_address_01.sql"
+    nodes:
+      # The address AS RECORDED. Kept unmerged on purpose, same reasoning as the government map's
+      # `address` kind: a stale address is a matching signal, not noise to collapse away.
+      - kind: address
+        key: "{line1}-{postal_code}"
+        label: "{line1}, {city}"
+        sources: [line1, postal_code]
+        valid_from: valid_from
+        attrs:
+          address_type: address_type
+          line2: line2
+          city: city
+          postal_code: postal_code
+          country_code: country_code
+          valid_to: valid_to
+    edges:
+      - kind: located_at
+        src: "party:{party_id}"
+        dst: "address:{line1}-{postal_code}"
+        evidence: [party_id]
+
+  - id: cb_party_contact
+    reader: sql_insert
+    table: core_banking.party_contact
+    trust: trusted
+    row_key: "{contact_id}"
+    path: "core_banking/seed/03_party_contact_01.sql"
+    nodes:
+      # `contact` ("a named individual at a party ... as the CRM holds them", ontology.yaml) is
+      # reused here for the bank's OWN contact register: the shape — a named individual at a
+      # party, not onboarded in their own right — is identical, and the ontology names no
+      # bank-specific counterpart. Keyed on contact_id, a disjoint space from crm.contact's
+      # crm_contact_id, so the two registers stay two nodes exactly like `party` above.
+      - kind: contact
+        key: "{contact_id}"
+        label: "{contact_name}"
+        canonical_id: contact_id
+        sources: [contact_id, contact_name]
+        valid_from: updated_at
+        attrs:
+          email: email
+          phone: phone
+          role_title: role_title
+          is_primary: is_primary
+    edges:
+      - kind: contact_for
+        src: "contact:{contact_id}"
+        dst: "party:{party_id}"
+        evidence: [party_id]
+
+  - id: cb_account
+    reader: sql_insert
+    table: core_banking.account
+    trust: trusted
+    row_key: "{account_id}"
+    path: "core_banking/seed/04_account_01.sql"
+    nodes:
+      - kind: account
+        key: "{account_id}"
+        label: "{account_no}"
+        canonical_id: account_id
+        sources: [account_id, account_no]
+        valid_from: opened_on
+        attrs:
+          account_no: account_no
+          product_code: product_code
+          currency: currency
+          closed_on: closed_on
+          status: status
+          branch_code: branch_code
+          ledger_balance: ledger_balance
+          available_balance: available_balance
+          updated_at: updated_at
+      - kind: branch
+        key: "{branch_code}"
+        label: "{branch_code}"
+        sources: [branch_code]
+        when: {branch_code: not_null}
+    edges:
+      - kind: holds_account
+        src: "party:{party_id}"
+        dst: "account:{account_id}"
+        evidence: [party_id]
+      - kind: booked_at
+        src: "account:{account_id}"
+        dst: "branch:{branch_code}"
+        evidence: [branch_code]
+        when: {branch_code: not_null}
+
+  - id: cb_facility
+    reader: sql_insert
+    table: core_banking.facility
+    trust: trusted
+    row_key: "{facility_id}"
+    path: "core_banking/seed/05_facility_01.sql"
+    nodes:
+      - kind: facility
+        key: "{facility_id}"
+        label: "{facility_type}"
+        canonical_id: facility_id
+        sources: [facility_id, facility_type]
+        valid_from: start_date
+        attrs:
+          limit_amount: limit_amount
+          drawn_amount: drawn_amount
+          currency: currency
+          maturity_date: maturity_date
+          interest_basis: interest_basis
+          margin_bps: margin_bps
+          status: status
+          booking_entity: booking_entity
+          review_date: review_date
+          updated_at: updated_at
+          # `notes` is UNTRUSTED (sources.yaml) and deliberately absent — see the header note.
+      # `booking_entity` (e.g. "LABUAN", "LONDON-BRANCH") is a second, disjoint branch-code space
+      # from `account.branch_code`; both are legitimately `branch` nodes and neither collides with
+      # the other by construction (their value formats do not overlap).
+      - kind: branch
+        key: "{booking_entity}"
+        label: "{booking_entity}"
+        sources: [booking_entity]
+        when: {booking_entity: not_null}
+    edges:
+      - kind: borrower_of
+        src: "party:{party_id}"
+        dst: "facility:{facility_id}"
+        evidence: [party_id]
+      - kind: booked_at
+        src: "facility:{facility_id}"
+        dst: "branch:{booking_entity}"
+        evidence: [booking_entity]
+        when: {booking_entity: not_null}
+
+  # ============================================================================================
+  # FACILITY, READ THROUGH THE ADAPTER FLEET instead of the .sql dump above.
+  # ============================================================================================
+  # Same table, same rows, a DIFFERENT reader: `reader: adapter` has no file behind it — this
+  # dataset is refused if `only=` names it and no `adapter_rows["cb_facility_adapter"]` producer
+  # is supplied (`finance_seed.facility_adapter_rows`), and contributes nothing at all to an
+  # ordinary full build (`only=None`), so the pinned counts this file's OTHER datasets produce do
+  # not move.
+  #
+  # `notes` is here, unlike `cb_facility` above: reading through `PostgresCore` stamps trust PER
+  # FIELD from `sources.yaml`, so the untrusted column no longer has to be dropped to keep the
+  # dataset's other columns honestly `trusted` — see `finance_seed.py`'s module docstring.
+  #
+  # No edges, and no `branch` node here (unlike the dataset above): this dataset is built in
+  # isolation in the proof-of-mechanism test, without `party`/`account` loaded alongside it, so an
+  # edge citing either would be dangling by construction — correctly counted, but noise this
+  # demonstration does not need.
+  - id: cb_facility_adapter
+    reader: adapter
+    table: core_banking.facility
+    trust: trusted
+    row_key: "{facility_id}"
+    # WHICH purpose and role read this dataset is itself a pack-owned policy decision, exactly
+    # like a node kind or a coercion rule — so it lives here, as data, rather than as a literal
+    # string in `finance_seed.py` (`test_no_domain_branching` is the test that makes this a
+    # requirement, not a style preference: an estate purpose id is domain vocabulary the same way
+    # an issuer code is). `finance_seed.facility_via_adapter` reads these four keys generically.
+    reader_options:
+      adapter_purpose: kyc.screening
+      adapter_role: compliance_officer
+      adapter_on_behalf_of: fcc-3
+      adapter_grant_id: grant-fcc-3
+    nodes:
+      - kind: facility
+        key: "{facility_id}"
+        label: "{facility_type}"
+        canonical_id: facility_id
+        sources: [facility_id, facility_type]
+        valid_from: start_date
+        attrs:
+          limit_amount: limit_amount
+          drawn_amount: drawn_amount
+          currency: currency
+          maturity_date: maturity_date
+          interest_basis: interest_basis
+          margin_bps: margin_bps
+          status: status
+          booking_entity: booking_entity
+          review_date: review_date
+          updated_at: updated_at
+          notes: notes
+
+  - id: cb_facility_account
+    reader: sql_insert
+    table: core_banking.facility_account
+    trust: trusted
+    row_key: "{facility_id}-{account_id}"
+    path: "core_banking/seed/06_facility_account_01.sql"
+    edges:
+      - kind: drawn_under
+        src: "account:{account_id}"
+        dst: "facility:{facility_id}"
+        evidence: [facility_id, account_id]
+
+  - id: cb_txn
+    reader: sql_insert
+    table: core_banking.txn
+    trust: trusted
+    row_key: "{txn_id}"
+    paths: ["core_banking/seed/07_txn_*.sql"]
+    nodes:
+      - kind: transaction
+        key: "{txn_id}"
+        label: "{txn_code}"
+        canonical_id: txn_id
+        sources: [txn_id, txn_code]
+        valid_from: booking_ts
+        attrs:
+          value_date: value_date
+          amount: amount
+          currency: currency
+          direction: direction
+          txn_code: txn_code
+          channel: channel
+          status: status
+          # `narrative` and `counterparty_name` are UNTRUSTED (sources.yaml) and deliberately
+          # absent — see the header note. The counterparty is represented below by ID alone.
+      # The ledger's own side of the posting (ontology `counterparty`, deliberately distinct from
+      # `party`: "may never be onboarded at all"). Keyed and labelled on the UNDECLARED FK
+      # `counterparty_party_id` ONLY — never on `counterparty_name`, which is untrusted free text
+      # typed by whoever sent the instruction. ~11% of these ids are orphans by construction
+      # (sources.yaml); the `counterparty_to` edge below dangles on exactly those, honestly.
+      - kind: counterparty
+        key: "{counterparty_party_id}"
+        label: "{counterparty_party_id}"
+        canonical_id: counterparty_party_id
+        sources: [counterparty_party_id]
+        when: {counterparty_party_id: not_null}
+    edges:
+      - kind: posted_to
+        src: "transaction:{txn_id}"
+        dst: "account:{account_id}"
+        evidence: [account_id]
+      - kind: counterparty_to
+        src: "counterparty:{counterparty_party_id}"
+        dst: "transaction:{txn_id}"
+        evidence: [counterparty_party_id]
+        when: {counterparty_party_id: not_null}
+      # `reversal_of` is an UNDECLARED self-FK (sources.yaml, ~10% orphans). No dedicated "reverses"
+      # edge kind exists in the ontology; `references` ("a cites b, with no stronger claim") is the
+      # kind the ontology itself names for exactly this case.
+      - kind: references
+        src: "transaction:{txn_id}"
+        dst: "transaction:{reversal_of}"
+        evidence: [reversal_of]
+        when: {reversal_of: not_null}
+
+  - id: cb_balance
+    reader: sql_insert
+    table: core_banking.account_balance_monthly
+    trust: trusted
+    row_key: "{account_id}-{as_of_date}"
+    paths: ["core_banking/seed/08_balance_*.sql"]
+    nodes:
+      - kind: balance_observation
+        key: "{account_id}-{as_of_date}"
+        label: "Balance {as_of_date}"
+        sources: [account_id, as_of_date]
+        valid_from: as_of_date
+        attrs:
+          closing_balance: closing_balance
+          currency: currency
+    edges:
+      - kind: posted_to
+        src: "balance_observation:{account_id}-{as_of_date}"
+        dst: "account:{account_id}"
+        evidence: [account_id]
+
+  - id: cb_collateral
+    reader: sql_insert
+    table: core_banking.collateral
+    trust: trusted
+    row_key: "{collateral_id}"
+    path: "core_banking/seed/09_collateral_01.sql"
+    nodes:
+      - kind: collateral
+        key: "{collateral_id}"
+        label: "{collateral_type}"
+        canonical_id: collateral_id
+        sources: [collateral_id, collateral_type]
+        valid_from: valuation_date
+        attrs:
+          valuation_amount: valuation_amount
+          valuation_currency: valuation_currency
+          ltv_pct: ltv_pct
+          custodian: custodian
+          # `description` and `notes` are UNTRUSTED (sources.yaml) and deliberately absent.
+    edges:
+      # `facility_id` is an UNDECLARED FK (sources.yaml, ~6% orphans) — a dangling `secures` edge
+      # here is that rate made visible.
+      - kind: secures
+        src: "collateral:{collateral_id}"
+        dst: "facility:{facility_id}"
+        evidence: [facility_id]
+        when: {facility_id: not_null}
+
+  - id: cb_covenant
+    reader: sql_insert
+    table: core_banking.covenant
+    trust: trusted
+    row_key: "{covenant_id}"
+    path: "core_banking/seed/10_covenant_01.sql"
+    nodes:
+      - kind: covenant
+        key: "{covenant_id}"
+        label: "{covenant_type}"
+        canonical_id: covenant_id
+        sources: [covenant_id, covenant_type]
+        attrs:
+          comparison_op: comparison_op
+          threshold_value: threshold_value
+          unit: unit
+          test_frequency: test_frequency
+          next_test_date: next_test_date
+          status: status
+    edges:
+      - kind: governs
+        src: "covenant:{covenant_id}"
+        dst: "facility:{facility_id}"
+        evidence: [facility_id]
+
+  - id: cb_covenant_test
+    reader: sql_insert
+    table: core_banking.covenant_test
+    trust: trusted
+    row_key: "{test_id}"
+    path: "core_banking/seed/11_covenant_test_01.sql"
+    nodes:
+      - kind: covenant_test
+        key: "{test_id}"
+        label: "Test {test_id}"
+        canonical_id: test_id
+        sources: [test_id, test_date]
+        valid_from: test_date
+        attrs:
+          observed_value: observed_value
+          breached: breached
+          waiver_ref: waiver_ref
+          recorded_by: recorded_by
+          recorded_at: recorded_at
+    edges:
+      - kind: tests
+        src: "covenant_test:{test_id}"
+        dst: "covenant:{covenant_id}"
+        evidence: [covenant_id]
+
+  # ============================================================================================
+  # CRM — relationship management. Trusted (sources.yaml), less `interaction.summary`,
+  # `interaction.subject` and `opportunity.lost_reason`, which are UNTRUSTED and omitted.
+  # ============================================================================================
+  - id: crm_rm
+    reader: sql_insert
+    table: crm.relationship_manager
+    trust: trusted
+    row_key: "{rm_code}"
+    path: "crm/seed/01_relationship_manager_01.sql"
+    nodes:
+      - kind: relationship_manager
+        key: "{rm_code}"
+        label: "{full_name}"
+        canonical_id: rm_code
+        sources: [rm_code, full_name]
+        valid_from: hire_date
+        attrs:
+          email: email
+          team: team
+          region: region
+          is_active: is_active
+    edges:
+      # `manager_rm_code` is an UNDECLARED self-FK. `references` — no stronger claim than a
+      # citation of the reporting line, which is what this map is entitled to assert.
+      - kind: references
+        src: "relationship_manager:{rm_code}"
+        dst: "relationship_manager:{manager_rm_code}"
+        evidence: [manager_rm_code]
+        when: {manager_rm_code: not_null}
+
+  - id: crm_account_org
+    reader: sql_insert
+    table: crm.account_org
+    trust: trusted
+    row_key: "{crm_org_id}"
+    path: "crm/seed/02_account_org_01.sql"
+    nodes:
+      # CRM's OWN register of the same real-world entities `cb_party` above holds — a second,
+      # independent `party` node space (crm_org_id, never party_id), exactly the "two registers,
+      # two nodes until a human attests" pattern the government map's `person` split demonstrates.
+      - kind: party
+        key: "{crm_org_id}"
+        label: "{org_name}"
+        canonical_id: crm_org_id
+        sources: [crm_org_id, org_name]
+        valid_from: created_at
+        attrs:
+          website: website
+          sector: sector
+          hq_city: hq_city
+          hq_country: hq_country
+          lifecycle_stage: lifecycle_stage
+          annual_revenue_band: annual_revenue_band
+          updated_at: updated_at
+      # `sector` NODES are built only in `sp_exposure_by_sector` below, from a source that actually
+      # carries sector-level facts; this dataset only cites the sector by name (`in_sector` below),
+      # so the richer node's attrs are never shadowed by an earlier, attribute-less sighting.
+      # `jurisdiction`, by contrast, is built HERE — no other bound source carries a clean
+      # legal-jurisdiction fact — so the `in_jurisdiction` edge below can actually resolve.
+      - kind: jurisdiction
+        key: "{hq_country}"
+        label: "{hq_country}"
+        sources: [hq_country]
+        when: {hq_country: not_null}
+    edges:
+      - kind: manages
+        src: "relationship_manager:{owner_rm_code}"
+        dst: "party:{crm_org_id}"
+        evidence: [owner_rm_code]
+        when: {owner_rm_code: not_null}
+      - kind: in_sector
+        src: "party:{crm_org_id}"
+        dst: "sector:{sector}"
+        evidence: [sector]
+        when: {sector: not_null}
+      - kind: in_jurisdiction
+        src: "party:{crm_org_id}"
+        dst: "jurisdiction:{hq_country}"
+        evidence: [hq_country]
+        when: {hq_country: not_null}
+      # `external_ref` is the estate's own worked example of a CANDIDATE bridge column: ~30%
+      # correct, ~50% NULL, ~20% wrong (sources.yaml `bridge_to_core_banking`). `references` is
+      # the honest kind for it — "a cites b, with no stronger claim" — and NOT `resolved_to` /
+      # `same_as`: those require a named human's attestation and the builder refuses them
+      # structurally regardless of what this map said. A dangling or wrong-target `references`
+      # edge here is the ~70% non-match rate made visible, not a bug.
+      - kind: references
+        src: "party:{crm_org_id}"
+        dst: "party:{external_ref}"
+        evidence: [external_ref]
+        when: {external_ref: not_null}
+
+  - id: crm_contact
+    reader: sql_insert
+    table: crm.contact
+    trust: trusted
+    row_key: "{crm_contact_id}"
+    path: "crm/seed/03_contact_01.sql"
+    nodes:
+      - kind: contact
+        key: "{crm_contact_id}"
+        label: "{first_name} {last_name}"
+        canonical_id: crm_contact_id
+        sources: [crm_contact_id, first_name]
+        attrs:
+          email: email
+          phone: phone
+          job_title: job_title
+          opted_out: opted_out
+          updated_at: updated_at
+    edges:
+      - kind: contact_for
+        src: "contact:{crm_contact_id}"
+        dst: "party:{crm_org_id}"
+        evidence: [crm_org_id]
+
+  - id: crm_interaction
+    reader: sql_insert
+    table: crm.interaction
+    trust: trusted
+    row_key: "{interaction_id}"
+    paths: ["crm/seed/04_interaction_*.sql"]
+    nodes:
+      - kind: interaction
+        key: "{interaction_id}"
+        label: "Interaction {interaction_id}"
+        canonical_id: interaction_id
+        sources: [interaction_id, occurred_at]
+        valid_from: occurred_at
+        attrs:
+          channel: channel
+          sentiment: sentiment
+          follow_up_date: follow_up_date
+          # `subject` and `summary` are UNTRUSTED (sources.yaml) and deliberately absent.
+    edges:
+      - kind: logged_with
+        src: "interaction:{interaction_id}"
+        dst: "party:{crm_org_id}"
+        evidence: [crm_org_id]
+      - kind: logged_with
+        src: "interaction:{interaction_id}"
+        dst: "contact:{crm_contact_id}"
+        evidence: [crm_contact_id]
+        when: {crm_contact_id: not_null}
+
+  - id: crm_opportunity
+    reader: sql_insert
+    table: crm.opportunity
+    trust: trusted
+    row_key: "{opportunity_id}"
+    path: "crm/seed/05_opportunity_01.sql"
+    nodes:
+      - kind: opportunity
+        key: "{opportunity_id}"
+        label: "{name}"
+        canonical_id: opportunity_id
+        sources: [opportunity_id, name]
+        valid_from: created_at
+        attrs:
+          stage: stage
+          amount: amount
+          currency: currency
+          probability: probability
+          expected_close: expected_close
+          updated_at: updated_at
+          # `lost_reason` is UNTRUSTED (sources.yaml) and deliberately absent.
+    edges:
+      - kind: manages
+        src: "relationship_manager:{owner_rm_code}"
+        dst: "opportunity:{opportunity_id}"
+        evidence: [owner_rm_code]
+        when: {owner_rm_code: not_null}
+      - kind: references
+        src: "opportunity:{opportunity_id}"
+        dst: "party:{crm_org_id}"
+        evidence: [crm_org_id]
+
+  # ============================================================================================
+  # MAILBOX — correspondence. UNTRUSTED in full (sources.yaml: untrusted_fields ["*"]). Bound from
+  # `listing.csv` only, which is the one structured, row-shaped artefact this source ships; the
+  # `.eml` bodies themselves are read by nothing here. No envelope identity exists anywhere in this
+  # source (SOURCES.md), so — deliberately, matching the government map's correspondence dataset —
+  # no `sent_by`/`sent_to` edge is written: `from`/`to` are stored and displayed as untrusted
+  # attributes and never used to route, join or decide anything.
+  # ============================================================================================
+  - id: mailbox_listing
+    reader: csv
+    table: mailbox.listing
+    trust: untrusted
+    row_key: "{history_seq}"
+    path: "mailbox/listing.csv"
+    nodes:
+      - kind: message
+        key: "{history_seq}"
+        label: "{subject}"
+        canonical_id: history_seq
+        sources: [history_seq, path]
+        valid_from: date
+        attrs:
+          from_address: from
+          to_address: to
+          subject: subject
+          path: path
+          planted_injection: planted_injection
+
+  # ============================================================================================
+  # MARKET_DATA — prices, ratings, FX. Trusted (sources.yaml), less `issuer_name_as_reported`
+  # (declared UNTRUSTED per field), which is used only as display text in a label — see the
+  # header note on per-field trust — and never as an attribute, a key or an edge endpoint.
+  # ============================================================================================
+  - id: md_instruments
+    reader: csv
+    table: market_data.instruments
+    trust: trusted
+    row_key: "{instrument_id}"
+    path: "market_data/instruments.csv"
+    nodes:
+      - kind: instrument
+        key: "{instrument_id}"
+        label: "{issuer_name_as_reported}"
+        canonical_id: instrument_id
+        sources: [instrument_id]
+        attrs:
+          asset_class: asset_class
+          currency: currency
+          listing_venue: listing_venue
+          first_observation: first_observation
+
+  - id: md_prices
+    reader: csv
+    table: market_data.prices
+    trust: trusted
+    row_key: "{instrument_id}-{obs_date}"
+    paths: ["market_data/prices/prices_*.csv"]
+    nodes:
+      - kind: price_observation
+        key: "{instrument_id}-{obs_date}"
+        label: "{instrument_id} {obs_date}"
+        sources: [instrument_id, obs_date]
+        valid_from: obs_date
+        attrs:
+          open: open
+          high: high
+          low: low
+          close: close
+          volume: volume
+          currency: currency
+          vendor: vendor
+    edges:
+      - kind: prices
+        src: "price_observation:{instrument_id}-{obs_date}"
+        dst: "instrument:{instrument_id}"
+        evidence: [instrument_id]
+
+  # The June-2026 restatement (SOURCES.md #6, `sources.yaml: restatements`): 39 rows reissued
+  # under UNCHANGED keys, no version field. Bound as its OWN dataset with a key that cannot
+  # collide with the original observation's, precisely so both survive and `supersedes` can join
+  # them — collapsing them onto the same key would silently discard the pre-restatement value this
+  # bi-temporal case exists to keep.
+  - id: md_prices_restated
+    reader: csv
+    table: market_data.prices_restated
+    trust: trusted
+    row_key: "{instrument_id}-{obs_date}-restated"
+    path: "market_data/prices/restatements/prices_2026-06_restated_2026-07-31.csv"
+    nodes:
+      - kind: price_observation
+        key: "{instrument_id}-{obs_date}-restated"
+        label: "{instrument_id} {obs_date} (restated 2026-07-31)"
+        sources: [instrument_id, obs_date]
+        valid_from: obs_date
+        attrs:
+          open: open
+          high: high
+          low: low
+          close: close
+          volume: volume
+          currency: currency
+          vendor: vendor
+    edges:
+      - kind: prices
+        src: "price_observation:{instrument_id}-{obs_date}-restated"
+        dst: "instrument:{instrument_id}"
+        evidence: [instrument_id]
+      - kind: supersedes
+        src: "price_observation:{instrument_id}-{obs_date}-restated"
+        dst: "price_observation:{instrument_id}-{obs_date}"
+        evidence: [instrument_id, obs_date]
+
+  - id: md_ratings
+    reader: csv
+    table: market_data.rating_actions
+    trust: trusted
+    row_key: "{action_id}"
+    path: "market_data/ratings/rating_actions.csv"
+    nodes:
+      # No reliable id joins `entity_name_as_reported` to a `party`/`instrument`/`facility` node
+      # (issuer identified by name only — SOURCES.md #6), so this stays an unlinked event rather
+      # than a fabricated join. `orphan_node_ids` reports exactly this, honestly, per row.
+      - kind: rating_action
+        key: "{action_id}"
+        label: "{new_rating} ({action_type})"
+        canonical_id: action_id
+        sources: [action_id, action_date]
+        valid_from: action_date
+        attrs:
+          agency: agency
+          entity_name_as_reported: entity_name_as_reported
+          prior_rating: prior_rating
+          new_rating: new_rating
+          outlook: outlook
+          action_type: action_type
+          rationale: rationale
+
+  - id: md_fx
+    reader: csv
+    table: market_data.fx_rates
+    trust: trusted
+    row_key: "{base_ccy}-{quote_ccy}-{obs_date}"
+    path: "market_data/fx/fx_rates.csv"
+    nodes:
+      - kind: fx_rate
+        key: "{base_ccy}-{quote_ccy}-{obs_date}"
+        label: "{base_ccy}/{quote_ccy} {obs_date}"
+        sources: [base_ccy, quote_ccy, obs_date]
+        valid_from: obs_date
+        attrs:
+          rate: rate
+          fixing: fixing
+          vendor: vendor
+
+  # ============================================================================================
+  # SPREADSHEETS — the group credit risk pack. Trusted (sources.yaml), less `note` on
+  # exposure_summary_by_sector and `borrower` on covenant_tracker (UNTRUSTED per field, omitted).
+  # `risk_model_pd_lgd.csv` is bound out entirely — see the header note.
+  # ============================================================================================
+  - id: sp_exposure_by_sector
+    reader: csv
+    table: spreadsheets.exposure_summary_by_sector
+    trust: trusted
+    row_key: "{sector}"
+    path: "spreadsheets/exposure_summary_by_sector.csv"
+    nodes:
+      # The one dataset in this map that builds `sector` nodes; `crm_account_org.in_sector` above
+      # only cites this kind by name, so this richer, attribute-bearing sighting is never shadowed.
+      - kind: sector
+        key: "{sector}"
+        label: "{sector}"
+        canonical_id: sector
+        sources: [sector]
+        attrs:
+          borrower_count: borrower_count
+          limit_total_sgd_equiv: limit_total_sgd_equiv
+          drawn_total_sgd_equiv: drawn_total_sgd_equiv
+          utilisation: utilisation
+          # `note` is UNTRUSTED (sources.yaml) and deliberately absent.
+
+  - id: sp_covenant_tracker
+    reader: csv
+    table: spreadsheets.covenant_tracker
+    trust: trusted
+    row_key: "{facility_id}-{covenant}"
+    path: "spreadsheets/covenant_tracker.csv"
+    nodes:
+      # The risk pack's own tracked view of a covenant's status — deliberately a SEPARATE key
+      # space ("...-tracker") from `cb_covenant_test.test_id`: this is a T3 monthly-overwrite
+      # summary (SOURCES.md #7), not the T1 ledger of individual tests, and collapsing the two
+      # would misrepresent a derived snapshot as the primary record.
+      - kind: covenant_test
+        key: "{facility_id}-{covenant}-tracker"
+        label: "{covenant} tracker"
+        sources: [facility_id, covenant]
+        attrs:
+          threshold: threshold
+          last_observed: last_observed
+          headroom: headroom
+          status: status
+          last_test_date_serial: last_test_date_serial
+          # `borrower` is UNTRUSTED, hand-typed free text (sources.yaml) and deliberately absent —
+          # this row cites the FACILITY it is about below, never a borrower built from that name.
+    edges:
+      # No `covenant_id` is carried by this sheet, only the covenant TYPE as text, so `tests`
+      # (which needs a specific covenant) is not available; `references` — a citation of the
+      # facility this tracked row is about — is the honest, available kind.
+      - kind: references
+        src: "covenant_test:{facility_id}-{covenant}-tracker"
+        dst: "facility:{facility_id}"
+        evidence: [facility_id]
+
+  - id: sp_limit_utilisation
+    reader: csv
+    table: spreadsheets.limit_utilisation
+    trust: trusted
+    row_key: "{facility_id}-{as_of_serial}"
+    path: "spreadsheets/limit_utilisation.csv"
+    nodes:
+      # `as_of_serial` is an Excel 1900-system serial number, not an ISO date (SOURCES.md #7's
+      # documented hazard) — left as an opaque attribute rather than converted, since decoding it
+      # is a coercion this map has no authority to invent silently. No `valid_from` is set from it
+      # for the same reason; the node falls back to `default_valid_from`, honestly.
+      - kind: balance_observation
+        key: "{facility_id}-{as_of_serial}"
+        label: "Utilisation {as_of_serial}"
+        sources: [facility_id, as_of_serial]
+        attrs:
+          limit_amount: limit_amount
+          drawn_amount: drawn_amount
+          currency: currency
+          as_of_serial: as_of_serial
+    edges:
+      - kind: posted_to
+        src: "balance_observation:{facility_id}-{as_of_serial}"
+        dst: "facility:{facility_id}"
+        evidence: [facility_id]
+
+  # ============================================================================================
+  # SANCTIONS_WATCHLIST — the ninth source (SOURCES.md #9), bound last. Trusted "as to
+  # publication" (sources.yaml: trust_class trusted, no untrusted_fields declared for this
+  # source — unlike market_data/spreadsheets above, no per-field carve-out is needed).
+  #
+  # `name` is used for `label` and cited in `sources` alone, never duplicated into `attrs`, same
+  # convention every other dataset above follows for its label/identity column. `note` is
+  # publisher prose ("Synthetic entry. Fictional.") about the LISTING, not about a client, and
+  # carries no instruction this builder — or anything downstream — is permitted to act on; it is
+  # trusted only in the sense that the CELL is honestly what the publisher printed, exactly like
+  # `spreadsheets.covenant_tracker.status` above. It is never read as an instruction, matching
+  # `sources.yaml`'s own point about `core_banking.party.notes` (INJ-08): this map has no branch
+  # that reads free text and no branch could suppress a match even if it tried, since resolution
+  # is a separate deterministic step (`resolve:` below, executed by `estate_seed.resolve_incoming`)
+  # that never opens this column at all.
+  #
+  # See the module header ("THE NINTH SOURCE") for why the `nodes:` block below stops at
+  # `watchlist_entry` and the actual match against the graph is declared separately, in `resolve:`.
+  # ============================================================================================
+  - id: wl_watchlist
+    reader: csv
+    table: sanctions_watchlist.watchlist
+    trust: trusted
+    row_key: "{watchlist_id}"
+    path: "sanctions_watchlist/watchlist_2026-08-01.csv"
+    nodes:
+      - kind: watchlist_entry
+        key: "{watchlist_id}"
+        label: "{name}"
+        canonical_id: watchlist_id
+        sources: [watchlist_id, name]
+        valid_from: listed_on
+        attrs:
+          subject_type: subject_type
+          country: country
+          date_of_birth: date_of_birth
+          list_code: list_code
+          listed_on: listed_on
+          measure: measure
+          note: note
+
+    # ------------------------------------------------------------------------------------------
+    # RESOLVE — the declarative instruction `estate_seed.resolve_incoming` executes, against the
+    # STORE, once these `watchlist_entry` nodes are loaded (never at build time — see the module
+    # header). This is where the ninth source's join actually happens, and it is written here
+    # rather than in Python for the same reason every other binding in this map is: the executor
+    # is domain-free (`test_no_domain_branching`), and what a `watchlist_entry` is matched against,
+    # and on what basis, is exactly the kind of fact `00_SPINE.md` §4 says belongs in a pack.
+    #
+    # A match requires the row's `name` (already `label` above) AND a decisive attribute to NOT
+    # conflict with a `party` node already in the graph — never the name alone. `selector_column`
+    # (`subject_type`) picks which `cases` entry applies per row: an `ENTITY` row is decided on
+    # `country` vs. the party's `country_code`, restricted to candidates whose `party_type` reads
+    # as an organisation; an `INDIVIDUAL` row is decided on `date_of_birth` vs. the party's own,
+    # restricted to candidates typed `individual`. The candidate's decisive attribute may be
+    # ABSENT without vetoing a match (an incomplete registry row is not evidence against one —
+    # `WL-00003` / `CB-P-000305`, a true hit whose `country_code` is NULL on the registry side —
+    # a named human reviewer, not this pass, is who an incomplete record should reach); an
+    # attribute PRESENT on both sides and disagreeing is what vetoes. Checked against the fixture:
+    # every one of `ground_truth/expected_screening_results.json`'s `true_hits` clears both
+    # signals, and every one of its `false_positive_traps` clears the name signal and hits an
+    # explicit conflict on the decisive one — the fixture's own worked case for why signal 2
+    # exists (same registry row, "Calidon Logistics" / "CALIDON LOGISTICS CO., LTD.", matches
+    # `WL-00007`'s AE and must NOT match `WL-00015`'s VN, an explicit conflict on both sides).
+    #
+    # A match writes a NEW `screening_result` node plus a `screened_against` edge back to this
+    # `watchlist_entry` and a `memo_about` edge to the EXISTING `party` node — never a write to
+    # that party, never a `party` node of its own, and never anything bound to `resolved_to`
+    # (`estate_seed.py` refuses that structurally regardless of what a map asks for). Where the
+    # honest answer is "no decisive match" — every `false_positive_trap` above, by design — nothing
+    # is written at all: two nodes stand unlinked, which is the correct outcome a human, not this
+    # builder, may still act on.
+    resolve:
+      from_kind: watchlist_entry
+      against_kind: party
+      result_kind: screening_result
+      result_edge_kind: screened_against
+      claim_edge_kind: memo_about
+      name_threshold: 0.999
+      selector_column: subject_type
+      cases:
+        ENTITY:
+          row_column: country
+          target_attr: country_code
+          target_type_column: party_type
+          target_type_values: [organisation, org, organization]
+        INDIVIDUAL:
+          row_column: date_of_birth
+          target_attr: date_of_birth
+          target_type_column: party_type
+          target_type_values: [individual]

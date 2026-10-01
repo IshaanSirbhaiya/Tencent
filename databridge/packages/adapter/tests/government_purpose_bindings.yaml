@@ -1,0 +1,25 @@
+# TEST-ONLY pack-purpose -> estate-purpose binding for the government correspondence tests.
+#
+# The packaged `databridge_adapter/config/purpose_bindings.yaml` declares
+# `walnut-finance-synthetic` only, and says in its own header that the file belongs in the pack.
+# `load_purpose_bindings(path=...)` takes this one instead.
+#
+# `register.graph_build` -> `ingest` is the same binding `tests/government_estate.py` uses for the
+# document sources, and it is the honest one: the pack declares it "scheduled build-time crawl
+# staging evidence into the graph. Not subject-scoped", and the estate's `ingest` purpose belongs
+# to the bound adapter instance that does exactly that.
+#
+# `benefits.case_review` -> `correspondence` is the human read: the pack calls it "a caseworker
+# reading a case file within their own caseload" and the estate calls `correspondence` "reading
+# correspondence from a person on an assigned case". It is `subject_scoped: true` in the pack, so
+# a `Principal` carrying it must carry a grant — and the read is then refused anyway, because the
+# estate scopes it through a subquery in another source.
+
+version: 1
+
+estates:
+  aldermoor-government-synthetic:
+    pack: government
+    bindings:
+      register.graph_build: ingest
+      benefits.case_review: correspondence

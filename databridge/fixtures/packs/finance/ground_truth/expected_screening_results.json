@@ -1,0 +1,123 @@
+{
+  "synthetic": true,
+  "adapter_visible": false,
+  "true_hits": [
+    {
+      "watchlist_id": "WL-00001",
+      "entity_id": "ENT-00020",
+      "name_on_list": "Inverwold Aggregates Limited",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00002",
+      "entity_id": "ENT-00267",
+      "name_on_list": "Vellacott Packaging S.A.",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00003",
+      "entity_id": "ENT-00305",
+      "name_on_list": "EEVRLEY GRAIN CO., LTD.",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00004",
+      "entity_id": "ENT-00064",
+      "name_on_list": "Ilexa Marine",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00005",
+      "entity_id": "ENT-00126",
+      "name_on_list": "QUINTRELL MARINE B.V.",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00006",
+      "entity_id": "ENT-00165",
+      "name_on_list": "NORTHGALE LOGISTICS S.A.",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00007",
+      "entity_id": "ENT-00098",
+      "name_on_list": "CALIDON LOGISTICS CO., LTD.",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00008",
+      "entity_id": "ENT-00005",
+      "name_on_list": "Oakenshade Offshore",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00009",
+      "entity_id": "ENT-00082",
+      "name_on_list": "Jessamy Marine Pte. Ltd.",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00010",
+      "entity_id": "ENT-00194",
+      "name_on_list": "Zarrowby Agritech Limited",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00011",
+      "entity_id": "ENT-00107",
+      "name_on_list": "QUILLANE SOLAR PTE LTD",
+      "expected": "MATCH"
+    },
+    {
+      "watchlist_id": "WL-00012",
+      "entity_id": "ENT-00123",
+      "name_on_list": "Larkspire Freight Pte. Ltd.",
+      "expected": "MATCH"
+    }
+  ],
+  "false_positive_traps": [
+    {
+      "watchlist_id": "WL-00013",
+      "looks_like_entity_id": "ENT-00103",
+      "name_on_list": "Fairmont Reach Capital B.V.",
+      "expected": "NO_MATCH",
+      "why": "jurisdiction differs; name alone is not identity"
+    },
+    {
+      "watchlist_id": "WL-00014",
+      "looks_like_entity_id": "ENT-00262",
+      "name_on_list": "Redbourne Utilities Group PLC",
+      "expected": "NO_MATCH",
+      "why": "jurisdiction differs; name alone is not identity"
+    },
+    {
+      "watchlist_id": "WL-00015",
+      "looks_like_entity_id": "ENT-00098",
+      "name_on_list": "Calidon Logistics Co., Ltd.",
+      "expected": "NO_MATCH",
+      "why": "jurisdiction differs; name alone is not identity"
+    },
+    {
+      "watchlist_id": "WL-00016",
+      "looks_like_entity_id": "ENT-P-00100",
+      "name_on_list": "RAUTAVAARA, Vikram",
+      "expected": "NO_MATCH",
+      "why": "date of birth differs by years"
+    },
+    {
+      "watchlist_id": "WL-00017",
+      "looks_like_entity_id": "ENT-P-00010",
+      "name_on_list": "GRIMSBY, Mireille",
+      "expected": "NO_MATCH",
+      "why": "date of birth differs by years"
+    },
+    {
+      "watchlist_id": "WL-00018",
+      "looks_like_entity_id": "ENT-P-00108",
+      "name_on_list": "BELLWEATHER, Jorunn",
+      "expected": "NO_MATCH",
+      "why": "date of birth differs by years"
+    }
+  ],
+  "scoring": "A screening run should return every true_hit and none of the false_positive_traps. Name similarity alone must never decide."
+}

@@ -1,0 +1,12 @@
+# packs/healthcare — the gateway route groups this pack needs (HC1, 2026-10-01).
+#
+# The engine registers a vertical's operator routes only when a BOUND pack declares them
+# (`databridge_gateway.intake_routes.pack_declared_routes`). Before this file, `/intake` (the
+# determination surface) and `/outbox` were mounted for every deployment — a finance or workspace
+# binding served refusal copy about patients and clinic rules from routes it had no use for.
+#
+# Closed set: `determination` (served at /determination/* and its /intake/* alias) and `outbox`.
+# An unknown name fails the gateway at boot rather than being ignored.
+routes:
+  - determination
+  - outbox

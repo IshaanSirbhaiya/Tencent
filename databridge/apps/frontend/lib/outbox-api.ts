@@ -13,13 +13,13 @@
 //     human's decision, and `execute` starts a separate, model-free process that reads the outbox.
 //
 // Nothing in this file computes. Every string it renders was produced server-side.
-import { GATEWAY } from "./api";
+import { GATEWAY, authHeaders } from "./api";
 import type { Refusal } from "./types";
 
 /** One pointer behind a draft field, in the closed shape the gateway publishes.
  *
  *  `repo_config` is the important flag: true means `source` is a file in this repository that a
- *  human can open (`clinic_monitors.yaml`, `coverage_rules.yaml`), so its identifiers print. False
+ *  human can open (the pack's monitor and coverage rules), so its identifiers print. False
  *  means the source is a data store, and its row is a handle. */
 export interface Citation {
   kind: string;
@@ -37,7 +37,7 @@ export interface Citation {
 /** Who a draft is addressed to, as much as this surface may say — and how that was decided.
  *
  *  `established` is a code-authored sentence from a closed table keyed on `origin`. It is the part
- *  an approver actually needs: not "who is this mailbox" but "the address the clinic already held
+ *  an approver actually needs: not "who is this mailbox" but "the address the organisation held
  *  for the patient a named human selected in person". */
 export interface RecipientView {
   origin: "committed_ledger" | "typed_by_human" | string;
@@ -55,7 +55,7 @@ export interface ActionCard {
   status: "drafted" | "approved" | "rejected" | "sent" | string;
   channel: string;
   playbook_id: string;
-  /** The clinic rule's own prose from `clinic_monitors.yaml` — config, so it prints. */
+  /** The monitor rule's own prose from the pack's monitor config — config, so it prints. */
   title: string | null;
   when: string | null;
   escalate_to: string | null;
@@ -79,7 +79,7 @@ export interface ActionCard {
   message_id: string | null;
 }
 
-/** A clinic rule that applies but produced no draft, and the code-authored reason.
+/** A monitor rule that applies but produced no draft, and the code-authored reason.
  *
  *  Rendered, never swallowed. "The system decided not to tell you why it did nothing" is the
  *  failure mode a review queue dies of, and each of these reasons is something staff can act on. */
@@ -123,7 +123,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${GATEWAY}${path}`, {
     cache: "no-store",
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
   });
   const body = await res.json().catch(() => ({}));
   // Refusals ride in the body with a 4xx (house convention) — surface them, do not throw. A

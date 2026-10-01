@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000145",
+  "filename": "IMG-2019-000145.jpg",
+  "image_present": false,
+  "captured_at": "2019-09-28T16:47:06+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2019-000507",
+  "application_id": "APP-2018-000644",
+  "parcel_id": "PCL-CB-00395",
+  "photo_batch_ref": "PHB-2019-000507",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-462714"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 442666,
+    "northing": 1206601,
+    "accuracy_m": 4.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          405,
+          120,
+          330,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-772910",
+        "confidence": 0.852,
+        "bbox": [
+          643,
+          219,
+          891,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "131 HOLLYBANK CRESCENT, CORRISBECK AM4 3WZ",
+        "confidence": 0.733,
+        "bbox": [
+          270,
+          390,
+          1050,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2019-09-28",
+        "confidence": 0.758,
+        "bbox": [
+          161,
+          537,
+          638,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.893,
+        "bbox": [
+          1129,
+          640,
+          416,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

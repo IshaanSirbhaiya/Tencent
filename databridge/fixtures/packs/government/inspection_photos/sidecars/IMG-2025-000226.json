@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2025-000226",
+  "filename": "IMG-2025-000226.jpg",
+  "image_present": false,
+  "captured_at": "2025-07-03T10:54:53+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2025-000067",
+  "application_id": "APP-2024-000096",
+  "parcel_id": "PCL-IH-02784",
+  "photo_batch_ref": "PHB-2025-000067",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-440375"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 441215,
+    "northing": 1205568,
+    "accuracy_m": 9.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          513,
+          120,
+          253,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2025-339023",
+        "confidence": 0.939,
+        "bbox": [
+          1997,
+          224,
+          729,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "32 HOLLYBANK ROAD, ISK HARBOUR AM9 9WD",
+        "confidence": 0.894,
+        "bbox": [
+          2772,
+          336,
+          912,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2025-07-03",
+        "confidence": 0.711,
+        "bbox": [
+          1827,
+          567,
+          638,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.961,
+        "bbox": [
+          1166,
+          580,
+          544,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

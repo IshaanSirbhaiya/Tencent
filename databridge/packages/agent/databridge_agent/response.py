@@ -121,6 +121,11 @@ class AgentResponse(BaseModel):
     notes: tuple[AgentNote, ...] = ()
     reads: tuple[ReadRecord, ...] = ()
     model_calls: int = 0
+    #: Which planner chose the values: ``"live"`` (a configured model) or ``"offline_gold"`` (the
+    #: deterministic planner, used only when no model is configured). Set by the route that ran
+    #: the agent; empty when the caller did not say. HC1 (2026-10-01): an answer chosen offline
+    #: must be labelled as such, never presented as a model's reading.
+    planner: str = ""
 
 
 def to_response(answer: "AgentAnswer") -> AgentResponse:

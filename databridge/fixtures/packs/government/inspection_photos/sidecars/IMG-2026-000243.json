@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2026-000243",
+  "filename": "IMG-2026-000243.jpg",
+  "image_present": false,
+  "captured_at": "2026-06-25T08:56:42+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2026-000494",
+  "application_id": "APP-2025-000628",
+  "parcel_id": "PCL-AR-02163",
+  "photo_batch_ref": "PHB-2026-000494",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-967052"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 439192,
+    "northing": 1198587,
+    "accuracy_m": 2.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1066,
+          120,
+          242,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2026-330161",
+        "confidence": 0.944,
+        "bbox": [
+          2664,
+          226,
+          864,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "113 BELLROPE ROW, ASHCOMBE REACH AM3 5PQ",
+        "confidence": 0.747,
+        "bbox": [
+          2395,
+          398,
+          1200,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2026-06-25",
+        "confidence": 0.857,
+        "bbox": [
+          2505,
+          456,
+          754,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.768,
+        "bbox": [
+          1440,
+          680,
+          496,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -29,6 +29,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from conftest import AUTH_HEADERS
+
 from databridge_gateway.mcp_routes import (
     ActRegistry,
     MCPJungleClient,
@@ -151,7 +153,7 @@ def build(jungle: FakeJungle, *, acts: ActRegistry | None = None,
                               "server_info": {"name": "databridge-clinic-reader"} if reader_up
                               else None,
                               "detail": None if reader_up else "ConnectError"})
-    return TestClient(app)
+    return TestClient(app, headers=AUTH_HEADERS)
 
 
 @pytest.fixture()
@@ -446,7 +448,7 @@ def test_a_tool_error_is_relayed_as_an_error_not_flattened_into_success():
     app = FastAPI()
     register_mcp_routes(app, client=MCPJungleClient(REGISTRY, transport=httpx.MockTransport(handler)),
                         act_registry=ActRegistry(), reader_probe=lambda: {"reachable": False})
-    r = TestClient(app).post("/mcp/tools/walnut_clinic_read__brain_query/invoke", json={})
+    r = TestClient(app, headers=AUTH_HEADERS).post("/mcp/tools/walnut_clinic_read__brain_query/invoke", json={})
     assert r.status_code == 200
     assert r.json()["is_error"] is True
     assert "field required" in r.json()["text"]
@@ -517,7 +519,7 @@ def test_a_registry_rejection_is_relayed_with_its_reason():
     register_mcp_routes(app, client=MCPJungleClient(REGISTRY,
                                                     transport=httpx.MockTransport(handler)),
                         act_registry=ActRegistry(), reader_probe=lambda: {"reachable": False})
-    r = TestClient(app).post("/mcp/servers", json={"name": "dead_srv", "kind": "read",
+    r = TestClient(app, headers=AUTH_HEADERS).post("/mcp/servers", json={"name": "dead_srv", "kind": "read",
                                                    "url": "http://h:9999/mcp"})
     assert r.status_code == 502
     assert r.json()["refusal"]["code"] == "REGISTRY_REJECTED"

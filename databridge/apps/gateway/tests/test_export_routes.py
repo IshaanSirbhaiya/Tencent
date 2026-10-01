@@ -21,6 +21,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from conftest import AUTH_HEADERS
+
 from databridge_gateway.export_routes import register_export_routes
 from databridge_graph.clinic_seed import fresh_clinic_store
 from databridge_graph.node_sheet import node_markdown
@@ -40,7 +42,7 @@ def client(store):
     app = FastAPI()
     app.state.brain = SimpleNamespace(store=store)
     register_export_routes(app)
-    return TestClient(app)
+    return TestClient(app, headers=AUTH_HEADERS)
 
 
 def _archive(response) -> zipfile.ZipFile:
@@ -96,7 +98,9 @@ def test_entries_are_confined_to_one_directory(client):
 def test_the_download_is_named_and_not_cached(client):
     response = client.get("/brain/export/sheets")
     disposition = response.headers["content-disposition"]
-    assert disposition.startswith('attachment; filename="clinic-evidence-sheets-')
+    from databridge_gateway.export_routes import ARCHIVE_PREFIX
+    assert ARCHIVE_PREFIX  # non-vacuous: an empty prefix would match any filename
+    assert disposition.startswith(f'attachment; filename="{ARCHIVE_PREFIX}-')
     assert disposition.endswith('.zip"')
     assert "\n" not in disposition and "\r" not in disposition
     assert response.headers["cache-control"] == "no-store"
@@ -154,6 +158,6 @@ def test_an_uninitialised_graph_refuses_rather_than_serving_an_empty_zip():
     app = FastAPI()
     app.state.brain = None
     register_export_routes(app)
-    response = TestClient(app).get("/brain/export/sheets")
+    response = TestClient(app, headers=AUTH_HEADERS).get("/brain/export/sheets")
     assert response.status_code == 503
     assert response.json()["refusal"]["code"] == "EXPORT_UNAVAILABLE"

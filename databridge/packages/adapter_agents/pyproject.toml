@@ -1,0 +1,31 @@
+# packages/adapter_agents — the adapter-agent manager (BUILD_PLAN_KNOWLEDGE_PLATFORM.md §6 "M").
+# An adapter agent MANAGES DATA SOURCES: which MCP connections, their approved crawl plans, when
+# they sync, screening/extraction policy, freshness targets, health, and proposing ontology
+# additions when it keeps meeting things the ontology cannot hold. Agents automate work; adapter
+# agents keep the data right. Ingestion itself is `packages/mcp_ingest`, reached only through the
+# `IngestService` protocol so this package never reaches into its internals.
+[project]
+name = "databridge-adapter-agents"
+version = "0.0.0"
+description = "Walnut adapter agents: registry, sync across approved connections, health, freshness, ontology proposals"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-workflow-spec",
+  "pydantic>=2.7",
+  "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+# The real ingest pipeline and the shared store. Imported lazily; tests use a fake IngestService.
+ingest = ["databridge-mcp-ingest", "databridge-graph"]
+
+[project.scripts]
+walnut-adapter-agents = "databridge_adapter_agents.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_adapter_agents"]

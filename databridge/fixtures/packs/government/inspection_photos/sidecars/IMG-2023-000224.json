@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2023-000224",
+  "filename": "IMG-2023-000224.jpg",
+  "image_present": false,
+  "captured_at": "2023-01-01T17:26:55+00:00",
+  "captured_by": "OFF-0039",
+  "inspection_id": "INS-2022-000079",
+  "application_id": "APP-2022-000106",
+  "parcel_id": "PCL-VH-01981",
+  "photo_batch_ref": "PHB-2022-000079",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-651976"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445384,
+    "northing": 1197805,
+    "accuracy_m": 6.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1309,
+          120,
+          341,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2023-890229",
+        "confidence": 0.775,
+        "bbox": [
+          987,
+          269,
+          675,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "168 SALTMARSH RISE, VANTRY HOLLOW AM8 2LW",
+        "confidence": 0.866,
+        "bbox": [
+          861,
+          312,
+          1312,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2023-01-01",
+        "confidence": 0.717,
+        "bbox": [
+          1078,
+          405,
+          986,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0039",
+        "confidence": 0.772,
+        "bbox": [
+          1492,
+          504,
+          384,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

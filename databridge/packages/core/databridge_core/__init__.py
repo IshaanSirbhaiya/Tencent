@@ -14,10 +14,26 @@ from .config import (
 )
 from .events import PipelineEvent, content_hash
 from .provenance import (
+    Absent,
+    Cell,
+    DISCLOSING_CELL_TYPES,
+    Denial,
     GroundedValue,
+    MissingReason,
+    PartialDisclosure,
     SnapshotIdentity,
     SourcePointer,
     SourcePointerKind,
+    TransformRecord,
+    Transformed,
+    Trust,
+    Withheld,
+    WithholdingRecord,
+    assert_cell_states_disjoint,
+    assert_withheld_disjoint,
+    effective_trust,
+    trust_from_parents,
+    trust_lub,
 )
 from .types import (
     AnnotatedColumn,
@@ -41,6 +57,25 @@ __all__ = [
     "SourcePointerKind",
     "GroundedValue",
     "SnapshotIdentity",
+    # provenance — trust lattice (spine D3)
+    "Trust",
+    "trust_from_parents",
+    "trust_lub",
+    "effective_trust",
+    # provenance — withholding, the third cell state (spine D4)
+    "WithholdingRecord",
+    "Denial",
+    "Withheld",
+    "Absent",
+    # provenance — transformation, the FOURTH cell state (spine O1b)
+    "TransformRecord",
+    "PartialDisclosure",
+    "Transformed",
+    "Cell",
+    "DISCLOSING_CELL_TYPES",
+    "MissingReason",
+    "assert_withheld_disjoint",
+    "assert_cell_states_disjoint",
     # types — enums
     "SemanticType",
     "TableRole",

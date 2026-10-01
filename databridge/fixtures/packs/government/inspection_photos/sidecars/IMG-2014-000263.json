@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000263",
+  "filename": "IMG-2014-000263.jpg",
+  "image_present": false,
+  "captured_at": "2014-07-21T13:18:36+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2014-000123",
+  "application_id": "APP-2013-000167",
+  "parcel_id": "PCL-OH-01541",
+  "photo_batch_ref": "PHB-2014-000123",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-527534"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445143,
+    "northing": 1208346,
+    "accuracy_m": 12.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2632,
+          120,
+          275,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-295421",
+        "confidence": 0.803,
+        "bbox": [
+          1056,
+          213,
+          756,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "232 MARROW STREET, OLD HARROWGATE AM9 2LG",
+        "confidence": 0.851,
+        "bbox": [
+          979,
+          316,
+          1066,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-07-21",
+        "confidence": 0.824,
+        "bbox": [
+          250,
+          522,
+          899,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.914,
+        "bbox": [
+          1198,
+          668,
+          448,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,27 @@
+# packages/adapter — the adapter port and its contract (PHASE_PLAN 3A).
+#
+# CONTRACT ONLY. No I/O, no drivers, no credentials, no network, no LLM. Everything here is a
+# value object, a Protocol, or a pure function over value objects. A real Postgres adapter is 3B;
+# if a dependency on a database driver ever appears in this file, the layering has been broken.
+[project]
+name = "databridge-adapter"
+version = "0.0.0"
+description = "DataBridge adapter fleet: CapabilityRequest, the five-verb port, GroundedRows (ADAPTER_AGENT_SPEC)"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "pydantic>=2.7",
+  # purposes.py reads packs/<name>/purposes.yaml — the pack-declared purpose vocabulary (D5).
+  "pyyaml>=6",
+  # The DEFAULT purpose vocabulary is the enabled packs' union, and the deployment binding lives
+  # in databridge_graph.packs. Imported lazily, inside the function, so importing the contract
+  # does not drag the graph in; declared here because the default path genuinely needs it.
+  "databridge-graph",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_adapter"]

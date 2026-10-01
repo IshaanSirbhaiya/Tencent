@@ -6,6 +6,11 @@
  * this JSX, which is the point: a dashboard whose headline number is hardcoded is worth nothing to
  * anyone assessing it, and the difference is invisible in a screenshot.
  *
+ * The MINUTES are an estimate, and the page says so (SWEEP UNSURE → HC1/HC2). Each saving is the
+ * configured baseline minus an estimated "with this system" time; what is measured is only which
+ * stages completed. The wording below is read from the response's `saving_basis` — the gateway
+ * key is still called `measured` for compatibility, and that name is never shown.
+ *
  * The identity row is deliberately the most prominent thing in the table rather than a footnote.
  * A step we explicitly refuse to automate, shown as zero saved next to eight steps that do save,
  * is the clearest single statement of what this system is — and turning that constraint into a
@@ -13,8 +18,9 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Lock, TrendingUp } from "lucide-react";
-import { GATEWAY } from "@/lib/api";
+import { GATEWAY, authHeaders } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useNouns } from "@/lib/pack-context";
 
 interface BaselineStep {
   step: number;
@@ -27,7 +33,16 @@ interface BaselineStep {
   note: string;
 }
 
+interface SavingBasis {
+  /** "estimate" today. Rendered as-is, so a future stopwatch reading would say "measured". */
+  minutes: string;
+  stages_completed: string;
+  source: string;
+  note: string;
+}
+
 interface ImpactResponse {
+  saving_basis?: SavingBasis;
   baseline: {
     total_min: number;
     patients_per_morning: number;
@@ -47,7 +62,7 @@ interface ImpactResponse {
 }
 
 async function fetchImpact(): Promise<ImpactResponse> {
-  const res = await fetch(`${GATEWAY}/impact`, { cache: "no-store" });
+  const res = await fetch(`${GATEWAY}/impact`, { cache: "no-store", headers: authHeaders() });
   if (!res.ok) throw new Error(`/impact → ${res.status}`);
   return res.json();
 }
@@ -68,6 +83,7 @@ function Bar({ baseline, saved, max }: { baseline: number; saved: number; max: n
 }
 
 export default function ImpactPage() {
+  const nouns = useNouns();
   const q = useQuery({ queryKey: ["impact"], queryFn: fetchImpact, refetchInterval: 10_000 });
 
   if (q.isError) {
@@ -81,9 +97,12 @@ export default function ImpactPage() {
   // (browser offline, gateway unreachable at mount) reports `isPending` without `isFetching` and
   // without `isError`, so an `isLoading`-only guard falls through and destructuring undefined
   // white-screens the page instead of showing the message it already has.
-  if (!q.data) return <p className="p-6 text-xs text-subtle">Measuring…</p>;
+  if (!q.data) return <p className="p-6 text-xs text-subtle">Loading…</p>;
 
   const { baseline, measured } = q.data;
+  // A response with no basis is NOT treated as measured: the honest default is the weaker claim.
+  const basis = q.data.saving_basis;
+  const minutesAre = basis?.minutes === "estimate" ? "estimated" : basis?.minutes ?? "unlabelled";
   const baselineBand = `${baseline.band_min_total}–${baseline.band_max_total}`;
   const savedByStep = new Map(measured.per_step.map((s) => [s.step, s]));
   // `Math.max(...[])` is -Infinity, which would make every bar width NaN%.
@@ -94,27 +113,37 @@ export default function ImpactPage() {
       <header>
         <h1 className="text-lg font-semibold">Impact</h1>
         <p className="text-xs text-subtle">
-          Measured over the {measured.intakes} intake{measured.intakes === 1 ? "" : "s"} currently
-          read by this system. Savings are claimed per stage, and only for stages that actually
-          completed — an intake whose coverage could not be determined claims nothing for
-          eligibility, billing or the claim draft.
+          Minutes saved are <strong data-testid="impact-minutes-basis">{minutesAre}</strong>,
+          over the {measured.intakes} intake{measured.intakes === 1 ? "" : "s"} currently read by
+          this system. Savings are claimed per stage, and only for stages that actually completed —
+          an intake whose coverage could not be determined claims nothing for eligibility, billing
+          or the claim draft.
+        </p>
+        <p className="mt-1 text-2xs text-subtle" data-testid="impact-saving-basis">
+          {basis
+            ? `${basis.note} Stages completed: ${basis.stages_completed}. Source: ${basis.source}.`
+            : "The gateway did not say how these minutes were obtained; treat them as an estimate."}
         </p>
       </header>
 
       {measured.intakes === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-xs text-subtle">
-          No intakes measured yet. Read a document from <code>/intake</code> and the numbers here
+          No intakes read yet. Read a document from <code>/intake</code> and the numbers here
           compute from it — there is nothing hardcoded on this page to show in the meantime.
         </p>
       ) : (
         <div className="flex flex-wrap gap-3">
           <div className="rounded-lg border border-border bg-surface px-4 py-3">
             <div className="tnum text-2xl font-semibold">{measured.mean_saved_min}</div>
-            <div className="text-2xs text-subtle">minutes saved per patient (mean)</div>
+            <div className="text-2xs text-subtle">
+              minutes saved per {nouns.subject} (mean, {minutesAre})
+            </div>
           </div>
           <div className="rounded-lg border border-border bg-surface px-4 py-3">
             <div className="tnum text-2xl font-semibold">{measured.saved_pct}%</div>
-            <div className="text-2xs text-subtle">of the {baseline.total_min}-minute baseline</div>
+            <div className="text-2xs text-subtle">
+              of the {baseline.total_min}-minute baseline ({minutesAre})
+            </div>
           </div>
           <div className="rounded-lg border border-border bg-surface px-4 py-3">
             <div className="tnum flex items-center gap-1.5 text-2xl font-semibold text-band-auto">
@@ -122,7 +151,8 @@ export default function ImpactPage() {
               {measured.projected_morning_hours_saved}
             </div>
             <div className="text-2xs text-subtle">
-              hours per morning, projected at {measured.patients_per_morning} patients
+              hours per morning, projected at {measured.patients_per_morning} {nouns.subject_plural}{" "}
+              ({minutesAre})
             </div>
           </div>
         </div>
@@ -135,7 +165,7 @@ export default function ImpactPage() {
             <tr className="border-b border-border">
               <th className="py-1.5 pr-2 font-medium">Step</th>
               <th className="px-2 py-1.5 font-medium">Baseline</th>
-              <th className="px-2 py-1.5 font-medium">Saved (measured)</th>
+              <th className="px-2 py-1.5 font-medium">Saved ({minutesAre})</th>
               <th className="px-2 py-1.5 font-medium">Claimed on</th>
               <th className="w-1/3 px-2 py-1.5 font-medium">Proportion</th>
             </tr>
@@ -204,7 +234,8 @@ export default function ImpactPage() {
       <p className="max-w-3xl text-2xs text-subtle">
         The baseline is the midpoint of the {baselineBand} minute band in the Technical Problem Statement;
         the &ldquo;with copilot&rdquo; figures are our estimates. Both live in{" "}
-        <code>config/time_baseline.yaml</code> so they can be argued with. The identity row cannot
+        <code>{basis?.source.split(":")[0] ?? "the pack's time baseline"}</code> so they can be
+        argued with. The identity row cannot
         be made non-zero by editing that file — the saving is refused in code before any arithmetic
         runs.
       </p>

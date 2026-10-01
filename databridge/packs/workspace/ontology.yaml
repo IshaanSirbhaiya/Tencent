@@ -1,0 +1,156 @@
+# packs/workspace — the general business starter ontology.
+#
+# The closed vocabulary that MCP-ingested extraction maps to when Walnut runs in "workspace" mode
+# (`start-walnut-kg.ps1` sets DATABRIDGE_PACKS=workspace). It is a STARTER: the user is expected to
+# extend it on /ontology. Same loader, same rules as every other pack (`databridge_graph/packs.py`):
+# top-level keys are exactly {pack, title, version, node_kinds, edge_kinds, subject_kinds}; every
+# node kind binds to a Layer-0 node meta-kind, every edge kind to an edge meta-kind, and edge
+# `src`/`dst` name kinds declared in THIS file (or "*").
+#
+# Choices worth knowing:
+#   - `project` binds to `agreement`, not `event`: a project is a scoped engagement that parties
+#     commit to (it has parties, a customer, deliverables), not a thing that happened at a time.
+#     `meeting` is the dated occurrence and binds to `event`.
+#   - `invoice` is a `document` (an issued artefact that pointers resolve into); `contract` is an
+#     `agreement` (the obligation), whatever file it was captured from.
+#   - `person` is the ONLY subject kind. A person found in a file and a person found in the CRM
+#     table are never merged by name similarity; a named human confirms the match through a
+#     verified channel (their email / employee id), per CLAUDE.md hard constraint 1 and spine D4b.
+#     Organisations are deliberately NOT subjects here, so they link by canonical id (a domain or
+#     a customer id) — give every organisation a canonical_id to avoid the 0.92 label merge.
+#   - Enabling this pack beside `government` would fail loudly: both declare subject kind `person`
+#     with different identity guarantees, and `build_vocabulary` refuses that rather than letting
+#     list order decide.
+
+pack: workspace
+title: Workspace (general business)
+version: "0.1"
+
+node_kinds:
+  - name: person
+    binds_to: entity
+    description: A natural person named in a document or a record — an employee, a customer contact, a signatory.
+
+  - name: organisation
+    binds_to: organisation
+    description: A company, customer, supplier, team or other collective actor.
+
+  - name: document
+    binds_to: document
+    description: A captured file or record body — a note, a brief, a policy, a report. What pointers resolve into.
+
+  - name: invoice
+    binds_to: document
+    description: A bill issued by one organisation to another, with a number, amounts and a due date.
+
+  - name: contract
+    binds_to: agreement
+    description: A binding agreement between parties — an MSA, a statement of work, an NDA.
+
+  - name: project
+    binds_to: agreement
+    description: A scoped engagement with a customer, owner and deliverables (bound to `agreement` — see header).
+
+  - name: meeting
+    binds_to: event
+    description: A dated meeting — a kickoff, a steering committee, a review.
+
+  - name: product
+    binds_to: entity
+    description: A product, service line or named deliverable an organisation offers.
+
+  - name: location
+    binds_to: location
+    description: An office, site, city or postal address.
+
+  - name: topic
+    binds_to: entity
+    description: A subject area a document or meeting is about — e.g. demand forecasting, data retention.
+
+edge_kinds:
+  - name: works_for
+    binds_to: role_of
+    src: [person]
+    dst: [organisation]
+    description: A person is employed by, or acts for, an organisation.
+
+  - name: manages
+    binds_to: role_of
+    src: [person]
+    dst: [project, organisation]
+    description: A person owns or leads a project or a team.
+
+  - name: authored
+    binds_to: issued
+    src: [person, organisation]
+    dst: [document, invoice, contract]
+    description: Who wrote or issued an artefact.
+
+  - name: mentions
+    binds_to: references
+    src: [document, invoice, contract, meeting]
+    dst: ["*"]
+    description: An artefact names something, with no stronger claim than "this appears in that".
+
+  - name: about
+    binds_to: about
+    src: [document, invoice, contract, meeting]
+    # Deliberately NOT `person` (the subject kind): an `about` edge that can reach a subject makes
+    # every source document "claim-capable", and /evidence then holds all of them for human
+    # confirmation. People named in an artefact are linked with `mentions` (references), which
+    # claims nothing about who they are. (Coordinator decision 2026-10-01.)
+    dst: [organisation, project, product, topic, location, document, invoice, contract, meeting]
+    description: >
+      An artefact CLAIMS to concern an entity or topic — a claim, never a determination. The
+      `about` meta-kind is never auto-approvable through the growth protocol.
+
+  - name: party_to
+    binds_to: party_to
+    src: [person, organisation]
+    dst: [contract, project, meeting]
+    description: A person or organisation is a party to a contract or project, or an attendee of a meeting.
+
+  - name: billed_to
+    binds_to: party_to
+    src: [invoice]
+    dst: [organisation]
+    description: The organisation an invoice is addressed to.
+
+  - name: part_of
+    binds_to: part_of
+    src: ["*"]
+    dst: ["*"]
+    description: >
+      Containment, written WHOLE → PART: src is the whole, dst is the part it contains (read the
+      edge as "src has part dst", despite the name). project → invoice, company → team,
+      MSA → SOW. The same direction as common.part_of and as the engine's analytics, which read
+      an agreement-shaped src as including its dst. Never write it part → whole.
+
+  - name: located_in
+    binds_to: at
+    src: [person, organisation, meeting]
+    dst: [location]
+    description: Where something is sited or took place.
+
+  - name: derived_from
+    binds_to: derived_from
+    src: ["*"]
+    dst: ["*"]
+    description: One artefact was produced from another (minutes from a recording, a summary from a report).
+
+  - name: supersedes
+    binds_to: supersedes
+    src: [document, invoice, contract]
+    dst: [document, invoice, contract]
+    description: A newer version replaces an older one (a credit note, an amended contract, a revised policy).
+
+subject_kinds:
+  - kind: person
+    # What a human checks the candidate against. Both are held by a system of record (the CRM
+    # contacts table, the HR directory) — a name alone is never an identifier.
+    identifiers: [email, employee_id]
+    never_fuzzy_merge: true
+    # A workspace contact is not seen in person; the attestable act is a named human confirming
+    # the match against the system of record, which is what `verified_channel` means.
+    attestation: verified_channel
+    grant_type: PersonReadGrant

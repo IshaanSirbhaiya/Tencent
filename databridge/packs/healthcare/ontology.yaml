@@ -1,0 +1,155 @@
+# packs/healthcare — clinical intake.
+#
+# Layer 1 of the three-layer schema (00_SPINE.md §4). This file is the ONLY place the clinical
+# vocabulary is written down. It used to be a pair of Python enums in
+# `packages/graph/databridge_graph/schema.py` (ADR-0009); the members are unchanged — the same
+# eight node kinds and ten edge kinds, the same string values, so every stored node id and every
+# persisted `kind` column still reads back identically — but they now bind to the domain-free
+# meta-kinds in `meta.py`, and the engine no longer names a single clinical concept.
+#
+# The vocabulary stays CLOSED. An unrecognised kind is skipped, never coined on the fly: a graph
+# that invents its own node types to fit incoming data cannot be reasoned about, and "what kinds of
+# thing are in here?" stops having an answer. What changed is only WHERE the closure is declared.
+#
+# Healthcare is a peer of `finance` and `government`, privileged by nothing in the code. It happens
+# to be the pack that exists in full today.
+
+pack: healthcare
+title: Clinical intake
+version: "1.0"
+
+node_kinds:
+  - name: patient
+    binds_to: entity
+    description: >
+      A registry row — never an identity assertion. Being on file is not being identified. Declared
+      a subject below, which is what makes name similarity unable to merge two of them.
+
+  - name: org
+    binds_to: organisation
+    description: An insurer, TPA, government scheme or employer named on a referring document.
+
+  - name: package
+    binds_to: agreement
+    description: >
+      A named screening package (WELL2, PEE226) — the bundle a document authorises, and the thing
+      a visit is scheduled as.
+
+  - name: test
+    binds_to: entity
+    description: A catalogue entry (chest_xray, resting_ecg).
+
+  - name: document
+    binds_to: document
+    description: A referring chit letter, health-check voucher or authorisation form.
+
+  - name: visit
+    binds_to: event
+    description: One intake occurrence.
+
+  - name: clinic
+    binds_to: location
+    description: A clinic location.
+
+  - name: coverage_rule
+    binds_to: rule
+    description: One row of the pack's coverage rules — config as a graph object.
+
+edge_kinds:
+  - name: employed_by
+    binds_to: role_of
+    src: [patient]
+    dst: [org]
+    description: The patient holds the employee role with respect to the organisation.
+
+  - name: covered_by
+    binds_to: party_to
+    src: [patient]
+    dst: [org]
+    description: The payer named on a document — participation in a payment arrangement.
+
+  - name: issued
+    binds_to: issued
+    src: [org]
+    dst: [document]
+
+  - name: authorises
+    binds_to: authorises
+    src: [document]
+    dst: [package, coverage_rule]
+
+  - name: requests_test
+    binds_to: references
+    src: [document]
+    dst: [test]
+    description: A test printed on the document. Citing it is not authorising it.
+
+  - name: includes_test
+    binds_to: part_of
+    src: [package]
+    dst: [test]
+    description: Whole → part. The test is a component of the package, per the rule definition.
+
+  - name: for_patient
+    binds_to: about
+    src: [document, visit]
+    dst: [patient]
+    description: >
+      The CLAIMED subject, and the one edge worth a warning. It records that a document *claims*
+      to be about a patient — it is built from the resolver's candidates, so a document with two
+      equally-scored candidates yields TWO such edges and neither is a determination. Nothing
+      downstream may read a single one as "this is who the patient is"
+      (CLAUDE.md §Hard constraints 1). The `about` meta-kind is what makes that rule enforceable
+      without the engine knowing the word "patient".
+
+  - name: at_clinic
+    binds_to: at
+    src: [visit]
+    dst: [clinic]
+
+  - name: scheduled_as
+    binds_to: references
+    src: [visit]
+    dst: [package]
+    description: The visit cites the package it was booked under. Not a claim about a person.
+
+  - name: references
+    binds_to: references
+    src: ["*"]
+    dst: ["*"]
+    description: A document cites a node, with no stronger claim.
+
+  - name: resolved_to
+    binds_to: resolved_to
+    src: [document, visit]
+    dst: [patient]
+    description: >
+      THE determination: this document/visit is about THIS person. Written only on the far side
+      of a named human's in-person attestation against a declared identifier, and never produced
+      by a score, a similarity, or a model.
+
+      This kind was missing until 2026-08-16, which is worth recording rather than quietly
+      fixing. The pack declared a subject and an attestation mode, and the engine enforced that
+      a determination requires attestation — but the pack whose entire product IS an identity
+      determination had no edge kind to write one on. `for_patient` binds to `about`: it is a
+      CLAIM, two candidates yield two of them, and neither decides anything. Overloading it
+      would have made the claim indistinguishable from the determination, which is the single
+      distinction this system exists to hold.
+
+      Found by the agent implementing attestation enforcement — the gap was invisible while
+      nothing could write a determination at all.
+
+subject_kinds:
+  # Spine D4b. A subject is the entity whose identity the system may never auto-confirm. The
+  # engine reads this declaration — not the literal "patient" — to decide that candidates are
+  # presented, a named human attests in person, and name similarity never merges two rows.
+  #
+  # Why this is load-bearing here specifically: the registry holds THREE patients named
+  # "Loh Wei Ming" and two named "Devi Hui Min". Fuzzy-merging them collapses different people
+  # into one node, and merging an extracted document mention into a registry row is the machine
+  # deciding whose record this is — precisely the determination reserved for a human, in person.
+  - kind: patient
+    identifiers: [nric, fin, passport, patient_id]
+    never_fuzzy_merge: true
+    attestation: in_person
+    grant_type: PatientReadGrant

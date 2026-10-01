@@ -1,0 +1,622 @@
+# packs/finance — lending and underwriting.
+#
+# Layer 1 of the three-layer schema (00_SPINE.md §4). Finance is the spine's default worked example
+# because lending exercises T0 sources: a system of record that can actually serve a past instant.
+#
+# ---------------------------------------------------------------------------------------------
+# A predefined library that the agents are meant to CHOOSE from, not to replace.
+# ---------------------------------------------------------------------------------------------
+# The government graph is built deterministically from its declared ontology. The finance graph is
+# the comparison case: it is built by the adapter agents, observably, with their escalations
+# visible. That comparison is only meaningful if the agents start from a library rich enough that
+# inventing a kind is a *choice* — an agent handed six node kinds will coin one for everything,
+# and every such coinage is an ontology decision nobody reviewed.
+#
+# So the library below covers the nine sources of the synthetic finance estate
+# (`fixtures/packs/finance/`): the lending book, the CRM, filings, credit memoranda, the mailbox,
+# market data, the spreadsheet exports, the payment event stream and the held-out watchlist. Every
+# `description` is written to be read at the moment of choosing — it says what the kind holds and,
+# where two are close, which one to pick.
+#
+# Ontology only. The estate this vocabulary describes is generated separately; nothing here depends
+# on it existing.
+
+pack: finance
+title: Lending and underwriting
+version: "2.0"
+
+node_kinds:
+
+  # --- parties (the protected end of the ontology) ---------------------------------------------
+  - name: party
+    binds_to: entity
+    description: >
+      The KYC subject — a borrowing entity, a guarantor or an individual, natural person or
+      company. A subject (D4b): identity is attested at onboarding by a named human, never by a
+      score. Use this for anyone the book has an exposure or a relationship to; use `institution`
+      for the lender's own side.
+
+  - name: counterparty
+    binds_to: entity
+    description: >
+      The other side of a posting or a trade, as the ledger names it. A subject in its own right:
+      the ledger's counterparty references are frequently orphaned and free-text, so name
+      similarity must never fuse two of them. Distinct from `party` because a counterparty may
+      never be onboarded at all.
+
+  - name: beneficial_owner
+    binds_to: entity
+    description: >
+      A natural person with ultimate ownership or control of a `party`. A subject: this is the kind
+      an AML control actually turns on, and it is reached through ownership chains where every link
+      is a claim.
+
+  - name: institution
+    binds_to: organisation
+    description: A bank, fund, insurer, exchange or agent acting in its own name — including the
+      lender itself.
+
+  - name: relationship_manager
+    binds_to: entity
+    description: >
+      The banker who owns the relationship. An entity rather than an `agent` object: a named human
+      whose attestations and approvals are attributable. Staff identity is keyed and merges
+      exactly.
+
+  - name: contact
+    binds_to: entity
+    description: >
+      A named individual at a party or institution, as the CRM holds them. Weaker than
+      `party`: a contact is a channel, not an obligor, and is not onboarded.
+
+  - name: committee
+    binds_to: organisation
+    description: The credit committee or delegated-authority body that approves. An organisation
+      because its decisions are collective and its membership changes over time.
+
+  - name: sector
+    binds_to: entity
+    description: An industry classification a party sits in. A node rather than an attribute so
+      that concentration limits can point at it.
+
+  # --- arrangements ------------------------------------------------------------------------------
+  - name: account
+    binds_to: agreement
+    description: A deposit, loan or securities account — a standing arrangement with a party.
+
+  - name: facility
+    binds_to: agreement
+    description: "A committed credit line: term loan, revolver, guarantee or trade facility."
+
+  - name: opportunity
+    binds_to: agreement
+    description: A prospective arrangement in the pipeline. An `agreement` shape because it becomes
+      one, and because it carries the same parties and the same limits questions before it does.
+
+  - name: collateral
+    binds_to: entity
+    description: A pledged asset — property, receivable, security or cash — with its own identity,
+      its own valuation history and its own location.
+
+  - name: instrument
+    binds_to: entity
+    description: A traded security or index a price series attaches to. An entity because it
+      persists and is referenced across sources under different symbologies.
+
+  # --- rules ---------------------------------------------------------------------------------------
+  - name: covenant
+    binds_to: rule
+    description: >
+      A testable condition on a facility (a leverage ceiling, a coverage floor, a reporting
+      deadline). A rule, so a breach determination is a graph object with a citation rather than a
+      spreadsheet cell.
+
+  - name: credit_policy
+    binds_to: rule
+    description: A lending-policy row — exclusions, delegated authority thresholds, required
+      approvals.
+
+  - name: exposure_limit
+    binds_to: rule
+    description: A ceiling on exposure to a party, a sector or a jurisdiction. Separate from
+      `credit_policy` because it is measured continuously and breached numerically.
+
+  - name: risk_model
+    binds_to: rule
+    description: A declared scoring model (probability of default, loss given default) with its
+      inputs and its version. A rule so that a score can cite the model that produced it.
+
+  # --- events --------------------------------------------------------------------------------------
+  - name: transaction
+    binds_to: event
+    description: "One posting on an account or facility: drawdown, repayment, fee, interest
+      accrual, transfer. Append-only in the book."
+
+  - name: payment_event
+    binds_to: event
+    description: >
+      One message from the payment rail's event stream. Distinct from `transaction`: a rail event
+      is what the network said, a transaction is what the book recorded, and the estate contains
+      cases where the two disagree.
+
+  - name: balance_observation
+    binds_to: event
+    description: >
+      A month-end balance as the book computed it. An observation rather than a state, because it
+      is a derived cut and the derivation may be restated.
+
+  - name: covenant_test
+    binds_to: event
+    description: One evaluation of one covenant at one date, with its measured value and its
+      outcome. The event a breach determination is built from.
+
+  - name: rating_action
+    binds_to: event
+    description: An internal or agency rating assignment, upgrade, downgrade or withdrawal, at a
+      point in time.
+
+  - name: price_observation
+    binds_to: event
+    description: >
+      One price for one instrument on one date. The market-data source RESTATES prices: a
+      correction is a new observation with a later recording time, never an overwrite, which is
+      what makes this the estate's clearest bi-temporal case.
+
+  - name: fx_rate
+    binds_to: event
+    description: One currency pair on one date. Kept apart from `price_observation` because its
+      identity is a pair rather than an instrument.
+
+  - name: interaction
+    binds_to: event
+    description: A logged contact with a party — a call, a meeting, a site visit — as the CRM
+      records it.
+
+  - name: screening_result
+    binds_to: event
+    description: The outcome of screening a party against a restriction list at a point in time.
+      An event, because a clear screen is only ever true as at a date.
+
+  # --- artefacts -------------------------------------------------------------------------------------
+  - name: credit_memo
+    binds_to: document
+    description: The underwriting write-up put to a credit committee. The document a determination
+      is argued in, and the one whose every claim should carry a pointer.
+
+  - name: filing
+    binds_to: document
+    description: >
+      A statutory or exchange filing — annual accounts, a registry extract, a disclosure. Captured,
+      because anything ledger-bound is captured and a filing cannot be re-read from the issuer on
+      demand.
+
+  - name: message
+    binds_to: document
+    description: >
+      One item of correspondence. Its headers and its body are untrusted: a reference
+      taken from either is a proposal, never a binding.
+
+  - name: spreadsheet
+    binds_to: document
+    description: >
+      An exported sheet with its formulas as a sidecar. A document rather than a table, because the
+      value in a cell and the formula behind it are different claims and both need citing.
+
+  - name: watchlist_entry
+    binds_to: document
+    description: One entry on a restriction or sanctions list, as published. A document because it
+      is a published record with its own provenance, not a fact about a party.
+
+  # --- places ------------------------------------------------------------------------------------------
+  - name: branch
+    binds_to: location
+    description: The booking office a facility or account sits in.
+
+  - name: address
+    binds_to: location
+    description: >
+      An address AS RECORDED on some record. Kept unmerged for the same reason it is
+      kept unmerged everywhere: a stale address is a matching signal, not noise.
+
+  - name: jurisdiction
+    binds_to: location
+    description: The legal jurisdiction a party, instrument or facility sits in. Drives both
+      regulatory questions and egress class.
+
+  # --- the agent plane (spine D10–D12) ------------------------------------------------------------------
+  - name: approval_action
+    binds_to: action_type
+    description: >
+      A declared write path: the committee decision that may change a facility's state. Actions are
+      the only write path, so the action type is itself an ontology object carrying its automation
+      mode.
+
+  - name: disbursement_action
+    binds_to: action_type
+    description: The declared write path by which money may actually move. Separated from
+      `approval_action` because the two carry different automation modes and different audit duties.
+
+  - name: agent
+    binds_to: agent
+    description: An agent as an ontology object (spine D10) — versioned, grounded in the pack file
+      that declares it, invalidated rather than deleted when replaced.
+
+  - name: adapter
+    binds_to: adapter
+    description: >
+      A source connector as an ontology object: source, pinning tier, projection,
+      capture policy, egress class.
+
+  - name: capability_grant
+    binds_to: capability_grant
+    description: A minted capability (spine D11), bound to one adapter and one purpose.
+
+edge_kinds:
+
+  # --- who is party to what -----------------------------------------------------------------------
+  - name: holds_account
+    binds_to: party_to
+    src: [party]
+    dst: [account]
+    description: >
+      Participation in the arrangement. The party the account belongs to.
+
+  - name: borrower_of
+    binds_to: party_to
+    src: [party]
+    dst: [facility]
+    description: The party obligated under the facility. A guarantor gets its own role edge, so
+      that "who owes this?" and "who backs this?" never collapse into one answer.
+
+  - name: guarantor_of
+    binds_to: role_of
+    src: [party, institution]
+    dst: [facility]
+    description: >
+      The party that backs the exposure without owing it. Held apart from `borrower_of` so
+      that "who owes this?" and "who backs this?" never collapse into one answer.
+
+  - name: counterparty_to
+    binds_to: party_to
+    src: [counterparty]
+    dst: [transaction, payment_event]
+    description: The other side of a posting. Frequently orphaned in the ledger, and a dangling one
+      is a finding rather than an error to paper over.
+
+  - name: beneficial_owner_of
+    binds_to: role_of
+    src: [beneficial_owner]
+    dst: [party]
+    description: An ownership or control link. Every link is a CLAIM with a source; a chain of
+      them is a chain of claims, and its weakest link is its strength.
+
+  - name: manages
+    binds_to: role_of
+    src: [relationship_manager]
+    dst: [party, opportunity]
+    description: >
+      The relationship the banker owns. An access predicate as well as an attribution, so it
+      is never inferred from a name.
+
+  - name: contact_for
+    binds_to: role_of
+    src: [contact]
+    dst: [party, institution]
+    description: >
+      The party or institution a named individual speaks for.
+
+  - name: in_sector
+    binds_to: role_of
+    src: [party]
+    dst: [sector]
+    description: >
+      The classification a party sits in, for concentration questions.
+
+  - name: sits_on
+    binds_to: role_of
+    src: [relationship_manager]
+    dst: [committee]
+
+  # --- who produced what ----------------------------------------------------------------------------
+    description: >
+      Membership of an approving body, with its own valid-time window.
+
+  - name: issued_by
+    binds_to: issued
+    src: [institution, party, committee]
+    dst: [credit_memo, filing, watchlist_entry, spreadsheet]
+    description: >
+      The body that produced the artefact, acting in its own name.
+
+  - name: sent_by
+    binds_to: issued
+    src: [party, institution, relationship_manager, contact]
+    dst: [message]
+    description: >
+      The originator of a message. For an inbound message this is read from headers and is
+      therefore untrusted for anything but display.
+
+  - name: approved_by
+    binds_to: role_of
+    src: [committee, relationship_manager]
+    dst: [credit_memo, facility, opportunity]
+    description: >
+      The body or human that approved. A role edge rather than an `issued` edge: the
+      approver did not write the memo, they signed off on it.
+
+  # --- the ledger ------------------------------------------------------------------------------------
+  - name: posted_to
+    binds_to: part_of
+    src: [transaction, balance_observation]
+    dst: [account, facility]
+    description: Part → whole. The posting is a component of the account's ledger.
+
+  - name: settles
+    binds_to: references
+    src: [payment_event]
+    dst: [transaction]
+    description: >
+      The rail event and the booked posting it corresponds to. Deliberately `references`: whether a
+      given event actually settled a given posting is a determination made from timing and amount,
+      and the estate contains cases where it is wrong.
+
+  - name: drawn_under
+    binds_to: part_of
+    src: [account]
+    dst: [facility]
+    description: The account a facility is drawn through. Whole-of-arrangement composition.
+
+  - name: secures
+    binds_to: references
+    src: [collateral]
+    dst: [facility, account]
+    description: >
+      The pledge cites the exposure it backs. Deliberately `references`, not `authorises` — whether
+      the security is perfected is a determination, not a graph shape.
+
+  - name: amends
+    binds_to: part_of
+    src: [facility]
+    dst: [facility]
+    description: An amended-and-restated facility as a part of the original arrangement.
+
+  # --- rules and their tests -----------------------------------------------------------------------
+  - name: governs
+    binds_to: authorises
+    src: [covenant, credit_policy, exposure_limit]
+    dst: [facility, account, opportunity, sector, jurisdiction]
+    description: The condition under which the exposure may remain drawn, or the ceiling it sits
+      beneath.
+
+  - name: tests
+    binds_to: references
+    src: [covenant_test]
+    dst: [covenant]
+    description: One evaluation citing the condition it evaluated. A breach is read from the test's
+      outcome, never inferred from the covenant alone.
+
+  - name: scored_by
+    binds_to: derived_from
+    src: [rating_action]
+    dst: [risk_model, filing, balance_observation]
+    description: >
+      What a rating was computed from. Provenance within the graph: it makes "which
+      ratings move if this model version is withdrawn?" answerable.
+
+  # --- market data --------------------------------------------------------------------------------
+  - name: prices
+    binds_to: references
+    src: [price_observation]
+    dst: [instrument]
+    description: >
+      The instrument an observation is a price for.
+
+  - name: rates
+    binds_to: references
+    src: [rating_action]
+    dst: [instrument, party, facility]
+    description: >
+      The thing a rating action was assigned to.
+
+  - name: valued_at
+    binds_to: derived_from
+    src: [collateral]
+    dst: [price_observation, spreadsheet]
+    description: Where a collateral valuation came from. A valuation with no such edge is an
+      assertion.
+
+  # --- identity CLAIMS (never determinations) ------------------------------------------------------
+  - name: memo_about
+    binds_to: about
+    src: [credit_memo, filing, rating_action, screening_result]
+    dst: [party, counterparty, beneficial_owner]
+    description: >
+      A CLAIM that the document concerns this subject. Two candidate parties yield two edges and
+      neither is a determination. The destination is a SUBJECT only: an `about` edge pointing at a
+      facility would attach the identity caveat to an arrangement, which is noise where the rule
+      needs to be loud.
+
+  - name: mentions
+    binds_to: about
+    src: [message, filing, credit_memo, spreadsheet]
+    dst: [party, counterparty, beneficial_owner, contact]
+    description: >
+      A name recovered from free text or OCR. UNTRUSTED and weaker than `memo_about`: a hypothesis
+      with a pointer, storable and citable, and never permitted to influence control flow.
+
+  - name: screened_against
+    binds_to: references
+    src: [screening_result]
+    dst: [watchlist_entry]
+    description: The list entry a screen matched or cleared against. The MATCH is a candidate; a
+      true hit is a human's determination.
+
+  # --- the determinations, gated by attestation ------------------------------------------------------
+  - name: resolved_to
+    binds_to: resolved_to
+    src: [credit_memo, filing, message, spreadsheet, transaction]
+    dst: [party, counterparty, beneficial_owner]
+    description: >
+      The determination, written only on the far side of a named human's attestation at onboarding.
+      Never produced by a score. The engine enforces it: an edge bound to `resolved_to` refuses
+      construction without a valid `Attestation`.
+
+  - name: same_as
+    binds_to: resolved_to
+    src: [party, counterparty, beneficial_owner, institution]
+    dst: [party, counterparty, beneficial_owner, institution]
+    description: >
+      Two records asserted to be the same subject. A resolver may PROPOSE it; only a named human
+      may assert it. It never crosses subject kinds.
+
+  # --- documents and correspondence -------------------------------------------------------------------
+  - name: concerns_facility
+    binds_to: references
+    src: [credit_memo, filing, rating_action, message, spreadsheet]
+    dst: [facility, account, opportunity]
+    description: The exposure a document discusses. No identity claim, so not `about`.
+
+  - name: sent_to
+    binds_to: references
+    src: [message]
+    dst: [party, contact, relationship_manager, institution]
+    description: >
+      A recipient of the message. Read from headers, so untrusted for routing.
+
+  - name: in_thread
+    binds_to: part_of
+    src: [message]
+    dst: [message]
+    description: >
+      Reply threading, from the headers that name a parent message.
+
+  - name: bundled_into
+    binds_to: part_of
+    src: [spreadsheet, filing, message]
+    dst: [credit_memo, opportunity]
+    description: >
+      Membership of the pack a document was submitted in. Named `bundled_into` rather than
+      `attached_to` because the government pack binds that name to `at` (a thing sited on land),
+      and one name meaning two shapes makes the merged vocabulary ambiguous.
+
+  - name: logged_with
+    binds_to: references
+    src: [interaction]
+    dst: [party, contact, opportunity]
+
+  # --- places ------------------------------------------------------------------------------------------
+    description: >
+      The party or opportunity a contact event was logged against.
+
+  - name: booked_at
+    binds_to: at
+    src: [facility, account]
+    dst: [branch]
+    description: >
+      The office an arrangement is booked in. Drives which jurisdiction's rules apply.
+
+  - name: located_at
+    binds_to: at
+    src: [party, institution, branch, collateral, counterparty]
+    dst: [address]
+    description: >
+      An address as some record holds it. Kept unmerged: a stale address is a matching
+      signal.
+
+  - name: in_jurisdiction
+    binds_to: at
+    src: [party, institution, instrument, facility, collateral]
+    dst: [jurisdiction]
+
+  # --- lineage ------------------------------------------------------------------------------------------
+    description: >
+      The legal jurisdiction the thing sits in. Drives both regulatory questions and
+      egress class.
+
+  - name: derived_from
+    binds_to: derived_from
+    src: [credit_memo, rating_action, balance_observation, spreadsheet, screening_result]
+    dst: [filing, transaction, spreadsheet, price_observation, watchlist_entry,
+          balance_observation]
+    description: >
+      Provenance WITHIN the graph: this node was computed from those. Not a citation of a
+      source span, which is what `sources` on the node itself carries.
+
+  - name: supersedes
+    binds_to: supersedes
+    src: [credit_memo, filing, covenant, price_observation, watchlist_entry, risk_model,
+          exposure_limit]
+    dst: [credit_memo, filing, covenant, price_observation, watchlist_entry, risk_model,
+          exposure_limit]
+    description: b replaces a. The market-data source restates rows, so this is the edge that keeps
+      a restatement legible instead of destroying the original.
+
+  # --- the agent plane -----------------------------------------------------------------------------------
+  - name: granted_capability
+    binds_to: authorises
+    src: [agent]
+    dst: [capability_grant]
+    description: >
+      The capability an agent holds (spine D11), with its own bi-temporal history so
+      that "when did this widen, and who authorised it?" is answerable.
+
+  - name: may_invoke
+    binds_to: authorises
+    src: [agent]
+    dst: [approval_action, disbursement_action]
+    description: >
+      The declared write paths an agent may propose through. A path not declared here cannot
+      be requested at runtime.
+
+  - name: resolved_through
+    binds_to: references
+    src: [capability_grant]
+    dst: [adapter]
+    description: >
+      The connector a capability is exercised against.
+
+  - name: reads_from
+    binds_to: references
+    src: [adapter]
+    dst: [party, account, facility, transaction, filing, credit_memo, message, price_observation,
+          payment_event, spreadsheet, watchlist_entry]
+    description: >
+      Which kinds an adapter is the writer for. The reverse index that answers "if this
+      source drifted, what in the graph moves?".
+
+  - name: references
+    binds_to: references
+    src: ["*"]
+    dst: ["*"]
+    description: a cites b, with no stronger claim. Frequent use of this kind is the signal to run
+      the growth protocol rather than to keep widening it.
+
+subject_kinds:
+  # Spine D4b: finance's subject is the KYC party, attested at onboarding.
+  #
+  # Three kinds rather than one. `party` is D4b's named subject. `counterparty` and
+  # `beneficial_owner` are declared alongside it because both are identity-bearing and both would
+  # otherwise sit outside the guardrail entirely: the ledger's counterparty references are
+  # free-text and frequently orphaned, and a beneficial owner is reached through a chain of claims
+  # with no identifier of its own. A kind omitted here loses `never_fuzzy_merge` with it, and that
+  # loss is silent.
+  #
+  # `institution` is deliberately NOT a subject: it is the lender's own side, keyed internally, and
+  # declaring it one would spend a human attestation on a row that has an identifier.
+  - kind: party
+    identifiers: [national_id, passport, company_registration, lei, tax_id]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: PartyReadGrant
+
+  - kind: counterparty
+    identifiers: [company_registration, lei, tax_id, account_number]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: CounterpartyReadGrant
+
+  - kind: beneficial_owner
+    identifiers: [national_id, passport, tax_id]
+    never_fuzzy_merge: true
+    attestation: in_person
+    grant_type: BeneficialOwnerReadGrant

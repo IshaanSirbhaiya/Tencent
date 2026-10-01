@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000077",
+  "filename": "IMG-2019-000077.jpg",
+  "image_present": false,
+  "captured_at": "2019-05-26T09:36:14+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2019-000513",
+  "application_id": "APP-2019-000653",
+  "parcel_id": "PCL-TF-01351",
+  "photo_batch_ref": "PHB-2019-000513",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-989397"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 441042,
+    "northing": 1189319,
+    "accuracy_m": 5.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          429,
+          120,
+          297,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-532305",
+        "confidence": 0.853,
+        "bbox": [
+          1322,
+          254,
+          756,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "31 QUARRY STREET, TARNFIELD AM3 1SF",
+        "confidence": 0.793,
+        "bbox": [
+          371,
+          370,
+          770,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2019-05-26",
+        "confidence": 0.83,
+        "bbox": [
+          2160,
+          492,
+          696,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.941,
+        "bbox": [
+          69,
+          576,
+          512,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

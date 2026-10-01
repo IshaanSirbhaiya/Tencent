@@ -26,6 +26,8 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import AUTH_HEADERS
+
 from databridge_gateway import create_app, intake_routes
 
 # The chit→PDF/PNG builder lives with the convert tests (it is a fixture *builder*, not product
@@ -56,7 +58,7 @@ def force_gold():
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(create_app()) as c:
+    with TestClient(create_app(), headers=AUTH_HEADERS) as c:
         yield c
 
 

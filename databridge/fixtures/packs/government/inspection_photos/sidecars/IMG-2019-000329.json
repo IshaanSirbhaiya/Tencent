@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000329",
+  "filename": "IMG-2019-000329.jpg",
+  "image_present": false,
+  "captured_at": "2019-09-10T12:44:26+00:00",
+  "captured_by": "OFF-0040",
+  "inspection_id": "INS-2019-000323",
+  "application_id": "APP-2019-000423",
+  "parcel_id": "PCL-ND-00033",
+  "photo_batch_ref": "PHB-2019-000323",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-500576"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 416783,
+    "northing": 1199490,
+    "accuracy_m": 12.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2286,
+          120,
+          341,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-145696",
+        "confidence": 0.775,
+        "bbox": [
+          1308,
+          229,
+          756,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "210 NETHERFIELD CRESCENT, TARNFIELD AM7 9QN",
+        "confidence": 0.914,
+        "bbox": [
+          270,
+          324,
+          1032,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2019-09-10",
+        "confidence": 0.729,
+        "bbox": [
+          1764,
+          438,
+          986,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0040",
+        "confidence": 0.826,
+        "bbox": [
+          333,
+          684,
+          448,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

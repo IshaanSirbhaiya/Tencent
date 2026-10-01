@@ -7,24 +7,21 @@ import { useCountUp } from "./use-count-up";
 // backend numbers (D-FE-2) — never the prompt's illustrative values. "100% provenance" is the key
 // differentiator. Below: a provenance mini-bar (source → entities), computed server-side.
 
-function Counter({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
-  const n = useCountUp(value);
+// `value` undefined = UNKNOWN (graph not loaded, or the backend did not report it) and renders "—".
+// It used to default to 0 entities and 100% provenance, which with the backend down is the worst
+// possible claim on a governance panel.
+function Counter({ value, label, accent }: { value: number | undefined; label: string; accent?: boolean }) {
+  const n = useCountUp(value ?? 0);
   return (
     <div className="rounded border border-border bg-surface px-3 py-2.5">
-      <div className={`tnum text-2xl font-semibold leading-none ${accent ? "text-band-auto" : "text-fg"}`}>
-        {n}
-        {accent ? "%" : ""}
+      <div className={`tnum text-2xl font-semibold leading-none ${accent && value != null ? "text-band-auto" : "text-fg"}`}>
+        {value == null ? "—" : n}
+        {accent && value != null ? "%" : ""}
       </div>
       <div className="mt-1 text-2xs uppercase tracking-wide text-subtle">{label}</div>
     </div>
   );
 }
-
-const SOURCE_ICON: Record<string, string> = {
-  "email_001.eml": "email",
-  "meeting_001.txt": "meeting transcript",
-  "contract_001.pdf": "contract",
-};
 
 export function StatsPanel({ graph }: { graph: BrainGraph | undefined }) {
   const stats = graph?.stats;
@@ -35,11 +32,11 @@ export function StatsPanel({ graph }: { graph: BrainGraph | undefined }) {
     <div className="flex h-full flex-col gap-3">
       <h3 className="text-2xs font-semibold uppercase tracking-wider text-subtle">Brain stats</h3>
       <div className="grid grid-cols-2 gap-2">
-        <Counter value={stats?.nodes ?? 0} label="entities" />
-        <Counter value={stats?.edges ?? 0} label="connections" />
-        <Counter value={Object.keys(prov).length} label="source docs" />
-        {/* provenance % is the backend-measured figure (stats.provenance_pct), not a hardcoded 100 */}
-        <Counter value={stats?.provenance_pct ?? 100} label="provenance" accent />
+        <Counter value={stats?.nodes} label="entities" />
+        <Counter value={stats?.edges} label="connections" />
+        <Counter value={graph ? Object.keys(prov).length : undefined} label="source docs" />
+        {/* provenance % is the backend-measured figure (stats.provenance_pct); unknown is "—" */}
+        <Counter value={stats?.provenance_pct ?? undefined} label="provenance" accent />
       </div>
 
       <div className="mt-1">
@@ -50,7 +47,9 @@ export function StatsPanel({ graph }: { graph: BrainGraph | undefined }) {
           {Object.entries(prov).map(([src, n]) => (
             <div key={src} className="flex items-center gap-2">
               <span className="w-28 shrink-0 truncate text-2xs text-subtle" title={src}>
-                {SOURCE_ICON[src] ?? src}
+                {/* The source id as the backend reported it. A filename→label table keyed to old
+                    demo fixtures used to sit here (SWEEP #18); it recalled, it did not read. */}
+                {src}
               </span>
               <div className="h-3 flex-1 overflow-hidden rounded-sm bg-muted">
                 <div

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000169",
+  "filename": "IMG-2012-000169.jpg",
+  "image_present": false,
+  "captured_at": "2012-10-22T15:07:31+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2012-000110",
+  "application_id": "APP-2012-000157",
+  "parcel_id": "PCL-WH-02828",
+  "photo_batch_ref": "PHB-2012-000110",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-191882"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 442920,
+    "northing": 1216786,
+    "accuracy_m": 3.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          493,
+          120,
+          264,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-643438",
+        "confidence": 0.916,
+        "bbox": [
+          702,
+          223,
+          675,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "146 WINDLASS PASSAGE, WEND HILL AM5 2QT",
+        "confidence": 0.913,
+        "bbox": [
+          1537,
+          414,
+          1131,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF lNSPECTION 2012-10-22",
+        "confidence": 0.767,
+        "bbox": [
+          327,
+          543,
+          725,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.922,
+        "bbox": [
+          1426,
+          616,
+          528,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

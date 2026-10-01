@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000106",
+  "filename": "IMG-2012-000106.jpg",
+  "image_present": false,
+  "captured_at": "2012-01-21T14:13:56+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2012-000315",
+  "application_id": "APP-2011-000411",
+  "parcel_id": "PCL-OH-01517",
+  "photo_batch_ref": "PHB-2012-000315",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-122561"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 437020,
+    "northing": 1181558,
+    "accuracy_m": 16.6
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2298,
+          120,
+          352,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-Z012-523759",
+        "confidence": 0.738,
+        "bbox": [
+          706,
+          222,
+          756,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "97 KILNYARD PASSAGE, MIREBROOK AM8 5BE",
+        "confidence": 0.851,
+        "bbox": [
+          578,
+          338,
+          1178,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2O12-01-21",
+        "confidence": 0.749,
+        "bbox": [
+          638,
+          435,
+          986,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.764,
+        "bbox": [
+          1722,
+          648,
+          416,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

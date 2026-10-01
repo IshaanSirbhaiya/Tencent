@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2026-000174",
+  "filename": "IMG-2026-000174.jpg",
+  "image_present": false,
+  "captured_at": "2026-07-27T17:32:50+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2026-000119",
+  "application_id": "APP-2026-000165",
+  "parcel_id": "PCL-ND-01749",
+  "photo_batch_ref": "PHB-2026-000119",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-636375"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445261,
+    "northing": 1204207,
+    "accuracy_m": 6.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          514,
+          120,
+          374,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2026-271577",
+        "confidence": 0.745,
+        "bbox": [
+          582,
+          235,
+          729,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "166 BELLROPE YARD, NORTH DUNMOOR AM7 1VV",
+        "confidence": 0.744,
+        "bbox": [
+          2187,
+          342,
+          920,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTI0N 2026-07-Z7",
+        "confidence": 0.89,
+        "bbox": [
+          226,
+          480,
+          696,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.854,
+        "bbox": [
+          1906,
+          524,
+          432,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

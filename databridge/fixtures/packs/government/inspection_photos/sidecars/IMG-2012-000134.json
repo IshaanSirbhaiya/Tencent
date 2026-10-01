@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000134",
+  "filename": "IMG-2012-000134.jpg",
+  "image_present": false,
+  "captured_at": "2012-07-28T09:04:10+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2012-000438",
+  "application_id": "APP-2011-000569",
+  "parcel_id": "PCL-VH-00913",
+  "photo_batch_ref": "PHB-2012-000438",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-760740"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 412911,
+    "northing": 1188874,
+    "accuracy_m": 5.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1476,
+          120,
+          330,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-610756",
+        "confidence": 0.766,
+        "bbox": [
+          165,
+          256,
+          864,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "154 PATERNOSTER WAY, ASHCOMBE REACH AM6 6HJ",
+        "confidence": 0.848,
+        "bbox": [
+          169,
+          342,
+          1118,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTlON 2012-07-28",
+        "confidence": 0.704,
+        "bbox": [
+          229,
+          447,
+          638,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.911,
+        "bbox": [
+          767,
+          604,
+          512,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

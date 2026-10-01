@@ -29,10 +29,10 @@ import {
  *   field of the whole outbox design: it is why this draft exists, and it is what makes the
  *   proposal arguable rather than oracular.
  * * **The recipient is a masked mailbox plus a sentence about how it was established.** That
- *   sentence is the part that matters — "the address the clinic already held for the patient a
+ *   sentence is the part that matters — "the address already on file for the subject a
  *   named member of staff selected in person" is a claim somebody can be held to, and a mailbox
- *   printed on a screen visible across a front desk is not something this page is entitled to do
- *   (`intelligence_surface`). The full address is on the intake, where the patient is.
+ *   printed on a shared screen is not something this page is entitled to do
+ *   (`intelligence_surface`). The full address is on the intake, where the person is.
  *
  * ## What the buttons do not do
  *
@@ -136,7 +136,7 @@ export function ActionCard({
         <p className="mt-1 text-2xs text-subtle">
           Established by <span className="text-fg">{card.recipient.chosen_by}</span>. The mailbox
           itself is masked here: this screen counts and proposes, and the address is visible on the
-          intake, where the patient is.
+          intake, where the person is.
         </p>
       </section>
 
@@ -156,7 +156,7 @@ export function ActionCard({
         {card.redacted && (
           <p className="text-2xs text-band-spot">
             This draft&rsquo;s own text is addressed to an automated reader — an instruction inside
-            a clinical document. It is not reproduced, and the citations below still resolve, so it
+            a restricted document. It is not reproduced, and the citations below still resolve, so it
             can be read in place. Rejecting is the expected answer.
           </p>
         )}
@@ -181,9 +181,9 @@ export function ActionCard({
           ))}
         </ul>
         <p className="mt-1.5 text-2xs text-subtle">
-          Lines in the accent colour are cells in a config file in this repository — the clinic rule
-          that fired, and the coverage row it read. The rest are handles: a document is never named
-          by its filename here, because a filename can carry a patient&rsquo;s name.
+          Lines in the accent colour are cells in a config file in this repository — the policy rule
+          that fired, and the row it read. The rest are handles: a document is never named by its
+          filename here, because a filename can carry a person&rsquo;s name.
         </p>
       </details>
 
@@ -288,7 +288,7 @@ export function ActionCard({
           <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />
           An approval records who says they approved it. There is no authentication behind that
           name yet — this is a proof of concept, and building it is the next thing that has to
-          happen before this touches a real clinic.
+          happen before this touches a real deployment.
         </p>
       </footer>
     </article>
@@ -318,7 +318,7 @@ function Outcome({ card }: { card: ActionCardData }) {
     return (
       <p className="text-2xs text-subtle" data-testid="action-outcome">
         Approved by <span className="text-fg">{card.approved_by}</span> at{" "}
-        <span className="tnum text-fg">{card.approved_at}</span>. Nothing has left the clinic yet.
+        <span className="tnum text-fg">{card.approved_at}</span>. Nothing has left the building yet.
       </p>
     );
   }

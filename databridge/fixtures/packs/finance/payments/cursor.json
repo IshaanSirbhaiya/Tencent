@@ -1,0 +1,17 @@
+{
+  "cursor_kind": "monotonic_sequence",
+  "field": "seq",
+  "low_water_mark": 1001,
+  "high_water_mark": 13010,
+  "replay": "forward_only",
+  "known_gap": {
+    "from": 6000,
+    "to": 6009,
+    "cause": "producer restart; these sequence numbers were never emitted"
+  },
+  "delivery": "at-least-once",
+  "duplicate_events": 120,
+  "ordering": "not guaranteed within a 5 second window",
+  "deletes_detectable": false,
+  "synthetic": true
+}

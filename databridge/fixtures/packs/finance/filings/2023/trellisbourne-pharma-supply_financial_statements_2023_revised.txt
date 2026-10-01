@@ -1,0 +1,52 @@
+ Trellisbourne Pharma Supply PTE LTD
+
+Financial Statements for the financial year ended 31 December 2023
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Trellisbourne Pharma Supply PTE LTD
+  Registration number   SYN-CRN-1856275
+  Country of incorporation   HK
+  Principal activity   Textiles and Apparel
+  Reporting currency   SGD
+  Date of incorporation   1997-01-07
+
+ Directors' commentary
+
+The Board notes continued pressure on freight rates and has renegotiated the Group's principal charter commitments.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2023   FY2022
+------:---:|
+  Revenue   29   28
+  Gross profit   12   11
+  EBITDA   7   8
+  Depreciation and amortisation   -1   -1
+  Finance costs   -1   -1
+  Profit after tax   4   5
+  Total assets   62   58
+  Total borrowings   33   36
+  Cash and cash equivalents   10   10
+  Total equity   14   15
+
+ Key ratios
+
+  Ratio   FY2023   Covenant reference
+------:---|
+  Net debt / EBITDA   3.29x   Tested quarterly under the syndicated facility
+  Interest cover   6.05x   Tested quarterly
+  Current ratio   1.53x   -
+
+ Banking arrangements
+
+The Group's principal banker is Northgate Mercantile Bank. Facilities comprise a revolving credit line and a trade finance line, both secured.
+
+ Auditor's note
+
+We draw attention to note 14, which describes a material uncertainty related to the renewal of the Group's principal facility. Our opinion is not modified in this respect.

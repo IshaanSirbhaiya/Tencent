@@ -1,0 +1,28 @@
+# packs/government — this pack's connector catalogue entries (HC1, 2026-10-01).
+#
+# Moved out of the gateway's Python `CATALOGUE` literal: a pack's servers are the pack's data. Same
+# contract as `packs/common/connectors.yaml`; `pack` is this directory, never declared.
+# Synthetic throughout: the permit office and its register are fictional.
+
+connectors:
+- id: permits_registry_mcp
+  name: PERMITWORKS permit register
+  vendor: Aldermoor Territory permit office (synthetic)
+  summary: 'Permit applications: application id, submission time, status, applicant name and applicant-supplied
+    free-text notes.'
+  reads:
+  - application_id
+  - submitted_at
+  - status
+  - applicant_name
+  - applicant_notes
+  status: vendored
+  vendored_path: fixtures/mcp/permits_mcp/server.py
+  template: fixtures/packs/government/adapters/permits_registry_mcp.yaml
+  tags:
+  - government
+  - permits
+  - permit
+  - applications
+  - registry
+  - aldermoor

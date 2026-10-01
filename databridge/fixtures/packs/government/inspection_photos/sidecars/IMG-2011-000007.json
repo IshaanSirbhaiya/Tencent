@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2011-000007",
+  "filename": "IMG-2011-000007.jpg",
+  "image_present": false,
+  "captured_at": "2011-12-17T09:15:30+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2011-000317",
+  "application_id": "APP-2011-000412",
+  "parcel_id": "PCL-CB-02663",
+  "photo_batch_ref": "PHB-2011-000317",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-797549"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 434991,
+    "northing": 1199909,
+    "accuracy_m": 15.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1203,
+          120,
+          374,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2011-743409",
+        "confidence": 0.879,
+        "bbox": [
+          1121,
+          225,
+          702,
+          79
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "104 CATTLE YARD, CORRISBECK AM1 7KN",
+        "confidence": 0.831,
+        "bbox": [
+          739,
+          338,
+          840,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2011-12-17",
+        "confidence": 0.83,
+        "bbox": [
+          1868,
+          444,
+          899,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.938,
+        "bbox": [
+          847,
+          596,
+          544,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

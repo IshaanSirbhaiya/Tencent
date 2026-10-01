@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000417",
+  "filename": "IMG-2020-000417.jpg",
+  "image_present": false,
+  "captured_at": "2020-11-17T12:18:17+00:00",
+  "captured_by": "OFF-0042",
+  "inspection_id": "INS-2020-000275",
+  "application_id": "APP-2020-000370",
+  "parcel_id": "PCL-TF-02839",
+  "photo_batch_ref": "PHB-2020-000275",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-651405"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 424779,
+    "northing": 1185223,
+    "accuracy_m": 16.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1134,
+          120,
+          319,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-979465",
+        "confidence": 0.878,
+        "bbox": [
+          682,
+          221,
+          621,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "165A VINTNERS ROW, TARNFIELD AM4 3QE",
+        "confidence": 0.725,
+        "bbox": [
+          1821,
+          352,
+          972,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-11-17",
+        "confidence": 0.919,
+        "bbox": [
+          198,
+          447,
+          783,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0042",
+        "confidence": 0.861,
+        "bbox": [
+          635,
+          568,
+          384,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

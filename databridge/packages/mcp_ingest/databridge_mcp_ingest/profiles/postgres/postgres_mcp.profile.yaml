@@ -1,0 +1,21 @@
+# postgres-mcp (crystaldba, `uvx --with "mcp<2" postgres-mcp --access-mode=restricted`):
+# `execute_sql(sql)` returns the Python repr of a list of row dicts — Decimal('18500.00'),
+# datetime.date(2026, 8, 31), datetime.datetime(..., tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')),
+# UUID(...), None. `tabular/pyrepr.py` parses that with `ast` (whitelisted constructors only).
+# Keys come from pg_catalog (`postgres.sql.yaml`): a SELECT-only role sees none in
+# information_schema. Use --access-mode=restricted for ingestion; a write-capable declaration
+# is a SEPARATE connection (see write_connection.example.yaml) and is never crawled.
+id: postgres-mcp
+title: Postgres MCP Pro (postgres-mcp)
+group: postgres
+priority: 10
+verified: "2026-10-01 — live against the demo DB (walnut_reader): 9 tools listed; execute_sql output recorded in tests/test_s2_recorded_postgres_mcp.json"
+match:
+  all_tools: [execute_sql, list_schemas, list_objects]
+step:
+  strategy: tabular
+  sql:
+    tool: execute_sql
+    arg: sql
+    dialect: postgres
+    parse: {mode: json_rows}

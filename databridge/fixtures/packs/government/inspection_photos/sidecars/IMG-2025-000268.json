@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2025-000268",
+  "filename": "IMG-2025-000268.jpg",
+  "image_present": false,
+  "captured_at": "2025-02-21T15:08:37+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2025-000225",
+  "application_id": "APP-2024-000305",
+  "parcel_id": "PCL-CB-02519",
+  "photo_batch_ref": "PHB-2025-000225",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-824299"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 422077,
+    "northing": 1184675,
+    "accuracy_m": 4.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1558,
+          120,
+          297,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2025-614593",
+        "confidence": 0.844,
+        "bbox": [
+          1029,
+          236,
+          675,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "6 WINDLASS WALK, CORRISBECK AM7 7QH",
+        "confidence": 0.829,
+        "bbox": [
+          906,
+          316,
+          1015,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2025-02-21",
+        "confidence": 0.902,
+        "bbox": [
+          1875,
+          528,
+          841,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.939,
+        "bbox": [
+          65,
+          508,
+          544,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

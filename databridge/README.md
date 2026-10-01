@@ -1,30 +1,30 @@
 # databridge — code monorepo
 
-DataBridge Stage-1 (POC). `uv`-managed Python 3.11+ monorepo. **Scaffold only** after
-PROMPT 0 — no product code yet; package directories carry `__init__.py` placeholders.
+The engine and product code for Walnut. `uv`-managed Python 3.11+ workspace (`packages/*`,
+`apps/*`) plus a Next.js frontend under `apps/frontend`. This directory is no longer a scaffold —
+see the root [`../README.md`](../README.md) for what the system is, the layout of every package,
+and how to run it.
 
-Read `CLAUDE.md` before any session. The shared brain (state, tasks, decisions) is the
-sibling repo `../databridge-brain`; start at `../databridge-brain/00-meta/STATE.md`.
+Read [`../CLAUDE.md`](../CLAUDE.md) before any session — it holds the hard constraints this code
+must never violate — then [`../STATUS.md`](../STATUS.md) for where the build currently stands.
 
-## Layout (02_TRD A.2)
-```
-packages/
-  core/      shared types, provenance, config, events   (T01 — next)
-  harness/   model abstraction (LiteLLM wrapper)         (T02)
-  ingest/    connectors + adapters                       (T03-T05)
-  semantic/  schema graph + annotator + confirmation     (T06-T07)
-  graph/     knowledge graph (Pillar 1)                  (T08)
-  convert/   conversion engine (Pillar 2)                (T09-T10, C01-C24)
-  evals/     evaluation suites                           (T11, C24)
-apps/
-  cli/       POC interface (typer)
-  mcp_server/ Stage-2: expose graph to agents
-tests/
-docs/        the 9 build docs (01-09) — source-of-truth the brain mirrors FROM
-config/      models.yaml, sources.yaml (added in T01/T02)
+## Running the tests
+
+```powershell
+python -m pytest -m "not integration"
 ```
 
-## Invariants
-- No vendor SDK imports outside `packages/harness` (P2; CI grep rule lands in T01).
-- Every emitted value is a `GroundedValue` (P4).
-- Closed vocabularies change only via an ADR in the brain repo (P3/P6).
+The marker is required: a plain run hangs on a test that expects a local Ollama instance.
+
+## Running the app
+
+```powershell
+.\start-databridge.ps1        # frees ports 8000/3000, starts the gateway and the frontend
+```
+
+## Invariants (enforced, see `../CLAUDE.md` for the full list)
+- No vendor SDK imports (`import anthropic` / `import openai`) outside `packages/harness`.
+- Every emitted value is a `GroundedValue` carrying a `SourcePointer`
+  (`packages/core/databridge_core/provenance.py`) — refused at construction otherwise.
+- No per-domain branching in the engine — `packages/graph/tests/test_no_domain_branching.py`.
+- Closed vocabularies live in pack YAML (`packs/`), not in engine code.

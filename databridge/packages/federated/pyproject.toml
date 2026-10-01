@@ -1,0 +1,33 @@
+# packages/federated — delegated cross-source querying (FED, 2026-10-01).
+#
+# The main agent decomposes a question into typed SubTasks; each adapter agent's DELEGATE answers
+# its SubTask over its own sources with the fastest correct method (exact SQL on the facts store,
+# graph + passages for documents, a live read only when freshness is asked for); a DETERMINISTIC
+# combine engine joins, groups, aggregates and compares periods with decimal-exact arithmetic; the
+# model only narrates the table it is given, and the answer contract (P15) checks the narration.
+[project]
+name = "databridge-federated"
+version = "0.0.0"
+description = "Walnut delegated cross-source querying: planner, delegates, deterministic combine"
+requires-python = ">=3.11"
+dependencies = [
+  "databridge-core",
+  "databridge-harness",
+  "databridge-graph",
+  "databridge-workflow-spec",
+  "databridge-agent-runtime",
+  "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+# The facts store (tabular delegates), the adapter-agent registry (the catalogue) and passage
+# search (document delegates) are used when importable; without them the delegate reports the
+# channel unavailable as coverage rather than failing.
+sources = ["databridge-mcp-ingest", "databridge-adapter-agents", "databridge-retrieval"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["databridge_federated"]

@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "notice": "SYNTHETIC FIXTURE -- Aldermoor Territory public registry. No real business is represented.",
+    "api": "aldermoor-public-registry",
+    "api_version": "2.3.1",
+    "endpoint": "/v2/businesses",
+    "fetched_at": "2026-08-01T06:15:00Z",
+    "page": 7,
+    "page_size": 100,
+    "page_count": 7,
+    "total_records": 602,
+    "etag": "W/\"4c3d7cb00ff384878636\"",
+    "next_cursor": null,
+    "retention_notice": "The registry serves current state only. There is no as-at parameter and no change feed."
+  },
+  "data": [
+    {
+      "registration_number": "BR-0000605",
+      "legal_name": "New Quay Grocer Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2026-05-19",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4711",
+        "description": "Retail"
+      },
+      "registered_address": {
+        "line1": "5 Sable Quay Row",
+        "locality": "Sable Quay",
+        "postcode": "AM4 2QY",
+        "parcel_id": null,
+        "ward_code": "SQ"
+      },
+      "officers": [],
+      "last_filing_on": null
+    },
+    {
+      "registration_number": "BR-0000606",
+      "legal_name": "New Quay Salon Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2026-05-19",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4711",
+        "description": "Retail"
+      },
+      "registered_address": {
+        "line1": "6 Sable Quay Row",
+        "locality": "Sable Quay",
+        "postcode": "AM4 2QY",
+        "parcel_id": null,
+        "ward_code": "SQ"
+      },
+      "officers": [],
+      "last_filing_on": null
+    }
+  ]
+}

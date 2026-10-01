@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2025-000190",
+  "filename": "IMG-2025-000190.jpg",
+  "image_present": false,
+  "captured_at": "2025-04-10T13:26:04+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2025-000368",
+  "application_id": "APP-2024-000483",
+  "parcel_id": "PCL-WH-02216",
+  "photo_batch_ref": "PHB-2025-000368",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-552937"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 434464,
+    "northing": 1183493,
+    "accuracy_m": 14.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1596,
+          120,
+          264,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2025-482764",
+        "confidence": 0.873,
+        "bbox": [
+          1970,
+          225,
+          702,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "206 TANNERY CLOSE, ASHCOMBE REACH AM8 9YH",
+        "confidence": 0.936,
+        "bbox": [
+          1372,
+          376,
+          984,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF lNSPECTION 2025-04-10",
+        "confidence": 0.86,
+        "bbox": [
+          2789,
+          516,
+          783,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.953,
+        "bbox": [
+          2373,
+          576,
+          448,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

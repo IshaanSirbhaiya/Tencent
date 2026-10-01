@@ -1,6 +1,6 @@
 "use client";
 /**
- * `/intake` — the kiosk/patient side: drop a referring document in and read it.
+ * `/intake` — the intake side of the active pack: drop an incoming document in and read it.
  *
  * Three ways in, ONE pipeline. The fixture buttons fetch the real corpus text from the gateway and
  * post it through `/intake/upload`; the paste box posts the same way; the file control posts the
@@ -13,10 +13,11 @@
  * complete, so the four checkbox-derived fields come back unresolved instead of grounded
  * (`ground.unprovable_checkbox_spans`, R-13). `ExtractionReport` shows that on the way in.
  *
- * **What is NOT accepted has not changed.** Identity documents and insurance e-cards are refused,
- * and the banner says exactly how — including the part that is uncomfortable: a photographed NRIC
- * cannot be recognised from its filename, so it is read in order to be screened, and then nothing
- * from it survives the call. R-12 exists because that sentence once claimed more than the code did.
+ * **What is NOT accepted has not changed.** Identity documents and entitlement credentials are
+ * refused, and the banner says exactly how — including the part that is uncomfortable: a
+ * photographed identity card cannot be recognised from its filename, so it is read in order to be
+ * screened, and then nothing from it survives the call. R-12 exists because that sentence once
+ * claimed more than the code did.
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -28,7 +29,8 @@ import type { SummaryCard } from "@/lib/intake-types";
 import { ExtractionReport } from "@/components/intake/extraction-report";
 import { UploadFileControl } from "@/components/intake/upload-file-control";
 import { TryChips } from "@/components/try-chips";
-import { INTAKE_TRIALS, type IntakeTrial } from "@/components/try-prompts";
+import { usePackTrials, type IntakeTrial } from "@/components/try-prompts";
+import { useNouns } from "@/lib/pack-context";
 
 /** The body of the file the "Refuses" chip uploads. Synthetic, one line, and never read: the guard
  *  fires on the NAME before a byte is parsed, so this text exists only so the upload is a real file
@@ -39,6 +41,8 @@ const IDENTITY_TRIAL_FILE_TEXT =
 
 export default function IntakeUploadPage() {
   const router = useRouter();
+  const nouns = useNouns();
+  const trials = usePackTrials("intake");
   const [documentId, setDocumentId] = useState("");
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -154,11 +158,10 @@ export default function IntakeUploadPage() {
   return (
     <div className="flex flex-col gap-4 p-6">
       <header>
-        <h1 className="text-lg font-semibold">Read a referring document</h1>
+        <h1 className="text-lg font-semibold">Read a {nouns.document}</h1>
         <p className="text-xs text-subtle">
-          An insurer referral letter, health-check voucher, underwriting memo, TPA or government
-          authorisation form, or an HR email. Upload the file, or paste its text. The system reads
-          it before the patient reaches the counter.
+          {nouns.document_examples}. Upload the file, or paste its text. The system reads it before
+          the {nouns.subject} reaches the {nouns.operator_role}.
         </p>
       </header>
 
@@ -167,21 +170,20 @@ export default function IntakeUploadPage() {
         <div className="text-2xs text-subtle" data-testid="identity-refusal-notice">
           <p>
             <span className="font-semibold text-band-review">
-              Do not upload an NRIC, FIN, passport or an insurance e-card.
+              Do not upload {nouns.identifier} or {nouns.credential} documents.
             </span>{" "}
-            Identity and e-card validity are checked in person at the counter, by a person, against
-            the physical document. This system never does that and has no code path that could.
+            Identity and credential validity are checked in person, by a person, against the
+            physical document. This system never does that and has no code path that could.
           </p>
           <p className="mt-1">
-            <span className="font-medium text-fg">What is accepted:</span> the referring document —
-            a referral letter, voucher, authorisation form or HR email — as a PDF, a photograph or
-            scan, or as text.
+            <span className="font-medium text-fg">What is accepted:</span> the {nouns.document} —
+            {" "}{nouns.document_examples} — as a PDF, a photograph or scan, or as text.
           </p>
           <p className="mt-1">
             <span className="font-medium text-fg">What happens to a refused file:</span> if it is
             named like an identity document it is refused before it is opened. Otherwise it is{" "}
-            <span className="font-medium text-fg">read by OCR first</span> — a photographed NRIC
-            cannot be recognised any other way — and refused on the extracted text, before that
+            <span className="font-medium text-fg">read by OCR first</span> — a photographed
+            identity card cannot be recognised any other way — and refused on the extracted text, before that
             text is stored, before any model sees it, and before a record exists. Nothing from it
             is kept: no document, no queue entry, no ledger row, and the refusal never quotes what
             it read. (A file over 1 MB briefly touches a temporary file that the server then
@@ -191,7 +193,7 @@ export default function IntakeUploadPage() {
       </div>
 
       <TryChips
-        groups={INTAKE_TRIALS}
+        groups={trials}
         onPick={(chip) => runTrial(chip.payload)}
         disabled={trialRead.isPending || trialIdentityFile.isPending}
         testId="intake-try-chips"
@@ -267,7 +269,7 @@ export default function IntakeUploadPage() {
           disabled={!text.trim() || upload.isPending}
           onClick={() => upload.mutate()}
           data-testid="upload-document"
-          className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-subtle"
+          className="inline-flex items-center gap-1.5 rounded bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-subtle"
         >
           <FileUp className="h-3.5 w-3.5" />
           {upload.isPending ? "Reading…" : "Read document"}

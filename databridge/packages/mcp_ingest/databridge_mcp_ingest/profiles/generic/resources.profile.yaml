@@ -1,0 +1,24 @@
+# Generic — ANY server that lists MCP resources (resources/list + resources/read).
+#
+# Resources-first crawling, no model: when no server-specific profile matches and the server lists
+# resources, every listed resource is an item (its URI is the identity; its declared mime picks
+# the extractor), read with resources/read. Works direct and through MCPJungle, which proxies
+# resources as mcpj://res/<server>/<b64url(uri)> — the client maps that back to the server's own
+# URI, so both routes mint the same item_id.
+#
+# `fallback: true` — applies only when NO specific profile matched (a filesystem or Postgres server
+# that also lists resources keeps its own plan). A fallback plan is probed (one listing + one read
+# through the session) before it can be approved.
+#
+# Verified live 2026-10-01: @modelcontextprotocol/server-everything 2.0.0 (7 markdown resources,
+# direct and via MCPJungle latest-stdio).
+id: generic-resources
+title: Any MCP server that lists resources
+group: generic
+priority: 0
+verified: "2026-10-01 — server-everything 2.0.0 direct and via MCPJungle (resources/list + read)"
+match:
+  resources: true
+  fallback: true
+step:
+  strategy: resources

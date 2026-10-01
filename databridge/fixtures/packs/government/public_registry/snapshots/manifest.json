@@ -1,0 +1,228 @@
+{
+  "notice": "SYNTHETIC FIXTURE.",
+  "source": "public_registry",
+  "pinning_tier": "T2",
+  "snapshots": [
+    "2026-05-01",
+    "2026-08-01"
+  ],
+  "pages": [
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "businesses",
+      "page": 1,
+      "path": "snapshots/2026-05-01/businesses_page_001.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "businesses",
+      "page": 2,
+      "path": "snapshots/2026-05-01/businesses_page_002.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "businesses",
+      "page": 3,
+      "path": "snapshots/2026-05-01/businesses_page_003.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "businesses",
+      "page": 4,
+      "path": "snapshots/2026-05-01/businesses_page_004.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "businesses",
+      "page": 5,
+      "path": "snapshots/2026-05-01/businesses_page_005.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "businesses",
+      "page": 6,
+      "path": "snapshots/2026-05-01/businesses_page_006.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 1,
+      "path": "snapshots/2026-05-01/licences_page_001.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 2,
+      "path": "snapshots/2026-05-01/licences_page_002.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 3,
+      "path": "snapshots/2026-05-01/licences_page_003.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 4,
+      "path": "snapshots/2026-05-01/licences_page_004.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 5,
+      "path": "snapshots/2026-05-01/licences_page_005.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 6,
+      "path": "snapshots/2026-05-01/licences_page_006.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 7,
+      "path": "snapshots/2026-05-01/licences_page_007.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 8,
+      "path": "snapshots/2026-05-01/licences_page_008.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-05-01",
+      "collection": "licences",
+      "page": 9,
+      "path": "snapshots/2026-05-01/licences_page_009.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 1,
+      "path": "snapshots/2026-08-01/businesses_page_001.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 2,
+      "path": "snapshots/2026-08-01/businesses_page_002.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 3,
+      "path": "snapshots/2026-08-01/businesses_page_003.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 4,
+      "path": "snapshots/2026-08-01/businesses_page_004.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 5,
+      "path": "snapshots/2026-08-01/businesses_page_005.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 6,
+      "path": "snapshots/2026-08-01/businesses_page_006.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "businesses",
+      "page": 7,
+      "path": "snapshots/2026-08-01/businesses_page_007.json",
+      "records": 2
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 1,
+      "path": "snapshots/2026-08-01/licences_page_001.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 2,
+      "path": "snapshots/2026-08-01/licences_page_002.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 3,
+      "path": "snapshots/2026-08-01/licences_page_003.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 4,
+      "path": "snapshots/2026-08-01/licences_page_004.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 5,
+      "path": "snapshots/2026-08-01/licences_page_005.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 6,
+      "path": "snapshots/2026-08-01/licences_page_006.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 7,
+      "path": "snapshots/2026-08-01/licences_page_007.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 8,
+      "path": "snapshots/2026-08-01/licences_page_008.json",
+      "records": 100
+    },
+    {
+      "snapshot_date": "2026-08-01",
+      "collection": "licences",
+      "page": 9,
+      "path": "snapshots/2026-08-01/licences_page_009.json",
+      "records": 100
+    }
+  ]
+}

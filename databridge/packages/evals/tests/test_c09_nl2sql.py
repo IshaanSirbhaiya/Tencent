@@ -48,7 +48,10 @@ def test_ev_sql_gold_backend_passes_gate():
     h = Harness(FakeBackend(sql_gold_backend()), config=CFG, profile="cloud")
     res = run_ev_sql(h, engine)
     assert res.accuracy == 1.0 and res.passed             # gold SQL → 100% (pipeline proof)
-    assert res.total == 12
+    # Derived (HC2, SWEEP #24-34): every gold pair was scored — none skipped, none invented.
+    from databridge_evals.e_sql import PAIRS
+    assert len(PAIRS) >= 1 and len({q for q, _ in PAIRS}) == len(PAIRS)   # non-vacuous, distinct
+    assert res.total == len(PAIRS) and len(res.per_question) == len(PAIRS)
 
 
 def test_ev_sql_detects_wrong_sql():

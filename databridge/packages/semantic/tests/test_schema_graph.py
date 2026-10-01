@@ -33,10 +33,42 @@ def test_all_five_roles_correct():
     assert {t.table: t.role for t in r.tables} == GOLD_ROLES
 
 
+def _airtight_by_the_stage_a_rule(extract) -> int:
+    """06_PRD §2 Stage A, restated over the fixture's raw metadata — NOT through
+    `classify_column` — so the count is derived from the fixture, not recalled (HC2, SWEEP #24-34).
+    The dtype sets are the rule's parameters, read from the module that applies them."""
+    from datetime import datetime
+
+    from databridge_semantic.schema_graph import _INT_DTYPES, _TIMESTAMP_DTYPES
+
+    def iso(vals):
+        vals = [v for v in vals if v is not None]
+        try:
+            return bool(vals) and all(
+                isinstance(v, str) and datetime.fromisoformat(v.replace("Z", "+00:00"))
+                for v in vals)
+        except ValueError:
+            return False
+
+    n = 0
+    for t in extract.tables:
+        for c in t.columns:
+            d = c.dtype.lower()
+            n += (c.name in t.fk_columns
+                  or (c.is_primary_key and d in _INT_DTYPES)
+                  or (not c.is_primary_key and d in ("boolean", "bool"))
+                  or (not c.is_primary_key and d in _TIMESTAMP_DTYPES and iso(c.sample_values)))
+    return n
+
+
 def test_airtight_resolves_30_to_50_percent():
     r = report()
-    assert r.airtight_columns == 18
-    assert r.total_columns == 36
+    extract = fintech_fixture()
+    expected_total = sum(len(t.columns) for t in extract.tables)
+    expected_airtight = _airtight_by_the_stage_a_rule(extract)
+    assert expected_total >= 1 and 1 <= expected_airtight < expected_total   # non-vacuous
+    assert r.airtight_columns == expected_airtight
+    assert r.total_columns == expected_total
     assert 0.30 <= r.airtight_fraction <= 0.55           # spec target ~30-50%
 
 

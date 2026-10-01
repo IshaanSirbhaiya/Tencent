@@ -1,0 +1,147 @@
+# =====================================================================
+# roles.yaml -- the access model the MCP adapter tests run against.
+#
+# SYNTHETIC FIXTURE. The Aldermoor permit office, its roles and its
+# officers are invented.
+#
+# WHY THIS FILE LIVES UNDER packages/adapter/tests RATHER THAN IN THE PACK
+# ------------------------------------------------------------------------
+# `fixtures/packs/government/roles.yaml` is the real government estate's
+# policy and it is richer than this one -- but its `roles:` key is a LIST
+# of role objects, and `rolemodel.load_role_model` requires a MAPPING of
+# role name -> body. So the government estate does not load through the
+# current loader at all. That is a genuine finding and it is reported
+# rather than fixed here: `fixtures/packs/government/roles.yaml` and
+# `packages/adapter/databridge_adapter/config/purpose_bindings.yaml` are
+# both outside this workstream's scope, and quietly rewriting another
+# workstream's policy input to make a test pass is exactly the move that
+# turns a policy engine into an engine with a favourite shape.
+#
+# This file is therefore the SMALLEST role model that exercises the
+# decisions an MCP adapter actually has to make:
+#
+#   * a role that may read the free-text field (and therefore sees the
+#     planted injection payload), and one that may not;
+#   * a role whose egress ceiling is below the source's class, so the
+#     read is refused before it runs;
+#   * a purpose that reaches the object and one that does not.
+# =====================================================================
+
+estate: aldermoor-government-mcp-synthetic
+version: 1
+
+# ---------------------------------------------------------------------
+# The estate's own purpose vocabulary. `packs/government/purposes.yaml`
+# declares what a Principal may CARRY; these are what the access model
+# knows. Nothing joins them by convention -- purpose_bindings.yaml does,
+# as data.
+# ---------------------------------------------------------------------
+purposes:
+  - id: permit_assessment
+    description: Assess a permit application against the register.
+  - id: register_operation
+    description: Metadata and health reads over the register. Never values.
+  - id: audit
+    description: Re-resolve an existing citation to answer "is this still good?".
+
+reason_codes:
+  POLICY_COLUMN_DENIED: the role denies this column explicitly
+  POLICY_FREE_TEXT_UNREVIEWED: >-
+    free text is withheld from every role by default; there are no columns
+    inside a paragraph, so a column-level rule cannot see what is in one
+  METADATA_ONLY: the role may see schema and digests, never a value
+
+masks:
+  metadata_only:
+    emit: "<withheld>"
+    cell_type: Withheld
+    reason: METADATA_ONLY
+    note: >-
+      Declared as a Withheld rather than a transformed disclosure because
+      the fourth cell state (spine O1b) does not exist: a partial
+      disclosure would put an uncitable value behind a pointer.
+
+# ---------------------------------------------------------------------
+# Free text is withheld from EVERY role by default, by named exception
+# only. This is the rule that decides who ever sees the two planted
+# prompt-injection payloads in `applicant_notes` -- and the answer is
+# "one role, under one purpose", which is the point.
+# ---------------------------------------------------------------------
+column_classification:
+  free_text_may_contain_personal_data:
+    - permits_registry_mcp.permit_application.applicant_notes
+
+free_text_policy:
+  default: withheld
+  exceptions:
+    - role: permit_officer
+      purposes: [permit_assessment]
+      justification: >-
+        A case officer assessing an application must read what the
+        applicant and the objectors wrote. The exception is per (role,
+        purpose), never per role, and it is the reason this estate can
+        demonstrate injection containment at all: the payload has to reach
+        somebody before containment means anything.
+
+roles:
+
+  permit_officer:
+    description: Assesses permit applications. The only role that reads free text.
+    purposes: [permit_assessment, audit]
+    egress_ceiling: RESTRICTED_INTERNAL
+    allow:
+      permits_registry_mcp: [permit_application]
+    unscoped_objects:
+      - object: permits_registry_mcp.permit_application
+        reason: >-
+          The MCP tool surface exposes no principal-scopable column: there
+          is no officer id in the projection, and a row filter over a field
+          the projection does not read cannot be evaluated. Declared
+          deliberately rather than defaulted, because an object read with
+          no declared scope is an object read with none.
+
+  register_clerk:
+    description: Handles counter enquiries. Reads the register, never the free text.
+    purposes: [permit_assessment]
+    egress_ceiling: RESTRICTED_INTERNAL
+    allow:
+      permits_registry_mcp: [permit_application]
+    unscoped_objects:
+      - object: permits_registry_mcp.permit_application
+        reason: same as permit_officer; there is nothing in the projection to scope on
+    deny_columns:
+      - permits_registry_mcp.permit_application.applicant_name
+
+  platform_operator:
+    description: Runs the adapter fleet. Sees that a source is healthy, never what it holds.
+    purposes: [register_operation]
+    egress_ceiling: INTERNAL
+    metadata_only: true
+    allow:
+      permits_registry_mcp: [permit_application]
+    unscoped_objects:
+      - object: permits_registry_mcp.permit_application
+        reason: metadata reads touch no rows
+    column_masks:
+      "*": metadata_only
+
+# ---------------------------------------------------------------------
+# A role's `purposes` list is a UNION, not a grant. What a purpose
+# actually reaches is declared here, per grant, and absence is a refusal
+# rather than a wildcard.
+# ---------------------------------------------------------------------
+purpose_scoped_grants:
+
+  permit_officer:
+    permit_assessment:
+      objects: [permits_registry_mcp.permit_application]
+    audit:
+      objects: [permits_registry_mcp.permit_application]
+
+  register_clerk:
+    permit_assessment:
+      objects: [permits_registry_mcp.permit_application]
+
+  platform_operator:
+    register_operation:
+      objects: [permits_registry_mcp.permit_application]

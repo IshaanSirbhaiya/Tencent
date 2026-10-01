@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000250",
+  "filename": "IMG-2012-000250.jpg",
+  "image_present": false,
+  "captured_at": "2012-03-15T17:39:51+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2012-000251",
+  "application_id": "APP-2011-000343",
+  "parcel_id": "PCL-MB-01670",
+  "photo_batch_ref": "PHB-2012-000251",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-796332"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 413995,
+    "northing": 1184169,
+    "accuracy_m": 13.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1221,
+          120,
+          374,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-187984",
+        "confidence": 0.839,
+        "bbox": [
+          1118,
+          229,
+          648,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "157 PATERNOSTER LANE, ISK HARBOUR AM9 1HR",
+        "confidence": 0.69,
+        "bbox": [
+          517,
+          332,
+          1148,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2012-03-15",
+        "confidence": 0.868,
+        "bbox": [
+          850,
+          393,
+          841,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.812,
+        "bbox": [
+          360,
+          624,
+          400,
+          79
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

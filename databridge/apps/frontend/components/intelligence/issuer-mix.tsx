@@ -3,13 +3,12 @@ import { cn } from "@/lib/utils";
 import type { IssuerRow } from "@/lib/intelligence-api";
 
 /**
- * Who sent the clinic its paperwork — one row per organisation with an `ISSUED` edge to a
- * document, counted by walking those edges.
+ * Who issued the documents — one row per entity with an `issued`-shaped relationship (the ISSUED
+ * meta-edge) to a document, counted by walking those edges.
  *
  * There is no per-issuer anything in this component: the rows come from the graph, the bar widths
- * come from the counts, and adding an insurer is a `coverage_rules.yaml` change that lands here
- * with no code change at all (CLAUDE.md §Hard constraints 3). If you ever find yourself wanting to
- * special-case a name here, that is the constraint being violated.
+ * from the counts. If you ever find yourself wanting to special-case a name here, that is the
+ * no-per-domain-branching rule being violated.
  */
 export function IssuerMix({
   rows,

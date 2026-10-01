@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, ShieldAlert, UserCheck } from "lucide-react";
 import type { IntakeCandidate, IntakeIdentity, ConfirmationView } from "@/lib/intake-types";
 import { cn } from "@/lib/utils";
+import { useNouns } from "@/lib/pack-context";
 
 /** At or above this, at least one IDENTIFIER matched rather than only a name.
  *  Mirrors `resolve.HIGH_CONFIDENCE_SCORE`. Used only to LABEL the score, never to decide. */
@@ -83,6 +84,7 @@ export function IdentityPanel({
   // makes it unforgeable by state that outlived its subject.
   const [attestedFor, setAttestedFor] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const nouns = useNouns();
 
   // Reset every local decision when the intake changes. An attestation is a record of something a
   // person did for a SPECIFIC patient; carrying it to the next screen would be a forged one.
@@ -112,8 +114,8 @@ export function IdentityPanel({
         <div>
           <h2 className="text-sm font-semibold">Identity — verify in person</h2>
           <p className="mt-0.5 text-2xs text-subtle">
-            The system does not verify identity and never will. Check the patient&apos;s
-            NRIC/FIN/passport against the person in front of you, then select their registry record.
+            The system does not verify identity and never will. Check the {nouns.subject}&apos;s{" "}
+            {nouns.identifier} against the person in front of you, then select their registry record.
           </p>
         </div>
       </header>
@@ -132,8 +134,8 @@ export function IdentityPanel({
         <p className="rounded border border-border bg-surface px-3 py-4 text-xs text-subtle">
           No registry record matches this document
           {identity.status === "insufficient_identifiers"
-            ? " — it carries no name or identifier to search by. Register this patient at the counter."
-            : ". Register this patient at the counter."}
+            ? ` — it carries no name or identifier to search by. Register this ${nouns.subject} at the counter.`
+            : `. Register this ${nouns.subject} at the counter.`}
         </p>
       ) : (
         <ul
@@ -169,7 +171,7 @@ export function IdentityPanel({
                     <span className="tnum block text-2xs text-subtle">
                       {c.id_number} · born {c.date_of_birth}
                     </span>
-                    <span className="block text-2xs text-subtle">from the clinic registry</span>
+                    <span className="block text-2xs text-subtle">from the {nouns.registry}</span>
                   </span>
                   <span className="flex flex-col items-end gap-1">
                     <ScorePill score={c.score} />
@@ -204,7 +206,7 @@ export function IdentityPanel({
               className="mt-0.5 h-3.5 w-3.5 accent-[var(--band-review)] disabled:opacity-50"
             />
             <span className={cn(picked === null && "text-subtle")}>
-              I have checked this patient&apos;s NRIC/FIN/passport{" "}
+              I have checked this {nouns.subject}&apos;s {nouns.identifier}{" "}
               <strong>against the person in front of me</strong>.
             </span>
           </label>
@@ -230,11 +232,11 @@ export function IdentityPanel({
               className={cn(
                 "rounded px-3 py-1.5 text-xs font-medium transition-colors",
                 canSelect && staffId.trim()
-                  ? "bg-accent text-white hover:opacity-90"
+                  ? "bg-accent text-accent-fg hover:opacity-90"
                   : "cursor-not-allowed bg-muted text-subtle",
               )}
             >
-              {selecting ? "Recording…" : "Select this patient"}
+              {selecting ? "Recording…" : `Select this ${nouns.subject}`}
             </button>
           </div>
 
@@ -252,7 +254,7 @@ export function IdentityPanel({
             // the behaviour that made the original bug harmless-looking.
             <p className="mt-1.5 text-2xs text-band-review">
               You changed the selected record, so the attestation was cleared. Check this
-              patient&apos;s ID against the person in front of you again.
+              {nouns.subject}&apos;s ID against the person in front of you again.
             </p>
           )}
           {error && (

@@ -30,14 +30,14 @@
  *
  * ## Why `sessionStorage`
  *
- * A shift ends. `localStorage` would leave a clinic terminal signed in as whoever last used it,
+ * A shift ends. `localStorage` would leave a shared terminal signed in as whoever last used it,
  * overnight, and the ledger would then attribute tomorrow's confirmations to yesterday's staff.
  * `sessionStorage` dies with the tab, which is the closest thing the browser has to "end of shift".
  * This is a POC affordance, not authentication — see the banner in `StaffGate`.
  */
 import * as React from "react";
 
-const STORAGE_KEY = "parkway.staff.session.v1";
+const STORAGE_KEY = "walnut.staff.session.v1";
 
 /** Must agree with `STAFF_ID_PATTERN` in `apps/gateway/databridge_gateway/intake_routes.py`.
  *  Previously the only check was "non-empty after trim", so a control character or an unbounded
@@ -45,7 +45,7 @@ const STORAGE_KEY = "parkway.staff.session.v1";
 const STAFF_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{1,63}$/;
 
 /** A shift, in ms. `sessionStorage` outlives a shift whenever the tab stays open — which on a
- *  clinic terminal is "always". Without an expiry the next operator silently inherits the previous
+ *  shared terminal is "always". Without an expiry the next operator silently inherits the previous
  *  one's identity and every ledger row they create is attributed to someone who went home. */
 const SHIFT_MS = 12 * 60 * 60 * 1000;
 
@@ -114,7 +114,7 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
     setReady(true);
 
     // `read()` is what applies SHIFT_MS, and running it only at mount meant the expiry never fired
-    // on the machine it was written for: a clinic terminal's tab stays open for days, so the
+    // on the machine it was written for: a front-counter terminal's tab stays open for days, so the
     // component never remounts and a 13-hour-old session kept prefilling the attester id.
     // `StaffChip` showed the shift age going amber, which looked like the feature working while
     // nothing actually expired. Both reviewers found this.

@@ -105,7 +105,19 @@ def test_chit_02_voucher(records):
     assert rec.issuer.issuer_code.value == "EVWPA"
     assert rec.issuer.policy_number.value == "EVW563298"
     assert rec.subject.claimed_id_number.value == "T2221854H"
-    assert len(rec.authorisation.requested_tests) == 4
+    # The printed list, read from the fixture (HC1, rule 6): every line after the voucher's
+    # "shall consist of the following:" up to the next table cell.
+    from databridge_intake.paths import chits_dir
+
+    lines = (chits_dir() / "chit_02_everwell_voucher.txt").read_text(encoding="utf-8").splitlines()
+    start = next(i for i, l in enumerate(lines) if "consist of the following" in l) + 1
+    listed = []
+    for line in lines[start:]:
+        if "|" in line:
+            break
+        listed.append(line.strip())
+    assert len(listed) >= 1
+    assert [t.value for t in rec.authorisation.requested_tests] == listed
     assert rec.authorisation.appointment_datetime.value == "30 / 07 / 2026"
     assert rec.authorisation.valid_until.value == "30 Sep 2026"
 
@@ -130,7 +142,12 @@ def test_chit_05_voucher_reads_only_the_ticked_tier(records):
     assert rec.authorisation.package_code.value == "WELL2"
     blob = str(rec.model_dump())
     assert "WELL1" not in blob and "WELL3" not in blob
-    assert len(rec.authorisation.requested_tests) == 11
+    # The voucher prints every test of the ticked tier; the count is the rule table's (HC1).
+    from databridge_intake.rules import rules
+
+    package = rules().package(rec.issuer.issuer_code.value, rec.authorisation.package_code.value)
+    assert package is not None and len(package.includes_tests) >= 1
+    assert len(rec.authorisation.requested_tests) == len(package.includes_tests)
 
 
 # --- absence is recorded as absence, never inferred -------------------------------------

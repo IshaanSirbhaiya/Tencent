@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2012-000039",
+  "filename": "IMG-2012-000039.jpg",
+  "image_present": false,
+  "captured_at": "2012-02-19T14:02:07+00:00",
+  "captured_by": "OFF-0040",
+  "inspection_id": "INS-2012-000108",
+  "application_id": "APP-2011-000154",
+  "parcel_id": "PCL-OH-01697",
+  "photo_batch_ref": "PHB-2012-000108",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-920948"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 448809,
+    "northing": 1195654,
+    "accuracy_m": 15.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          409,
+          120,
+          308,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2012-900335",
+        "confidence": 0.809,
+        "bbox": [
+          448,
+          253,
+          675,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "91 PELLET CLOSE, OLD HARROWGATE AM3 5ST",
+        "confidence": 0.803,
+        "bbox": [
+          417,
+          390,
+          897,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2012-02-19",
+        "confidence": 0.917,
+        "bbox": [
+          1166,
+          519,
+          841,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0040",
+        "confidence": 0.802,
+        "bbox": [
+          324,
+          516,
+          464,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

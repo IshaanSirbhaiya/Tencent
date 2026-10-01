@@ -21,7 +21,11 @@ _ROOT = pathlib.Path(__file__).resolve().parents[2]          # databridge/
 # PROCESS (apps/dispatcher) with its own store handle, and importability is not reachability.
 _PACKAGES = ("packages/core", "packages/harness", "packages/ingest", "packages/semantic",
              "packages/convert", "packages/graph", "packages/intake", "packages/agent",
-             "packages/outbox", "packages/evals",
+             "packages/adapter", "packages/agentdef", "packages/materialise",
+             "packages/outbox", "packages/evals", "packages/orchestrator",
+             "packages/workflow_spec", "packages/mcp_ingest", "packages/retrieval",
+             "packages/agent_runtime", "packages/automation", "packages/adapter_agents",
+             "packages/federated",
              "apps/gateway", "apps/mcp_server", "apps/dispatcher")
 for _p in _PACKAGES:
     _path = _ROOT / _p
@@ -40,6 +44,30 @@ except ImportError:
 _backend = ("openai" if os.getenv("OPENAI_API_KEY")
             else "anthropic" if os.getenv("ANTHROPIC_API_KEY") else "fake")
 print(f"LLM backend: {_backend} (profile: cloud)")
+
+# ---------------------------------------------------------------------------------------------
+# Which graph the gateway serves.
+#
+# ONE shared store (KNOWLEDGE_SYSTEM_PRINCIPLES §6 Batch 1, contract C1): `WALNUT_GRAPH_DB_PATH`,
+# default `var/graph/workspace.db` — resolved in `brain_server.graph_db_path`, the same function
+# the MCP servers and the ingest CLI use, so every process lands on the same file.
+#
+# This launcher USED to pick the largest `var/graph/*.db` when the env var was unset. With one
+# shared, writable store that would be wrong in a way nobody would see: the user's ingested
+# sources would be written into whichever demo estate happened to be biggest. Those graphs are
+# kept (nothing here deletes them) and listed, so the operator can point at one on purpose.
+def _announce_graph_db() -> None:
+    chosen = os.environ.get("WALNUT_GRAPH_DB_PATH") or str(_ROOT / "var" / "graph" / "workspace.db")
+    print(f"[serve] graph store -> {chosen}  (set WALNUT_GRAPH_DB_PATH to override; clinic demo "
+          f"seed {'ON' if os.environ.get('WALNUT_LOAD_CLINIC_SEED') == '1' else 'off'} — "
+          f"WALNUT_LOAD_CLINIC_SEED=1 to load it)")
+    others = sorted(q.name for q in (_ROOT / "var" / "graph").glob("*.db")
+                    if q.is_file() and str(q.resolve()) != str(pathlib.Path(chosen).resolve()))
+    if others:
+        print(f"[serve] other built graphs on disk (not served): {', '.join(others)}")
+
+
+_announce_graph_db()
 
 import uvicorn  # noqa: E402
 

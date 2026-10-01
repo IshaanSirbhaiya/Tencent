@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2021-000160",
+  "filename": "IMG-2021-000160.jpg",
+  "image_present": false,
+  "captured_at": "2021-04-24T16:44:19+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2021-000262",
+  "application_id": "APP-2021-000353",
+  "parcel_id": "PCL-OH-00113",
+  "photo_batch_ref": "PHB-2021-000262",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-286582"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 440296,
+    "northing": 1213694,
+    "accuracy_m": 17.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          3274,
+          120,
+          264,
+          79
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2021-319768",
+        "confidence": 0.761,
+        "bbox": [
+          2354,
+          263,
+          648,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "63 KILNYARD TERRACE, OLD HARROWGATE AM5 4WN",
+        "confidence": 0.858,
+        "bbox": [
+          1236,
+          318,
+          1462,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2021-04-24",
+        "confidence": 0.801,
+        "bbox": [
+          3036,
+          477,
+          783,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.855,
+        "bbox": [
+          1090,
+          508,
+          544,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

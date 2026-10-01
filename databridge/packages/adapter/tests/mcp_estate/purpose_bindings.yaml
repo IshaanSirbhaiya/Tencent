@@ -1,0 +1,37 @@
+# Binding: PACK purpose id -> ESTATE purpose id, for the MCP adapter tests.
+#
+# Same shape and same rules as
+# `packages/adapter/databridge_adapter/config/purpose_bindings.yaml`, and a separate file for the
+# same reason `roles.yaml` beside it is separate: the packaged binding table declares only the
+# finance estate, and adding an estate to it would be editing another workstream's shared config
+# to make this workstream's tests pass.
+#
+# `load_purpose_bindings` takes a `path`, so a deployment (or a test) supplies its own. The loader
+# still checks every bound estate purpose against the role model's own declarations, so this file
+# cannot bind to a purpose `roles.yaml` does not declare.
+
+version: 1
+
+estates:
+
+  aldermoor-government-mcp-synthetic:
+    pack: government
+    bindings:
+      # The pack's assessment purpose is the estate's. Both are subject-scoped in their own
+      # vocabulary, which is why every request under it must carry a grant.
+      permits.assessment:            permit_assessment
+      # Re-resolving a citation is an audit act, not an assessment act. Bound separately so a
+      # verification read cannot silently borrow an assessment grant.
+      register.pointer_verification: audit
+      register.source_health:        register_operation
+
+      # DELIBERATELY UNBOUND -- `register.graph_build`, `benefits.eligibility`,
+      # `benefits.case_review`.
+      #
+      # The first is a build-time crawl that stages evidence into the graph. The nearest estate
+      # purpose is `register_operation`, which is metadata-only, so binding there would let a
+      # metadata-only role read values. The other two belong to the benefits estate and have no
+      # counterpart in a permits register at all.
+      #
+      # Leaving them unbound makes such a read a refusal that names both files, which is a
+      # question for the data owner rather than a decision for an adapter.

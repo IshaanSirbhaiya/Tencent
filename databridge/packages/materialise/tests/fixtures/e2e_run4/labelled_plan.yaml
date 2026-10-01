@@ -1,0 +1,223 @@
+api_version: walnut.materialisation/v1
+kind: MaterialisationPlan
+scheme_version: 2
+label: One row per invoice at its issue date, with the customer, project, net and
+  VAT a
+authored_by:
+  agent: data_agent
+  on_behalf_of: null
+  purpose: dataset_materialisation
+  at: '2026-10-01T13:03:25.824290Z'
+selection:
+  entity: invoice
+  cohort:
+    filter: null
+    decision_time_field: issued_on
+  traverse: []
+temporal:
+  feature_axis: system_time
+  feature_as_of: per_row
+  feature_valid_filter: none
+  feature_as_of_fixed: null
+  label_axis: valid_time
+  label_window:
+    after: T_d
+    within: P30D
+  label_read_at_system_time: build_time
+  label_maturity_lag: P0D
+  build_time: '2026-10-01T13:02:55Z'
+  corpus_as_of: null
+  source_snapshots:
+  - source_id: graph:workspace.db
+    tier: T1
+    as_of: '2026-10-01T13:02:55Z'
+    content_hash: 09d2df05269e67f12b2bf980c12b0a69375e0c15d5d3700e9d47bf62cb675431
+    schema_hash: 275c021eda9d61809e5b7ec5568dc3560dded4e8bbeafba8d1daa86c7457b2a4
+    version_id: null
+    capture_ref: null
+  - source_id: facts:larkspur_db
+    tier: T1
+    as_of: '2026-10-01T13:02:55Z'
+    content_hash: 64d6ec4fc3bbe576360089162988094cd4fc059f977d6bf25da73315ab7ab246
+    schema_hash: ''
+    version_id: null
+    capture_ref: null
+  - source_id: passages:larkspur-files__default__cb59e21931e054c3
+    tier: T1
+    as_of: '2026-10-01T13:02:55Z'
+    content_hash: 72be268790a9f23f109f6130ae2e75fd0cb6cd0166ffa456cfe6e092430f921d
+    schema_hash: ''
+    version_id: null
+    capture_ref: null
+  - source_id: passages:larkspur_db__default__47fb78a122b3800d
+    tier: T1
+    as_of: '2026-10-01T13:02:55Z'
+    content_hash: 1518c868dd38854250f762758b19924d672ba1dce52dcfa5f185f53a45dbb1c0
+    schema_hash: ''
+    version_id: null
+    capture_ref: null
+  pin_strength: observational
+shape:
+  kind: tabular
+  consumer:
+    framework: xgboost
+    version: 3.4.0
+  columns:
+  - path: invoice._id
+    type: string
+    source:
+      entity: invoice
+      field: _id
+      relation: cohort_key
+      join_key: null
+      system_time_field: null
+      valid_time_field: null
+      window: null
+    null_policy: keep
+    pointer_mode: full
+    vocabulary: null
+    unknown_level: false
+  - path: invoice.issued_on
+    type: date
+    source:
+      entity: invoice
+      field: issued_on
+      relation: decision_time
+      join_key: null
+      system_time_field: null
+      valid_time_field: null
+      window: null
+    null_policy: keep
+    pointer_mode: full
+    vocabulary: null
+    unknown_level: false
+  - path: invoice.billed_to_id
+    type: category
+    source:
+      entity: invoice
+      field: billed_to_id
+      relation: cohort_row
+      join_key: null
+      system_time_field: _system_from
+      valid_time_field: _valid_from
+      window: null
+    null_policy: keep
+    pointer_mode: full
+    vocabulary: null
+    unknown_level: false
+  - path: invoice.part_of_id
+    type: category
+    source:
+      entity: invoice
+      field: part_of_id
+      relation: cohort_row
+      join_key: null
+      system_time_field: _system_from
+      valid_time_field: _valid_from
+      window: null
+    null_policy: keep
+    pointer_mode: full
+    vocabulary: null
+    unknown_level: false
+  - path: invoice.net_gbp
+    type: float64
+    source:
+      entity: invoice
+      field: net_gbp
+      relation: cohort_row
+      join_key: null
+      system_time_field: _system_from
+      valid_time_field: _valid_from
+      window: null
+    null_policy: keep
+    pointer_mode: full
+    vocabulary: null
+    unknown_level: false
+  - path: invoice.vat_gbp
+    type: float64
+    source:
+      entity: invoice
+      field: vat_gbp
+      relation: cohort_row
+      join_key: null
+      system_time_field: _system_from
+      valid_time_field: _valid_from
+      window: null
+    null_policy: keep
+    pointer_mode: full
+    vocabulary: null
+    unknown_level: false
+  label:
+    path: invoice.status
+    type: category
+    source:
+      entity: invoice
+      field: status
+      join_key: _id
+      valid_time_field: _valid_from
+      system_time_field: _system_from
+  emit_missing_reason: true
+  semantic_names: true
+  text_field: null
+  chunking: null
+policy:
+  purpose: dataset_materialisation
+  principal:
+    actor: e2e4-analyst
+    on_behalf_of: null
+    grant_id: null
+  lawful_basis: legitimate_interests
+  purpose_compatibility_check: strict
+  trust_policy:
+    untrusted_columns: allow_as_data
+  pii:
+    direct_identifiers: suppress
+    quasi_identifiers:
+      min_group_size: 20
+      action: suppress
+  perturbation:
+    grounded_columns: forbidden
+    aggregates:
+      mechanism: none
+      epsilon: null
+      delta: null
+  egress: internal
+  missingness_leak_check:
+    max_class_delta: 0.02
+  abstention: null
+  bundle_version: ''
+determinism:
+  seed: 20260816
+  split:
+    strategy: none
+    train_before: null
+    val: null
+    test: null
+  row_order:
+  - invoice._id
+  - invoice.issued_on
+  - invoice.billed_to_id
+  - invoice.part_of_id
+  - invoice.net_gbp
+  - invoice.vat_gbp
+  executor:
+    backend: walnut-platform/sqlite
+    threads: 1
+    materialiser_version: walnut-mat 0.1.0
+  float_scale: 6
+provenance:
+  mode: compressed
+  require_pointer_for_every_cell: true
+output:
+  format: jsonl
+  metadata: croissant/1.1
+  storage: null
+packs:
+- workspace
+id: mp_6dcf55298e92
+hashes:
+  query_hash: 2c6bf02cd6923407397bf6fdd433dce2f308030d358d80a3f1ec06c9c4ea37b9
+  policy_hash: abb92bf6d319f61985251be003c082b7020a04275d42e3ee0ca9e6941d257231
+  temporal_hash: e6dd0a4a0578ba1d326904db3eac55bd538378fc9af045d2b7ca57e9564812c4
+  pack_hash: 2747c765d6e214616ee547c380901e585d608ca4c37602db89b94da1228459b4
+  plan_hash: 6dcf55298e926c07f07350cf2d91a09f8afd0cc39f27b969a1b823cd6dc4ccd8

@@ -1,0 +1,13 @@
+entity_id_a,name_a,country_a,entity_id_b,name_b,country_b,trap,must_not_merge
+ENT-00204,Quillane Mining Group PLC,VN,ENT-00301,The Quillane Mining Pte. Ltd.,ID,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00205,Northgale Semiconductors Sdn Bhd,AE,ENT-00302,The Northgale Semiconductors Group PLC,AU,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00012,Dunmarch Analytics Limited,ID,ENT-00303,Dumnarch Analytics GmbH,TH,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00111,Cindervale Shipping B.V.,GB,ENT-00304,Cindervale Shhipping Pte. Ltd.,SG,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00260,Everley Grain Group PLC,JP,ENT-00305,"Eevrley Grain Co., Ltd.",NL,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00239,Kelbrooke Shipping Limited,HK,ENT-00306,Kelbrokoe Shipping GmbH,IN,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00124,Whitmarsh Shipping Ltd,NL,ENT-00307,"Whitmarsh Shpiping Co., Ltd.",AE,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00113,"Larkspire Textiles Co., Ltd.",ID,ENT-00308,Larkspiree Textiles Group PLC,AU,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00016,Ulmara Energy Group PLC,JP,ENT-00309,Ulmaar Energy S.A.,ID,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00102,Amberfell Aviation Services Pte. Ltd.,AU,ENT-00310,Amberfell Aivation Services LLC,IN,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00088,Belmoray Bioworks Limited,MY,ENT-00311,Belmoray Biowoorks Group PLC,JP,"near-identical legal name, different jurisdiction and registration number",TRUE
+ENT-00164,Silvercrag Textiles Limited,MY,ENT-00312,Silvrecrag Textiles Pte Ltd,VN,"near-identical legal name, different jurisdiction and registration number",TRUE

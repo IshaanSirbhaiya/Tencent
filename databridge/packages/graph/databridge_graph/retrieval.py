@@ -1,4 +1,4 @@
-"""BM25 entity linking for the clinic graph (`PLAN.md` §6.5).
+"""BM25 entity linking over the graph (`PLAN.md` §6.5).
 
 ## The bug this replaces
 
@@ -6,7 +6,7 @@
 with `t in text`, a **substring** test over one joined string. Two failures compounded:
 
 1. **Substring matching.** The token ``life`` matched ``…Life Assurance``, so *"What is the meaning
-   of life?"* linked four insurers. Reproduced against a live gateway before this rewrite.
+   of life?"* linked four unrelated organisations. Reproduced against a live gateway first.
 2. **Raw counts with no notion of term rarity.** A token appearing in forty nodes counted exactly as
    much as one appearing in a single node, so common words drowned out the discriminating one.
 
@@ -16,7 +16,7 @@ of life" at all — retrieval should have declined first.
 
 ## What this does instead
 
-Standard BM25 over exact tokens, with two clinic-specific adjustments:
+Standard BM25 over exact tokens, with two adjustments this graph shape needs:
 
 - **Label tokens are repeated `_LABEL_WEIGHT` times** in a node's term vector. A question naming an
   entity should beat a node that merely mentions it in an attribute — the property the old
@@ -74,10 +74,10 @@ MIN_SCORE = 1.15
 #
 # A question is *about* an entity only if it accounts for a decent share of that entity's NAME.
 # BM25 alone cannot express this: "life" is genuinely rare across ~60 nodes, so it earns a healthy
-# IDF, and "What is the meaning of life?" still scored three insurers above any absolute floor.
+# IDF, and "What is the meaning of life?" still scored three of them above any absolute floor.
 # But it explains just 1 of the 3 tokens in "Northstar Life Assurance" — it does not name it.
 #
-# Contrast the in-domain cases: "Chest X-Ray" 2/2, "Full Blood Count" 3/3, "Everwell Insurance
+# Contrast the in-vocabulary cases: "Chest X-Ray" 2/2, "Full Blood Count" 3/3, "Everwell
 # Group" 3/3, "Meridian Life Assurance Pte Ltd" 3/5. Half is the natural cut, not a fitted one.
 #
 # KNOWN LIMITATION, recorded rather than hidden: this is exact-token matching, so an acronym does
@@ -178,7 +178,7 @@ class Bm25Index:
             label = self._label_tokens[i]
             coverage = (len(label & q_set) / len(label)) if label else 0.0
             # An exact canonical-id hit IS the name, however long the display label is:
-            # "PEE226" should fully identify "Executive Screening (PEE226)". Compared as TOKENS,
+            # "PEE226" should fully identify "Executive Review (PEE226)". Compared as TOKENS,
             # not as the raw string against `q_set`: `q_set` is built by `tokens()`, which splits
             # on underscore, so a raw `"chest_xray" in q_set` could never match — `q_set` only ever
             # holds `"chest"` and `"xray"` separately. A subset check on the tokenised id is the

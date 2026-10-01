@@ -27,3 +27,11 @@ Thumbs.db
 *.log
 /r.txt
 /*.out.txt
+
+# Walnut knowledge-graph mode (start-walnut-kg.ps1): graph store, captures, ingest runs and the
+# Google Drive OAuth client + sign-in token all live under var/. Also ignored by the repo-root
+# .gitignore; repeated here so this directory is safe on its own.
+/var/
+# Google Drive MCP credentials, wherever someone drops them by mistake
+gcp-oauth.keys.json
+**/secrets/gdrive/

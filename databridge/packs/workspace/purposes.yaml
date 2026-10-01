@@ -1,0 +1,23 @@
+# packs/workspace/purposes.yaml — the purposes user-defined agents in the `workspace` pack run under.
+#
+# A purpose is the lawful reason a read happens; an agent declaration names exactly one and the
+# compiler (`databridge_agentdef.compile_agent`) refuses a purpose the pack does not declare.
+# Agents compiled from plain English (`databridge_automation`) bind `workspace.agent_run` unless the
+# user's sentence or `WALNUT_AGENT_PURPOSE` names another.
+#
+# SYNTHETIC deployment: the Larkspur Analytics demo estate is invented.
+pack: workspace
+purposes:
+  - id: workspace.agent_run
+    description: >
+      A user-defined agent answering a question or running an automation over the sources the
+      user connected. Reads are scoped to the agent's declared sources; identity is never resolved
+      by the agent.
+    subject_scoped: false
+    lawful_basis: legitimate interest - internal business operations on the organisation's own data
+  - id: workspace.graph_build
+    description: >
+      An adapter agent crawling connected sources and staging evidence into the knowledge graph.
+      Not subject-scoped: it builds the graph, it does not look anyone up.
+    subject_scoped: false
+    lawful_basis: legitimate interest - maintaining the organisation's knowledge base

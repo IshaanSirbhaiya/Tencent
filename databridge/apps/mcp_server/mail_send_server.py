@@ -47,7 +47,7 @@ from serving import (
     serve_streamable_http,
 )
 
-SERVER_NAME = "databridge-clinic-send"
+SERVER_NAME = "databridge-send"
 
 #: Said in the tool's own description as well as here, because a tool description is what an
 #: aggregator lists and what a model reads. If this ever appears in an agent's tool list, the

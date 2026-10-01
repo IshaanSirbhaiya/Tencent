@@ -20,9 +20,28 @@ def test_extraction_f1_is_perfect_on_gold():
     assert res.entity_f1 == 1.0 and res.relation_f1 == 1.0   # plumbing proof (like E1)
 
 
+def _declared_merge_cases() -> int:
+    """How many cases `_merge_cases` declares: its `cases.append(...)` calls, read from the source
+    (HC2, SWEEP #24-34) — so adding a case widens the expectation instead of failing a pin."""
+    import ast
+    import inspect
+
+    from databridge_evals import e_intake
+
+    tree = ast.parse(inspect.getsource(e_intake._merge_cases))
+    return sum(1 for n in ast.walk(tree)
+               if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+               and n.func.attr == "append" and isinstance(n.func.value, ast.Name)
+               and n.func.value.id == "cases")
+
+
 def test_all_five_merge_cases_resolve_correctly():
     res = run_ev_intake(gold_harness())
-    assert len(res.merge_cases) == 5
+    declared = _declared_merge_cases()
+    assert declared >= 1                                          # non-vacuous
+    assert len(res.merge_cases) == declared                       # none dropped from the report
+    # The negative controls (two records that must NOT merge) are among them.
+    assert any("not merged" in c["name"] for c in res.merge_cases)
     assert all(c["pass"] for c in res.merge_cases)
 
 

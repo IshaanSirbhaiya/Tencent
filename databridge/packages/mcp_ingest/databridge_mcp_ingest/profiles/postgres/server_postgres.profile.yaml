@@ -1,0 +1,18 @@
+# @modelcontextprotocol/server-postgres (reference server, archived upstream): one read-only
+# `query(sql)` tool returning JSON rows, plus a schema resource per table. `query` alone is too
+# common a name to identify a database, so the resource listing is part of the signature.
+id: mcp-server-postgres
+title: MCP Postgres reference server (@modelcontextprotocol/server-postgres)
+group: postgres
+priority: 5
+verified: "JSON.stringify(rows) output per the reference implementation; not run live here"
+match:
+  all_tools: [query]
+  resources: true
+step:
+  strategy: tabular
+  sql:
+    tool: query
+    arg: sql
+    dialect: information_schema
+    parse: {mode: json_rows}

@@ -1,0 +1,793 @@
+# =====================================================================
+# sources.yaml -- machine-readable source descriptors for the synthetic
+# government estate. The prose form is SOURCES.md; these are the same
+# facts in the shape `describe()` returns.
+#
+# SYNTHETIC FIXTURE. The Aldermoor Territory, its agencies and every
+# record in this estate are invented. No real person, permit, claim,
+# parcel, business or address is represented.
+#
+# ---------------------------------------------------------------------
+# Field meanings
+#
+#   pinning_tier        T0 native snapshot | T1 monotonic cursor, forward-only
+#                       | T2 current-addressable, no history | T3 unversioned
+#                       The SOURCE tier is the MINIMUM over its streams. A
+#                       source-wide tier is never the best stream's tier.
+#   streams[].tier      per-stream tier. This is the one an adapter plans on.
+#   t0_capable          true only where a deployment option can serve a past
+#                       instant AND `t0_requirements` are all satisfiable.
+#   cursor.lossy        true when the watermark can skip rows (clock-based,
+#                       equal timestamps, commit-order races)
+#   deletes_detectable  hard | soft_only | none
+#   capture_required    true when pointers into this source must resolve
+#                       against the Capture Store rather than the live source
+#   origin_class        where the bytes came from        (independent axis)
+#   trust_class         D3 trust of the bytes            (independent axis)
+#   egress_class        where the bytes may go           (independent axis)
+#   reachable_verdicts  the subset of the D6 lattice this source can produce
+#   verified_means      what a `VERIFIED` verdict from THIS source asserts.
+#                       Read this before trusting the word.
+# =====================================================================
+
+estate: aldermoor-government-synthetic
+synthetic: true
+generated_by: generate.py
+seed: 20260815
+notice: "SYNTHETIC FIXTURE -- no real person, agency or record is represented."
+
+# ---------------------------------------------------------------------
+# The three independent classification axes (review finding H13).
+#
+# `third_party_ingress` was previously written as an egress class. It is not
+# one: it says where data CAME FROM and how much it may be believed, not where
+# it may GO. Third-party data is frequently the most restricted (it contains
+# other people's personal data); internally produced data is frequently the
+# least (a public register). The axes are orthogonal and are declared
+# separately.
+# ---------------------------------------------------------------------
+classification_axes:
+
+  origin_class:
+    agency_internal: "produced inside the agency boundary by an agency system or officer"
+    third_party_ingress: "arrived from outside the boundary: inbound mail, an external API, a photographed placard"
+    public_source: "published by the agency as a statutory public record"
+
+  trust_class:
+    trusted: "may influence control flow"
+    untrusted: "may be stored, cited and displayed; may NEVER influence control flow (spine D3)"
+    lattice: "trusted < untrusted"
+    propagation: >-
+      Least upper bound. A derived value with ANY untrusted parent is untrusted.
+      A generated_claim is never trusted. Trust is stamped by the adapter Core
+      from this contract and from `untrusted_fields` below -- never inferred
+      from content, because that lets the thing being contained decide whether
+      it is contained.
+    field_level: >-
+      A source-level trust bit is NOT sufficient (review finding M23). A source
+      whose default is `trusted` still carries free-text columns that are
+      untrusted, and every assertion derived from one of those columns is
+      untrusted. `untrusted_fields` on each source below overrides the default
+      in the strict direction ONLY. There is no field-level promotion to
+      trusted anywhere in this estate.
+
+  egress_class:
+    PUBLIC: "may leave the agency boundary as published: no personal data"
+    INTERNAL: "may circulate inside the agency; no external transmission"
+    RESTRICTED_INTERNAL: "must not leave the boundary; disclosable only to an entitled principal, per-read logged"
+    lattice: "PUBLIC < INTERNAL < RESTRICTED_INTERNAL"
+    propagation: >-
+      Most restrictive wins. A derived output takes the MAXIMUM egress class
+      over all of its inputs. Joining open parcel data (PUBLIC) to an applicant
+      row (RESTRICTED_INTERNAL) yields RESTRICTED_INTERNAL -- the join is the
+      disclosure, and the open half does not launder the restricted half.
+    enforcement: >-
+      Enforced at pointer resolution (spine D4a) against the requesting role's
+      `egress_ceiling` in roles.yaml. A read whose egress class exceeds the
+      principal's ceiling returns FORBIDDEN, not a redacted value.
+
+# ---------------------------------------------------------------------
+# What `VERIFIED` does and does not assert in this estate.
+#
+# Review finding M20 is correct, and it exposes an ambiguity in the D6 lattice
+# rather than in this fixture: `VERIFIED` ("re-read matches, digests equal") is
+# a statement about the bytes NOW, not about the bytes at citation time. For an
+# unversioned source those are very different claims, and the difference is the
+# whole value of a citation. Until D6 says which it means, every source in this
+# estate declares it explicitly in `verified_means`.
+# ---------------------------------------------------------------------
+verdict_semantics:
+  VERIFIED: >-
+    The bytes currently at this locator equal the captured bytes. This is a
+    present-tense claim. It does NOT establish that the bytes were there at
+    citation time; only a T0 source or a Capture Store entry can establish that.
+  VERIFIED_AS_OF_CAPTURE: >-
+    The captured bytes were re-read from the Capture Store and match the
+    citation. The live source may have moved on, or may no longer exist. For
+    every T3 source in this estate this is the strongest available verdict.
+  UNVERIFIABLE: >-
+    The tier cannot answer the question asked. Not a failure -- the tier
+    answering honestly.
+
+# The T0 bar, referenced by both PostgreSQL sources. Review finding M21:
+# "enable backups" is not a tier.
+t0_requirements_postgresql:
+  - "an operational restore-or-query service that can serve a requested past instant on demand"
+  - "a declared recoverable window AND a declared granularity (per-transaction, or per-N-minutes)"
+  - "transaction-consistent handling ACROSS both databases, since the graph spans them"
+  - "retention measured in actually-restorable, restore-tested backups -- not in configured WAL retention"
+  - "a tested failure mode: what `snapshot(at=...)` returns when the instant is outside the window"
+
+# =====================================================================
+sources:
+
+  # -------------------------------------------------------------------
+  - id: permits_registry
+    title: PERMITWORKS permits case system
+    kind: postgresql
+    entrypoint: permits_registry/schema.sql
+    seed: permits_registry/seed/load_all.sql
+
+    # Review finding C1. The previous declaration was T1 source-wide with a
+    # "reliable (recorded_at, LSN)" watermark. Both halves were overclaims:
+    #   - only `case_events` has any usable cursor at all; updates and deletes
+    #     in applicants, applications, decisions, conditions, inspections and
+    #     appeals are entirely unobservable;
+    #   - this deployment runs NO logical replication slot, so there is no
+    #     retained LSN to read. The LSN claim is deleted rather than softened.
+    #     An LSN that PostgreSQL can report is not a readable, retained change
+    #     feed.
+    # A source-wide tier is the minimum over its streams, so the source is T2.
+    pinning_tier: T2
+    tier_justification: >-
+      Current-addressable: any row can be read by primary key at the present
+      instant, and nothing else. One append-only stream (case_events) supports
+      a forward-only cursor and is declared T1 individually; every other table
+      is a mutable current-value table with no change feed, no tombstone and no
+      trustworthy watermark. The source tier is the minimum over its streams.
+    tier_upgrade_path:
+      to_T1_source_wide:
+        - "a retained logical replication slot with a publication covering every table"
+        - "declared slot retention, and a tested, non-silent handling of slot expiry"
+        - "tombstones surfaced from the slot, so `deletes_detectable` can move off `none`"
+        - "a declared bootstrap-snapshot -> slot handoff protocol with no gap and no duplicate"
+      to_T0: "every line of `t0_requirements_postgresql` above. PITR alone is not sufficient."
+    t0_capable: false
+    t0_mechanism: null
+    t0_note: >-
+      Until every line of `t0_requirements_postgresql` is true of the
+      deployment, `snapshot(at=<past>)` raises `CannotPinPast`. Claiming T0 on
+      the strength of a backup schedule is exactly the tier inflation that
+      makes a citation worthless three months after it is made.
+
+    streams:
+      - name: permits.case_events
+        tier: T1
+        append_only: true
+        cursor:
+          kind: compound_key
+          fields: [recorded_at, event_id]
+          order: "(recorded_at, event_id) ascending, strict lexicographic"
+          lossy: false
+          lossy_conditional_on: overlap_protocol
+          replay: forward_only
+          overlap_protocol:
+            # Why the compound key and the overlap window are BOTH required.
+            # `recorded_at` alone is a clock, and a clock is not a cursor:
+            # equal timestamps hide rows behind each other, and a transaction
+            # that takes its timestamp early and commits late is invisible to a
+            # watermark that has already passed it. The compound key breaks ties
+            # deterministically; the overlap window catches the commit-order race.
+            re_read_window: PT30M
+            re_read_window_basis: "must exceed the longest permitted transaction duration"
+            stabilisation_lag: PT5M
+            stabilisation_note: "never read rows newer than now() - stabilisation_lag; they may still be in flight"
+            dedupe_on: event_id
+            required: true
+            if_omitted: "the cursor is LOSSY and the stream is T2, not T1"
+        deletes_detectable: none
+        delete_note: "append-only by convention, not by constraint. A DELETE would leave no trace."
+        watermark_traps:
+          - "`occurred_at` is VALID time and trails `recorded_at` by up to 11 days. An adapter that watermarks on `occurred_at` silently loses rows."
+          - "`event_id` is a sequence value, obtained before commit. It is a tiebreaker, not a commit order. It does not remove the need for the overlap window."
+
+      - name: permits.decisions
+        tier: T2
+        append_only: effectively
+        append_only_note: "corrections supersede via `superseded_by` rather than updating; the superseding write still mutates the superseded row's pointer column"
+        cursor: {kind: none}
+        deletes_detectable: soft_only
+        delete_marker: permits.decisions.superseded_by
+
+      - name: permits.applicants
+        tier: T2
+        cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort}
+        cursor_note: >-
+          An application clock maintained by whichever code path wrote the row.
+          Not monotonic across writers, not set on every path, and loses rows
+          updated inside the same second. It may be used to PRIORITISE a
+          re-read. It may never be used to PROVE completeness.
+        deletes_detectable: none
+
+      - name: permits.applications
+        tier: T2
+        cursor: {kind: none}
+        cursor_note: "`last_event_at` is derived from case_events and is not maintained transactionally with the row."
+        deletes_detectable: none
+
+      - {name: permits.permit_conditions, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: permits.inspections, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: permits.appeals, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: permits.officers, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: permits.permit_types, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: permits.v_public_register, tier: T2, cursor: {kind: none}, deletes_detectable: none,
+         derived_from: [permits.applications, permits.decisions]}
+
+    deletes_detectable: none
+    deletes_note: >-
+      `soft_only` holds for `decisions` alone. Every other table can be DELETEd
+      with no tombstone, so estate-wide the honest answer is `none`. An adapter
+      that infers deletion from a row no longer appearing is fabricating.
+
+    retention: {rows: indefinite, history: none}
+    retention_note: "Retention of ROWS is not retention of HISTORY. Every mutable table holds the current value only."
+
+    origin_class: agency_internal
+    trust_class: trusted
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capabilities: [describe, snapshot_present, plan, resolve, verify]
+    snapshot_at_past: raises CannotPinPast
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    drift_benign_note: >-
+      Reporting DRIFT_BENIGN requires a cheap entity-level change signal that
+      covers the whole row (xmin, a row version). This adapter does not read
+      one, so per ADAPTER_AGENT_SPEC section 5 it never emits DRIFT_BENIGN.
+      Saying so is more useful than inventing it.
+    verified_means: "the row at this primary key currently holds the cited value. Not a claim about any past instant."
+
+    untrusted_fields:
+      # Review finding M23. The source default is `trusted`; these override it
+      # in the strict direction. Anything derived from one of these -- including
+      # a graph edge -- is untrusted and may never influence control flow.
+      - permits.applicants.notes
+      - permits.applications.site_description
+      - permits.applications.agent_of_record
+      - permits.decisions.rationale
+      - permits.inspections.notes
+      - permits.appeals.grounds
+      - permits.case_events.detail
+    untrusted_derived_edges:
+      - {edge: CLAIMS_AGENT_FOR, derived_from: permits.applications.agent_of_record, status: proposal_only}
+      - {edge: MENTIONS, derived_from: [permits.applicants.notes, permits.case_events.detail], status: proposal_only}
+
+    hazards:
+      - undeclared_fk_to_gis
+      - national_id_ref_is_not_a_join_key
+      - intra_source_duplicate_applicants
+      - valid_time_trails_system_time
+      - laundered_injection_via_free_text
+    hazard_notes:
+      undeclared_fk_to_gis: "`applications.parcel_id` has no foreign key to the GIS -- a different system on a different release train. A tail of PCL-XX-* values resolve to nothing. An adapter that inner-joins these away is deleting evidence."
+      national_id_ref_is_not_a_join_key: "`applicants.national_id_ref` is nullable and frequently wrong, however much it looks like a key."
+      intra_source_duplicate_applicants: "~6% of people have two applicant rows. The duplicates are within one source and one table."
+
+  # -------------------------------------------------------------------
+  - id: benefits_case_management
+    title: CLAIMLINE benefits case system
+    kind: postgresql
+    entrypoint: benefits_case_management/schema.sql
+    seed: benefits_case_management/seed/load_all.sql
+
+    pinning_tier: T2
+    tier_justification: >-
+      Same shape as permits, same correction (review finding C1). Two
+      append-only streams support a forward-only cursor under an explicit
+      protocol and are declared T1 individually. Claimants, claims,
+      determinations, reviews and notes have no cursor, no tombstone and no
+      change feed. The source tier is the minimum over its streams.
+    tier_upgrade_path:
+      to_T1_source_wide:
+        - "a retained logical replication slot with a publication covering every table"
+        - "declared slot retention, and a tested, non-silent handling of slot expiry"
+        - "tombstones surfaced from the slot"
+        - "a declared bootstrap-snapshot -> slot handoff protocol"
+      to_T0: "every line of `t0_requirements_postgresql`, plus the cross-database line below."
+    t0_capable: false
+    t0_note: >-
+      Identical to permits_registry, and one requirement bites hardest here: a
+      past-instant read must be transaction-consistent ACROSS both databases,
+      because the graph joins them. Two independently restored databases give a
+      torn read that looks like a determination without a payment.
+
+    streams:
+      - name: benefits.claim_events
+        tier: T1
+        append_only: true
+        cursor:
+          kind: compound_key
+          fields: [recorded_at, event_id]
+          lossy: false
+          lossy_conditional_on: overlap_protocol
+          replay: forward_only
+          overlap_protocol: {re_read_window: PT30M, stabilisation_lag: PT5M, dedupe_on: event_id, required: true}
+        deletes_detectable: none
+        retention: P7Y
+        retention_trap: >-
+          An unlogged retention job truncates this table at roughly seven years.
+          The oldest claims therefore have determinations and payments with NO
+          surviving events. Absence of an event is not evidence the event did
+          not happen -- this is the single most important line in this file,
+          because it is the mistake a graph builder makes by default. It also
+          means a full resync from cursor zero returns LESS than a resync run
+          last year did: the cursor is forward-only AND its tail is being eaten.
+
+      - name: benefits.payments
+        tier: T1
+        append_only: true
+        append_only_note: "reversals are new rows pointing back via `reversal_of`; never an update"
+        cursor:
+          kind: compound_key
+          fields: [posted_at, payment_id]
+          lossy: false
+          lossy_conditional_on: overlap_protocol
+          replay: forward_only
+          overlap_protocol: {re_read_window: PT30M, stabilisation_lag: PT5M, dedupe_on: payment_id, required: true}
+          note: >-
+            `payment_id` is a text key and is NOT monotonic. It serves only as a
+            deterministic tiebreaker so that two rows sharing a `posted_at`
+            cannot hide behind each other. Ordering is by `posted_at` first.
+            Without the overlap window this cursor is lossy and the stream is T2.
+        deletes_detectable: none
+
+      - name: benefits.eligibility_determinations
+        tier: T2
+        append_only: effectively
+        append_only_note: "corrections chain via `supersedes`"
+        cursor: {kind: none}
+        deletes_detectable: soft_only
+        delete_marker: benefits.eligibility_determinations.supersedes
+
+      - {name: benefits.claimants, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: benefits.claims, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: benefits.reviews, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: benefits.claim_notes, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: benefits.caseworkers, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: benefits.benefit_programs, tier: T2, cursor: {kind: none}, deletes_detectable: none}
+      - {name: benefits.v_program_caseload, tier: T2, cursor: {kind: none}, deletes_detectable: none,
+         derived_from: [benefits.claims], aggregate_only: true}
+
+    deletes_detectable: none
+    retention: {claim_events: P7Y, rows: indefinite, history: none}
+
+    origin_class: agency_internal
+    trust_class: trusted
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capabilities: [describe, snapshot_present, plan, resolve, verify]
+    snapshot_at_past: raises CannotPinPast
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    verified_means: "the row at this primary key currently holds the cited value. Not a claim about any past instant."
+
+    untrusted_fields:
+      - benefits.claim_notes.body
+      - benefits.claim_events.detail
+      - benefits.reviews.notes
+      - benefits.payments.reference
+      - benefits.eligibility_determinations.evidence_ref
+    untrusted_note: >-
+      Passing through a system of record does NOT promote trust. Two of the
+      estate's ten planted injections were laundered into `claim_notes.body` by
+      a caseworker pasting an email. The row is trusted; the column is not; and
+      the service-principal grant in roles.yaml may not stamp `benefits.*` as
+      uniformly trusted (review finding M23).
+
+    entity_resolution_note: >-
+      The estate's identity test lives here. CLAIMLINE never adopted the
+      Aldermoor Resident Number and keys on its own BRN. ~55% of the people in
+      it are the same human beings as rows in permits.applicants, and NOTHING
+      joins the two reliably: `resident_number` is present on about a third of
+      rows, hand-keyed, and often transposed or truncated;
+      `claims.linked_application_id` is a hint on ~12% of claims and mistyped on
+      a quarter of those. Answer key: GROUND_TRUTH.md.
+
+    hazards: [no_shared_identifier_with_permits, unreliable_bridge_columns,
+              event_log_truncated_at_7y, laundered_injection_via_claim_notes]
+
+  # -------------------------------------------------------------------
+  - id: case_files
+    title: Scanned case documents (OCR text)
+    kind: document_drop
+    entrypoint: case_files/INDEX.csv
+    formats: [md, txt]
+    pinning_tier: T3
+    tier_justification: "Unversioned filesystem drop. No version field, no tombstone, no usable watermark."
+    t0_capable: false
+    cursor:
+      kind: none
+      rejected_candidate: mtime
+      rejected_reason: >-
+        `mtime` moves when a file is re-scanned, re-saved or copied by a backup
+        tool, and does NOT move when some scanners replace content in place. It
+        is wrong in both directions.
+    deletes_detectable: none
+    delete_note: "a file that disappears is indistinguishable from one that was never indexed"
+    retention: {default: indefinite, versions: 1}
+    retention_note: "unversioned: the previous OCR pass is gone the moment a page is re-scanned"
+
+    origin_class: third_party_ingress
+    origin_note: "scanner output of documents submitted by members of the public. Hostile input by construction; one file carries a planted injection."
+    trust_class: untrusted
+    untrusted_fields: ["*"]
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_note: "a pointer into a case file resolves against the Capture Store (content-addressed, WORM), never the live path"
+    capabilities: [describe, plan, resolve, verify_live_bytes, verify_against_capture]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, UNVERIFIABLE]
+    verified_means:
+      # Review finding M20. The previous text said "nothing to verify against",
+      # which threw away a real and useful distinction.
+      VERIFIED: >-
+        the file currently at this path digests to the captured bytes. This is
+        worth having: it is how a re-scan is DETECTED. It is not a claim that
+        the bytes were there when the citation was made.
+      VERIFIED_AS_OF_CAPTURE: "the Capture Store entry re-reads and matches. The strongest verdict this tier can reach."
+      DRIFT_MATERIAL: "the live file digests differently: the page was re-scanned and the prior OCR is gone."
+      VANISHED: "the path no longer resolves. NOT evidence of deletion -- deletes are not detectable here."
+
+    trusted_binding:
+      # Review finding H12: `case_ref` in INDEX.csv is recovered from OCR of a
+      # form a member of the public filled in. It is a CLAIM, not a routing
+      # decision.
+      field: case_ref
+      status: claimed_only
+      exposed_as: claimed_case_ref
+      rule: >-
+        `claimed_case_ref` is untrusted evidence. It may be stored, cited and
+        displayed. It may NOT be used as a row predicate, may NOT create a
+        traversable EVIDENCES edge, and may NOT decide who can see the
+        document. A trusted `case_ref` exists only after an agency intake
+        mapping or a named human attestation, recorded with the attesting
+        principal and timestamp.
+
+    hazards: [ocr_character_confusion, mid_word_hyphenation, page_furniture,
+              misread_identifiers, unrecoverable_values, planted_injection]
+    unrecoverable_note: >-
+      Some values are genuinely unrecoverable. The correct output for those is
+      `unresolved`, not a repaired guess.
+
+  # -------------------------------------------------------------------
+  - id: legacy_records
+    title: LEGACY-MASTER fixed-width flat file
+    kind: fixed_width
+    entrypoint: legacy_records/LAYOUT.md
+    copybook: legacy_records/COPYBOOK.cpy
+    record_bytes: 220
+    pinning_tier: T3
+    tier_justification: "The archetype. Re-cut in full nightly; between two cuts there is no diff, no tombstone and no key-stability guarantee."
+    t0_capable: false
+    cursor:
+      kind: none
+      rejected_candidate: LM-LAST-UPD-CYMD
+      rejected_reason: "a date, not a cursor: day granularity, and some records carry 00000000"
+    deletes_detectable: none
+    retention: {generations: 1}
+    retention_note: "one generation. Only the most recent cut exists; yesterday's is gone."
+
+    origin_class: agency_internal
+    trust_class: trusted
+    trust_note: "trusted as to provenance, worthless as to currency"
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capabilities: [describe, plan, resolve, verify_against_capture]
+    reachable_verdicts: [VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, UNVERIFIABLE]
+    verified_means:
+      VERIFIED_AS_OF_CAPTURE: "the captured cut re-reads and matches"
+      why_VERIFIED_is_not_reachable: >-
+        A live re-read is possible but nearly always meaningless: the file is
+        re-cut in full nightly and record offsets are not stable across cuts, so
+        a byte-range pointer into last night's cut addresses different data
+        today. Cite the capture, never the live file. UNVERIFIABLE is not a
+        failure here -- it is the tier answering honestly.
+    hazards: [surname_truncated_at_30, uppercase_only, impossible_dates,
+              blank_primary_keys, retired_reference_schemes, orphan_records]
+    orphan_note: "~8% are records for people no modern system holds. A resolver that forces every legacy row onto a known person is wrong, and this source is how you find that out."
+
+  # -------------------------------------------------------------------
+  - id: correspondence
+    title: Mailbox extract
+    kind: rfc5322_drop
+    entrypoint: correspondence/INDEX.csv
+
+    # Review finding MH19. The shipped fixture is a directory of .eml files. It
+    # CANNOT exercise cursor advancement, cursor expiry, a 404, a resync race,
+    # or a message deleted between pages -- so the T1 claim was asserted by
+    # prose and tested by nothing. The two are now declared separately.
+    pinning_tier: T3
+    pinning_tier_scope: as_shipped
+    tier_justification: "As shipped this is an unversioned directory drop with a static index. That is T3, and an adapter built against it is testing T3 behaviour."
+    live_contract:
+      pinning_tier: T1
+      cursor: {kind: opaque_history_cursor, replay: forward_only, expires: true, expiry_response: "404 -> EXPIRED"}
+      effective_retention: P30D
+      documented_retention: "typically at least one week (the comparable-provider figure)"
+      retention_note: "plan against the EFFECTIVE figure. Message bodies persist far longer than the cursor that finds them."
+      status: NOT_EXERCISED_BY_THIS_FIXTURE
+      required_to_exercise:
+        # Build these before any adapter may claim it implements the T1 contract.
+        - "a deterministic mock history endpoint serving a fixed response sequence"
+        - "cursor advancement across at least three pages"
+        - "cursor expiry mid-read -> 404 -> EXPIRED, distinguishable from VANISHED"
+        - "duplicate delivery of the same message_id in two consecutive pages"
+        - "a late arrival: a message whose sent_at precedes the last page's newest"
+        - "a message present on page N and absent on a re-read of page N (deletion ambiguity)"
+        - "a full-resync handoff after EXPIRED, with no gap and no duplicate at the seam"
+    t0_capable: false
+    deletes_detectable: none
+    delete_note: "a deleted message leaves no tombstone; the cursor simply never mentions it again. EXPIRED and VANISHED must stay distinguishable."
+
+    origin_class: third_party_ingress
+    trust_class: untrusted
+    untrusted_fields: ["*"]
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_note: "`email_part` pointers resolve against the Capture Store. Always."
+    capabilities: [describe, plan, resolve, verify_against_capture]
+    reachable_verdicts: [VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, EXPIRED, VANISHED, UNVERIFIABLE]
+
+    trusted_binding:
+      # Review finding H12 -- the sharpest one in the review, because the estate
+      # as written MODELLED a flow that spine D3 forbids.
+      field: case_ref
+      derived_from_header: X-Case-Reference
+      status: claimed_only
+      exposed_as: claimed_case_ref
+      rule: >-
+        `X-Case-Reference` arrives on inbound mail from applicants, claimants
+        and third parties. It is attacker-controlled. Using it to associate a
+        message with a case means a forged header can route hostile content
+        into another person's case AND decide who is entitled to read it --
+        untrusted input deciding control flow and access, precisely what D3
+        forbids.
+      trusted_mapping_required_before:
+        - "the message may be associated with a case (a traversable CORRESPONDS_ON edge)"
+        - "the message may appear in, or be excluded from, any caseload-scoped result"
+        - "the message may be traversed by a query that produces a determination"
+      trusted_mapping_sources:
+        - id: agency_outbound_thread
+          rule: >-
+            The message is a reply -- by In-Reply-To / References -- to a message
+            the agency itself sent from the case system. The case association
+            comes from the AGENCY's outbound spool record, not from the inbound
+            header. This is the only automatic path.
+          covers: "agency-originated threads, which carry an outbound spool id"
+        - id: human_attestation
+          rule: "a named officer associates the message with a case; principal and timestamp recorded"
+      until_then: >-
+        The adapter emits `claimed_case_ref` as an untrusted GroundedValue with
+        a pointer to the header span, plus a CLAIMS_CASE_REF proposal edge that
+        no access decision and no determination-producing traversal may follow.
+
+    hazards: [planted_injection_plain_body, planted_injection_html_alternative,
+              planted_injection_json_attachment, forged_case_reference_header,
+              no_delete_tombstones, cursor_expiry]
+    injection_answer_key: correspondence/INJECTIONS.md
+    injection_note: "INDEX.csv deliberately does not flag which messages are hostile."
+
+  # -------------------------------------------------------------------
+  - id: gis_parcels
+    title: Parcel and address extract
+    kind: csv
+    entrypoint: gis_parcels/SCHEMA.md
+    crs: "AMG-1 (fictional local grid)"
+    pinning_tier: T2
+    tier_justification: "Current-addressable by parcel id; the cut is reissued in place and nothing else is kept."
+    t0_capable: false
+    cursor:
+      kind: file_level_only
+      lossy: true
+      rejected_candidate: last_survey_on
+      rejected_reason: "a survey date, not a modification time"
+    deletes_detectable: none
+    delete_note: "a merged or renumbered parcel simply stops appearing in the next cut"
+    retention: {cuts: 1}
+
+    origin_class: agency_internal
+    trust_class: trusted
+    egress_class: PUBLIC
+    egress_note: >-
+      PUBLIC applies to parcels, zoning and address points ALONE. The moment a
+      parcel is joined to an applicant, a claimant or a case, the derived output
+      takes the maximum egress class of its inputs and becomes
+      RESTRICTED_INTERNAL. "This parcel is zoned R2" is public; "this parcel is
+      the site of APP-2023-000252" is not.
+    capture_required: true
+    capabilities: [describe, plan, resolve, verify]
+    snapshot_at_past: refused
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, UNVERIFIABLE]
+    verified_means:
+      VERIFIED: "the current cut still carries the cited value at this parcel id"
+      caveat: >-
+        Review finding M20, the converse half: once the cut changes, digest
+        comparison can no longer verify an OLD citation at all. The verdict for
+        a citation into a superseded cut is VERIFIED_AS_OF_CAPTURE (against the
+        Capture Store) or DRIFT_MATERIAL -- never VERIFIED.
+    hazards: [renumbered_parcels, merged_parcels, no_row_level_change_marker]
+
+  # -------------------------------------------------------------------
+  # Review finding MH18. The live API and the shipped captures were one source,
+  # which meant a fixture adapter could serve HISTORICAL state -- something the
+  # real adapter cannot do -- while claiming to exercise T2 behaviour. They are
+  # now two resources with two contracts and two pointer namespaces.
+  # -------------------------------------------------------------------
+  - id: public_registry_api
+    title: Business and licence registry (live API)
+    kind: json_api
+    resource_role: live_source
+    pointer_namespace: "public_registry_api://"
+    pinning_tier: T2
+    tier_justification: "Current state only. There is no `as_of` parameter and no change feed."
+    t0_capable: false
+    cursor:
+      kind: none
+      rejected_candidates:
+        - {field: etag, reason: "detects THAT something changed. It does not order changes and cannot drive an incremental read."}
+        - {field: next_cursor, reason: "paginates one response. A page cursor, not a change cursor."}
+    deletes_detectable: none
+    delete_note: >-
+      Demonstrably so: a delete and a filter change are the SAME observation.
+      The API returns no tombstone and no deleted_at. See public_registry/DRIFT.md.
+    retention: {history: none}
+    origin_class: third_party_ingress
+    trust_class: untrusted
+    untrusted_fields: ["*"]
+    egress_class: INTERNAL
+    egress_note: >-
+      The registry is public at source, but a Walnut projection of it is joined
+      to internal case data and is INTERNAL. Public origin does not make a
+      derived output public.
+    capture_required: true
+    capabilities: [describe, plan, resolve]
+    verify_note: >-
+      verify() against this source compares the CURRENT response to a capture,
+      so it is really a verify against `public_registry_captures`, declared
+      separately below. Pointers must not straddle the two namespaces.
+    reachable_verdicts: [VERIFIED, DRIFT_MATERIAL, VANISHED, UNVERIFIABLE]
+    verified_means: {VERIFIED: "the current API response still carries the cited value. Present tense only."}
+
+  - id: public_registry_captures
+    title: Business and licence registry (Capture Store snapshots)
+    kind: capture_store
+    resource_role: capture_store
+    pointer_namespace: "capture://public_registry/"
+    captures_of: public_registry_api
+    entrypoint: public_registry/snapshots/
+    snapshots: ["2026-05-01", "2026-08-01"]
+    pinning_tier: T0
+    tier_scope: within_the_captured_set_only
+    tier_justification: >-
+      A Capture Store IS addressable at a past instant, but only at instants it
+      actually holds. It is T0 over {2026-05-01, 2026-08-01} and UNVERIFIABLE
+      for every other instant -- it must not be mistaken for a T0 SOURCE. This
+      separation exists so that a test cannot accidentally validate a T0-like
+      fixture adapter while believing it exercised the T2 live contract.
+    t0_capable: true
+    t0_mechanism: content_addressed_worm_store
+    t0_retention: indefinite
+    t0_granularity: "per shipped capture only; three months apart. There is nothing between them."
+    cursor: {kind: capture_date}
+    deletes_detectable: hard
+    deletes_note: >-
+      Within the captured set only: four registrations present on 2026-05-01 are
+      absent on 2026-08-01, and the store can prove that. It says nothing about
+      whether the registrar deleted them or merely stopped returning them.
+    origin_class: third_party_ingress
+    trust_class: untrusted
+    egress_class: INTERNAL
+    capabilities: [describe, snapshot, plan, resolve, verify]
+    reachable_verdicts: [VERIFIED_AS_OF_CAPTURE, DRIFT_BENIGN, DRIFT_MATERIAL, VANISHED, UNVERIFIABLE]
+    drift_benign_capable: true
+    drift_benign_basis: "the `meta.etag` block is an entity-level change signal covering the whole record, so benign drift is genuinely detectable here"
+    expected_verdicts: public_registry/DRIFT.md
+
+  # -------------------------------------------------------------------
+  - id: inspection_photos
+    title: Site photograph metadata sidecars
+    kind: json_sidecar
+    entrypoint: inspection_photos/INDEX.csv
+    images_shipped: false
+    pinning_tier: T3
+    t0_capable: false
+    cursor: {kind: none}
+    deletes_detectable: none
+    retention: {default: indefinite, versions: 1}
+    retention_note: "a re-OCR overwrites"
+
+    origin_class: third_party_ingress
+    origin_note: "a placard photographed on site is input from the world; one sidecar's OCR carries a planted instruction"
+    trust_class: untrusted
+    untrusted_fields: ["inspection_photos.ocr.blocks[].text"]
+    trusted_fields:
+      # These come from the agency's own device fleet and batch assignment, not
+      # from the photographed world. They are the ONLY fields in this source
+      # that may bind a photo to a case.
+      - inspection_id
+      - photo_batch_ref
+      - captured_by
+      - captured_at
+    trusted_binding:
+      rule: >-
+        A photo binds to a case through `photo_batch_ref` ->
+        `permits.inspections.photo_batch_ref` -> `inspections.application_id`.
+        The sidecar's own `application_id` is a convenience copy and must be
+        reconciled against that path, never trusted alone. OCR text binds
+        nothing.
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_note: "`ocr_bbox` pointers resolve against the Capture Store, never the live filesystem"
+    capabilities: [describe, plan, resolve, verify_against_capture]
+    reachable_verdicts: [VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, UNVERIFIABLE]
+
+    ocr_bbox_checkability:
+      # Review finding M22. The previous claim -- "exactly what an ocr_bbox
+      # pointer needs to be checkable rather than merely plausible" -- was
+      # misleading, because no images ship and the sidecar corroborates only
+      # itself.
+      what_is_checkable:
+        - "the sidecar bytes re-read from the Capture Store and match their digest"
+        - "the bbox lies within the declared `image.width` x `image.height`"
+        - "the coordinate origin and format are declared (`top_left`, `xywh_pixels`), so the geometry is unambiguous"
+        - "block ordering and `line` indices are internally consistent"
+      what_is_NOT_checkable:
+        - "that the text was ever present in an image"
+        - "that the text was at that location in that image"
+        - "that an image ever existed -- `image_present` is false throughout"
+      honest_verdict: >-
+        An `ocr_bbox` pointer into this source reaches VERIFIED_AS_OF_CAPTURE as
+        to THE SIDECAR, and UNVERIFIABLE as to the image. Both must be reported;
+        reporting only the first would let a reader believe the photograph had
+        been checked.
+      to_become_fully_checkable:
+        - "ship image bytes into the Capture Store"
+        - "record an image digest in the sidecar"
+        - "make the image retrievable by that digest, so the bbox can be cropped and re-read"
+
+# ---------------------------------------------------------------------
+# Declared gaps. Review finding M26 -- recorded rather than closed, because
+# closing them means generating new fixture data (generate.py), outside the
+# scope of this contract revision. No adapter may claim coverage of any of
+# these on the strength of this fixture.
+# ---------------------------------------------------------------------
+known_fixture_gaps:
+  - id: bootstrap_cdc_handoff_race
+    affects: [permits_registry, benefits_case_management]
+    missing: "a snapshot taken at T, a slot opened at T-delta, and the overlapping rows that must dedupe to exactly one"
+  - id: equal_timestamps_and_out_of_order_commits
+    affects: [permits_registry, benefits_case_management]
+    missing: "two case_events sharing recorded_at to the microsecond; a transaction whose recorded_at precedes an already-consumed watermark"
+    severity: "highest of these. It is the exact failure the compound cursor and overlap window exist to prevent, and nothing tests them."
+  - id: replication_slot_expiry
+    affects: [permits_registry, benefits_case_management]
+    missing: "a slot that has dropped behind retention, and the full-resync handoff"
+  - id: partial_page_failure_and_duplicate_pages
+    affects: [correspondence, public_registry_api]
+  - id: hostile_mime
+    affects: [correspondence]
+    missing: "malformed MIME, duplicate Message-IDs, attachment bombs, mismatched Content-Transfer-Encoding"
+  - id: timezone_and_dst_ambiguity
+    affects: [permits_registry, benefits_case_management, correspondence]
+    missing: "a local timestamp inside a DST fold; a date-only field whose day boundary differs by zone"
+  - id: schema_drift_new_sensitive_column
+    affects: [permits_registry, benefits_case_management]
+    missing: "a column added after the policy was written -- the case that roles.yaml `on_unclassified_column: deny` exists to survive"
+  - id: multi_role_multi_purpose_evaluation
+    affects: [roles.yaml]
+    missing: "a principal holding two roles, and a request naming a purpose the active role does not hold"
+  - id: retained_parent_purged_children
+    affects: [benefits_case_management]
+    note: "partially present -- the 7-year claim_events truncation is real -- but no test asserts the correct behaviour"
+  - id: source_permission_change_mid_read
+    affects: all
+    missing: "a read that succeeds on page 1 and returns FORBIDDEN on page 2"

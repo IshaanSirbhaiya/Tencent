@@ -1,0 +1,52 @@
+ Hexbury Cold Chain Co., Ltd.
+
+Interim Review for the financial year ended 31 December 2023
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Hexbury Cold Chain Co., Ltd.
+  Registration number   SYN-CRN-8303874
+  Country of incorporation   NL
+  Principal activity   Food and Agriculture
+  Reporting currency   SGD
+  Date of incorporation   2021-01-15
+
+ Directors' commentary
+
+Demand in the Group's principal market softened, offset in part by a full year contribution from the contract logistics division acquired in the prior period.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2023   FY2022
+------:---:|
+  Revenue   470   496
+  Gross profit   195   208
+  EBITDA   131   134
+  Depreciation and amortisation   -18   -20
+  Finance costs   -35   -40
+  Profit after tax   66   59
+  Total assets   563   525
+  Total borrowings   77   69
+  Cash and cash equivalents   75   66
+  Total equity   368   400
+
+ Key ratios
+
+  Ratio   FY2023   Covenant reference
+------:---|
+  Net debt / EBITDA   0.01x   Tested quarterly under the syndicated facility
+  Interest cover   3.18x   Tested quarterly
+  Current ratio   0.75x   -
+
+ Banking arrangements
+
+The Group's principal banker is Northgate Mercantile Bank. Facilities comprise a revolving credit line and a trade finance line, both secured.
+
+ Auditor's note
+
+The comparative figures for the prior period were restated following a reclassification of contract assets.

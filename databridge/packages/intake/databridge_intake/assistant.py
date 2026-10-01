@@ -1,4 +1,4 @@
-"""Loader for ``config/assistant.yaml`` — the assistant's persona and refusal rules.
+"""Loader for the active pack's ``config/assistant.yaml`` — persona and refusal rules.
 
 The prompt lives in config rather than in ``apps/gateway/.../llm.py`` for the same reason the
 coverage table does: swapping the model provider (Azure OpenAI, for the Copilot Studio story) must

@@ -1,0 +1,52 @@
+# walnut-files-blob — Walnut's own read-only filesystem MCP server
+# (packages/mcp_ingest/servers/files_blob/server.py, READ mode: `--root DIR`).
+#
+# THE ROUTE FOR PDF / DOCX / PPTX / XLSX. Evaluated 2026-10-01 over fixtures/workspace_demo/files:
+#   (a) @modelcontextprotocol/server-filesystem 2026.8.31 — declares no `resources` capability
+#       (resources/list and resources/read → "Method not found"), and read_media_file on a .pdf or
+#       .docx fails with `MCP error -32602: Invalid tools/call result` (its SDK rejects the
+#       embedded-resource block the handler builds). Text files work; binaries land in failed.jsonl.
+#   (b) markitdown-mcp (uvx) — one tool, convert_to_markdown(uri). It reads the files (docx 0.48 s,
+#       pdf 0.15 s) but (1) returns Markdown, so the capture store would hold a DERIVED text under
+#       a .pdf/.docx name, not the source bytes — the content hash no longer identifies the file
+#       and docling never sees it; (2) it has no listing tool, so it cannot crawl on its own;
+#       (3) it accepts ANY file:/http(s):/data: URI — an unscoped reader, no declared roots. Rejected.
+#   (c) this server — CHOSEN: original bytes for every type (embedded resource, base64 blob, with
+#       _meta.sha256), so capture → sha256 → docling text → offsets is unbroken; scoped to declared
+#       roots with realpath containment; exposes NO write tool at all in read mode.
+#
+# Identity (P4): list_dir returns each entry's full `path`; the engine hashes the source-qualified
+# full path, so two `brief.md` in different folders are two items. Folder names with '#' or '%'
+# are addressed by path (no URL encoding anywhere), so 'Q3 #roadmap' lists and reads normally.
+#
+# Output formats: verified by tests/test_s1_files_blob.py against the live server (stdio).
+id: walnut-files-blob
+title: Walnut files server (original bytes, read-only)
+description: >-
+  Walnut's filesystem MCP server in read mode. Every file is read with read_bytes, so the
+  captured bytes are the file's own bytes whatever its type; docling extracts PDF/Office text.
+group: walnut-files
+priority: 20
+verified: "2026-10-01 — output formats exercised live by tests/test_s1_files_blob.py (mcp 1.27)"
+match:
+  all_tools: [list_roots, list_dir, read_bytes]
+step:
+  strategy: documents
+  roots:
+    tool: list_roots
+    args: {}
+    parse: {mode: json, items_path: roots, value_field: path}
+  list:
+    tool: list_dir
+    args: {path: "{path}"}
+    recurse: true
+    dir_values: [dir]
+    parse:
+      mode: json
+      items_path: entries
+      fields: {name: name, type: type, path: path, size: size, mime: mime}
+  read:
+    # No text tool: every type goes through read_bytes, so the captured bytes are the file's
+    # bytes (a text tool would capture the server's decoding of them, not the file).
+    binary_tool: read_bytes
+    binary_args: {path: "{path}"}

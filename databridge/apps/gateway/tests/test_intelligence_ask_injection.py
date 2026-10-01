@@ -45,6 +45,8 @@ from fastapi.testclient import TestClient
 
 from databridge_gateway.intelligence_routes import _register_intelligence_routes
 
+from conftest import AUTH_HEADERS
+
 # The classic, written the way it would actually arrive: an instruction to a machine, printed on a
 # document, stored as a label. It names a send target, an identity decision, and a role change.
 DOCUMENT_INJECTION = (
@@ -106,7 +108,7 @@ def app():
 
 @pytest.fixture(scope="module")
 def client(app):
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         yield c
 
 
@@ -133,7 +135,9 @@ def test_the_fixture_actually_reaches_the_agent(app, answered):
     assert labels[POISONED_ISSUER] == ISSUER_INJECTION, "the poison is not in the graph"
 
     registry = build_structural_registry(store)
-    reached = [row.values for tool in registry for row in tool.call().rows]
+    # The figure tools take no argument; the entity tools need a reference the question supplies.
+    reached = [row.values for tool in registry
+               if not (tool.parameters.get("required") or []) for row in tool.call().rows]
     flat = json.dumps(reached)
     # The tools READ both poisoned entities — they are in the rows, by handle — and neither
     # payload is in what they returned. That pair of assertions is the whole point: the attack is
@@ -143,8 +147,8 @@ def test_the_fixture_actually_reaches_the_agent(app, answered):
     assert DOCUMENT_INJECTION not in flat
     assert ISSUER_INJECTION not in flat
     assert INJECTED_LABEL_TEXT in flat, "the tool did not say a label was talking to a machine"
-    assert {r["tool"] for r in answered["reads"]} == {
-        "coverage_gaps", "documents_needing_a_person", "issuer_document_mix"}
+    ran = {r["tool"] for r in answered["reads"] if r["status"] == "ok"}
+    assert {"documents_needing_a_person", "issuer_document_mix"} <= ran
 
 
 def test_the_payload_is_not_reproduced_anywhere_in_the_response(answered):
@@ -223,11 +227,13 @@ def test_the_answer_makes_no_claim_to_have_acted(answered):
         assert not screen_agent_output(value["text"]).refused
 
 
-def test_nothing_outside_the_registered_reads_ever_executed(answered):
+def test_nothing_outside_the_registered_reads_ever_executed(app, answered):
     """A compliant model can name `send_email`. There is nothing for the name to land in."""
-    assert all(read["status"] == "ok" for read in answered["reads"])
-    assert {r["tool"] for r in answered["reads"]} <= {
-        "coverage_gaps", "documents_needing_a_person", "issuer_document_mix"}
+    from databridge_gateway.agent_tools import build_structural_registry
+
+    assert all(read["status"] in {"ok", "not_read"} for read in answered["reads"])
+    registered = set(build_structural_registry(app.state.brain.store).names())
+    assert {r["tool"] for r in answered["reads"]} <= registered
 
 
 def test_the_tool_surface_cannot_grow_after_the_agent_has_taken_it(app):
@@ -257,7 +263,7 @@ def test_the_graph_was_not_written_to(app, answered):
     for a read tool quietly growing a write.
     """
     before = app.state.brain.store.counts()
-    client = TestClient(app)
+    client = TestClient(app, headers=AUTH_HEADERS)
     with client:
         client.post("/intelligence/ask", json={"question": "what is still blocked?"})
     assert app.state.brain.store.counts() == before

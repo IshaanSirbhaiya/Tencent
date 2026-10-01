@@ -1,4 +1,9 @@
-"""Loader + typed view over ``config/coverage_rules.yaml`` (PLAN.md §3).
+"""Loader + typed view over the ACTIVE PACK's ``config/coverage_rules.yaml`` (PLAN.md §3).
+
+The file lives at ``packs/<pack>/config/coverage_rules.yaml`` — beside the ``ontology.yaml``
+that declares the vocabulary it is written in — and is located through
+``databridge_intake.paths.config_dir()``, which resolves it from the deployment binding. No
+module here names a pack.
 
 This module is the *only* thing that knows an issuer code exists. Everything downstream asks it
 questions ("what package does BLPHS/WELL2 authorise?") instead of branching on codes. That is what
@@ -215,6 +220,9 @@ class CoverageRules(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     version: int
+    # ISO 4217 code of every price in this table, declared by the pack (SWEEP #15). Optional so a
+    # table that predates it still loads; the API then reports `currency: null`, never a guess.
+    currency: Optional[str] = Field(default=None, pattern=r"^[A-Z]{3}$")
     issuers: list[Issuer]
     packages: list[Package]
     self_pay: SelfPay

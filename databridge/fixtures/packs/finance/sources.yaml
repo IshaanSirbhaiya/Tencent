@@ -1,0 +1,1248 @@
+# =====================================================================
+# sources.yaml -- machine-readable source descriptors for the Walnut
+# synthetic finance estate. The prose form is SOURCES.md; these are the
+# same facts in the shape `describe()` returns.
+#
+# SYNTHETIC FIXTURE. Every entity, person, instrument and identifier in
+# this estate is invented. No real organisation, price or listing is
+# represented, and none was used to build it.
+#
+# ---------------------------------------------------------------------
+# Field meanings
+#
+#   pinning_tier        T0 native snapshot | T1 monotonic cursor, forward-only
+#                       | T2 current-addressable, no history | T3 unversioned
+#                       The SOURCE tier is the MINIMUM over its streams. A
+#                       source-wide tier is never the best stream's tier.
+#   streams[].tier      per-stream tier. This is the one an adapter plans on.
+#   t0_capable          true only where a deployment option can serve a past
+#                       instant AND every line of `t0_requirements_postgresql`
+#                       is satisfiable. It is a CAPABILITY, never a permission
+#                       to pin the past -- see `t0_is_not_permission_to_pin`.
+#   cursor.lossy        true when the watermark can skip rows (clock-based,
+#                       equal timestamps, commit-order races). `false` is only
+#                       ever declared CONDITIONAL on a named protocol.
+#   deletes_detectable  hard | soft_only | none. Declared per stream; the
+#                       source-level value is the weakest of them.
+#   capture_required    true when pointers into this source must resolve
+#                       against the Capture Store rather than the live source
+#   origin_class        where the bytes came from        (independent axis)
+#   trust_class         D3 trust of the bytes            (independent axis)
+#   egress_class        where the bytes may go           (independent axis)
+#   reachable_verdicts  the subset of the D6 lattice this source can produce
+#   verified_means      what a `VERIFIED` verdict from THIS source asserts.
+#                       Read this before trusting the word.
+#
+# Revision note: version 2, revised against review phase2-3-b4-finance.
+# Disposition log: wiki/40-reviews/R-004-finance-estate-fixes.md
+# =====================================================================
+
+estate: walnut-finance-synthetic
+synthetic: true
+generated_by: generate.py
+seed: 20260815
+version: 2
+notice: "SYNTHETIC FIXTURE -- no real organisation, person, instrument or price is represented."
+held_out_sources: [sanctions_watchlist]
+
+# ---------------------------------------------------------------------
+# The three independent classification axes.
+#
+# Aligned field-for-field with the government estate's `classification_axes`
+# so the two estates are comparable. Finance adds one egress class the
+# government estate has no use for -- `LICENSED_THIRD_PARTY` -- and it sits
+# ABOVE `RESTRICTED_INTERNAL`, because the constraint on it is contractual as
+# well as internal: the licence forbids the rows leaving even where the
+# internal classification would allow it. The three shared classes have
+# identical meaning in both estates.
+# ---------------------------------------------------------------------
+classification_axes:
+
+  origin_class:
+    first_party: "produced inside the bank by a bank system or member of staff"
+    third_party_ingress: "arrived from outside the boundary: inbound mail, a payer's remittance text, a customer-supplied document"
+    licensed_vendor: "supplied under a redistribution licence"
+    public_source: "published by a public authority or by the entity itself"
+
+  trust_class:
+    trusted: "may influence control flow"
+    untrusted: "may be stored, cited and displayed; may NEVER influence control flow (spine D3)"
+    lattice: "trusted < untrusted"
+    propagation: >-
+      Least upper bound. A derived value with ANY untrusted parent is
+      untrusted. A generated_claim is never trusted. Trust is stamped by the
+      adapter Core from this contract and from each source's
+      `untrusted_fields` -- never inferred from content, because that lets the
+      thing being contained decide whether it is contained.
+    field_level: >-
+      A source-level trust bit is NOT sufficient. A source whose default is
+      `trusted` still carries free-text columns that are untrusted, and every
+      assertion derived from one of those columns is untrusted.
+      `untrusted_fields` on each source below overrides the default in the
+      STRICT DIRECTION ONLY. There is no field-level promotion to trusted
+      anywhere in this estate.
+
+  egress_class:
+    PUBLIC: "may leave the bank as published: no personal data, no client identity"
+    INTERNAL: "may circulate inside the bank; no external transmission"
+    RESTRICTED_INTERNAL: "must not leave the boundary; disclosable only to an entitled principal, per-read logged"
+    LICENSED_THIRD_PARTY: "rows are licensed and may not be redistributed at all; see `row_egress` / `derived_egress`"
+    lattice: "PUBLIC < INTERNAL < RESTRICTED_INTERNAL < LICENSED_THIRD_PARTY"
+    propagation: >-
+      Most restrictive wins. A derived output takes the MAXIMUM egress class
+      over all of its inputs. Joining a vendor price (LICENSED_THIRD_PARTY) to
+      a borrower row (RESTRICTED_INTERNAL) yields LICENSED_THIRD_PARTY -- the
+      join is the disclosure, and neither half launders the other.
+    enforcement: >-
+      Enforced at pointer resolution (spine D4a) against the requesting role's
+      `egress_ceiling` in roles.yaml. A read whose egress class exceeds the
+      principal's ceiling returns FORBIDDEN, not a redacted value. No role in
+      this estate declares a `LICENSED_THIRD_PARTY` ceiling, so a raw
+      market-data ROW read is FORBIDDEN by construction rather than by prose.
+
+# ---------------------------------------------------------------------
+# Whose verdict is this? (review: `reachable_verdicts` omits FORBIDDEN on
+# sources that roles.yaml denies.)
+# ---------------------------------------------------------------------
+verdict_scope: policy_wrapped_adapter
+verdict_scope_note: >-
+  `reachable_verdicts` describes the POLICY-WRAPPED adapter -- the thing a
+  caller actually holds -- not the bare storage adapter. FORBIDDEN is therefore
+  reachable on every source in this estate without exception, because every
+  source is denied to at least one role and because a grant can be withdrawn
+  after a citation is made. A storage-only verdict set would be a different
+  list and is not what `describe()` returns here.
+
+verdict_semantics:
+  VERIFIED: >-
+    The bytes currently at this locator equal the captured bytes. A PRESENT
+    TENSE claim. It does NOT establish that the bytes were there at citation
+    time; only a T0 source or a Capture Store entry can establish that.
+  VERIFIED_AS_OF_CAPTURE: >-
+    The captured bytes were re-read from the Capture Store and match the
+    citation. The live source may have moved on, or may no longer exist. For
+    every T3 source in this estate this is the strongest available verdict.
+  DRIFT_BENIGN: >-
+    Something in the source moved and it was not anything we cited. Only
+    emittable where the source declares `benign_drift_signal` -- a cheap
+    ENTITY-LEVEL change signal (ADAPTER_AGENT_SPEC section 5). Where no such
+    signal exists the honest verdict is VERIFIED, and this estate says so
+    rather than inventing benign drift.
+  DRIFT_MATERIAL: "a cited value changed. Always escalates."
+  UNVERIFIABLE: "the tier cannot answer the question asked. Not a failure -- the tier answering honestly."
+  FORBIDDEN: "policy now denies what it once allowed. Reachable on every source; see `verdict_scope`."
+
+# ---------------------------------------------------------------------
+# The T0 bar. "PITR is enabled" is not a tier.
+# Identical in substance to the government estate's block of the same name;
+# lines 6 and 7 are finance-specific.
+# ---------------------------------------------------------------------
+t0_requirements_postgresql:
+  - "an operational restore-or-query service that can serve a requested past instant ON DEMAND, not a ticket to an infrastructure team"
+  - "a declared recoverable WINDOW and a declared GRANULARITY (per-transaction, or per-N-minutes)"
+  - "transaction-consistent handling ACROSS both databases, since the graph spans core_banking and crm"
+  - "retention measured in actually-restorable, RESTORE-TESTED backups -- not in configured WAL retention"
+  - "a tested failure mode: what `snapshot(at=...)` returns when the instant is outside the window"
+  - "a declared restore SLA, because a past instant that takes four hours to serve cannot be on the read path"
+  - "a pointer namespace of its own, so a citation into a restored instance can never be mistaken for a citation into the live source"
+
+t0_is_not_permission_to_pin:
+  rule: >-
+    `t0_capable: true` means a deployment OPTION exists. It is NOT permission
+    for the ordinary read path to pin the past, and no component may read it as
+    such. On every source in this estate `snapshot(at=<past>)` raises
+    `CannotPinPast` on the ordinary interface, whatever `t0_capable` says.
+  restore_is_a_separate_resource: >-
+    A PITR restore produces a SEPARATE resource with its own pointer namespace
+    (`core_banking_pitr://<restored_at>/`), its own describe(), and its own
+    authorisation. Pointers may not straddle the two namespaces, and a pointer
+    into the live source is never silently resolved against a restore. This
+    mirrors the government estate's split of `public_registry_api` from
+    `public_registry_captures`, for the same reason: a fixture or an adapter
+    that can serve historical state while claiming to exercise the live
+    contract will validate behaviour nobody has.
+  enforcement_note: >-
+    `source_description_from_yaml` already refuses to carry `t0_mechanism` or
+    `t0_retention_days` on a non-T0 description, so a T0 promise cannot leak
+    into a T1/T2/T3 capability matrix by transcription. That refusal is the
+    machine half of this rule.
+
+# ---------------------------------------------------------------------
+# THE CAPTURE STORE.
+#
+# Every source below declares `capture_required: true`, and until this block
+# existed the estate made no promise at all about how long a captured pointer
+# stays resolvable. That was the largest gap in the pinning contract: it is
+# not enough to say a pointer resolves against the Capture Store if nothing
+# says how long the Capture Store keeps it.
+#
+# Three retentions are different things and must never be conflated:
+#   1. BUSINESS-RECORD retention -- how long the row/document survives in the
+#      source (`retention` on each source below). `txn: P7Y` says nothing
+#      about verifiability.
+#   2. NATIVE HISTORICAL VERIFIABILITY -- how far back the SOURCE itself can
+#      answer. For every source in this estate this is ZERO, except a
+#      core_banking PITR restore, which reaches at most 35 days.
+#   3. CAPTURE STORE retention -- how long a CITATION stays checkable. This is
+#      the only one of the three that bounds the ledger, and it is declared
+#      here.
+# ---------------------------------------------------------------------
+capture_store:
+  kind: content_addressed_worm
+  implementation_requirement: "S3/MinIO Object Lock in COMPLIANCE mode, or equivalent. A store an operator can delete from is not a capture store."
+  addressing: "sha256 of the captured bytes. A capture is immutable by construction; there is no update path."
+  retention:
+    default: P7Y
+    ledger_bound: P10Y
+    ledger_bound_note: >-
+      A capture referenced by a determination in the evidence ledger is
+      retained for the life of the determination plus the credit-file
+      retention period (P10Y), whichever is longer. A capture may NOT expire
+      out from under a determination that cites it.
+    per_source:
+      core_banking: P7Y
+      crm: P5Y
+      filings: P10Y
+      credit_memos: P10Y
+      mailbox: P7Y
+      market_data: P24M
+      market_data_note: "bounded by the vendor licence, not by us. A market-data citation older than 24 months is UNVERIFIABLE and must be reported as such rather than silently trusted."
+      spreadsheets: P7Y
+      payments: P7Y
+      sanctions_watchlist: indefinite
+  retention_can_exceed_source: >-
+    Deliberately. The Capture Store outlives `spreadsheets` (overwritten
+    monthly) and `mailbox` (P3Y) on purpose: capture retention is what makes a
+    citation checkable, and a citation into a source with a shorter retention
+    is exactly the case the store exists for.
+  on_expiry:
+    verdict: UNVERIFIABLE
+    rule: >-
+      When a capture passes its retention the pointer DOWNGRADES: `verify()`
+      returns UNVERIFIABLE with `reason: CAPTURE_EXPIRED`, and the pointer is
+      marked as such in the ledger. It does NOT return VANISHED -- vanished is
+      a claim about the SOURCE, and after capture expiry we no longer know
+      anything about the source. Silently returning VERIFIED against a live
+      re-read at that point would be the worst available answer.
+    ledger_effect: "the determination is not retracted; it is re-labelled as resting on evidence that can no longer be re-checked. That distinction is the whole point of the lattice."
+  partial_capture:
+    rule: "a capture that did not complete is not a capture. A truncated or interrupted write is discarded and the pointer is UNVERIFIABLE, never resolved against the partial bytes."
+    status: NOT_EXERCISED_BY_THIS_FIXTURE
+  not_a_t0_source: >-
+    The Capture Store is addressable at the instants it actually holds and at
+    no others. It is T0 over the captured set and UNVERIFIABLE everywhere else.
+    It must never be described as making its sources T0.
+
+# ---------------------------------------------------------------------
+# IDENTITY: candidates and confirmations.
+#
+# Several fields in this estate LOOK like identity links and are not. A join
+# that resolves is a CANDIDATE. Nothing in this estate, at any reliability,
+# produces a confirmed identity without a named human's attestation. This is
+# the same rule the hard constraints state for patients, applied to parties.
+# ---------------------------------------------------------------------
+identity:
+  subject_kind: party                 # spine D4b; see roles.yaml `subject_kinds`
+  states:
+    candidate: "a proposed link between two records, carrying its basis and its own SourcePointer. Storable, citable, displayable. Never determinative."
+    confirmed: "a link a NAMED HUMAN attested to, carrying the attesting principal, the timestamp, the basis they were shown, and its own SourcePointer."
+  rule: >-
+    `requires_human_selection` stays `Literal[True]`. There is no code path
+    that sets it False. No reliability figure in this file -- including 1.0 --
+    promotes a candidate to a confirmation, because reliability is a property
+    of a POPULATION and identity is a claim about ONE subject.
+  confirmation_requires:
+    - "a named human principal"
+    - "a timestamp"
+    - "the candidate set that was shown, so the choice can be re-examined"
+    - "a SourcePointer for the attestation itself, distinct from the pointers for the evidence"
+  automatic_merge: forbidden
+  automatic_merge_note: "no source pair in this estate may be auto-merged, at any threshold. See GROUND_TRUTH.md `non_matches.csv` for what a loose threshold costs."
+  screening_states:
+    # A watchlist hit is the same shape of claim and gets the same treatment.
+    candidate_hit: "a name/jurisdiction/date-of-birth comparison scored above threshold. Deterministic, reproducible, and NOT a finding."
+    confirmed_hit: "a named compliance officer attested that this candidate IS this subject. Only a confirmed hit is a finding, and only a finding has consequences."
+    suppression: "a candidate hit may be dismissed only by a named human with a recorded reason. No text in any source can suppress a hit -- see INJ-08."
+
+# ---------------------------------------------------------------------
+# ANSWER KEYS -- not part of any source, not returned by describe().
+#
+# The scoring key for the held-out sanctions source used to sit inside
+# `sanctions_watchlist/` and was named in this file, which meant `describe()`
+# handed an adapter an input-to-answer lookup table. It now lives with every
+# other answer key under `ground_truth/`, which no adapter reads.
+# ---------------------------------------------------------------------
+answer_keys:
+  location: ground_truth/
+  adapter_visible: false
+  rule: >-
+    Nothing under `ground_truth/` is a source, is described by this file, is
+    reachable from any transport declared here, or may be opened by an adapter
+    or by the engine. It exists for the TEST HARNESS, to score a run after the
+    fact. An adapter that can read its own answer key is not being tested.
+  files:
+    - {path: ground_truth/expected_screening_results.json, scores: sanctions_watchlist}
+    - {path: ground_truth/entity_map.csv, scores: entity_resolution}
+    - {path: ground_truth/entity_clusters.json, scores: entity_resolution}
+    - {path: ground_truth/non_matches.csv, scores: entity_resolution}
+    - {path: ground_truth/intra_source_duplicates.csv, scores: entity_resolution}
+    - {path: ground_truth/injections.json, scores: injection_defence}
+    - {path: ground_truth/pii_in_free_text.csv, scores: pii_handling}
+    - {path: ground_truth/expected_counts.json, scores: determinism}
+
+# =====================================================================
+sources:
+
+  # -------------------------------------------------------------------
+  - id: core_banking
+    title: Core banking / lending book
+    kind: postgresql
+    transport: "postgresql://<host>/<db>?options=-csearch_path%3Dcore_banking"
+    entrypoint: core_banking/load.sql
+
+    # Review: "T1 not yet defensible." Correct, and the correction is the same
+    # one the government estate made to both of its PostgreSQL sources.
+    #
+    #   * The LSN claim is DELETED, not softened. An LSN is readable as a
+    #     change feed only if logical decoding is configured and a replication
+    #     slot is retained. This deployment runs neither -- and it cannot,
+    #     without contradicting the rest of the estate, whose whole delete
+    #     story is that a hard DELETE leaves nothing behind. An LSN PostgreSQL
+    #     can REPORT is not a retained, readable change feed.
+    #   * `updated_at` is an application clock, it is absent from six of the
+    #     eleven tables, and it is lossy. It may PRIORITISE a re-read. It may
+    #     never PROVE completeness.
+    #
+    # Three append-only tables do support a forward-only cursor under an
+    # explicit protocol and are declared T1 individually. The source tier is
+    # the minimum over its streams, so the source is T2.
+    pinning_tier: T2
+    tier_justification: >-
+      Current-addressable: any row can be read by primary key at the present
+      instant, and nothing else. Three append-only streams support a
+      forward-only cursor under the protocol declared on each and are T1
+      individually; the other eight tables are mutable current-value tables
+      with no change feed, no tombstone and no trustworthy watermark. The
+      source tier is the minimum over its streams.
+    tier_upgrade_path:
+      to_T1_source_wide:
+        - "a retained logical replication slot with a publication covering every table"
+        - "declared slot retention, and a tested, non-silent handling of slot expiry"
+        - "tombstones surfaced from the slot, so `deletes_detectable` can move off `none`"
+        - "a declared bootstrap-snapshot -> slot handoff protocol with no gap and no duplicate at the seam"
+      to_T0: "every line of `t0_requirements_postgresql`. PITR alone is not sufficient."
+
+    # The T0 option, declared in full. Review: the pairing of T1/T2 with
+    # `t0_capable: true` is coherent; what was missing was everything that
+    # makes it checkable.
+    t0_capable: true
+    t0_mechanism: point_in_time_recovery
+    t0_retention_days: 35
+    t0_option:
+      enabled: true
+      enabled_meaning: "the managed instance retains WAL and restore-tested base backups for 35 days. It does NOT mean the read path can pin the past."
+      granularity: per_transaction
+      restore_target: "a NEW instance, restored out of band"
+      restore_sla: PT4H
+      restore_sla_consequence: "four hours is not a read path. A PITR read is an investigation, never a step in answering a question."
+      pointer_namespace: "core_banking_pitr://<restored_at>/"
+      cross_database_consistency: false
+      cross_database_consistency_note: >-
+        The graph spans core_banking AND crm. Restoring one without the other
+        gives a torn read -- a facility with no relationship record, or the
+        reverse -- that looks like data rather than like an artefact of the
+        restore. Until both are restored to one coordinated instant, a PITR
+        read of this source alone may not be joined to crm at all. This is why
+        `t0_requirements_postgresql` line 3 is not yet satisfied and the source
+        is not T0.
+      out_of_window: "raises CannotPinPast. Never a silent nearest-instant."
+      requirements_met: [1, 2, 4, 5, 6, 7]
+      requirements_unmet: [3]
+
+    # No source-wide watermark exists. Absence declared rather than left blank.
+    cursor:
+      kind: none
+      rejected_candidate: lsn
+      rejected_reason: "no logical decoding, no retained replication slot. There is no LSN a reader can consume."
+      rejected_candidate_2: updated_at
+      rejected_reason_2: >-
+        An application clock, not monotonic across writers, absent from txn,
+        party_address, facility_account, account_balance_monthly, collateral,
+        covenant and covenant_test, and it loses rows updated inside the same
+        second. Six of eleven tables have no watermark at all, which is what
+        makes a source-wide T1 claim impossible rather than merely optimistic.
+
+    streams:
+      - name: core_banking.txn
+        tier: T1
+        append_only: true
+        cursor:
+          kind: compound_key
+          fields: [booking_ts, txn_id]
+          order: "(booking_ts, txn_id) ascending, strict lexicographic"
+          lossy: false
+          lossy_conditional_on: overlap_protocol
+          replay: forward_only
+          overlap_protocol:
+            re_read_window: PT30M
+            re_read_window_basis: "must exceed the longest permitted transaction duration"
+            stabilisation_lag: PT5M
+            stabilisation_note: "never read rows newer than now() - stabilisation_lag; they may still be in flight"
+            dedupe_on: txn_id
+            required: true
+            if_omitted: "the cursor is LOSSY and the stream is T2, not T1"
+        deletes_detectable: none
+        delete_note: "append-only by convention, not by constraint. A DELETE would leave no trace."
+        watermark_traps:
+          - "`value_date` is VALID time. It is sometimes NULL and sometimes days after `booking_ts`. An adapter that watermarks on it silently loses rows."
+          - "`txn_id` is a sequence value obtained before commit. It is a tiebreaker, not a commit order, and it does not remove the need for the overlap window."
+
+      - name: core_banking.account_balance_monthly
+        tier: T1
+        append_only: true
+        cursor: {kind: compound_key, fields: [as_of_date, account_id], lossy: false,
+                 lossy_conditional_on: overlap_protocol, replay: forward_only,
+                 overlap_protocol: {re_read_window: P1D, dedupe_on: "(account_id, as_of_date)", required: true}}
+        cursor_note: "month-grained. The overlap window is a day because the writer is a monthly batch, not a transaction."
+        deletes_detectable: none
+
+      - name: core_banking.covenant_test
+        tier: T1
+        append_only: true
+        cursor: {kind: compound_key, fields: [recorded_at, test_id], lossy: false,
+                 lossy_conditional_on: overlap_protocol, replay: forward_only,
+                 overlap_protocol: {re_read_window: PT30M, stabilisation_lag: PT5M, dedupe_on: test_id, required: true}}
+        cursor_note: "`recorded_at` is the recording clock; `test_date` is valid time and trails it. Watermark on `recorded_at`."
+        deletes_detectable: none
+
+      - name: core_banking.party
+        tier: T2
+        key: [party_id]
+        pointer_address: "core_banking://party/{party_id}#{column}"
+        cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort}
+        cursor_note: "may PRIORITISE a re-read; may never PROVE completeness."
+        deletes_detectable: soft_only
+        delete_marker: core_banking.party.deleted_at
+        delete_note: "soft deletes only, and ONLY here. A hard DELETE of a party leaves nothing behind."
+
+      - {name: core_banking.account, tier: T2, key: [account_id],
+         pointer_address: "core_banking://account/{account_id}#{column}",
+         cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort},
+         deletes_detectable: none}
+      - {name: core_banking.facility, tier: T2, key: [facility_id],
+         pointer_address: "core_banking://facility/{facility_id}#{column}",
+         cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort},
+         deletes_detectable: none}
+      - {name: core_banking.party_contact, tier: T2, key: [contact_id],
+         pointer_address: "core_banking://party_contact/{contact_id}#{column}",
+         cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort},
+         deletes_detectable: none}
+      - {name: core_banking.party_address, tier: T2, key: [address_id],
+         pointer_address: "core_banking://party_address/{address_id}#{column}",
+         cursor: {kind: none}, deletes_detectable: none}
+      - {name: core_banking.facility_account, tier: T2, key: [facility_id, account_id],
+         cursor: {kind: none}, deletes_detectable: none}
+      - {name: core_banking.collateral, tier: T2, key: [collateral_id],
+         cursor: {kind: none}, deletes_detectable: none}
+      - {name: core_banking.covenant, tier: T2, key: [covenant_id],
+         cursor: {kind: none}, deletes_detectable: none}
+
+    # Review: `soft_only` was too broad -- only `party.deleted_at` exists.
+    deletes_detectable: none
+    deletes_note: >-
+      `soft_only` holds for `party` ALONE, and is declared on that stream. Every
+      other table can be DELETEd with no tombstone, so estate-wide the honest
+      answer is `none`. An adapter that infers deletion from a row no longer
+      appearing is fabricating.
+
+    retention: {txn: P7Y, party: indefinite, default: indefinite}
+    retention_note: >-
+      Retention of ROWS is not retention of HISTORY. `txn: P7Y` is a
+      business-record obligation and says nothing about whether a citation into
+      a transaction can be re-checked. Native historical verifiability here is
+      ZERO on the ordinary interface (at most 35 days through an out-of-band
+      PITR restore); citation verifiability is bounded by
+      `capture_store.retention.per_source.core_banking`.
+
+    origin_class: first_party
+    trust_class: trusted
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_retention: P7Y
+    capabilities: [describe, snapshot_present, plan, resolve, verify]
+    snapshot_at_past: raises CannotPinPast
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    drift_benign_note: >-
+      DRIFT_BENIGN was previously listed and is now removed. Reporting it
+      requires a cheap entity-level change signal covering the WHOLE row --
+      `xmin`, a row version. `updated_at` is not one: it is absent from six
+      tables and is written by whichever code path happened to touch the row.
+      Per ADAPTER_AGENT_SPEC section 5 the honest verdict without such a signal
+      is VERIFIED, and saying so is more useful than inventing benign drift.
+    verified_means: "the row at this primary key currently holds the cited value. Not a claim about any past instant."
+
+    sensitive_columns:
+      - core_banking.party.notes
+      - core_banking.party.date_of_birth
+      - core_banking.party_address.line1
+      - core_banking.party_address.line2
+      - core_banking.party_address.postal_code
+      - core_banking.party_contact.contact_name
+      - core_banking.party_contact.email
+      - core_banking.party_contact.phone
+    untrusted_fields:
+      # The source default is `trusted`; these override it in the strict
+      # direction. Anything derived from one of these -- including a graph edge
+      # -- is untrusted and may never influence control flow.
+      - core_banking.party.notes
+      - core_banking.facility.notes
+      - core_banking.collateral.notes
+      - core_banking.collateral.description
+      - core_banking.txn.narrative
+      - core_banking.txn.counterparty_name
+    untrusted_note: >-
+      `txn.counterparty_name` is the name on the instruction, typed by whoever
+      sent the payment. It is first-party by storage and third-party by origin,
+      which is exactly the case a source-level trust bit gets wrong.
+
+    undeclared_foreign_keys:
+      - {column: core_banking.txn.counterparty_party_id, references: core_banking.party.party_id, orphan_rate: 0.11}
+      - {column: core_banking.txn.reversal_of, references: core_banking.txn.txn_id, orphan_rate: 0.10}
+      - {column: core_banking.collateral.facility_id, references: core_banking.facility.facility_id, orphan_rate: 0.06}
+      - {column: core_banking.party.primary_rm_code, references: crm.relationship_manager.rm_code, orphan_rate: 0.06}
+    undeclared_fk_note: >-
+      These are relationships a heuristic finder should DISCOVER, not
+      relationships the policy layer may assume. roles.yaml declares every row
+      scope explicitly for exactly this reason: an access boundary that
+      propagates through an undeclared, 6-11% orphaned FK is a boundary that
+      leaks on the orphans.
+
+    hazards: [inconsistent_casing, empty_string_vs_null, undeclared_fks, orphan_fks,
+              intra_source_duplicate_parties, over_limit_facilities, planted_injection, embedded_pii]
+
+  # -------------------------------------------------------------------
+  - id: crm
+    title: Relationship management
+    kind: postgresql
+    transport: "postgresql://<host>/<db>?options=-csearch_path%3Dcrm"
+    entrypoint: crm/load.sql
+
+    pinning_tier: T2
+    tier_justification: >-
+      Current-addressable. The only watermark is an application-clock
+      `updated_at`; it is not monotonic across writers, it is absent from
+      `relationship_manager` and `interaction` entirely, and it loses rows
+      updated inside the same second. It can neither reconstruct the past nor
+      guarantee complete forward replay.
+    tier_upgrade_path:
+      to_T1: ["a retained logical replication slot", "declared slot retention and tested expiry handling", "tombstones surfaced from the slot"]
+      to_T0: "every line of `t0_requirements_postgresql`."
+    t0_capable: false
+    t0_note: "no PITR is operated on this instance. `snapshot(at=<past>)` raises CannotPinPast."
+
+    cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort}
+
+    # Review: "T2 conditional -- reasonable only if every pointer has a stable
+    # current-row address. Primary keys, mutation behaviour and pointer
+    # granularity are absent." All three are now declared per stream.
+    streams:
+      - name: crm.relationship_manager
+        tier: T2
+        key: [rm_code]
+        pointer_address: "crm://relationship_manager/{rm_code}#{column}"
+        cursor: {kind: none}
+        cursor_note: "no updated_at at all. A change here is invisible to any incremental read."
+        mutation: update_in_place
+        deletes_detectable: none
+        key_stability: "rm_code is reissued to a new joiner after a leaver's record is purged. A pointer to an rm_code is NOT stable across that reissue."
+      - name: crm.account_org
+        tier: T2
+        key: [crm_org_id]
+        pointer_address: "crm://account_org/{crm_org_id}#{column}"
+        cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort}
+        mutation: update_in_place
+        deletes_detectable: none
+      - name: crm.contact
+        tier: T2
+        key: [crm_contact_id]
+        pointer_address: "crm://contact/{crm_contact_id}#{column}"
+        cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort}
+        mutation: update_in_place
+        deletes_detectable: none
+        delete_note: "hard deletes, no tombstone. crm.interaction.crm_contact_id already carries orphans from deletions that happened before this snapshot."
+      - name: crm.interaction
+        tier: T2
+        key: [interaction_id]
+        pointer_address: "crm://interaction/{interaction_id}#{column}"
+        cursor: {kind: none}
+        cursor_note: "no updated_at. `occurred_at` is valid time and is backdated on entry; it is not a watermark."
+        mutation: update_in_place
+        deletes_detectable: none
+      - name: crm.opportunity
+        tier: T2
+        key: [opportunity_id]
+        pointer_address: "crm://opportunity/{opportunity_id}#{column}"
+        cursor: {kind: timestamp, field: updated_at, lossy: true, replay: best_effort}
+        mutation: update_in_place
+        deletes_detectable: none
+
+    pointer_granularity: cell
+    pointer_granularity_note: "a pointer addresses (table, primary key, column) at the present instant. There is no version component because there are no versions."
+
+    deletes_detectable: none
+    retention: {default: P5Y}
+    retention_note: "5 years after relationship closure. Rows, not history: every table holds the current value only."
+
+    origin_class: first_party
+    trust_class: trusted
+    egress_class: INTERNAL
+    capture_required: true
+    capture_retention: P5Y
+    capabilities: [describe, snapshot_present, plan, resolve, verify]
+    snapshot_at_past: raises CannotPinPast
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    drift_benign_note: "same reason as core_banking: `updated_at` is absent from two tables and is not a row version. Previously listed; removed."
+    verified_means: "the row at this primary key currently holds the cited value. Present tense only."
+
+    sensitive_columns: [crm.contact.first_name, crm.contact.last_name, crm.contact.email,
+                        crm.contact.phone, crm.relationship_manager.email, crm.interaction.summary]
+    untrusted_fields: [crm.interaction.summary, crm.interaction.subject, crm.opportunity.lost_reason]
+
+    # Review Critical 4: this looked like an executable identity link.
+    bridge_to_core_banking:
+      column: crm.account_org.external_ref
+      status: candidate_only
+      reliability: {correct: 0.30, "null": 0.50, wrong: 0.20}
+      reliability_is_not_identity: >-
+        30% correct is a property of the POPULATION. It says nothing about the
+        row in front of you, and a 100% figure would say no more. Following
+        this column produces a CANDIDATE link carrying its own SourcePointer
+        and the basis it was proposed on -- never a confirmed identity.
+      corroboration:
+        required: true
+        minimum: "two independent bases (for example: legal name similarity AND a shared contact email domain AND a matching address), each with its own pointer"
+        insufficient_alone: [external_ref, org_name, contact_email]
+        insufficient_alone_note: "role mailboxes (ops@, treasury@) are shared, so a contact email matches several distinct people. A shared key is not a key."
+      confirmation:
+        requires_named_human: true
+        attestor: "a named relationship manager or compliance officer"
+        records: [principal, timestamp, candidate_set_shown, basis, source_pointer_of_the_attestation]
+        note: "corroboration raises confidence; only the attestation confirms. The two are different operations and the second is never automatic."
+
+    hazards: [no_shared_identifiers, unreliable_bridge_column, name_column_swaps,
+              shared_role_mailboxes, orphan_contact_references, planted_injection,
+              rm_code_reissued_after_leaver]
+
+  # -------------------------------------------------------------------
+  - id: filings
+    title: Annual reports and financial statements
+    kind: document_drop
+    transport: "file://filings/"
+    formats: [md, txt]
+    pinning_tier: T3
+    tier_justification: >-
+      Unversioned drop. No version field, no watermark, no tombstone. A
+      document replaced in place is indistinguishable from one that was always
+      that way.
+    t0_capable: false
+    cursor:
+      kind: none
+      rejected_candidate: mtime
+      rejected_reason: "moves when a file is re-saved or copied by a backup tool, and does NOT move when a drop is replaced by a writer that preserves timestamps. Wrong in both directions."
+    deletes_detectable: none
+    delete_note: "a file that disappears is indistinguishable from one that was never indexed."
+
+    retention: {default: indefinite, versions: 1}
+    retention_note: >-
+      "Indefinite" is retention of the CURRENT document. It is NOT retention of
+      historical versions -- there are none, and mistaking the first for the
+      second is how a T3 source gets treated as though it could answer about
+      the past. Effective native historical retention here is ZERO.
+
+    document_address:
+      addressed_by: "path + sha256 of the captured bytes"
+      path_is_not_identity: >-
+        `_FINAL`, `_revised`, `_v2` and ` (1)` copies of the same period coexist
+        with nothing inside them to order them by. The path is a locator; the
+        digest is the identity. A citation names both, and a citation that
+        names only the path cites whichever file is there today.
+      byte_range_stability: "byte offsets are stable within a captured digest and meaningless across digests. A byte-range pointer that does not carry its digest is not resolvable."
+
+    origin_class: third_party_ingress
+    origin_note: "authored by the entity being assessed, or by its auditor. Hostile input by construction where it matters most -- the figures are the entity's own claims about itself."
+    trust_class: untrusted
+    untrusted_fields: ["*"]
+    egress_class: INTERNAL
+    capture_required: true
+    capture_retention: P10Y
+    capabilities: [describe, plan, resolve, verify_live_bytes, verify_against_capture]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    verified_means:
+      VERIFIED: "the file currently at this path digests to the captured bytes. Worth having -- it is how a silent replacement is DETECTED. Not a claim that the bytes were there at citation time."
+      VERIFIED_AS_OF_CAPTURE: "the Capture Store entry re-reads and matches. The strongest verdict this tier can reach."
+      DRIFT_MATERIAL: "the live file digests differently: the document was replaced and the prior text is gone."
+      VANISHED: "the path no longer resolves. NOT evidence of deletion -- deletes are not detectable here."
+    hazards: [unversioned_duplicates, entity_named_in_prose_only, former_names,
+              units_declared_in_prose, planted_injection_in_table_cell]
+
+  # -------------------------------------------------------------------
+  - id: credit_memos
+    title: Underwriting memoranda
+    kind: document_drop
+    transport: "file://credit_memos/"
+    formats: [md]
+    pinning_tier: T3
+    tier_justification: >-
+      Same shape as `filings`: an unversioned drop with no version field, no
+      watermark and no tombstone. Declared here rather than left to inference,
+      because a tier without a justification is a number nobody can check.
+    t0_capable: false
+    cursor: {kind: none}
+    deletes_detectable: none
+    retention: {default: P10Y}
+    retention_note: "credit-file retention. Retention of the CURRENT memo; there are no prior versions. Native historical verifiability is zero."
+
+    document_address:
+      addressed_by: "path + sha256 of the captured bytes"
+      immutability: "a memo is immutable ONCE CAPTURED, and mutable in the drop. The Capture Store entry is the citable artefact; the path is a locator that may point at different bytes tomorrow."
+      byte_range_stability: "byte offsets are stable within a captured digest and meaningless across digests."
+      supersession: "a revised memo is a NEW document with a new digest. Nothing in the drop links it to the one it replaces; the link, if any, is a human assertion."
+
+    origin_class: first_party
+    trust_class: untrusted
+    untrusted_fields: ["*"]
+    untrusted_note: >-
+      First-party by authorship and untrusted by content: a memo quotes the
+      borrower, pastes in email, and carries analyst opinion. Three memos carry
+      a planted instruction that contradicts a grounded covenant result.
+      Authorship inside the bank does not promote trust.
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_retention: P10Y
+    capabilities: [describe, plan, resolve, verify_live_bytes, verify_against_capture]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    verified_means:
+      VERIFIED: "the file currently at this path digests to the captured bytes."
+      VERIFIED_AS_OF_CAPTURE: "the Capture Store entry re-reads and matches. The strongest verdict this tier can reach."
+
+    # Review Critical 4: `reliability.correct: 1.0` presented a join as certain.
+    # It is worse than that: the reference is TEXT INSIDE AN UNTRUSTED DOCUMENT,
+    # and roles.yaml was using the memo's own printed RM code to decide who may
+    # read the memo. That is untrusted input deciding access, which D3 forbids.
+    trusted_binding:
+      claimed_fields:
+        - {field: facility_reference, exposed_as: claimed_facility_reference, from: "the memo's own header table"}
+        - {field: relationship_manager, exposed_as: claimed_relationship_manager_code, from: "the memo's own header table"}
+        - {field: borrower, exposed_as: claimed_borrower_name, from: "the memo's own header table"}
+      status: claimed_only
+      rule: >-
+        These are CLAIMS printed in a document. They may be stored, cited and
+        displayed. They may NOT be used as a row predicate, may NOT create a
+        traversable EVIDENCES edge into `core_banking.facility`, and may NOT
+        decide who is entitled to read the memo. A memo whose printed reference
+        happens to resolve to a real facility_id in 100% of the shipped fixture
+        is still a claim: that figure is a property of this fixture, not a
+        guarantee of the source, and it is not identity confirmation.
+      established_by:
+        - id: document_intake_register
+          rule: "the memo was registered against a facility by the officer who filed it; the association comes from the BANK's own intake record, not from the document's text."
+          status: NOT_PRESENT_IN_THIS_FIXTURE
+        - id: human_attestation
+          rule: "a named officer binds the memo to a facility; principal and timestamp recorded."
+      until_established: >-
+        The memo is OUTSIDE every portfolio scope. It is reachable only by a
+        principal holding an explicit unbound-document triage grant
+        (`compliance_officer` in this estate), and by no portfolio-scoped role.
+        This is a real restriction and it is the correct one: the alternative is
+        that anyone who can write a memo can choose who reads it.
+
+    hazards: [internal_opinion, inconsistent_borrower_naming, planted_injection,
+              unbound_documents]
+
+  # -------------------------------------------------------------------
+  - id: mailbox
+    title: Correspondence
+    kind: rfc5322_drop
+    transport: "file://mailbox/messages/"
+
+    # Review: "T1 not defensible from this contract." Correct, and for the same
+    # reason the government estate's correspondence source was corrected: what
+    # SHIPS is a directory of .eml files with a static index. It cannot exercise
+    # cursor advancement, cursor expiry, a 404, a resync race, or a message
+    # deleted between pages. The T1 claim was asserted by prose and tested by
+    # nothing. The two contracts are now declared separately.
+    pinning_tier: T3
+    pinning_tier_scope: as_shipped
+    tier_justification: >-
+      As shipped this is an unversioned directory drop with a static
+      `listing.csv` and a static `cursor.json`. That is T3, and an adapter built
+      against it is testing T3 behaviour whatever the header claims.
+    live_contract:
+      pinning_tier: T1
+      cursor:
+        kind: monotonic_sequence
+        field: X-Walnut-History-Seq
+        replay: forward_only
+        expires: true
+        expiry_response: "404 -> EXPIRED"
+        lossy: false
+        lossy_conditional_on: [cursor_not_expired, dedupe_on_message_id]
+        lossy_caveat: >-
+          `lossy: false` is a claim about the CURSOR not skipping a message that
+          was delivered. It is NOT a claim about completeness of the mailbox: a
+          message DELETED between two reads leaves no tombstone, so the stream
+          cannot tell "never existed" from "existed and was removed". Those are
+          different guarantees and conflating them is what made the previous
+          `lossy: false` misleading.
+      effective_retention: P30D
+      documented_retention: "typically at least one week (the comparable-provider figure)"
+      retention_note: "plan against the EFFECTIVE figure. Message bodies persist for years after the cursor that finds them has expired."
+      status: NOT_EXERCISED_BY_THIS_FIXTURE
+      required_to_exercise:
+        - "a deterministic mock history endpoint serving a fixed response sequence"
+        - "cursor advancement across at least three pages"
+        - "cursor expiry mid-read -> 404 -> EXPIRED, distinguishable from VANISHED"
+        - "duplicate delivery of the same Message-ID in two consecutive pages"
+        - "a late arrival: a message whose Date precedes the last page's newest"
+        - "a message present on page N and absent on a re-read of page N (deletion ambiguity)"
+        - "a full-resync handoff after EXPIRED, with no gap and no duplicate at the seam"
+        - "an edited message: same Message-ID, different body (providers permit this on drafts and on some sync clients)"
+    t0_capable: false
+    cursor: {kind: none}
+    cursor_note: "as shipped. The live contract's cursor is declared above and is not exercised here."
+    deletes_detectable: none
+    delete_note: "a deleted message leaves no tombstone; the history stream simply never mentions it again. EXPIRED and VANISHED must stay distinguishable."
+
+    retention: {default: P3Y}
+    retention_note: "3 years on the mail platform. Capture retention (P7Y) is longer on purpose: a citation must outlive the mailbox."
+
+    origin_class: third_party_ingress
+    trust_class: untrusted
+    untrusted_fields: ["*"]
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_retention: P7Y
+    capture_note: "`email_part` pointers resolve against the Capture Store. Always. Never against the live mailbox."
+    capabilities: [describe, plan, resolve, verify_against_capture]
+    reachable_verdicts: [VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, EXPIRED, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    verified_means:
+      VERIFIED_AS_OF_CAPTURE: "the captured message part re-reads and matches. The strongest verdict here."
+      why_VERIFIED_is_not_reachable: "a live re-read of a mailbox is not a re-read of the same artefact: MIME re-encoding, transfer-encoding rewrites and provider-side normalisation change the bytes without changing the message. Cite the capture."
+
+    # Review: "Mailbox filtering uses spoofable message headers and an undefined
+    # CONTAINS operator." Sharper than that: this extract carries NO envelope
+    # data at all, so there is nothing in it that could safely scope a mailbox
+    # read. roles.yaml's header-based filter has been removed rather than
+    # rewritten.
+    trusted_binding:
+      claimed_fields:
+        - {field: "From", exposed_as: claimed_from_address, note: "an RFC5322 header. Set by the sender. Forgeable."}
+        - {field: "To", exposed_as: claimed_to_addresses, note: "a header, not a delivery record. A message can be delivered to an account named nowhere in it (Bcc), and can name accounts it was never delivered to."}
+        - {field: "In-Reply-To/References", exposed_as: claimed_thread_refs, note: "one planted payload is a SPOOFED quoted reply chain from a fake internal address. Threading headers are attacker-controlled."}
+        - {field: "Facility reference: CB-F-......", exposed_as: claimed_facility_reference, note: "free text in the body."}
+      status: claimed_only
+      rule: >-
+        No message header may decide access, association or routing. A header
+        may be stored, cited and displayed as an untrusted GroundedValue with a
+        pointer to its span.
+      required_before_any_mailbox_row_scope:
+        - id: delivered_to_account
+          rule: "an AUTHENTICATED mailbox identity supplied by the extractor -- which account the extract was taken from -- compared by exact normalised address match, never by CONTAINS."
+          status: NOT_PRESENT_IN_THIS_FIXTURE
+          note: "the shipped .eml files carry X-Mailbox-Folder but no account. There is no envelope recipient anywhere in this estate."
+        - id: human_attestation
+          rule: "a named officer binds a message to a client or a facility; principal and timestamp recorded."
+      until_established: >-
+        The mailbox is not row-scopable. It is compliance-only in roles.yaml,
+        and no portfolio-scoped role receives it. Scoping a mailbox on `From`
+        and `To` would let anyone who can send mail choose whose portfolio a
+        message lands in.
+      operator_note: >-
+        `CONTAINS` is not defined anywhere in this design and must not be
+        implemented. Address comparison is exact match after RFC5322
+        normalisation (case-fold the domain, strip display name and comments,
+        do NOT case-fold the local part). Substring matching on an address
+        field matches `rm.007@bank.example.attacker.example`.
+
+    hazards: [planted_injection, hidden_html_text, attachment_borne_instruction,
+              spoofed_quoted_reply, zero_width_obfuscation, embedded_pii,
+              no_delete_tombstones, no_envelope_identity]
+
+  # -------------------------------------------------------------------
+  - id: market_data
+    title: Prices, ratings and FX
+    kind: csv
+    transport: "file://market_data/"
+
+    # Review: "T2 only at whole-file level ... a mixed-tier source rather than
+    # uniformly T2." Both halves are right and are declared per stream.
+    pinning_tier: T2
+    tier_justification: >-
+      The vendor serves "the file at this address" and reissues it in place.
+      Whole-file addressable at the present instant; no row-level address, no
+      version field, no effective-date column. The source tier is the minimum
+      over its streams.
+    t0_capable: false
+    cursor: {kind: file_mtime, lossy: true}
+    cursor_note: "mtime of the served file. Lossy in both directions -- it moves on a re-copy and does not move on a byte-identical reissue."
+
+    pointer_granularity: whole_file
+    pointer_granularity_note: >-
+      A row here has NO stable address. There is no row id, and (instrument,
+      date) is not stable either -- the restatement rewrote 39 rows under
+      unchanged keys. A pointer therefore cites the FILE digest plus a byte
+      range within it, and a citation into a reissued file is DRIFT_MATERIAL,
+      not a lookup that quietly returns a different number.
+
+    streams:
+      - name: market_data.current
+        tier: T2
+        paths: ["market_data/prices/", "market_data/ratings/", "market_data/fx/", "market_data/instruments.csv"]
+        addressable: whole_file_at_present_instant
+        deletes_detectable: none
+        delete_note: "a delisted instrument stops appearing. Indistinguishable from a filter change at the vendor."
+      - name: market_data.restatement_archive
+        tier: T2
+        tier_scope: within_the_published_set_only
+        paths: ["market_data/prices/restatements/"]
+        addressable: "by publication date in the path, which is part of the address and does not change"
+        immutability: "a published restatement file is never reissued at the same path. Within this set an old edition IS retrievable, which is why the source is mixed-tier."
+        why_not_T0: >-
+          Retrievable-by-publication-date is not the same as answerable-at-an-
+          arbitrary-instant. The archive holds the editions the vendor chose to
+          publish, at the dates it chose. Asking "what did this file say on
+          2026-07-15" has no answer unless an edition was published that day, so
+          the honest tier is T2 over an addressable set, not T0.
+        deletes_detectable: none
+
+    restatements:
+      - {published_on: 2026-07-31, covers: 2026-06, rows_changed: 39,
+         path: market_data/prices/restatements/prices_2026-06_restated_2026-07-31.csv,
+         expected_verdict_for_prior_capture: DRIFT_MATERIAL}
+
+    deletes_detectable: none
+    retention: {default: P24M, note: per licence}
+    retention_note: "24 months of history is SERVED. That is the vendor's obligation to us, not a historical-version guarantee: an older edition is retrievable only if it was published as a restatement."
+
+    origin_class: licensed_vendor
+    trust_class: trusted
+    trust_note: "trusted as to provenance. `issuer_name_as_reported` is the vendor's rendering of a name and is a candidate for identity resolution, never an identity."
+    untrusted_fields: [market_data.instruments.issuer_name_as_reported]
+
+    egress_class: LICENSED_THIRD_PARTY
+    row_egress:
+      class: LICENSED_THIRD_PARTY
+      rule: >-
+        Rows may not be redistributed. Enforced, not merely stated: no role in
+        roles.yaml declares a `LICENSED_THIRD_PARTY` egress ceiling, so
+        resolving a market_data ROW pointer returns FORBIDDEN for every
+        principal in this estate. Raising a role's ceiling to reach these rows
+        would also raise it above every other source, which is why the ceiling
+        is a poor place to grant this and why it is not granted there.
+    derived_egress:
+      class: INTERNAL
+      object: market_data.derived_aggregates
+      rule: "derived aggregates may leave the licence boundary. A derived aggregate qualifies only if ALL of the following hold."
+      requires:
+        - "it is one of the projections declared in `market_data.derived_aggregates.projections`"
+        - "at least 5 contributing instruments, and no single instrument contributing more than 40% of the measure"
+        - "it is re-typed as a `derived` pointer citing the aggregate, not the rows"
+        - "no published margin or adjacent cut from which a single instrument's value can be recovered by subtraction"
+      on_failure: {verdict: FORBIDDEN, reason: LICENCE_ROW_EGRESS}
+    derived_aggregates:
+      projections:
+        - {id: sector_price_index, group_by: [sector, as_of_month], measures: [index_level, contributing_instruments]}
+        - {id: rating_distribution, group_by: [rating_bucket, as_of_month], measures: [issuer_count]}
+        - {id: fx_month_average, group_by: [currency_pair, as_of_month], measures: [mean_rate]}
+      note: "a fixed surface. A free-form aggregate over licensed rows is a redistribution argument nobody wants to have in front of the vendor."
+
+    capture_required: true
+    capture_retention: P24M
+    capture_retention_note: >-
+      Bounded by the LICENCE, not by us: we may not retain vendor rows beyond
+      the licensed window even to prove a citation. A market-data citation older
+      than 24 months therefore verifies to UNVERIFIABLE with
+      `reason: CAPTURE_EXPIRED_BY_LICENCE`. This is the one place in the estate
+      where a contract, rather than a technical limit, bounds verifiability, and
+      it must be reported rather than hidden.
+
+    capabilities: [describe, plan, resolve, verify]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_BENIGN, DRIFT_MATERIAL, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: true
+    benign_drift_signal: file_digest
+    drift_benign_basis: >-
+      The unit of change here is the FILE, and the file digest is a cheap
+      entity-level signal covering it entirely. When the digest moves and the
+      cited byte range re-reads identically, something moved and it was not what
+      we cited: DRIFT_BENIGN, exactly as ADAPTER_AGENT_SPEC section 5 intends.
+      This is the only source in the estate that can honestly report it.
+    verified_means:
+      VERIFIED: "the current file digests to the captured bytes and the cited range is unchanged. Present tense."
+      DRIFT_BENIGN: "the file digest changed; the cited range did not."
+      DRIFT_MATERIAL: "the cited range changed. The 2026-07-31 restatement produces exactly this for any June-2026 price captured before it."
+
+    hazards: [in_place_restatement, no_version_field, issuer_identified_by_name_only,
+              no_row_level_address]
+
+  # -------------------------------------------------------------------
+  - id: spreadsheets
+    title: Group credit risk pack
+    kind: csv_export
+    transport: "file://spreadsheets/"
+    sidecar: spreadsheets/FORMULAS.yaml
+    pinning_tier: T3
+    tier_justification: "Monthly overwrite, no cursor, no version field, no tombstone."
+    t0_capable: false
+    cursor: {kind: none}
+    deletes_detectable: none
+    retention: {default: none, note: overwritten monthly}
+    retention_note: >-
+      Effective native historical retention is ZERO: last month's pack does not
+      exist anywhere in the source. Everything citable about a prior month is
+      citable only because it was captured. Capture retention (P7Y) is the
+      entire historical record of this source.
+
+    document_address:
+      addressed_by: "file path + sha256 of the captured bytes + (row index, column name) within that digest"
+      row_address_stability: "row order is not stable across monthly exports. A row index is meaningful ONLY within a captured digest."
+      sidecar_disagreement: "FORMULAS.yaml is hand-maintained and is itself T3. Where it disagrees with the CSV, the CSV is what was exported and the sidecar is a claim about it. Cite both separately; never reconcile them silently."
+
+    origin_class: first_party
+    trust_class: trusted
+    trust_note: "trusted as to provenance, unreliable as to arithmetic. `override_flag='Y'` rows hold a hardcoded value that does not satisfy the stated formula."
+    untrusted_fields: [spreadsheets.risk_model_pd_lgd.model_owner_comment,
+                       spreadsheets.exposure_summary_by_sector.note,
+                       spreadsheets.risk_model_pd_lgd.borrower_name,
+                       spreadsheets.covenant_tracker.borrower]
+    untrusted_note: "`borrower_name` and `borrower` are hand-typed names with no identifier beside them. They are candidates for resolution, never identities, and they may not appear in a predicate."
+    egress_class: INTERNAL
+    capture_required: true
+    capture_retention: P7Y
+    capabilities: [describe, plan, resolve, verify_live_bytes, verify_against_capture]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, VANISHED, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    verified_means:
+      VERIFIED: "the file currently at this path digests to the captured bytes. True for at most one month."
+      VERIFIED_AS_OF_CAPTURE: "the Capture Store entry re-reads and matches. After the next monthly export this is the only reachable positive verdict."
+    hazards: [formulas_lost_in_export, sidecar_can_disagree, numeric_columns_stored_as_text,
+              excel_error_strings, hardcoded_overrides, excel_serial_dates, hidden_total_row,
+              planted_injection]
+
+  # -------------------------------------------------------------------
+  - id: payments
+    title: Payment event bus
+    kind: jsonl_stream
+    transport: "file://payments/events/"
+
+    # Review: "T1 claim is too generous. `lossy: false` contradicts the declared
+    # producer-restart gap. Sequence monotonicity is not completeness.
+    # At-least-once delivery also requires an event identity/deduplication
+    # rule." The tier survives -- a monotonic, forward-only sequence IS T1 --
+    # but only under a declared protocol, and `lossy: false` is now conditional
+    # on it rather than asserted beside a known gap.
+    pinning_tier: T1
+    tier_justification: >-
+      A monotonic per-producer sequence with forward-only replay. That is T1 and
+      nothing more: it cannot reconstruct the bus as it stood last quarter, and
+      it is complete only under the protocol below.
+    t0_capable: false
+    cursor:
+      kind: monotonic_sequence
+      field: seq
+      lossy: false
+      lossy_conditional_on: consumption_protocol
+      replay: forward_only
+      consumption_protocol:
+        dedupe_on: [event_id, idempotency_key]
+        dedupe_note: >-
+          At-least-once delivery means the same event arrives more than once
+          (120 times in this fixture, with `delivery_attempt: 2`). `seq` does
+          NOT identify an event -- a redelivery carries a new `seq`. The event
+          identity is `(event_id, idempotency_key)` and dedupe is on that pair.
+          Without it, a consumer double-counts settlements.
+        reorder_window: PT5S
+        reorder_window_basis: "`ordering: not_guaranteed_within_5s`. A consumer must buffer at least this long before treating an ordering as final."
+        required: true
+        if_omitted: "the stream is T2, not T1, and no completeness claim may be made from it."
+      known_gaps: [{from: 6000, to: 6009, cause: producer restart, declared_in: payments/cursor.json}]
+      gap_semantics:
+        declared_gap: "a gap listed in `known_gaps` and in `payments/cursor.json` is a number range that was never emitted. Skipping it is correct."
+        undeclared_gap: >-
+          MUST be treated as LOSS and must fail closed: the consumer stops,
+          reports `SEQUENCE_GAP_UNDECLARED`, and makes no completeness claim
+          over the affected range. A consumer that treats every gap as benign
+          cannot tell a producer restart from a dropped shard, and one that
+          treats every gap as loss alarms on this fixture forever. The
+          difference is the out-of-band declaration, which is part of this
+          contract.
+        monotonicity_is_not_completeness: >-
+          `seq` increasing proves ORDER, not COVERAGE. `lossy: false` here means
+          "the cursor does not skip an event that was delivered", not "every
+          event that occurred was delivered". Those are different claims and the
+          second is not made anywhere in this estate.
+    delivery: at_least_once
+    ordering: not_guaranteed_within_5s
+    deletes_detectable: none
+    delete_note: "events are never retracted, only superseded by a later event (`payment.returned`, `payment.recalled`). A superseding event is not a delete and must not be modelled as one."
+
+    retention: {default: P18M}
+    retention_note: "18 months on the bus. Capture retention (P7Y) is longer because a payment citation outlives the bus that carried it."
+
+    origin_class: third_party_ingress
+    origin_note: "the events are ours; the content of `remittance_info`, `name_as_instructed` and the counterparty fields is written by whoever sent the payment."
+    trust_class: trusted
+    untrusted_fields: [payments.event.remittance_info, payments.debtor.name_as_instructed,
+                       payments.creditor.name_as_instructed]
+    untrusted_note: "`remittance_info` carries a planted beneficiary-rerouting instruction -- the classic BEC shape. It is read as data, never as an instruction, and it may never appear in a predicate."
+    egress_class: RESTRICTED_INTERNAL
+    capture_required: true
+    capture_retention: P7Y
+    capabilities: [describe, plan, resolve, verify_against_capture]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+    verified_means:
+      VERIFIED: "the event at this (event_id, idempotency_key) re-reads identically from the shard. Events are immutable once written, so this is the one source where a live re-read is nearly as good as a capture -- for as long as the 18-month retention holds."
+      UNVERIFIABLE: "after 18 months the shard is gone from the bus; the capture is the only remaining answer."
+
+    # Review Critical 4: this "looks executable as an automatic identity link".
+    join_normalisation:
+      - from: payments.debtor.account_ref
+        to: core_banking.account.account_no
+        rule: "strip '-' from account_no before comparing"
+        status: candidate_only
+        why_not_identity: >-
+          Normalising a format produces a SYNTACTIC candidate. It does not
+          establish that this payment concerns that account holder: an account
+          reference on a payment message is what the payer typed, and
+          `name_as_instructed` frequently disagrees with the name on the party
+          record. A normalised match proposes a link with its own SourcePointer
+          and the normalisation applied; a named human confirms it, or it stays
+          a candidate. See `identity` above.
+        collision_note: "stripping a separator can make two distinct account numbers equal. A normalisation that is not injective must report its collisions, not pick one."
+    hazards: [sequence_gap, duplicate_deliveries, out_of_order_arrival,
+              account_ref_formatting_differs, planted_injection]
+
+  # -------------------------------------------------------------------
+  - id: sanctions_watchlist
+    title: Sanctions and restrictions watchlist
+    kind: csv
+    transport: "file://sanctions_watchlist/"
+    held_out: true
+    held_out_reason: >-
+      Ninth source. Joining it later, with its own adapter, must merge into the
+      existing eight-source graph without a rebuild.
+
+    # Review: "Internally contradictory. Publication dates in filenames plus
+    # indefinite retention could provide immutable historical editions -- closer
+    # to T0 for retained files. If editions are overwritten or only the latest
+    # is served, T2 may be correct, but that must be stated." Stated.
+    pinning_tier: T2
+    tier_justification: >-
+      THE PUBLISHER SERVES THE LATEST EDITION ONLY. A prior edition is not
+      retrievable from the publisher at any address, so the source is
+      current-addressable and nothing more. The publication date in the filename
+      identifies the edition we hold; it is not an `as_of` parameter we can ask
+      the publisher for.
+    retention_disambiguation: >-
+      `retention: indefinite` refers to OUR retained copies in the Capture
+      Store, not to publisher-side history. Retained editions ARE immutable and
+      ARE addressable by publication date -- but that is a property of the
+      Capture Store, which is T0 over the captured set and UNVERIFIABLE
+      elsewhere, and not a property of the source. Reading the two as one is
+      exactly the confusion that turns a T2 source into a false T0 claim.
+    t0_capable: false
+    cursor: {kind: publication_date_in_filename, lossy: true}
+    cursor_note: "a publication date is not a change feed. Two editions a week apart may differ by hundreds of rows and nothing orders the changes within them."
+    deletes_detectable: none
+    delete_note: "delisting is invisible -- a name simply stops appearing. A diff of two retained editions shows THAT a name went, never WHY or WHEN within the interval."
+
+    retention: {default: indefinite, publisher_history: none}
+    origin_class: public_source
+    trust_class: trusted
+    trust_note: "trusted as to publication. A name on a list is not a finding about a client -- see `identity.screening_states`."
+    egress_class: INTERNAL
+    capture_required: true
+    capture_retention: indefinite
+    capabilities: [describe, plan, resolve, verify]
+    reachable_verdicts: [VERIFIED, VERIFIED_AS_OF_CAPTURE, DRIFT_MATERIAL, FORBIDDEN, UNVERIFIABLE]
+    drift_benign_capable: false
+
+    screening_contract:
+      # Review Critical 4: "Sanctions screening has no contract state separating
+      # a candidate match from a confirmed identity."
+      produces: candidate_hit
+      never_produces: confirmed_hit
+      determinism: "screening is a deterministic core-layer step. Same inputs, same candidates, every time, with no model in the path."
+      confirmation: "a candidate becomes a finding only when a named compliance officer attests to it, recording principal, timestamp, the candidate set shown and the basis."
+      dismissal: "a candidate may be dismissed only by a named human with a recorded reason and its own SourcePointer."
+      no_text_may_suppress: >-
+        No value in any source -- notes, memo commentary, remittance text, email
+        body -- can suppress, dismiss or downgrade a candidate hit. INJ-08 is
+        planted in `core_banking.party.notes` and instructs exactly that. It
+        must have no effect, and the reason it has no effect is structural: free
+        text is UNTRUSTED and untrusted values do not influence control flow
+        (D3), so there is no path from a note to the screening step.
+      near_name_traps: "same name / different jurisdiction and same name / different date of birth are planted deliberately. Name similarity alone must never decide."
+
+    answer_key: ground_truth/expected_screening_results.json
+    answer_key_visibility: harness_only
+    answer_key_note: >-
+      NOT part of this source and NOT returned by describe(). It sits under
+      `ground_truth/` with every other answer key, is not reachable from this
+      source's transport, and may not be opened by an adapter or by the engine.
+      It was previously declared here as `scoring_key`, which handed the adapter
+      an input-to-answer lookup table.
+
+    hazards: [near_name_false_positives, jurisdiction_mismatch, dob_mismatch,
+              screening_suppression_attempted_from_another_source]
+
+# ---------------------------------------------------------------------
+# Declared gaps. Recorded rather than closed: closing them means generating
+# new fixture data, which is a `generate.py` change beyond this contract
+# revision. No adapter may claim coverage of any of these on the strength of
+# this estate.
+# ---------------------------------------------------------------------
+known_fixture_gaps:
+  - id: equal_timestamps_and_out_of_order_commits
+    affects: [core_banking]
+    missing: "two txn rows sharing booking_ts to the microsecond; a transaction whose booking_ts precedes an already-consumed watermark"
+    severity: "highest. It is the exact failure the compound cursor and overlap window exist to prevent, and nothing exercises them."
+  - id: bootstrap_cdc_handoff_race
+    affects: [core_banking]
+    missing: "a snapshot taken at T, a stream opened at T-delta, and the overlapping rows that must dedupe to exactly one"
+  - id: pitr_restore_and_out_of_window
+    affects: [core_banking]
+    missing: "a restored instance in its own pointer namespace, a citation resolved against it, and a CannotPinPast for an instant older than 35 days"
+  - id: capture_store_expiry_and_partial_capture
+    affects: all
+    missing: "an expired capture downgrading a pointer to UNVERIFIABLE, and a truncated capture that must be discarded rather than resolved"
+    severity: "high. The capture_store block above is the estate's central pinning promise and nothing tests it."
+  - id: mailbox_live_cursor_contract
+    affects: [mailbox]
+    missing: "the seven response-sequence vectors in `mailbox.live_contract.required_to_exercise`"
+  - id: undeclared_sequence_gap
+    affects: [payments]
+    missing: "a gap NOT listed in cursor.json, which must fail closed as loss"
+  - id: schema_drift_new_sensitive_column
+    affects: [core_banking, crm]
+    missing: "a column added after roles.yaml was written -- the case `on_unclassified_column: deny` exists to survive"
+  - id: authorization_attribute_change_mid_read
+    affects: [roles.yaml]
+    missing: "an rm_code reassigned between page 1 and page 2 of a read, and a grant that expires mid-read"
+  - id: multi_role_multi_purpose_evaluation
+    affects: [roles.yaml]
+    missing: "a principal holding two roles, and a request naming a purpose the active role does not hold"
+  - id: human_attestation_of_identity
+    affects: [crm, credit_memos, payments, sanctions_watchlist]
+    missing: "an attestation record -- principal, timestamp, candidate set, basis -- and a refusal to confirm without one"
+  - id: timezone_and_dst_ambiguity
+    affects: [core_banking, payments, mailbox]
+    missing: "a local timestamp inside a DST fold; an expires_on boundary evaluated in two zones"
+  - id: source_permission_change_mid_read
+    affects: all
+    missing: "a read that succeeds on page 1 and returns FORBIDDEN on page 2"

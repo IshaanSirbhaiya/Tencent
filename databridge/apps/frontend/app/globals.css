@@ -2,10 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design law (D-FE-3): near-neutral gray scale + ONE accent. Dark-first (PRD-08 §5,
-   projector-tested), light is a toggle. Provenance is the aesthetic; restraint reads as
-   professional. No gradients, no glassmorphism. */
+/* Design law (D-FE-3): near-neutral gray scale + ONE accent. LIGHT-first — a clean, light,
+   professional surface is what this product should read as; the projector-tested dark palette is
+   kept intact under `.dark` so the toggle remains a one-line change rather than a re-theme.
+   Provenance is the aesthetic; restraint reads as professional. No gradients, no glassmorphism.
+
+   Every colour that carries MEANING is a token, not a literal, and every token is redefined for
+   both themes. That matters most for the three-stop scale below: on a white ground the dark-mode
+   greens and ambers fall to roughly 3:1 against small text, which is exactly where "trusted vs
+   untrusted", "withheld vs absent" and the verdict states stop being distinguishable at a glance.
+   Light gets the 700-weight variants; dark keeps the brighter ones. */
 :root {
+  --bg: 210 20% 98%;
+  --surface: 0 0% 100%;
+  --elevated: 0 0% 100%;
+  --border: 214 18% 88%;
+  --muted: 210 16% 95%;
+  --fg: 222 30% 12%;
+  --subtle: 215 14% 42%;
+
+  /* the single accent, and the 3-stop confidence scale — the only semantic colours */
+  --accent: 224 76% 48%;
+  --accent-fg: 0 0% 100%;
+  --band-auto: 142 72% 29%;
+  --band-spot: 26 90% 37%;
+  --band-review: 0 74% 42%;
+  /* the readable text colour ON a band-spot ground: the two themes need opposite answers */
+  --on-band-spot: 0 0% 100%;
+
+  /* table roles (muted, not neon) */
+  --role-entity: 224 76% 48%;
+  --role-event: 26 90% 37%;
+  --role-log: 220 9% 40%;
+  --role-relationship: 262 63% 45%;
+  --role-lookup: 142 72% 29%;
+
+  /* `/graph` canvas — deliberately NOT redefined under `.light`/`.dark`. The founder's ask is a
+     dark graph surface regardless of the app's own theme (the Obsidian pattern: the graph view is
+     its own dark room inside a light app, same as a map view). One fixed set of tokens here means
+     the canvas never flips when the app theme toggles — see D-FE-3's note on tokens vs literals;
+     this is a token set that intentionally has only one value. */
+  --graph-bg: 224 24% 8%;
+  --graph-surface: 224 20% 12%;
+  --graph-elevated: 224 18% 16%;
+  --graph-border: 224 14% 24%;
+  --graph-muted: 224 14% 18%;
+  --graph-fg: 210 20% 94%;
+  --graph-subtle: 216 12% 66%;
+}
+
+/* Explicit light, for a toggle that wants to override a system or stored preference. Identical to
+   `:root` by construction: light is the default, not a variant. */
+.light {
+  --bg: 210 20% 98%;
+  --surface: 0 0% 100%;
+  --elevated: 0 0% 100%;
+  --border: 214 18% 88%;
+  --muted: 210 16% 95%;
+  --fg: 222 30% 12%;
+  --subtle: 215 14% 42%;
+  --accent: 224 76% 48%;
+  --accent-fg: 0 0% 100%;
+  --band-auto: 142 72% 29%;
+  --band-spot: 26 90% 37%;
+  --band-review: 0 74% 42%;
+  --on-band-spot: 0 0% 100%;
+  --role-entity: 224 76% 48%;
+  --role-event: 26 90% 37%;
+  --role-log: 220 9% 40%;
+  --role-relationship: 262 63% 45%;
+  --role-lookup: 142 72% 29%;
+}
+
+.dark {
   --bg: 222 18% 9%;
   --surface: 222 16% 12%;
   --elevated: 222 14% 16%;
@@ -13,16 +82,17 @@
   --muted: 222 12% 18%;
   --fg: 210 16% 92%;
   --subtle: 215 12% 62%;
-}
-
-.light {
-  --bg: 210 20% 98%;
-  --surface: 0 0% 100%;
-  --elevated: 210 20% 99%;
-  --border: 214 18% 88%;
-  --muted: 210 16% 95%;
-  --fg: 222 30% 12%;
-  --subtle: 215 14% 42%;
+  --accent: 221 83% 53%;
+  --accent-fg: 0 0% 100%;
+  --band-auto: 142 76% 36%;
+  --band-spot: 32 95% 44%;
+  --band-review: 0 72% 51%;
+  --on-band-spot: 30 60% 8%;
+  --role-entity: 221 83% 53%;
+  --role-event: 32 95% 44%;
+  --role-log: 220 9% 46%;
+  --role-relationship: 262 83% 58%;
+  --role-lookup: 142 76% 36%;
 }
 
 * {

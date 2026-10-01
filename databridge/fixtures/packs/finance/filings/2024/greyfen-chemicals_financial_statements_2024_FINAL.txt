@@ -1,0 +1,52 @@
+ Greyfen Chemicals Sdn Bhd
+
+Financial Statements for the financial year ended 31 December 2024
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Greyfen Chemicals Sdn Bhd
+  Registration number   SYN-CRN-8838255
+  Country of incorporation   AU
+  Principal activity   Electronics
+  Reporting currency   EUR
+  Date of incorporation   2012-02-08
+
+ Directors' commentary
+
+Trading conditions were mixed across the year. Volumes recovered in the second half while input costs remained elevated, and the Group continued to prioritise working capital discipline over headline growth.
+
+ Financial summary
+
+All figures in EUR thousands unless stated.
+
+  Line item   FY2024   FY2023
+------:---:|
+  Revenue   146   159
+  Gross profit   41   37
+  EBITDA   30   26
+  Depreciation and amortisation   -12   -12
+  Finance costs   -2   -2
+  Profit after tax   13   16
+  Total assets   148   148
+  Total borrowings   44   43
+  Cash and cash equivalents   3   3
+  Total equity   75   75
+
+ Key ratios
+
+  Ratio   FY2024   Covenant reference
+------:---|
+  Net debt / EBITDA   1.36x   Tested quarterly under the syndicated facility
+  Interest cover   9.56x   Tested quarterly
+  Current ratio   2.21x   -
+
+ Banking arrangements
+
+The Group's principal banker is Northgate Mercantile Bank. Facilities comprise a revolving credit line and a trade finance line, both secured.
+
+ Auditor's note
+
+We draw attention to note 14, which describes a material uncertainty related to the renewal of the Group's principal facility. Our opinion is not modified in this respect.

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2023-000409",
+  "filename": "IMG-2023-000409.jpg",
+  "image_present": false,
+  "captured_at": "2023-04-28T11:52:14+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2023-000189",
+  "application_id": "APP-2022-000261",
+  "parcel_id": "PCL-KF-00304",
+  "photo_batch_ref": "PHB-2023-000189",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-792531"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 429455,
+    "northing": 1194318,
+    "accuracy_m": 13.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2501,
+          120,
+          374,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2023-376355",
+        "confidence": 0.742,
+        "bbox": [
+          2683,
+          216,
+          783,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "45 QUARRY YARD, ASHCOMBE REACH AM3 6NE",
+        "confidence": 0.76,
+        "bbox": [
+          2442,
+          380,
+          874,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2023-04-28",
+        "confidence": 0.897,
+        "bbox": [
+          2206,
+          453,
+          957,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.936,
+        "bbox": [
+          2177,
+          544,
+          352,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

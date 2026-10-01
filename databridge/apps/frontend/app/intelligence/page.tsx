@@ -18,7 +18,8 @@
  *
  * **The agent may propose anything and perform nothing.** Every act on the world goes through a
  * draft a human approves and a model-free dispatcher executes. That is not timidity — it is what
- * makes an agent safe enough to point at a clinic, and it is the demo beat: the draft appears, a
+ * makes an agent safe enough to point at a real operation, and it is the demo beat: the draft
+ * appears, a
  * human reads it, *then* it happens.
  *
  * The three rules this page has always been held to are unchanged and now apply to the new half
@@ -45,8 +46,10 @@ import { ConsolePanel } from "@/components/intelligence/console-panel";
 import { Figures } from "@/components/intelligence/figures";
 import { SubgraphPanel } from "@/components/intelligence/subgraph-panel";
 import { intelligenceApi, type IntelligenceResponse } from "@/lib/intelligence-api";
+import { useNouns } from "@/lib/pack-context";
 
 export default function IntelligencePage() {
+  const nouns = useNouns();
   const [asOf, setAsOf] = React.useState<string>("");
   const [figures, setFigures] = React.useState<IntelligenceResponse | null>(null);
   const [selection, setSelection] = React.useState<{ title: string; members: string[] } | null>(
@@ -70,12 +73,13 @@ export default function IntelligencePage() {
       <div className="flex flex-col gap-5 p-6">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div className="max-w-3xl">
-            <h1 className="text-lg font-semibold">Ask the clinic for something</h1>
+            <h1 className="text-lg font-semibold">Ask the {nouns.org} for something</h1>
             <p className="text-xs text-subtle">
-              Reading the graph happens immediately, with a citation on every value. Anything that
-              would act on the world becomes a draft a named member of staff approves, which a
-              separate process with no model in it then performs. Figures are one possible answer,
-              not the content of this page.
+              Reading the graph happens immediately, with a citation on every value. Put a name in
+              quotes to ask about one entity &mdash; its neighbours, its sources, or the path
+              between two. Anything that would act on the world becomes a draft a named person
+              approves, which a separate process with no model in it then performs. Figures are
+              one possible answer, not the content of this page.
             </p>
           </div>
           <label className="flex items-center gap-2 text-2xs text-subtle">
@@ -111,8 +115,8 @@ export default function IntelligencePage() {
           <p className="text-2xs text-subtle">
             Graph reads are rewound to <span className="tnum text-fg">{asOf}</span> — facts whose
             validity had not begun by then are excluded, and so are their relationships. The intake
-            queue is <em>not</em> rewound: it is the live queue, and pretending otherwise would put
-            a fabricated number next to a real one.
+            queue and the ingestion register are <em>not</em> rewound: they are live, and
+            pretending otherwise would put a fabricated number next to a real one.
           </p>
         )}
 
@@ -132,10 +136,10 @@ export default function IntelligencePage() {
                 >
                   <BarChart3 className="h-3.5 w-3.5" />
                   {figures
-                    ? "Hide the clinic figures"
+                    ? `Hide the ${nouns.org} figures`
                     : openFigures.isPending
                       ? "Walking the graph…"
-                      : "Show the clinic figures"}
+                      : `Show the ${nouns.org} figures`}
                 </button>
                 <span className="text-2xs text-subtle">
                   or ask for them &mdash; a request that asks for counts returns them beside the
@@ -168,12 +172,12 @@ export default function IntelligencePage() {
         </div>
 
         <p className="max-w-3xl text-2xs text-subtle">
-          Documents are shown by an opaque handle and their type, never by filename: a filename can
-          carry a patient&rsquo;s name, and this page counts identity work without ever performing
-          any. A proposed action inherits the same rule &mdash; its recipient is a masked mailbox
-          plus a sentence saying how it was established, because a mailbox is a stronger identifier
-          than a name and this screen is visible across a front desk. Open the intake on{" "}
-          <code>/frontdesk</code> to see the document and the address themselves.
+          Anything carrying a {nouns.subject}&rsquo;s information is shown by its kind and an opaque
+          handle, never by its name: a document&rsquo;s filename can carry a person&rsquo;s name,
+          and this page counts identity work without ever performing any. {nouns.subject_plural_title}{" "}
+          themselves are counted and never listed. A proposed action inherits the same rule &mdash;
+          its recipient is a masked mailbox plus a sentence saying how it was established. Open the
+          entity on <code>/evidence</code> to see its source, once a person has confirmed it.
         </p>
 
         <p className="max-w-3xl text-2xs text-subtle">

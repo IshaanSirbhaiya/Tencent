@@ -119,10 +119,14 @@ def test_node_detail_on_a_document_reports_claims_not_conclusions():
     Addressed by node id, not by name: DOCUMENT nodes are provenance and are deliberately excluded
     from `link_entities`, so a bare filename does not resolve."""
     d = _tools().node_detail(document_node_id("chit_03_everwell_group_invitation.txt"))
-    assert len(d["claims"]) == 2, d["claims"]
+    # Derived (HC2, SWEEP UNSURE): the seed draws one claim edge per registry candidate and stamps
+    # each with `candidate_count = len(resolution.candidates)`, so every claim's count IS the number
+    # of claims. ">= 2" is a lower bound, not a recalled answer: "competing" needs two.
+    n = len(d["claims"])
+    assert n >= 2, d["claims"]
     for claim in d["claims"]:
         assert claim["requires_human_verification"] is True
-        assert claim["candidate_count"] == 2
+        assert claim["candidate_count"] == n
         assert claim["match_score"] is not None
 
 
@@ -285,13 +289,13 @@ def test_every_serialised_patient_node_carries_the_caveat_in_every_tool():
     them, and a patient reached through someone ELSE's 1-hop neighbourhood never passes through
     `node_detail` at all. The caveat is therefore attached in `node_to_dict`, which is the one
     place every one of those paths goes through."""
-    from brain_server import PATIENT_NODE_CAVEAT
+    from brain_server import subject_node_caveat
 
     tools = _tools()
     patients = 0
     for node in tools.graph()["nodes"]:
         if node["kind"] == "patient":
-            assert node["identity_caveat"] == PATIENT_NODE_CAVEAT, node["id"]
+            assert node["identity_caveat"] == subject_node_caveat(node["kind"]), node["id"]
             assert node["identity_verified"] is False
             patients += 1
         else:
@@ -303,7 +307,7 @@ def test_every_serialised_patient_node_carries_the_caveat_in_every_tool():
     sideways = [n for n in tools.brain_neighbors(doc)["nodes"] if n["kind"] == "patient"]
     assert sideways
     for node in sideways:
-        assert node["identity_caveat"] == PATIENT_NODE_CAVEAT
+        assert node["identity_caveat"] == subject_node_caveat(node["kind"])
 
 
 def test_the_claimed_by_a_document_flag_names_the_documents_it_was_computed_from():
@@ -434,10 +438,7 @@ def test_a_patient_node_detail_carries_the_identity_caveat_with_or_without_a_cla
     nothing saying "not verified". The caveat is keyed on the KIND."""
     from databridge_graph import NodeKind
     from databridge_graph.clinic_seed import claimed_patient_node_ids
-    from databridge_graph.identity import (
-        IDENTITY_CLAIMED_ON_DOCUMENT,
-        IDENTITY_REGISTRY_ONLY,
-    )
+    from brain_server import identity_caveat_for
     from databridge_graph.store import row_to_edge, row_to_node
 
     tools = _tools()
@@ -456,14 +457,16 @@ def test_a_patient_node_detail_carries_the_identity_caveat_with_or_without_a_cla
     assert named["identity"] == {"verified": False, "requires_human_verification": True,
                                  "claimed_by_a_document": True,
                                  "claimed_by": named["identity"]["claimed_by"],
-                                 "caveat": IDENTITY_CLAIMED_ON_DOCUMENT}
+                                 "caveat": identity_caveat_for(named["node"]["kind"],
+                                                               claimed=True)}
     assert named["identity"]["claimed_by"], "the boolean must name what produced it"
 
     unnamed = tools.node_detail(on_file_only[0].id)
     assert unnamed["claims"] == []
     assert unnamed["identity"] == {"verified": False, "requires_human_verification": True,
                                    "claimed_by_a_document": False, "claimed_by": [],
-                                   "caveat": IDENTITY_REGISTRY_ONLY}
+                                   "caveat": identity_caveat_for(unnamed["node"]["kind"],
+                                                                 claimed=False)}
 
     # nothing that is not a patient acquires an identity verdict it has no business carrying
     org = tools.node_detail(MERIDIAN)

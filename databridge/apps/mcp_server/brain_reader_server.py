@@ -41,23 +41,28 @@ from serving import (
     serve_streamable_http,
 )
 
-SERVER_NAME = "databridge-clinic-reader"
+SERVER_NAME = "databridge-reader"
 
 
 def default_reader_tools() -> BrainTools:
-    """A seeded ``BrainTools`` with no ingestion capability configured.
+    """A ``BrainTools`` over the shared store with no ingestion capability configured.
 
     ``harness=None`` and ``sources={}`` are not decoration: ``BrainTools.brain_ingest`` refuses
     without a harness, and refuses any source that is not registered. So even a caller who
     reflected its way past :class:`ReadOnlyBrain` would find the write path inert in this process.
     """
-    tools = BrainTools(harness=None, sources={})
-    tools.load_seed()
-    return tools
+    from brain_server import open_reader_store
+
+    # The SHARED store (`WALNUT_GRAPH_DB_PATH`): the agent reads the same graph the gateway shows
+    # and the ingesters write — opened READ-ONLY (Codex f1 #4). This process creates no directory,
+    # no file, no schema, and it never loads the demo seed: seeding is a write, and the writer
+    # processes (the gateway, `brain_writer_server.py`) own it. A missing store is a refusal to
+    # start, not an empty file created on the reader's behalf.
+    return BrainTools(open_reader_store(), harness=None, sources={})
 
 
 def build_reader_brain(tools: Optional[BrainTools] = None) -> ReadOnlyBrain:
-    """Wrap ``BrainTools`` (or the seeded default) in the frozen read-only view."""
+    """Wrap ``BrainTools`` (or the read-only default) in the frozen read-only view."""
     return ReadOnlyBrain(tools if tools is not None else default_reader_tools())
 
 

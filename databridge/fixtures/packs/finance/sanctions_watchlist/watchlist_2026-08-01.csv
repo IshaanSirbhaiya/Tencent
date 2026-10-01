@@ -1,0 +1,181 @@
+watchlist_id,subject_type,name,country,date_of_birth,list_code,listed_on,measure,note
+WL-00001,ENTITY,Inverwold Aggregates Limited,AE,,SYN-LIST-C,2026-02-18,Sectoral restriction,Synthetic entry. Fictional.
+WL-00002,ENTITY,Vellacott Packaging S.A.,DE,,SYN-LIST-A,2025-06-07,Sectoral restriction,Synthetic entry. Fictional.
+WL-00003,ENTITY,"EEVRLEY GRAIN CO., LTD.",NL,,SYN-LIST-A,2023-04-20,Sectoral restriction,Synthetic entry. Fictional.
+WL-00004,ENTITY,Ilexa Marine,MY,,SYN-LIST-A,2023-03-15,Sectoral restriction,Synthetic entry. Fictional.
+WL-00005,ENTITY,QUINTRELL MARINE B.V.,US,,SYN-LIST-C,2025-04-12,Sectoral restriction,Synthetic entry. Fictional.
+WL-00006,ENTITY,NORTHGALE LOGISTICS S.A.,DE,,SYN-LIST-B,2026-07-12,Sectoral restriction,Synthetic entry. Fictional.
+WL-00007,ENTITY,"CALIDON LOGISTICS CO., LTD.",AE,,SYN-LIST-B,2023-10-31,Sectoral restriction,Synthetic entry. Fictional.
+WL-00008,ENTITY,Oakenshade Offshore,AU,,SYN-LIST-B,2026-01-27,Asset freeze,Synthetic entry. Fictional.
+WL-00009,ENTITY,Jessamy Marine Pte. Ltd.,US,,SYN-LIST-B,2023-02-11,Asset freeze,Synthetic entry. Fictional.
+WL-00010,ENTITY,Zarrowby Agritech Limited,MY,,SYN-LIST-A,2025-11-08,Export control,Synthetic entry. Fictional.
+WL-00011,ENTITY,QUILLANE SOLAR PTE LTD,HK,,SYN-LIST-B,2023-04-22,Asset freeze,Synthetic entry. Fictional.
+WL-00012,ENTITY,Larkspire Freight Pte. Ltd.,GB,,SYN-LIST-A,2023-09-16,Export control,Synthetic entry. Fictional.
+WL-00013,ENTITY,Fairmont Reach Capital B.V.,IN,,SYN-LIST-C,2025-10-09,Asset freeze,Synthetic entry. Different jurisdiction from the estate entity of the same name.
+WL-00014,ENTITY,Redbourne Utilities Group PLC,AE,,SYN-LIST-C,2022-06-02,Asset freeze,Synthetic entry. Different jurisdiction from the estate entity of the same name.
+WL-00015,ENTITY,"Calidon Logistics Co., Ltd.",VN,,SYN-LIST-C,2022-01-18,Asset freeze,Synthetic entry. Different jurisdiction from the estate entity of the same name.
+WL-00016,INDIVIDUAL,"RAUTAVAARA, Vikram",GB,2011-04-22,SYN-LIST-B,2024-05-06,Travel ban,Synthetic entry. Date of birth differs from the estate individual of the same name.
+WL-00017,INDIVIDUAL,"GRIMSBY, Mireille",US,1974-12-23,SYN-LIST-B,2025-04-15,Travel ban,Synthetic entry. Date of birth differs from the estate individual of the same name.
+WL-00018,INDIVIDUAL,"BELLWEATHER, Jorunn",DE,2000-09-14,SYN-LIST-B,2024-04-04,Travel ban,Synthetic entry. Date of birth differs from the estate individual of the same name.
+WL-00019,ENTITY,"Xeralt Textiles Co., Ltd.",MY,,SYN-LIST-A,2022-07-17,Sectoral restriction,Synthetic entry. Fictional.
+WL-00020,ENTITY,Jarnwick Property Ltd,US,,SYN-LIST-B,2023-08-20,Asset freeze,Synthetic entry. Fictional.
+WL-00021,ENTITY,"Ravenhurst Packaging Co., Ltd.",TH,,SYN-LIST-A,2025-06-26,Travel ban,Synthetic entry. Fictional.
+WL-00022,ENTITY,Verrant Precision Pte Ltd,JP,,SYN-LIST-C,2023-04-17,Travel ban,Synthetic entry. Fictional.
+WL-00023,ENTITY,Verrant Mining Limited,GB,,SYN-LIST-C,2026-02-15,Export control,Synthetic entry. Fictional.
+WL-00024,ENTITY,Belmoray Logistics Ltd,AU,,SYN-LIST-C,2021-05-27,Asset freeze,Synthetic entry. Fictional.
+WL-00025,ENTITY,Zephrine Offshore GmbH,SG,,SYN-LIST-C,2025-10-19,Travel ban,Synthetic entry. Fictional.
+WL-00026,ENTITY,Fennmark Capital Pte Ltd,MY,,SYN-LIST-C,2021-02-23,Asset freeze,Synthetic entry. Fictional.
+WL-00027,ENTITY,Kestrel Packaging Ltd,ID,,SYN-LIST-A,2021-02-10,Export control,Synthetic entry. Fictional.
+WL-00028,ENTITY,Greyfen Offshore Sdn Bhd,GB,,SYN-LIST-A,2023-03-31,Asset freeze,Synthetic entry. Fictional.
+WL-00029,ENTITY,Glenholt Logistics Group PLC,US,,SYN-LIST-B,2022-08-20,Export control,Synthetic entry. Fictional.
+WL-00030,ENTITY,Fennmark Mining Ltd,GB,,SYN-LIST-A,2021-05-24,Export control,Synthetic entry. Fictional.
+WL-00031,ENTITY,Ravenhurst Property Group PLC,AU,,SYN-LIST-C,2024-06-02,Sectoral restriction,Synthetic entry. Fictional.
+WL-00032,ENTITY,Thornbury Diagnostics Group PLC,NL,,SYN-LIST-A,2021-06-01,Sectoral restriction,Synthetic entry. Fictional.
+WL-00033,ENTITY,Vantorne Analytics Group PLC,TH,,SYN-LIST-C,2023-08-22,Travel ban,Synthetic entry. Fictional.
+WL-00034,ENTITY,Larkspire Wire and Cable B.V.,ID,,SYN-LIST-A,2025-09-26,Export control,Synthetic entry. Fictional.
+WL-00035,ENTITY,"Ravenhurst Instruments Co., Ltd.",MY,,SYN-LIST-A,2024-11-07,Export control,Synthetic entry. Fictional.
+WL-00036,ENTITY,Ashcombe Industries Sdn Bhd,AE,,SYN-LIST-A,2026-04-23,Sectoral restriction,Synthetic entry. Fictional.
+WL-00037,ENTITY,Inverwold Cold Chain PTE LTD,AE,,SYN-LIST-B,2024-03-23,Travel ban,Synthetic entry. Fictional.
+WL-00038,ENTITY,Palliser Grain Ltd,VN,,SYN-LIST-B,2023-08-29,Sectoral restriction,Synthetic entry. Fictional.
+WL-00039,ENTITY,Dunmarch Wire and Cable Ltd,TH,,SYN-LIST-B,2025-09-02,Asset freeze,Synthetic entry. Fictional.
+WL-00040,ENTITY,Quarrenden Foods Group PLC,SG,,SYN-LIST-B,2024-06-15,Asset freeze,Synthetic entry. Fictional.
+WL-00041,ENTITY,Sablewick Utilities LLC,MY,,SYN-LIST-B,2023-04-14,Asset freeze,Synthetic entry. Fictional.
+WL-00042,ENTITY,"Palliser Fabrication Co., Ltd.",DE,,SYN-LIST-B,2025-05-02,Export control,Synthetic entry. Fictional.
+WL-00043,ENTITY,Pellaton Utilities GmbH,DE,,SYN-LIST-C,2022-03-24,Travel ban,Synthetic entry. Fictional.
+WL-00044,ENTITY,Vondrel Energy Pte. Ltd.,VN,,SYN-LIST-A,2024-10-28,Sectoral restriction,Synthetic entry. Fictional.
+WL-00045,ENTITY,Amberfell Logistics B.V.,GB,,SYN-LIST-B,2023-03-25,Asset freeze,Synthetic entry. Fictional.
+WL-00046,ENTITY,Xanthe Composites B.V.,AE,,SYN-LIST-A,2021-05-03,Asset freeze,Synthetic entry. Fictional.
+WL-00047,ENTITY,"Corvane Metals Co., Ltd.",GB,,SYN-LIST-C,2025-06-28,Export control,Synthetic entry. Fictional.
+WL-00048,ENTITY,Yolande Semiconductors Limited,JP,,SYN-LIST-C,2024-03-26,Asset freeze,Synthetic entry. Fictional.
+WL-00049,ENTITY,Galewood Packaging Sdn Bhd,SG,,SYN-LIST-C,2026-04-18,Export control,Synthetic entry. Fictional.
+WL-00050,ENTITY,Verrant Diagnostics Limited,VN,,SYN-LIST-A,2023-05-11,Export control,Synthetic entry. Fictional.
+WL-00051,ENTITY,Kirkhaven Automotive LLC,NL,,SYN-LIST-B,2026-04-04,Sectoral restriction,Synthetic entry. Fictional.
+WL-00052,ENTITY,Xanthe Foods S.A.,MY,,SYN-LIST-A,2021-01-08,Sectoral restriction,Synthetic entry. Fictional.
+WL-00053,ENTITY,Quintrell Aviation Services B.V.,MY,,SYN-LIST-B,2023-11-26,Travel ban,Synthetic entry. Fictional.
+WL-00054,ENTITY,Thornbury Semiconductors LLC,NL,,SYN-LIST-C,2022-11-07,Sectoral restriction,Synthetic entry. Fictional.
+WL-00055,ENTITY,Elvermere Freight Ltd,TH,,SYN-LIST-C,2024-03-17,Travel ban,Synthetic entry. Fictional.
+WL-00056,ENTITY,Dunmarch Mining Pte. Ltd.,JP,,SYN-LIST-C,2022-02-08,Export control,Synthetic entry. Fictional.
+WL-00057,ENTITY,Glenholt Utilities B.V.,GB,,SYN-LIST-B,2024-08-29,Sectoral restriction,Synthetic entry. Fictional.
+WL-00058,ENTITY,Foxhollow Semiconductors Limited,TH,,SYN-LIST-B,2023-09-23,Sectoral restriction,Synthetic entry. Fictional.
+WL-00059,ENTITY,Oakenshade Instruments Group PLC,NL,,SYN-LIST-C,2021-06-29,Travel ban,Synthetic entry. Fictional.
+WL-00060,ENTITY,Juniperton Wire and Cable Group PLC,ID,,SYN-LIST-C,2021-11-07,Asset freeze,Synthetic entry. Fictional.
+WL-00061,ENTITY,"Belmoray Grain Co., Ltd.",DE,,SYN-LIST-C,2022-11-26,Sectoral restriction,Synthetic entry. Fictional.
+WL-00062,ENTITY,Morrowfield Capital Limited,ID,,SYN-LIST-B,2025-02-01,Export control,Synthetic entry. Fictional.
+WL-00063,ENTITY,Netherby Fabrication PTE LTD,TH,,SYN-LIST-C,2021-08-15,Export control,Synthetic entry. Fictional.
+WL-00064,ENTITY,Glenholt Logistics Group PLC,JP,,SYN-LIST-A,2023-04-25,Travel ban,Synthetic entry. Fictional.
+WL-00065,ENTITY,Silvercrag Terminals GmbH,AE,,SYN-LIST-C,2023-03-06,Sectoral restriction,Synthetic entry. Fictional.
+WL-00066,ENTITY,Ilexa Industries B.V.,US,,SYN-LIST-A,2023-06-07,Travel ban,Synthetic entry. Fictional.
+WL-00067,ENTITY,Kestrel Analytics Group PLC,AE,,SYN-LIST-B,2026-04-17,Asset freeze,Synthetic entry. Fictional.
+WL-00068,ENTITY,Ostrander Property Group PLC,MY,,SYN-LIST-B,2023-12-09,Asset freeze,Synthetic entry. Fictional.
+WL-00069,ENTITY,"Pentrelew Industries Co., Ltd.",VN,,SYN-LIST-B,2021-06-18,Asset freeze,Synthetic entry. Fictional.
+WL-00070,ENTITY,Fairmont Reach Instruments Pte Ltd,GB,,SYN-LIST-C,2025-04-26,Sectoral restriction,Synthetic entry. Fictional.
+WL-00071,ENTITY,"Corvane Aviation Services Co., Ltd.",DE,,SYN-LIST-A,2024-08-26,Export control,Synthetic entry. Fictional.
+WL-00072,ENTITY,"Bracklind Industries Co., Ltd.",AE,,SYN-LIST-C,2022-05-19,Sectoral restriction,Synthetic entry. Fictional.
+WL-00073,ENTITY,"Trellisbourne Automotive Co., Ltd.",DE,,SYN-LIST-A,2025-10-09,Sectoral restriction,Synthetic entry. Fictional.
+WL-00074,ENTITY,Ironvale Precision Ltd,TH,,SYN-LIST-A,2024-06-25,Export control,Synthetic entry. Fictional.
+WL-00075,ENTITY,Harrowby Aviation Services Pte. Ltd.,IN,,SYN-LIST-A,2021-07-11,Export control,Synthetic entry. Fictional.
+WL-00076,ENTITY,Silvercrag Agritech GmbH,AE,,SYN-LIST-C,2024-11-01,Export control,Synthetic entry. Fictional.
+WL-00077,ENTITY,Quillane Wire and Cable B.V.,TH,,SYN-LIST-C,2025-07-13,Sectoral restriction,Synthetic entry. Fictional.
+WL-00078,ENTITY,Amberfell Solar Limited,SG,,SYN-LIST-B,2021-11-30,Asset freeze,Synthetic entry. Fictional.
+WL-00079,ENTITY,Hollowmere Nutrition PTE LTD,AU,,SYN-LIST-B,2023-07-03,Sectoral restriction,Synthetic entry. Fictional.
+WL-00080,ENTITY,Merriscourt Holdings S.A.,VN,,SYN-LIST-C,2024-03-08,Asset freeze,Synthetic entry. Fictional.
+WL-00081,ENTITY,Vantorne Grain B.V.,NL,,SYN-LIST-B,2023-04-01,Sectoral restriction,Synthetic entry. Fictional.
+WL-00082,ENTITY,"Merriscourt Semiconductors Co., Ltd.",DE,,SYN-LIST-B,2025-10-13,Travel ban,Synthetic entry. Fictional.
+WL-00083,ENTITY,Dellamar Capital Ltd,AE,,SYN-LIST-B,2025-06-07,Asset freeze,Synthetic entry. Fictional.
+WL-00084,ENTITY,Nordvale Utilities PTE LTD,GB,,SYN-LIST-B,2025-05-13,Travel ban,Synthetic entry. Fictional.
+WL-00085,ENTITY,Morrowfield Property PTE LTD,JP,,SYN-LIST-A,2024-11-28,Export control,Synthetic entry. Fictional.
+WL-00086,ENTITY,Whitmarsh Offshore B.V.,TH,,SYN-LIST-A,2025-08-02,Asset freeze,Synthetic entry. Fictional.
+WL-00087,ENTITY,Northgale Packaging Pte Ltd,SG,,SYN-LIST-C,2024-12-13,Sectoral restriction,Synthetic entry. Fictional.
+WL-00088,ENTITY,Jessamy Diagnostics Ltd,AU,,SYN-LIST-B,2023-05-16,Travel ban,Synthetic entry. Fictional.
+WL-00089,ENTITY,Bracklind Offshore Group PLC,HK,,SYN-LIST-B,2023-01-06,Export control,Synthetic entry. Fictional.
+WL-00090,ENTITY,"Harrowby Industries Co., Ltd.",MY,,SYN-LIST-A,2024-03-05,Travel ban,Synthetic entry. Fictional.
+WL-00091,ENTITY,Kelbrooke Industries Pte Ltd,TH,,SYN-LIST-C,2025-08-11,Travel ban,Synthetic entry. Fictional.
+WL-00092,ENTITY,Kelbrooke Packaging LLC,US,,SYN-LIST-B,2025-08-25,Travel ban,Synthetic entry. Fictional.
+WL-00093,ENTITY,Redbourne Automotive Limited,SG,,SYN-LIST-C,2022-06-15,Export control,Synthetic entry. Fictional.
+WL-00094,ENTITY,Ilexa Foods PTE LTD,HK,,SYN-LIST-B,2026-02-21,Sectoral restriction,Synthetic entry. Fictional.
+WL-00095,ENTITY,Pellaton Offshore Ltd,DE,,SYN-LIST-C,2021-06-16,Export control,Synthetic entry. Fictional.
+WL-00096,ENTITY,"Loamfield Analytics Co., Ltd.",MY,,SYN-LIST-B,2023-05-11,Asset freeze,Synthetic entry. Fictional.
+WL-00097,ENTITY,Yolande Robotics S.A.,DE,,SYN-LIST-C,2022-07-28,Travel ban,Synthetic entry. Fictional.
+WL-00098,ENTITY,Everley Precision Pte. Ltd.,NL,,SYN-LIST-A,2021-10-11,Sectoral restriction,Synthetic entry. Fictional.
+WL-00099,ENTITY,Hollowmere Agritech PTE LTD,TH,,SYN-LIST-B,2025-07-10,Sectoral restriction,Synthetic entry. Fictional.
+WL-00100,ENTITY,Windermoor Industries Group PLC,HK,,SYN-LIST-A,2025-01-27,Sectoral restriction,Synthetic entry. Fictional.
+WL-00101,ENTITY,Kytherra Chemicals S.A.,GB,,SYN-LIST-C,2026-04-14,Sectoral restriction,Synthetic entry. Fictional.
+WL-00102,ENTITY,"Kytherra Shipping Co., Ltd.",TH,,SYN-LIST-B,2026-02-28,Sectoral restriction,Synthetic entry. Fictional.
+WL-00103,ENTITY,Ravenhurst Water Systems S.A.,HK,,SYN-LIST-C,2021-05-17,Asset freeze,Synthetic entry. Fictional.
+WL-00104,ENTITY,Broadhelm Aviation Services PTE LTD,AE,,SYN-LIST-A,2022-07-14,Asset freeze,Synthetic entry. Fictional.
+WL-00105,ENTITY,Yolande Ventures Pte. Ltd.,JP,,SYN-LIST-C,2024-11-19,Travel ban,Synthetic entry. Fictional.
+WL-00106,ENTITY,Hexbury Instruments Pte. Ltd.,VN,,SYN-LIST-A,2023-11-29,Export control,Synthetic entry. Fictional.
+WL-00107,ENTITY,Lanthorn Aviation Services Pte Ltd,AE,,SYN-LIST-B,2022-04-25,Asset freeze,Synthetic entry. Fictional.
+WL-00108,ENTITY,Dunmarch Water Systems Limited,NL,,SYN-LIST-C,2021-06-25,Asset freeze,Synthetic entry. Fictional.
+WL-00109,ENTITY,Nordvale Freight Group PLC,NL,,SYN-LIST-C,2025-05-13,Travel ban,Synthetic entry. Fictional.
+WL-00110,ENTITY,Brightwake Automotive GmbH,IN,,SYN-LIST-B,2023-12-31,Sectoral restriction,Synthetic entry. Fictional.
+WL-00111,ENTITY,Zarrowby Ventures Limited,TH,,SYN-LIST-B,2025-09-10,Asset freeze,Synthetic entry. Fictional.
+WL-00112,ENTITY,Foxhollow Terminals Limited,AE,,SYN-LIST-B,2025-06-12,Travel ban,Synthetic entry. Fictional.
+WL-00113,ENTITY,Drummore Property S.A.,US,,SYN-LIST-B,2025-09-20,Travel ban,Synthetic entry. Fictional.
+WL-00114,ENTITY,Pentrelew Metals Pte Ltd,VN,,SYN-LIST-C,2023-10-08,Asset freeze,Synthetic entry. Fictional.
+WL-00115,ENTITY,Juniperton Aggregates Pte Ltd,SG,,SYN-LIST-B,2025-08-28,Export control,Synthetic entry. Fictional.
+WL-00116,ENTITY,Xanthe Cold Chain B.V.,MY,,SYN-LIST-A,2024-11-08,Asset freeze,Synthetic entry. Fictional.
+WL-00117,ENTITY,Xeralt Aviation Services B.V.,DE,,SYN-LIST-C,2021-01-27,Export control,Synthetic entry. Fictional.
+WL-00118,ENTITY,Windermoor Optics Pte. Ltd.,JP,,SYN-LIST-C,2021-02-11,Asset freeze,Synthetic entry. Fictional.
+WL-00119,ENTITY,Silvercrag Textiles PTE LTD,MY,,SYN-LIST-C,2026-02-11,Sectoral restriction,Synthetic entry. Fictional.
+WL-00120,ENTITY,Aldermoor Bioworks Group PLC,VN,,SYN-LIST-B,2023-02-07,Asset freeze,Synthetic entry. Fictional.
+WL-00121,ENTITY,Ambervale Instruments Sdn Bhd,GB,,SYN-LIST-C,2021-04-12,Travel ban,Synthetic entry. Fictional.
+WL-00122,ENTITY,Calidon Aggregates Pte. Ltd.,TH,,SYN-LIST-C,2022-08-21,Export control,Synthetic entry. Fictional.
+WL-00123,ENTITY,Quintrell Composites PTE LTD,VN,,SYN-LIST-C,2021-10-30,Sectoral restriction,Synthetic entry. Fictional.
+WL-00124,ENTITY,Umberly Solar LLC,ID,,SYN-LIST-B,2022-09-30,Travel ban,Synthetic entry. Fictional.
+WL-00125,ENTITY,Larkspire Precision B.V.,DE,,SYN-LIST-B,2022-10-28,Asset freeze,Synthetic entry. Fictional.
+WL-00126,ENTITY,Vantorne Wire and Cable GmbH,JP,,SYN-LIST-B,2021-07-06,Export control,Synthetic entry. Fictional.
+WL-00127,ENTITY,Jarnwick Offshore Sdn Bhd,US,,SYN-LIST-B,2025-03-13,Asset freeze,Synthetic entry. Fictional.
+WL-00128,ENTITY,Calidon Solar LLC,TH,,SYN-LIST-B,2023-04-22,Sectoral restriction,Synthetic entry. Fictional.
+WL-00129,ENTITY,Vellacott Packaging Pte. Ltd.,HK,,SYN-LIST-A,2023-10-23,Export control,Synthetic entry. Fictional.
+WL-00130,ENTITY,Inverwold Precision Limited,MY,,SYN-LIST-A,2021-02-18,Sectoral restriction,Synthetic entry. Fictional.
+WL-00131,ENTITY,Vondrel Energy S.A.,HK,,SYN-LIST-B,2025-11-17,Travel ban,Synthetic entry. Fictional.
+WL-00132,ENTITY,"Ravenhurst Nutrition Co., Ltd.",NL,,SYN-LIST-A,2022-07-30,Asset freeze,Synthetic entry. Fictional.
+WL-00133,ENTITY,Oakenshade Analytics Sdn Bhd,HK,,SYN-LIST-A,2021-12-30,Travel ban,Synthetic entry. Fictional.
+WL-00134,ENTITY,Quillane Fabrication Limited,US,,SYN-LIST-A,2022-10-31,Export control,Synthetic entry. Fictional.
+WL-00135,ENTITY,Vellacott Automotive Group PLC,AU,,SYN-LIST-C,2025-09-13,Sectoral restriction,Synthetic entry. Fictional.
+WL-00136,ENTITY,Drummore Aggregates LLC,GB,,SYN-LIST-A,2025-12-04,Export control,Synthetic entry. Fictional.
+WL-00137,ENTITY,Vantorne Precision B.V.,DE,,SYN-LIST-A,2024-04-05,Export control,Synthetic entry. Fictional.
+WL-00138,ENTITY,Kestrel Industries Ltd,AE,,SYN-LIST-C,2026-03-08,Asset freeze,Synthetic entry. Fictional.
+WL-00139,ENTITY,Bracklind Mining Sdn Bhd,MY,,SYN-LIST-C,2022-03-24,Asset freeze,Synthetic entry. Fictional.
+WL-00140,ENTITY,Kirkhaven Energy LLC,NL,,SYN-LIST-B,2021-04-24,Sectoral restriction,Synthetic entry. Fictional.
+WL-00141,ENTITY,Ostrander Bioworks Pte Ltd,US,,SYN-LIST-B,2021-11-29,Sectoral restriction,Synthetic entry. Fictional.
+WL-00142,ENTITY,Greyfen Cold Chain B.V.,SG,,SYN-LIST-C,2021-12-25,Sectoral restriction,Synthetic entry. Fictional.
+WL-00143,ENTITY,Amberfell Foods PTE LTD,SG,,SYN-LIST-C,2025-08-21,Export control,Synthetic entry. Fictional.
+WL-00144,ENTITY,Ambervale Pharma Supply PTE LTD,NL,,SYN-LIST-A,2021-01-21,Asset freeze,Synthetic entry. Fictional.
+WL-00145,ENTITY,Hexbury Utilities B.V.,VN,,SYN-LIST-A,2021-08-08,Sectoral restriction,Synthetic entry. Fictional.
+WL-00146,ENTITY,Eastvane Composites Group PLC,TH,,SYN-LIST-C,2021-04-11,Asset freeze,Synthetic entry. Fictional.
+WL-00147,ENTITY,Cindervale Precision Limited,ID,,SYN-LIST-B,2022-06-28,Export control,Synthetic entry. Fictional.
+WL-00148,ENTITY,Yarrowmede Terminals LLC,DE,,SYN-LIST-A,2024-06-06,Sectoral restriction,Synthetic entry. Fictional.
+WL-00149,ENTITY,Orrinshaw Water Systems PTE LTD,DE,,SYN-LIST-B,2023-04-14,Sectoral restriction,Synthetic entry. Fictional.
+WL-00150,ENTITY,Stonecrest Nutrition LLC,IN,,SYN-LIST-A,2022-03-04,Asset freeze,Synthetic entry. Fictional.
+WL-00151,ENTITY,Merriscourt Bioworks Pte Ltd,GB,,SYN-LIST-A,2022-07-18,Sectoral restriction,Synthetic entry. Fictional.
+WL-00152,ENTITY,Stonecrest Analytics GmbH,US,,SYN-LIST-B,2023-01-18,Sectoral restriction,Synthetic entry. Fictional.
+WL-00153,ENTITY,Loamfield Optics S.A.,GB,,SYN-LIST-A,2025-09-02,Travel ban,Synthetic entry. Fictional.
+WL-00154,ENTITY,"Ironvale Aggregates Co., Ltd.",SG,,SYN-LIST-B,2024-04-08,Asset freeze,Synthetic entry. Fictional.
+WL-00155,ENTITY,Glenholt Capital Group PLC,TH,,SYN-LIST-C,2021-06-26,Sectoral restriction,Synthetic entry. Fictional.
+WL-00156,ENTITY,Amberfell Terminals Group PLC,US,,SYN-LIST-C,2025-10-07,Asset freeze,Synthetic entry. Fictional.
+WL-00157,ENTITY,Quarrenden Agritech S.A.,TH,,SYN-LIST-C,2021-07-25,Export control,Synthetic entry. Fictional.
+WL-00158,ENTITY,"Corvane Grain Co., Ltd.",TH,,SYN-LIST-A,2024-01-11,Sectoral restriction,Synthetic entry. Fictional.
+WL-00159,ENTITY,Palliser Solar Pte Ltd,ID,,SYN-LIST-A,2023-12-10,Travel ban,Synthetic entry. Fictional.
+WL-00160,ENTITY,Yolande Optics Limited,DE,,SYN-LIST-A,2024-10-07,Export control,Synthetic entry. Fictional.
+WL-00161,ENTITY,Everley Freight Sdn Bhd,AU,,SYN-LIST-B,2024-07-14,Travel ban,Synthetic entry. Fictional.
+WL-00162,ENTITY,"Hexbury Capital Co., Ltd.",GB,,SYN-LIST-A,2022-01-04,Travel ban,Synthetic entry. Fictional.
+WL-00163,ENTITY,Juniperton Ventures GmbH,AE,,SYN-LIST-C,2023-09-08,Asset freeze,Synthetic entry. Fictional.
+WL-00164,ENTITY,Redbourne Utilities S.A.,TH,,SYN-LIST-C,2024-01-23,Export control,Synthetic entry. Fictional.
+WL-00165,ENTITY,"Lanthorn Precision Co., Ltd.",MY,,SYN-LIST-C,2022-11-27,Sectoral restriction,Synthetic entry. Fictional.
+WL-00166,ENTITY,Lanthorn Grain Pte Ltd,GB,,SYN-LIST-C,2025-06-01,Asset freeze,Synthetic entry. Fictional.
+WL-00167,ENTITY,Netherby Composites Group PLC,US,,SYN-LIST-A,2023-09-20,Asset freeze,Synthetic entry. Fictional.
+WL-00168,ENTITY,Amberfell Metals Ltd,GB,,SYN-LIST-C,2025-07-20,Travel ban,Synthetic entry. Fictional.
+WL-00169,ENTITY,Ulmara Analytics Pte. Ltd.,IN,,SYN-LIST-A,2023-03-12,Travel ban,Synthetic entry. Fictional.
+WL-00170,ENTITY,Netherby Wire and Cable Pte Ltd,DE,,SYN-LIST-A,2025-10-26,Sectoral restriction,Synthetic entry. Fictional.
+WL-00171,ENTITY,Quarrenden Shipping Limited,GB,,SYN-LIST-A,2022-10-24,Export control,Synthetic entry. Fictional.
+WL-00172,ENTITY,Quarrenden Energy PTE LTD,US,,SYN-LIST-C,2023-12-02,Asset freeze,Synthetic entry. Fictional.
+WL-00173,ENTITY,"Corvane Optics Co., Ltd.",AE,,SYN-LIST-C,2023-07-18,Asset freeze,Synthetic entry. Fictional.
+WL-00174,ENTITY,Jessamy Textiles PTE LTD,NL,,SYN-LIST-A,2026-08-12,Asset freeze,Synthetic entry. Fictional.
+WL-00175,ENTITY,Bracklind Wire and Cable GmbH,IN,,SYN-LIST-C,2024-11-02,Asset freeze,Synthetic entry. Fictional.
+WL-00176,ENTITY,Silvercrag Optics Pte. Ltd.,US,,SYN-LIST-A,2024-01-17,Sectoral restriction,Synthetic entry. Fictional.
+WL-00177,ENTITY,Glenholt Shipping Pte Ltd,IN,,SYN-LIST-B,2024-09-23,Export control,Synthetic entry. Fictional.
+WL-00178,ENTITY,Lanthorn Bioworks B.V.,US,,SYN-LIST-A,2026-06-08,Travel ban,Synthetic entry. Fictional.
+WL-00179,ENTITY,Netherby Offshore Group PLC,GB,,SYN-LIST-C,2021-07-16,Export control,Synthetic entry. Fictional.
+WL-00180,ENTITY,Verrant Agritech Pte Ltd,GB,,SYN-LIST-C,2025-08-20,Sectoral restriction,Synthetic entry. Fictional.

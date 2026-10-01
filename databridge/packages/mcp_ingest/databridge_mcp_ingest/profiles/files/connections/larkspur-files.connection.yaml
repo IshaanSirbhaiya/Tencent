@@ -1,0 +1,26 @@
+# Ingestion connection for the Larkspur demo corpus — READ ONLY, original bytes.
+# A SourceConnection declaration (connections.py): register with
+#   register_connection(yaml.safe_load(open(<this file>)))
+# `${...}` are expanded at connect time, never written out. ${WALNUT_PYTHON} lets a launcher pin the
+# interpreter that has the `mcp` SDK (1.x); plain `python` otherwise.
+#
+# The server runs in READ mode: it exposes list_roots / list_dir / stat_file / read_bytes and NO
+# write tool at all, so "block write tools" holds structurally for this connection (and the
+# engine's ReadOnlyClient still refuses any write-named tool by pattern). Scope is declared (P5):
+# roots come from the server's own --root; file types and the byte cap are here.
+id: larkspur-files
+title: Larkspur demo files (original bytes)
+transport:
+  type: stdio
+  command: "${WALNUT_PYTHON:-python}"
+  args:
+    - "${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py"
+    - "--root"
+    - "${WALNUT_ROOT}/fixtures/workspace_demo/files"
+    - "--max-bytes"
+    - "26214400"
+via: direct
+scope:
+  file_types: [.md, .txt, .pdf, .docx, .pptx, .xlsx, .eml]
+  max_bytes: 26214400
+auto_approve: false

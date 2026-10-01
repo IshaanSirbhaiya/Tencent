@@ -1,0 +1,53 @@
+# Machine-readable expectations for the Larkspur Analytics demo corpus, screened with
+# packs/workspace/screen.yaml. MANIFEST.md explains each case in prose. The test
+# packages/graph/tests/test_workspace_pack_loads.py evaluates the screen over files/ and asserts
+# every entry here (and that every file under files/ has an entry — none may go unlisted).
+#
+#   decision: allow | review | block
+#   rules:    rule ids expected to fire (decisive ids, or the signal ids that made the score)
+#   redacted: redaction ids expected to mask at least one span (allowed documents only)
+#   kept:     literal strings that must SURVIVE redaction (shape-alike values that fail a checksum)
+
+files:
+  contracts/Pellucid/MSA-2026-014_Pellucid_Freightways.pdf:
+    decision: allow            # "confidential" in a clause scores 1; the GBP 5,000,000 liability cap scores nothing (wording, not magnitude)
+    rules: [confidential_word]
+  contracts/Corriedale/SOW-2026-021_Demand_Forecasting.docx:
+    decision: review           # "Total contract value" wording scores 2 → exclude, list for owner override
+    rules: [contract_value_wording]
+  projects/route-optimisation/brief.md:
+    decision: allow
+  projects/route-optimisation/notes.md:
+    decision: allow
+  projects/demand-forecasting/brief.md:
+    decision: allow            # same filename as the route-optimisation brief — identity is the full path
+  projects/demand-forecasting/notes.md:
+    decision: allow
+  meetings/2026-07-14_kickoff_pellucid.txt:
+    decision: allow
+    redacted: [email, phone]
+  meetings/2026-08-19_steering_corriedale.docx:
+    decision: allow
+  finance/invoices/INV-2026-0041.pdf:
+    decision: allow
+    rules: [bank_details_terms]
+    redacted: [iban, email, phone]
+  finance/invoices/INV-2026-0057.pdf:
+    decision: allow
+    rules: [bank_details_terms]
+    redacted: [iban, card_number, email, phone]
+    kept: ["DE44 LSPR 2026 0457 11"]   # IBAN-shaped part number that fails mod-97 — must NOT be masked
+  hr/Remote_Working_Policy.docx:
+    decision: allow            # "strictly confidential manner" is prose, not a marking
+    rules: [confidential_word]
+  hr/Compensation_Bands_2026.md:
+    decision: block            # "STRICTLY CONFIDENTIAL" on its own line — decisive
+    rules: [confidentiality_marking]
+  engineering/deploy_notes.txt:
+    decision: block            # planted (fake) private key block — decisive
+    rules: [private_key_block]
+  sales/Rate_Card_Draft_v2.md:
+    decision: block            # two independent signals: pricing heading (1) + currency table (2) = 3
+    rules: [pricing_heading, currency_table]
+  "planning/Q3 #roadmap/roadmap.md":
+    decision: allow            # '#' in the folder name — must still be collected

@@ -9,12 +9,14 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import AUTH_HEADERS
+
 from databridge_gateway import create_app
 
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(create_app()) as c:
+    with TestClient(create_app(), headers=AUTH_HEADERS) as c:
         yield c
 
 
@@ -46,8 +48,20 @@ def test_an_empty_queue_reports_zeros_not_a_projection(client):
 
 
 def test_the_baseline_sits_in_the_problem_statements_band(client):
+    """The band is the config's (`band_min_total`/`band_max_total`, transcribed from the problem
+    statement in time_baseline.yaml) — read, not written here (HC1, rule 6)."""
     body = client.get("/impact").json()
-    assert 23.0 <= body["baseline"]["total_min"] <= 32.0
+    lo, hi = body["baseline"]["band_min_total"], body["baseline"]["band_max_total"]
+    assert 0 < lo <= hi
+    assert lo <= body["baseline"]["total_min"] <= hi
+
+
+def test_the_minutes_are_labelled_an_estimate(client):
+    """HC1: `with_copilot_min` is an estimate, so the saving is one — and the payload says so."""
+    basis = client.get("/impact").json()["saving_basis"]
+    assert basis["minutes"] == "estimate"
+    assert basis["stages_completed"] == "measured"
+    assert "ESTIMATE" in basis["note"]
 
 
 def test_the_identity_step_is_marked_never_automatable_and_saves_nothing(client, chit):

@@ -15,35 +15,37 @@ import { StatsPanel } from "@/components/brain/stats-panel";
 import { MarkdownPanel } from "@/components/brain/markdown-panel";
 import { Toast } from "@/components/brain/toast";
 import { ResizeHandle, useBottomPanelHeight } from "@/components/brain/resize-handle";
-import { NODE_STYLE } from "@/lib/brain-layout";
+import { nodeStylesFor } from "@/lib/brain-layout";
 import { onDemoAction } from "@/lib/demo";
+import { usePack } from "@/lib/pack-context";
+import type { Pack } from "@/lib/packs";
 
-// The /brain route — the investor-facing Company Brain (T08). Renders backend truth only (D-FE-2):
+// The /brain route — the active pack's knowledge graph. Renders backend truth only (D-FE-2):
 // graph, grounded answers, server-computed insights, real counters. The "wow" is the live cited
 // graph + the bi-temporal time-slider, not decoration.
 
-function Legend() {
-  // dark-scoped (the graph canvas is always near-black, theme-independent) — matches the
-  // controls/minimap so a future light toggle can't turn this into a white box on black.
+function Legend({ pack }: { pack: Pack }) {
+  // The kinds come from the pack's own vocabulary, so a legend can never list a kind the active
+  // pack does not have. Every colour here is a token, so the legend follows the canvas into either
+  // theme instead of staying a black box on a white page.
+  const styles = nodeStylesFor(pack);
   return (
-    <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col gap-1 rounded border border-white/10 bg-black/70 px-2.5 py-2">
-      {(Object.keys(NODE_STYLE) as (keyof typeof NODE_STYLE)[]).map((k) => (
-        <div key={k} className="flex items-center gap-1.5 text-2xs text-white/60">
+    <div className="pointer-events-none absolute left-3 top-3 z-10 flex flex-col gap-1 rounded border border-border bg-surface/90 px-2.5 py-2">
+      {Object.entries(styles).map(([k, style]) => (
+        <div key={k} className="flex items-center gap-1.5 text-2xs text-subtle">
           <span
             className="h-2.5 w-2.5 rounded-full"
-            style={{ background: NODE_STYLE[k].color, boxShadow: `0 0 5px ${NODE_STYLE[k].color}` }}
+            style={{ background: style.color, boxShadow: `0 0 5px ${style.color}` }}
           />
-          {NODE_STYLE[k].label}
+          {style.label}
         </div>
       ))}
     </div>
   );
 }
 
-// The insurer that issued most of the corpus — a real node in the clinic seed.
-const MERIDIAN_NODE_ID = "org:meridian-life-assurance";
-
 export default function BrainPage() {
+  const { pack } = usePack();
   const graphQ = useQuery({ queryKey: ["brain-graph"], queryFn: brainApi.graph });
   const insightsQ = useQuery({ queryKey: ["brain-insights"], queryFn: () => brainApi.insights() });
   const healthQ = useQuery({ queryKey: ["health"], queryFn: api.health, refetchInterval: 5000 });
@@ -121,7 +123,7 @@ export default function BrainPage() {
       const g = data as BrainGraph | undefined;
       if (g) {
         setToast(
-          `Clinic graph loaded — ${g.stats.nodes} nodes, ${g.stats.edges} edges from ${Object.keys(g.provenance_by_source).length} sources`,
+          `Graph loaded — ${g.stats.nodes} nodes, ${g.stats.edges} edges from ${Object.keys(g.provenance_by_source).length} sources`,
         );
       }
     } finally {
@@ -133,22 +135,23 @@ export default function BrainPage() {
   React.useEffect(() => {
     return onDemoAction((action) => {
       if (action === "load") onLoadDemo();
-      else if (action === "ask")
-        setAutoAsk((prev) => ({ q: "What does the WELL2 package include?", n: (prev?.n ?? 0) + 1 }));
-      else if (action === "slider") {
-        // May 2026: the coverage rules and the test catalogue are already in force, but none of
-        // the referrals have arrived yet — a genuinely meaningful "before" view. The old date
-        // (Jan 2024) predated the entire clinic seed, so the slider rewound to an EMPTY graph.
-        setAsOf(new Date("2026-05-01T00:00:00Z"));
+      else if (action === "ask" && pack.demo_question)
+        setAutoAsk((prev) => ({ q: pack.demo_question, n: (prev?.n ?? 0) + 1 }));
+      else if (action === "slider" && pack.demo_as_of) {
+        // A "before" view that is genuinely meaningful: late enough that the reference data is in
+        // force, early enough that none of the incoming documents have arrived. Which instant that
+        // is depends entirely on the pack's own seed, so the pack names it — a date written here
+        // once predated an entire seed and rewound the slider to an EMPTY graph.
+        setAsOf(new Date(pack.demo_as_of));
         setTimeout(() => setAsOf(null), 4000);
-      } else if (action === "node") {
-        // A node that exists. This used to focus `person:sarah@acmecorp.com`, deleted with the
-        // Acme seed in Phase 2 — so the step silently selected nothing.
-        setSelectedNode(MERIDIAN_NODE_ID);
-        setFocusNode(MERIDIAN_NODE_ID);
+      } else if (action === "node" && pack.demo_focus_node) {
+        // A node that exists — named by the pack, because a node id written into this component is
+        // a node id that silently selects nothing the moment the seed changes.
+        setSelectedNode(pack.demo_focus_node);
+        setFocusNode(pack.demo_focus_node);
       }
     });
-  }, [onLoadDemo]);
+  }, [onLoadDemo, pack]);
 
   const sourceCount = graph ? Object.keys(graph.provenance_by_source).length : 0;
 
@@ -167,7 +170,7 @@ export default function BrainPage() {
           its resizable share — `flex-1` rather than a fixed ratio, so the drag handle has something
           to actually trade against instead of two ratios that both stay fixed. */}
       <div className="relative min-h-0 flex-1 border-b border-border bg-bg">
-        <Legend />
+        <Legend pack={pack} />
         {graph ? (
           <GraphView
             graph={graph}
@@ -188,8 +191,7 @@ export default function BrainPage() {
       </div>
 
       {/* The slider's domain is derived from this graph's own valid_from/valid_to. It used to be
-          hardcoded to Jan–Jun 2024, two years before the clinic seed, so any drag blanked the
-          canvas. */}
+          hardcoded to a fixed window two years before the seed, so any drag blanked the canvas. */}
       <TimeSlider graph={graph} onChange={setAsOf} />
 
       {/* T-32: draggable/keyboard-resizable boundary — see components/brain/resize-handle.tsx. */}

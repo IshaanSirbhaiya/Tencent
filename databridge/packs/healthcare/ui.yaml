@@ -1,0 +1,237 @@
+# packs/healthcare — the pack's OPERATOR-SURFACE vocabulary (Layer 1, presentation half).
+#
+# `ontology.yaml` says what KINDS this pack has. This file says what a person is shown: every
+# domain noun the UI is otherwise forbidden to hardcode, the operator surfaces the pack declares,
+# its roster, its demo trials and its graph colours.
+#
+# It lives HERE, beside the ontology, because it is the pack's own vocabulary — not the frontend's.
+# `GET /packs` (apps/gateway/databridge_gateway/pack_routes.py) reads this file and serves it; the
+# frontend's `config/packs.json` is the offline fallback for the same shape and is the copy to
+# delete once the gateway is always reachable. Two copies is a drift hazard and is temporary.
+#
+# `available` is NOT declared here. Whether a pack is available is a property of the DEPLOYMENT
+# (`packs/deployment.yaml` / DATABRIDGE_PACKS), not of the pack, and the gateway computes it from
+# the binding. A pack that declared its own availability could claim to be enabled when nothing
+# had enabled it.
+#
+# Synthetic throughout: every person, organisation and document named here is fictional.
+
+pack: healthcare
+label: Healthcare
+tagline: Referral intake, coverage determination, questionnaire pre-fill
+nouns:
+  subject: patient
+  subject_plural: patients
+  subject_title: Patient
+  org: clinic
+  org_plural: clinics
+  org_title: Clinic
+  registry: clinic registry
+  record: clinic record
+  graph: clinic graph
+  workspace: Clinic brain
+  counterparty: insurer
+  counterparty_plural: insurers
+  document: referring document
+  determination: coverage determination
+  operator_surface: Front desk
+  operator_role: front desk
+  queue: Queue
+  identifier: NRIC/FIN/passport
+  pitch: Reads a patient's referring document before they reach the counter.
+  credential: insurance e-card
+  document_examples: a referral letter, voucher, authorisation form or HR email
+  subject_plural_title: Patients
+roster:
+- staffId: PS-FD-014
+  name: Nurul Aisyah
+  role: Front desk — Registration
+- staffId: PS-FD-027
+  name: Tan Jia Hui
+  role: Front desk — Registration
+- staffId: PS-RN-103
+  name: Kavitha Raman
+  role: Registered nurse
+surfaces:
+- href: /frontdesk
+  label: Queue
+  icon: queue
+- href: /intake
+  label: Read a document
+  icon: upload
+- href: /brain
+  label: Knowledge graph
+  icon: graph
+- href: /impact
+  label: Impact
+  icon: chart
+trials:
+  intelligence:
+  - label: Ask
+    note: Read straight from the pack graph. Every value arrives with the pointer it came from — and
+      only the last one asks for figures, which is why only it makes them appear.
+    chips:
+    - id: ask-issuers
+      label: which issuers sent documents?
+      payload: which issuers sent documents?
+    - id: ask-blocked
+      label: what is blocked right now?
+      payload: what is blocked right now?
+    - id: ask-unconfirmed
+      label: which documents have no confirmed patient?
+      payload: which documents have no confirmed patient?
+    - id: ask-count
+      label: how many documents are here?
+      payload: how many documents are here?
+  - label: Act
+    note: A request that implies an act becomes a draft in the outbox, never a send. With no registration
+      named, nothing is drafted at all — choosing which patient a message concerns is an identity determination,
+      and this system does not make one.
+    chips:
+    - id: act-uncovered-test
+      label: email the patient about the test that is not covered
+      payload: email the patient about the test that is not covered
+    - id: act-questionnaire
+      label: email the patient that their questionnaire is outstanding
+      payload: email the patient that their questionnaire is outstanding
+  - label: Refuses
+    note: 'These two are answered with a refusal, and the refusal is decided before the graph is read
+      and before any model is called — model_calls: 0. Identity is checked in person, by a person, against
+      the physical document. This is the product working, not a button that failed.'
+    chips:
+    - id: refuse-verify-identity
+      label: verify the identity of this patient
+      payload: verify the identity of this patient
+    - id: refuse-candidate-2
+      label: is candidate 2 the right person?
+      payload: is candidate 2 the right person?
+  evidence:
+  - label: Traces
+    note: Pack configuration — packages, tests, coverage rules, issuers. No patient is involved, so
+      there is nothing to confirm and the chain is readable now.
+    chips:
+    - id: ev-test
+      label: test:full_blood_count
+      payload: test:full_blood_count
+    - id: ev-package
+      label: package:blphs-well2
+      payload: package:blphs-well2
+    - id: ev-rule
+      label: coverage_rule:rule-bluepeak-well2
+      payload: coverage_rule:rule-bluepeak-well2
+    - id: ev-org
+      label: org:meridian-life-assurance
+      payload: org:meridian-life-assurance
+  - label: Gated
+    note: These exist. Their evidence is withheld until a named member of staff has checked identity
+      in person and confirmed — AWAITING_HUMAN_CONFIRMATION is the gate holding, and it is deliberately
+      worded so it cannot be mistaken for “no such entity”.
+    chips:
+    - id: ev-document
+      label: document:chit_03_everwell_group_invitation.txt
+      payload: document:chit_03_everwell_group_invitation.txt
+    - id: ev-patient
+      label: patient:pat:4e487c99807b
+      payload: patient:pat:4e487c99807b
+  intake:
+  - label: Read
+    note: 'One click: fetch the document, run the whole pipeline, land on its summary card. The same
+      endpoint a paste uses — there is no separate demo path.'
+    chips:
+    - id: intake-meridian
+      label: insurer referral letter
+      title: chit_01_meridian_referral.txt
+      payload:
+        kind: fixture
+        name: chit_01_meridian_referral.txt
+    - id: intake-mol
+      label: government authorisation form
+      title: chit_07_mol_authorisation_pee226.txt
+      payload:
+        kind: fixture
+        name: chit_07_mol_authorisation_pee226.txt
+    - id: intake-hr-email
+      label: HR email
+      title: chit_09_coralharbour_hr_email.eml
+      payload:
+        kind: fixture
+        name: chit_09_coralharbour_hr_email.eml
+  - label: Refuses
+    note: Uploads a file named like an identity-document scan. It is refused on the name, before a byte
+      of it is parsed — the banner above is a mechanism, not a promise.
+    chips:
+    - id: intake-identity-refusal
+      label: upload something named like an identity document
+      title: posts nric_front.txt — refused by screen_upload before extraction
+      payload:
+        kind: identity-file
+        filename: nric_front.txt
+demo_steps:
+- route: /frontdesk
+  caption: The operator queue — documents read before the patient reaches the counter.
+  ms: 8000
+- route: /intake
+  caption: 'Any referring document: insurer letter, voucher, TPA form, HR email — or nothing at all.'
+  ms: 8000
+- route: /brain
+  caption: 'The pack graph: patients, insurers, packages and tests, built from the real data.'
+  action: load
+  ms: 9000
+- caption: Ask it anything. Every answer is cited — and it refuses to confirm anyone's identity.
+  action: ask
+  ms: 10000
+- caption: 'Rewind: what did the graph know in May, before any of these referrals arrived?'
+  action: slider
+  ms: 9000
+- caption: Click any node for its receipts — the exact rows and spans it was built from.
+  action: node
+  ms: 8000
+- route: /impact
+  caption: ~16 minutes of admin saved per patient — and zero claimed on identity, by design.
+  ms: 9000
+- route: /frontdesk
+  caption: Every value traces to the characters it came from. Nothing commits without a human.
+  action: finish
+  ms: 7000
+graph_vocabulary:
+  node_kinds:
+    patient:
+      color: '#6f9fd8'
+      label: Patient
+    org:
+      color: '#9a86c4'
+      label: Org
+    package:
+      color: '#5fa98d'
+      label: Package
+    test:
+      color: '#c2a163'
+      label: Test
+    visit:
+      color: '#c088a4'
+      label: Visit
+    clinic:
+      color: '#63a3a3'
+      label: Clinic
+    coverage_rule:
+      color: '#c4827a'
+      label: Coverage rule
+    document:
+      color: '#7d8492'
+      label: Document
+      dim: true
+  edge_labels:
+    includes_test: includes
+    requests_test: requests
+    authorises: authorises
+    for_patient: for patient
+    issued: issued
+    references: references
+    at_clinic: at clinic
+demo_focus_node: org:meridian-life-assurance
+demo_as_of: '2026-05-01T00:00:00Z'
+demo_question: What does the WELL2 package include?
+brain_suggested_fallback:
+- What does the WELL2 package include?
+- Which patients does Meridian Life Assurance cover?
+- Which intakes are waiting on an identity check?

@@ -3,8 +3,8 @@
  * The sign-in screen, and the signed-in chip in the sidebar.
  *
  * Read the header of `lib/staff-session.tsx` first — it explains the one line this must not cross.
- * The short version: signing in says *who* is at the terminal. It never says a patient's identity
- * was checked. That remains a per-patient tick, reset on every intake.
+ * The short version: signing in says *who* is at the terminal. It never says a subject's identity
+ * was checked. That remains a per-subject tick, reset on every intake.
  *
  * This is deliberately NOT authentication. There is no password, no directory, no session token
  * the gateway validates. A POC that shipped a fake login and called it access control would be
@@ -14,16 +14,15 @@
 import * as React from "react";
 import { LogOut, ShieldCheck, UserCircle2 } from "lucide-react";
 import { isValidStaffId, useStaffSession } from "@/lib/staff-session";
-
-/** Front-desk staff on the synthetic roster. Convenience for the demo, not a permission list. */
-const ROSTER: { staffId: string; name: string; role: string }[] = [
-  { staffId: "PS-FD-014", name: "Nurul Aisyah", role: "Front desk — Registration" },
-  { staffId: "PS-FD-027", name: "Tan Jia Hui", role: "Front desk — Registration" },
-  { staffId: "PS-RN-103", name: "Kavitha Raman", role: "Clinic nurse" },
-];
+import { usePack } from "@/lib/pack-context";
 
 export function StaffGate({ children }: { children: React.ReactNode }) {
   const { staff, ready, signIn } = useStaffSession();
+  // The roster and every noun on this screen come from the active pack. A synthetic roster written
+  // into this component would be one vertical's staff list compiled into the platform shell.
+  const { pack } = usePack();
+  const roster = pack.roster;
+  const nouns = pack.nouns;
   const [staffId, setStaffId] = React.useState("");
   const [name, setName] = React.useState("");
 
@@ -40,10 +39,10 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen items-center justify-center bg-bg p-6">
       <div className="w-full max-w-md">
         <div className="mb-5 text-center">
-          <h1 className="text-lg font-semibold">Walnut — Parkway Shenton</h1>
-          <p className="mt-1 text-xs text-subtle">
-            Reads a patient&apos;s referring document before they reach the counter.
-          </p>
+          <h1 className="text-lg font-semibold">
+            Walnut <span className="font-normal text-subtle">· {pack.label} pack</span>
+          </h1>
+          <p className="mt-1 text-xs text-subtle">{nouns.pitch}</p>
         </div>
 
         <form
@@ -58,7 +57,7 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
             <div>
               <h2 className="text-sm font-semibold">Who is at this terminal?</h2>
               <p className="mt-0.5 text-2xs text-subtle">
-                Your staff id is written into the evidence ledger next to everything you confirm.
+                Your operator id is written into the evidence ledger next to everything you confirm.
               </p>
             </div>
           </div>
@@ -70,7 +69,7 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
             type="text"
             value={staffId}
             onChange={(e) => setStaffId(e.target.value)}
-            placeholder="PS-FD-014"
+            placeholder={roster[0]?.staffId ?? "OP-001"}
             data-testid="staff-id-input"
             autoFocus
             maxLength={64}
@@ -90,7 +89,7 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nurul Aisyah"
+            placeholder={roster[0]?.name ?? "Your name"}
             data-testid="staff-name-input"
             className="mb-4 w-full rounded border border-border bg-bg px-3 py-2 text-xs"
           />
@@ -99,15 +98,16 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
             type="submit"
             disabled={!canSubmit}
             data-testid="staff-sign-in"
-            className="w-full rounded bg-accent px-3 py-2 text-xs font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-subtle"
+            className="w-full rounded bg-accent px-3 py-2 text-xs font-medium text-accent-fg transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-subtle"
           >
             Start shift
           </button>
 
+          {roster.length > 0 && (
           <div className="mt-4 border-t border-border pt-3">
             <p className="mb-1.5 text-2xs text-subtle">Or pick from the synthetic roster:</p>
             <div className="flex flex-col gap-1">
-              {ROSTER.map((r) => (
+              {roster.map((r) => (
                 <button
                   key={r.staffId}
                   type="button"
@@ -121,6 +121,7 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
               ))}
             </div>
           </div>
+          )}
         </form>
 
         {/* Say plainly what this is. An unauthenticated field that looks like a login is a
@@ -130,8 +131,8 @@ export function StaffGate({ children }: { children: React.ReactNode }) {
           <span>
             Prototype: this records who is operating the terminal, so the ledger can attribute each
             confirmation. It is not authentication — a production deployment signs in against the
-            hospital directory (Entra ID). Signing in never attests to a patient&apos;s identity;
-            that stays a per-patient check you make in person.
+            deploying organisation&apos;s directory. Signing in never attests to the identity of a{" "}
+            {nouns.subject}; that stays a per-{nouns.subject} check you make in person.
           </span>
         </p>
       </div>

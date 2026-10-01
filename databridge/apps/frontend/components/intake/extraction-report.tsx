@@ -13,23 +13,13 @@
  */
 import { ArrowRight, ScanLine, FileText, TriangleAlert } from "lucide-react";
 import type { SummaryCard } from "@/lib/intake-types";
+import { ReadSourceBanner } from "@/components/frontdesk/card-sections";
 
-/** The four paths whose value describes what was SELECTED on a checkbox form.
- *  Mirrors `extract.CHECKBOX_SENSITIVE` — used only to LABEL what the server already decided,
- *  never to decide anything. */
-const CHECKBOX_DERIVED = [
-  "authorisation.package_code",
-  "authorisation.package_name",
-  "authorisation.requested_tests",
-  "authorisation.add_ons",
-];
-
-const FIELD_LABELS: Record<string, string> = {
-  "authorisation.package_code": "package code",
-  "authorisation.package_name": "package name",
-  "authorisation.requested_tests": "requested tests",
-  "authorisation.add_ons": "add-ons",
-};
+/** A field path in words: its last segment, underscores as spaces. Computed from the path the
+ *  server sent, so no per-field label table lives in UI code (SWEEP #16). */
+function fieldWords(path: string): string {
+  return (path.split(".").pop() ?? path).replace(/_/g, " ");
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -53,7 +43,19 @@ export function ExtractionReport({
   // field means the plain thing — the document does not say it — and the card already shows that.
   // Labelling it "not read from this document" here would dress an ordinary absence up as a
   // withheld value, which is the same overclaiming in the opposite direction.
-  const withheld = ocred ? CHECKBOX_DERIVED.filter((p) => card.unresolved.includes(p)) : [];
+  //
+  // WHICH paths describe a checkbox selection is the server's knowledge
+  // (`extract.CHECKBOX_SENSITIVE`), sent as `extraction.selection_paths` (SWEEP #16, HC3). No copy
+  // of that list lives here. A gateway that does not send it gets the CONSERVATIVE notice: every
+  // unresolved field is listed, because any of them may be a tick box the engine failed to read.
+  // Hiding the notice for want of a list would turn a safety notice into a silent omission.
+  const selectionPaths = x?.selection_paths;
+  const pathsKnown = Array.isArray(selectionPaths);
+  const withheld = !ocred
+    ? []
+    : pathsKnown
+      ? selectionPaths.filter((p) => card.unresolved.includes(p))
+      : card.unresolved;
 
   return (
     <div
@@ -71,6 +73,8 @@ export function ExtractionReport({
         </h2>
         <span className="font-mono text-2xs text-subtle">{card.document.document_id}</span>
       </div>
+
+      <ReadSourceBanner card={card} />
 
       {x && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="extraction-stats">
@@ -118,8 +122,14 @@ export function ExtractionReport({
           <div className="text-2xs font-semibold text-band-review">
             Not read from this document — take these from the original
           </div>
+          {!pathsKnown && (
+            <div className="mt-0.5 text-2xs text-subtle" data-testid="selection-paths-unknown">
+              The server did not say which fields are tick-box selections, so every unresolved
+              field is listed.
+            </div>
+          )}
           <div className="mt-0.5 text-2xs text-subtle">
-            {withheld.map((p) => FIELD_LABELS[p] ?? p).join(", ")}. A tick box the engine failed
+            {withheld.map(fieldWords).join(", ")}. A tick box the engine failed
             to recognise looks exactly like one that was never printed, so a selection recovered
             from a scan cannot be proved complete. Rather than ground an option the form may have
             declined, these are left unresolved.

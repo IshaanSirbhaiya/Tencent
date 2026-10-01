@@ -19,6 +19,8 @@ import pytest
 
 from fastapi.testclient import TestClient
 
+from conftest import AUTH_HEADERS
+
 from databridge_gateway import create_app
 
 # Reuse the comment-blanking scanner rather than re-deriving "is this line code?".
@@ -181,7 +183,7 @@ def test_the_sign_in_screen_says_it_is_not_authentication():
 
 @pytest.fixture()
 def client():
-    with TestClient(create_app()) as c:                  # `with` runs the lifespan
+    with TestClient(create_app(), headers=AUTH_HEADERS) as c:                  # `with` runs the lifespan
         yield c
 
 

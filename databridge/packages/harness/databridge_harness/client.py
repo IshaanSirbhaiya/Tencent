@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Any, MutableMapping, Optional
+from typing import TYPE_CHECKING, Any, MutableMapping, Optional
 
 from pydantic import BaseModel, ValidationError
 
@@ -26,6 +26,9 @@ from databridge_core import PipelineEvent, active_profile, content_hash, resolve
 
 from .backends import Backend, caps_for, is_hosted
 from .tracking import build_event
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .embedding import EmbeddingResult
 
 Message = dict  # {"role": "system"|"user"|"assistant", "content": str}
 
@@ -275,3 +278,126 @@ class Harness:
                             model=model, tokens=raw.tokens, cost_usd=raw.cost_usd,
                             duration_ms=duration_ms, cached=False)
         return TextResult(text=raw.text, event=event)
+
+    # -- embeddings (additive: task_class ``embed``, BUILD_PLAN §5.5) ---------------------------
+    def embed(
+        self,
+        texts: list[str],
+        *,
+        task_class: str = "embed",
+        batch_size: int = 64,
+        workers: int = 4,
+        source_id: Optional[str] = None,
+    ) -> "EmbeddingResult":
+        """Embed ``texts`` (order preserved) through the routed embedding model.
+
+        Routing is config like every other call. The model is resolved and the airgapped guard
+        runs FIRST, so a hosted embedding model under the airgapped profile refuses loudly rather
+        than quietly dropping to the offline fallback.
+
+        The **offline deterministic fallback** (``embedding.hashing_embed``) is used — and the
+        result says so in ``offline``/``label`` — when ``WALNUT_EMBED_OFFLINE`` is set, when the
+        backend has no ``embed`` method (e.g. an offline gold backend), or when the real LiteLLM
+        backend's provider has no credential in the environment. It is never used to paper over
+        a failing *real* call: that raises, because silence is not success.
+
+        Batches run on ``workers`` threads (I/O-bound HTTP calls). Throughput is MEASURED over
+        this call and returned; nothing here estimates it.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        from .embedding import (
+            OFFLINE_EMBED_DIM,
+            OFFLINE_EMBED_MODEL,
+            OFFLINE_LABEL,
+            EmbeddingResult,
+            RawEmbedding,
+            embedding_key_present,
+            force_offline,
+            hashing_embed,
+        )
+
+        texts = list(texts)
+        model = self._resolve(task_class)
+        self._guard_airgapped(model)
+        backend_embed = getattr(self._backend, "embed", None)
+        offline = (force_offline() or backend_embed is None
+                   or (getattr(self._backend, "name", "") == "litellm"
+                       and not embedding_key_present(model)))
+        n_chars = sum(len(t) for t in texts)
+        batch_size = max(1, int(batch_size))
+        batches = [texts[i:i + batch_size] for i in range(0, len(texts), batch_size)]
+        t0 = perf_counter()
+
+        if offline:
+            vectors = hashing_embed(texts, OFFLINE_EMBED_DIM)
+            duration_ms = (perf_counter() - t0) * 1000
+            secs = duration_ms / 1000
+            event = build_event("embed", texts, f"{len(vectors)} vectors", task_class=task_class,
+                                model=OFFLINE_EMBED_MODEL, tokens=0, cost_usd=0.0,
+                                duration_ms=duration_ms, cached=False)
+            return EmbeddingResult(
+                vectors=vectors, model=OFFLINE_EMBED_MODEL, dim=OFFLINE_EMBED_DIM, offline=True,
+                label=OFFLINE_LABEL, tokens=0, cost_usd=0.0, duration_ms=duration_ms,
+                batches=len(batches), workers=1,
+                texts_per_second=(len(texts) / secs) if texts and secs > 0 else None,
+                chars_per_second=(n_chars / secs) if texts and secs > 0 else None,
+                events=[event])
+
+        # Per-text cache: an unchanged chunk re-embeds for free (incremental indexing).
+        results: list[Optional[list[float]]] = [None] * len(texts)
+        todo: list[int] = []
+        for i, t in enumerate(texts):
+            key = (task_class, model, content_hash(t), "embed")
+            if self._cache is not None and key in self._cache:
+                results[i] = list(self._cache[key])
+            else:
+                todo.append(i)
+        todo_batches = [todo[i:i + batch_size] for i in range(0, len(todo), batch_size)]
+        if todo_batches:
+            self._check_budget(source_id)
+
+        def _run(idx: list[int]) -> tuple[list[int], RawEmbedding, float]:
+            b0 = perf_counter()
+            raw = backend_embed(model=model, inputs=[texts[i] for i in idx])
+            if len(raw.vectors) != len(idx):
+                raise HarnessError(f"{task_class}: backend returned {len(raw.vectors)} vectors "
+                                   f"for {len(idx)} inputs")
+            return idx, raw, (perf_counter() - b0) * 1000
+
+        n_workers = max(1, min(int(workers), len(todo_batches) or 1))
+        if n_workers == 1:
+            outs = [_run(b) for b in todo_batches]
+        else:
+            with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                outs = list(pool.map(_run, todo_batches))
+
+        tokens = 0
+        cost = 0.0
+        events = []
+        for idx, raw, ms in outs:
+            tokens += raw.tokens
+            cost += raw.cost_usd
+            for i, vec in zip(idx, raw.vectors):
+                results[i] = list(map(float, vec))
+                if self._cache is not None:
+                    self._cache[(task_class, model, content_hash(texts[i]), "embed")] = \
+                        tuple(results[i])
+            events.append(build_event("embed", [texts[i] for i in idx],
+                                      f"{len(raw.vectors)} vectors", task_class=task_class,
+                                      model=model, tokens=raw.tokens, cost_usd=raw.cost_usd,
+                                      duration_ms=ms, cached=False))
+        self._add_usage(tokens, source_id)
+        dims = {len(v) for v in results if v is not None}
+        if len(dims) > 1:
+            raise HarnessError(f"{task_class}: inconsistent embedding dimensions {sorted(dims)}")
+        duration_ms = (perf_counter() - t0) * 1000
+        secs = duration_ms / 1000
+        return EmbeddingResult(
+            vectors=[v for v in results if v is not None] if texts else [],
+            model=model, dim=dims.pop() if dims else 0, offline=False, label=None,
+            tokens=tokens, cost_usd=cost, duration_ms=duration_ms, batches=len(todo_batches),
+            workers=n_workers,
+            texts_per_second=(len(texts) / secs) if texts and secs > 0 else None,
+            chars_per_second=(n_chars / secs) if texts and secs > 0 else None,
+            events=events)

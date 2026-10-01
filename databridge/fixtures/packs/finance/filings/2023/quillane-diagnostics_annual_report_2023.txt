@@ -1,0 +1,52 @@
+ Quillane Diagnostics PTE LTD
+
+Annual Report for the financial year ended 31 December 2023
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Quillane Diagnostics PTE LTD
+  Registration number   SYN-CRN-5904668
+  Country of incorporation   TH
+  Principal activity   Specialty Chemicals
+  Reporting currency   SGD
+  Date of incorporation   2011-04-25
+
+ Directors' commentary
+
+Demand in the Group's principal market softened, offset in part by a full year contribution from the contract logistics division acquired in the prior period.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2023   FY2022
+------:---:|
+  Revenue   408   434
+  Gross profit   121   110
+  EBITDA   91   72
+  Depreciation and amortisation   -18   -19
+  Finance costs   -11   -9
+  Profit after tax   52   43
+  Total assets   707   714
+  Total borrowings   203   233
+  Cash and cash equivalents   104   93
+  Total equity   459   458
+
+ Key ratios
+
+  Ratio   FY2023   Covenant reference
+------:---|
+  Net debt / EBITDA   1.09x   Tested quarterly under the syndicated facility
+  Interest cover   6.65x   Tested quarterly
+  Current ratio   2.26x   -
+
+ Banking arrangements
+
+Borrowings are held with Northgate Mercantile Bank and one other lender. The Group has provided a fixed and floating charge over its assets.
+
+ Auditor's note
+
+Our opinion on the financial statements is unmodified.

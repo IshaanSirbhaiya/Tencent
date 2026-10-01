@@ -26,7 +26,7 @@ from databridge_intake.resolve import HIGH_CONFIDENCE_SCORE, parse_claimed_dob, 
 
 @pytest.fixture(scope="module")
 def records() -> tuple[PatientRecord, ...]:
-    return registry()
+    return registry(DATASET_TODAY)
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +37,7 @@ def resolved() -> dict[str, ResolutionResult]:
     for path in sorted((fixtures_dir() / "chits").glob("*")):
         record = extract_intake(path.read_text(encoding="utf-8"),
                                 document_id=path.name, harness=harness)
-        out[path.name] = resolve(record.subject)
+        out[path.name] = resolve(record.subject, today=DATASET_TODAY)
     return out
 
 
@@ -72,7 +72,7 @@ def test_the_resolver_eval_matrix(resolved, fixture, status, count, winning_id):
 
 def test_a_walk_in_with_no_document_is_insufficient_identifiers():
     """Row 10 of the matrix. Not an error — it routes to registration at the counter."""
-    result = resolve(SubjectBlock())
+    result = resolve(SubjectBlock(), today=DATASET_TODAY)
     assert result.status is ResolutionStatus.INSUFFICIENT_IDENTIFIERS
     assert result.candidates == ()
     assert any("register this patient" in n for n in result.notes)
@@ -199,21 +199,21 @@ def test_a_name_that_is_merely_similar_does_not_match(records):
     """Names are exact-after-normalisation with NO fuzzy tolerance — the Phase 1 rule, carried
     forward. 'Lim Arjuna' scores ~0.96 against 'Lim Arjun' under any fuzzy metric, and they are
     different people; a near-miss here puts a stranger's record in front of staff."""
-    assert resolve(_subject(claimed_name="Lim Arjuna")).status is ResolutionStatus.NO_CANDIDATE
-    assert resolve(_subject(claimed_name="Lim Arjun")).status is ResolutionStatus.SINGLE_CANDIDATE
+    assert resolve(_subject(claimed_name="Lim Arjuna"), today=DATASET_TODAY).status is ResolutionStatus.NO_CANDIDATE
+    assert resolve(_subject(claimed_name="Lim Arjun"), today=DATASET_TODAY).status is ResolutionStatus.SINGLE_CANDIDATE
 
 
 def test_name_matching_ignores_case_and_punctuation_spacing():
     """Normalisation is not tolerance: a printed letter and a CSV cell differ in spacing and case
     without meaning two different people."""
-    assert resolve(_subject(claimed_name="  lim   ARJUN ")).status is (
+    assert resolve(_subject(claimed_name="  lim   ARJUN "), today=DATASET_TODAY).status is (
         ResolutionStatus.SINGLE_CANDIDATE)
 
 
 def test_an_identifier_matching_nobody_falls_back_to_name_and_flags_the_mismatch():
     """A typo'd or stale NRIC must not produce an empty result for a patient who IS registered —
     but the candidate has to carry the mismatch, or staff see a clean match to the wrong basis."""
-    result = resolve(_subject(claimed_name="Lim Arjun", claimed_id_number="S0000000A"))
+    result = resolve(_subject(claimed_name="Lim Arjun", claimed_id_number="S0000000A"), today=DATASET_TODAY)
     candidate = _only(result)
     assert candidate.matched_on == ["name"]
     assert "id_number_mismatch" in candidate.conflicts
@@ -224,7 +224,7 @@ def test_a_conflicting_dob_is_flagged_not_dropped():
     """An ID match with a disagreeing date of birth is exactly what staff need to see. Dropping
     the candidate would hide the conflict; keeping it unflagged would hide it just as well."""
     result = resolve(_subject(claimed_name="Lim Arjun", claimed_id_number="T2221854H",
-                              claimed_dob="01/01/99"))
+                              claimed_dob="01/01/99"), today=DATASET_TODAY)
     candidate = _only(result)
     assert "dob_mismatch" in candidate.conflicts
     assert "id_number" in candidate.matched_on
@@ -234,7 +234,7 @@ def test_a_conflicting_dob_is_flagged_not_dropped():
 def test_demographics_alone_are_never_a_search_key():
     """'Male, Singaporean' describes a third of the registry. Returning 100 candidates is
     indistinguishable from returning none, so a subject with no name and no id is insufficient."""
-    result = resolve(_subject(claimed_sex="Male", claimed_nationality="Singaporean"))
+    result = resolve(_subject(claimed_sex="Male", claimed_nationality="Singaporean"), today=DATASET_TODAY)
     assert result.status is ResolutionStatus.INSUFFICIENT_IDENTIFIERS
     assert result.candidates == ()
 
@@ -242,9 +242,9 @@ def test_demographics_alone_are_never_a_search_key():
 def test_the_demographic_weight_is_split_across_whichever_fields_are_stated():
     """A form carrying only sex must not earn the same corroboration as one carrying sex AND
     nationality — otherwise the weakest possible demographic signal scores full marks."""
-    sex_only = _only(resolve(_subject(claimed_name="Lim Arjun", claimed_sex="M")))
+    sex_only = _only(resolve(_subject(claimed_name="Lim Arjun", claimed_sex="M"), today=DATASET_TODAY))
     both = _only(resolve(_subject(claimed_name="Lim Arjun", claimed_sex="M",
-                                  claimed_nationality="Singaporean")))
+                                  claimed_nationality="Singaporean"), today=DATASET_TODAY))
     assert sex_only.score < both.score
 
 
@@ -252,7 +252,7 @@ def test_an_unparseable_dob_is_silent_rather_than_a_conflict():
     """Absence of information is not evidence of disagreement. A spurious conflict badge trains
     staff to ignore the real ones."""
     candidate = _only(resolve(_subject(claimed_name="Lim Arjun", claimed_id_number="T2221854H",
-                                       claimed_dob="not a date")))
+                                       claimed_dob="not a date"), today=DATASET_TODAY))
     assert "dob_mismatch" not in candidate.conflicts
     assert "dob" not in candidate.matched_on
 
@@ -262,7 +262,7 @@ def test_ranking_is_deterministic_for_equally_scored_candidates(resolved):
     in order and staff learn positions."""
     first = [c.patient_id for c in resolved["chit_03_everwell_group_invitation.txt"].candidates]
     for _ in range(3):
-        again = resolve(_subject(claimed_name="Devi Hui Min"))
+        again = resolve(_subject(claimed_name="Devi Hui Min"), today=DATASET_TODAY)
         assert [c.patient_id for c in again.candidates] == first
 
 
@@ -277,12 +277,12 @@ def test_ranking_is_deterministic_for_equally_scored_candidates(resolved):
     ("07 Oct 1990", dt.date(1990, 10, 7)),
 ])
 def test_claimed_dob_parses_the_formats_the_documents_print(printed, expected):
-    assert parse_claimed_dob(printed) == expected
+    assert parse_claimed_dob(printed, today=DATASET_TODAY) == expected
 
 
 @pytest.mark.parametrize("bad", ["", "   ", "not a date", "31/02/90", "99/99/99", None])
 def test_an_unreadable_claimed_dob_returns_none_rather_than_guessing(bad):
-    assert parse_claimed_dob(bad) is None
+    assert parse_claimed_dob(bad, today=DATASET_TODAY) is None
 
 
 def test_the_claimed_dob_pivot_matches_the_registry_pivot():
@@ -291,12 +291,12 @@ def test_the_claimed_dob_pivot_matches_the_registry_pivot():
     from databridge_intake.registry import parse_dob_two_digit_year
 
     for yy in ("05", "26", "27", "99"):
-        assert parse_claimed_dob(f"01/01/{yy}") == parse_dob_two_digit_year(f"01/01/{yy}")
+        assert parse_claimed_dob(f"01/01/{yy}", today=DATASET_TODAY) == parse_dob_two_digit_year(f"01/01/{yy}", today=DATASET_TODAY)
 
 
 def test_a_claimed_dob_is_never_in_the_future():
     """The pivot resolves toward the most recent non-future reading; a future DOB would produce a
     negative age and, downstream, a nonsense eligibility decision."""
     for yy in range(0, 100):
-        parsed = parse_claimed_dob(f"01/01/{yy:02d}")
+        parsed = parse_claimed_dob(f"01/01/{yy:02d}", today=DATASET_TODAY)
         assert parsed is not None and parsed <= DATASET_TODAY

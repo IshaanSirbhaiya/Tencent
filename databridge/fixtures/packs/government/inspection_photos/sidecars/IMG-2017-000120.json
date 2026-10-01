@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2017-000120",
+  "filename": "IMG-2017-000120.jpg",
+  "image_present": false,
+  "captured_at": "2017-12-04T11:17:27+00:00",
+  "captured_by": "OFF-0042",
+  "inspection_id": "INS-2017-000341",
+  "application_id": "APP-2017-000442",
+  "parcel_id": "PCL-VH-01069",
+  "photo_batch_ref": "PHB-2017-000341",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-308682"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 436886,
+    "northing": 1219845,
+    "accuracy_m": 13.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1327,
+          120,
+          341,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2017-300871",
+        "confidence": 0.88,
+        "bbox": [
+          3189,
+          223,
+          783,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "224 OSTLER WALK, VANTRY HOLLOW AM1 4DA",
+        "confidence": 0.912,
+        "bbox": [
+          1523,
+          336,
+          1178,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2017-12-04",
+        "confidence": 0.71,
+        "bbox": [
+          2687,
+          510,
+          841,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0042",
+        "confidence": 0.925,
+        "bbox": [
+          3029,
+          484,
+          352,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

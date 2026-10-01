@@ -1,0 +1,103 @@
+# =====================================================================
+# fixture_fleet.yaml -- the opt-in FIXTURE FLEET this estate declares for the gateway
+#
+# SYNTHETIC FIXTURE. Every identity, grant and row below is invented.
+#
+# R-019 round 2 (Codex finding 4): the identities, purposes, grants, reads and the write
+# entitlement behind `/orchestrate` (fixture mode) and `/evidence/verify` used to be Python
+# dicts in `apps/gateway/databridge_gateway/{orchestrator_fleet,verify_fleet}.py`. They are
+# this estate's behaviour, so they live here. The gateway discovers this file by its name
+# (`fixtures/packs/*/fixture_fleet.yaml`), validates it strictly (an unknown key, a role
+# `roles.yaml` does not declare, or a purpose the bound packs do not declare is a load error,
+# never a silent default), and names no estate, role, purpose or source itself.
+#
+# Adding an estate is adding a directory with one of these files; no gateway code changes.
+# =====================================================================
+version: 1
+
+#: `WALNUT_FLEET=<mode>` selects this declaration for `/orchestrate`. `/evidence/verify` uses
+#: the declaration named by `WALNUT_EVIDENCE_FLEET`, else the first (sorted) that has an
+#: `evidence:` section.
+mode: finance_fixture
+estate_label: "walnut-finance-synthetic (fixtures/packs/finance) -- synthetic, fictional"
+
+#: Packs whose `purposes.yaml` form the purpose vocabulary every purpose below is checked against.
+purpose_packs: [finance]
+#: Relative to this file.
+roles: roles.yaml
+sources: sources.yaml
+
+#: The private working copy each fleet loads. `loader` is `module:function` and must live under
+#: `databridge_adapter.`; it is called as `loader(target_dir, tables=seed)`. The repo fixture is
+#: never opened for writing.
+estate:
+  loader: "databridge_adapter.testing.estate:load_finance_estate"
+  schema_dir: core_banking          # must hold schema.sql
+  #: The smallest shard set that supports a foreign-keyed read (`facility` references `party`).
+  seed: [01_party_01.sql, 05_facility_01.sql]
+
+#: The service identity every read is made BY (on behalf of the signed-in principal).
+actor: {id: orchestrator@walnut, role: credit_analyst}
+
+#: The estate's identity directory: which role, purpose and grant each AUTHENTICATED identity acts
+#: under here. Who may use which surface is explicit (`surfaces`), and a WRITE is a separate
+#: entitlement (`writes`) -- reading a citation never implies being allowed to change it.
+principals:
+  analyst-7:
+    role: credit_analyst
+    purpose: lending.underwriting
+    grant_id: grant-analyst-7
+    label: "Credit analyst (analyst-7) -- lending.underwriting"
+    surfaces: [orchestrate, evidence]
+    writes: [evidence.mutate_working_copy]
+  fcc-3:
+    role: compliance_officer
+    purpose: kyc.screening
+    grant_id: grant-fcc-3
+    label: "Compliance officer (fcc-3) -- kyc.screening"
+    surfaces: [orchestrate, evidence]
+  audit-1:
+    role: auditor
+    purpose: finance.pointer_verification
+    grant_id: grant-audit-1
+    label: "Auditor (audit-1) -- finance.pointer_verification"
+    surfaces: [evidence]
+default_principal: analyst-7
+
+#: `/orchestrate` in fixture mode: two adapters, so the fan-out and independent admission show.
+orchestrate:
+  adapters:
+    - source_id: core_banking
+      adapter: "databridge_adapter.sources.postgres:PostgresCore"
+      engine: true
+    - source_id: mailbox
+      adapter: "databridge_adapter.sources.mailbox:MailboxCore"
+      capture_store: mailbox-capture
+      options: {register_taint: false}
+
+#: `/evidence/verify`: the adapter it verifies against, and the reads whose cells become citations.
+evidence:
+  adapters:
+    - source_id: core_banking
+      adapter: "databridge_adapter.sources.postgres:PostgresCore"
+      engine: true
+      #: the schema the mutation control writes in the WORKING COPY (a plain identifier)
+      write_schema: core_banking
+  #: What the pack declares for re-resolution. Verification of a cited cell runs under the purpose
+  #: the READ was made under (STATUS section 3.0), so this is reported, not used to decide.
+  pointer_verification_purpose: finance.pointer_verification
+  reads:
+    - source_id: core_banking
+      entity: facility
+      fields: [facility_id, limit_amount, drawn_amount, currency, status]
+      key: [facility_id]
+      order_by: [facility_id]
+      limit: 4
+      cite: [limit_amount, drawn_amount, status]
+    - source_id: core_banking
+      entity: party
+      fields: [party_id, legal_name, kyc_status]
+      key: [party_id]
+      order_by: [party_id]
+      limit: 3
+      cite: [legal_name, kyc_status]

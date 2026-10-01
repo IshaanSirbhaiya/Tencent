@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000129",
+  "filename": "IMG-2020-000129.jpg",
+  "image_present": false,
+  "captured_at": "2020-05-15T14:32:27+00:00",
+  "captured_by": "OFF-0042",
+  "inspection_id": "INS-2020-000585",
+  "application_id": "APP-2019-000731",
+  "parcel_id": "PCL-WH-02912",
+  "photo_batch_ref": "PHB-2020-000585",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-201587"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 419001,
+    "northing": 1199664,
+    "accuracy_m": 15.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          117,
+          120,
+          330,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-874790",
+        "confidence": 0.741,
+        "bbox": [
+          491,
+          247,
+          729,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "150 MALLOW WALK, WEND HILL AM5 3KH",
+        "confidence": 0.687,
+        "bbox": [
+          1943,
+          414,
+          1020,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 20ZO-05-15",
+        "confidence": 0.896,
+        "bbox": [
+          532,
+          468,
+          725,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0042",
+        "confidence": 0.906,
+        "bbox": [
+          907,
+          672,
+          544,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

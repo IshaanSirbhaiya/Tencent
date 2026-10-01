@@ -29,7 +29,7 @@ from .models import (BillingDraft, ConfirmationState, CoverageDetermination, Doc
                      ResolutionResult)
 from .ocr import MediaIndex
 from .prefill import prefill
-from .registry import DATASET_TODAY
+from .clock import resolve_today
 from .resolve import resolve
 from .rules import CoverageRules, rules
 
@@ -67,7 +67,7 @@ def run_intake(text: str,
                intake_id: Optional[str] = None,
                confirmation: Optional[ConfirmationState] = None,
                selected_patient: Optional[PatientRecord] = None,
-               today: dt.date = DATASET_TODAY,
+               today: Optional[dt.date] = None,
                table: Optional[CoverageRules] = None,
                history: Optional[ClinicHistory] = None,
                media: Optional[MediaIndex] = None) -> IntakeDraft:
@@ -83,6 +83,7 @@ def run_intake(text: str,
     an intake therefore has to pass the stored text and the stored index together.
     """
     table = table or rules()
+    today = resolve_today(today)
     harness = harness or gold_harness()
     # `NoHistory` by default, and that is the tested default: the pipeline must produce a valid card
     # with no graph attached at all. History is an ENRICHMENT — its absence removes flags, never an

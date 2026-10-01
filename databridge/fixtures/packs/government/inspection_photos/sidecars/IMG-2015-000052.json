@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2015-000052",
+  "filename": "IMG-2015-000052.jpg",
+  "image_present": false,
+  "captured_at": "2015-07-14T10:00:30+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2015-000615",
+  "application_id": "APP-2015-000757",
+  "parcel_id": "PCL-ND-00561",
+  "photo_batch_ref": "PHB-2015-000615",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-118814"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 435013,
+    "northing": 1182867,
+    "accuracy_m": 17.5
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          422,
+          120,
+          341,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2015-412086",
+        "confidence": 0.8,
+        "bbox": [
+          1986,
+          263,
+          702,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "222 KILNYARD PASSAGE, PELLING GREEN AM3 9YT",
+        "confidence": 0.684,
+        "bbox": [
+          699,
+          386,
+          1118,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2015-07-14",
+        "confidence": 0.74,
+        "bbox": [
+          2159,
+          450,
+          725,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.935,
+        "bbox": [
+          448,
+          496,
+          368,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

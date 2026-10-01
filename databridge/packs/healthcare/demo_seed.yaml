@@ -1,0 +1,12 @@
+# packs/healthcare — the demo seed this pack contributes (Codex f2 #6).
+#
+# Loaded only when this pack is ENABLED and the deployment opts in (WALNUT_LOAD_CLINIC_SEED=1).
+# The engine (`databridge_graph.pack_seed`) reads this file; it names no pack's module itself.
+# Every patient, insurer and document the seed writes is synthetic (CLAUDE.md constraint 5).
+
+# Called as load_clinic_seed(store) -> dict of created counts.
+loader: databridge_graph.clinic_seed:load_clinic_seed
+
+# The registered documents `brain_ingest` may read by name — an allow-list, never a path.
+sources:
+  demo_sample.txt: databridge_evals.e_intake:FIXTURE_TEXT

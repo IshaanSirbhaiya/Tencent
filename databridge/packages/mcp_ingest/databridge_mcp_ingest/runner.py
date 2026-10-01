@@ -1,0 +1,2522 @@
+"""The staged run: collect → extract → screen → build → verify → report (P10).
+
+Every stage writes its artefacts under `WALNUT_INGEST_DIR/<source>/<run_id>/`, created at the
+start of the run so they exist EVEN WHEN EMPTY (P3):
+
+    plan.snapshot.yaml   the approved plan this run executed
+    inventory.jsonl      every item seen (item_id = sha256 of the source-qualified full path)
+    excluded.jsonl       out of declared scope — rule + how to reverse
+    blocked.jsonl        blocked patterns — rule + how to reverse
+    failed.jsonl         could not be listed / fetched — error in plain words
+    captured.jsonl       bytes captured (sha256, size, mime)
+    unchanged.jsonl      content hash already ingested for this source — skipped (incremental)
+    extracted.jsonl      text extracted (chars, extractor)
+    extract_skipped.jsonl  no extractor / extractor unavailable / no text / failed
+    governance.jsonl     ONE screen decision per extracted item (allow | review | block)
+    governance_chunks.jsonl  the per-chunk screen (P1: the gate runs twice)
+    coverage.jsonl       partial coverage (a table read up to its row cap) — P7
+    mapping.snapshot.yaml  the table mapping this run used (tabular sources)
+    build.jsonl          per item: chunks, entities, relations, anchor, model calls
+    build_skipped.jsonl  allowed items that produced nothing, with the reason
+    refused.jsonl        extraction refusals (off-ontology, ungrounded) — never silently dropped
+    pointers.jsonl       every pointer minted this run, for verification
+    verify.json          reconciliation + pointer resolution
+    removed.jsonl        items gone from the source: the graph nodes/edges whose ONLY source was
+                         that item, CLOSED on the system axis (bi-temporal — never deleted)
+    timings.jsonl        per item: stage, milliseconds, and what the time went on
+    index.json           the retrieval hook: passages indexed, or why not
+    report.json          measured counts and durations; status ok | empty | failed | unverified;
+                         `timings` = per-stage breakdown (MCP connect/list/read, capture, docling,
+                         screen, model calls/tokens/latency, graph write, retrieval, verify)
+    stages.json          per stage: seconds, and a `breakdown` of the same buckets
+    checkpoint.json      progress, every 20 items or 120 s (whichever first)
+
+Speed (BUILD_PLAN §11a P, measured in `bench/`): model calls run on a bounded worker pool
+(`concurrency`, default 4, env `WALNUT_EXTRACT_CONCURRENCY`) behind an on-disk model-output cache
+keyed by content (`llm.ModelOutputCache`); docling conversions are cached by content hash
+(`extract.extract_text_cached`); graph writes happen on ONE thread, in order, one transaction per
+document (`build.store_batch`) — so the graph is identical to a serial run's.
+
+Per-source state (`<source>/state.json`) holds the content hash last BUILT for each item, which
+is what incremental runs key on (P10's sharp edge: key on content, never on id).
+"""
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import json
+import os
+import threading
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Optional
+
+import yaml
+
+from . import capture, paths
+from .build import (ProseBuilder, anchor_id_for, build_tables, document_kind, store_batch)
+from .client import McpClientError, ReadOnlyClient, ToolChanged, open_client
+from .connections import SourceConnection, load_connection
+from .crawl import (CrawlError, Decision, Item, decide, enumerate_documents, enumerate_resources,
+                    enumerate_tables, fetch_document, fetch_table, item_identity, table_text)
+from .extract import ExtractionFailed, extract_text_cached, extractor_for, text_digest
+from .ledger import emit_event, item_event_id, now_iso, read_jsonl, scrub, typed_ledger
+from .plans import CrawlPlan, PlanError, load_plan
+from .records import DRIFT_PENDING_APPROVAL, DriftHolds, RunReportRecord, load_holds
+from .screen import load_overrides, load_screen, screen_text
+
+#: The runner reads `<sources>/<id>.holds.yaml` (written by adapter agents) and holds exactly the
+#: table, path or plan step a pending shape drift affects — the rest of the source keeps syncing.
+#: A held table / path is CAPTURED (inventoried, so removal inference never closes it, and the
+#: drift probe still sees it) but NOT BUILT; a held step is not enumerated and the run's listing
+#: is marked incomplete. Both are recorded with rule `DRIFT_PENDING_APPROVAL` and the reversal
+#: (`excluded.drift.jsonl`, `build_skipped.jsonl`, `failed.jsonl`). `adapter_agents` reads this
+#: flag to move from its coarser fallbacks (mapping status, whole connection) to precise holds.
+HONOURS_DRIFT_HOLDS = True
+#: The run-directory ledger of items captured but held (typed as `records.ExclusionRecord`, found
+#: by pattern as a tagged variant of `excluded`, so `verify_run`'s partition is unaffected).
+HELD_LEDGER = "excluded.drift"
+#: INT5 (R-022 sources cross-track 5): a plan step whose tool CHANGED on the server since the
+#: plan was approved (or is no longer offered) is refused by `ReadOnlyClient` (`ToolChanged`).
+#: That is reported as a HOLD awaiting a re-proposed, re-approved plan — the way a shape drift is
+#: — not as a failure of the source: the step/item goes to `failed.jsonl` with this rule and the
+#: reversal, the listing is marked incomplete (nothing is inferred removed), and the report says
+#: so in its message, counts (`tool_changed`) and notes.
+TOOL_CHANGED = "TOOL_CHANGED_PENDING_REPLAN"
+_TOOL_CHANGED_REVERSE = ("re-propose the crawl plan against the server's current tools and have "
+                         "a person approve it (propose_plan, then approve_plan)")
+
+#: The rule an item whose locator carries a credential is blocked under (Codex f2 #4).
+CREDENTIAL_IN_LOCATOR = "credential_in_locator"
+
+CHECKPOINT_ITEMS = 20
+CHECKPOINT_SECONDS = 120.0
+
+LEDGERS = ("inventory", "excluded", "blocked", "failed", "captured", "unchanged", "extracted",
+           "extract_skipped", "governance", "governance_chunks", "coverage", "build",
+           "build_skipped", "refused", "pointers", "removed", "timings")
+STAGES = ("collect", "extract", "screen", "build", "index", "verify", "report")
+DEFAULT_CONCURRENCY = 4
+
+
+class Timings:
+    """Named time buckets (ms + count), thread-safe. Bucket names are `<stage>.<what>`; a stage's
+    buckets are copied into its `stages.json` entry as `breakdown`, and all of them into
+    `report.json["timings"]`. Per-item rows go to `timings.jsonl`."""
+
+    def __init__(self, ledger=None) -> None:
+        self._lock = threading.Lock()
+        self.buckets: dict[str, dict] = {}
+        self.ledger = ledger
+        self.items: list[tuple[float, str, str]] = []
+
+    def add(self, bucket: str, seconds: float, n: int = 1) -> None:
+        with self._lock:
+            b = self.buckets.setdefault(bucket, {"ms": 0.0, "n": 0})
+            b["ms"] += max(0.0, seconds) * 1000.0
+            b["n"] += n
+
+    def item(self, item_id: Optional[str], stage: str, seconds: float, **detail: Any) -> None:
+        ms = round(max(0.0, seconds) * 1000.0, 2)
+        with self._lock:
+            self.items.append((ms, stage, str(item_id)))
+        if self.ledger is not None:
+            self.ledger.write({"item_id": item_id, "stage": stage, "ms": ms, **detail})
+
+    def stage(self, stage: str) -> dict:
+        with self._lock:
+            return {k.split(".", 1)[1]: {"ms": round(v["ms"], 1), "n": v["n"]}
+                    for k, v in sorted(self.buckets.items()) if k.startswith(stage + ".")}
+
+    def as_dict(self, model: Optional[dict] = None) -> dict:
+        with self._lock:
+            slow = sorted(self.items, reverse=True)[:5]
+            return {"buckets": {k: {"ms": round(v["ms"], 1), "n": v["n"]}
+                                for k, v in sorted(self.buckets.items())},
+                    "model": model or {},
+                    "slowest_items": [{"ms": ms, "stage": st, "item_id": iid}
+                                      for ms, st, iid in slow]}
+
+
+class _LazyLedger:
+    """A typed ledger whose file is created on its first record (a TAGGED variant — e.g.
+    `excluded.drift.jsonl` — exists only when the run has something to say in it)."""
+
+    def __init__(self, path: Path, *, truncate: bool) -> None:
+        self.path = path
+        self._truncate = truncate           # a fresh run: the first write starts the file
+        self._inner = None
+
+    def write(self, record: dict) -> None:
+        if self._inner is None:
+            self._inner = typed_ledger(self.path, truncate=self._truncate)
+        self._inner.write(record)
+
+    def close(self) -> None:
+        if self._inner is not None:
+            self._inner.close()
+
+
+def _timed_iter(it, timings: Timings, bucket: str):
+    """Charge the time spent INSIDE an iterator's `next()` (for a lazy listing: the list calls)."""
+    it = iter(it)
+    while True:
+        t0 = time.perf_counter()
+        try:
+            value = next(it)
+        except StopIteration:
+            timings.add(bucket, time.perf_counter() - t0, n=0)
+            return
+        timings.add(bucket, time.perf_counter() - t0)
+        yield value
+
+
+def _configure_local_store(store, report) -> None:
+    """WAL + NORMAL sync for the LOCAL, file-backed store while ingest writes to it (principles
+    trap 7: never WAL on a shared/network file — a published copy is a separate DELETE-mode file,
+    not this one). `WALNUT_INGEST_SQLITE_WAL=0` turns it off. One writer: every graph write in a
+    run happens on the run's own thread, under the store's lock."""
+    conn = getattr(store, "conn", None)
+    path = str(getattr(store, "path", "") or "")
+    if conn is None or not path or path == ":memory:":
+        return
+    if os.environ.get("WALNUT_INGEST_SQLITE_WAL", "1") == "0":
+        report.notes.append("sqlite: WAL disabled by WALNUT_INGEST_SQLITE_WAL=0")
+        return
+    if path.startswith(("\\\\", "//")):
+        report.notes.append("sqlite: store is on a network share — journal mode left as is (P11)")
+        return
+    lock = getattr(store, "_lock", None) or threading.RLock()
+    try:
+        with lock:
+            mode = conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA temp_store=MEMORY")
+            conn.execute("PRAGMA cache_size=-32000")
+            conn.execute("PRAGMA busy_timeout=10000")
+        report.notes.append(f"sqlite: journal_mode={mode}, synchronous=NORMAL, busy_timeout=10s")
+    except Exception as exc:                                         # noqa: BLE001
+        report.notes.append(f"sqlite: pragmas not applied ({_plain_error(exc)})")
+
+
+def _pool_snapshot() -> Optional[dict]:
+    """`client.get_pool().snapshot()` when the client offers a session pool, else None."""
+    try:
+        from .client import get_pool
+
+        snap = get_pool().snapshot()
+        return dict(snap) if isinstance(snap, dict) else None
+    except Exception:                                                # noqa: BLE001
+        return None
+
+
+def _resolve_concurrency(value: Optional[int]) -> int:
+    if value is None:
+        try:
+            value = int(os.environ.get("WALNUT_EXTRACT_CONCURRENCY", DEFAULT_CONCURRENCY))
+        except ValueError:
+            value = DEFAULT_CONCURRENCY
+    return max(1, int(value))
+
+
+def _passages_enabled(value: Optional[bool]) -> bool:
+    if value is not None:
+        return bool(value)
+    return os.environ.get("WALNUT_INGEST_PASSAGES", "0") == "1"
+
+
+class PlanNotApproved(PlanError):
+    pass
+
+
+class NotAnIngestConnection(PlanError):
+    """A write-capable (`purpose: agent_write`) connection is never crawled."""
+
+
+class RunInProgress(PlanError):
+    """Another run of the same source holds its run lock (Codex f1 #6: one writer per source)."""
+
+
+class ResumeRefused(PlanError):
+    """A resume was asked for under a different plan / screen / overrides / holds than the run
+    started with (Codex f1 #2). Start a new run; the interrupted one stays on disk as it was."""
+
+
+def _require_plan_approval(plan, sources_root: Optional[Path]) -> Optional[str]:
+    """Codex f1 #1: `status: approved` / `approved_by` are fields anyone can type into the YAML.
+    The plan's approval is verified by `plans.verify_plan_approval(plan, root=...)` — the
+    authenticated principal's stored approval, bound to the digest of the plan as it is NOW —
+    which raises (`ApprovalRefused` / `PlanError`) when it is missing, not a principal's, or for
+    different content. Any refusal becomes `PlanNotApproved`, before anything runs.
+
+    Codex f2 #1: FAIL CLOSED. A build without the verifier refuses to run — a note is not an
+    authorisation control. (The return value stays for callers; it is always None now.)"""
+    from . import plans as _plans
+
+    verify = getattr(_plans, "verify_plan_approval", None)
+    if not callable(verify):
+        raise PlanNotApproved(f"the plan for {plan.source_id!r} cannot be verified: "
+                              f"plans.verify_plan_approval is not available in this build, and "
+                              f"status/approved_by are typed fields, not proof. Nothing runs")
+    try:
+        verify(plan, root=sources_root)
+    except PlanError as exc:
+        raise PlanNotApproved(f"the plan for {plan.source_id!r} is not approved by an "
+                              f"authenticated principal for its current content: {exc}") from None
+    return None
+
+
+#: source key -> [owning thread ident, depth]. Re-entrant for the OWNING thread only, so the
+#: tabular recipe can hold the lock around its whole sync and call the core run inside it
+#: (Codex f2 #9); any other thread or process is refused.
+_LOCAL_RUNS: dict[str, list] = {}
+_LOCAL_RUNS_GUARD = threading.Lock()
+
+
+class _source_lock:
+    """One run per source at a time — across threads (an in-process set) and processes (an OS
+    byte-range lock on `<source>/.run.lock`, released by the OS if the process dies, so a crash
+    never leaves a stale lock). A second run raises `RunInProgress` instead of racing the first
+    on `state.json`, `decided.json` and the run's ledgers."""
+
+    def __init__(self, source_id: str, *, reentrant: bool = False) -> None:
+        self.reentrant = reentrant
+        self.dir = source_dir(source_id)
+        self.source_id = source_id
+        self._fh = None
+        self._key = ""
+        self._nested = False
+
+    def __enter__(self) -> "_source_lock":
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self._key = os.path.normcase(str(self.dir.resolve()))
+        me = threading.get_ident()
+        with _LOCAL_RUNS_GUARD:
+            held = _LOCAL_RUNS.get(self._key)
+            if held is not None and held[0] == me and self.reentrant:
+                held[1] += 1                    # the same thread, one level deeper
+                self._nested = True
+                return self
+            if held is not None:
+                raise RunInProgress(f"a run of {self.source_id!r} is already in progress in this "
+                                    f"process; wait for it to finish")
+            _LOCAL_RUNS[self._key] = [me, 1]
+        try:
+            self._fh = open(self.dir / ".run.lock", "a+b")
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    self._fh.seek(0)
+                    msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(self._fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                raise RunInProgress(f"a run of {self.source_id!r} is already in progress in "
+                                    f"another process; wait for it to finish") from None
+        except BaseException:
+            self._release()
+            raise
+        return self
+
+    def _release(self) -> None:
+        if self._nested:
+            with _LOCAL_RUNS_GUARD:
+                held = _LOCAL_RUNS.get(self._key)
+                if held is not None:
+                    held[1] -= 1
+            self._nested = False
+            return
+        if self._fh is not None:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    self._fh.seek(0)
+                    msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+            self._fh.close()
+            self._fh = None
+        with _LOCAL_RUNS_GUARD:
+            _LOCAL_RUNS.pop(self._key, None)
+
+    def __exit__(self, *exc) -> None:
+        self._release()
+
+
+def _digest(obj: Any) -> str:
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _override_allows(overrides, item_id: str, digest: Optional[str]) -> bool:
+    """Does an owner override cover THIS item AT THIS content digest? (R-022 build cross-track 2)
+    Only an `OverrideSet` (from `load_overrides`) can say; a bare set of ids binds no content, so
+    it never admits anything (fail closed)."""
+    allows = getattr(overrides, "allows", None)
+    return bool(callable(allows) and allows(item_id, digest))
+
+
+def _overrides_fingerprint(overrides) -> list:
+    """What an override approval covers: (item, its approved digests). A changed approval (a new
+    digest, a revocation) changes the run binding, so `decided.json` is never reused across it."""
+    digests = getattr(overrides, "digests", None)
+    if isinstance(digests, dict):
+        return sorted((str(k), sorted(str(d) for d in v)) for k, v in digests.items())
+    return sorted(str(o) for o in (overrides or ()))
+
+
+def _run_binding(plan, screen_cfg, overrides, holds: DriftHolds) -> dict:
+    """What a run is bound to: digests of the plan, the screen rules, the owner overrides and the
+    drift holds in force when it started (`updated_at` of the holds is not content)."""
+    return {"plan": _digest(plan.model_dump(mode="json")),
+            "screen": screen_fingerprint(screen_cfg),
+            "overrides": _digest(_overrides_fingerprint(overrides)),
+            "holds": _digest(holds.model_dump(mode="json", exclude={"updated_at"}))}
+
+
+def _bind_run(run_dir: Path, binding: dict, *, resuming: bool, stages_done: dict) -> None:
+    """Write `binding.json` on a run's first start; on a resume, refuse any difference."""
+    path = run_dir / "binding.json"
+    if resuming and path.is_file():
+        try:
+            before = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            before = {}
+        changed = sorted(k for k in binding if before.get(k) != binding[k])
+        if changed:
+            raise ResumeRefused(
+                f"run {run_dir.name} cannot resume: its {', '.join(changed)} changed since it "
+                f"started. Start a new run (the interrupted one is kept as it is)")
+        return
+    inv = run_dir / "inventory.jsonl"
+    if resuming and (stages_done or (inv.is_file() and inv.stat().st_size > 0)):
+        # a run from before binding existed, part-way through: nothing proves what it ran under
+        raise ResumeRefused(f"run {run_dir.name} predates run binding and cannot be resumed "
+                            f"safely; start a new run")
+    _atomic_text(path, json.dumps({**binding, "at": now_iso(),
+                                   # the source-state generation this run started on (f2 #8)
+                                   "state_gen": load_state_gen(run_dir.parent.name).get("gen")},
+                                  sort_keys=True, indent=1))
+
+
+def _atomic_text(path: Path, text: str) -> None:
+    """A control file (stages, checkpoint, binding, state) written whole or not at all: a unique
+    temp file, fsynced, then `os.replace` (Codex f2 #14 — a crash never leaves torn JSON)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex[:12]}.tmp")
+    with open(tmp, "wb") as fh:
+        fh.write(text.encode("utf-8"))
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+def _mapping_fingerprint(mapping) -> str:
+    """What a table build is bound to: every APPROVED table of the effective mapping, with the
+    digest of its node/edges and the approval (principal, time) that made it count."""
+    from .mapping import mapping_digest
+
+    return _digest(sorted(
+        (t, mapping_digest(tm), (tm.approval or {}).get("principal_id"),
+         (tm.approval or {}).get("at"))
+        for t, tm in mapping.tables.items() if tm.status == "approved"))
+
+
+MAPPING_BINDING = "mapping.binding.json"
+
+
+def _bind_mapping(run_dir: Path, mapping) -> None:
+    """Codex f2 #3: record the approved mapping on the run's FIRST table build; on any later
+    attempt of the same run, refuse a different one (`ResumeRefused`)."""
+    path = run_dir / MAPPING_BINDING
+    now = _mapping_fingerprint(mapping)
+    if path.is_file():
+        try:
+            before = json.loads(path.read_text(encoding="utf-8")).get("mapping")
+        except ValueError:
+            before = None
+        if before != now:
+            raise ResumeRefused(f"run {run_dir.name} cannot resume: its approved table mapping "
+                                f"changed since it first built tables. Start a new run (the "
+                                f"interrupted one is kept as it is)")
+        return
+    _atomic_text(path, json.dumps({"mapping": now, "at": now_iso()}, sort_keys=True))
+
+
+def _check_mapping_binding(run_dir: Path, source_id: str, vocab, sources_root) -> None:
+    """On a resume, BEFORE any ledger is touched: a run that already built tables under one
+    approved mapping is refused if the approved mapping now differs."""
+    if not (run_dir / MAPPING_BINDING).is_file():
+        return
+    from .mapping import effective_mapping, load_mapping
+
+    _bind_mapping(run_dir, effective_mapping(load_mapping(source_id, sources_root), vocab,
+                                             sources_root))
+
+
+# --- source-state generations (Codex f2 #8) ------------------------------------------------------
+def state_gen_path(source_id: str) -> Path:
+    return source_dir(source_id) / "state.gen.json"
+
+
+def load_state_gen(source_id: str) -> dict:
+    p = state_gen_path(source_id)
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+    except (OSError, ValueError):
+        raw = {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _check_state_generation(source_id: str, run_id: str, binding_file: Path) -> None:
+    """A resumed run may advance `state.json` only if nobody else has since: the current state
+    generation must be the one the run STARTED on, or one this run wrote itself. Otherwise a
+    newer run's state would be overwritten with this run's older hashes (Codex f2 #8)."""
+    try:
+        started_on = json.loads(binding_file.read_text(encoding="utf-8")).get("state_gen")
+    except (OSError, ValueError):
+        started_on = None
+    gen = load_state_gen(source_id)
+    if gen.get("gen") == started_on or gen.get("run_id") == run_id:
+        return
+    raise ResumeRefused(f"run {run_id} cannot resume: run {gen.get('run_id')!r} advanced this "
+                        f"source's state after it started, and resuming would roll that back. "
+                        f"Start a new run (the interrupted one is kept as it is)")
+
+
+def _retire_unfinished_ledgers(run_dir: Path, names: list[str]) -> None:
+    """Move the ledgers of stages that will re-run to `attempts/<n>/` (never truncate — Codex f1
+    #3). `governance.jsonl` also holds the decisions the EXTRACT stage carried forward (F-31);
+    when extraction is not re-running those lines are copied back, so they are not lost."""
+    present = [n for n in names if (run_dir / f"{n}.jsonl").is_file()
+               and (run_dir / f"{n}.jsonl").stat().st_size > 0]
+    if not present:
+        return
+    base = run_dir / "attempts"
+    n = 1
+    while (base / str(n)).exists():
+        n += 1
+    dest = base / str(n)
+    dest.mkdir(parents=True)
+    extract_rerun = "extracted" in names
+    for name in present:
+        src = run_dir / f"{name}.jsonl"
+        keep = ([r for r in read_jsonl(src) if r.get("carried_forward")]
+                if name == "governance" and not extract_rerun else [])
+        os.replace(src, dest / src.name)
+        if keep:
+            with typed_ledger(src) as led:
+                for r in keep:
+                    led.write(r)
+
+
+#: Set while `tabular.ingest_database` runs a sync on this thread, so the core run it calls back
+#: into keeps the options of the sync that started it (and hands its report back).
+_TABULAR = threading.local()
+
+
+def _inside_tabular_recipe() -> bool:
+    """True when `tabular.ingest_database` is already on this call stack — it calls run_ingest for
+    its graph stage and must not be started again from inside itself. (Belt and braces: the
+    recipe can also pass `tabular=False`.)"""
+    import sys
+
+    frame = sys._getframe(1)
+    while frame is not None:
+        if frame.f_code.co_name == "ingest_database" and \
+                frame.f_globals.get("__name__", "").endswith("tabular.pipeline"):
+            return True
+        frame = frame.f_back
+    return False
+
+
+def _has_tabular_step(plan) -> bool:
+    return any(s.strategy == "tabular" and getattr(s, "sql", None) is not None
+               for s in plan.steps)
+
+
+@dataclass
+class RunReport:
+    source_id: str
+    run_id: str
+    run_dir: str
+    status: str = "running"
+    message: str = ""
+    counts: dict = field(default_factory=dict)
+    durations: dict = field(default_factory=dict)
+    verify: dict = field(default_factory=dict)
+    notes: list = field(default_factory=list)
+    started_at: str = ""
+    finished_at: str = ""
+    plan: dict = field(default_factory=dict)
+    timings: dict = field(default_factory=dict)
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "ok"
+
+    def as_dict(self) -> dict:
+        return {"source_id": self.source_id, "run_id": self.run_id, "run_dir": self.run_dir,
+                "status": self.status, "message": self.message, "counts": self.counts,
+                "durations_s": self.durations, "verify": self.verify, "notes": self.notes,
+                "started_at": self.started_at, "finished_at": self.finished_at,
+                "plan": self.plan, "timings": self.timings}
+
+
+# --- locations -----------------------------------------------------------------------------------
+def source_dir(source_id: str) -> Path:
+    """`<ingest>/<source_id>` — the id must be ONE safe path segment (Codex f1 #4)."""
+    return paths.contained(paths.ingest_dir(), source_id, what="source id")
+
+
+def run_dir_for(source_id: str, run_id: str) -> Path:
+    """`<ingest>/<source_id>/<run_id>`, both ids checked as single safe segments and the result
+    proven to lie under the ingest root — the ONE way a caller-supplied run id becomes a path."""
+    return paths.contained(paths.ingest_dir(), source_id, run_id, what="source or run id")
+
+
+def state_path(source_id: str) -> Path:
+    return source_dir(source_id) / "state.json"
+
+
+def load_state(source_id: str) -> dict:
+    p = state_path(source_id)
+    return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+
+
+def decided_path(source_id: str) -> Path:
+    """`decided.json`: items the screen BLOCKED or sent to REVIEW, by content hash and screen
+    fingerprint (E2E F-31) — so an unchanged, still-decided item is not re-extracted every sync."""
+    return source_dir(source_id) / "decided.json"
+
+
+def load_decided(source_id: str) -> dict:
+    p = decided_path(source_id)
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def screen_fingerprint(cfg) -> str:
+    """Changes whenever a rule, weight or threshold does: a decision made under other rules is
+    re-made, never carried."""
+    blob = json.dumps({
+        "source": getattr(cfg, "source", ""),
+        "thresholds": [cfg.block_threshold, cfg.review_threshold, cfg.min_signals_to_block],
+        "rules": [[k, r.id, r.pattern.pattern, r.weight, r.min_count, r.validate]
+                  for k in ("decisive", "signals", "redactions")
+                  for r in getattr(cfg, k)]}, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def save_state(source_id: str, state: dict, *, run_id: Optional[str] = None) -> None:
+    """Atomically replace `state.json`, then stamp a NEW state generation naming the run that
+    wrote it (`state.gen.json`, Codex f2 #8) — what a resume checks before it may write again."""
+    _atomic_text(state_path(source_id), json.dumps(state, sort_keys=True, indent=1))
+    _atomic_text(state_gen_path(source_id),
+                 json.dumps({"gen": uuid.uuid4().hex, "run_id": run_id, "at": now_iso()},
+                            sort_keys=True))
+
+
+def list_runs(source_id: str) -> list[dict]:
+    base = source_dir(source_id)
+    if not base.is_dir():
+        return []
+    out = []
+    for d in sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name):
+        rep = d / "report.json"
+        data = json.loads(rep.read_text(encoding="utf-8")) if rep.is_file() else {}
+        out.append({"run_id": d.name, "run_dir": str(d), "status": data.get("status", "incomplete"),
+                    "message": data.get("message", ""), "counts": data.get("counts", {}),
+                    "finished_at": data.get("finished_at")})
+    return out
+
+
+def _new_run_id() -> str:
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
+
+
+# --- the run -------------------------------------------------------------------------------------
+class _Progress:
+    def __init__(self, cb: Optional[Callable[[dict], None]], verbose: bool) -> None:
+        self.cb = cb
+        self.verbose = verbose
+        self.t0 = time.monotonic()
+
+    def __call__(self, stage: str, **info: Any) -> None:
+        elapsed = time.monotonic() - self.t0
+        event = {"stage": stage, "elapsed_s": round(elapsed, 2), **info}
+        if self.cb is not None:
+            self.cb(event)
+        if self.verbose:
+            done = info.get("done")
+            rate = f" {done / elapsed:.1f}/s" if done and elapsed > 0 else ""
+            detail = " ".join(f"{k}={v}" for k, v in info.items())
+            print(f"[{elapsed:7.1f}s] {stage:8s} {detail}{rate}", flush=True)
+
+
+class _Checkpoint:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.n = 0
+        self.last = time.monotonic()
+
+    def tick(self, payload: dict, *, force: bool = False) -> bool:
+        self.n += 1
+        if force or self.n >= CHECKPOINT_ITEMS or time.monotonic() - self.last >= CHECKPOINT_SECONDS:
+            _atomic_text(self.path, json.dumps({**payload, "at": now_iso()}, sort_keys=True))
+            self.n = 0
+            self.last = time.monotonic()
+            return True
+        return False
+
+
+PENDING_VERIFICATION = "pending_verification"
+
+
+def _provisional(entry: dict) -> dict:
+    """A state entry for an item BUILT but not yet verified (Codex f2 #10): it carries the content
+    hash (so removal inference and `replaced_hash` still work) but `graph: false`, so an
+    incremental run never treats it as unchanged until `_promote_state` confirms it."""
+    if entry.get("graph") is False:
+        return entry
+    return {**entry, "graph": False, "reason": PENDING_VERIFICATION}
+
+
+def _promote_state(state: dict, run_dir: Path, *, verified: bool) -> dict:
+    """After verification: every item this run built (its `build.jsonl` outbox) whose state is
+    still this run's PROVISIONAL entry is promoted to the final entry when the run verified, and
+    left provisional (rebuilt next sync) when it did not."""
+    out = {"promoted": 0, "withheld": 0}
+    for r in read_jsonl(run_dir / "build.jsonl"):
+        box = r.get("outbox") if isinstance(r.get("outbox"), dict) else {}
+        final = box.get("state") if isinstance(box.get("state"), dict) else None
+        iid = r.get("item_id")
+        if not iid or final is None or final.get("graph") is False:
+            continue
+        cur = state.get(iid) or {}
+        if cur.get("reason") != PENDING_VERIFICATION or \
+                cur.get("content_hash") != final.get("content_hash"):
+            continue
+        if verified:
+            state[iid] = final
+            out["promoted"] += 1
+        else:
+            out["withheld"] += 1
+    return out
+
+
+def _run_started(run_dir: Path) -> dt.datetime:
+    """The run's start time from `binding.json` - the ONE `retrieved_at` every graph write of
+    the run carries, so a resumed attempt re-applies identical pointers (Codex f2 #7)."""
+    try:
+        at = json.loads((run_dir / "binding.json").read_text(encoding="utf-8")).get("at")
+        return dt.datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+    except (OSError, ValueError, TypeError):
+        return dt.datetime.now(dt.timezone.utc)
+
+
+def _done_ids(run_dir: Path, *names: str) -> set[str]:
+    out: set[str] = set()
+    for n in names:
+        out.update(r["item_id"] for r in read_jsonl(run_dir / f"{n}.jsonl") if r.get("item_id"))
+    return out
+
+
+def run_ingest(source_id: str, store=None, harness=None,
+               progress_cb: Optional[Callable[[dict], None]] = None, *,
+               run_id: Optional[str] = None, client=None, sources_root: Optional[Path] = None,
+               verbose: bool = False, vocab=None, concurrency: Optional[int] = None,
+               passages: Optional[bool] = None, cache: bool = True,
+               bridges: bool = True, tabular: Optional[bool] = None,
+               event_attrs: Optional[dict] = None) -> RunReport:
+    """Run an APPROVED plan for one source end to end. `run_id` of an existing run resumes it:
+    stages already marked done are skipped, collection skips items already decided, and the
+    build skips items already built. `harness=None` builds document anchors only and says so.
+
+    `concurrency`  model calls in flight at once (default 4, env `WALNUT_EXTRACT_CONCURRENCY`);
+                   1 is fully serial. The graph written is the same either way.
+    `passages`     index each built document into `databridge_retrieval` after the build (the
+                   adapter agent's `extract.passages`); default off unless
+                   `WALNUT_INGEST_PASSAGES=1`. Skipped — with the reason recorded — when off or
+                   when the package is not importable.
+    `cache`        use the on-disk model-output and conversion caches (`var/cache/`).
+    `bridges`      recover relations whose ends fall in adjacent chunks (one extra, screened,
+                   grounded window per chunk boundary that has such a pair).
+    `tabular`      a plan with a SQL (`tabular`) step runs the database recipe around this run —
+                   profile → mapping → [this run] → facts store → schema cards
+                   (`tabular.ingest_database`) — so a normal sync refreshes facts and cards too.
+                   Default on when the plan has such a step; False runs the core stages only.
+    `event_attrs`  extra attributes merged into the run's `run_completed` / `run_failed` event
+                   (e.g. an adapter agent's `{"shape_changed": ...}`). The §5.3 event TYPES are
+                   unchanged, and the run's own attributes (status, message, counts, error) win
+                   over a caller's key of the same name.
+
+    Drift holds (`<sources>/<id>.holds.yaml`, see `HONOURS_DRIFT_HOLDS`) are honoured on every
+    run: a held table / path is captured but not built, a held step is not enumerated."""
+    conn = load_connection(source_id, sources_root)
+    if getattr(conn, "purpose", "ingest") != "ingest":
+        raise NotAnIngestConnection(
+            f"connection {source_id!r} is declared purpose={conn.purpose!r}: it is the "
+            f"write-capable route agents act through and is never crawled. Ingest the source "
+            f"through a separate purpose=ingest connection with read-only credentials")
+    plan = load_plan(source_id, sources_root)
+    if plan.status != "approved":
+        raise PlanNotApproved(
+            f"the plan for {source_id!r} is {plan.status!r}; a signed-in person approves it "
+            f"before it runs (auto_approve approves nothing)")
+    approval_note = _require_plan_approval(plan, sources_root)
+    outer = getattr(_TABULAR, "kwargs", None)
+    nested = outer is not None and outer.get("source_id") == source_id
+    if nested:
+        # called back by `ingest_database` for the sync that started it: keep that sync's options
+        run_id, concurrency, passages = outer["run_id"], outer["concurrency"], outer["passages"]
+        cache, bridges, verbose = outer["cache"], outer["bridges"], outer["verbose"]
+        event_attrs = event_attrs if event_attrs is not None else outer.get("event_attrs")
+    elif tabular is not False and _has_tabular_step(plan) and not _inside_tabular_recipe():
+        # Codex f2 #9: the WHOLE recipe (profile, mapping, core run, facts, cards) runs under the
+        # source's run lock - two syncs never profile or publish over each other
+        with _source_lock(source_id):
+            _TABULAR.locked = source_id
+            try:
+                return _run_with_tabular(
+                    source_id, store, harness, progress_cb, client=client,
+                    sources_root=sources_root, vocab=vocab,
+                    options={"source_id": source_id, "run_id": run_id,
+                             "concurrency": concurrency, "passages": passages, "cache": cache,
+                             "bridges": bridges, "verbose": verbose,
+                             "event_attrs": event_attrs})
+            finally:
+                _TABULAR.locked = None
+    # re-entered only by THIS thread's own tabular recipe for the same source (f2 #9)
+    with _source_lock(source_id, reentrant=getattr(_TABULAR, "locked", None) == source_id):
+        return _run_core(source_id, conn, plan, store, harness, progress_cb, run_id=run_id,
+                         client=client, sources_root=sources_root, verbose=verbose, vocab=vocab,
+                         concurrency=concurrency, passages=passages, cache=cache,
+                         bridges=bridges, nested=nested, event_attrs=event_attrs,
+                         approval_note=approval_note)
+
+
+def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id, client,
+              sources_root, verbose, vocab, concurrency, passages, cache, bridges, nested,
+              event_attrs, approval_note) -> RunReport:
+    """The body of `run_ingest`, entered holding the source's run lock."""
+    extra_attrs = dict(event_attrs or {})
+    if store is None:
+        from databridge_graph.store import GraphStore
+
+        db = paths.graph_db_path()
+        db.parent.mkdir(parents=True, exist_ok=True)
+        store = GraphStore(str(db))
+    if vocab is None:
+        from databridge_graph.packs import active_vocabulary
+
+        vocab = active_vocabulary()
+
+    resuming = run_id is not None and run_dir_for(source_id, run_id).is_dir()
+    run_id = run_id or _new_run_id()
+    run_dir = run_dir_for(source_id, run_id)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    report = RunReport(source_id=source_id, run_id=run_id, run_dir=str(run_dir),
+                       started_at=now_iso(),
+                       plan={"origin": plan.origin, "profiles": plan.profiles,
+                             "approved_by": plan.approved_by,
+                             "steps": [s.id for s in plan.steps]})
+    if approval_note:
+        report.notes.append(approval_note)
+    progress = _Progress(progress_cb, verbose)
+    workers = _resolve_concurrency(concurrency)
+    stages_file = run_dir / "stages.json"
+    stages_done: dict = (json.loads(stages_file.read_text(encoding="utf-8"))
+                         if resuming and stages_file.is_file() else {})
+    # Codex f1 #2: a run is BOUND to the plan, screen rules, owner overrides and drift holds it
+    # started under. A resume under anything else is refused BEFORE a ledger is touched (start a
+    # new run instead) — a crashed run never finishes under rules nobody reviewed it with.
+    # Read ONCE per run: a malformed holds file fails the run loudly (never "no holds").
+    try:
+        holds = load_holds(conn.id, sources_root)
+        screen_cfg = load_screen()
+        # Codex f2 #11: the owner overrides are read ONCE; this exact object is bound and passed
+        # to every stage, so an approval or revocation mid-run cannot change what this run does
+        overrides = load_overrides(source_id, sources_root)
+        binding = _run_binding(plan, screen_cfg, overrides, holds)
+        _bind_run(run_dir, binding, resuming=resuming, stages_done=stages_done)
+        if resuming:
+            # f2 #8 / #3: nobody advanced the source's state since, and the approved table
+            # mapping is the one this run already built under - checked before a ledger is opened
+            _check_state_generation(source_id, run_id, run_dir / "binding.json")
+            _check_mapping_binding(run_dir, source_id, vocab, sources_root)
+    except ResumeRefused:
+        raise                            # the interrupted run is left exactly as it was
+    except Exception as exc:
+        report.status = "failed"
+        report.message = _plain_error(exc, limit=1000)
+        _write_report(report, run_dir)                  # durable first, then the event (f2 #13)
+        emit_event("run_failed", source_id=source_id, run_id=run_id,
+                   attrs={**extra_attrs, "error": report.message})
+        if nested:
+            _TABULAR.report = report
+        raise
+    snapshot = run_dir / "plan.snapshot.yaml"
+    if not (resuming and snapshot.is_file()):
+        # written ONCE: a resume never overwrites the plan the run was collected under
+        snapshot.write_text(yaml.safe_dump(plan.model_dump(mode="json"), sort_keys=False),
+                            encoding="utf-8")
+    _configure_local_store(store, report)
+
+    def mark(stage: str, seconds: float) -> None:
+        # Codex f2 #14: every ledger line written so far is made durable BEFORE the stage is
+        # recorded done, and `stages.json` is replaced atomically (never torn)
+        for led in ledgers.values():
+            sync = getattr(led, "sync", None)
+            if callable(sync):
+                sync()
+        stages_done[stage] = {"done_at": now_iso(), "seconds": round(seconds, 3),
+                              "breakdown": timings.stage(stage)}
+        _atomic_text(stages_file, json.dumps(stages_done, sort_keys=True))
+        report.durations[stage] = round(seconds, 3)
+
+    # On resume, collect and build ledgers are kept (both resume item by item); the ledgers of
+    # a stage that had not finished are started again, since that stage re-runs whole. Codex f1
+    # #3: an abandoned attempt's ledger is MOVED to `attempts/<n>/` intact — never truncated —
+    # so what an interrupted stage wrote stays on disk as history.
+    stage_of = {"unchanged": "extract", "extracted": "extract", "extract_skipped": "extract",
+                "governance": "screen"}
+    if resuming:
+        _retire_unfinished_ledgers(run_dir, [n for n, st in stage_of.items()
+                                             if st not in stages_done])
+    # every ledger with a typed format (`records.py`) is written THROUGH its model; a fresh run's
+    # directory is new, so nothing is ever truncated
+    ledgers = {n: typed_ledger(run_dir / f"{n}.jsonl") for n in LEDGERS}
+    # created on the first held item only: its presence alone says "something was held this run"
+    ledgers["held"] = _LazyLedger(run_dir / f"{HELD_LEDGER}.jsonl", truncate=False)
+    checkpoint = _Checkpoint(run_dir / "checkpoint.json")
+    timings = Timings(ledgers["timings"])
+    meter = None
+    state = load_state(source_id)
+    report.notes.extend(screen_cfg.notes)
+    report.notes.append(f"screen rules: {screen_cfg.source}")
+    enumeration_complete = True
+    try:
+        # ---------------------------------------------------------------- collect
+        if "collect" not in stages_done:
+            t0 = time.monotonic()
+            pool_before = _pool_snapshot()
+            enumeration_complete = _collect(conn, plan, ledgers, run_dir, client, progress,
+                                            checkpoint, resuming, timings,
+                                            holds=holds)
+            mark("collect", time.monotonic() - t0)
+            stages_done["collect"]["enumeration_complete"] = enumeration_complete
+            pool_after = _pool_snapshot()
+            if pool_after is not None:
+                # the process-wide MCP session pool (client.py): cumulative counters, and what
+                # THIS collect added to them (a warm lease is a hit; a spawn is a miss)
+                stages_done["collect"]["mcp_pool"] = {
+                    "after": pool_after,
+                    "this_run": {k: v - (pool_before or {}).get(k, 0)
+                                 for k, v in pool_after.items()
+                                 if isinstance(v, (int, float)) and not isinstance(v, bool)
+                                 and k not in ("idle", "leased", "keys", "max_idle",
+                                               "idle_timeout_s")}}
+                report.timings["mcp_pool"] = stages_done["collect"]["mcp_pool"]
+            _atomic_text(stages_file, json.dumps(stages_done, sort_keys=True))
+        else:
+            enumeration_complete = bool(stages_done["collect"].get("enumeration_complete"))
+        captured = read_jsonl(run_dir / "captured.jsonl")
+
+        # ---------------------------------------------------------------- extract
+        if "extract" not in stages_done:
+            t0 = time.monotonic()
+            decided = load_decided(source_id)
+            _extract(captured, state, ledgers, progress, timings, cache, decided=decided,
+                     fingerprint=screen_fingerprint(screen_cfg), overrides=overrides)
+            mark("extract", time.monotonic() - t0)
+        extracted = read_jsonl(run_dir / "extracted.jsonl")
+
+        # ---------------------------------------------------------------- screen (pre-model)
+        if "screen" not in stages_done:
+            t0 = time.monotonic()
+            _screen(extracted, screen_cfg, overrides, ledgers, progress, timings)
+            _record_decided(source_id, run_id, run_dir, screen_fingerprint(screen_cfg))
+            mark("screen", time.monotonic() - t0)
+        decisions = {r["item_id"]: r for r in read_jsonl(run_dir / "governance.jsonl")}
+
+        # ---------------------------------------------------------------- build
+        if "build" not in stages_done:
+            t0 = time.monotonic()
+            doc_kind, note = document_kind(vocab, conn.document_kind)
+            report.notes.append(note)
+            if harness is None:
+                report.notes.append("no model configured: document anchors only, no entity "
+                                    "extraction (configure a key or pass a harness)")
+            model_harness = harness
+            if harness is not None:
+                from .capture import cache_root
+                from .llm import CachedHarness, ModelOutputCache
+
+                rps = os.environ.get("WALNUT_EXTRACT_MAX_RPS")
+                model_harness = CachedHarness(
+                    harness, cache=ModelOutputCache(cache_root() / "extract") if cache else None,
+                    max_concurrent=workers, max_per_second=float(rps) if rps else None)
+                meter = model_harness.meter
+            report.notes.append(f"extraction: {workers} worker(s); model-output cache "
+                                f"{'on' if cache and harness is not None else 'off'}; "
+                                f"cross-chunk bridges {'on' if bridges else 'off'}")
+            built = _build(conn, store, model_harness, vocab, doc_kind, screen_cfg, extracted,
+                           decisions, state, ledgers, run_dir, progress, checkpoint,
+                           sources_root, report, timings=timings, workers=workers,
+                           bridges=bridges, overrides=overrides,
+                           retrieved_at=_run_started(run_dir))
+            t_rm = time.perf_counter()
+            _emit_item_events(conn.id, run_id, built, state, run_dir, enumeration_complete,
+                              report, store=store, doc_kind=doc_kind, ledger=ledgers["removed"],
+                              holds=holds, resuming=resuming)
+            timings.add("build.removals", time.perf_counter() - t_rm)
+            # built items are saved PROVISIONAL (graph: false, pending_verification) - they are
+            # promoted only after verify passes (f2 #10); a crash before that rebuilds them
+            save_state(source_id, state, run_id=run_id)
+            mark("build", time.monotonic() - t0)
+
+        # ---------------------------------------------------------------- index (retrieval)
+        if "index" not in stages_done:
+            t0 = time.monotonic()
+            _index_passages(conn.id, run_dir, _passages_enabled(passages), harness, timings,
+                            report)
+            mark("index", time.monotonic() - t0)
+
+        for led in ledgers.values():
+            led.close()
+
+        # ---------------------------------------------------------------- verify
+        t0 = time.monotonic()
+        report.verify = verify_run(source_id, run_id, store=store)
+        (run_dir / "verify.json").write_text(json.dumps(report.verify, sort_keys=True,
+                                                        indent=1), encoding="utf-8")
+        timings.add("verify.reconcile", time.monotonic() - t0)
+        mark("verify", time.monotonic() - t0)
+        report.timings = {**report.timings,
+                          **timings.as_dict(meter.as_dict() if meter is not None else None)}
+        report.counts = report.verify.get("counts", {})
+        _count_backfill(report, run_dir)
+        _note_holds(report, run_dir)
+        _finalise_status(report, enumeration_complete)
+        # Codex f2 #10: incremental state advances ONLY for a run that verified
+        state = load_state(source_id)
+        promoted = _promote_state(state, run_dir, verified=bool(report.verify.get("ok")))
+        if promoted["promoted"]:
+            save_state(source_id, state, run_id=run_id)
+        if promoted["withheld"]:
+            report.notes.append(f"state NOT advanced for {promoted['withheld']} item(s): "
+                                f"verification failed, so the next sync rebuilds and re-verifies "
+                                f"them")
+    except Exception as exc:
+        for led in ledgers.values():
+            led.close()
+        report.status = "failed"
+        report.message = _plain_error(exc, limit=1000)
+        report.timings = {**report.timings,
+                          **timings.as_dict(meter.as_dict() if meter is not None else None)}
+        _write_report(report, run_dir)                  # durable first, then the event (f2 #13)
+        emit_event("run_failed", source_id=source_id, run_id=run_id,
+                   attrs={**extra_attrs, "error": report.message})
+        if nested:
+            _TABULAR.report = report
+        raise
+    # Codex f2 #13: report.json is durable BEFORE the completion event; f2 #9: inside the tabular
+    # recipe the event waits until the recipe's own outcome is known (`_run_with_tabular`)
+    _write_report(report, run_dir)
+    final = ("run_completed" if report.status in ("ok", "empty") else "run_failed",
+             {**extra_attrs, "status": report.status, "message": report.message,
+              **{k: report.counts.get(k) for k in ("inventory", "captured", "built")}})
+    if getattr(_TABULAR, "defer_event", None) == source_id:
+        _TABULAR.pending_event = final
+    else:
+        emit_event(final[0], source_id=source_id, run_id=run_id, attrs=final[1])
+    if nested:
+        _TABULAR.report = report
+    progress("report", status=report.status, message=report.message)
+    return report
+
+
+def _run_with_tabular(source_id: str, store, harness, progress_cb, *, client, sources_root,
+                      vocab, options: dict) -> RunReport:
+    """A sync of a source whose plan has a SQL step: the database recipe (S2's
+    `tabular.ingest_database`) on one session, with THIS module's core run inside it. The core
+    run's report is returned, annotated with the tabular outcome. If the recipe fails BEFORE the
+    core run, the core run happens anyway (the graph must not go stale because profiling broke)
+    and the failure is recorded; if it fails AFTER, the core report stands with the failure noted;
+    if the core run itself fails, that failure is raised as always."""
+    try:
+        from .tabular.pipeline import ingest_database
+    except ImportError as exc:
+        report = run_ingest(source_id, store, harness, progress_cb, client=client,
+                            sources_root=sources_root, vocab=vocab, tabular=False,
+                            event_attrs=options.get("event_attrs"),
+                            **{k: options[k] for k in ("run_id", "concurrency", "passages",
+                                                       "cache", "bridges", "verbose")})
+        report.notes.append(f"tabular: recipe not available here ({exc}); core stages only")
+        _write_report(report, Path(report.run_dir))
+        return report
+    # f2 #9: the core run's completion event is HELD until the recipe's own outcome is known;
+    # a recipe that fails (before or after the graph run) makes the sync `unverified`
+    _TABULAR.kwargs, _TABULAR.report = options, None
+    _TABULAR.defer_event, _TABULAR.pending_event = source_id, None
+    t0 = time.monotonic()
+    try:
+        try:
+            out = ingest_database(source_id, store, harness, client=client, vocab=vocab,
+                                  sources_root=sources_root,
+                                  index=_passages_enabled(options["passages"]),
+                                  progress_cb=progress_cb)
+        except Exception as exc:                                     # noqa: BLE001
+            report = getattr(_TABULAR, "report", None)
+            _TABULAR.kwargs = _TABULAR.report = None
+            if report is None:
+                report = run_ingest(source_id, store, harness, progress_cb, client=client,
+                                    sources_root=sources_root, vocab=vocab, tabular=False,
+                                    event_attrs=options.get("event_attrs"),
+                                    **{k: options[k] for k in ("run_id", "concurrency",
+                                                               "passages", "cache", "bridges",
+                                                               "verbose")})
+                _tabular_failed(report, f"the database recipe failed before the graph run "
+                                        f"({_plain_error(exc)}); core stages ran alone - no "
+                                        f"facts or schema cards this run")
+                return report
+            if report.status == "failed":
+                raise
+            _tabular_failed(report, f"the database recipe failed after the graph run - "
+                                    f"{_plain_error(exc)}")
+            return report
+        report = _TABULAR.report
+        _TABULAR.report = None
+        tab = out.get("tabular") or {}
+        report.notes.append(f"tabular: {tab.get('tables_profiled', 0)} table(s) profiled, facts "
+                            f"{(tab.get('facts') or {}).get('status')}, {tab.get('cards', 0)} "
+                            f"schema card(s)")
+        report.timings["tabular"] = {**(out.get("timings") or {}),
+                                     "wall_s": round(time.monotonic() - t0, 3)}
+        _write_report(report, Path(report.run_dir))
+        _emit_pending(report)
+        if progress_cb is not None:
+            progress_cb({"stage": "report", "status": report.status,
+                         "message": report.message})
+        return report
+    finally:
+        _TABULAR.kwargs = None
+        _TABULAR.defer_event = None
+        _TABULAR.pending_event = None
+
+
+def _emit_pending(report: RunReport) -> None:
+    """Emit the core run's held completion event (if it produced one), AFTER report.json."""
+    pending = getattr(_TABULAR, "pending_event", None)
+    _TABULAR.pending_event = None
+    if pending is None:
+        return
+    kind, attrs = pending
+    if report.status not in ("ok", "empty"):
+        kind = "run_failed"
+    emit_event(kind, source_id=report.source_id, run_id=report.run_id,
+               attrs={**attrs, "status": report.status, "message": report.message})
+
+
+def _tabular_failed(report: RunReport, why: str) -> None:
+    """A sync whose database recipe failed is NOT a success (f2 #9): an `ok` graph run becomes
+    `unverified` (facts / schema cards were not refreshed), the reason is the message, the report
+    is written, and only then is the held event emitted (as `run_failed`)."""
+    report.notes.append(f"tabular: {why}")
+    if report.status == "ok":
+        report.status = "unverified"
+        report.message = f"graph run ok, but {why}"
+    _write_report(report, Path(report.run_dir))
+    _emit_pending(report)
+
+
+#: What produced a refusal the model never saw (e.g. "no model configured"): this package.
+INGEST_PRODUCER = {"component": "databridge_mcp_ingest", "kind": "rule"}
+
+
+def _run_produced_by(report: RunReport, run_dir: Path) -> dict:
+    """§5.8 for the run as a whole (E2E F-33): the component, the run, and every distinct model
+    stamp the build recorded (`build.jsonl` `produced_by`) — none when no model was called."""
+    stamps: dict[str, dict] = {}
+    for r in read_jsonl(run_dir / "build.jsonl"):
+        for st in r.get("produced_by") or []:
+            if isinstance(st, dict):
+                stamps[json.dumps(st, sort_keys=True, default=str)] = st
+    return {**INGEST_PRODUCER, "run_id": report.run_id,
+            "models_used": [stamps[k] for k in sorted(stamps)]}
+
+
+def _write_report(report: RunReport, run_dir: Path) -> None:
+    report.finished_at = now_iso()
+    # built THROUGH the typed format its readers use (`records.RunReportRecord`)
+    body = json.loads(json.dumps(report.as_dict(), default=str))
+    # f1 #5: nothing a person reads back from report.json carries a credential
+    body["message"] = scrub(body.get("message") or "")
+    body["notes"] = [scrub(n) for n in body.get("notes") or []]
+    body["produced_by"] = _run_produced_by(report, run_dir)
+    body = RunReportRecord.model_validate(body).model_dump(mode="json", exclude_unset=True)
+    _atomic_text(run_dir / "report.json", json.dumps(body, sort_keys=True, indent=1,
+                                                     default=str))
+
+
+def _count_backfill(report: RunReport, run_dir: Path) -> None:
+    """E2E run-2 N-01: the passage back-fill this run did, in report.json's counts."""
+    try:
+        bf = json.loads((run_dir / "index.json").read_text(encoding="utf-8")).get("backfill")
+    except (OSError, ValueError):
+        bf = None
+    if isinstance(bf, dict):
+        report.counts["passages_backfilled"] = bf.get("indexed", 0)
+        report.counts["passages_backfill_pending"] = bf.get("pending", 0)
+
+
+def _note_holds(report: RunReport, run_dir: Path) -> None:
+    """Say what drift holds did this run (P3: a hold is never silent)."""
+    held = held_items(run_dir)
+    failed = read_jsonl(run_dir / "failed.jsonl")
+    steps = [r for r in failed if r.get("rule") == DRIFT_PENDING_APPROVAL]
+    changed = [r for r in failed if r.get("rule") == TOOL_CHANGED]
+    if changed:
+        report.counts["tool_changed"] = len(changed)
+        report.notes.append(
+            f"tool changed ({TOOL_CHANGED}): {len(changed)} step(s)/item(s) HELD because a tool "
+            f"the plan calls changed on the server since the plan was approved — "
+            f"{_TOOL_CHANGED_REVERSE}; nothing was inferred removed")
+    if held or steps:
+        report.counts["held"] = len(held)
+        report.counts["held_steps"] = len(steps)
+        report.notes.append(
+            f"drift holds ({DRIFT_PENDING_APPROVAL}): {len(held)} item(s) captured but not "
+            f"built, {len(steps)} step(s) not enumerated — they await a person's decision on "
+            f"a shape change (approve_adaptation / reject_adaptation); everything else synced")
+
+
+def _finalise_status(report: RunReport, enumeration_complete: bool) -> None:
+    c = report.counts
+    problems = report.verify.get("problems") or []
+    if problems:
+        report.status = "unverified"
+        report.message = f"verification found {len(problems)} problem(s): {problems[0]}"
+    elif c.get("tool_changed") and not c.get("captured"):
+        report.status = "empty"
+        report.message = (f"HELD ({TOOL_CHANGED}): {c.get('tool_changed')} step(s)/item(s) were "
+                          f"not read because a tool the approved plan calls changed on the "
+                          f"server since it was approved. Nothing was inferred removed; "
+                          f"{_TOOL_CHANGED_REVERSE}")
+    elif not c.get("inventory") and c.get("held_steps") and \
+            c.get("held_steps") == c.get("failed_listing"):
+        report.status = "empty"
+        report.message = (f"EMPTY RUN: every listed step ({c.get('held_steps')}) is HELD "
+                          f"({DRIFT_PENDING_APPROVAL}) — the tool it calls changed shape and a "
+                          f"person has not decided yet (approve_adaptation / reject_adaptation). "
+                          f"Nothing was inferred removed")
+    elif not c.get("inventory"):
+        report.status = "empty"
+        report.message = ("EMPTY RUN: the source listed nothing. This is not a success — check the "
+                          "roots and scope, and that the server can see the files")
+    elif not c.get("captured"):
+        report.status = "empty"
+        report.message = (f"EMPTY RUN: {c.get('inventory')} item(s) seen, none captured "
+                          f"({c.get('excluded', 0)} excluded, {c.get('blocked', 0)} blocked, "
+                          f"{c.get('failed', 0)} failed). Not a success — see the ledgers")
+    else:
+        report.status = "ok"
+        report.message = (f"{c.get('inventory')} seen, {c.get('captured')} captured, "
+                          f"{c.get('built', 0)} built, {c.get('unchanged', 0)} unchanged")
+    if not enumeration_complete:
+        report.notes.append("listing did not complete (see failed.jsonl); removals were not "
+                            "inferred from this run")
+
+
+# --- stages --------------------------------------------------------------------------------------
+def _collect(conn: SourceConnection, plan: CrawlPlan, ledgers: dict, run_dir: Path, client,
+             progress, checkpoint: _Checkpoint, resuming: bool,
+             timings: Optional[Timings] = None, holds: Optional[DriftHolds] = None) -> bool:
+    timings = timings or Timings()
+    holds = holds or DriftHolds(source_id=conn.id)
+    already = _done_ids(run_dir, "captured", "excluded", "blocked") if resuming else set()
+    complete = True
+    counts = {"seen": 0, "captured": 0}
+
+    def record(item: Item, decision: Decision) -> None:
+        rec = item.as_record()
+        ledgers["inventory"].write({**rec, "decision": decision.outcome})
+        if decision.outcome in ("excluded", "blocked"):
+            ledgers[decision.outcome].write({"item_id": item.item_id, "uri": item.uri,
+                                             "rel": item.rel, "rule": decision.rule,
+                                             "reverse": decision.reverse, "at": now_iso()})
+
+    def on_dir(info: dict) -> None:
+        iid = item_identity(conn.id, info["uri"])
+        if iid in already:
+            return
+        ledgers["inventory"].write({"item_id": iid, "source_id": conn.id, "kind": "folder",
+                                    "uri": info["uri"], "rel": info["rel"],
+                                    "decision": info["outcome"]})
+        ledgers[info["outcome"]].write({"item_id": iid, "uri": info["uri"], "rel": info["rel"],
+                                        "rule": info["rule"], "reverse": info["reverse"],
+                                        "at": now_iso()})
+
+    def outside_roots(step_id: str):
+        def record_outside(count: int, roots: list) -> None:
+            # ONE aggregate line: the individual resources are outside what the owner declared,
+            # so their names are not written down — only that they were not captured, and why
+            ledgers["excluded"].write({"item_id": None, "step": step_id, "rule": "outside_roots",
+                                       "count": count, "roots": roots,
+                                       "reverse": "declare a scope.roots entry that contains "
+                                                  "them (or remove scope.roots to take all)",
+                                       "at": now_iso()})
+        return record_outside
+
+    def run_with(c) -> None:
+        nonlocal complete
+        for step in plan.steps:
+            step_aid = holds.step_hold(step.id)
+            if step_aid:
+                # never enumerated, and the listing is marked incomplete, so nothing this step
+                # would have listed is inferred removed while the drift awaits a person
+                complete = False
+                ledgers["failed"].write({
+                    "item_id": None, "step": step.id, "stage": "enumerate",
+                    "error": f"{DRIFT_PENDING_APPROVAL}: step {step.id!r} is held by adaptation "
+                             f"{step_aid} (the tool it calls changed shape)",
+                    "rule": DRIFT_PENDING_APPROVAL, "adaptation_id": step_aid,
+                    "reverse": holds.reverse_text(step_aid), "at": now_iso()})
+                continue
+            try:
+                if step.strategy == "documents":
+                    items = enumerate_documents(c, step, conn.scope, conn.id, on_dir=on_dir)
+                elif step.strategy == "resources":
+                    items = enumerate_resources(c, step, conn.id, scope=conn.scope,
+                                                on_outside=outside_roots(step.id))
+                else:
+                    items = enumerate_tables(c, step, conn.id)
+                for item in _timed_iter(items, timings, "collect.mcp_list"):
+                    if item.item_id in already:
+                        continue
+                    counts["seen"] += 1
+                    if scrub(item.uri) != item.uri:
+                        # f2 #4: a locator that carries a credential (userinfo, a signed or
+                        # token-bearing URL) is never fetched or captured; the ledgers keep only
+                        # its scrubbed form
+                        record(item, Decision("blocked", CREDENTIAL_IN_LOCATOR,
+                                              "expose the item through a locator without "
+                                              "credentials (the connection holds them)"))
+                        continue
+                    decision = decide(item, conn.scope, collected_so_far=counts["captured"],
+                                      holds=holds)
+                    aid = decision.hold                 # held: captured below, never built
+                    if decision.outcome != "collect" and not aid:
+                        record(item, decision)
+                        continue
+                    got = _fetch_one(c, step, item, conn, ledgers, record, counts, timings)
+                    if aid and got:
+                        # captured (so it stays inventoried and observable), NOT built
+                        ledgers["held"].write({
+                            "item_id": item.item_id, "uri": item.uri, "rel": item.rel,
+                            "rule": DRIFT_PENDING_APPROVAL, "reverse": holds.reverse_text(aid),
+                            "adaptation_id": aid, "at": now_iso(),
+                            "note": "captured, NOT built: held until a person decides"})
+                    checkpoint.tick({"stage": "collect", **counts})
+                    if counts["seen"] % CHECKPOINT_ITEMS == 0:
+                        progress("collect", done=counts["seen"], captured=counts["captured"])
+            except (McpClientError, CrawlError, Exception) as exc:      # noqa: BLE001
+                complete = False
+                ledgers["failed"].write({"item_id": None, "step": step.id, "stage": "enumerate",
+                                         "error": _plain_error(exc), "at": now_iso(),
+                                         **_tool_changed_hold(exc)})
+
+    if client is not None:
+        run_with(ReadOnlyClient(client, plan=plan))
+    else:
+        t0 = time.perf_counter()
+        with open_client(conn) as c:
+            timings.add("collect.mcp_connect", time.perf_counter() - t0)
+            run_with(ReadOnlyClient(c, plan=plan))
+    checkpoint.tick({"stage": "collect", **counts}, force=True)
+    progress("collect", done=counts["seen"], captured=counts["captured"])
+    return complete
+
+
+def _tool_changed_hold(exc: BaseException) -> dict:
+    """The hold fields for a `ToolChanged` refusal anywhere in `exc`'s cause chain, else {}."""
+    seen: set[int] = set()
+    cur: Optional[BaseException] = exc
+    while cur is not None and id(cur) not in seen:
+        if isinstance(cur, ToolChanged):
+            return {"rule": TOOL_CHANGED, "reverse": _TOOL_CHANGED_REVERSE}
+        seen.add(id(cur))
+        cur = cur.__cause__ or cur.__context__
+    return {}
+
+
+def _plain_error(exc: BaseException, limit: int = 300) -> str:
+    """One readable line: a server's multi-kilobyte validation dump is not a reason a person can
+    act on. The full text is not lost — it is the server's to log."""
+    text = " ".join(scrub(str(exc)).split())
+    return f"{type(exc).__name__}: {text[:limit]}{'…' if len(text) > limit else ''}"
+
+
+def _fetch_one(client, step, item: Item, conn: SourceConnection, ledgers: dict, record,
+               counts: dict, timings: Optional[Timings] = None) -> bool:
+    """Fetch and capture one item. True when it was captured."""
+    timings = timings or Timings()
+    t0 = time.perf_counter()
+    try:
+        if item.kind == "table":
+            data, snapshot = fetch_table(client, step, item, limit=conn.scope.max_rows_per_table)
+            mime = "application/json"
+        else:
+            data, mime = fetch_document(client, step, item)
+            snapshot = None
+    except Exception as exc:                                         # noqa: BLE001
+        timings.add("collect.mcp_read", time.perf_counter() - t0)
+        ledgers["inventory"].write({**item.as_record(), "decision": "failed"})
+        ledgers["failed"].write({"item_id": item.item_id, "uri": item.uri, "stage": "fetch",
+                                 "error": _plain_error(exc), "at": now_iso(),
+                                 **_tool_changed_hold(exc)})
+        return False
+    t_read = time.perf_counter() - t0
+    timings.add("collect.mcp_read", t_read)
+    if item.kind != "table" and len(data) > conn.scope.max_bytes:
+        record(item, Decision("excluded", "size_cap",
+                              f"raise scope.max_bytes above {len(data)}"))
+        return False
+    t1 = time.perf_counter()
+    sha = capture.put_bytes(data)
+    meta = {"source": conn.id, "uri": item.uri, "mime": mime, "title": item.name,
+            "retrieved_at": now_iso()}
+    if item.attrs:
+        meta["attrs"] = dict(item.attrs)          # e.g. modified time + source-native mime
+    capture.put_meta(sha, meta)
+    if snapshot is not None:
+        try:
+            capture.put_text(sha, table_text(snapshot))
+        except capture.TextConflict:
+            pass        # write-once (f2 #5): the stored rendering is kept; extract records ITS digest
+        total, limit = snapshot.get("row_count_total"), snapshot.get("limit")
+        if total is not None and total > len(snapshot.get("rows") or []):
+            ledgers["coverage"].write({
+                "item_id": item.item_id, "uri": item.uri, "rule": "row_cap",
+                "rows_total": total, "rows_read": len(snapshot.get("rows") or []),
+                "reverse": f"raise scope.max_rows_per_table above {limit}"})
+    t_cap = time.perf_counter() - t1
+    timings.add("collect.capture_write", t_cap)
+    timings.item(item.item_id, "collect", t_read + t_cap, read_ms=round(t_read * 1000, 2),
+                 capture_ms=round(t_cap * 1000, 2), bytes=len(data))
+    ledgers["inventory"].write({**item.as_record(), "decision": "collect"})
+    ledgers["captured"].write({"item_id": item.item_id, "uri": item.uri, "name": item.name,
+                               "kind": item.kind, "sha256": sha, "bytes": len(data),
+                               "mime": mime, "step": item.step_id, "at": now_iso(),
+                               # anchors the capture's `.json` to this run (R-019 deferred #5)
+                               "meta_digest": capture.stored_meta_digest(sha),
+                               **({"attrs": dict(item.attrs)} if item.attrs else {})})
+    counts["captured"] += 1
+    return True
+
+
+def held_items(run_dir: Path) -> dict[str, dict]:
+    """item_id -> hold record, for the items this run captured but holds (`excluded.drift.jsonl`,
+    rule DRIFT_PENDING_APPROVAL)."""
+    return {r["item_id"]: r for r in read_jsonl(run_dir / f"{HELD_LEDGER}.jsonl")
+            if r.get("item_id") and r.get("rule") == DRIFT_PENDING_APPROVAL}
+
+
+def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
+             timings: Optional[Timings] = None, cache: bool = True, *,
+             decided: Optional[dict] = None, fingerprint: str = "",
+             overrides: Optional[set] = None) -> None:
+    from .extract import extract_text
+
+    timings = timings or Timings()
+    decided, overrides = decided or {}, overrides or set()
+    for i, rec in enumerate(captured, 1):
+        iid, sha = rec["item_id"], rec["sha256"]
+        prev = state.get(iid)
+        # an item seen but NOT built (F-23: a table awaiting its mapping) is never "unchanged":
+        # it is re-read until it is built
+        if prev and prev.get("content_hash") == sha and prev.get("graph", True) is not False:
+            ledgers["unchanged"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                        "last_run": prev.get("run_id")})
+            continue
+        dec = decided.get(iid)
+        if dec and dec.get("content_hash") == sha and dec.get("screen") == fingerprint \
+                and not _override_allows(overrides, iid, sha):
+            # E2E F-31: blocked / sent to review, unchanged, same rules, no owner override —
+            # the decision stands. Not re-extracted; the decision is carried into this run's
+            # governance ledger so exclusion counts stay truthful.
+            ledgers["unchanged"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                        "last_run": dec.get("run_id"),
+                                        "decided": dec.get("decision")})
+            ledgers["governance"].write({**(dec.get("record") or {}), "item_id": iid,
+                                         "uri": rec["uri"], "sha256": sha,
+                                         "decision": dec.get("decision"),
+                                         "carried_forward": True,
+                                         "decided_in_run": dec.get("run_id"), "at": now_iso()})
+            continue
+        if rec.get("kind") == "table":
+            text = capture.get_text(sha) or ""
+            ledgers["extracted"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                        "kind": "table", "chars": len(text),
+                                        "extractor": "table", "text_sha256": text_digest(text),
+                                        # f2 #15: tables carry the metadata anchor too
+                                        **({"meta_digest": rec["meta_digest"]}
+                                           if rec.get("meta_digest") else {})})
+            continue
+        # the extractor is chosen BEFORE the bytes are read (P10)
+        kind = extractor_for(rec.get("name") or rec["uri"], rec.get("mime"))
+        if kind is None:
+            ledgers["extract_skipped"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                              "reason": "no_extractor", "mime": rec.get("mime")})
+            continue
+        t0 = time.perf_counter()
+        hit = False
+        try:
+            data = capture.get_bytes(sha)
+            name = rec.get("name") or rec["uri"]
+            if cache:
+                got, hit = extract_text_cached(data, sha=sha, name=name, mime=rec.get("mime"),
+                                               source_id=iid)
+            else:
+                got = extract_text(data, name=name, mime=rec.get("mime"), source_id=iid)
+        except ExtractionFailed as exc:
+            timings.add(f"extract.{'docling' if kind != 'text' else 'text'}_failed",
+                        time.perf_counter() - t0)
+            reason = ("extractor_unavailable" if "extractor_unavailable" in str(exc)
+                      else "extract_failed")
+            ledgers["extract_skipped"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                              "reason": reason, "detail": _plain_error(exc)})
+            continue
+        took = time.perf_counter() - t0
+        bucket = "text" if kind == "text" else ("convert_cache_hit" if hit else "docling")
+        timings.add(f"extract.{bucket}", took)
+        timings.item(iid, "extract", took, extractor=got.extractor, cache_hit=hit)
+        if not got.text.strip():
+            ledgers["extract_skipped"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                              "reason": "no_text", "detail": got.extractor})
+            continue
+        # the text digest goes into the ledger AND a `<sha>.txt.json` sidecar, so materialise
+        # verifies the text without docling (R-022 build cross-track 5)
+        text_sha, chars, extractor = got.text_sha256, len(got.text), got.extractor
+        try:
+            capture.put_text(sha, got.text, text_sha256=got.text_sha256, extractor=got.extractor)
+        except capture.TextConflict as exc:
+            # f2 #5: the text is WRITE-ONCE per capture - existing pointers index the stored one.
+            # This run uses the stored text, provided it still matches its own sidecar digest.
+            side = capture.get_text_meta(sha) or {}
+            if side.get("text_sha256") != exc.existing_digest:
+                ledgers["extract_skipped"].write({
+                    "item_id": iid, "uri": rec["uri"], "sha256": sha, "reason": "text_conflict",
+                    "detail": "a different extraction of these bytes is stored and does not "
+                              "match its recorded digest; nothing built from it"})
+                continue
+            stored = capture.get_text(sha, expect_text_digest=exc.existing_digest) or ""
+            text_sha, chars = exc.existing_digest, len(stored)
+            extractor = str(side.get("extractor") or extractor)
+        ledgers["extracted"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                    "kind": rec.get("kind", "document"), "name": rec.get("name"),
+                                    "chars": chars, "extractor": extractor,
+                                    "text_sha256": text_sha,
+                                    "warnings": list(got.warnings), "cache_hit": hit,
+                                    # carried so the build verifies the capture's `.json`
+                                    **({"meta_digest": rec["meta_digest"]}
+                                       if rec.get("meta_digest") else {})})
+        if i % CHECKPOINT_ITEMS == 0:
+            progress("extract", done=i, total=len(captured))
+    progress("extract", done=len(captured), total=len(captured))
+
+
+def _record_decided(source_id: str, run_id: str, run_dir: Path, fingerprint: str) -> None:
+    """Persist this run's FRESH block / review decisions (F-31); an item screened `allow` (or
+    no longer decided) is dropped, so it is never skipped on stale grounds."""
+    ledgers_fresh = [r for r in read_jsonl(run_dir / "governance.jsonl")
+                     if not r.get("carried_forward")]
+    if not ledgers_fresh:
+        return
+    decided = load_decided(source_id)
+    keep = ("decision", "score", "fired", "rationale", "reverse", "kind", "rules_source")
+    for r in ledgers_fresh:
+        iid = r.get("item_id")
+        if not iid or r.get("kind") == "table":
+            continue
+        if r.get("decision") in ("block", "review"):
+            decided[iid] = {"content_hash": r.get("sha256"), "decision": r.get("decision"),
+                            "screen": fingerprint, "run_id": run_id,
+                            "record": {k: r.get(k) for k in keep}}
+        else:
+            decided.pop(iid, None)
+    p = decided_path(source_id)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f".decided.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(decided, sort_keys=True, indent=1, default=str), encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def _screen(extracted: list[dict], cfg, overrides: set[str], ledgers: dict, progress,
+            timings: Optional[Timings] = None) -> None:
+    timings = timings or Timings()
+    fingerprint = screen_fingerprint(cfg)
+    for i, rec in enumerate(extracted, 1):
+        t0 = time.perf_counter()
+        # f2 #5: screened = extracted; a text that changed since raises (the stage fails loudly)
+        text = capture.get_text(rec["sha256"], expect_text_digest=rec.get("text_sha256")) or ""
+        override = _override_allows(overrides, rec["item_id"], rec["sha256"])
+        result = screen_text(text, cfg, override_allow=override)
+        masked: dict = {}
+        if rec.get("kind") != "table":
+            # Codex f1 #8: the masked view is keyed by (content, rule set) and written once; its
+            # digest goes into THIS decision, so the build reads exactly what was screened here
+            variant = capture.redaction_variant(fingerprint, override)
+            _, digest = capture.put_redacted_variant(rec["sha256"], variant, result.masked_text)
+            capture.put_redacted(rec["sha256"], result.masked_text)   # shared §5.2 copy
+            masked = {"redaction_variant": variant, "masked_sha256": digest}
+        timings.add("screen.document", time.perf_counter() - t0)
+        ledgers["governance"].write({"item_id": rec["item_id"], "uri": rec["uri"],
+                                     "sha256": rec["sha256"], "kind": rec.get("kind"),
+                                     "rules_source": cfg.source, "at": now_iso(),
+                                     **masked, **result.as_record()})
+    progress("screen", done=len(extracted))
+
+
+class _Now:
+    """A completed future, for the serial path."""
+
+    def __init__(self, fn, *args) -> None:
+        self._value = fn(*args)
+
+    def result(self):
+        return self._value
+
+
+def _masked_for_build(rec: dict, raw: str, decision: dict, screen_cfg,
+                      override_allow: bool) -> Optional[str]:
+    """The masked text THIS run's screen decision recorded (Codex f1 #8): the rule-set-keyed,
+    write-once variant, verified against the decision's `masked_sha256`. If that file is missing
+    or altered, the text is re-masked with the run's own rules and accepted only if it reproduces
+    the recorded digest. None: nothing verifiable - the caller skips the item (no model call).
+    A decision written before digests (no `masked_sha256`) is re-masked under this run's rules."""
+    sha = rec["sha256"]
+    variant, want = decision.get("redaction_variant"), decision.get("masked_sha256")
+    if variant and want:
+        try:
+            return capture.get_redacted_variant(sha, variant, expect_digest=want)
+        except capture.CaptureCorrupt:
+            pass
+    masked = screen_text(raw, screen_cfg, override_allow=override_allow).masked_text
+    if want and capture.sha256_bytes(masked.encode("utf-8")) != want:
+        return None
+    return masked
+
+
+def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisions, state,
+           ledgers, run_dir, progress, checkpoint, sources_root, report, *,
+           timings: Optional[Timings] = None, workers: int = 1,
+           bridges: bool = True, overrides=None,
+           retrieved_at: Optional[dt.datetime] = None) -> list[dict]:
+    """Documents: prepare (chunk + screen) → extract on a pool of `workers` → apply in order,
+    one transaction per document. Items whose screen decision is not `allow` never reach this
+    loop's model calls. Tables: the approved mapping, deterministically (no model per row)."""
+    from .mapping import ensure_mapping
+
+    timings = timings or Timings()
+    already = _done_ids(run_dir, "build", "build_skipped")
+    held = held_items(run_dir)
+    if overrides is None:                       # a direct caller; the run passes its bound set
+        overrides = load_overrides(conn.id, sources_root)
+    texts = {r["item_id"]: r.get("text_sha256") for r in read_jsonl(run_dir / "extracted.jsonl")
+             if r.get("item_id")}
+    rels = {r["item_id"]: r.get("rel") for r in read_jsonl(run_dir / "inventory.jsonl")
+            if r.get("item_id")}
+    caps = {r["item_id"]: r for r in read_jsonl(run_dir / "captured.jsonl") if r.get("item_id")}
+    builder = ProseBuilder(store, harness, source_id=conn.id, vocab=vocab, doc_kind=doc_kind,
+                           screen=screen_cfg, chunk_ledger=ledgers["governance_chunks"],
+                           bridges=bridges, run_id=run_dir.name)
+    built: list[dict] = []
+    # Codex f1 #6: a build line carries its OUTBOX - the event it owes and the state it advances -
+    # written in the same line, AFTER the item's graph transaction. A resume replays the outboxes
+    # of the items it skips, so a crash between the graph write and `save_state` neither loses
+    # their state nor their events (and item event ids are deterministic, so none is doubled).
+    for r in (*read_jsonl(run_dir / "build.jsonl"), *read_jsonl(run_dir / "build_skipped.jsonl")):
+        box = r.get("outbox")
+        if isinstance(box, dict) and r.get("item_id"):
+            if isinstance(box.get("event"), dict):
+                built.append(box["event"])
+            if isinstance(box.get("state"), dict):
+                state[r["item_id"]] = _provisional(box["state"])
+    tables: list[tuple[dict, str, dict, dict]] = []
+    retrieved = retrieved_at or dt.datetime.now(dt.timezone.utc)
+    pool = (ThreadPoolExecutor(max_workers=workers, thread_name_prefix="extract")
+            if workers > 1 and harness is not None else None)
+
+    def submit(plan, job):
+        return pool.submit(builder.extract, plan, job) if pool else _Now(builder.extract, plan,
+                                                                          job)
+
+    def finish(i: int, rec: dict, meta: dict, plan, futures: list, t_prep: float) -> None:
+        iid = rec["item_id"]
+        t_wait = time.perf_counter()
+        results = [f.result() for f in futures]
+        more = builder.bridge_jobs(plan, results)
+        if more:
+            plan.jobs.extend(more)
+            results += [f.result() for f in [submit(plan, j) for j in more]]
+        timings.add("build.model_wait", time.perf_counter() - t_wait)
+        out = builder.apply(plan, results)
+        timings.add("build.graph_write", out.write_ms / 1000.0)
+        timings.item(iid, "build", t_prep + out.write_ms / 1000.0 + out.model_ms / 1000.0,
+                     prepare_ms=round(t_prep * 1000, 2), model_ms=round(out.model_ms, 2),
+                     write_ms=round(out.write_ms, 2), chunks=out.chunks,
+                     model_calls=out.model_called, model_cached=out.model_cached,
+                     bridges=out.bridges)
+        for p in out.pointers:
+            ledgers["pointers"].write({"item_id": iid, **p})
+        for r in out.refused:
+            # §5.8 (E2E F-33): the refused claim's producer — the model stamps of this item, or
+            # this package when no model produced anything
+            ledgers["refused"].write({"item_id": iid, "reason": r,
+                                      "produced_by": list(out.produced_by) or [INGEST_PRODUCER]})
+        entry = {"item_id": iid, "uri": rec["uri"], "sha256": rec["sha256"], "kind": "document",
+                 # f1 #7: the capture's metadata anchor travels on to indexing and verification
+                 **({"meta_digest": rec["meta_digest"]} if rec.get("meta_digest") else {}),
+                 "anchor": out.anchor_id, "chunks": out.chunks,
+                 "chunks_blocked": out.chunks_blocked, "entities": out.entities,
+                 "relations": out.relations, "anchor_edges": out.anchor_edges,
+                 "model_calls": out.model_called, "bridges": out.bridges,
+                 "bridge_relations": out.bridge_relations, "produced_by": out.produced_by,
+                 "subject_mentions": out.subject_mentions,
+                 "subject_candidates": out.subject_candidates,
+                 # E2E run-3 P-05: mentions joined to a keyed record by its grounded name
+                 "name_joins": out.name_joins,
+                 # f2 #6: every graph row this item wrote, each verified to carry a pointer
+                 "graph_ids": _graph_ids(out)}
+        event = {**entry, "name": rec.get("name"),
+                 # f2 #12: the mime THIS source captured it as, not the first sighting's
+                 "mime": (caps.get(iid) or {}).get("mime") or meta.get("mime"),
+                 "replaced_hash": (state.get(iid) or {}).get("content_hash")}
+        new_state = {"content_hash": rec["sha256"], "uri": rec["uri"], "rel": rels.get(iid),
+                     "run_id": run_dir.name, "built_at": now_iso()}
+        ledgers["build"].write({**entry, "outbox": {"event": event, "state": new_state}})
+        if out.model_called and not out.entities:
+            ledgers["build_skipped"].write({"item_id": iid, "uri": rec["uri"],
+                                            "reason": "zero_graph_output",
+                                            "detail": f"{out.model_called} chunk(s) sent to the "
+                                                      f"model; nothing survived the wall"})
+        elif out.chunks and out.chunks == out.chunks_blocked:
+            ledgers["build_skipped"].write({"item_id": iid, "uri": rec["uri"],
+                                            "reason": "all_chunks_screened_out"})
+        built.append(event)
+        state[iid] = _provisional(new_state)
+        if checkpoint.tick({"stage": "build", "done": i}):
+            save_state(conn.id, state, run_id=run_dir.name)
+        if i % CHECKPOINT_ITEMS == 0:
+            progress("build", done=i, total=len(extracted))
+
+    # documents in flight at once: enough to keep every worker busy, bounded for memory
+    window = max(2, workers * 2)
+    pending: list[tuple] = []
+    try:
+        for i, rec in enumerate(extracted, 1):
+            iid = rec["item_id"]
+            if iid in already:
+                continue
+            decision = decisions.get(iid, {}).get("decision")
+            if decision != "allow":
+                continue                          # excluded by the screen; governance says why
+            if iid in held:
+                # captured, NOT built: a pending shape drift holds it. The state is not advanced,
+                # so once the hold is released the next sync builds it (never "unchanged").
+                h = held[iid]
+                ledgers["build_skipped"].write({
+                    "item_id": iid, "uri": rec["uri"], "reason": DRIFT_PENDING_APPROVAL,
+                    "detail": (f"held by adaptation {h.get('adaptation_id')}: the source's shape "
+                               f"changed here and a person has not decided yet"),
+                    "reverse": h.get("reverse") or "", "adaptation_id": h.get("adaptation_id")})
+                continue
+            if rec.get("kind") == "table":
+                snapshot = json.loads(capture.get_bytes(rec["sha256"]))
+                tables.append((snapshot, rec["sha256"], rec, {}))
+                continue
+            t0 = time.perf_counter()
+            try:
+                # f2 #5: the text the pointers will index is the one this run EXTRACTED
+                raw = capture.get_text(rec["sha256"], expect_text_digest=texts.get(iid)
+                                       or rec.get("text_sha256")) or ""
+            except capture.CaptureCorrupt as exc:
+                ledgers["build_skipped"].write({
+                    "item_id": iid, "uri": rec["uri"], "reason": "text_mismatch",
+                    "detail": _plain_error(exc), "reverse": "start a new run (it re-extracts)"})
+                continue
+            masked = _masked_for_build(rec, raw, decisions.get(iid) or {}, screen_cfg,
+                                       _override_allows(overrides, iid, rec["sha256"]))
+            if masked is None:
+                ledgers["build_skipped"].write({
+                    "item_id": iid, "uri": rec["uri"], "reason": "masked_text_mismatch",
+                    "detail": "the masked text on disk is not the one this run's screen decision "
+                              "recorded, and re-masking does not reproduce it - never sent to a "
+                              "model", "reverse": "start a new run (it re-screens)"})
+                continue
+            meta = capture.get_meta(rec["sha256"],
+                                    expect_digest=rec.get("meta_digest")) or {}
+            plan = builder.prepare(item_id=iid, sha=rec["sha256"], raw_text=raw,
+                                   masked_text=masked,
+                                   title=rec.get("name") or meta.get("title") or rec["uri"],
+                                   uri=rec["uri"], retrieved_at=retrieved,
+                                   override_allow=_override_allows(overrides, iid,
+                                                                   rec["sha256"]))
+            t_prep = time.perf_counter() - t0
+            timings.add("build.prepare_and_chunk_screen", t_prep)
+            pending.append((i, rec, meta, plan, [submit(plan, j) for j in plan.jobs], t_prep))
+            while len(pending) > window:
+                finish(*pending.pop(0))
+        while pending:
+            finish(*pending.pop(0))
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=True, cancel_futures=True)
+
+    if tables:
+        t_tab = time.perf_counter()
+        snaps = {(f"{s.get('schema')}.{s.get('table')}" if s.get("schema")
+                  else str(s.get("table"))): s for s, _, _, _ in tables}
+        # Codex f2 #2: a connection flag is never an approval - always False here; a table is
+        # built only under an authenticated principal's digest-bound approval (mapping.py)
+        mapping = ensure_mapping(conn.id, snaps, vocab, harness=harness, auto_approve=False,
+                                 root=sources_root)
+        # Codex f2 #3: the run is BOUND to the approved mapping it first built tables under. The
+        # binding is written BEFORE any table row is written; a later attempt of the same run
+        # under a different approved mapping is refused, never mixed. The snapshot is written once.
+        _bind_mapping(run_dir, mapping)
+        snap_path = run_dir / "mapping.snapshot.yaml"
+        if not snap_path.is_file():
+            _atomic_text(snap_path, yaml.safe_dump(mapping.model_dump(mode="json"),
+                                                   sort_keys=False))
+        ready = []
+        for snapshot, sha, rec, _ in tables:
+            tref = (f"{snapshot.get('schema')}.{snapshot.get('table')}"
+                    if snapshot.get("schema") else str(snapshot.get("table")))
+            tm = mapping.tables.get(tref)
+            if tm is None or tm.status != "approved" or not tm.node:
+                reason = ("unmapped" if tm is not None and tm.status == "unmapped"
+                          else "mapping_not_approved")
+                skipped_line = ({
+                    "item_id": rec["item_id"], "uri": rec["uri"], "reason": reason,
+                    "detail": "; ".join(tm.rationale) if tm else "",
+                    "reverse": ("approve the mapping (`approve --mapping`) and re-run"
+                                if reason == "mapping_not_approved"
+                                else "map the table to a kind in <source>.mapping.yaml")})
+                # E2E F-23: the table's content is SEEN even though its rows are not (yet) in
+                # the graph — a change is still an item_changed event (attrs.graph = false), and
+                # the state remembers the hash WITHOUT marking it built, so the day its mapping
+                # is approved the next sync builds it.
+                prev = state.get(rec["item_id"]) or {}
+                event = None
+                if prev.get("content_hash") != sha:
+                    event = {"item_id": rec["item_id"], "uri": rec["uri"], "sha256": sha,
+                             "kind": "table", "name": snapshot.get("table"),
+                             "mime": "application/json",
+                             "replaced_hash": prev.get("content_hash"),
+                             "graph": False, "reason": reason}
+                    built.append(event)
+                new_state = {"content_hash": sha, "uri": rec["uri"],
+                             "rel": rels.get(rec["item_id"]), "run_id": run_dir.name,
+                             "built_at": None, "graph": False, "reason": reason}
+                state[rec["item_id"]] = new_state
+                skipped_line["outbox"] = {"event": event, "state": new_state}
+                ledgers["build_skipped"].write(skipped_line)
+                continue
+            ready.append((snapshot, sha, tm.model_dump(), rec))
+        if ready:
+            result = build_tables(store, vocab, source_id=conn.id,
+                                  tables=[(s, sha, tm) for s, sha, tm, _ in ready],
+                                  retrieved_at=retrieved, mask_cfg=screen_cfg,
+                                  screen_cfg=screen_cfg, overrides=overrides,
+                                  item_ids={sha: rec["item_id"] for _, sha, _, rec in ready})
+            for p in result["pointers"]:
+                ledgers["pointers"].write(p)
+            for b in result["blocked_rows"]:
+                ledgers["governance_chunks"].write({"item_id": None, **b})
+            # E2E F-03 / F-19: a subject row whose declared identifier equals another record's
+            # is a CANDIDATE for a human (never merged); listed here with its reversal
+            if result.get("candidate_links"):
+                with open(run_dir / "identity_candidates.jsonl", "a", encoding="utf-8") as fh:
+                    for c in result["candidate_links"]:
+                        fh.write(json.dumps(c, sort_keys=True, default=str) + "\n")
+            report.notes.append(
+                f"tables: {result['nodes']} nodes, {result['edges']} edges, "
+                f"{result['dangling_edges']} dangling edges dropped (counted), "
+                f"{result['rows_blocked']} rows blocked by the screen, "
+                f"{len(result['redactions'])} cells masked, "
+                f"{len(result.get('canonical_masked') or [])} canonical id(s) withheld because "
+                f"the value was masked (those rows merge by row key only), "
+                f"{len(result.get('merged') or [])} row node(s) merged onto an existing node by "
+                f"exact id, {len(result.get('candidate_links') or [])} identity candidate(s) "
+                f"listed for a human")
+            per_table_nodes = result["report"].get("nodes_by_kind", {})
+            table_ids: dict[str, set] = {}
+            for ptr in result["pointers"]:
+                if ptr.get("item_id") and ptr.get("entity"):
+                    table_ids.setdefault(ptr["item_id"], set()).add(ptr["entity"])
+            for snapshot, sha, tm, rec in ready:
+                entry = {"item_id": rec["item_id"], "uri": rec["uri"], "sha256": sha,
+                         "kind": "table", "rows": len(snapshot.get("rows") or []),
+                         "node_kind": tm["node"]["kind"],
+                         "nodes_of_kind_this_run": per_table_nodes.get(tm["node"]["kind"], 0),
+                         **({"meta_digest": rec["meta_digest"]} if rec.get("meta_digest")
+                            else {}),
+                         "graph_ids": sorted(table_ids.get(rec["item_id"], ()))}
+                event = {**entry, "name": snapshot.get("table"), "mime": "application/json",
+                         "replaced_hash": (state.get(rec["item_id"]) or {}).get("content_hash")}
+                new_state = {"content_hash": sha, "uri": rec["uri"],
+                             "rel": rels.get(rec["item_id"]), "run_id": run_dir.name,
+                             "built_at": now_iso()}
+                ledgers["build"].write({**entry, "outbox": {"event": event, "state": new_state}})
+                if not snapshot.get("rows"):
+                    ledgers["build_skipped"].write({"item_id": rec["item_id"],
+                                                    "uri": rec["uri"], "reason": "no_rows"})
+                built.append(event)
+                state[rec["item_id"]] = _provisional(new_state)
+        timings.add("build.tables", time.perf_counter() - t_tab)
+    progress("build", done=len(extracted), total=len(extracted))
+    return built
+
+
+def _graph_ids(out) -> list[str]:
+    """Every node / edge id one document's build wrote: what `build.py` reports
+    (`DocBuild.graph_ids`: anchor, entities, anchor edges, relations, bridge relations) plus the
+    anchor and every entity a pointer was ledgered for. `verify_run` requires each to carry a
+    resolving pointer (Codex f2 #6). INT5: read directly — FXJ2 exposes it on every DocBuild, so
+    a build result without it is an error, never read as "wrote nothing"."""
+    ids = set(out.graph_ids)
+    if getattr(out, "anchor_id", None):
+        ids.add(out.anchor_id)
+    ids.update(p["entity"] for p in getattr(out, "pointers", None) or () if p.get("entity"))
+    return sorted(ids)
+
+
+def _emit_item_events(source_id: str, run_id: str, built: list[dict], prev_state_live: dict,
+                      run_dir: Path, enumeration_complete: bool, report: RunReport, *,
+                      store=None, doc_kind: Optional[str] = None, ledger=None,
+                      holds: Optional[DriftHolds] = None, resuming: bool = False) -> None:
+    """§5.3 events. `prev_state_live` has already been updated for built items, so the previous
+    hash is recovered from the build's own record of what it replaced. A removed item's graph
+    footprint is CLOSED (not deleted) before its event is emitted — see `close_removed_item`."""
+    prior = {r["item_id"]: r for r in read_jsonl(run_dir / "unchanged.jsonl")}
+    counts = {"item_added": 0, "item_changed": 0, "item_removed": 0}
+    closed_total = {"nodes": 0, "edges": 0}
+    # Codex f1 #6: item event ids are deterministic; a resumed run skips the ones already logged
+    from .ledger import event_ids_for_run
+
+    emitted = event_ids_for_run(run_id) if resuming else set()
+    for b in built:
+        kind = "item_changed" if b.get("replaced_hash") else "item_added"
+        attrs = {"mime": b.get("mime"), "title": b.get("name")}
+        if b.get("graph") is False:
+            attrs.update(graph=False, reason=b.get("reason"))
+        eid = item_event_id(kind, source_id=source_id, run_id=run_id, item_id=b["item_id"],
+                            content_hash=b["sha256"])
+        counts[kind] += 1
+        if eid in emitted:
+            continue
+        emit_event(kind, source_id=source_id, run_id=run_id, item_id=b["item_id"],
+                   uri=b["uri"], content_hash=b["sha256"], attrs=attrs, event_id=eid)
+        emitted.add(eid)
+    if enumeration_complete:
+        seen = {r["item_id"] for r in read_jsonl(run_dir / "inventory.jsonl") if r.get("item_id")}
+        gone_ids = sorted(set(prev_state_live) - seen - set(prior))
+        # an item a drift hold names (e.g. a table the source dropped, held until a person
+        # decides) is NOT inferred removed: closing its graph footprint is the decision pending
+        # Codex f1 #11: a path hold is a glob on the scope-RELATIVE path, so the state's `rel`
+        # is what it is matched against (the uri only for a state entry written before `rel`)
+        kept_held = [i for i in gone_ids if holds is not None and
+                     holds.absent_hold(str(prev_state_live[i].get("uri") or ""),
+                                       prev_state_live[i].get("rel"))]
+        if kept_held:
+            report.notes.append(f"drift holds: {len(kept_held)} item(s) absent from the source "
+                                f"but held ({DRIFT_PENDING_APPROVAL}) — not inferred removed")
+        for iid in [i for i in gone_ids if i not in kept_held]:
+            gone = prev_state_live.pop(iid)
+            attrs: dict = {}
+            if store is not None:
+                live_hashes = {v.get("content_hash") for v in prev_state_live.values()}
+                closed = close_removed_item(store, source_id=source_id, item_id=iid,
+                                            content_hash=gone.get("content_hash"),
+                                            doc_kind=doc_kind, live_hashes=live_hashes)
+                closed_total["nodes"] += len(closed["nodes_closed"])
+                closed_total["edges"] += len(closed["edges_closed"])
+                attrs = {"nodes_closed": len(closed["nodes_closed"]),
+                         "edges_closed": len(closed["edges_closed"])}
+                if ledger is not None:
+                    ledger.write({"item_id": iid, "uri": gone.get("uri"),
+                                  "content_hash": gone.get("content_hash"), "at": now_iso(),
+                                  **closed})
+            eid = item_event_id("item_removed", source_id=source_id, run_id=run_id,
+                                item_id=iid, content_hash=gone.get("content_hash"))
+            if eid not in emitted:
+                emit_event("item_removed", source_id=source_id, run_id=run_id, item_id=iid,
+                           uri=gone.get("uri"), content_hash=gone.get("content_hash"),
+                           attrs=attrs, event_id=eid)
+            counts["item_removed"] += 1
+    report.notes.append(f"events: {counts}")
+    if counts["item_removed"]:
+        report.notes.append(f"removals: {closed_total['nodes']} node(s) and "
+                            f"{closed_total['edges']} edge(s) closed (system_to set; history "
+                            f"kept)")
+
+
+def close_removed_item(store, *, source_id: str, item_id: str, content_hash: Optional[str],
+                       doc_kind: Optional[str] = None,
+                       live_hashes: Optional[set] = None) -> dict:
+    """Close — never delete — the graph rows whose ONLY evidence was a removed item.
+
+    A pointer is the item's when it carries the connection id AND the item identity
+    (`document_id`, for prose spans), or — for a table cell, which has no document id — the
+    item's last content hash, provided no other live item of the source has the same bytes. A
+    derived pointer is the item's when all of its basis is. An OPEN node or edge is closed only
+    if EVERY pointer on its open version is the item's; an entity also seen in another document
+    or source stays open, untouched. An open edge left touching a closed node is closed too (it
+    would otherwise dangle). `system_to` is set; `valid_to` is left as it was — the file going
+    away is not evidence of when the fact stopped being true. One transaction."""
+    live_hashes = live_hashes or set()
+
+    def mine(p) -> bool:
+        if p.kind == "derived":
+            return bool(p.derived_from) and all(mine(b) for b in p.derived_from)
+        if p.source_id != source_id:
+            return False
+        if p.document_id == item_id:
+            return True
+        return (p.kind == "table_cell" and bool(content_hash)
+                and p.capture_digest == content_hash and content_hash not in live_hashes)
+
+    patterns = [f"%{item_id}%"] + ([f"%{content_hash}%"] if content_hash else [])
+    where = " OR ".join("source_pointer_json LIKE ?" for _ in patterns)
+    candidates = sorted({r["entity_id"] for r in store.fetchall(
+        f"SELECT DISTINCT entity_id FROM sources WHERE {where}", tuple(patterns))})
+    if doc_kind:
+        candidates = sorted(set(candidates) | {anchor_id_for(doc_kind, source_id, item_id)})
+    nodes_closed: list[str] = []
+    edges_closed: list[str] = []
+    kept: list[str] = []
+    at = store.now()
+    with store_batch(store):
+        for eid in candidates:
+            is_node = store.open_node_row(eid) is not None
+            is_edge = not is_node and store.fetchone(
+                "SELECT 1 AS x FROM edges WHERE id = ? AND system_to IS NULL", (eid,)) is not None
+            if not (is_node or is_edge):
+                continue                                     # already closed, or never written
+            ptrs = store.sources_for(eid)
+            if not ptrs or not all(mine(p) for p in ptrs):
+                kept.append(eid)
+                continue
+            if is_node:
+                store.close_node(eid, at=at, _commit=False)
+                nodes_closed.append(eid)
+            else:
+                store.close_edge(eid, at=at, _commit=False)
+                edges_closed.append(eid)
+        for nid in nodes_closed:
+            for row in store.fetchall("SELECT DISTINCT id FROM edges WHERE (src_id = ? OR "
+                                      "dst_id = ?) AND system_to IS NULL", (nid, nid)):
+                store.close_edge(row["id"], at=at, _commit=False)
+                edges_closed.append(row["id"])
+    return {"nodes_closed": nodes_closed, "edges_closed": edges_closed,
+            "kept_other_evidence": len(kept)}
+
+
+#: At most this many already-built documents are back-filled into the passage index per run
+#: (E2E run-2 N-01); the rest are reported `pending` and taken by the next sync.
+BACKFILL_MAX_DEFAULT = 500
+
+
+def _backfill_max() -> int:
+    try:
+        return max(0, int(os.environ.get("WALNUT_INGEST_BACKFILL_MAX", BACKFILL_MAX_DEFAULT)))
+    except ValueError:
+        return BACKFILL_MAX_DEFAULT
+
+
+def _indexed_digests(retrieval, source_id: str) -> Optional[dict]:
+    """The passage index's OWN record of what it holds for this source: doc_id -> (capture
+    digest, chunker version), read-only from the published store. None: no store yet."""
+    from databridge_retrieval import store as rst
+    from databridge_retrieval.paths import passages_dir
+
+    p = passages_dir() / rst.store_filename(source_id, "default")
+    if not p.is_file():
+        return None
+    conn = rst.connect(p, readonly=True)
+    try:
+        return {r["doc_id"]: (r["sha256"], r["chunker"]) for r in conn.execute(
+            "SELECT doc_id, sha256, chunker FROM documents")}
+    finally:
+        conn.close()
+
+
+def _backfill_candidates(retrieval, source_id: str, run_dir: Path, built_ids: set) -> list[dict]:
+    """E2E run-2 N-01: documents this run did NOT build, but which an earlier run built at the
+    SAME content digest this run captured, and which the passage index does not hold at that
+    digest (or holds under an older chunker). Incremental by digest; sorted by item id, so the
+    per-run bound always makes progress."""
+    state = load_state(source_id)
+    have = _indexed_digests(retrieval, source_id) or {}
+    out = []
+    for rec in read_jsonl(run_dir / "captured.jsonl"):
+        iid, sha = rec.get("item_id"), rec.get("sha256")
+        if not iid or not sha or iid in built_ids or rec.get("kind", "document") != "document":
+            continue
+        st = state.get(iid) or {}
+        if st.get("graph") is False or st.get("content_hash") != sha:
+            continue                    # never built, held, unverified, or changed: not ours
+        try:
+            doc_id = retrieval.doc_id_for({"uri": rec["uri"]}, source_id=source_id)
+        except ValueError:
+            continue
+        if have.get(doc_id) == (sha, retrieval.CHUNKER_VERSION):
+            continue                    # the index already holds this digest
+        out.append(rec)
+    return sorted(out, key=lambda r: r["item_id"])
+
+
+def _index_passages(source_id: str, run_dir: Path, enabled: bool, harness, timings: Timings,
+                    report: RunReport) -> dict:
+    """BUILD_PLAN §5.5: each document built this run is indexed into the retrieval store, and each
+    removed item is dropped from it, in ONE `BuildSession` (single writer; published once).
+    E2E run-2 N-01: documents built by EARLIER runs that the index does not hold at their current
+    digest are back-filled in the same session (bounded per run, `WALNUT_INGEST_BACKFILL_MAX`).
+    Writes `index.json` either way — with the reason when it did nothing."""
+    out: dict = {"enabled": enabled, "indexed": 0, "unchanged": 0, "removed": 0,
+                 "other": {}, "status": "skipped", "reason": "", "at": now_iso(),
+                 "backfill": {"candidates": 0, "indexed": 0, "unchanged": 0, "other": {},
+                              "pending": 0, "max": _backfill_max()}}
+    path = run_dir / "index.json"
+    built = [r for r in read_jsonl(run_dir / "build.jsonl") if r.get("kind") == "document"]
+    removed = read_jsonl(run_dir / "removed.jsonl")
+    retrieval = None
+    backfill: list[dict] = []
+    if not enabled:
+        out["reason"] = ("passages off: pass passages=True (adapter agent extract.passages) or "
+                         "set WALNUT_INGEST_PASSAGES=1")
+    else:
+        try:
+            import databridge_retrieval as retrieval
+        except ImportError as exc:
+            out["reason"] = f"databridge_retrieval is not importable here ({exc})"
+        if retrieval is not None:
+            try:
+                backfill = _backfill_candidates(retrieval, source_id, run_dir,
+                                                {r["item_id"] for r in built})
+            except Exception as exc:                                 # noqa: BLE001
+                report.notes.append(f"passages: back-fill check failed — {_plain_error(exc)}")
+            bf = out["backfill"]
+            bf["candidates"] = len(backfill)
+            bf["pending"] = max(0, len(backfill) - bf["max"])
+            backfill = backfill[:bf["max"]]
+            if not built and not removed and not backfill:
+                out["reason"] = "nothing built, removed or left to back-fill this run"
+                retrieval = None
+    if retrieval is not None:
+        t0 = time.perf_counter()
+        try:
+            session = retrieval.BuildSession(source_id, harness=harness)
+            with session:
+                jobs = [(r, False) for r in built] + [(r, True) for r in backfill]
+                for r, is_backfill in jobs:
+                    t1 = time.perf_counter()
+                    meta = capture.get_meta(r["sha256"],
+                                            expect_digest=r.get("meta_digest")) or {}
+                    # f2 #12: the title / mime THIS source saw (the build's outbox, or the
+                    # capture line for a back-fill), not the first sighting's
+                    own = ((r.get("outbox") or {}).get("event") or {}) if not is_backfill \
+                        else {"name": r.get("name"), "mime": r.get("mime")}
+                    res = session.index_capture(r["sha256"], {
+                        "source_id": source_id, "item_id": r["item_id"], "uri": r["uri"],
+                        "title": own.get("name") or meta.get("title"),
+                        "mime": own.get("mime") or meta.get("mime")})
+                    timings.item(r["item_id"], "index", time.perf_counter() - t1,
+                                 status=res.status, chunks=res.chunks, backfill=is_backfill)
+                    tally = out["backfill"] if is_backfill else out
+                    if res.status in ("indexed", "unchanged"):
+                        tally[res.status] += 1
+                    else:
+                        tally["other"][res.status] = tally["other"].get(res.status, 0) + 1
+                for r in removed:
+                    session.remove(r["item_id"])
+                    out["removed"] += 1
+            out["status"] = "ok"
+        except Exception as exc:                                     # noqa: BLE001
+            out["status"] = "failed"
+            out["reason"] = _plain_error(exc)
+            report.notes.append(f"passages: not published — {out['reason']}")
+        timings.add("index.retrieval", time.perf_counter() - t0)
+    if out["status"] == "skipped":
+        report.notes.append(f"passages: skipped — {out['reason']}")
+    elif out["status"] == "ok":
+        bf = out["backfill"]
+        report.notes.append(f"passages: {out['indexed']} indexed, {out['unchanged']} unchanged, "
+                            f"{out['removed']} removed; back-filled {bf['indexed']} earlier-built "
+                            f"document(s), {bf['pending']} pending")
+    _atomic_text(path, json.dumps(out, sort_keys=True, indent=1))
+    return out
+
+
+# --- verification --------------------------------------------------------------------------------
+class _PointerResolver:
+    """Resolves one pointer record (the ledger's dict shape) against the capture store:
+    `doc_span` (offsets within the captured text; a label must ground in the raw or masked slice
+    by the extractor's own rule), `table_cell` (the row and column exist in the captured
+    snapshot), and `derived` (Codex f1 #9: a non-empty `basis`, every leaf of which resolves)."""
+
+    def __init__(self, masked_variant: Optional[dict] = None,
+                 text_digests: Optional[dict] = None) -> None:
+        self._rows: dict[str, dict] = {}
+        self._text: dict[str, Optional[str]] = {}
+        self._masked_variant = masked_variant or {}
+        # f2 #5: capture sha -> the text digest the run's extraction recorded; a text that does
+        # not match it resolves NOTHING (a changed text under existing offsets is not evidence)
+        self._text_digests = text_digests or {}
+
+    def _get_text(self, sha: str) -> Optional[str]:
+        if sha not in self._text:
+            try:
+                self._text[sha] = capture.get_text(
+                    sha, expect_text_digest=self._text_digests.get(sha))
+            except capture.CaptureCorrupt:
+                self._text[sha] = None
+        return self._text[sha]
+
+    def _masked(self, sha: str) -> Optional[str]:
+        variant, digest = self._masked_variant.get(sha, (None, None))
+        if not (variant and digest):
+            return None
+        try:
+            return capture.get_redacted_variant(sha, variant, expect_digest=digest)
+        except capture.CaptureCorrupt:
+            return None
+
+    def _table(self, sha: str) -> dict:
+        if sha not in self._rows:
+            index: dict = {}
+            try:
+                snap = json.loads(capture.get_bytes(sha))
+                pk = snap.get("primary_key") or []
+                for n, row in enumerate(snap.get("rows") or []):
+                    vals = [row.get(c) for c in pk]
+                    key = (",".join(str(v) for v in vals) if pk and all(v is not None
+                                                                          for v in vals)
+                           else f"#{n}")
+                    index[key] = row
+            except Exception:                                        # noqa: BLE001
+                index = {}
+            self._rows[sha] = index
+        return self._rows[sha]
+
+    def resolves(self, p: dict, depth: int = 0) -> bool:
+        kind, sha = p.get("kind"), p.get("sha")
+        if kind == "derived":
+            basis = p.get("basis") or []
+            return depth < 8 and bool(basis) and all(
+                isinstance(b, dict) and self.resolves(b, depth + 1) for b in basis)
+        if not sha:
+            return False
+        if kind == "doc_span":
+            text = self._get_text(sha)
+            s, e = p.get("start"), p.get("end")
+            ok = text is not None and isinstance(s, int) and isinstance(e, int) and \
+                0 <= s <= e <= len(text)
+            if ok and p.get("label"):
+                # E2E F-16: the SAME rule the extractor grounded the span with (case- and
+                # whitespace-folded, boundary-aware) - imported, not restated.
+                from databridge_graph.extractor import _span_grounds
+
+                slices = [text[s:e]]
+                masked = self._masked(sha)
+                if masked is not None:
+                    slices.append(masked[s:e])
+                ok = any(_span_grounds(t, p["label"], 0, len(t)) is not None for t in slices)
+            elif ok and e == s and len(text) > 0:
+                ok = False
+            return ok
+        if kind == "table_cell":
+            row = self._table(sha).get(str(p.get("row_id")))
+            return row is not None and p.get("column") in row
+        return False
+
+
+def _pointer_record(ptr) -> dict:
+    """A graph `SourcePointer` in the ledger's dict shape (for `_PointerResolver`)."""
+    kind = getattr(ptr, "kind", None)
+    kind = getattr(kind, "value", kind)
+    if kind == "derived":
+        return {"kind": "derived", "basis": [_pointer_record(b)
+                                             for b in (getattr(ptr, "derived_from", None) or [])]}
+    return {"kind": kind, "sha": getattr(ptr, "capture_digest", None),
+            "start": getattr(ptr, "char_start", None), "end": getattr(ptr, "char_end", None),
+            "row_id": getattr(ptr, "row_id", None), "column": getattr(ptr, "column", None)}
+
+
+def _verify_graph_ids(store, build_records: list[dict], shas: list[str],
+                      resolver: "_PointerResolver") -> dict:
+    """Codex f2 #6: EVERY graph row a build record says it wrote (`graph_ids`) must exist in the
+    store and carry at least one pointer that names one of this run's built captures and
+    resolves. A row with no pointer, or only pointers elsewhere, is ungrounded output."""
+    out = {"ids": 0, "ungrounded": 0, "examples": []}
+    wanted = set(shas)
+
+    def names_run_capture(rec: dict) -> bool:
+        if rec.get("kind") == "derived":
+            return bool(rec.get("basis")) and all(names_run_capture(b) for b in rec["basis"])
+        return rec.get("sha") in wanted
+
+    for r in build_records:
+        for gid in r.get("graph_ids") or ():
+            out["ids"] += 1
+            try:
+                ptrs = [_pointer_record(p) for p in store.sources_for(gid)]
+            except Exception:                                        # noqa: BLE001
+                ptrs = []
+            if not any(names_run_capture(p) and resolver.resolves(p) for p in ptrs):
+                out["ungrounded"] += 1
+                if len(out["examples"]) < 5:
+                    out["examples"].append(f"{r.get('item_id', '')[:12]}:{gid}")
+    return out
+
+
+def _verify_store_provenance(store, shas: list[str], resolver: "_PointerResolver") -> dict:
+    """Every OPEN node / edge whose pointers name one of `shas` (this run's built captures): each
+    of its entity pointers that names such a capture must resolve (Codex f1 #10). Pointer kinds
+    this package does not mint are counted as `unchecked_kinds`, never passed silently as
+    resolved."""
+    out = {"entities": 0, "pointers": 0, "unresolved": 0, "unchecked_kinds": 0,
+           "examples": []}
+    if not shas:
+        return out
+    try:
+        entity_ids: set[str] = set()
+        for sha in shas:
+            for r in store.fetchall("SELECT DISTINCT entity_id FROM sources WHERE "
+                                    "source_pointer_json LIKE ?", (f"%{sha}%",)):
+                entity_ids.add(r["entity_id"])
+    except Exception:                                                # noqa: BLE001
+        return out
+    wanted = set(shas)
+
+    def names_run_capture(rec: dict) -> bool:
+        if rec.get("kind") == "derived":
+            return any(names_run_capture(b) for b in rec.get("basis") or [])
+        return rec.get("sha") in wanted
+
+    for eid in sorted(entity_ids):
+        is_open = store.open_node_row(eid) is not None or store.fetchone(
+            "SELECT 1 AS x FROM edges WHERE id = ? AND system_to IS NULL", (eid,)) is not None
+        if not is_open:
+            continue
+        out["entities"] += 1
+        for ptr in store.sources_for(eid):
+            rec = _pointer_record(ptr)
+            if not names_run_capture(rec):
+                continue
+            if rec.get("kind") not in ("doc_span", "table_cell", "derived"):
+                out["unchecked_kinds"] += 1
+                continue
+            out["pointers"] += 1
+            if not resolver.resolves(rec):
+                out["unresolved"] += 1
+                if len(out["examples"]) < 5:
+                    out["examples"].append(f"{eid} {rec.get('kind')}")
+    return out
+
+
+def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
+    """Reconcile the run's artefacts with each other and with the capture store (P8). Reads every
+    `*.jsonl` in the run dir BY PATTERN, so a ledger added later is counted, not missed (trap 3)."""
+    run_dir = run_dir_for(source_id, run_id)
+    ledgers = {p.stem: read_jsonl(p) for p in sorted(run_dir.glob("*.jsonl"))}
+
+    def ids(name: str) -> list[str]:
+        return [r["item_id"] for r in ledgers.get(name, []) if r.get("item_id")]
+
+    problems: list[str] = []
+    inventory = ids("inventory")
+    # an item appears once per decision line; the final outcome decides membership
+    outcome = {r["item_id"]: r.get("decision") for r in ledgers.get("inventory", [])
+               if r.get("item_id")}
+    captured, excluded, blocked = set(ids("captured")), set(ids("excluded")), set(ids("blocked"))
+    # Codex f1 #12: a fetch that failed and then succeeded on resume keeps its failed line as
+    # history; the item's LATEST outcome (the last inventory line) decides where it belongs
+    failed_all = set(ids("failed"))
+    retried = {i for i in failed_all if outcome.get(i) != "failed"
+               and i in (captured | excluded | blocked)}
+    failed = failed_all - retried
+    accounted = captured | excluded | blocked | failed
+    inv = set(outcome)
+    if inv != accounted:
+        missing = sorted(inv - accounted)[:3]
+        extra = sorted(accounted - inv)[:3]
+        problems.append(f"inventory ({len(inv)}) != captured+excluded+blocked+failed "
+                        f"({len(accounted)}); unaccounted {missing} not-inventoried {extra}")
+    if len(captured) + len(excluded) + len(blocked) + len(failed) != len(accounted):
+        problems.append("an item is in more than one of captured/excluded/blocked/failed")
+
+    extracted, skipped, unchanged = set(ids("extracted")), set(ids("extract_skipped")), \
+        set(ids("unchanged"))
+    if captured != (extracted | skipped | unchanged) or \
+            len(extracted) + len(skipped) + len(unchanged) != len(captured):
+        problems.append(f"captured ({len(captured)}) != extracted ({len(extracted)}) + "
+                        f"skipped ({len(skipped)}) + unchanged ({len(unchanged)})")
+    # a CARRIED decision (F-31: unchanged, still blocked / in review) is not a fresh screen; it
+    # must belong to an item this run recorded as unchanged-and-decided
+    gov = [r["item_id"] for r in ledgers.get("governance", [])
+           if r.get("item_id") and not r.get("carried_forward")]
+    carried = {r["item_id"] for r in ledgers.get("governance", []) if r.get("carried_forward")}
+    if sorted(gov) != sorted(extracted):
+        problems.append(f"governance has {len(gov)} decision(s) for {len(extracted)} extracted "
+                        f"item(s) — every extracted item needs exactly one")
+    decided_unchanged = {r["item_id"] for r in ledgers.get("unchanged", []) if r.get("decided")}
+    if carried != decided_unchanged:
+        problems.append(f"{len(carried ^ decided_unchanged)} carried decision(s) do not match "
+                        f"the items recorded unchanged-and-decided")
+    decisions = {r["item_id"]: r.get("decision") for r in ledgers.get("governance", [])}
+    allowed = {i for i, d in decisions.items() if d == "allow"}
+    build_ids, bskip = set(ids("build")), set(ids("build_skipped"))
+    if not allowed <= (build_ids | bskip):
+        problems.append(f"{len(allowed - build_ids - bskip)} allowed item(s) have no build "
+                        f"record and no recorded skip")
+    zero = {r["item_id"] for r in ledgers.get("build", [])
+            if r.get("model_calls") and not r.get("entities")}
+    zero_recorded = {r["item_id"] for r in ledgers.get("build_skipped", [])
+                     if r.get("reason") == "zero_graph_output"}
+    if not zero <= zero_recorded:
+        problems.append(f"{len(zero - zero_recorded)} item(s) produced no graph output and it "
+                        f"was not recorded")
+
+    # capture integrity (bytes AND the metadata anchor - Codex f1 #7) + pointer resolution
+    # against the CAPTURED text / rows
+    for rec in ledgers.get("captured", []):
+        try:
+            capture.get_bytes(rec["sha256"])
+        except Exception as exc:                                     # noqa: BLE001
+            problems.append(f"capture {rec['sha256'][:12]} unreadable or altered: {exc}")
+            continue
+        if not rec.get("meta_digest"):
+            problems.append(f"capture {rec['sha256'][:12]} has no meta_digest anchor in "
+                            f"captured.jsonl (its metadata cannot be verified)")
+            continue
+        try:
+            capture.get_meta(rec["sha256"], expect_digest=rec["meta_digest"])
+        except capture.CaptureCorrupt as exc:
+            problems.append(f"capture {rec['sha256'][:12]} metadata altered: {exc}")
+    # f2 #5: the extracted text each pointer indexes must be the text this run extracted
+    text_digests: dict[str, str] = {}
+    for rec in ledgers.get("extracted", []):
+        want = rec.get("text_sha256")
+        if not (rec.get("sha256") and want):
+            continue
+        text_digests[rec["sha256"]] = want
+        try:
+            capture.get_text(rec["sha256"], expect_text_digest=want)
+        except capture.CaptureCorrupt as exc:
+            problems.append(f"extracted text of {rec['sha256'][:12]} is not the text this run "
+                            f"extracted: {exc}")
+    masked_variant = {r["sha256"]: (r.get("redaction_variant"), r.get("masked_sha256"))
+                      for r in ledgers.get("governance", [])
+                      if r.get("sha256") and r.get("masked_sha256")}
+    resolver = _PointerResolver(masked_variant, text_digests)
+    resolved = 0
+    unresolved: list[str] = []
+    for p in ledgers.get("pointers", []):
+        if resolver.resolves(p):
+            resolved += 1
+        elif len(unresolved) < 5:
+            unresolved.append(f"{p.get('entity')} {p.get('kind')} "
+                              f"{p.get('sha') and str(p.get('sha'))[:12]}")
+    total_ptrs = len(ledgers.get("pointers", []))
+    if resolved != total_ptrs:
+        problems.append(f"{total_ptrs - resolved} of {total_ptrs} pointer(s) do not resolve "
+                        f"against the capture store: {unresolved}")
+    # Codex f1 #10: an item the build says produced graph output must have pointers in the ledger
+    # (0 of 0 resolving is not proof), and - with a store - every OPEN graph row grounded in this
+    # run's captures must carry pointers that resolve, whatever the ledger says.
+    ptr_items = {p.get("item_id") for p in ledgers.get("pointers", [])}
+    no_ptrs = sorted(r["item_id"] for r in ledgers.get("build", [])
+                     if r.get("kind") == "document"
+                     and (r.get("anchor") or r.get("entities") or r.get("relations"))
+                     and r.get("item_id") not in ptr_items)
+    if no_ptrs:
+        problems.append(f"{len(no_ptrs)} built item(s) wrote graph rows but no pointers: "
+                        f"{no_ptrs[:3]}")
+    # f2 #6: a graph id a build record names must have pointers in the ledger too
+    ptr_entities = {p.get("entity") for p in ledgers.get("pointers", []) if p.get("entity")}
+    unledgered = sorted({g for r in ledgers.get("build", []) for g in r.get("graph_ids") or ()}
+                        - ptr_entities)
+    store_check = {"entities": 0, "pointers": 0, "unresolved": 0, "unchecked_kinds": 0,
+                   "graph_ids": 0, "ungrounded": 0}
+    if store is not None:
+        built_shas = sorted({r["sha256"] for r in ledgers.get("build", []) if r.get("sha256")})
+        store_check = {**store_check,
+                       **_verify_store_provenance(store, built_shas, resolver)}
+        if store_check["unresolved"]:
+            problems.append(f"{store_check['unresolved']} pointer(s) on open graph rows grounded "
+                            f"in this run's captures do not resolve: "
+                            f"{store_check['examples']}")
+        if store_check["unchecked_kinds"]:
+            # f2 #6: a pointer kind this verifier cannot resolve is NOT a pass
+            problems.append(f"{store_check['unchecked_kinds']} pointer(s) on open graph rows are "
+                            f"of a kind verification cannot resolve")
+        gid = _verify_graph_ids(store, ledgers.get("build", []), built_shas, resolver)
+        store_check["graph_ids"], store_check["ungrounded"] = gid["ids"], gid["ungrounded"]
+        if gid["ungrounded"]:
+            problems.append(f"{gid['ungrounded']} graph row(s) written this run carry no "
+                            f"resolving pointer into this run's captures: {gid['examples']}")
+        # the ledger may legitimately lack an edge the builder wrote with its entity's pointer
+        # (an anchor edge); with a store each such id was just proven grounded above
+        unledgered = []
+        store_check.pop("examples", None)
+    if unledgered:
+        problems.append(f"{len(unledgered)} graph id(s) in build.jsonl have no ledgered pointer: "
+                        f"{unledgered[:3]}")
+
+    by_reason: dict[str, int] = {}
+    for r in ledgers.get("extract_skipped", []):
+        by_reason[r.get("reason", "?")] = by_reason.get(r.get("reason", "?"), 0) + 1
+    gov_counts: dict[str, int] = {}
+    for d in decisions.values():
+        gov_counts[d] = gov_counts.get(d, 0) + 1
+    counts = {
+        "inventory": len(inv), "inventory_lines": len(inventory), "captured": len(captured),
+        "excluded": len(excluded), "blocked": len(blocked), "failed": len(failed),
+        "failed_listing": sum(1 for r in ledgers.get("failed", []) if not r.get("item_id")),
+        "unchanged": len(unchanged), "extracted": len(extracted),
+        "extract_skipped": len(skipped), "extract_skipped_by_reason": by_reason,
+        "governance": gov_counts, "built": len(build_ids),
+        "build_skipped": len(bskip), "zero_graph_output": len(zero),
+        "entities": sum(r.get("entities", 0) for r in ledgers.get("build", [])),
+        "relations": sum(r.get("relations", 0) for r in ledgers.get("build", [])),
+        "refused": len(ledgers.get("refused", [])), "pointers": total_ptrs,
+        "pointers_resolved": resolved, "failed_retried": len(retried),
+        "store_provenance": store_check,
+        "partial_coverage": len(ledgers.get("coverage", [])),
+        "ledgers_found": sorted(ledgers),
+    }
+    if store is not None:
+        try:
+            counts["store_totals"] = store.counts()
+        except Exception:                                            # noqa: BLE001
+            pass
+    return {"ok": not problems, "problems": problems, "counts": counts, "checked_at": now_iso()}
+
+
+__all__ = ["run_ingest", "verify_run", "list_runs", "RunReport", "PlanNotApproved",
+           "NotAnIngestConnection", "RunInProgress", "ResumeRefused", "run_dir_for",
+           "close_removed_item", "Timings", "DEFAULT_CONCURRENCY",
+           "load_state", "state_path", "source_dir", "LEDGERS", "CHECKPOINT_ITEMS",
+           "CHECKPOINT_SECONDS"]

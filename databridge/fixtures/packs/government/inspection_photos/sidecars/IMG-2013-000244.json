@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000244",
+  "filename": "IMG-2013-000244.jpg",
+  "image_present": false,
+  "captured_at": "2013-12-18T10:58:45+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2013-000146",
+  "application_id": "APP-2013-000210",
+  "parcel_id": "PCL-KF-02152",
+  "photo_batch_ref": "PHB-2013-000146",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-137312"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 442245,
+    "northing": 1184408,
+    "accuracy_m": 10.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1189,
+          120,
+          286,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-6l1643",
+        "confidence": 0.945,
+        "bbox": [
+          1122,
+          236,
+          621,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "86 WINDLASS YARD, KELDER FLATS AM8 6NF",
+        "confidence": 0.923,
+        "bbox": [
+          900,
+          376,
+          1064,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-12-18",
+        "confidence": 0.881,
+        "bbox": [
+          603,
+          516,
+          783,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.977,
+        "bbox": [
+          1136,
+          604,
+          512,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

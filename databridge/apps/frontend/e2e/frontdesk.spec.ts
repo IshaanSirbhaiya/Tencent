@@ -35,7 +35,7 @@ const RUN = `${Date.now()}`;
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.sessionStorage.setItem(
-      "parkway.staff.session.v1",
+      "walnut.staff.session.v1",
       JSON.stringify({
         staffId: "PS-FD-014",
         name: "Nurul Aisyah",

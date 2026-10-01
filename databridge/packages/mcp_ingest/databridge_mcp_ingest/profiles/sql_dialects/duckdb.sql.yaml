@@ -1,0 +1,86 @@
+# DuckDB dialect template (W4). Shape: tabular/dialect_draft.py (TEMPLATE_KEYS / RESULT_COLUMNS).
+name: duckdb
+engine: duckdb
+title: DuckDB
+status: engine_tested
+verified: >-
+  2026-10-01 (W4) — every catalogue query probed against the real duckdb engine (1.5.x) through a
+  JSON query tool (tests/test_w4_dialects.py). No DuckDB/MotherDuck MCP server was run live, so
+  its row output format is unverified (rows: auto — JSON or Python repr).
+detect:
+  priority: 5
+  tool_hints: [query]
+  probes:
+    - {sql: "SELECT version() AS v", match: '^v\d+\.\d+'}
+mcp:
+  rows: auto
+  error_prefixes: ["Error:"]
+# R-022 f1 #4: engine functions (beyond the generic allow-list in dialect_draft.py) that these
+# statements call. Each is a pure READ; a function not listed here is refused before any probe.
+read_functions: [duckdb_constraints, duckdb_tables]
+quote: '"'
+list_tables: >-
+  SELECT table_schema, table_name FROM information_schema.tables
+  WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('information_schema', 'pg_catalog')
+  ORDER BY table_schema, table_name
+describe: >-
+  SELECT column_name, data_type FROM information_schema.columns
+  WHERE table_schema = {schema|literal} AND table_name = {table|literal} ORDER BY ordinal_position
+# duckdb_constraints(): a parallel UNNEST zips the local and referenced column lists (a PK's
+# referenced list is empty, so ref_column pads NULL).
+keys: >-
+  SELECT UNNEST(constraint_column_names) AS column_name, constraint_type,
+         CASE WHEN constraint_type = 'FOREIGN KEY' THEN schema_name END AS ref_schema,
+         referenced_table AS ref_table, UNNEST(referenced_column_names) AS ref_column
+  FROM duckdb_constraints()
+  WHERE schema_name = {schema|literal} AND table_name = {table|literal}
+    AND constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+  ORDER BY constraint_type DESC
+keys_alternatives:
+  - name: information_schema
+    note: the SQL-standard views (DuckDB fills them from the same catalogue)
+    sql: >-
+      SELECT kcu.column_name AS column_name, tc.constraint_type AS constraint_type,
+             ccu.table_schema AS ref_schema, ccu.table_name AS ref_table,
+             ccu.column_name AS ref_column
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu
+        ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+       AND tc.table_name = kcu.table_name
+      LEFT JOIN information_schema.constraint_column_usage ccu
+        ON ccu.constraint_name = tc.constraint_name
+       AND ccu.constraint_schema = tc.constraint_schema AND tc.constraint_type = 'FOREIGN KEY'
+      WHERE tc.table_schema = {schema|literal} AND tc.table_name = {table|literal}
+        AND tc.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+row_estimate: >-
+  SELECT estimated_size AS n FROM duckdb_tables()
+  WHERE schema_name = {schema|literal} AND table_name = {table|literal}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int} OFFSET {offset|int}
+column_stats: >-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         COUNT(DISTINCT CAST({column|ident} AS VARCHAR)) AS distinct_n,
+         AVG(LENGTH(CAST({column|ident} AS VARCHAR))) AS avg_len,
+         MAX(LENGTH(CAST({column|ident} AS VARCHAR))) AS max_len,
+         AVG(LENGTH(CAST({column|ident} AS VARCHAR))
+             - LENGTH(REPLACE(CAST({column|ident} AS VARCHAR), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+table_stats: >-
+  SELECT COUNT(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT({column|ident}) AS {p}_non_null,
+  COUNT(DISTINCT CAST({column|ident} AS VARCHAR)) AS {p}_distinct_n,
+  AVG(LENGTH(CAST({column|ident} AS VARCHAR))) AS {p}_avg_len,
+  MAX(LENGTH(CAST({column|ident} AS VARCHAR))) AS {p}_max_len,
+  AVG(LENGTH(CAST({column|ident} AS VARCHAR)) - LENGTH(REPLACE(CAST({column|ident} AS VARCHAR), ' ', ''))) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}

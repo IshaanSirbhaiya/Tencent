@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { X } from "lucide-react";
 import { brainApi } from "@/lib/brain-api";
 import { nodeStyle } from "@/lib/brain-layout";
+import { useNouns } from "@/lib/pack-context";
 import type { NodeDetail, NodeKind } from "@/lib/brain-types";
 import type { SourcePointer } from "@/lib/types";
 
@@ -25,7 +26,7 @@ function sourceLine(p: SourcePointer): string {
   return `> ${mdEsc(p.source_id)} · ${loc}`;
 }
 
-function buildMarkdown(d: NodeDetail): string {
+function buildMarkdown(d: NodeDetail, subjectNoun: string): string {
   const a = d.node.attrs as Record<string, unknown>;
   const meta: string[] = [];
   if (a.role) meta.push(`**Role:** ${mdEsc(String(a.role))}  `);
@@ -40,12 +41,12 @@ function buildMarkdown(d: NodeDetail): string {
   const link = (label: string, id: string) => `[${mdEsc(label)}](${WIKI}${encodeURIComponent(id)})`;
 
   const parts = [`## ${mdEsc(d.node.label)}`, meta.join("\n")];
-  // Candidate patients this DOCUMENT names. The heading and the caveat line are not decoration:
+  // Candidate subjects this DOCUMENT names. The heading and the caveat line are not decoration:
   // this panel is what a staff member reads before they look at the person in front of them, and
   // a bare list of names here reads as an answer to "who is this?" (CLAUDE.md §Hard constraints 1).
   if (d.claims?.length) {
     parts.push(
-      "## Claimed patient — NOT verified\n" +
+      `## Claimed ${subjectNoun} — NOT verified\n` +
         "_Identity is verified in person by staff. These are registry candidates only._\n\n" +
         d.claims
           .map((x) => {
@@ -94,6 +95,7 @@ export function MarkdownPanel({
     enabled: !!nodeId,
   });
   const open = !!nodeId;
+  const nouns = useNouns();
   const panelRef = React.useRef<HTMLElement>(null);
 
   React.useEffect(() => {
@@ -109,7 +111,7 @@ export function MarkdownPanel({
   const color = nodeStyle(kind).color;
   // Fall back to the client-built summary only while the sheet is in flight or unavailable, so a
   // slow request shows the old view rather than an empty panel.
-  const md = sheet && !sheet.refusal ? sheet.markdown : buildMarkdown(data);
+  const md = sheet && !sheet.refusal ? sheet.markdown : buildMarkdown(data, nouns.subject);
 
   const Wikilink = ({ href, children }: { href?: string; children?: React.ReactNode }) => {
     if (href?.startsWith(WIKI)) {
@@ -119,7 +121,7 @@ export function MarkdownPanel({
         <button
           onClick={() => onNavigate(id)}
           aria-label={`Open note: ${text}`}
-          className="font-mono text-[#7eb6ff] underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+          className="font-mono text-accent underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
         >
           [[{children}]]
         </button>
@@ -135,34 +137,38 @@ export function MarkdownPanel({
       aria-label={`${data.node.label} note`}
       tabIndex={-1}
       className="fixed right-4 top-16 z-40 flex max-h-[78vh] w-[380px] flex-col overflow-hidden rounded-lg border shadow-2xl outline-none"
-      style={{ background: "#1a1a1a", borderColor: "#2a2a2a", animation: "count-in 160ms ease-out" }}
+      style={{
+        background: "hsl(var(--surface))",
+        borderColor: "hsl(var(--border))",
+        animation: "count-in 160ms ease-out",
+      }}
     >
-      <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "#2a2a2a" }}>
+      <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "hsl(var(--border))" }}>
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
-          <span className="text-2xs uppercase tracking-wide text-white/50">{nodeStyle(kind).label}</span>
+          <span className="text-2xs uppercase tracking-wide text-subtle">{nodeStyle(kind).label}</span>
         </div>
-        <button onClick={onClose} aria-label="Close" className="rounded text-white/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30">
+        <button onClick={onClose} aria-label="Close" className="rounded text-subtle hover:text-fg focus:outline-none focus:ring-2 focus:ring-accent/40">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="obsidian-md overflow-y-auto px-4 py-3 text-sm text-white/85">
+      <div className="obsidian-md overflow-y-auto px-4 py-3 text-sm text-fg">
         <ReactMarkdown
           components={{
             a: Wikilink as never,
-            h2: ({ children }) => <h2 className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-white/45 first:mt-0">{children}</h2>,
+            h2: ({ children }) => <h2 className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-subtle first:mt-0">{children}</h2>,
             p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
             ul: ({ children }) => <ul className="mb-2 space-y-1">{children}</ul>,
             li: ({ children }) => <li className="text-[13px] leading-snug">{children}</li>,
-            strong: ({ children }) => <strong className="font-semibold text-white/95">{children}</strong>,
-            em: ({ children }) => <em className="text-2xs not-italic text-white/40">{children}</em>,
+            strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
+            em: ({ children }) => <em className="text-2xs not-italic text-subtle">{children}</em>,
             blockquote: ({ children }) => (
-              <blockquote className="my-1 border-l-2 pl-2.5 font-mono text-2xs text-white/60" style={{ borderColor: color }}>
+              <blockquote className="my-1 border-l-2 pl-2.5 font-mono text-2xs text-subtle" style={{ borderColor: color }}>
                 {children}
               </blockquote>
             ),
-            hr: () => <hr className="my-2 border-white/10" />,
+            hr: () => <hr className="my-2 border-border" />,
           }}
         >
           {md}

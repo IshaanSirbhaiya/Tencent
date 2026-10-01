@@ -1,0 +1,17 @@
+# Example AdapterAgentSpec (BUILD_PLAN §5.6) for the files source alone. The combined
+# "Larkspur workspace sources" agent (files + DB) is shipped by workstream X in
+# packs/workspace/adapter_agents/; this one is the files half, runnable on its own.
+spec: adapter_agent/v1
+id: larkspur_files_sources
+title: Larkspur files
+created_from: "Keep the Larkspur files folder in the graph, including PDFs and Word documents; check hourly and re-ingest when a file changes"
+connections: [larkspur-files]
+plans: {larkspur-files: approved}
+sync:
+  type: schedule
+  schedule: {cron: "0 * * * *", timezone: "Asia/Singapore"}
+extract: {pack: workspace, prose: true, tabular: false, passages: true}
+screen: {pack: workspace}
+freshness: {max_age_hours: 24}
+propose_ontology_additions: true
+status: draft

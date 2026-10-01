@@ -102,7 +102,7 @@ from .adapters import StaticReadAdapter
 # NOTE: only names, never the `render` function itself — binding `databridge_agent.render` to a
 # function would shadow the submodule of the same name, and a test importing the module would
 # silently get a callable instead.
-from .render import NOTES, UNKNOWN_TOOL_NAME, note_text, public_name
+from .render import UNKNOWN_TOOL_NAME, note_text, public_name
 from .results import ToolResult, ToolRow
 from .sealed import (
     AdapterRefused,
@@ -218,3 +218,13 @@ __all__ = [
     "load_playbooks",
     "playbooks",
 ]
+
+
+def __getattr__(name: str):
+    # `NOTES` is the bound pack's wording (`render.notes()`), read on access rather than frozen at
+    # import — importing this package must not require a pack binding to be resolvable (HC1).
+    if name == "NOTES":
+        from .render import notes
+
+        return notes()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

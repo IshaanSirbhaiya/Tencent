@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000135",
+  "filename": "IMG-2013-000135.jpg",
+  "image_present": false,
+  "captured_at": "2013-09-03T17:44:35+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2013-000554",
+  "application_id": "APP-2013-000695",
+  "parcel_id": "PCL-TF-02599",
+  "photo_batch_ref": "PHB-2013-000554",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-586142"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 431381,
+    "northing": 1208731,
+    "accuracy_m": 14.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2526,
+          120,
+          363,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-338320",
+        "confidence": 0.92,
+        "bbox": [
+          169,
+          219,
+          648,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "28 LAMPLIGHT CRESCENT, SABLE QUAY AM2 1PZ",
+        "confidence": 0.789,
+        "bbox": [
+          1596,
+          374,
+          1230,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-09-03",
+        "confidence": 0.812,
+        "bbox": [
+          1248,
+          465,
+          986,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.944,
+        "bbox": [
+          1149,
+          600,
+          480,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

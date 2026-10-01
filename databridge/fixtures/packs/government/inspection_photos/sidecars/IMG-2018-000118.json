@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2018-000118",
+  "filename": "IMG-2018-000118.jpg",
+  "image_present": false,
+  "captured_at": "2018-10-07T16:58:28+00:00",
+  "captured_by": "OFF-0037",
+  "inspection_id": "INS-2018-000371",
+  "application_id": "APP-2018-000487",
+  "parcel_id": "PCL-TF-00631",
+  "photo_batch_ref": "PHB-2018-000371",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-823811"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 427625,
+    "northing": 1195751,
+    "accuracy_m": 7.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1320,
+          120,
+          330,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2018-059230",
+        "confidence": 0.833,
+        "bbox": [
+          310,
+          218,
+          702,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "4 SALTMARSH ROAD, KELDER FLATS AM1 9KW",
+        "confidence": 0.756,
+        "bbox": [
+          452,
+          316,
+          1292,
+          48
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2018-10-07",
+        "confidence": 0.821,
+        "bbox": [
+          507,
+          435,
+          870,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0037",
+        "confidence": 0.79,
+        "bbox": [
+          241,
+          676,
+          352,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

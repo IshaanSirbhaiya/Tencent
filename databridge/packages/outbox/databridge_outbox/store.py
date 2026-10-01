@@ -40,7 +40,7 @@ import datetime as dt
 import json
 import sqlite3
 import threading
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Protocol, runtime_checkable
 
 from databridge_core import SourcePointer
 
@@ -156,10 +156,27 @@ def _now(at: Optional[dt.datetime] = None) -> str:
     return (at or dt.datetime.now(dt.timezone.utc)).isoformat()
 
 
+@runtime_checkable
+class EmissionSink(Protocol):
+    """Where a filed draft registers itself with the reverse pointer index.
+
+    A `Protocol`, not an import of `databridge_graph` — the same seam `databridge_intake.ledger`
+    uses, for the same reason: this store should not have to grow a dependency on the graph
+    substrate just to log a citation. `ReverseIndex.record_emission` already has exactly this
+    shape, so a real `GraphStore.reverse_index()` satisfies it with no import in either direction;
+    composition happens where the store is constructed.
+    """
+
+    def record_emission(self, kind: str, ref: str, pointers: Iterable[SourcePointer], *,
+                        plan_hash: Optional[str] = None, ledger_bound: bool = False,
+                        emitted_at: Optional[dt.datetime] = None) -> int: ...
+
+
 class OutboxStore:
     """Append-only SQLite store of outbound drafts and what humans decided about them."""
 
-    def __init__(self, path: str = ":memory:") -> None:
+    def __init__(self, path: str = ":memory:", *,
+                emission_sink: Optional[EmissionSink] = None) -> None:
         # Default in-memory, as ``EvidenceLedger`` is, and with the same caveat: nothing survives a
         # restart and multiple workers would each hold their own. Pass a file path for anything
         # durable — and for the dispatcher, which is a DIFFERENT PROCESS and therefore cannot see
@@ -170,6 +187,10 @@ class OutboxStore:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.commit()
+        # `None` by default: every existing caller (the dispatcher, the gateway route) keeps
+        # working unchanged. Wired in, every filed draft becomes discoverable through the reverse
+        # index's `impact_of` — see `record_draft` below.
+        self._emission_sink = emission_sink
 
     # -- reads --------------------------------------------------------------------
     def _rows(self, draft_id: Optional[str] = None) -> list[sqlite3.Row]:
@@ -295,6 +316,25 @@ class OutboxStore:
                 # name people, and those are the two fields ``refuse_machine_actor`` guards.
                 "recorded_by": f"monitor:{draft.playbook_id}",
             })
+            # Registered as the last step of the SAME `with self._lock, self.conn:` block the
+            # insert above runs in, exactly as `EvidenceLedger.commit` does and for the same
+            # reason: a sink failure raises before this block commits, which rolls the insert back
+            # with it, so a draft can never exist un-registered. It is not a single transaction
+            # spanning the outbox's database and the graph's — two independent SQLite connections
+            # cannot share one — but it is the strongest ordering available short of that: the sink
+            # is called synchronously, in-process, before the outbox's own commit, and nothing runs
+            # after it that could still fail.
+            #
+            # Every citation `pointers_of()` would return for this draft once it is an
+            # `OutboxEntry` — the recipient's provenance AND every `because` pointer — registers
+            # here, not only the recipient: `because` is this draft's whole justification, and a
+            # fan-out that dropped it would make the drift cascade blind to the draft citing a
+            # value that has since changed for any reason other than who it was addressed to.
+            if self._emission_sink is not None:
+                self._emission_sink.record_emission(
+                    kind="outbox_draft", ref=draft.draft_id,
+                    pointers=(draft.recipient.pointer, *draft.because),
+                    ledger_bound=False, emitted_at=draft.created_at)
         entry = self.current(draft.draft_id)
         assert entry is not None and entry.rowid == rowid
         return entry
@@ -372,7 +412,7 @@ class OutboxStore:
             if not live.is_dispatchable:
                 raise NotApproved(
                     f"record_sent REFUSED: draft {draft_id!r} is {live.status!r} and "
-                    f"approved_by={live.approved_by!r}. Nothing leaves this clinic without a named "
+                    f"approved_by={live.approved_by!r}. Nothing leaves this system without a named "
                     f"human approving it (CLAUDE.md §Hard constraints 4).")
             if not (message_id or "").strip():
                 raise OutboxError(

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000418",
+  "filename": "IMG-2020-000418.jpg",
+  "image_present": false,
+  "captured_at": "2020-06-06T13:30:24+00:00",
+  "captured_by": "OFF-0037",
+  "inspection_id": "INS-2020-000624",
+  "application_id": "APP-2019-000767",
+  "parcel_id": "PCL-XX-92534",
+  "photo_batch_ref": "PHB-2020-000624",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-455182"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 434448,
+    "northing": 1183194,
+    "accuracy_m": 8.6
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          689,
+          120,
+          341,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-114468",
+        "confidence": 0.871,
+        "bbox": [
+          301,
+          261,
+          756,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "185 SALTMARSH ROAD, CORRISBECK AM2 5QZ",
+        "confidence": 0.908,
+        "bbox": [
+          645,
+          312,
+          874,
+          79
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-06-06",
+        "confidence": 0.709,
+        "bbox": [
+          1007,
+          513,
+          957,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0037",
+        "confidence": 0.774,
+        "bbox": [
+          683,
+          524,
+          496,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,224 @@
+# infra/mcp_servers.yaml — the MCP servers the workspace demo connects to, declared (P5: sources are
+# declared, not discovered). Transport-neutral: each server says HOW to launch it directly (stdio
+# on this machine) and how to register it into MCPJungle (stdio inside the mcpjungle container,
+# reached over one HTTP gateway). The ingest package picks one route per run.
+#
+# ─── SHAPE (version 1) ──────────────────────────────────────────────────────────────────────────
+#   version: 1
+#   # Versions are PINNED (S4, 2026-10-01): unpinned `npx -y` drifted between the host cache and the
+# MCPJungle container, so the two routes ran different server versions. postgres-mcp is not yet
+# pinned (its verified version was not recorded) - pin it when S2 reports one.
+# MCPJungle registrations default to session_mode: stateful (jungle.DEFAULT_SESSION_MODE).
+servers:
+#     - id: <snake_case>              stable source id; also the MCPJungle server name
+#       title / description: <text>
+#       source_class: files | database | drive      what the crawl planner should expect
+#       trust: untrusted | trusted    per-source default for every field it returns (a third-party
+#                                     field stays untrusted until a named human justifies it)
+#       package: {registry: npm|pypi, name, verified: <date + how>}
+#       direct:                       launch it yourself, stdio, on the host
+#         transport: stdio
+#         command: <exe>
+#         args: [..]
+#         env: {KEY: value}           values may use ${VAR} / ${VAR:-default}; the consumer
+#                                     expands them from the process environment at connect time
+#       mcpjungle:                    the POST /api/v0/servers body (paths are CONTAINER paths)
+#         transport: stdio | streamable_http
+#         command / args / env        (stdio) — or url: (streamable_http)
+#       scope:                        what collection may read (anything else is recorded, not read)
+#         roots: [..]                 folder roots / schemas / Drive folder ids
+#         include_extensions: [..]
+#         max_bytes: <int>
+#       tools_hint:                   the tools the planner should reach for first (rules first,
+#                                     model second — P16); the tool LIST is still read live
+#       setup: <doc path>             human steps before first use
+#
+# Placeholders: ${WALNUT_ROOT} is the databridge/ directory (start-walnut-kg.ps1 sets it).
+# Tool names through MCPJungle are "<id>__<tool>" and POST /api/v0/tools/invoke takes a FLAT body:
+#   {"name": "workspace_files__list_directory", "path": "/data/workspace_demo/files"}
+# (verified 2026-10-01 — arguments nested under "input"/"arguments" fail validation.)
+
+version: 1
+
+servers:
+  - id: workspace_files
+    title: Larkspur demo files
+    description: The synthetic document corpus (md, txt, pdf, docx) under fixtures/workspace_demo/files.
+    source_class: files
+    trust: untrusted
+    package:
+      registry: npm
+      name: "@modelcontextprotocol/server-filesystem"
+      verified: "2026-10-01 — npm view → 2026.8.31; registered into MCPJungle; list_directory on 'Q3 #roadmap' returned roadmap.md; write_file refused (EROFS, read-only mount)"
+    direct:
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "${WALNUT_ROOT}/fixtures/workspace_demo/files"]
+      env: {}
+    mcpjungle:
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "/data/workspace_demo/files"]
+    scope:
+      roots: ["."]
+      include_extensions: [".md", ".txt", ".pdf", ".docx", ".pptx", ".xlsx", ".eml"]
+      max_bytes: 26214400
+    tools_hint:
+      enumerate: directory_tree        # or list_directory per folder
+      read_text: read_text_file
+      read_binary: read_media_file     # base64 bytes → capture store → docling
+      stat: get_file_info
+    notes: >
+      The server also exposes write tools (write_file, edit_file, move_file, create_directory).
+      The ingest client must never call them; the MCPJungle mount is read-only as a backstop, the
+      direct route is not — deny them by name in the client.
+      KNOWN LIMIT (measured 2026-10-01, S1): read_media_file returns -32602 for PDF/DOCX and the
+      server has no resources capability, so it cannot deliver document bytes. Use larkspur-files
+      (below) for the full corpus; this entry stays for text-only folders and as a comparison.
+
+  # --- S1 (2026-10-01): Walnut's own filesystem MCP server — original bytes, read-only ------------
+  - id: larkspur-files
+    title: Larkspur demo files (original bytes)
+    source_class: files
+    trust: untrusted
+    package: {registry: local, name: walnut-files-blob, verified: "2026-10-01 — tests/test_s1_integration_files.py (15/15 screen decisions, 47/47 pointers resolve)"}
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--root", "${WALNUT_ROOT}/fixtures/workspace_demo/files"]
+    mcpjungle:   # UNTESTED: needs mount ${WALNUT_ROOT}/packages/mcp_ingest/servers -> /walnut/servers:ro
+      transport: stdio
+      command: uv
+      args: ["run", "--no-project", "--with", "mcp>=1.20,<2", "python", "/walnut/servers/files_blob/server.py", "--root", "/data/workspace_demo/files"]
+    scope: {roots: ["."], include_extensions: [".md", ".txt", ".pdf", ".docx", ".pptx", ".xlsx", ".eml"], max_bytes: 26214400}
+    tools_hint: {enumerate: list_dir, read_binary: read_bytes, stat: stat_file}
+
+  - id: larkspur-followups
+    title: Larkspur Follow-ups (write, create-only)
+    description: Write connection for read-write agents; agents use source.write:larkspur-followups:write_file.
+    source_class: files
+    trust: untrusted
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--write-root", "${WALNUT_ROOT}/var/workspace_demo/Follow-ups", "--create-write-root", "--write-ext", ".md", "--write-ext", ".txt"]
+    tools_hint: {write: write_file}
+
+  - id: larkspur_db
+    title: Larkspur CRM / billing database
+    description: Synthetic Postgres (customers, contacts, projects, invoices, employees, contact_notes).
+    source_class: database
+    aliases: [crm]                 # what people call it in English (EF4: "the CRM" -> larkspur_db)
+    trust: untrusted
+    package:
+      registry: pypi
+      name: postgres-mcp
+      verified: >-
+        2026-10-01 — `uvx postgres-mcp --help` FAILS with the current mcp 2.x SDK
+        (No module named 'mcp.server.fastmcp'); `uvx --with "mcp<2" postgres-mcp --help` works.
+        Registered into MCPJungle; execute_sql returned the 3 invoices; `delete from invoices`
+        refused in restricted mode. (@modelcontextprotocol/server-postgres is DEPRECATED on npm.)
+    direct:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=restricted"]
+      env:
+        DATABASE_URI: "postgresql://walnut_reader:${WALNUT_DEMO_PG_READER_PASSWORD}@127.0.0.1:${WALNUT_DEMO_PG_PORT:-5433}/larkspur"
+    mcpjungle:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=restricted"]
+      env:
+        DATABASE_URI: "postgresql://walnut_reader:${WALNUT_DEMO_PG_READER_PASSWORD}@walnut_demo_pg:5432/larkspur"
+    scope:
+      roots: ["public"]
+    tools_hint:
+      enumerate: list_objects          # {"schema_name": "public", "object_type": "table"}
+      describe: get_object_details
+      query: execute_sql               # read-only in restricted mode
+    notes: >
+      Read-only twice over: restricted access mode AND the walnut_reader role (SELECT only).
+      Results come back as a Python-repr string of rows (Decimal(...)), not JSON — parse accordingly.
+
+  - id: google_drive
+    title: Google Drive (your own account)
+    description: A Drive folder holding a copy of the synthetic corpus. Needs one-time OAuth setup.
+    source_class: drive
+    trust: untrusted
+    package:
+      registry: npm
+      name: "@piotr-agier/google-drive-mcp"
+      verified: >-
+        2026-10-01 — live tools/list of 2.12.0 recorded without credentials (130 tools, 35
+        readOnlyHint); handlers read from its dist; crawl profile google-drive-mcp (S3), activated
+        by P after the core extension. NOT exercised end to end: needs a Google account.
+        (@modelcontextprotocol/server-gdrive is DEPRECATED on npm.)
+    direct:
+      transport: stdio
+      command: npx
+      args: ["-y", "@piotr-agier/google-drive-mcp@2.12.0"]
+      env:
+        GOOGLE_DRIVE_OAUTH_CREDENTIALS: "${WALNUT_ROOT}/var/secrets/gdrive/gcp-oauth.keys.json"
+        GOOGLE_DRIVE_MCP_TOKEN_PATH: "${WALNUT_ROOT}/var/secrets/gdrive/tokens.json"
+        GOOGLE_DRIVE_MCP_SCOPES: "drive.readonly"
+        # The OAuth callback defaults to ports 3000-3004 — 3000 is Walnut's frontend. Move it.
+        GOOGLE_DRIVE_MCP_AUTH_PORT: "3100"
+    mcpjungle:
+      transport: stdio
+      command: npx
+      args: ["-y", "@piotr-agier/google-drive-mcp@2.12.0"]
+      env:
+        GOOGLE_DRIVE_OAUTH_CREDENTIALS: /secrets/gdrive/gcp-oauth.keys.json
+        GOOGLE_DRIVE_MCP_TOKEN_PATH: /secrets/gdrive/tokens.json
+        GOOGLE_DRIVE_MCP_SCOPES: drive.readonly
+    scope:
+      roots: ["${WALNUT_GDRIVE_FOLDER_ID}"]   # the Drive folder id from its URL; expanded at run
+                                               # time and BINDING (never lists outside it) — P
+      include_extensions: [".md", ".txt", ".csv", ".pdf", ".docx", ".pptx", ".xlsx"]
+      max_bytes: 26214400
+    tools_hint:
+      enumerate: "search rawQuery \"'<folder>' in parents\" (paged)"
+      read: "resources/read gdrive:///<id>  (Docs→Markdown, Sheets→CSV first tab, Slides→text, other files→bytes)"
+    setup: docs/GOOGLE_DRIVE_SETUP.md
+    notes: >
+      Sign in ONCE on the host (`npx -y @piotr-agier/google-drive-mcp auth` with the env above);
+      tokens.json lands in var/secrets/gdrive, which the MCPJungle container mounts — the browser
+      sign-in cannot happen inside the container.
+
+  # --- S2 (2026-10-01): agent WRITE connection. purpose: agent_write => ingestion refuses it
+  # (P). Role walnut_agent_writer applied to the demo DB 2026-10-01: INSERT on
+  # public.follow_up_tasks only (verified via information_schema.role_table_grants).
+  - id: larkspur_db_writer
+    title: Larkspur CRM — agent write (follow-up tasks only)
+    description: INSERT-only access to public.follow_up_tasks for read-write agents. Never ingested.
+    source_class: database
+    purpose: agent_write
+    writes_for: [larkspur_db]      # the ingest connection whose data this writer changes (R-017-t03)
+    trust: untrusted
+    package:
+      registry: pypi
+      name: postgres-mcp
+      verified: >-
+        2026-10-01 — scratch schema test (tests/test_s2_integration.py): INSERT through execute_sql
+        succeeds; SELECT/DELETE/UPDATE on the same table and SELECT on invoices are refused by the
+        role.
+    direct:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=unrestricted"]
+      env:
+        DATABASE_URI: "postgresql://walnut_agent_writer:${WALNUT_DEMO_PG_WRITER_PASSWORD}@127.0.0.1:${WALNUT_DEMO_PG_PORT:-5433}/larkspur"
+    mcpjungle:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=unrestricted"]
+      env:
+        DATABASE_URI: "postgresql://walnut_agent_writer:${WALNUT_DEMO_PG_WRITER_PASSWORD}@walnut_demo_pg:5432/larkspur"
+    scope:
+      roots: []
+    tools_hint:
+      write: execute_sql            # one INSERT INTO public.follow_up_tasks (...) per approved action
+    notes: >
+      Declared as an ACTION tool only (automation_mode human_required in the overdue-invoice
+      example). The ingest connection larkspur_db re-reads follow_up_tasks on its next sync
+      (walnut_reader has SELECT on it), closing the loop.

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000349",
+  "filename": "IMG-2020-000349.jpg",
+  "image_present": false,
+  "captured_at": "2020-02-10T11:16:51+00:00",
+  "captured_by": "OFF-0031",
+  "inspection_id": "INS-2020-000022",
+  "application_id": "APP-2019-000026",
+  "parcel_id": "PCL-MB-00494",
+  "photo_batch_ref": "PHB-2020-000022",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-556374"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 433489,
+    "northing": 1207054,
+    "accuracy_m": 14.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          295,
+          120,
+          341,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-284290",
+        "confidence": 0.821,
+        "bbox": [
+          70,
+          218,
+          648,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "209C PELLET TERRACE, MIRE8ROOK AM8 6VP",
+        "confidence": 0.869,
+        "bbox": [
+          128,
+          318,
+          1064,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE 0F INSPECTION 2020-02-10",
+        "confidence": 0.715,
+        "bbox": [
+          777,
+          543,
+          638,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0031",
+        "confidence": 0.956,
+        "bbox": [
+          1595,
+          700,
+          432,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

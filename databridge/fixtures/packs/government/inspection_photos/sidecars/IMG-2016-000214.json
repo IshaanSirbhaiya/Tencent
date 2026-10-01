@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2016-000214",
+  "filename": "IMG-2016-000214.jpg",
+  "image_present": false,
+  "captured_at": "2016-08-25T17:26:23+00:00",
+  "captured_by": "OFF-0037",
+  "inspection_id": "INS-2016-000397",
+  "application_id": "APP-2015-000526",
+  "parcel_id": "PCL-CB-01019",
+  "photo_batch_ref": "PHB-2016-000397",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-763638"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 410454,
+    "northing": 1214031,
+    "accuracy_m": 10.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          429,
+          120,
+          308,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2016-585477",
+        "confidence": 0.807,
+        "bbox": [
+          81,
+          244,
+          783,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "132 PELLET CLOSE, CORRISBECK AM7 4ZP",
+        "confidence": 0.805,
+        "bbox": [
+          62,
+          418,
+          828,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2016-08-25",
+        "confidence": 0.812,
+        "bbox": [
+          1834,
+          546,
+          870,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0037",
+        "confidence": 0.966,
+        "bbox": [
+          440,
+          592,
+          416,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

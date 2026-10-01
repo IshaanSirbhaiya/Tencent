@@ -53,7 +53,10 @@ from .monitors import (
 # accessor over the SUBMODULE of the same name, so `databridge_outbox.monitors` would stop being
 # the module and `import databridge_outbox.monitors as m` would silently hand back a function.
 # (`packages/intake` has the same `rules.py`/`rules()` shape and the same trap.)
-from .monitors import monitors as clinic_monitors
+from .monitors import monitors as pack_monitors
+
+#: The pre-HC1 name, kept so existing imports keep working. Reads the BOUND pack's table.
+clinic_monitors = pack_monitors
 from .store import (
     ALLOWED_NEXT,
     DuplicateDraft,
@@ -114,6 +117,7 @@ __all__ = [
     "build_outbound_draft",
     "draft_id_for",
     "clinic_monitors",
+    "pack_monitors",
     "load_monitors",
     "monitors_path",
     "recipient_from_committed_ledger",

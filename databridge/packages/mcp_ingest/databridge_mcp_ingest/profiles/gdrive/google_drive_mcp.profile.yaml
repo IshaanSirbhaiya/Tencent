@@ -1,0 +1,130 @@
+# @piotr-agier/google-drive-mcp (2.12.0) — one DECLARED Drive folder, read-only.
+#
+# STATUS: DORMANT. This profile uses four crawl-profile fields the engine does not have yet
+# (`list.page`, `list.uri`, `list.meta_fields`, `read.resource_uri`). The strict profile schema
+# would refuse it — and a malformed profile makes the loader refuse EVERY profile — so it is named
+# `.pending`, which the loader (`*.profile.yaml`) does not see. Activate: apply the S3 core
+# extension (tests/fixtures/gdrive/core_extension.patch — or apply_core_extension.py beside it
+# if the core has moved since) and rename this file to
+# `google_drive_mcp.profile.yaml`. tests/test_s3_gdrive_profile.py runs the whole crawl against it
+# once the extension is present (and skips, saying why, until then).
+#
+# How this server was read (2026-10-01, no Google account):
+#   * `tools/list` of the real server over stdio — it answers without credentials (130 tools; the
+#     35 read tools carry readOnlyHint: true, the 95 others no annotation). Recorded verbatim in
+#     tests/fixtures/gdrive/tools_list.2.12.0.json.
+#   * output formats from the handlers in the package's dist/index.js (npm pack 2.12.0):
+#       search(query, rawQuery, pageSize<=100, pageToken, orderBy) ->
+#         "Found N files (ordered by name):\n"
+#         "<name> (<mimeType>) [id: <id>, path: <parent folder path>] [created: <t>, modified: <t>]"
+#         ... then, only when there is a next page:
+#         "\n\nMore results available. Use pageToken: <token>\nPass orderBy: name again ..."
+#       listFolder prints only "📁|📄 <name> (ID: <id>)" — no mime, no modified time — so the crawl
+#       lists with `search` (a raw parent query) instead.
+#       resources/read gdrive:///<id> -> Google Docs exported as text/markdown, Sheets text/csv
+#       (FIRST sheet only — a Drive export limit), Slides text/plain, Drawings image/png; text/*
+#       and application/json as text; every other file as base64 BYTES (PDF, DOCX, ...). It is the
+#       only read path that returns bytes: `downloadFile` writes to the SERVER's disk and is not
+#       read-only (the server marks it so), and readTextFile/readGoogleDoc each read one kind.
+#
+# Design:
+#   * scope: `scope.roots` = Drive folder ids (from the folder's URL). Nothing is listed without
+#     one — there is no default root, so an undeclared connection cannot sweep a whole Drive (P5).
+#     `root` (Drive's alias for My Drive) is accepted when a person declares it on purpose.
+#   * listing: `search` with rawQuery "'<folder>' in parents", 100 per page, ordered by name,
+#     recursing into folders; every page is followed (a repeated token or a runaway listing is an
+#     error, never a silent cut — trap 1).
+#   * identity (P4): gdrive:///<declared root id>/<folder path>/<name>?id=<file id>. Drive allows
+#     two files with one name in one folder; the file id keeps them apart, the path keeps a
+#     citation readable and tied to where the file was when it was read.
+#   * types: a native Google type is scoped and extracted as the type it is EXPORTED as (the mime
+#     rewrites below), and its native mime, Drive path and created/modified times travel on the
+#     item (`meta_fields` -> inventory + capture meta `attrs`). Types with no export an extractor
+#     reads (Forms, Sites, shortcuts, ...) keep their native mime and are recorded as excluded.
+#   * change detection: modifiedTime is recorded per item; what DECIDES "changed" is the content
+#     hash of the captured bytes (P10 — key on content, never on an id or a timestamp).
+#   * read-only, three times over: the plan names exactly one tool (`search`, readOnlyHint: true)
+#     plus resources/read; `match.deny_tools` lists every tool the server does NOT label read-only
+#     (95 in 2.12.0 — camelCase names such as `createFolder` slip past a verb pattern, and
+#     `downloadFile` writes to the server's own disk), refused by plan validation and by the
+#     read-only client; and the OAuth grant itself is drive.readonly (GOOGLE_DRIVE_MCP_SCOPES).
+#   * route: DIRECT (stdio) is the tested route. A route whose client cannot read resources gets a
+#     plan with a problem (not approvable). MCPJungle's resource proxy is not yet exercised with
+#     this server.
+#   * known limit: `search` lists with corpora=allDrives; Google may then return a partial page
+#     (incompleteSearch) for accounts with very many shared drives, and this server does not
+#     report it. Use a folder in My Drive (as the setup guide does).
+id: google-drive-mcp
+title: Google Drive (@piotr-agier/google-drive-mcp)
+description: >-
+  One or more declared Drive folders, recursively: Google Docs/Sheets/Slides exported to
+  Markdown/CSV/text, every other file read as bytes, identity = folder path + file id.
+group: gdrive
+priority: 20
+verified: >-
+  2026-10-01: tool names + input schemas from a live tools/list of 2.12.0 (no credentials);
+  search/resources output formats from dist/index.js 2.12.0; exercised end to end against the
+  recorded fake (tests/fixtures/gdrive). NOT yet run against a signed-in Drive.
+match:
+  all_tools: [search, listFolder, readGoogleDoc]
+  # every tool 2.12.0 does not annotate readOnlyHint: true (from its live tools/list;
+  # tests/test_s3_gdrive_profile.py re-derives the list from the recording and compares)
+  deny_tools: [
+      addComment, addDataValidation, addDimensionGroup, addDocumentTab,
+      addGoogleSheetConditionalFormat, addNamedRange, addPermission, addSheet,
+      addSpreadsheetSheet, appendSpreadsheetRows, applyParagraphStyle, applyTextStyle,
+      autoResizeColumns, autoResizeRows, batchUpdateGoogleSheetValues, bulkConvertFolderPdfs,
+      convertPdfToGoogleDoc, copyFile, createCalendarEvent, createDocFromHTML, createFolder,
+      createFootnote, createGoogleDoc, createGoogleSheet, createGoogleSlides,
+      createGoogleSlidesShape, createGoogleSlidesTextBox, createParagraphBullets, createShortcut,
+      createTextFile, deleteCalendarEvent, deleteComment, deleteDimensionGroup,
+      deleteGoogleSlide, deleteItem, deleteRange, deleteSheet, deleteSlideElement, downloadFile,
+      duplicateSlide, editTableCell, findAndReplaceInDoc, formatGoogleDocParagraph,
+      formatGoogleDocText, formatGoogleSheetCells, formatGoogleSheetNumbers,
+      formatGoogleSheetText, formatGoogleSlidesParagraph, formatGoogleSlidesText,
+      hideSheetDimension, insertImageFromUrl, insertLocalImage, insertSlidesImageFromUrl,
+      insertSlidesLocalImage, insertSmartChip, insertTable, insertText, lockFile,
+      manage_accounts, mergeGoogleSheetCells, moveItem, moveSlideElement, protectRange,
+      removePermission, renameDocumentTab, renameItem, renameSheet, reorderSlides,
+      replaceAllTextInSlides, replaceSlideImage, replyToComment, restoreRevision, setColumnWidth,
+      setElementText, setElementZOrder, setGoogleSheetBorders, setGoogleSlidesBackground,
+      setRowHeight, setSlideVisibility, shareFile, showSheetDimension, styleDocTable,
+      styleGoogleSlidesShape, unlockFile, updateCalendarEvent, updateDimensionGroup,
+      updateGoogleDoc, updateGoogleSheet, updateGoogleSheetIfUnchanged, updateGoogleSlides,
+      updateGoogleSlidesSpeakerNotes, updatePermission, updateTextFile, uploadFile,
+      uploadPdfWithSplit]
+step:
+  strategy: documents
+  list:
+    tool: search
+    args:
+      query: "'{id}' in parents"
+      rawQuery: true
+      pageSize: 100
+      orderBy: name
+    recurse: true
+    dir_values: [folder]
+    page:
+      arg: pageToken
+      regex: '^More results available\. Use pageToken: (?P<token>\S+)\s*$'
+    uri: "gdrive:///{root}/{rel}?id={id}"
+    meta_fields: [drive_mime, drive_path, created, modified]
+    parse:
+      mode: lines
+      # One pattern per shape, first match wins. `name` is lazy so a title holding "(...)" still
+      # parses; the header line and the paging lines match nothing and are dropped.
+      patterns:
+        - regex: '^(?P<name>.+?) \((?P<drive_mime>application/vnd\.google-apps\.folder)\) \[id: (?P<id>[A-Za-z0-9_-]+), path: (?P<drive_path>.*?)\] \[created: (?P<created>[^,\]]*), modified: (?P<modified>[^\]]*)\]$'
+          set: {type: folder}
+        - regex: '^(?P<name>.+?) \((?P<drive_mime>application/vnd\.google-apps\.document)\) \[id: (?P<id>[A-Za-z0-9_-]+), path: (?P<drive_path>.*?)\] \[created: (?P<created>[^,\]]*), modified: (?P<modified>[^\]]*)\]$'
+          set: {type: file, mime: text/markdown}
+        - regex: '^(?P<name>.+?) \((?P<drive_mime>application/vnd\.google-apps\.spreadsheet)\) \[id: (?P<id>[A-Za-z0-9_-]+), path: (?P<drive_path>.*?)\] \[created: (?P<created>[^,\]]*), modified: (?P<modified>[^\]]*)\]$'
+          set: {type: file, mime: text/csv}
+        - regex: '^(?P<name>.+?) \((?P<drive_mime>application/vnd\.google-apps\.presentation)\) \[id: (?P<id>[A-Za-z0-9_-]+), path: (?P<drive_path>.*?)\] \[created: (?P<created>[^,\]]*), modified: (?P<modified>[^\]]*)\]$'
+          set: {type: file, mime: text/plain}
+        - regex: '^(?P<name>.+?) \((?P<drive_mime>application/vnd\.google-apps\.drawing)\) \[id: (?P<id>[A-Za-z0-9_-]+), path: (?P<drive_path>.*?)\] \[created: (?P<created>[^,\]]*), modified: (?P<modified>[^\]]*)\]$'
+          set: {type: file, mime: image/png}
+        - regex: '^(?P<name>.+?) \((?P<mime>[^()\s]+/[^()\s]+)\) \[id: (?P<id>[A-Za-z0-9_-]+), path: (?P<drive_path>.*?)\] \[created: (?P<created>[^,\]]*), modified: (?P<modified>[^\]]*)\]$'
+          set: {type: file}
+  read:
+    resource_uri: "gdrive:///{id}"

@@ -95,7 +95,9 @@ def test_the_response_serializes_exactly_these_keys():
     response = _poisoned_answer().public()
     assert set(response.model_dump()) == {
         "question", "answer", "refused", "refusal_code", "requires_human_selection",
-        "values", "unresolved", "notes", "reads", "model_calls"}
+        "values", "unresolved", "notes", "reads", "model_calls",
+        # HC1 (2026-10-01): which planner chose the values, set by the route; a label, not text.
+        "planner"}
 
 
 def test_a_value_serializes_exactly_these_keys():

@@ -13,6 +13,7 @@ import { AlertTriangle, CheckCircle2, Users } from "lucide-react";
 import { intakeApi } from "@/lib/intake-api";
 import type { QueueRow } from "@/lib/intake-types";
 import { cn } from "@/lib/utils";
+import { useNouns } from "@/lib/pack-context";
 
 function IdentityCell({ row }: { row: QueueRow }) {
   if (row.identity_verified) {
@@ -40,6 +41,7 @@ function IdentityCell({ row }: { row: QueueRow }) {
 }
 
 export default function FrontDeskQueuePage() {
+  const nouns = useNouns();
   const q = useQuery({ queryKey: ["intake-queue"], queryFn: intakeApi.queue, refetchInterval: 4000 });
   const rows = q.data?.intakes ?? [];
   // "Still loading" and "nothing to do" are different answers; so is "the gateway is down".
@@ -59,9 +61,12 @@ export default function FrontDeskQueuePage() {
   return (
     <div className="flex flex-col gap-4 p-6">
       <header>
-        <h1 className="text-lg font-semibold">Front desk queue</h1>
+        <h1 className="text-lg font-semibold">
+          {nouns.operator_surface} {nouns.queue.toLowerCase()}
+        </h1>
         <p className="text-xs text-subtle">
-          Patients whose documents have been read. Identity is verified in person at the counter —
+          {nouns.subject_plural_title} whose documents have been read. Identity is verified in
+          person at the counter —
           nothing here is confirmed until a staff member attests to that check.
         </p>
       </header>
@@ -94,7 +99,7 @@ export default function FrontDeskQueuePage() {
         </p>
       ) : rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-xs text-subtle">
-          No intakes yet. Upload a referring document from{" "}
+          No intakes yet. Upload a {nouns.document} from{" "}
           <Link href="/intake" className="text-accent hover:underline">
             /intake
           </Link>
@@ -122,6 +127,16 @@ export default function FrontDeskQueuePage() {
                   >
                     {row.document_id}
                   </Link>
+                  {/* SWEEP #1: a row recalled from the offline sample says so in the queue too —
+                      and so does one whose read was not recorded. Only `false` is a live read. */}
+                  {row.offline_gold !== false && (
+                    <span
+                      data-testid={`queue-read-source-${row.intake_id}`}
+                      className="ml-1.5 rounded bg-band-spot/15 px-1.5 py-0.5 text-2xs font-medium text-band-spot"
+                    >
+                      {row.offline_gold === true ? "offline sample" : "read not recorded"}
+                    </span>
+                  )}
                 </td>
                 <td className="px-2 py-2 text-subtle">{row.document_type.replace(/_/g, " ")}</td>
                 <td className="px-2 py-2">

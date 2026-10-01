@@ -1,0 +1,8 @@
+{
+  "cursor_kind": "monotonic_history_sequence",
+  "header": "X-Walnut-History-Seq",
+  "high_water_mark": 109799,
+  "replay": "forward_only",
+  "note": "A cursor replays forward only. Messages deleted from the mailbox leave no tombstone, so DELETES ARE NOT DETECTABLE on this source; anything ledger-bound must be captured to the Capture Store at read time.",
+  "synthetic": true
+}

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2016-000274",
+  "filename": "IMG-2016-000274.jpg",
+  "image_present": false,
+  "captured_at": "2016-07-02T12:39:56+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2016-000208",
+  "application_id": "APP-2016-000283",
+  "parcel_id": "PCL-IH-02304",
+  "photo_batch_ref": "PHB-2016-000208",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-961314"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 431350,
+    "northing": 1208335,
+    "accuracy_m": 6.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1522,
+          120,
+          286,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-201G-227015",
+        "confidence": 0.831,
+        "bbox": [
+          141,
+          254,
+          702,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "219 VINTNERS WAY, ISK HARBOUR AM4 8VV",
+        "confidence": 0.828,
+        "bbox": [
+          976,
+          338,
+          888,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2016-07-02",
+        "confidence": 0.92,
+        "bbox": [
+          594,
+          492,
+          638,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.798,
+        "bbox": [
+          442,
+          520,
+          416,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000354",
+  "filename": "IMG-2013-000354.jpg",
+  "image_present": false,
+  "captured_at": "2013-06-08T17:45:08+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2013-000458",
+  "application_id": "APP-2012-000590",
+  "parcel_id": "PCL-OH-00977",
+  "photo_batch_ref": "PHB-2013-000458",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-319469"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 441539,
+    "northing": 1191357,
+    "accuracy_m": 6.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2516,
+          120,
+          352,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-815389",
+        "confidence": 0.846,
+        "bbox": [
+          304,
+          241,
+          810,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "85 NETHERFIELD TERRACE, PELLING GREEN AM2 2JP",
+        "confidence": 0.687,
+        "bbox": [
+          1277,
+          320,
+          1125,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-06-08",
+        "confidence": 0.704,
+        "bbox": [
+          730,
+          537,
+          841,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.859,
+        "bbox": [
+          1305,
+          616,
+          400,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

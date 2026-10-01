@@ -56,7 +56,7 @@ test("signing in reaches the app and attests to nothing", async ({ page }) => {
   // The session is who is at the terminal. It must not carry an attestation into storage, because
   // `sessionStorage` survives navigation and would outlive the patient it referred to.
   const stored = await page.evaluate(() =>
-    window.sessionStorage.getItem("parkway.staff.session.v1"),
+    window.sessionStorage.getItem("walnut.staff.session.v1"),
   );
   expect(stored).toBeTruthy();
   const session = JSON.parse(stored as string);
@@ -71,7 +71,7 @@ test("a malformed session is treated as signed out, not as a session with an emp
   // The ledger's `identity_checked_in_person_by` column exists to name an accountable person. A
   // session that restores with a blank or junk staff id would fill it with nothing.
   await page.addInitScript(() => {
-    window.sessionStorage.setItem("parkway.staff.session.v1", JSON.stringify({ staffId: "   " }));
+    window.sessionStorage.setItem("walnut.staff.session.v1", JSON.stringify({ staffId: "   " }));
   });
   await page.goto("/frontdesk");
   await expect(page.getByTestId("staff-sign-in")).toBeVisible();
@@ -83,7 +83,7 @@ test("a session older than the shift does not carry into the next one", async ({
   await page.addInitScript(() => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     window.sessionStorage.setItem(
-      "parkway.staff.session.v1",
+      "walnut.staff.session.v1",
       JSON.stringify({ staffId: "PS-FD-014", name: "Nurul Aisyah", signedInAt: yesterday }),
     );
   });

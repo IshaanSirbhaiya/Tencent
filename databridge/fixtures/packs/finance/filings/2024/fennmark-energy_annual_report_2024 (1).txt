@@ -1,0 +1,52 @@
+ Fennmark Energy Limited
+
+Annual Report for the financial year ended 31 December 2024
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Fennmark Energy Limited
+  Registration number   SYN-CRN-4878544
+  Country of incorporation   AU
+  Principal activity   Electronics
+  Reporting currency   EUR
+  Date of incorporation   2008-09-02
+
+ Directors' commentary
+
+The Board notes continued pressure on freight rates and has renegotiated the Group's principal charter commitments.
+
+ Financial summary
+
+All figures in EUR thousands unless stated.
+
+  Line item   FY2024   FY2023
+------:---:|
+  Revenue   841   756
+  Gross profit   273   294
+  EBITDA   214   231
+  Depreciation and amortisation   -73   -76
+  Finance costs   -10   -9
+  Profit after tax   108   77
+  Total assets   1,729   1,826
+  Total borrowings   756   664
+  Cash and cash equivalents   94   131
+  Total equity   699   723
+
+ Key ratios
+
+  Ratio   FY2024   Covenant reference
+------:---|
+  Net debt / EBITDA   3.09x   Tested quarterly under the syndicated facility
+  Interest cover   14.60x   Tested quarterly
+  Current ratio   0.85x   -
+
+ Banking arrangements
+
+Facilities were renewed during the year on substantially the same terms.
+
+ Auditor's note
+
+The comparative figures for the prior period were restated following a reclassification of contract assets.

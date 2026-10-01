@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2023-000204",
+  "filename": "IMG-2023-000204.jpg",
+  "image_present": false,
+  "captured_at": "2023-09-26T11:57:11+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2023-000327",
+  "application_id": "APP-2023-000426",
+  "parcel_id": "PCL-CB-01943",
+  "photo_batch_ref": "PHB-2023-000327",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-573419"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 413588,
+    "northing": 1184008,
+    "accuracy_m": 4.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1066,
+          120,
+          308,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2023-738794",
+        "confidence": 0.94,
+        "bbox": [
+          1163,
+          268,
+          918,
+          90
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "21 ROPEWALK YARD, PELLING GREEN AM1 8HG",
+        "confidence": 0.901,
+        "bbox": [
+          1007,
+          368,
+          1131,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2023-09-26",
+        "confidence": 0.811,
+        "bbox": [
+          1893,
+          462,
+          841,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.766,
+        "bbox": [
+          1213,
+          584,
+          432,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

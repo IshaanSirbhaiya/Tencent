@@ -1,0 +1,42 @@
+left_gt_person_id,right_gt_person_id,confusion_style,why_it_is_hard
+GT-PER-00211,GT-PER-00396,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00350,GT-PER-00095,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00055,GT-PER-00287,same_household_same_initials,"same surname, same address, same first initial -- indistinguishable once a form records an initial only"
+GT-PER-00176,GT-PER-00147,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00388,GT-PER-00013,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00230,GT-PER-00130,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00221,GT-PER-00405,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00061,GT-PER-00165,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00263,GT-PER-00144,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00024,GT-PER-00285,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00103,GT-PER-00016,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00223,GT-PER-00346,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00033,GT-PER-00252,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00036,GT-PER-00340,same_household_same_initials,"same surname, same address, same first initial -- indistinguishable once a form records an initial only"
+GT-PER-00077,GT-PER-00119,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00053,GT-PER-00517,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00086,GT-PER-00021,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00367,GT-PER-00289,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00300,GT-PER-00128,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00440,GT-PER-00389,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00372,GT-PER-00483,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00365,GT-PER-00290,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00210,GT-PER-00257,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00471,GT-PER-00178,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00234,GT-PER-00008,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00400,GT-PER-00076,same_household_same_initials,"same surname, same address, same first initial -- indistinguishable once a form records an initial only"
+GT-PER-00099,GT-PER-00434,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00511,GT-PER-00032,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00002,GT-PER-00051,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00148,GT-PER-00250,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00209,GT-PER-00469,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00337,GT-PER-00118,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00436,GT-PER-00408,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00406,GT-PER-00249,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00112,GT-PER-00448,same_surname_same_dob,same surname and identical date of birth; different forenames and different resident numbers
+GT-PER-00241,GT-PER-00155,same_household_same_initials,"same surname, same address, same first initial -- indistinguishable once a form records an initial only"
+GT-PER-00202,GT-PER-00214,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00131,GT-PER-00084,same_household_same_initials,"same surname, same address, same first initial -- indistinguishable once a form records an initial only"
+GT-PER-00069,GT-PER-00293,adjacent_resident_number,"resident numbers one digit apart -- looks exactly like the transposition traps, but these are two people"
+GT-PER-00083,GT-PER-00498,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"
+GT-PER-00277,GT-PER-00449,same_name_different_dob,"identical full name, 19-31 years apart -- the classic parent/child collision"

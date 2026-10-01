@@ -1,0 +1,53 @@
+# packs/finance — the closed PURPOSE vocabulary (spine D5, ADAPTER_AGENT_SPEC §2).
+#
+# See packs/healthcare/purposes.yaml for the field meanings. Ids are unique across the enabled
+# packs, so finance namespaces under lending.*, kyc.* and finance.*.
+
+pack: finance
+
+purposes:
+  - id: lending.underwriting
+    description: >
+      Assess a credit application against the lending book, filings and memoranda. The read
+      behind an underwriting recommendation.
+    subject_scoped: true
+    lawful_basis: contract - assessment of a credit application
+
+  - id: lending.covenant_monitoring
+    description: Test outstanding facilities against their covenants on a schedule.
+    subject_scoped: true
+    lawful_basis: contract - performance of the facility agreement
+
+  - id: lending.portfolio_reporting
+    description: >
+      Aggregate exposure reporting. Reads rows to emit aggregates; row-level egress is a separate
+      question the egress class answers, not this purpose.
+    subject_scoped: false
+    lawful_basis: legal obligation - prudential reporting
+
+  - id: kyc.onboarding
+    description: >
+      Assemble the CANDIDATE evidence a human uses to attest a party's identity at onboarding.
+      The attestation is the human's; this purpose covers only the retrieval.
+    subject_scoped: true
+    lawful_basis: legal obligation - AML/CFT customer due diligence
+
+  - id: kyc.screening
+    description: Screen a party against sanctions and restriction lists.
+    subject_scoped: true
+    lawful_basis: legal obligation - AML/CFT sanctions screening
+
+  - id: finance.graph_build
+    description: Scheduled build-time crawl staging evidence into the graph. Not subject-scoped.
+    subject_scoped: false
+    lawful_basis: legitimate interests - operating the record system
+
+  - id: finance.pointer_verification
+    description: Re-resolve an existing pointer to answer "is this citation still good?".
+    subject_scoped: false
+    lawful_basis: legitimate interests - audit and integrity
+
+  - id: finance.source_health
+    description: Metadata-only reads (describe/plan) that touch no subject data.
+    subject_scoped: false
+    lawful_basis: legitimate interests - system operation

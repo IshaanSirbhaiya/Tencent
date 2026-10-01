@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000086",
+  "filename": "IMG-2022-000086.jpg",
+  "image_present": false,
+  "captured_at": "2022-03-11T11:32:41+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2022-000512",
+  "application_id": "APP-2021-000647",
+  "parcel_id": "PCL-VH-02437",
+  "photo_batch_ref": "PHB-2022-000512",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-923572"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 449727,
+    "northing": 1192504,
+    "accuracy_m": 3.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1393,
+          120,
+          352,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-341202",
+        "confidence": 0.908,
+        "bbox": [
+          1535,
+          235,
+          729,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "105 HOLLYBANK PASSAGE, VANTRY HOLLOW AM2 8YV",
+        "confidence": 0.808,
+        "bbox": [
+          586,
+          336,
+          1100,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2022-03-11",
+        "confidence": 0.8,
+        "bbox": [
+          939,
+          519,
+          899,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.874,
+        "bbox": [
+          2030,
+          616,
+          432,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

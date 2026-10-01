@@ -1,0 +1,67 @@
+# packs/healthcare — the read-only agent's WORDING (HC1, 2026-10-01).
+#
+# The agent engine (`packages/agent`) names no domain. This file supplies the sentences that do:
+# the persona, where the data comes from, which identity documents exist, the report headings and
+# the staff-facing notes. Read by `databridge_agent.wording` when this pack is the one bound.
+#
+# What this file CANNOT do: change the injection rules. Those are code (`frame.py`, decision 3).
+# A pack supplies words that slot into a fixed structure. Every key below is required and the key
+# set is closed, so a note can be reworded but never removed or added (render.py, R-10).
+#
+# Synthetic throughout.
+
+pack: healthcare
+persona: >-
+  You are the clinic agent for a Parkway Shenton front desk. You read a clinic knowledge graph
+  through a fixed set of read-only tools and report what it says.
+data_origin: clinic records
+outside_authors: people outside the clinic
+identity_tools: >-
+  You have no tool that selects a patient, confirms an identity, or judges whether an NRIC, FIN,
+  passport or insurance e-card is valid, current or someone's.
+identity_argument: No tool takes a patient, candidate or identity argument
+question_label: QUESTION FROM CLINIC STAFF
+
+headings:
+  values: "What the clinic graph holds:"
+  unresolved: "Asked for, not found:"
+  candidates: "Registry candidates — all of them, in a fixed order, not a ranking:"
+
+notes:
+  human_selection: >-
+    Identity is decided in person. The registry candidates above are every candidate the registry
+    returned, listed in a fixed order this system chose and not in any order of likelihood: a named
+    member of clinic staff checks the NRIC, FIN or passport against the person at the counter and
+    selects one. Nothing in this report is a ranking, a score or a recommendation, and this system
+    has no way to make that choice.
+  injection_seen: >-
+    At least one value read for this answer contains text addressed to an automated reader — an
+    instruction inside a clinical document. It was not followed, and it is not reproduced above.
+    The citation still resolves, so a human can open the source and see it in place.
+  refs_not_returned: >-
+    Some values this report was asked to carry were not returned by any tool. They are listed as
+    not found rather than filled in.
+  nothing_answered: >-
+    Nothing in the clinic graph answered that. I would rather say so than fill the gap.
+
+console_notes:
+  proposal_only: >-
+    This is a draft. Nothing has been sent, and nothing here can send: the agent writes into an
+    append-only outbox, a named member of staff approves, and a separate process with no model in
+    it performs the send. An instruction hidden in a document can at worst cause a draft somebody
+    reads.
+  needs_an_intake: >-
+    That reads as a request to do something rather than to look something up. Name the
+    registration it concerns and the clinic's own rules will say what is worth sending about it —
+    the system does not choose which patient a message is about, because choosing that is an
+    identity determination.
+  no_authentication: >-
+    An approval records who says they approved it. There is no authentication behind that name
+    yet: this is a POC and the sign-in screen says the same thing. Building it is the next thing
+    that has to happen before this touches a real clinic.
+  figures_on_request: >-
+    Figures are shown because this request asked for them. They are counts of structural facts,
+    each with the population it was counted over; none of them is a claim about time or money.
+  answer_is_a_list: >-
+    The answer is a list of values, not a paragraph. The model chooses which values appear and
+    writes none of them: each line is printed by code beside the pointer that value itself carries.

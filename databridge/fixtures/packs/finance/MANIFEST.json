@@ -1,0 +1,2722 @@
+{
+  "estate": "walnut-finance-synthetic",
+  "synthetic": true,
+  "seed": 20260815,
+  "generated_by": "generate.py",
+  "file_count": 445,
+  "total_bytes": 18376709,
+  "by_source": {
+    "core_banking": {
+      "files": 21,
+      "bytes": 6117724
+    },
+    "credit_memos": {
+      "files": 75,
+      "bytes": 116016
+    },
+    "crm": {
+      "files": 8,
+      "bytes": 1247039
+    },
+    "filings": {
+      "files": 95,
+      "bytes": 154858
+    },
+    "ground_truth": {
+      "files": 9,
+      "bytes": 1779976
+    },
+    "mailbox": {
+      "files": 212,
+      "bytes": 230255
+    },
+    "market_data": {
+      "files": 8,
+      "bytes": 1744064
+    },
+    "payments": {
+      "files": 9,
+      "bytes": 6873723
+    },
+    "sanctions_watchlist": {
+      "files": 2,
+      "bytes": 21730
+    },
+    "spreadsheets": {
+      "files": 6,
+      "bytes": 91324
+    }
+  },
+  "files": [
+    {
+      "path": "core_banking/load.sql",
+      "source": "core_banking",
+      "bytes": 631,
+      "sha256": "872f161cf555e3b8d160e90ad5ae34da05deb1559494837178aa5438ebc1151e"
+    },
+    {
+      "path": "core_banking/schema.sql",
+      "source": "core_banking",
+      "bytes": 7837,
+      "sha256": "2ce2301057e56bd95cc7084876f5ca0838ede95a0c5ddb24ff76d9b1cf8d7c30"
+    },
+    {
+      "path": "core_banking/seed/01_party_01.sql",
+      "source": "core_banking",
+      "bytes": 124995,
+      "sha256": "4a80cb7b0b051368fa3902c664ca6abe926b93fb26135ec3ae34e647d642f331"
+    },
+    {
+      "path": "core_banking/seed/02_party_address_01.sql",
+      "source": "core_banking",
+      "bytes": 79058,
+      "sha256": "c04efaf400582289c4229f98297a591b0b957e2dc5c1166b9383be1212d44cea"
+    },
+    {
+      "path": "core_banking/seed/03_party_contact_01.sql",
+      "source": "core_banking",
+      "bytes": 116070,
+      "sha256": "f8c411de43215572d2842438993577f37d441855841cf942989b5a8ed1ad9a69"
+    },
+    {
+      "path": "core_banking/seed/04_account_01.sql",
+      "source": "core_banking",
+      "bytes": 99049,
+      "sha256": "5944ff0976a93277d4fd9cfdf5fefcbf60dcae8603e85276c1dd2ab03c92267f"
+    },
+    {
+      "path": "core_banking/seed/05_facility_01.sql",
+      "source": "core_banking",
+      "bytes": 68906,
+      "sha256": "3d2b9c16043f768745a41e1e6b97f8529fe6d7f10ea0889dc3707be875b2fec6"
+    },
+    {
+      "path": "core_banking/seed/06_facility_account_01.sql",
+      "source": "core_banking",
+      "bytes": 21466,
+      "sha256": "462605328e70a49a909da4628fa9a7b677f0302385842b2d92636469074f279e"
+    },
+    {
+      "path": "core_banking/seed/07_txn_01.sql",
+      "source": "core_banking",
+      "bytes": 745466,
+      "sha256": "e586f27542ab352b6804cb18b735faa0b7a265d8dea555a77cf93a7d96bf81d4"
+    },
+    {
+      "path": "core_banking/seed/07_txn_02.sql",
+      "source": "core_banking",
+      "bytes": 745214,
+      "sha256": "993a869fbb637b55d5298e978acc0c6e896b8dfa6d3b3c2b16f51f7339059e7a"
+    },
+    {
+      "path": "core_banking/seed/07_txn_03.sql",
+      "source": "core_banking",
+      "bytes": 745318,
+      "sha256": "a2795218a82c7ed11bbba01b5d746af0f8567461d5d72ac27c3d4828165f8df0"
+    },
+    {
+      "path": "core_banking/seed/07_txn_04.sql",
+      "source": "core_banking",
+      "bytes": 745623,
+      "sha256": "b6a9bc535900a0aadf39d8e4f1e09ff7b86a77d64591b793ea36aa0913693a33"
+    },
+    {
+      "path": "core_banking/seed/07_txn_05.sql",
+      "source": "core_banking",
+      "bytes": 745516,
+      "sha256": "4d6e5ac5892b7e3b8823c7ea31d0936931115291ac12c30894c6d62f0521ba3b"
+    },
+    {
+      "path": "core_banking/seed/07_txn_06.sql",
+      "source": "core_banking",
+      "bytes": 744535,
+      "sha256": "59fe4a343e7314212465efeca9e9caa23d6130a4cd843677f7b11bc0b83fcd56"
+    },
+    {
+      "path": "core_banking/seed/07_txn_07.sql",
+      "source": "core_banking",
+      "bytes": 26730,
+      "sha256": "4dab24215196a095b84f47b86d3bc68236cc1917ada39db77819c05f9b0c93ad"
+    },
+    {
+      "path": "core_banking/seed/08_balance_01.sql",
+      "source": "core_banking",
+      "bytes": 313755,
+      "sha256": "63a965eccdf4a9f70b5d5ef26df0519cac474a0513ac9b0cc017fba9839ae23a"
+    },
+    {
+      "path": "core_banking/seed/08_balance_02.sql",
+      "source": "core_banking",
+      "bytes": 313672,
+      "sha256": "8f6319baaa312d149de877721775e1f50fc563ca370709386035560f30ffb26e"
+    },
+    {
+      "path": "core_banking/seed/08_balance_03.sql",
+      "source": "core_banking",
+      "bytes": 125480,
+      "sha256": "69faad5d68971c834fb987e664fe105ccb22d5da99b6b63ff689608a4b7708de"
+    },
+    {
+      "path": "core_banking/seed/09_collateral_01.sql",
+      "source": "core_banking",
+      "bytes": 62006,
+      "sha256": "d44e4936ccc0cd6be3379316160b41a6e347115b405fdd8194bbc1a0b0570686"
+    },
+    {
+      "path": "core_banking/seed/10_covenant_01.sql",
+      "source": "core_banking",
+      "bytes": 58990,
+      "sha256": "eb5b410010244837edeef6365db6e659056c621d10742cb2713c191aad5eddfe"
+    },
+    {
+      "path": "core_banking/seed/11_covenant_test_01.sql",
+      "source": "core_banking",
+      "bytes": 227407,
+      "sha256": "cc4d25055af182947cef32476c606d1106cbfb0241a7fe2cefde341c10920d32"
+    },
+    {
+      "path": "crm/load.sql",
+      "source": "crm",
+      "bytes": 272,
+      "sha256": "4871f8639390f6b5c828e12eb66029c97529bbb46dc0fc7c569aa22df653742c"
+    },
+    {
+      "path": "crm/schema.sql",
+      "source": "crm",
+      "bytes": 3808,
+      "sha256": "26fa8c08fa675adb6060c406997eb24e39a408469db3be8f6a13ab9e7b7313ad"
+    },
+    {
+      "path": "crm/seed/01_relationship_manager_01.sql",
+      "source": "crm",
+      "bytes": 5872,
+      "sha256": "2554a1dcf7585c9e756023944c0418af0eb1d8c4e2e75a1f2d1ca0b394c450ec"
+    },
+    {
+      "path": "crm/seed/02_account_org_01.sql",
+      "source": "crm",
+      "bytes": 73150,
+      "sha256": "1bcba3250073aab24141eea66aa5f7c6354cca4a81dbae3eece560e3e01d3d22"
+    },
+    {
+      "path": "crm/seed/03_contact_01.sql",
+      "source": "crm",
+      "bytes": 156049,
+      "sha256": "6083493bc864f51f76c4cba0cda3f38c704f13c9a95828de8607eae10babeb8f"
+    },
+    {
+      "path": "crm/seed/04_interaction_01.sql",
+      "source": "crm",
+      "bytes": 826565,
+      "sha256": "9d6cf01581cd205092f1c4710b3799a33a0297b1c1b79448670e2b42006ffda5"
+    },
+    {
+      "path": "crm/seed/04_interaction_02.sql",
+      "source": "crm",
+      "bytes": 41639,
+      "sha256": "15f7b6443f145fd037d78e0962f10adb9ecdf0c6ebfece6fb347fd18dda47fc0"
+    },
+    {
+      "path": "crm/seed/05_opportunity_01.sql",
+      "source": "crm",
+      "bytes": 139684,
+      "sha256": "480f61f088f9f73a5b617037b930f498fb14085161e337c2ba220561b1ff4756"
+    },
+    {
+      "path": "filings/2023/ashcombe-pharma-supply_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1730,
+      "sha256": "abb7d4cdddf91d514a8b00669272f7d204037741faabc921a2726aaeb0a69e08"
+    },
+    {
+      "path": "filings/2023/brightwake-utilities_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1562,
+      "sha256": "bd073dc933a2e0fc44d7b494e273df6c5c7de80841b0fe256e0c17241b615e18"
+    },
+    {
+      "path": "filings/2023/dellamar-utilities_annual_report_2023_revised.md",
+      "source": "filings",
+      "bytes": 1690,
+      "sha256": "f880848318d32826f60895a0da510842612b9ef498cf68644179548daf0e440c"
+    },
+    {
+      "path": "filings/2023/fairmont-reach-property_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1613,
+      "sha256": "4ef439b6da7a92cb720f271dd426d719a4444e5d9c8d14e80af21a6445a721b9"
+    },
+    {
+      "path": "filings/2023/galewood-analytics_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1739,
+      "sha256": "f272703976153c4bfebe0d0adfd4c9773f3521bc5041402369c95eafc1cc7a93"
+    },
+    {
+      "path": "filings/2023/greyfen-chemicals_financial_statements_2023_v2.md",
+      "source": "filings",
+      "bytes": 1631,
+      "sha256": "01f415b2cf84e85a0f056e792bb5f608c6c42376e5d9fd53a7138862a33c08a8"
+    },
+    {
+      "path": "filings/2023/harrowby-cold-chain_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1535,
+      "sha256": "332efd9e5107caa6d1dbc5486d12fae95493327d5c7124a99877b0c706de1894"
+    },
+    {
+      "path": "filings/2023/hexbury-cold-chain_annual_report_2023_FINAL.md",
+      "source": "filings",
+      "bytes": 1647,
+      "sha256": "329ddb4e5305db90731e72f08a37c0991d4f2adf2a8e21380f8a017bbcf5ce08"
+    },
+    {
+      "path": "filings/2023/hexbury-cold-chain_interim_review_2023_revised.txt",
+      "source": "filings",
+      "bytes": 1584,
+      "sha256": "7c33e243f6e33b40b8d49b688b594e333a01da6e4b3e4a3b0bb3675ff451f806"
+    },
+    {
+      "path": "filings/2023/inverwold-composites_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1674,
+      "sha256": "b8d56177153a25d9151d6958a37ae7993b3ad4384fd7f4b6cf05aa2a29caaa03"
+    },
+    {
+      "path": "filings/2023/kelbrooke-aggregates_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1477,
+      "sha256": "8e8ad7d5428994c3b576bc1e2590d1c525619a88d55e5eb9ee0af9a9580d8f72"
+    },
+    {
+      "path": "filings/2023/kytherra-logistics_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1619,
+      "sha256": "cfe17a22c818052dcdd9465f8120ba9041237fcf3d26b64ea9516accea8b674f"
+    },
+    {
+      "path": "filings/2023/lanthorn-agritech_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1615,
+      "sha256": "1f5bbf3724cc2b563a137640f017acae7aa42a50be9549bfde6013431e133f7e"
+    },
+    {
+      "path": "filings/2023/loamfield-utilities_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1665,
+      "sha256": "26c0570b6d314452ae7e6edf66a9fcdf07cedf1f536e66e6c10ee6e3951d001e"
+    },
+    {
+      "path": "filings/2023/marlowe-precision_annual_report_2023_revised.md",
+      "source": "filings",
+      "bytes": 1699,
+      "sha256": "394ecbd15e76c327dd343a7ffea9f7e28c2d146dca193fe295340a3bf7e16a21"
+    },
+    {
+      "path": "filings/2023/merriscourt-wire-and-cable_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1655,
+      "sha256": "d2e6c3fa80815e52ead5bb4b45c29d44734d301def38887effd9e8bc41ad8792"
+    },
+    {
+      "path": "filings/2023/quarrenden-textiles_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1575,
+      "sha256": "b829a68e5c2c66d27bab9916f6c1848bd25ffe028be8994042f12161ad86d58b"
+    },
+    {
+      "path": "filings/2023/quillane-diagnostics_annual_report_2023.txt",
+      "source": "filings",
+      "bytes": 1527,
+      "sha256": "ea7cf2f08015c401c17d01827e1cf422407482adcbbcf25505b535519b0714ff"
+    },
+    {
+      "path": "filings/2023/quintrell-grain_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1614,
+      "sha256": "7b80d18dd700215e05b3d978696d3273f653b91a744babb6de0ed663558b81a2"
+    },
+    {
+      "path": "filings/2023/ravenhurst-foods_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1619,
+      "sha256": "422b8ab419853ae5a0658057fc1b57020870c785db150489b994b82055cec737"
+    },
+    {
+      "path": "filings/2023/ravenhurst-water-systems_financial_statements_2023 (1).md",
+      "source": "filings",
+      "bytes": 1762,
+      "sha256": "b758490e8be153e657cdc05613562016a6351dc93bcea3e3b1f414ba63634c31"
+    },
+    {
+      "path": "filings/2023/ravenhurst-water-systems_interim_review_2023_FINAL.md",
+      "source": "filings",
+      "bytes": 1613,
+      "sha256": "01e5fa99dcbd45eecb10613c741f683e6b98aab35fe86e04011cd1b8eaaeb050"
+    },
+    {
+      "path": "filings/2023/silvercrag-textiles_annual_report_2023.md",
+      "source": "filings",
+      "bytes": 1648,
+      "sha256": "1dd8e381d8c00a06531fe4156392ef046d240dc0589504067bbf66d206f4bb9f"
+    },
+    {
+      "path": "filings/2023/trellisbourne-pharma-supply_financial_statements_2023_revised.txt",
+      "source": "filings",
+      "bytes": 1607,
+      "sha256": "271af13b7d40c6d4a890b626c8667b399a6e35ff3d80e431b31a71fb79c8d8a4"
+    },
+    {
+      "path": "filings/2023/ulmara-diagnostics_annual_report_2023_v2.md",
+      "source": "filings",
+      "bytes": 1740,
+      "sha256": "350a48fa6ae61e24a14978c1e02cd18745dfafab5d91641f09378fc77cb92a93"
+    },
+    {
+      "path": "filings/2023/vantorne-aggregates_annual_report_2023.txt",
+      "source": "filings",
+      "bytes": 1546,
+      "sha256": "b71fd3fbd222091a3b50f9beda87520724b01f0dfe48ddd2754283eeb8757274"
+    },
+    {
+      "path": "filings/2023/vondrel-instruments_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1656,
+      "sha256": "3d7b0764ee64ab5dac703733bf56af5e5403e2f1e0e253014ad3a2e9d7ffe099"
+    },
+    {
+      "path": "filings/2023/westerlin-packaging_annual_report_2023_revised.txt",
+      "source": "filings",
+      "bytes": 1518,
+      "sha256": "670fad4dba02aacc1ecdeb1ed0b1d5a75ee856825dc8a2e9484dfbffa951bdea"
+    },
+    {
+      "path": "filings/2023/westerlin-packaging_interim_review_2023_FINAL.md",
+      "source": "filings",
+      "bytes": 1676,
+      "sha256": "0b7da28f0fc89b90925568e0e19d299c3bf0c1c38eb5dcad666164268d00ee38"
+    },
+    {
+      "path": "filings/2023/westerlin-pharma-supply_financial_statements_2023.md",
+      "source": "filings",
+      "bytes": 1548,
+      "sha256": "9d1b2a0e3a6f8f091cedc561afcd673caed9f279d44653f8213b04e1ba4777b1"
+    },
+    {
+      "path": "filings/2023/yolande-mining_annual_report_2023_revised.md",
+      "source": "filings",
+      "bytes": 1712,
+      "sha256": "55704b236b3bfed621841d59f9f759683c71aae4c1d309f7c16e8c3036da09dc"
+    },
+    {
+      "path": "filings/2023/zarrowby-diagnostics_annual_report_2023_FINAL.md",
+      "source": "filings",
+      "bytes": 1592,
+      "sha256": "3af67f91c9865f675d5ec24a597332a17e62d878a872a5a59998716d8c0e85f3"
+    },
+    {
+      "path": "filings/2024/ambervale-packaging_annual_report_2024.md",
+      "source": "filings",
+      "bytes": 1634,
+      "sha256": "5a233f2e69c2fedd191ab9ed4f29fc9ae680f6866293f7e73c508237146ae43d"
+    },
+    {
+      "path": "filings/2024/brightwake-utilities_financial_statements_2024_FINAL.md",
+      "source": "filings",
+      "bytes": 1637,
+      "sha256": "1dd86a3f2e9827b25f57a47224ee6396f2c5c03e18a232ce6be3a603c8ab2238"
+    },
+    {
+      "path": "filings/2024/cindervale-fabrication_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1558,
+      "sha256": "e1bd0cd1192a42219ea0c28d5c59d0e0655947db33488fecd4270c5e6542409b"
+    },
+    {
+      "path": "filings/2024/cindervale-fabrication_financial_statements_2024_FINAL.md",
+      "source": "filings",
+      "bytes": 1655,
+      "sha256": "da605524af80e525cb2cbbbb25751ae1109dd566c3c1453f000ccf10c538eecc"
+    },
+    {
+      "path": "filings/2024/dellamar-diagnostics_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1596,
+      "sha256": "47008922a0eec3488689b85c7d78073cb54f4efe25f76dfeffa40078887fef27"
+    },
+    {
+      "path": "filings/2024/eastvane-industries_annual_report_2024.md",
+      "source": "filings",
+      "bytes": 1740,
+      "sha256": "9fe25ffa7d657a2272922c0d9ad2efecd896f4fdece43d769753095d98627044"
+    },
+    {
+      "path": "filings/2024/eastvane-industries_interim_review_2024.md",
+      "source": "filings",
+      "bytes": 1690,
+      "sha256": "15d1dfc602a947d3b44b2a8f6e9b7b0fb72c2c7dfa2326584c9d943a82485992"
+    },
+    {
+      "path": "filings/2024/fairmont-reach-property_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1619,
+      "sha256": "63c9eb3cb27e80b3752b34ab785f8ce56cb7c755e9980e4c288adb9b0a7d0093"
+    },
+    {
+      "path": "filings/2024/fennmark-energy_annual_report_2024 (1).txt",
+      "source": "filings",
+      "bytes": 1459,
+      "sha256": "3a09cc227c0f2f4681cf6dca6efadd8ab669aef9eebb887626db5448ba62eb87"
+    },
+    {
+      "path": "filings/2024/fennmark-energy_financial_statements_2024.txt",
+      "source": "filings",
+      "bytes": 1798,
+      "sha256": "2dc00990fa79608befc1f14aa55c51435b9be10bcc9d70a5cf9048a88b3cf528"
+    },
+    {
+      "path": "filings/2024/foxhollow-semiconductors_annual_report_2024.md",
+      "source": "filings",
+      "bytes": 1775,
+      "sha256": "3a41ba0269f9857577872bdf23b7f467ee4d1eb5433961172338d6ba079504d8"
+    },
+    {
+      "path": "filings/2024/greyfen-chemicals_financial_statements_2024_FINAL.txt",
+      "source": "filings",
+      "bytes": 1678,
+      "sha256": "6657b493b4cd19c5002e9d28f5aebb4eabb295c18cd00e4384183117648f2ab5"
+    },
+    {
+      "path": "filings/2024/harrowby-cold-chain_annual_report_2024.md",
+      "source": "filings",
+      "bytes": 1572,
+      "sha256": "c0882d97e0d39f84c330c683c63a37bea91c2c9a5d310b9e6da0f9b3da4f079e"
+    },
+    {
+      "path": "filings/2024/inverwold-composites_annual_report_2024.md",
+      "source": "filings",
+      "bytes": 1714,
+      "sha256": "aae68fc3eaa6466d6ece19405a522c3df1be440319b22a1ef90811ef3cedabf8"
+    },
+    {
+      "path": "filings/2024/inverwold-offshore_annual_report_2024.md",
+      "source": "filings",
+      "bytes": 1641,
+      "sha256": "5c3e82d7190ddd082d2ac3a26f68311a028a78c687f97a768472ecf5af17942f"
+    },
+    {
+      "path": "filings/2024/inverwold-offshore_financial_statements_2024_v2.md",
+      "source": "filings",
+      "bytes": 1711,
+      "sha256": "40f532d308d435872f78a813ce8a85cb3a93440b6f398d360651a8467298e0fb"
+    },
+    {
+      "path": "filings/2024/kelbrooke-property_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1693,
+      "sha256": "778f7774900a83163476c8e2266b72aa18a258ecd253df8c27faffbaca414663"
+    },
+    {
+      "path": "filings/2024/lanthorn-foods_financial_statements_2024.txt",
+      "source": "filings",
+      "bytes": 1540,
+      "sha256": "df7cc932499a12251c8df87b814ffce16c45d3cb43c9ace79976714a46d08e1c"
+    },
+    {
+      "path": "filings/2024/palliser-water-systems_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1636,
+      "sha256": "45d477c7a13a0ef658c259723233f1bd9be73b300afe7fe6165b0a5f08da523d"
+    },
+    {
+      "path": "filings/2024/palliser-water-systems_interim_review_2024_revised.md",
+      "source": "filings",
+      "bytes": 1703,
+      "sha256": "3e335d232f61364bcc75dc45974006fea956aad5e1d515f199d8fccf6c3820e0"
+    },
+    {
+      "path": "filings/2024/quillane-diagnostics_annual_report_2024_v2.txt",
+      "source": "filings",
+      "bytes": 1578,
+      "sha256": "c0142f9d35ebffdd7026cb7c84c2a8994e8d72c27e2641af3d06efc9fba09fd8"
+    },
+    {
+      "path": "filings/2024/quintrell-grain_interim_review_2024.txt",
+      "source": "filings",
+      "bytes": 1544,
+      "sha256": "3a0347477d8cd0afa9b997446d9d075c3ed77bbccd3795fd1b009d2a1bca19a2"
+    },
+    {
+      "path": "filings/2024/silvercrag-cold-chain_annual_report_2024_FINAL.md",
+      "source": "filings",
+      "bytes": 1593,
+      "sha256": "4fa3ff27a51381d090c60e60150dd91d88a727c39c39e20c6c40b035678d0f82"
+    },
+    {
+      "path": "filings/2024/silvercrag-textiles_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1718,
+      "sha256": "b0020c0ef7b0e7fef3c11e7a544c66c86e5d1078d2dce0b656a6592dc549af5a"
+    },
+    {
+      "path": "filings/2024/vellacott-packaging_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1767,
+      "sha256": "5452e60c1846a4b44b6d731858cbba345b92259d6604a9b41086e69690746216"
+    },
+    {
+      "path": "filings/2024/vellacott-packaging_interim_review_2024.md",
+      "source": "filings",
+      "bytes": 1622,
+      "sha256": "d8c45c77df379ca826b112b99864bc7d38f6142bfc267b83c75bbef1e2428dd2"
+    },
+    {
+      "path": "filings/2024/vondrel-instruments_financial_statements_2024_FINAL.md",
+      "source": "filings",
+      "bytes": 1582,
+      "sha256": "0511fba814adf44a429b94e5bebc3831ecc4eb50afae4eea1a72fd4744c92b22"
+    },
+    {
+      "path": "filings/2024/windermoor-capital_financial_statements_2024.md",
+      "source": "filings",
+      "bytes": 1596,
+      "sha256": "ea1f9e6add6022a7a0311c1e650aa94a53dbe59452ea3052bc8a5bcb0b9cd584"
+    },
+    {
+      "path": "filings/2024/xanthe-utilities_financial_statements_2024.txt",
+      "source": "filings",
+      "bytes": 1546,
+      "sha256": "e362e528c29c187dddb8d7a9347cf8eab56783b42eceaefd355bbacd0f424a97"
+    },
+    {
+      "path": "filings/2024/yolande-mining_interim_review_2024_FINAL.md",
+      "source": "filings",
+      "bytes": 1786,
+      "sha256": "45c29e6ef2fbcfae85d9259385db179309efea8dd8354bc525454c9e9c05a1ce"
+    },
+    {
+      "path": "filings/2025/ashcombe-pharma-supply_interim_review_2025_v2.md",
+      "source": "filings",
+      "bytes": 1682,
+      "sha256": "e1ef7a0028f965bf2f707a6987e60499d80627f41242f4e4c7c71a6da3e27880"
+    },
+    {
+      "path": "filings/2025/broadhelm-bioworks_annual_report_2025_v2.txt",
+      "source": "filings",
+      "bytes": 1648,
+      "sha256": "ad807a7f81c321479044c95de3082e042a2a956b1bb58d9134f689dcc99277c7"
+    },
+    {
+      "path": "filings/2025/broadhelm-bioworks_interim_review_2025.md",
+      "source": "filings",
+      "bytes": 1666,
+      "sha256": "498e128eaddeb688773a7a757016e79d903574c3a47b1c0228f1cf31401c8f79"
+    },
+    {
+      "path": "filings/2025/dellamar-utilities_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1593,
+      "sha256": "71e44f538714ba70971cf91ff7402227016c73b67027ea4888aed30b4f6ea603"
+    },
+    {
+      "path": "filings/2025/foxhollow-semiconductors_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1680,
+      "sha256": "0770af2c734b232f75e275e688faa7ef5c1a30bceb276e7722bf9e79bfd9e35c"
+    },
+    {
+      "path": "filings/2025/galewood-analytics_interim_review_2025_revised.md",
+      "source": "filings",
+      "bytes": 1596,
+      "sha256": "ea828ed0fd1edefd29b1dce2de4ed37e1ee5b3b1f3bd1bc86cc95c645c20617a"
+    },
+    {
+      "path": "filings/2025/glenholt-analytics_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1605,
+      "sha256": "11c93ddda42f86b84e8bb95d9e96dd7c483cba01f1b99e625296309da3c53bf8"
+    },
+    {
+      "path": "filings/2025/glenholt-analytics_interim_review_2025.md",
+      "source": "filings",
+      "bytes": 1636,
+      "sha256": "10771c448376472b8e0c276890c303d44a11296b2a45782ad04a35252e6cf4b5"
+    },
+    {
+      "path": "filings/2025/kelbrooke-property_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1658,
+      "sha256": "c61c9f66690926686626fc0cb8335fc70b814f1479842a0d1e63ba2f2e101d17"
+    },
+    {
+      "path": "filings/2025/kytherra-logistics_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1611,
+      "sha256": "4db258c29144e5980a7af073ad19fd1cad7c82b4b8c4aa7d7f98481bd29c88d8"
+    },
+    {
+      "path": "filings/2025/kytherra-logistics_interim_review_2025.md",
+      "source": "filings",
+      "bytes": 1711,
+      "sha256": "d3ccfb5026b44e96735494c758f98ecac8c111ac2914d3be51115fc6a2025ab7"
+    },
+    {
+      "path": "filings/2025/lanthorn-agritech_interim_review_2025_v2.md",
+      "source": "filings",
+      "bytes": 1640,
+      "sha256": "541b04f9bb0a6ebad1f2772b4b939c1d14906968668ba1b6e02cbd4a26cb8dae"
+    },
+    {
+      "path": "filings/2025/lanthorn-foods_financial_statements_2025.md",
+      "source": "filings",
+      "bytes": 1643,
+      "sha256": "523af36c9a2cfe94c11bbcc165803e3a2fda78c158efbe9a988d1524b76273ca"
+    },
+    {
+      "path": "filings/2025/loamfield-utilities_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1659,
+      "sha256": "7dc030aca466b1004e10152ccc47b7f4d1da9c757e409170195ce65c34226371"
+    },
+    {
+      "path": "filings/2025/marlowe-precision_financial_statements_2025_FINAL.md",
+      "source": "filings",
+      "bytes": 1554,
+      "sha256": "05d9479efb1d2fc80fcbfd8cf1ca3fad7114e7f9ce2aa8c5f3e60dd9df19b849"
+    },
+    {
+      "path": "filings/2025/merriscourt-wire-and-cable_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1622,
+      "sha256": "2f011989abe373a692c038a1fa2d8ec5ab09a1459a5154f3dad1f3e115049baf"
+    },
+    {
+      "path": "filings/2025/oakenshade-offshore_annual_report_2025.txt",
+      "source": "filings",
+      "bytes": 1617,
+      "sha256": "8c6fd23b3155322dd9f581d338b82ede3adcb40ae87f1c70575afad33b7b1c2d"
+    },
+    {
+      "path": "filings/2025/oakenshade-offshore_financial_statements_2025.md",
+      "source": "filings",
+      "bytes": 1599,
+      "sha256": "d44d4a45ad95e2af7bb3955f748d99ef26f2d390a3069d43c7573bac3e8f36be"
+    },
+    {
+      "path": "filings/2025/quarrenden-textiles_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1663,
+      "sha256": "ae658c34a4f745faf25833aa9f901617797b2d25deaf95c5bd7c3cc946aaf0bf"
+    },
+    {
+      "path": "filings/2025/quintrell-grain_annual_report_2025.txt",
+      "source": "filings",
+      "bytes": 1565,
+      "sha256": "03721f31ce1eae4f89d6531a8754769b532e452e2a9775439175fcc1c1894ccc"
+    },
+    {
+      "path": "filings/2025/ravenhurst-foods_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1626,
+      "sha256": "e45a38ef42d46d16b9376621fdf870d613824b7ec802d2fbc75842bdc5d01cfc"
+    },
+    {
+      "path": "filings/2025/ravenhurst-water-systems_financial_statements_2025.md",
+      "source": "filings",
+      "bytes": 1610,
+      "sha256": "5ce9019f8298adb83aed73f487515b5254cc05152075ec27195debcd9061aef2"
+    },
+    {
+      "path": "filings/2025/silvercrag-cold-chain_financial_statements_2025.md",
+      "source": "filings",
+      "bytes": 1598,
+      "sha256": "295794b45b77a1cd53c91c088da86cb828c5d596c9589059ad0b1329ea88f630"
+    },
+    {
+      "path": "filings/2025/silvercrag-cold-chain_financial_statements_2025_FINAL.md",
+      "source": "filings",
+      "bytes": 1600,
+      "sha256": "d5524010773227a86d190b6a975d196868daf142265c91c12e50654d931de9a6"
+    },
+    {
+      "path": "filings/2025/trellisbourne-pharma-supply_annual_report_2025.md",
+      "source": "filings",
+      "bytes": 1667,
+      "sha256": "53f8abf3d094ee1db07b83f111e7b750fd104b2f727811658ab89e7a3e389bd1"
+    },
+    {
+      "path": "filings/2025/ulmara-diagnostics_annual_report_2025.txt",
+      "source": "filings",
+      "bytes": 1557,
+      "sha256": "872bde9de1a90ac77c4144ebd634810d4f365ca05f1f032bd41a2c53bde3e30f"
+    },
+    {
+      "path": "filings/2025/vantorne-aggregates_annual_report_2025.txt",
+      "source": "filings",
+      "bytes": 1550,
+      "sha256": "fbf577ab00978c30f4f5bc88c7e4e49e1253588bafe00049a00a943d6da257cd"
+    },
+    {
+      "path": "filings/2025/vellacott-ventures_financial_statements_2025.md",
+      "source": "filings",
+      "bytes": 1537,
+      "sha256": "ebf19f22c3781671f77030f17776ed5e14898341d6438c909545d9026b20f38a"
+    },
+    {
+      "path": "filings/2025/vellacott-ventures_interim_review_2025_revised.md",
+      "source": "filings",
+      "bytes": 1477,
+      "sha256": "efb0096ae9b9ca3745b5a6b4ac2cfaf6e615f9137e082aaebb0b515fb9cf2ecb"
+    },
+    {
+      "path": "filings/2025/westerlin-pharma-supply_financial_statements_2025_FINAL.md",
+      "source": "filings",
+      "bytes": 1716,
+      "sha256": "cbd2c5291152c1f4cfd949bc503e2cc86e1acea28e04dc5db69d27d44668a280"
+    },
+    {
+      "path": "filings/2025/windermoor-capital_financial_statements_2025_revised.md",
+      "source": "filings",
+      "bytes": 1650,
+      "sha256": "499eb2a54f361b70bf65c428a94db177788f8060fdc29037481b7e21b05edabf"
+    },
+    {
+      "path": "filings/2025/xanthe-utilities_financial_statements_2025_FINAL.md",
+      "source": "filings",
+      "bytes": 1587,
+      "sha256": "287af3be4fd273668497fc3b2339fbd33e3125d743fa2a5713e4f6db84844164"
+    },
+    {
+      "path": "filings/2025/zarrowby-diagnostics_annual_report_2025.txt",
+      "source": "filings",
+      "bytes": 1566,
+      "sha256": "61ab2143913eeb441c2592d148d28a2562f0ddc3d8760983853e288f7d9dee22"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0033_elvermere-bioworks.md",
+      "source": "credit_memos",
+      "bytes": 1554,
+      "sha256": "952669e2f22d6edf5dc33486c9cfcd453e8f6d20a5ba7f6f5d7e619dbdae9712"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0044_kirkhaven-ventures.md",
+      "source": "credit_memos",
+      "bytes": 1487,
+      "sha256": "5946e933fccf03191556bc70cdf0d98650c5cf59d5c767fdaed2e1267a0338b2"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0048_inverwold-composites.md",
+      "source": "credit_memos",
+      "bytes": 1473,
+      "sha256": "1d150569bce46bf2053102b6482cd2f04cdd5a9b69fec4cf55f2bcda64132224"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0051_quintrell-logistics.md",
+      "source": "credit_memos",
+      "bytes": 1508,
+      "sha256": "51dd52ba59951cda9178ea722202b6944190da5ccac32d8a512a7d5997818e15"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0056_ashcombe-terminals.md",
+      "source": "credit_memos",
+      "bytes": 1595,
+      "sha256": "6fa9900be72302e0a186a9b27f7c8919002c91bc6d081fd3627e61c03dd152d9"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0058_yarrowmede-utilities.md",
+      "source": "credit_memos",
+      "bytes": 1517,
+      "sha256": "5f4ee6f5299eb7f0b513135c6406b244334e357bae432de0327873784501a6d0"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0059_amberfell-instruments.md",
+      "source": "credit_memos",
+      "bytes": 1522,
+      "sha256": "09b8ed9e4f35c2ebabd655ee3d59fb55ff5a20b9b32fb749df66c2dd29f5cd7c"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0065_vellacott-packaging.md",
+      "source": "credit_memos",
+      "bytes": 1542,
+      "sha256": "1cc75515bfccd19e76de4a9f4c7cea240bc8430f114c948321fa035f94a05cad"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0068_everley-nutrition.md",
+      "source": "credit_memos",
+      "bytes": 1540,
+      "sha256": "4a79839f2d78a5271a1a5f121fa57f2091bbfe05490b7c8651b674a6c5db9be9"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0072_silvercrag-cold-chain.md",
+      "source": "credit_memos",
+      "bytes": 1568,
+      "sha256": "6e2cbb80b641422b9c0901e06f2e768becba01ba6bfac0aeb9e2aa0bdc1f9edb"
+    },
+    {
+      "path": "credit_memos/2024/CM-2024-0075_yewbank-bioworks.md",
+      "source": "credit_memos",
+      "bytes": 1496,
+      "sha256": "84ef396e4888feb50662bfbbfd15403a92809afd6f899a005b4092ecf29beb23"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0001_cindervale-shipping.md",
+      "source": "credit_memos",
+      "bytes": 1526,
+      "sha256": "6167dc602c65c0d84199b5e4e266fef0502321e0a6973e2f660fc598ed721dfc"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0003_kirkhaven-ventures.md",
+      "source": "credit_memos",
+      "bytes": 1595,
+      "sha256": "ebea9d69b3bf35218c6ebfad3472b9beccf6935f10d00fbb4d2d5b1100f1fa13"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0006_jessamy-wire-and-cable.md",
+      "source": "credit_memos",
+      "bytes": 1514,
+      "sha256": "ae913dd3f3212fb365dd9aafd06ae385fd60c9b04e8d6076991b0dd519d425ba"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0007_palliser-water-systems.md",
+      "source": "credit_memos",
+      "bytes": 1509,
+      "sha256": "be31496b087490ad5a9d06b64bf95650618c11fb11e0e0e6da9cd866caf8c40e"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0008_merriscourt-wire-and-cable.md",
+      "source": "credit_memos",
+      "bytes": 1567,
+      "sha256": "bbf9ce7afe1e1da8260d42cbe539025e633025e8bf96af955b546c4368d2bb88"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0009_westerlin-packaging.md",
+      "source": "credit_memos",
+      "bytes": 1517,
+      "sha256": "7cdaad670270c35323750e4c1a53d10cbe9d2e359b5390b2d7ac54794523aa73"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0010_merriscourt-metals.md",
+      "source": "credit_memos",
+      "bytes": 1634,
+      "sha256": "f15b52d4d8588fb5596520d48968323555e2ae9eace5f44e62bd9e88a0e76302"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0013_everley-nutrition.md",
+      "source": "credit_memos",
+      "bytes": 1519,
+      "sha256": "b95786936cb7555c387819da5deeac7351391caffe018025ee9e858f907311b5"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0014_larkspire-freight.md",
+      "source": "credit_memos",
+      "bytes": 1564,
+      "sha256": "75d1c5669af17efb562730cb77d4fceb90c5217688092eb3505544f52ca0f390"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0017_ostrander-precision.md",
+      "source": "credit_memos",
+      "bytes": 1575,
+      "sha256": "63cd9f5202245adc50922e9a99eaf378f2805c4bd82232dd019dca2c3edb4b07"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0018_quillane-bioworks.md",
+      "source": "credit_memos",
+      "bytes": 1550,
+      "sha256": "461ac1b13ff0f50d929804744f06b280a660306457fcef4fa727dc1de1fe7798"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0019_northgale-logistics.md",
+      "source": "credit_memos",
+      "bytes": 1532,
+      "sha256": "34dbab8b42daca875578ad531b6c0fc8312c7239c6255382bb15afc6f4aaca7e"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0020_netherby-mining.md",
+      "source": "credit_memos",
+      "bytes": 1506,
+      "sha256": "fd52e7dc8fdc20a850beff68d1098b16b6bcd55dd608f872499245b068c3b277"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0022_ravenhurst-aviation-marine.md",
+      "source": "credit_memos",
+      "bytes": 1540,
+      "sha256": "bc0b4e85c64d3cf61a21d9f257ebfa8a8c86f2fbde759fb0b966fd633c95a2fc"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0026_ambervale-composites.md",
+      "source": "credit_memos",
+      "bytes": 1496,
+      "sha256": "b2f443c4453906fc448ad13ce89ab65bfc4b6e16edde889fab8056774d9a55d8"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0031_vondrel-logistics.md",
+      "source": "credit_memos",
+      "bytes": 1671,
+      "sha256": "fb0538531881252824771a36b6888a3fcdaa1a2aa68d479dfd643c69d7dc61fb"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0034_rushmoor-chemicals.md",
+      "source": "credit_memos",
+      "bytes": 1657,
+      "sha256": "8978e4eb02f16dddb3c7a5cf5963b2ed2c98baeec1801c285e7014a71b53225b"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0035_kytherra-nutrition.md",
+      "source": "credit_memos",
+      "bytes": 1520,
+      "sha256": "a8113954df09ca02129db47204217de2f35b2402610f9316b6ae44eb8dad0a8f"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0040_dunmarch-optics.md",
+      "source": "credit_memos",
+      "bytes": 1551,
+      "sha256": "a485f2502163f64e2fcf7484f30f94438f68f8db6263b3b84536844642c77047"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0041_amberfell-robotics.md",
+      "source": "credit_memos",
+      "bytes": 1593,
+      "sha256": "a979f76ec19c4a4af87a3460c086f0df89ff9fa32da4f44ebe03c5f7b5015383"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0042_dunmarch-composites.md",
+      "source": "credit_memos",
+      "bytes": 1596,
+      "sha256": "1a63b4969bdc548a1d39e7e1df3a8776fac4b1e127919e14eeb7587bb2ad400a"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0045_merriscourt-wire-and-cable.md",
+      "source": "credit_memos",
+      "bytes": 1586,
+      "sha256": "089052111c070c1768111f02d3e570b5cadb25f808bfbb448a1fb7873bbd5f22"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0046_ironvale-grain.md",
+      "source": "credit_memos",
+      "bytes": 1601,
+      "sha256": "ddd815426d36695912a1fcade45cccb06ad9bec4f20d75b8ddf97170a20ac360"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0047_westerlin-freight.md",
+      "source": "credit_memos",
+      "bytes": 1535,
+      "sha256": "4a20e582305947a7b3e1d1c2f2a024c6815b5567623b141fd388d1c70a7ccfca"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0050_quarrenden-property.md",
+      "source": "credit_memos",
+      "bytes": 1652,
+      "sha256": "55951de88d29c95c878d1942217aaf5d504a1d164304464bbb9377e13f3abc06"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0053_everley-pharma-supply.md",
+      "source": "credit_memos",
+      "bytes": 1512,
+      "sha256": "137cdafe547bed82ad58a10b40c61eaf520c43588d473e354e183b4cbf05cac9"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0054_larkspire-freight.md",
+      "source": "credit_memos",
+      "bytes": 1562,
+      "sha256": "554a0fcf26ef83cca1e845240177614868a4c91019102b948ab7017309b30ad5"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0057_belmoray-metals.md",
+      "source": "credit_memos",
+      "bytes": 1513,
+      "sha256": "2692e1690e7538947b8d47b8374f49cda8fd2b87181058763014d05847f05288"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0061_tidewater-textiles.md",
+      "source": "credit_memos",
+      "bytes": 1609,
+      "sha256": "091bf98057cea42e4c2fb68311d6fcd3653c2eeb998b2eaf23b8d00245102058"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0062_silvercrag-textiles.md",
+      "source": "credit_memos",
+      "bytes": 1540,
+      "sha256": "eb6643f199621ebd49f02d296e5d6b0d9d37bbb6e85f4c355ff9884bd664b7f4"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0064_verrant-shipping.md",
+      "source": "credit_memos",
+      "bytes": 1502,
+      "sha256": "2fe4bc68a990406f823a7a5cb0718009b679869e62864da0de66d0a76af39e49"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0066_kestrel-metals.md",
+      "source": "credit_memos",
+      "bytes": 1527,
+      "sha256": "26c898d3816fa060ee35cab243529cd0451671b8863219fd732d4427da43305b"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0067_stonecrest-fabrication.md",
+      "source": "credit_memos",
+      "bytes": 1487,
+      "sha256": "e6e00f47b184ebbdd067d3dfb0ed5b2e5a9e87c2b8a5884d26372fd7bba73df4"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0069_yewbank-bioworks.md",
+      "source": "credit_memos",
+      "bytes": 1563,
+      "sha256": "727c6bba3d2d24938107ae8f212a56d8c48f67144fe09de0150fe14fb5fef6ba"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0070_netherby-terminals.md",
+      "source": "credit_memos",
+      "bytes": 1568,
+      "sha256": "62e82652c1232c7524341e26f01b8b492520e45712a6af2d8bf5ab85e02252d7"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0071_orrinshaw-wire-and-cable.md",
+      "source": "credit_memos",
+      "bytes": 1519,
+      "sha256": "488073fef5205db9609750e35366b36c3c9aed7b3d05a6b39b6411315a1a328e"
+    },
+    {
+      "path": "credit_memos/2025/CM-2025-0073_quarrenden-property.md",
+      "source": "credit_memos",
+      "bytes": 1590,
+      "sha256": "bb486422cb2fb06a367316884c71b7aff7d94e80486216b3a8b91d9282a1fca7"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0002_amberfell-instruments.md",
+      "source": "credit_memos",
+      "bytes": 1516,
+      "sha256": "36ada583dfbe9e6f93453e339f7f887956395e613472288c8a40fa3c5a32de3e"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0004_ashcombe-terminals.md",
+      "source": "credit_memos",
+      "bytes": 1572,
+      "sha256": "b1b1b41bf0831f9a423e6418bbc78d400b032421a3721aaab8a64dfc31d586a0"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0005_tidewater-pharma-supply.md",
+      "source": "credit_memos",
+      "bytes": 1503,
+      "sha256": "51a930a23e5ad40f35aab3ed5566c91a0bdbba4d2af85a4e45b86a22f98b4635"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0011_dellamar-utilities.md",
+      "source": "credit_memos",
+      "bytes": 1613,
+      "sha256": "3b44278a963f5cd4b6f2f8917aa0edf53b1d051e668347e551adde49f3054fcc"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0012_stonecrest-capital.md",
+      "source": "credit_memos",
+      "bytes": 1550,
+      "sha256": "df4be0dfa67812e3ff067c8b0e310e9437a2c3f75c6eadeaac76bf9820009c0c"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0015_vellacott-freight.md",
+      "source": "credit_memos",
+      "bytes": 1481,
+      "sha256": "e45723883426f194fb063f0acf081c7f62285a292020d49fd72d169a4f6a16df"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0016_kirkhaven-ventures.md",
+      "source": "credit_memos",
+      "bytes": 1684,
+      "sha256": "b2a4907507d228640efcb76035dffbca8e6b07b57bf138c5da4580b1a5486507"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0021_everley-nutrition.md",
+      "source": "credit_memos",
+      "bytes": 1468,
+      "sha256": "0785aa4865af9c6e38fed3748a400cd6d510202069027b2b920551347205713a"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0023_elvermere-bioworks.md",
+      "source": "credit_memos",
+      "bytes": 1499,
+      "sha256": "2c6187a97727c57afdf07e224bbd063037a317df5b697f0f0bb4bd54d94c690e"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0024_inverwold-aviation-services.md",
+      "source": "credit_memos",
+      "bytes": 1580,
+      "sha256": "34617bd0db2916148c6802c75364209777b9cd7929f5b01723f7af613524963d"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0025_quillane-solar.md",
+      "source": "credit_memos",
+      "bytes": 1514,
+      "sha256": "813eaf132bf9738457568e660df6dc7ffcc3e212cd69be7adb77280ebffc3896"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0027_windermoor-capital.md",
+      "source": "credit_memos",
+      "bytes": 1565,
+      "sha256": "aca51dc96d11767ca16d1d97e377dd958dbeda047a16fd1dd1c10e388ad3b279"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0028_windermoor-capital.md",
+      "source": "credit_memos",
+      "bytes": 1532,
+      "sha256": "a3679253a663ca03fb75f591cf0af44af8ef75e4c54d60af736c7d7eedb64f32"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0029_fairmont-reach-property.md",
+      "source": "credit_memos",
+      "bytes": 1540,
+      "sha256": "f564b12d594c25e57d175dfbbf306dd752bf7882e3d18dca077515cffd2f59ab"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0030_pellaton-logistics.md",
+      "source": "credit_memos",
+      "bytes": 1451,
+      "sha256": "8b6ffa199045115d0b7194364cb3c2c0340b1b7485ee7ca6dc1aae68430f6303"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0032_merriscourt-wire-and-cable.md",
+      "source": "credit_memos",
+      "bytes": 1564,
+      "sha256": "6520768eea5233cebd137ef9aae0a9cf4e85c4195b700f47e190f72dbbb1daaa"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0036_eastvane-energy.md",
+      "source": "credit_memos",
+      "bytes": 1577,
+      "sha256": "7b955d19a339777585f85bf8febe854a38274a644129674a95463cac7ecbb8c4"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0037_ashcombe-ventures.md",
+      "source": "credit_memos",
+      "bytes": 1456,
+      "sha256": "717cdb7c29551d25987b488adb7f46b5a1775c39b185afaee781a18f958b249a"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0038_corvane-composites.md",
+      "source": "credit_memos",
+      "bytes": 1573,
+      "sha256": "8ec44f5d8b3d8ea99cf94a15ef4832257f564f8d3251a0197212865a390d451d"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0039_kestrel-optics.md",
+      "source": "credit_memos",
+      "bytes": 1603,
+      "sha256": "45ff9d06ef849b5436b569f27068c3094ac79dcda471fe183594a36161fe24a3"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0043_rushmoor-chemicals.md",
+      "source": "credit_memos",
+      "bytes": 1549,
+      "sha256": "5ab40b0c623756c71e73894a624f0099dec9dcef6d2c8eaa31cd939bb8db8b4f"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0049_glenholt-energy.md",
+      "source": "credit_memos",
+      "bytes": 1652,
+      "sha256": "db60749cf8ced4dab22cfef40d32794ab56ae1248a3ffb3a60395c0ccc576bb0"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0052_everley-nutrition.md",
+      "source": "credit_memos",
+      "bytes": 1509,
+      "sha256": "b7a2a0dc3d7261ffcbb9e0d73560c665c23a3c00e67315cfd512cb7320413255"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0055_larkspiree-textiles.md",
+      "source": "credit_memos",
+      "bytes": 1585,
+      "sha256": "cab19626f4b825cca507be0215451fbbee7932225eb73bef4af8c7f1de3f349b"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0060_quillane-bioworks.md",
+      "source": "credit_memos",
+      "bytes": 1466,
+      "sha256": "4b5d2d082bc740aebdac93c837bde6ff6b7e74826179d9049de849ed417b2dca"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0063_jessamy-mining.md",
+      "source": "credit_memos",
+      "bytes": 1499,
+      "sha256": "325670235b09a71b7346e66aa15824406e660b0c2e32342d97866d108593f730"
+    },
+    {
+      "path": "credit_memos/2026/CM-2026-0074_corvane-composites.md",
+      "source": "credit_memos",
+      "bytes": 1515,
+      "sha256": "fd88e12d08300a7ee9821235c7b58c04354842767cf82ca71d4961dae9a6d49a"
+    },
+    {
+      "path": "mailbox/cursor.json",
+      "source": "mailbox",
+      "bytes": 382,
+      "sha256": "958fde0668364d99a17d267f5aa3787112cfa12b6b2905c4857023aa6ecd0d27"
+    },
+    {
+      "path": "mailbox/listing.csv",
+      "source": "mailbox",
+      "bytes": 44205,
+      "sha256": "f8896be9eff0d756acb50f24e7638bbb74fb5ff0b94d00a4550c5f81817eca69"
+    },
+    {
+      "path": "mailbox/messages/msg_00001_100007.eml",
+      "source": "mailbox",
+      "bytes": 858,
+      "sha256": "c8d4d1659edce572b15c07ab1b45a0365aaf9c4bfdbb6a8237799650e8051c38"
+    },
+    {
+      "path": "mailbox/messages/msg_00002_100037.eml",
+      "source": "mailbox",
+      "bytes": 809,
+      "sha256": "4e1489f93149447abf511d7492e3eca00df2029b3c28a4026b9c063a55c1d089"
+    },
+    {
+      "path": "mailbox/messages/msg_00003_100047.eml",
+      "source": "mailbox",
+      "bytes": 981,
+      "sha256": "5e6378337da7623a6dc17358988daa2d10909abb1ba171e677adc865fbe6e406"
+    },
+    {
+      "path": "mailbox/messages/msg_00004_100076.eml",
+      "source": "mailbox",
+      "bytes": 861,
+      "sha256": "1b0dba5ae83db556503a61d5a7ff45e855cea5c7c12f8c5f0939f7c9f3b92a0e"
+    },
+    {
+      "path": "mailbox/messages/msg_00005_100117.eml",
+      "source": "mailbox",
+      "bytes": 849,
+      "sha256": "95e1e5e47ac09b70e7ada5ee99f7914bf0253125b2759d604e163c157ec72b5a"
+    },
+    {
+      "path": "mailbox/messages/msg_00006_100166.eml",
+      "source": "mailbox",
+      "bytes": 794,
+      "sha256": "53c763b63805c7533241ae5bc58cb8a03f627fde4b87e0d1887c7bc0b14e5eb0"
+    },
+    {
+      "path": "mailbox/messages/msg_00007_100251.eml",
+      "source": "mailbox",
+      "bytes": 844,
+      "sha256": "7424d4fa0132fef0a9a0d40f8d3ef07384ee65b2d2f238f96b2024b90bd574cf"
+    },
+    {
+      "path": "mailbox/messages/msg_00008_100258.eml",
+      "source": "mailbox",
+      "bytes": 1022,
+      "sha256": "4dd5514732dc87da8433344ae22a6c762b6c6515c11644fb2ebe3005fc1b5339"
+    },
+    {
+      "path": "mailbox/messages/msg_00009_100267.eml",
+      "source": "mailbox",
+      "bytes": 801,
+      "sha256": "d70188e509f74cb19876e345688d5ba3ac0061cee4f455e505422bf8db5ee562"
+    },
+    {
+      "path": "mailbox/messages/msg_00010_100274.eml",
+      "source": "mailbox",
+      "bytes": 896,
+      "sha256": "3672b2d652834ecf384bd289618ac00b9f7319b644e3ceed229127ad7e9bd06e"
+    },
+    {
+      "path": "mailbox/messages/msg_00011_100304.eml",
+      "source": "mailbox",
+      "bytes": 768,
+      "sha256": "32e9d6268372dac0d17ae09bd27552065b78cd2d66b3cd2feea8d2cd15ba9ddd"
+    },
+    {
+      "path": "mailbox/messages/msg_00012_100342.eml",
+      "source": "mailbox",
+      "bytes": 821,
+      "sha256": "880f12e1a595c6bf43b393066cb5616ea8aa65237e971a79074315f53ff4f7a3"
+    },
+    {
+      "path": "mailbox/messages/msg_00013_100430.eml",
+      "source": "mailbox",
+      "bytes": 968,
+      "sha256": "7c06c0786d814a0918874b319f2efd15d5a01c2d4eb8f5a43574a0835d6d4a9a"
+    },
+    {
+      "path": "mailbox/messages/msg_00014_100482.eml",
+      "source": "mailbox",
+      "bytes": 925,
+      "sha256": "66e2f5afebb3c62c11f042d71cd5709266e50066315bfc8e2d91c709afc3fd74"
+    },
+    {
+      "path": "mailbox/messages/msg_00015_100551.eml",
+      "source": "mailbox",
+      "bytes": 860,
+      "sha256": "d10ccfc88db09d9583e872040bf2efc4e4fc0c46c16b7d43bf2839fdb84799a0"
+    },
+    {
+      "path": "mailbox/messages/msg_00016_100595.eml",
+      "source": "mailbox",
+      "bytes": 850,
+      "sha256": "641547eea7d7d64d493d7de7511eb0dff7b38c1c66ecb1ef74a12f5737f55817"
+    },
+    {
+      "path": "mailbox/messages/msg_00017_100609.eml",
+      "source": "mailbox",
+      "bytes": 968,
+      "sha256": "f9547484b67578014d6a114fc4951e7d822de0856218e69e6acc5fc7cd99f36d"
+    },
+    {
+      "path": "mailbox/messages/msg_00018_100653.eml",
+      "source": "mailbox",
+      "bytes": 867,
+      "sha256": "bd19671c251f195f2e8b231de7a50adf9235ea7e1a2ce319668a862598915720"
+    },
+    {
+      "path": "mailbox/messages/msg_00019_100666.eml",
+      "source": "mailbox",
+      "bytes": 929,
+      "sha256": "6e91e4acd1565352fbb725ee5549ce47d4988279663f68658e2492592a951e6e"
+    },
+    {
+      "path": "mailbox/messages/msg_00020_100699.eml",
+      "source": "mailbox",
+      "bytes": 1000,
+      "sha256": "d60e6a3eecd164bbbeacf72aa511385feb33a6b0c8144df65a7f042691d535cc"
+    },
+    {
+      "path": "mailbox/messages/msg_00021_100776.eml",
+      "source": "mailbox",
+      "bytes": 864,
+      "sha256": "2a504ff5f124dc9e388870114190247b503b9e628f64809cf455e0e393e36e65"
+    },
+    {
+      "path": "mailbox/messages/msg_00022_100825.eml",
+      "source": "mailbox",
+      "bytes": 786,
+      "sha256": "0b2625bfc0fa88b11290cc5aca8d39e87da6f83050d4e1b67220b1a6555bb8e8"
+    },
+    {
+      "path": "mailbox/messages/msg_00023_100863.eml",
+      "source": "mailbox",
+      "bytes": 930,
+      "sha256": "072b03884035d1d55b0171158ec37c0653138cf81518bc3db13dbe63060f18c4"
+    },
+    {
+      "path": "mailbox/messages/msg_00024_100951.eml",
+      "source": "mailbox",
+      "bytes": 915,
+      "sha256": "f5c0a4f961bc7da5102da7ec48760a467f97c5d3be96c648ef9fb3eacc462971"
+    },
+    {
+      "path": "mailbox/messages/msg_00025_101037.eml",
+      "source": "mailbox",
+      "bytes": 924,
+      "sha256": "9780aa6879f4402a06de665bb4b7c116e64bccfb4710499f590d7b19ba23a67d"
+    },
+    {
+      "path": "mailbox/messages/msg_00026_101063.eml",
+      "source": "mailbox",
+      "bytes": 846,
+      "sha256": "69b35d674fe7ac68edfe7b89ef0175554bf1df034ee459f835604143e9ee5381"
+    },
+    {
+      "path": "mailbox/messages/msg_00027_101121.eml",
+      "source": "mailbox",
+      "bytes": 768,
+      "sha256": "58f1d7d8c3caedf39068460e00e098945422ad274e10aec1a51431bd5b7dfeb3"
+    },
+    {
+      "path": "mailbox/messages/msg_00028_101145.eml",
+      "source": "mailbox",
+      "bytes": 871,
+      "sha256": "557cd0665064b59a34152f6eb355939867adb026a9c8f661ff1573b67de40c6f"
+    },
+    {
+      "path": "mailbox/messages/msg_00029_101191.eml",
+      "source": "mailbox",
+      "bytes": 836,
+      "sha256": "abe12a7bb9b522b933cf3544de444975b5b4e5fde485e53146adee0a1b884752"
+    },
+    {
+      "path": "mailbox/messages/msg_00030_101254.eml",
+      "source": "mailbox",
+      "bytes": 872,
+      "sha256": "5736403a6c765332de98b9f6eda0c087d54373137c9ceb14d89a763e962a6d95"
+    },
+    {
+      "path": "mailbox/messages/msg_00031_101295.eml",
+      "source": "mailbox",
+      "bytes": 921,
+      "sha256": "0f68d09a97e912dbaf151fca3f511a83d4048d97ac94a01727c90bbe688738b4"
+    },
+    {
+      "path": "mailbox/messages/msg_00032_101352.eml",
+      "source": "mailbox",
+      "bytes": 933,
+      "sha256": "341b1af5ee87f77a1f1f075e7adf48d86a7477aaa4d9bdeb6122d16395318985"
+    },
+    {
+      "path": "mailbox/messages/msg_00033_101437.eml",
+      "source": "mailbox",
+      "bytes": 800,
+      "sha256": "c0982043c4a616af2035a0068d2d4875df1f0cd56674728380a90be3b5457a93"
+    },
+    {
+      "path": "mailbox/messages/msg_00034_101524.eml",
+      "source": "mailbox",
+      "bytes": 1220,
+      "sha256": "272272fdcd0e57506bc9397db7d9c07e5ae9f08fe0e808b5f38307ac08a056fc"
+    },
+    {
+      "path": "mailbox/messages/msg_00035_101601.eml",
+      "source": "mailbox",
+      "bytes": 883,
+      "sha256": "0118735e51277584e6f37e0513ce1454bf1330a95902889d25539a99ea770ab2"
+    },
+    {
+      "path": "mailbox/messages/msg_00036_101611.eml",
+      "source": "mailbox",
+      "bytes": 889,
+      "sha256": "659ddda17cb5b23a7ddafa7b4b82abeef531c6647d2fa0e757328dcaf8f197c4"
+    },
+    {
+      "path": "mailbox/messages/msg_00037_101663.eml",
+      "source": "mailbox",
+      "bytes": 875,
+      "sha256": "4e605df8c57bf42c3492338e8e49a557d2e538f2cbb649d565f661f86bebeb87"
+    },
+    {
+      "path": "mailbox/messages/msg_00038_101722.eml",
+      "source": "mailbox",
+      "bytes": 840,
+      "sha256": "afd6b648a517c2bf8438093df8ebf6ddaf17bb62ab8820646216ba96fd691964"
+    },
+    {
+      "path": "mailbox/messages/msg_00039_101751.eml",
+      "source": "mailbox",
+      "bytes": 941,
+      "sha256": "a1d47dc4e9b0b842eed788634d08694510f4e9fdea9ad1db9ea072339dc444bb"
+    },
+    {
+      "path": "mailbox/messages/msg_00040_101825.eml",
+      "source": "mailbox",
+      "bytes": 916,
+      "sha256": "392e58fd9f995c78dab7154da7473a22a2bce8a5e033f80193341af2804c27ed"
+    },
+    {
+      "path": "mailbox/messages/msg_00041_101837.eml",
+      "source": "mailbox",
+      "bytes": 941,
+      "sha256": "b89b5032ff95218cd4ee531afa9ded2d595089ffedee539688e36dfe3602abda"
+    },
+    {
+      "path": "mailbox/messages/msg_00042_101872.eml",
+      "source": "mailbox",
+      "bytes": 845,
+      "sha256": "64f8b32173cd174a1210d935e861af3208d9e9ad73cc39ddc61393be9f72f28c"
+    },
+    {
+      "path": "mailbox/messages/msg_00043_101882.eml",
+      "source": "mailbox",
+      "bytes": 955,
+      "sha256": "134696aea2d642f702dfb459a4e7418f09be833001ad99451d334233e980383c"
+    },
+    {
+      "path": "mailbox/messages/msg_00044_101888.eml",
+      "source": "mailbox",
+      "bytes": 864,
+      "sha256": "ba50764b57fff9595a32f81463701680845ec72b67a9501ae174c2c86541acd2"
+    },
+    {
+      "path": "mailbox/messages/msg_00045_101971.eml",
+      "source": "mailbox",
+      "bytes": 805,
+      "sha256": "fc603874cbd3e8ec50802e7cc637610a11d97988cf2e4755b50d8e9548d4489f"
+    },
+    {
+      "path": "mailbox/messages/msg_00046_102031.eml",
+      "source": "mailbox",
+      "bytes": 788,
+      "sha256": "888fa10cdedc3905ce4b8c6772a8d25b89887f27d1e05a017524b8025e18e7d7"
+    },
+    {
+      "path": "mailbox/messages/msg_00047_102069.eml",
+      "source": "mailbox",
+      "bytes": 872,
+      "sha256": "555e65a09720f4de6ecb3704c88207546dace73ba914c4126464723b9ae99310"
+    },
+    {
+      "path": "mailbox/messages/msg_00048_102154.eml",
+      "source": "mailbox",
+      "bytes": 928,
+      "sha256": "f4e68c89ac7285873895c572dd8f28796490d7eeaf7e4eaf7dd280317995ea0e"
+    },
+    {
+      "path": "mailbox/messages/msg_00049_102242.eml",
+      "source": "mailbox",
+      "bytes": 1783,
+      "sha256": "8920b05e6946187d4eb0df29699dd255dfa6cfbc92969eb5ac606598c75feff3"
+    },
+    {
+      "path": "mailbox/messages/msg_00050_102311.eml",
+      "source": "mailbox",
+      "bytes": 900,
+      "sha256": "efb67459a614db48d59559ecf47ec98c53313dee9fc10e37bd50f66bfd31fd86"
+    },
+    {
+      "path": "mailbox/messages/msg_00051_102327.eml",
+      "source": "mailbox",
+      "bytes": 1028,
+      "sha256": "35e7215d09cbb8eaae59813c833e5fdcc2586e83e8aff1826b55e899d114b4e2"
+    },
+    {
+      "path": "mailbox/messages/msg_00052_102344.eml",
+      "source": "mailbox",
+      "bytes": 897,
+      "sha256": "cf64cf09800f8193d4f381033236e0f4fa037854e88f63f5b1662e9c55ca4381"
+    },
+    {
+      "path": "mailbox/messages/msg_00053_102372.eml",
+      "source": "mailbox",
+      "bytes": 821,
+      "sha256": "65c7efb22d40bec3211549c2c8227504d089354f040a1c4d35485734b340be5a"
+    },
+    {
+      "path": "mailbox/messages/msg_00054_102454.eml",
+      "source": "mailbox",
+      "bytes": 980,
+      "sha256": "3930a7bd329f115c74aa71ad70227b4c3e2072680c062b5f9de327869832b4b9"
+    },
+    {
+      "path": "mailbox/messages/msg_00055_102539.eml",
+      "source": "mailbox",
+      "bytes": 1046,
+      "sha256": "7ed8c7a5127260ef566907fc21e8ef07d3596d65f513abbb29c0fc61fad876f9"
+    },
+    {
+      "path": "mailbox/messages/msg_00056_102626.eml",
+      "source": "mailbox",
+      "bytes": 915,
+      "sha256": "4b41785087f7b640d0bd9e9941936fa020c7f7dc4f892656bd0ea359e7714eec"
+    },
+    {
+      "path": "mailbox/messages/msg_00057_102679.eml",
+      "source": "mailbox",
+      "bytes": 864,
+      "sha256": "a6f52e4b99a55f09a9adcf9d54f84aa3c999c186c063ede9701c2047d180b5b7"
+    },
+    {
+      "path": "mailbox/messages/msg_00058_102768.eml",
+      "source": "mailbox",
+      "bytes": 757,
+      "sha256": "f2065b53a576edde037059fe22255d43e59efbf65dd58993a5b3793b65d29d8d"
+    },
+    {
+      "path": "mailbox/messages/msg_00059_102822.eml",
+      "source": "mailbox",
+      "bytes": 853,
+      "sha256": "66f75f57079bb088776f16560605604c18b159409168043045b7ed9c40b71a3e"
+    },
+    {
+      "path": "mailbox/messages/msg_00060_102854.eml",
+      "source": "mailbox",
+      "bytes": 907,
+      "sha256": "6a474abe6177d480092de8bf3ccc91d58491a1ef15099ef6ce944589017cc207"
+    },
+    {
+      "path": "mailbox/messages/msg_00061_102921.eml",
+      "source": "mailbox",
+      "bytes": 886,
+      "sha256": "68cb27fe0ce41c75156b4d7cc6b66675d326d323e62cee4cbf0f7bde004bd78c"
+    },
+    {
+      "path": "mailbox/messages/msg_00062_102996.eml",
+      "source": "mailbox",
+      "bytes": 1127,
+      "sha256": "0bcea6af5c3a11aa4193196a47bf6c52cb7b8af12e4c2c3b0bfe2b7f98e125cc"
+    },
+    {
+      "path": "mailbox/messages/msg_00063_103073.eml",
+      "source": "mailbox",
+      "bytes": 937,
+      "sha256": "0166648f1a8720c3df9f7c5d63107453ce750b66638d99be1322dcc35e180336"
+    },
+    {
+      "path": "mailbox/messages/msg_00064_103078.eml",
+      "source": "mailbox",
+      "bytes": 999,
+      "sha256": "d44d94023270c4eb9b6c4732cf435f227c404b7e89b4c7e789acd808117de96c"
+    },
+    {
+      "path": "mailbox/messages/msg_00065_103114.eml",
+      "source": "mailbox",
+      "bytes": 880,
+      "sha256": "436d393e93b0a5b8d4cdda41361f3fcdf7a20d37f978042fddc6043d2d905b2c"
+    },
+    {
+      "path": "mailbox/messages/msg_00066_103177.eml",
+      "source": "mailbox",
+      "bytes": 862,
+      "sha256": "44e139055fa149be07273e9b37c497181c1ab9aa358d4ed369b42f0dd1d696b5"
+    },
+    {
+      "path": "mailbox/messages/msg_00067_103261.eml",
+      "source": "mailbox",
+      "bytes": 923,
+      "sha256": "ed68f7e360572c484955c56d347d8e9f46442d0bd90e43fa60e525c8730fe5d8"
+    },
+    {
+      "path": "mailbox/messages/msg_00068_103317.eml",
+      "source": "mailbox",
+      "bytes": 888,
+      "sha256": "51e67f73612bdd773c870099b79aefd1580d84e4d91a39fe6812ce68823dfe53"
+    },
+    {
+      "path": "mailbox/messages/msg_00069_103405.eml",
+      "source": "mailbox",
+      "bytes": 951,
+      "sha256": "abce6353db0feafe51f1d6838927855787580834068de308c205a8b8c2990392"
+    },
+    {
+      "path": "mailbox/messages/msg_00070_103488.eml",
+      "source": "mailbox",
+      "bytes": 773,
+      "sha256": "6e84935ba8abd1a413d0b50e1db04727a303c3fd6f04f0697653fa0d89e7a1db"
+    },
+    {
+      "path": "mailbox/messages/msg_00071_103499.eml",
+      "source": "mailbox",
+      "bytes": 814,
+      "sha256": "cc8ba66c30258f32a917ae778cbafd51f2c3fba7f34976eb0eea70cc2998e9ec"
+    },
+    {
+      "path": "mailbox/messages/msg_00072_103553.eml",
+      "source": "mailbox",
+      "bytes": 844,
+      "sha256": "f74afc2b57608b23c220e0177633207cbd1f7d7bee6d6d6f4c7885c0047a6970"
+    },
+    {
+      "path": "mailbox/messages/msg_00073_103618.eml",
+      "source": "mailbox",
+      "bytes": 890,
+      "sha256": "d8cb01242a7d59892be2b16d8795867c265693df5f3c49fa116169b5b942416d"
+    },
+    {
+      "path": "mailbox/messages/msg_00074_103654.eml",
+      "source": "mailbox",
+      "bytes": 747,
+      "sha256": "7bb0ed39bb132115c62bfd5385eb6bf5f39f3d16b37421ca65bbf49c990fa5e3"
+    },
+    {
+      "path": "mailbox/messages/msg_00075_103722.eml",
+      "source": "mailbox",
+      "bytes": 866,
+      "sha256": "f59d6775623261fe1804a421ce5037ccf0d4ee296cff91a7c4a871b278efb8a2"
+    },
+    {
+      "path": "mailbox/messages/msg_00076_103810.eml",
+      "source": "mailbox",
+      "bytes": 920,
+      "sha256": "32964867a0fd6169cc07381800d81926e17279533ce715008f821dd77bbc9bc4"
+    },
+    {
+      "path": "mailbox/messages/msg_00077_103839.eml",
+      "source": "mailbox",
+      "bytes": 1465,
+      "sha256": "44cdf5e3d8cb287c657d218e55416a276bf3137f0be9ba240a3c2ae8d0ed60cf"
+    },
+    {
+      "path": "mailbox/messages/msg_00078_103853.eml",
+      "source": "mailbox",
+      "bytes": 760,
+      "sha256": "142ec127272fae3fe134eb427258febbcb68a13ebfbcabd8544dc32a6b1bca59"
+    },
+    {
+      "path": "mailbox/messages/msg_00079_103857.eml",
+      "source": "mailbox",
+      "bytes": 1000,
+      "sha256": "5de7d7b69a33d04709b27eddee0c3b658f1fccc1aaa93cdf4c39f4fa4b2b2473"
+    },
+    {
+      "path": "mailbox/messages/msg_00080_103891.eml",
+      "source": "mailbox",
+      "bytes": 858,
+      "sha256": "b02a7b66ddce2dadce77286cb814ad50630ed3376cebe967228c310ba7578d2d"
+    },
+    {
+      "path": "mailbox/messages/msg_00081_103913.eml",
+      "source": "mailbox",
+      "bytes": 862,
+      "sha256": "2ccc0c93a3f8bd514aec23d4111cf96c820bf6c006ac118a363a4157181e4992"
+    },
+    {
+      "path": "mailbox/messages/msg_00082_103970.eml",
+      "source": "mailbox",
+      "bytes": 970,
+      "sha256": "ee02e0b51d62a5e0602eb9bbff1cbcda0b22fb9bd45b3ebc719edd3900ee5d7f"
+    },
+    {
+      "path": "mailbox/messages/msg_00083_103976.eml",
+      "source": "mailbox",
+      "bytes": 820,
+      "sha256": "0968ea316453997d5c92e914cd13e4b33d0810e2277b1457457c04f5e8105b75"
+    },
+    {
+      "path": "mailbox/messages/msg_00084_104014.eml",
+      "source": "mailbox",
+      "bytes": 868,
+      "sha256": "4158d95d10e80c561da1f46f0e659d354d02902233c84d5b114976f101ff2839"
+    },
+    {
+      "path": "mailbox/messages/msg_00085_104022.eml",
+      "source": "mailbox",
+      "bytes": 784,
+      "sha256": "afabd60605f16356294cbc20f5d915a324a989a2959f5bfa9776d9cda6662531"
+    },
+    {
+      "path": "mailbox/messages/msg_00086_104064.eml",
+      "source": "mailbox",
+      "bytes": 923,
+      "sha256": "66f291e846d598c14f477fd2d25630065331438fe7e050c7d726c85cadafdce2"
+    },
+    {
+      "path": "mailbox/messages/msg_00087_104077.eml",
+      "source": "mailbox",
+      "bytes": 820,
+      "sha256": "1f8da28d20b421cbf7144656f05e76bbb71d5b7410f9a15696f014ab7387a27d"
+    },
+    {
+      "path": "mailbox/messages/msg_00088_104134.eml",
+      "source": "mailbox",
+      "bytes": 891,
+      "sha256": "ff8e049f1034645a0ff5937149bdab35672b40dcf3295b75ba3d64d8bbb464c2"
+    },
+    {
+      "path": "mailbox/messages/msg_00089_104137.eml",
+      "source": "mailbox",
+      "bytes": 785,
+      "sha256": "265116728497618c05a1844fb0bbb8d8948051a8ada3ecdd691dab94c6d05f6b"
+    },
+    {
+      "path": "mailbox/messages/msg_00090_104219.eml",
+      "source": "mailbox",
+      "bytes": 771,
+      "sha256": "b6a04e602809780fb4e80ef34e761adedded2300de7b4c02daf72541f308a4c8"
+    },
+    {
+      "path": "mailbox/messages/msg_00091_104242.eml",
+      "source": "mailbox",
+      "bytes": 864,
+      "sha256": "91525140106ae4925f0f50cf98c08b511d964d6f3ac44f84b4b5b014ca574646"
+    },
+    {
+      "path": "mailbox/messages/msg_00092_104249.eml",
+      "source": "mailbox",
+      "bytes": 905,
+      "sha256": "f42e79b1f545fd0ddb76cf441dd90d1074d2fe3501d7b754f15e62ac9869dbd3"
+    },
+    {
+      "path": "mailbox/messages/msg_00093_104302.eml",
+      "source": "mailbox",
+      "bytes": 1022,
+      "sha256": "ec200a9cb4675576c26d8314786dc1cd1bfc45c83b81b64fa941724bdd9e8054"
+    },
+    {
+      "path": "mailbox/messages/msg_00094_104380.eml",
+      "source": "mailbox",
+      "bytes": 836,
+      "sha256": "131a318a7f52e16a1a045c0595185be519e6ca087405359ad61766d63a0bbff7"
+    },
+    {
+      "path": "mailbox/messages/msg_00095_104431.eml",
+      "source": "mailbox",
+      "bytes": 922,
+      "sha256": "4d721a90f285495add6ab0340c3807bd861881e850fcdead1dbf54fbadc13084"
+    },
+    {
+      "path": "mailbox/messages/msg_00096_104516.eml",
+      "source": "mailbox",
+      "bytes": 887,
+      "sha256": "a7652cc8eaa56929420792a1dfb9868079427ec5dfae0631b73496e1c1709db8"
+    },
+    {
+      "path": "mailbox/messages/msg_00097_104578.eml",
+      "source": "mailbox",
+      "bytes": 837,
+      "sha256": "63110519bdfc5e4e551fb8a655504addece6788df9b2cc7256ad842b6592f021"
+    },
+    {
+      "path": "mailbox/messages/msg_00098_104589.eml",
+      "source": "mailbox",
+      "bytes": 917,
+      "sha256": "c48c2cbbe1871449b47779c8e845384c7e7dcb81d7a38af35355469bdda98f27"
+    },
+    {
+      "path": "mailbox/messages/msg_00099_104663.eml",
+      "source": "mailbox",
+      "bytes": 841,
+      "sha256": "e7b53d5d6fe7305ebd3c14863b30e0887ee8d350d2da9669957976cf9f29991e"
+    },
+    {
+      "path": "mailbox/messages/msg_00100_104684.eml",
+      "source": "mailbox",
+      "bytes": 834,
+      "sha256": "cf5d7510b5c053c4c0eb687e62ccc0929516fc6a86ff55fecbb76bd086a2a015"
+    },
+    {
+      "path": "mailbox/messages/msg_00101_104717.eml",
+      "source": "mailbox",
+      "bytes": 854,
+      "sha256": "cdf32fc1c20c38529d8393c5c095718f7e3cc6a4d6bcf40533574b3e2930a7e6"
+    },
+    {
+      "path": "mailbox/messages/msg_00102_104765.eml",
+      "source": "mailbox",
+      "bytes": 925,
+      "sha256": "cf880cd153a49c76865ea415d4674987f5151653e0c5ff45b628243d11691166"
+    },
+    {
+      "path": "mailbox/messages/msg_00103_104804.eml",
+      "source": "mailbox",
+      "bytes": 916,
+      "sha256": "7e2c1df9cc9b13c24311ec372f6d8c504c8161298333a7f2228be626b12efde4"
+    },
+    {
+      "path": "mailbox/messages/msg_00104_104856.eml",
+      "source": "mailbox",
+      "bytes": 858,
+      "sha256": "23f13e940ab545eac25a8395e8b93d977b1e12362fc704e106b0890c657e73d6"
+    },
+    {
+      "path": "mailbox/messages/msg_00105_104880.eml",
+      "source": "mailbox",
+      "bytes": 977,
+      "sha256": "caa3d6ab530bbc3508e5d0270a4b0d5ed33810b48e7e8302d554c76bbdd608ff"
+    },
+    {
+      "path": "mailbox/messages/msg_00106_104940.eml",
+      "source": "mailbox",
+      "bytes": 956,
+      "sha256": "15c95dc012ae10d6ac7ae67cf7922a46c74a4508a78565d41109fba48686e511"
+    },
+    {
+      "path": "mailbox/messages/msg_00107_104991.eml",
+      "source": "mailbox",
+      "bytes": 855,
+      "sha256": "c137f87ddbcd1ce494db9b344c44bc06e09843af6c76daff03c870ce137056f0"
+    },
+    {
+      "path": "mailbox/messages/msg_00108_105024.eml",
+      "source": "mailbox",
+      "bytes": 804,
+      "sha256": "c43f37d82c969b5c8e1f28ca24bd416359995937ef5e83b5a68f2222a7114173"
+    },
+    {
+      "path": "mailbox/messages/msg_00109_105110.eml",
+      "source": "mailbox",
+      "bytes": 857,
+      "sha256": "a1f0917d5ff7a2674f6522720719742a774d0a0f3e0a475c22b882b89c003692"
+    },
+    {
+      "path": "mailbox/messages/msg_00110_105169.eml",
+      "source": "mailbox",
+      "bytes": 869,
+      "sha256": "98d8bad8efcb80292c71bb80ff976794c99c7aa5e1cc7649a14b994d75d57cc0"
+    },
+    {
+      "path": "mailbox/messages/msg_00111_105194.eml",
+      "source": "mailbox",
+      "bytes": 876,
+      "sha256": "7df49ca30e82e1906526c940517a5edc73cc358f3f2ac7df9d569eb9eb8d5d0b"
+    },
+    {
+      "path": "mailbox/messages/msg_00112_105274.eml",
+      "source": "mailbox",
+      "bytes": 992,
+      "sha256": "5ffe1d90acb6eef783cca3c0bcbeae4364eacd69627198524800725b17816f02"
+    },
+    {
+      "path": "mailbox/messages/msg_00113_105362.eml",
+      "source": "mailbox",
+      "bytes": 773,
+      "sha256": "63110059c2c34463ead68cc8d98ba69728d8dc5db5c594bf286c3a2f0e16872f"
+    },
+    {
+      "path": "mailbox/messages/msg_00114_105391.eml",
+      "source": "mailbox",
+      "bytes": 861,
+      "sha256": "48d48dc492e78ce37e678583c4192c7c33c6ea64695b1c201cacbf67b1b2410f"
+    },
+    {
+      "path": "mailbox/messages/msg_00115_105394.eml",
+      "source": "mailbox",
+      "bytes": 909,
+      "sha256": "8635fc4b7de1db31ad2f58e2356371287884ed0db6d406c97f83efb6b4b712c7"
+    },
+    {
+      "path": "mailbox/messages/msg_00116_105454.eml",
+      "source": "mailbox",
+      "bytes": 858,
+      "sha256": "3653c49ad1d2d805ec6a770d99c345f7d8a54df2d63acc017d72622f82bd447f"
+    },
+    {
+      "path": "mailbox/messages/msg_00117_105506.eml",
+      "source": "mailbox",
+      "bytes": 733,
+      "sha256": "579898a8f8fca20afbab8bafc16846529519b7d420084aa411419848b2a00284"
+    },
+    {
+      "path": "mailbox/messages/msg_00118_105558.eml",
+      "source": "mailbox",
+      "bytes": 803,
+      "sha256": "753cef4e7f579ea44255ba6e13511f5b9e348d24416374ccbf61125e72104ba0"
+    },
+    {
+      "path": "mailbox/messages/msg_00119_105631.eml",
+      "source": "mailbox",
+      "bytes": 1389,
+      "sha256": "7ad922ab536dd038be84516e75149d6ee6eef180ba60bd3992a518b855e97940"
+    },
+    {
+      "path": "mailbox/messages/msg_00120_105637.eml",
+      "source": "mailbox",
+      "bytes": 849,
+      "sha256": "55ced43ab31dbb0d3eb8714f764ab95b97636c631682571660766449e84e8fec"
+    },
+    {
+      "path": "mailbox/messages/msg_00121_105663.eml",
+      "source": "mailbox",
+      "bytes": 916,
+      "sha256": "b1d900c52ccacc52a10318bfeece27953bfbdbf1923ad09257b0887384609c50"
+    },
+    {
+      "path": "mailbox/messages/msg_00122_105679.eml",
+      "source": "mailbox",
+      "bytes": 894,
+      "sha256": "0d013d04d1743bfa9005e22eca21002b61eacc4ccb4fd9037d82d86b076a4397"
+    },
+    {
+      "path": "mailbox/messages/msg_00123_105710.eml",
+      "source": "mailbox",
+      "bytes": 819,
+      "sha256": "99d6f9a6c36beb61c30edc3acf01da3b775a042aef5eb5189c8e70f70c74bede"
+    },
+    {
+      "path": "mailbox/messages/msg_00124_105726.eml",
+      "source": "mailbox",
+      "bytes": 814,
+      "sha256": "ed4ff6cc9ae5ad6ffd04f7bac6eb2094aea2c2c85a7ce2fe474a7d62cb3ce867"
+    },
+    {
+      "path": "mailbox/messages/msg_00125_105797.eml",
+      "source": "mailbox",
+      "bytes": 1002,
+      "sha256": "28b827940d5ab826eee2879d0039b1a5a5d23675c192c5baea674b4d5da1d077"
+    },
+    {
+      "path": "mailbox/messages/msg_00126_105876.eml",
+      "source": "mailbox",
+      "bytes": 794,
+      "sha256": "f1397137e36fe77daf06aec49f1c6311a449bebd21892eb7260d4168e8032e76"
+    },
+    {
+      "path": "mailbox/messages/msg_00127_105925.eml",
+      "source": "mailbox",
+      "bytes": 810,
+      "sha256": "e648af3d283e2e6458935807bbc6b3330d7460473057e85673ee6efff24b1dae"
+    },
+    {
+      "path": "mailbox/messages/msg_00128_105948.eml",
+      "source": "mailbox",
+      "bytes": 973,
+      "sha256": "121dcd430c8c0a10cc59a2747598177ec694f152f7f770bf44500cd8504e0b56"
+    },
+    {
+      "path": "mailbox/messages/msg_00129_106018.eml",
+      "source": "mailbox",
+      "bytes": 763,
+      "sha256": "b1af579bdd810393525d73e069faca02b8fd61ec119b8e518820ec92779f3e0b"
+    },
+    {
+      "path": "mailbox/messages/msg_00130_106038.eml",
+      "source": "mailbox",
+      "bytes": 791,
+      "sha256": "a5764852fb6fbf4701909addfd335befe9485522b1a3ca69673150423c1095e4"
+    },
+    {
+      "path": "mailbox/messages/msg_00131_106077.eml",
+      "source": "mailbox",
+      "bytes": 946,
+      "sha256": "39073770f676ce1d46c08cca29c2ff9ee127508afb893f9579c764010465d34e"
+    },
+    {
+      "path": "mailbox/messages/msg_00132_106083.eml",
+      "source": "mailbox",
+      "bytes": 849,
+      "sha256": "998ab71b80f90eec3ddbe6a2a2a4907651c1c9b5c53249c0de07b675dc7ebfa2"
+    },
+    {
+      "path": "mailbox/messages/msg_00133_106138.eml",
+      "source": "mailbox",
+      "bytes": 759,
+      "sha256": "546f136e98946bd1f218053eb19b5c22d6fa685f321cc0776001afe15677c4e2"
+    },
+    {
+      "path": "mailbox/messages/msg_00134_106224.eml",
+      "source": "mailbox",
+      "bytes": 796,
+      "sha256": "33f2639eabecd2a886e6bd9d60a304032b6ab37d574eaa65724964614826d602"
+    },
+    {
+      "path": "mailbox/messages/msg_00135_106263.eml",
+      "source": "mailbox",
+      "bytes": 879,
+      "sha256": "ff3f1a1c8fcc4bbb6141af3ae7e928d7882168e99c5572c135505f846c4532a9"
+    },
+    {
+      "path": "mailbox/messages/msg_00136_106352.eml",
+      "source": "mailbox",
+      "bytes": 888,
+      "sha256": "14d76a3c54412f01be576e8be4d52bca5162e665ba2ffd8b2ffb0f2b38c50b4f"
+    },
+    {
+      "path": "mailbox/messages/msg_00137_106360.eml",
+      "source": "mailbox",
+      "bytes": 975,
+      "sha256": "482fd5e3c6b5715511dfeb750e78a244fdb064e2b395568625e5a4c56b9d5e2e"
+    },
+    {
+      "path": "mailbox/messages/msg_00138_106387.eml",
+      "source": "mailbox",
+      "bytes": 924,
+      "sha256": "f528d5f03fcbea968fa886189a5676fd923e04665c90dbde0be535def2a5bbe5"
+    },
+    {
+      "path": "mailbox/messages/msg_00139_106448.eml",
+      "source": "mailbox",
+      "bytes": 762,
+      "sha256": "2cdad89df95380d3e7e8a11b30bff307b4742e25e2defb125c40108a1b499a14"
+    },
+    {
+      "path": "mailbox/messages/msg_00140_106491.eml",
+      "source": "mailbox",
+      "bytes": 804,
+      "sha256": "9c2aae2a54df56db480ed1e14ad528892003670ec8cd8ff9eea9b11237f38d1c"
+    },
+    {
+      "path": "mailbox/messages/msg_00141_106562.eml",
+      "source": "mailbox",
+      "bytes": 842,
+      "sha256": "f7f19bafd3e1393a2cfae105163c3352a99522aa1f386233694ea82cb46d2c38"
+    },
+    {
+      "path": "mailbox/messages/msg_00142_106623.eml",
+      "source": "mailbox",
+      "bytes": 827,
+      "sha256": "617a48ba9d2728c765cb9acb71e08f92b375d8d0f069dfe2666c60b6e847c014"
+    },
+    {
+      "path": "mailbox/messages/msg_00143_106626.eml",
+      "source": "mailbox",
+      "bytes": 846,
+      "sha256": "cdf585fe8fa0e42d12dd8ae75abc830321efba69fb01cf0c85ae571d7132da7a"
+    },
+    {
+      "path": "mailbox/messages/msg_00144_106688.eml",
+      "source": "mailbox",
+      "bytes": 896,
+      "sha256": "55d7ecd3ca35ea8ff766950dc9fe88c6c47d9d5c348b62fd59efa0eaa80a46ea"
+    },
+    {
+      "path": "mailbox/messages/msg_00145_106776.eml",
+      "source": "mailbox",
+      "bytes": 805,
+      "sha256": "5812bca4a88a6be14dd7fa88fcf6aec8d747adcef4f0997e7401d498fd3f3eff"
+    },
+    {
+      "path": "mailbox/messages/msg_00146_106836.eml",
+      "source": "mailbox",
+      "bytes": 823,
+      "sha256": "d52a0cd570818e3fa1008f6e943975f92be6bd8c113dbbef96d27495b7e95ee5"
+    },
+    {
+      "path": "mailbox/messages/msg_00147_106899.eml",
+      "source": "mailbox",
+      "bytes": 966,
+      "sha256": "3920c3c7473abfaaf6f4b8c7f32cba2026ef694145284bfbfb9a383618767b4d"
+    },
+    {
+      "path": "mailbox/messages/msg_00148_106949.eml",
+      "source": "mailbox",
+      "bytes": 778,
+      "sha256": "8efa537fe4c668b64428c0cd7461efdb1e52132d12bec95ccb3959e16f799483"
+    },
+    {
+      "path": "mailbox/messages/msg_00149_107014.eml",
+      "source": "mailbox",
+      "bytes": 893,
+      "sha256": "282fce646c3db710358aeafa14a19a8bad714144f22b850bf24f27293dc27f96"
+    },
+    {
+      "path": "mailbox/messages/msg_00150_107024.eml",
+      "source": "mailbox",
+      "bytes": 986,
+      "sha256": "e6e74281599a02ee6cb7ba39d60f314e837549a11dd4a0ef4c39442fa08c4533"
+    },
+    {
+      "path": "mailbox/messages/msg_00151_107075.eml",
+      "source": "mailbox",
+      "bytes": 827,
+      "sha256": "6f603094ab9e3ababf04d0d9bbae765818fcbde69bc157aff9c6e801de63f9dd"
+    },
+    {
+      "path": "mailbox/messages/msg_00152_107100.eml",
+      "source": "mailbox",
+      "bytes": 772,
+      "sha256": "f207103beeebdb6e162c74bb34762eeee4f6f46b946113b1be4db7ad4e7711e9"
+    },
+    {
+      "path": "mailbox/messages/msg_00153_107106.eml",
+      "source": "mailbox",
+      "bytes": 945,
+      "sha256": "d4c2ec47126157288e6eab876216bd0566ef03ce72ee72013cbfd4facb5dfaa3"
+    },
+    {
+      "path": "mailbox/messages/msg_00154_107165.eml",
+      "source": "mailbox",
+      "bytes": 796,
+      "sha256": "0e2ed7207893cb9965c651454f855a6cc1898aff1b31c04b1cccb8ab3eed3de3"
+    },
+    {
+      "path": "mailbox/messages/msg_00155_107206.eml",
+      "source": "mailbox",
+      "bytes": 856,
+      "sha256": "aa1d63cd552c687c0c9d1c3bfe5fa335bd3b6d97f60235f40c935cb75898500a"
+    },
+    {
+      "path": "mailbox/messages/msg_00156_107289.eml",
+      "source": "mailbox",
+      "bytes": 763,
+      "sha256": "3d4a463eb47be079117c6031327c3582afc928641a543ba53b3977bc83761a80"
+    },
+    {
+      "path": "mailbox/messages/msg_00157_107294.eml",
+      "source": "mailbox",
+      "bytes": 1033,
+      "sha256": "503de0916ee38bed75fc9ce6b4a0fa5c5e48c4be1981514e7f78b7ce4cb38516"
+    },
+    {
+      "path": "mailbox/messages/msg_00158_107311.eml",
+      "source": "mailbox",
+      "bytes": 872,
+      "sha256": "df5267eed08ea32f3054d65c1c858bee96ed490458ea3de5cd8bf8ad7f304d3b"
+    },
+    {
+      "path": "mailbox/messages/msg_00159_107361.eml",
+      "source": "mailbox",
+      "bytes": 777,
+      "sha256": "ae8f7f2fb34c9c442e315ed071e92b582eaf299f65f462b86cf4ec9c240fa9cd"
+    },
+    {
+      "path": "mailbox/messages/msg_00160_107427.eml",
+      "source": "mailbox",
+      "bytes": 934,
+      "sha256": "f82e03c2b26667421dc55c177337065256460b8352590df3ea89d40a2eded8c8"
+    },
+    {
+      "path": "mailbox/messages/msg_00161_107492.eml",
+      "source": "mailbox",
+      "bytes": 871,
+      "sha256": "51f766ad8229efedde8b2192b1e37d6f915728c3c8019befc23fc568881b362f"
+    },
+    {
+      "path": "mailbox/messages/msg_00162_107577.eml",
+      "source": "mailbox",
+      "bytes": 814,
+      "sha256": "d7dc82741df0d84efa9cacc9a68a509343631f30d61f80ba2490692ef0ba2b43"
+    },
+    {
+      "path": "mailbox/messages/msg_00163_107624.eml",
+      "source": "mailbox",
+      "bytes": 763,
+      "sha256": "285c5d15da0534f1824d70330f46a44603dc33861d11b452b97321006b2f2e76"
+    },
+    {
+      "path": "mailbox/messages/msg_00164_107690.eml",
+      "source": "mailbox",
+      "bytes": 910,
+      "sha256": "685f8542193d818544b3c72143b5a9e0d2c93725d436eedd8d9c84dd948f160d"
+    },
+    {
+      "path": "mailbox/messages/msg_00165_107775.eml",
+      "source": "mailbox",
+      "bytes": 851,
+      "sha256": "4a121c879b65c01d244e3dc5e872c19d84e4022f967a3a7e199ef75c65b08cda"
+    },
+    {
+      "path": "mailbox/messages/msg_00166_107845.eml",
+      "source": "mailbox",
+      "bytes": 888,
+      "sha256": "9f631b819dd94f4e9c040a26c40e78bba327e60136ef7557d9784ff6698f023a"
+    },
+    {
+      "path": "mailbox/messages/msg_00167_107851.eml",
+      "source": "mailbox",
+      "bytes": 862,
+      "sha256": "70bffbcc5527f39fe0f2b4f58d9bea2381d99a0cadb0ab30863d42388ffc0d5a"
+    },
+    {
+      "path": "mailbox/messages/msg_00168_107918.eml",
+      "source": "mailbox",
+      "bytes": 799,
+      "sha256": "42ff365ad9ea35652d26386e44bf01a4e4be6d425fb0b2c55891215f18fb1e7d"
+    },
+    {
+      "path": "mailbox/messages/msg_00169_107949.eml",
+      "source": "mailbox",
+      "bytes": 858,
+      "sha256": "519fe71173bc3a08c4940f1e1270449e5f669e335b29b937840036af10e9a70a"
+    },
+    {
+      "path": "mailbox/messages/msg_00170_107974.eml",
+      "source": "mailbox",
+      "bytes": 730,
+      "sha256": "61a4c9e81be1369ab1ae838433d26f5499ffccc7909b7fe0fc57dfb2f06a572f"
+    },
+    {
+      "path": "mailbox/messages/msg_00171_108036.eml",
+      "source": "mailbox",
+      "bytes": 962,
+      "sha256": "f2228784adae472c21efc256819cfffafa731eca470fec03d3ee4f8dee578ebf"
+    },
+    {
+      "path": "mailbox/messages/msg_00172_108063.eml",
+      "source": "mailbox",
+      "bytes": 934,
+      "sha256": "a94d4a9940a50b8187ce51b8e3c2b0eed76dfb6a1890ad82a1a99f17acb81e73"
+    },
+    {
+      "path": "mailbox/messages/msg_00173_108087.eml",
+      "source": "mailbox",
+      "bytes": 935,
+      "sha256": "d228b3a6f5165f5f7555502a2911e8da668949719fb0b21bfcd1e276fcbe17ab"
+    },
+    {
+      "path": "mailbox/messages/msg_00174_108102.eml",
+      "source": "mailbox",
+      "bytes": 861,
+      "sha256": "80db389adbcd958d2b75407b92b1f4935e24d4a7b3f988478f73ad4de7268573"
+    },
+    {
+      "path": "mailbox/messages/msg_00175_108176.eml",
+      "source": "mailbox",
+      "bytes": 805,
+      "sha256": "95fefe179e3518623e337bfafa4403fd3d452634f9543615377feff762302558"
+    },
+    {
+      "path": "mailbox/messages/msg_00176_108190.eml",
+      "source": "mailbox",
+      "bytes": 800,
+      "sha256": "684c599c10f6d07e37a58c0ce1e120bb13c01af860c0dafdc10f9b951d73d373"
+    },
+    {
+      "path": "mailbox/messages/msg_00177_108217.eml",
+      "source": "mailbox",
+      "bytes": 861,
+      "sha256": "c3b7d28f660a2859e6f60d5953b65228dfc2e5468f6ba4a9c29640364751f8b6"
+    },
+    {
+      "path": "mailbox/messages/msg_00178_108232.eml",
+      "source": "mailbox",
+      "bytes": 799,
+      "sha256": "55176aaf9acd222980a4f98aa94f0dc8307b354787f14a2ed3a2b138b01b62d3"
+    },
+    {
+      "path": "mailbox/messages/msg_00179_108295.eml",
+      "source": "mailbox",
+      "bytes": 894,
+      "sha256": "c4799f9efdd6c6211833459503833008bd1f0db411d294465adcf69d5e5505fd"
+    },
+    {
+      "path": "mailbox/messages/msg_00180_108367.eml",
+      "source": "mailbox",
+      "bytes": 884,
+      "sha256": "2640bfcc96d5ca6f3985869dfb07ca8f21e7ef71049084225e49831b5cd09f5e"
+    },
+    {
+      "path": "mailbox/messages/msg_00181_108403.eml",
+      "source": "mailbox",
+      "bytes": 870,
+      "sha256": "7e92dc5635da3f374e6850c9a92bb291a889e57117d18c2ce6b248171bc0487e"
+    },
+    {
+      "path": "mailbox/messages/msg_00182_108467.eml",
+      "source": "mailbox",
+      "bytes": 887,
+      "sha256": "fcd4f9f778eb43d5f9b0814c930fb2c1b12c513b80cbf368244be463b81476d5"
+    },
+    {
+      "path": "mailbox/messages/msg_00183_108551.eml",
+      "source": "mailbox",
+      "bytes": 824,
+      "sha256": "eaf4079282d1947692393279c54d291a6c74f8322e407ce307a141fcba8e9df3"
+    },
+    {
+      "path": "mailbox/messages/msg_00184_108597.eml",
+      "source": "mailbox",
+      "bytes": 870,
+      "sha256": "b186de39441ee5e7bb16ebd42547c20145b61c3c792ba969314c9bde26172d1d"
+    },
+    {
+      "path": "mailbox/messages/msg_00185_108606.eml",
+      "source": "mailbox",
+      "bytes": 940,
+      "sha256": "3c352d1fb843314a7b35ad9372261cf223ef71127899b18aeb17d265737ac93d"
+    },
+    {
+      "path": "mailbox/messages/msg_00186_108646.eml",
+      "source": "mailbox",
+      "bytes": 835,
+      "sha256": "a36dfb1dd17403e2e056e9700b2d4bb7a46d209d49fcb687d425ba89dbd91fc9"
+    },
+    {
+      "path": "mailbox/messages/msg_00187_108717.eml",
+      "source": "mailbox",
+      "bytes": 977,
+      "sha256": "24b7f5b2f08a3a18d8dbf1aa71a54b48d8157510b183712443e61cb450dfe282"
+    },
+    {
+      "path": "mailbox/messages/msg_00188_108779.eml",
+      "source": "mailbox",
+      "bytes": 853,
+      "sha256": "44ee6858d04b8155304c9d6c01afba0f7e75bccba9ae5eb441ff45607262f87a"
+    },
+    {
+      "path": "mailbox/messages/msg_00189_108799.eml",
+      "source": "mailbox",
+      "bytes": 830,
+      "sha256": "80e30ee37fe779ecf3bffacc766cb806b664312a189d1525d5d8e84d8c4c8c0d"
+    },
+    {
+      "path": "mailbox/messages/msg_00190_108844.eml",
+      "source": "mailbox",
+      "bytes": 866,
+      "sha256": "5a4762bcc248dfa67a92e9c0c50c188be6bb5d6338859b506bf8f98590b9a7f3"
+    },
+    {
+      "path": "mailbox/messages/msg_00191_108873.eml",
+      "source": "mailbox",
+      "bytes": 1022,
+      "sha256": "94bb5f16ed153c68527ad0f6a75af6e4d068416e1c77c280abef561c62f2d77a"
+    },
+    {
+      "path": "mailbox/messages/msg_00192_108941.eml",
+      "source": "mailbox",
+      "bytes": 894,
+      "sha256": "6d6f957b533a58b44f1609579750c82b4125811b4f36361245224718789d24d7"
+    },
+    {
+      "path": "mailbox/messages/msg_00193_108963.eml",
+      "source": "mailbox",
+      "bytes": 868,
+      "sha256": "5602daf10ea8110f303c646d5bf32d6e3f0390ac16475e6dbb66e0ceda702326"
+    },
+    {
+      "path": "mailbox/messages/msg_00194_109012.eml",
+      "source": "mailbox",
+      "bytes": 816,
+      "sha256": "c49714daf985dff9f278f406df50df3935103d9f3f3b54ea40477b5d6a825cbf"
+    },
+    {
+      "path": "mailbox/messages/msg_00195_109084.eml",
+      "source": "mailbox",
+      "bytes": 878,
+      "sha256": "5ecc05d2d7f397bcba904daca14bd8539aae7cded3ede6c5c52e3b8bb209cc5d"
+    },
+    {
+      "path": "mailbox/messages/msg_00196_109163.eml",
+      "source": "mailbox",
+      "bytes": 912,
+      "sha256": "d91a41417a03a337c58a0a7e326d779e14b60d56264bcaf11e198e7ffb33dfcd"
+    },
+    {
+      "path": "mailbox/messages/msg_00197_109174.eml",
+      "source": "mailbox",
+      "bytes": 849,
+      "sha256": "797c030c535024624e67f5add853204b5e95c394360e986daeb3034739cc384c"
+    },
+    {
+      "path": "mailbox/messages/msg_00198_109250.eml",
+      "source": "mailbox",
+      "bytes": 876,
+      "sha256": "0874af61076af09524363686bdb1ff42d591c7f87211679a78e5d5474d8ecc11"
+    },
+    {
+      "path": "mailbox/messages/msg_00199_109264.eml",
+      "source": "mailbox",
+      "bytes": 837,
+      "sha256": "991b3dd1c0ec45849632064947b01db6a236eba2cd4c69041afe6300e4e7b420"
+    },
+    {
+      "path": "mailbox/messages/msg_00200_109316.eml",
+      "source": "mailbox",
+      "bytes": 890,
+      "sha256": "d3cce77365cca6c90d5934e034541ba7334ecdb178fa5f766f3dcdc35fb6e076"
+    },
+    {
+      "path": "mailbox/messages/msg_00201_109391.eml",
+      "source": "mailbox",
+      "bytes": 879,
+      "sha256": "3d760d343a1e1bf6f0868cb3d209b18fbe2149472f46b3da745a319fd7aa410e"
+    },
+    {
+      "path": "mailbox/messages/msg_00202_109435.eml",
+      "source": "mailbox",
+      "bytes": 892,
+      "sha256": "559f05b7d534a8e1a40a10dfe2474e22d8d295d331dfa6ed2b3c4d14c9b1faf2"
+    },
+    {
+      "path": "mailbox/messages/msg_00203_109466.eml",
+      "source": "mailbox",
+      "bytes": 908,
+      "sha256": "cf6135ea31c687c3a95972666e8ea234cfe35e8a2bbed861459a8072f00714bd"
+    },
+    {
+      "path": "mailbox/messages/msg_00204_109524.eml",
+      "source": "mailbox",
+      "bytes": 973,
+      "sha256": "208c4dda6bcf9f8e5fa72e256b529bf485b2dbe55123f207f8840c0a894e49db"
+    },
+    {
+      "path": "mailbox/messages/msg_00205_109559.eml",
+      "source": "mailbox",
+      "bytes": 881,
+      "sha256": "66ddc2759aeb4f5ab2b7732e6fa01e7bf8ef679878f745cf746994d9dc5a1a36"
+    },
+    {
+      "path": "mailbox/messages/msg_00206_109605.eml",
+      "source": "mailbox",
+      "bytes": 907,
+      "sha256": "23e1451c68ff52c42e154c1a5a2d6a4d52676520ca05efae18bcde880a60eff0"
+    },
+    {
+      "path": "mailbox/messages/msg_00207_109676.eml",
+      "source": "mailbox",
+      "bytes": 743,
+      "sha256": "10775bb4aa7111c249d2102ffc06f615c9938f6f586b87d2d2b4fac26ba0d3fb"
+    },
+    {
+      "path": "mailbox/messages/msg_00208_109701.eml",
+      "source": "mailbox",
+      "bytes": 916,
+      "sha256": "444b249c754183a94f604e87ab5272529763046872fa5b6a117a0fc621a022d6"
+    },
+    {
+      "path": "mailbox/messages/msg_00209_109721.eml",
+      "source": "mailbox",
+      "bytes": 804,
+      "sha256": "5f3d86510f2c3b48c8eb6d5382b1e08f306fe2148554e5048d34ef1617b72c70"
+    },
+    {
+      "path": "mailbox/messages/msg_00210_109799.eml",
+      "source": "mailbox",
+      "bytes": 782,
+      "sha256": "fcd981b996bc47c76613c3f6bcc308c05b427bef2b18d8643a0a83638000da92"
+    },
+    {
+      "path": "market_data/fx/fx_rates.csv",
+      "source": "market_data",
+      "bytes": 244364,
+      "sha256": "f10c395f569dc14201e8439eaba74ea3cdb1b654666d655cd7d89d96c503917c"
+    },
+    {
+      "path": "market_data/instruments.csv",
+      "source": "market_data",
+      "bytes": 2072,
+      "sha256": "eeccbd4f3eea36af9dab2e6e546732ebeda32e7cc9412f053e1bf23c704fa128"
+    },
+    {
+      "path": "market_data/prices/prices_2024.csv",
+      "source": "market_data",
+      "bytes": 293109,
+      "sha256": "e111453fef4e1691c3b4df21a30cc401ed592641b6bbea96858cd275d5acf508"
+    },
+    {
+      "path": "market_data/prices/prices_2025.csv",
+      "source": "market_data",
+      "bytes": 701123,
+      "sha256": "b0dc77e7038572d5d565ad19d16d6bf0250104913fd8aa4f70688acecd006b33"
+    },
+    {
+      "path": "market_data/prices/prices_2026.csv",
+      "source": "market_data",
+      "bytes": 436052,
+      "sha256": "f36d35290a2d1f928e8ec0d27543a1f1347db241d4329635aa7d0f79830f2228"
+    },
+    {
+      "path": "market_data/prices/restatements/prices_2026-06_restated_2026-07-31.csv",
+      "source": "market_data",
+      "bytes": 3566,
+      "sha256": "20d84c17856cc523c467eb0eb32956e3598f34099f27e7dae88fb6260ac8f24c"
+    },
+    {
+      "path": "market_data/prices/restatements/RESTATEMENT_NOTE.md",
+      "source": "market_data",
+      "bytes": 524,
+      "sha256": "6218380b18884ce348e0dad66cb09d86a3fa7a712abf35112e0cdbc0705824d2"
+    },
+    {
+      "path": "market_data/ratings/rating_actions.csv",
+      "source": "market_data",
+      "bytes": 63254,
+      "sha256": "fa65fa30d61a62e69cae84b6acd45899caccdde0aaefdcb4e7e9d23a1f2188af"
+    },
+    {
+      "path": "spreadsheets/covenant_tracker.csv",
+      "source": "spreadsheets",
+      "bytes": 13872,
+      "sha256": "b11125fc79a08db2b89ffc068789b99dbd66bab0473ef2d65d400ff30a48a0bf"
+    },
+    {
+      "path": "spreadsheets/exposure_summary_by_sector.csv",
+      "source": "spreadsheets",
+      "bytes": 881,
+      "sha256": "304a024bf30d1fd722c538eec0cfdf93aaecc223301722ddc3684da52b65267c"
+    },
+    {
+      "path": "spreadsheets/FORMULAS.yaml",
+      "source": "spreadsheets",
+      "bytes": 2353,
+      "sha256": "bf4f12e3d19920c44f9de135f4ccbff68ea1127f0f84da6f3ec6f2e954a1aaa5"
+    },
+    {
+      "path": "spreadsheets/limit_utilisation.csv",
+      "source": "spreadsheets",
+      "bytes": 50857,
+      "sha256": "9de35ff0185f10ce63c094faca8420e7ced22da47ab3696de9d8f44733e22289"
+    },
+    {
+      "path": "spreadsheets/README.md",
+      "source": "spreadsheets",
+      "bytes": 435,
+      "sha256": "cc8acd22faa22553e6b8bdcf7b66e728579173a072463cbcc4ff08f7ebf8527f"
+    },
+    {
+      "path": "spreadsheets/risk_model_pd_lgd.csv",
+      "source": "spreadsheets",
+      "bytes": 22926,
+      "sha256": "6b35de9b65fe1db6620cb97b2bb2f0849836d5ec9ce24c61a6e63b6f080f3e86"
+    },
+    {
+      "path": "payments/cursor.json",
+      "source": "payments",
+      "bytes": 440,
+      "sha256": "bf1dbbe8820c3f9ff474d16def9bfb772db5fd6982f447f54eee2033794b081a"
+    },
+    {
+      "path": "payments/events/events_00001.jsonl",
+      "source": "payments",
+      "bytes": 1132184,
+      "sha256": "7e21415a63d7cced682787be0dfea5f4addedbd0d35ef269398cfbd1d1f94d62"
+    },
+    {
+      "path": "payments/events/events_00002.jsonl",
+      "source": "payments",
+      "bytes": 1132899,
+      "sha256": "bed6e7552a9d15d20f30b5b166b003aa0f9d061992a7bccad1effc668ee29d5d"
+    },
+    {
+      "path": "payments/events/events_00003.jsonl",
+      "source": "payments",
+      "bytes": 1132673,
+      "sha256": "cfae7515f2899483a2650c03da2c744d95e84ebe38fd2aad325effa9ca82a85a"
+    },
+    {
+      "path": "payments/events/events_00004.jsonl",
+      "source": "payments",
+      "bytes": 1132664,
+      "sha256": "06a1f92763468463199cdf8798393a34812475a3b0856c7256e7ab6a5545c0e1"
+    },
+    {
+      "path": "payments/events/events_00005.jsonl",
+      "source": "payments",
+      "bytes": 1133093,
+      "sha256": "580b3b839de7b08ef96357915a38254c8099a0fa0f341ed0df49668ac61f8ac9"
+    },
+    {
+      "path": "payments/events/events_00006.jsonl",
+      "source": "payments",
+      "bytes": 1134559,
+      "sha256": "b2c87c45008a822c405d91ce5afc5c6f48cad20054292b10b0caefda6b9a1b97"
+    },
+    {
+      "path": "payments/events/events_00007.jsonl",
+      "source": "payments",
+      "bytes": 73598,
+      "sha256": "b2c8f9392a08f517f50616ea6db41537284ffa68c2a880e767402b9a47cec045"
+    },
+    {
+      "path": "payments/SCHEMA.md",
+      "source": "payments",
+      "bytes": 1613,
+      "sha256": "fa5da89acc1ad1e2ecc0ee2f4d8531687470db9ac147d581051302b968873340"
+    },
+    {
+      "path": "sanctions_watchlist/README.md",
+      "source": "sanctions_watchlist",
+      "bytes": 1048,
+      "sha256": "4d984498fecd27c40998785d73e449e0b34c8d973c5f4ca607cbee92c59511b6"
+    },
+    {
+      "path": "sanctions_watchlist/watchlist_2026-08-01.csv",
+      "source": "sanctions_watchlist",
+      "bytes": 20682,
+      "sha256": "0a733657a8d1bec88a0541edc942b044ee854c7d5c0cdf8f54befd162a098615"
+    },
+    {
+      "path": "ground_truth/entity_clusters.json",
+      "source": "ground_truth",
+      "bytes": 1117698,
+      "sha256": "e8033b1136dd9bb21e162ef829c87f7d9a701a44886cc55c8fa10c85609bb731"
+    },
+    {
+      "path": "ground_truth/entity_map.csv",
+      "source": "ground_truth",
+      "bytes": 589375,
+      "sha256": "1efe8d86a2f9c1c51089a0b6a32f81fa771407e47db435de09e1f3443a38a7e2"
+    },
+    {
+      "path": "ground_truth/expected_counts.json",
+      "source": "ground_truth",
+      "bytes": 1459,
+      "sha256": "102e84a3208f8e33a9bd726931fa06fc873a1a2cfbc5761f66a0d6d3c9d7c93f"
+    },
+    {
+      "path": "ground_truth/expected_screening_results.json",
+      "source": "ground_truth",
+      "bytes": 3442,
+      "sha256": "27e0af4c68eb7a7a473344b9ae7ebad068cda4d16cc87b5827ecc6f9a553b9ae"
+    },
+    {
+      "path": "ground_truth/injections.json",
+      "source": "ground_truth",
+      "bytes": 19641,
+      "sha256": "b9ddb570baab86c07e35fe7b493c6cc4aacad31c30d17c7873398ad5e4604139"
+    },
+    {
+      "path": "ground_truth/intra_source_duplicates.csv",
+      "source": "ground_truth",
+      "bytes": 5308,
+      "sha256": "887928193426e507b8d8b22d435784927da21ac364aefce1cf4e6b014068010d"
+    },
+    {
+      "path": "ground_truth/non_matches.csv",
+      "source": "ground_truth",
+      "bytes": 2037,
+      "sha256": "b08e6ce3034eb00b6d6e5336107129de4e7a40d1c5218d7c1e0e27ba43cae271"
+    },
+    {
+      "path": "ground_truth/pii_in_free_text.csv",
+      "source": "ground_truth",
+      "bytes": 39331,
+      "sha256": "ad2237f70e4cb77a4cb5e64ae349afe530837006251c858d7337ca2492b5870f"
+    },
+    {
+      "path": "ground_truth/README.md",
+      "source": "ground_truth",
+      "bytes": 1685,
+      "sha256": "f370763980e9baa031cb07b45af73dc6dbee65927039d70dbf28fedd2a4d1fe1"
+    }
+  ]
+}

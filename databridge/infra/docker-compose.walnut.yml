@@ -1,0 +1,97 @@
+# Walnut knowledge-graph demo infrastructure — synthetic Postgres + MCPJungle.
+#
+#   docker compose -f infra/docker-compose.walnut.yml up -d      (from databridge/)
+#   docker compose -f infra/docker-compose.walnut.yml down -v    (-v also drops the data volumes)
+#
+# Normally started by start-walnut-kg.ps1. Ports are chosen to avoid the other stacks on this
+# machine: 5433 (demo Postgres; 5432 is often taken), 8080 (MCPJungle — the gateway's default
+# MCPJUNGLE_URL is http://127.0.0.1:8080). Nothing here uses 8000/3000.
+#
+# ALL CREDENTIALS ARE SYNTHETIC DEFAULTS for a local demo. Override any of them with environment
+# variables (or an infra/.env file, which is gitignored via the repo's `.env` rule).
+#
+# Services
+#   walnut_demo_pg     postgres:16, initialised from fixtures/workspace_demo/db/*.sql on first
+#                      start (database `larkspur`, read-only role `walnut_reader`).
+#   mcpjungle_db       MCPJungle's own registry database (kept separate from the demo data).
+#   mcpjungle          ghcr.io/mcpjungle/mcpjungle:latest-stdio — the stdio-capable image that
+#                      bundles npx + uvx, so stdio MCP servers (filesystem, postgres-mcp, Google
+#                      Drive) can be registered INTO it and reached over one HTTP gateway.
+#                      Image and env names confirmed from the MCPJungle README and its upstream
+#                      docker-compose.yaml (2026-10-01).
+#
+# Paths INSIDE the mcpjungle container (use these when registering stdio servers into it):
+#   /data/workspace_demo/files    the synthetic document corpus (read-only)
+#   /secrets/gdrive               Google Drive OAuth credentials + tokens (see docs/GOOGLE_DRIVE_SETUP.md)
+#   Postgres from inside the network: postgresql://walnut_reader:...@walnut_demo_pg:5432/larkspur
+
+name: walnut-kg
+
+services:
+  walnut_demo_pg:
+    image: postgres:16
+    container_name: walnut_demo_pg
+    environment:
+      POSTGRES_USER: ${WALNUT_DEMO_PG_USER:-walnut}
+      POSTGRES_PASSWORD: ${WALNUT_DEMO_PG_PASSWORD:-walnut_synthetic}
+      POSTGRES_DB: larkspur
+    ports:
+      - "${WALNUT_DEMO_PG_PORT:-5433}:5432"
+    volumes:
+      - ../fixtures/workspace_demo/db:/docker-entrypoint-initdb.d:ro
+      - walnut_demo_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WALNUT_DEMO_PG_USER:-walnut} -d larkspur"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  mcpjungle_db:
+    image: postgres:16
+    container_name: walnut_mcpjungle_db
+    environment:
+      POSTGRES_USER: mcpjungle
+      POSTGRES_PASSWORD: ${MCPJUNGLE_DB_PASSWORD:-mcpjungle_synthetic}
+      POSTGRES_DB: mcpjungle
+    volumes:
+      - walnut_mcpjungle_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcpjungle -d mcpjungle"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  mcpjungle:
+    image: ghcr.io/mcpjungle/mcpjungle:${MCPJUNGLE_IMAGE_TAG:-latest-stdio}
+    container_name: walnut_mcpjungle
+    environment:
+      DATABASE_URL: postgres://mcpjungle:${MCPJUNGLE_DB_PASSWORD:-mcpjungle_synthetic}@mcpjungle_db:5432/mcpjungle
+      SERVER_MODE: ${MCPJUNGLE_SERVER_MODE:-development}
+      OTEL_ENABLED: "false"
+      MCP_SERVER_INIT_REQ_TIMEOUT_SEC: ${MCP_SERVER_INIT_REQ_TIMEOUT_SEC:-60}
+    ports:
+      - "${MCPJUNGLE_PORT:-8080}:8080"
+    volumes:
+      - ../fixtures/workspace_demo/files:/data/workspace_demo/files:ro
+      - ../var/secrets/gdrive:/secrets/gdrive
+    depends_on:
+      mcpjungle_db:
+        condition: service_healthy
+      walnut_demo_pg:
+        condition: service_healthy
+    # The image is distroless-ish; a CMD healthcheck may lack curl/wget. Probe from the host
+    # instead (start-walnut-kg.ps1 polls http://127.0.0.1:8080/health). If the image ships
+    # wget, this check also works; failing it only marks the container "unhealthy".
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || curl -fsS http://127.0.0.1:8080/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  walnut_demo_pg_data:
+  walnut_mcpjungle_db_data:

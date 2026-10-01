@@ -1,0 +1,15 @@
+MEETING NOTES — Kickoff, Route Optimisation Pilot (PRJ-101)
+Date: 2026-07-14   Location: Pellucid Freightways, Harbourgate depot, Southampton
+
+Attendees
+  Larkspur Analytics: Tobias Reinholt, Ines Marchetti-Holm
+  Pellucid Freightways: Rowan Achterberg, Selin Kaya-Morrow (Procurement)
+
+Discussion
+  - Rowan Achterberg walked through the southern trunk network and the three pilot depots.
+  - Selin Kaya-Morrow confirmed invoices go to Pellucid accounts payable, quoting MSA-2026-014.
+  - Contact for data questions: rowan.achterberg@pellucid-freightways.example, +44 20 7946 0321.
+
+Actions
+  1. Rowan Achterberg to send twelve months of telematics exports by 2026-07-21.
+  2. Tobias Reinholt to circulate the baseline method by 2026-08-01.

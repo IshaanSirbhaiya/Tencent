@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000102",
+  "filename": "IMG-2020-000102.jpg",
+  "image_present": false,
+  "captured_at": "2020-11-10T11:30:10+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2020-000453",
+  "application_id": "APP-2020-000586",
+  "parcel_id": "PCL-AR-02883",
+  "photo_batch_ref": "PHB-2020-000453",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-458279"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 439191,
+    "northing": 1219373,
+    "accuracy_m": 4.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1751,
+          120,
+          319,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-072328",
+        "confidence": 0.867,
+        "bbox": [
+          1616,
+          225,
+          702,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "73 FERRYMAN LANE, ASHCOMBE REACH AM8 2EF",
+        "confidence": 0.71,
+        "bbox": [
+          598,
+          324,
+          1280,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-11-10",
+        "confidence": 0.714,
+        "bbox": [
+          733,
+          522,
+          725,
+          56
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.967,
+        "bbox": [
+          2051,
+          560,
+          480,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

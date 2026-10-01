@@ -1,0 +1,70 @@
+# packs/finance — the pack's OPERATOR-SURFACE vocabulary (Layer 1, presentation half).
+#
+# `ontology.yaml` says what KINDS this pack has. This file says what a person is shown: every
+# domain noun the UI is otherwise forbidden to hardcode, the operator surfaces the pack declares,
+# its roster, its demo trials and its graph colours.
+#
+# It lives HERE, beside the ontology, because it is the pack's own vocabulary — not the frontend's.
+# `GET /packs` (apps/gateway/databridge_gateway/pack_routes.py) reads this file and serves it; the
+# frontend's `config/packs.json` is the offline fallback for the same shape and is the copy to
+# delete once the gateway is always reachable. Two copies is a drift hazard and is temporary.
+#
+# `available` is NOT declared here. Whether a pack is available is a property of the DEPLOYMENT
+# (`packs/deployment.yaml` / DATABRIDGE_PACKS), not of the pack, and the gateway computes it from
+# the binding. A pack that declared its own availability could claim to be enabled when nothing
+# had enabled it.
+#
+# Synthetic throughout: every person, organisation and document named here is fictional.
+
+pack: finance
+label: Finance
+tagline: Credit memo drafting over a pinned core-banking adapter
+nouns:
+  subject: party
+  subject_plural: parties
+  subject_title: Party
+  org: institution
+  org_plural: institutions
+  org_title: Institution
+  registry: party registry
+  record: institution record
+  graph: counterparty graph
+  workspace: Portfolio brain
+  counterparty: counterparty
+  counterparty_plural: counterparties
+  document: originating document
+  determination: credit determination
+  operator_surface: Underwriting desk
+  operator_role: underwriting desk
+  queue: Queue
+  identifier: legal entity identifier
+  pitch: Reads a party's originating documents before an underwriter opens the file.
+  credential: signature card
+  document_examples: a facility letter, mandate or counterparty memo
+  subject_plural_title: Parties
+roster: []
+surfaces: []
+trials:
+  intelligence: []
+  evidence: []
+  intake: []
+demo_steps: []
+graph_vocabulary:
+  node_kinds:
+    party:
+      color: '#6f9fd8'
+      label: Party
+    facility:
+      color: '#5fa98d'
+      label: Facility
+    obligation:
+      color: '#c4827a'
+      label: Obligation
+  edge_labels:
+    holds: holds
+    guarantees: guarantees
+    evidences: evidences
+demo_focus_node: ''
+demo_as_of: ''
+demo_question: ''
+brain_suggested_fallback: []

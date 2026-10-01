@@ -1,0 +1,1920 @@
+{
+  "meta": {
+    "notice": "SYNTHETIC FIXTURE -- Aldermoor Territory public registry. No real business is represented.",
+    "api": "aldermoor-public-registry",
+    "api_version": "2.3.1",
+    "endpoint": "/v2/licences",
+    "fetched_at": "2026-08-01T06:15:00Z",
+    "page": 1,
+    "page_size": 100,
+    "page_count": 9,
+    "total_records": 900,
+    "etag": "W/\"22b88c67b0aa91a8ac79\"",
+    "next_cursor": "ff1b912ca0191cab2363df15",
+    "retention_notice": "The registry serves current state only. There is no as-at parameter and no change feed."
+  },
+  "data": [
+    {
+      "licence_number": "LIC-LATE-HOURS-000001",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000448",
+      "premises": {
+        "parcel_id": "PCL-CB-01355",
+        "line1": "71 Tannery Rise",
+        "postcode": "AM1 6AW"
+      },
+      "issued_on": "2020-04-06",
+      "expires_on": "2021-04-05",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000002",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000390",
+      "premises": {
+        "parcel_id": "PCL-OH-01985",
+        "line1": "143 Quarry Lane",
+        "postcode": "AM8 9TF"
+      },
+      "issued_on": "2020-06-07",
+      "expires_on": "2025-06-05",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000003",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000428",
+      "premises": {
+        "parcel_id": "PCL-VH-02077",
+        "line1": "158 Marrow Terrace",
+        "postcode": "AM2 9YA"
+      },
+      "issued_on": "2018-09-23",
+      "expires_on": "2023-09-21",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000004",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000166",
+      "premises": {
+        "parcel_id": "PCL-VH-01633",
+        "line1": "171 Hollybank Lane",
+        "postcode": "AM4 6AG"
+      },
+      "issued_on": "2023-03-04",
+      "expires_on": "2028-03-01",
+      "status": "suspended",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "no amplified music after 23:00",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000005",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000067",
+      "premises": {
+        "parcel_id": null,
+        "line1": "114 Vintners Yard",
+        "postcode": "AM3 5VK"
+      },
+      "issued_on": "2022-12-26",
+      "expires_on": "2025-12-24",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "waste to be stored in the designated area",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000006",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000491",
+      "premises": {
+        "parcel_id": "PCL-VH-01369",
+        "line1": "232 Coldharbour Passage",
+        "postcode": "AM9 6VT"
+      },
+      "issued_on": "2025-09-02",
+      "expires_on": "2028-08-31",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000007",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000176",
+      "premises": {
+        "parcel_id": "PCL-OH-01421",
+        "line1": "132 Netherfield Yard",
+        "postcode": "AM1 7XK"
+      },
+      "issued_on": "2022-01-24",
+      "expires_on": "2027-01-22",
+      "status": "current",
+      "conditions": [
+        "no amplified music after 23:00",
+        "waste to be stored in the designated area",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000008",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000360",
+      "premises": {
+        "parcel_id": "PCL-TF-00763",
+        "line1": "223 Mallow Street",
+        "postcode": "AM3 9QG"
+      },
+      "issued_on": "2018-03-04",
+      "expires_on": "2019-03-03",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway",
+        "waste to be stored in the designated area",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000009",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000227",
+      "premises": {
+        "parcel_id": null,
+        "line1": "103 Ironmonger Rise",
+        "postcode": "AM9 1KJ"
+      },
+      "issued_on": "2020-07-07",
+      "expires_on": "2021-07-06",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area",
+        "no trading on the highway",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000010",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000560",
+      "premises": {
+        "parcel_id": null,
+        "line1": "211 Tannery Rise",
+        "postcode": "AM1 2VY"
+      },
+      "issued_on": "2023-02-02",
+      "expires_on": "2028-01-31",
+      "status": "current",
+      "conditions": [
+        "no trading on the highway",
+        "waste to be stored in the designated area",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000011",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000102",
+      "premises": {
+        "parcel_id": "PCL-SQ-01494",
+        "line1": "187 Ferryman Rise",
+        "postcode": "AM1 5PH"
+      },
+      "issued_on": "2024-05-14",
+      "expires_on": "2025-05-13",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000012",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000226",
+      "premises": {
+        "parcel_id": "PCL-VH-01813",
+        "line1": "203 Ostler Way",
+        "postcode": "AM6 1KB"
+      },
+      "issued_on": "2023-02-06",
+      "expires_on": "2024-02-05",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000013",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000396",
+      "premises": {
+        "parcel_id": "PCL-TF-02707",
+        "line1": "181 Hollybank Close",
+        "postcode": "AM6 9VK"
+      },
+      "issued_on": "2020-02-15",
+      "expires_on": "2023-02-13",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000014",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000509",
+      "premises": {
+        "parcel_id": "PCL-OH-00509",
+        "line1": "70 Cattle Close",
+        "postcode": "AM7 3FK"
+      },
+      "issued_on": "2024-06-06",
+      "expires_on": "2025-06-05",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000015",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000422",
+      "premises": {
+        "parcel_id": "PCL-SQ-02994",
+        "line1": "68 Weirside Row",
+        "postcode": "AM7 7XS"
+      },
+      "issued_on": "2021-01-30",
+      "expires_on": "2022-01-29",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000016",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000179",
+      "premises": {
+        "parcel_id": null,
+        "line1": "20 Saltmarsh Rise",
+        "postcode": "AM3 5ZT"
+      },
+      "issued_on": "2021-01-14",
+      "expires_on": "2022-01-13",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway",
+        "no amplified music after 23:00"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000017",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000324",
+      "premises": {
+        "parcel_id": "PCL-PG-02098",
+        "line1": "230 Ropewalk Street",
+        "postcode": "AM7 9BE"
+      },
+      "issued_on": "2018-05-14",
+      "expires_on": "2019-05-13",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000018",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000415",
+      "premises": {
+        "parcel_id": "PCL-ND-02793",
+        "line1": "103 Mallow Yard",
+        "postcode": "AM2 9VT"
+      },
+      "issued_on": "2026-03-20",
+      "expires_on": "2027-03-19",
+      "status": "current",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000019",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000230",
+      "premises": {
+        "parcel_id": null,
+        "line1": "82 Dovecote Rise",
+        "postcode": "AM3 4RG"
+      },
+      "issued_on": "2023-07-11",
+      "expires_on": "2026-07-09",
+      "status": "current",
+      "conditions": [
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000020",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000128",
+      "premises": {
+        "parcel_id": "PCL-TF-01531",
+        "line1": "38 Hollybank Row",
+        "postcode": "AM6 8HT"
+      },
+      "issued_on": "2024-03-21",
+      "expires_on": "2024-09-19",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "no trading on the highway",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000021",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000592",
+      "premises": {
+        "parcel_id": "PCL-OH-01937",
+        "line1": "86 Ferryman Way",
+        "postcode": "AM8 9BV"
+      },
+      "issued_on": "2022-01-02",
+      "expires_on": "2023-01-01",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "premises to be open to inspection at any reasonable time",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000022",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000300",
+      "premises": {
+        "parcel_id": "PCL-CB-01343",
+        "line1": "170 Gasworks Passage",
+        "postcode": "AM3 8YB"
+      },
+      "issued_on": "2020-09-19",
+      "expires_on": "2021-09-18",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000023",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000102",
+      "premises": {
+        "parcel_id": "PCL-SQ-01494",
+        "line1": "187 Ferryman Rise",
+        "postcode": "AM1 5PH"
+      },
+      "issued_on": "2025-05-31",
+      "expires_on": "2030-05-29",
+      "status": "current",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "no amplified music after 23:00",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000024",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000251",
+      "premises": {
+        "parcel_id": "PCL-OH-00173",
+        "line1": "238 Threadneedle Road",
+        "postcode": "AM5 2BB"
+      },
+      "issued_on": "2022-11-30",
+      "expires_on": "2023-11-29",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000025",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000487",
+      "premises": {
+        "parcel_id": "PCL-IH-01128",
+        "line1": "80B Marrow Road",
+        "postcode": "AM4 5VZ"
+      },
+      "issued_on": "2023-06-10",
+      "expires_on": "2023-12-09",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000026",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000004",
+      "premises": {
+        "parcel_id": "PCL-AR-01575",
+        "line1": "81 Marrow Lane",
+        "postcode": "AM7 5DW"
+      },
+      "issued_on": "2018-06-04",
+      "expires_on": "2021-06-02",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000027",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000176",
+      "premises": {
+        "parcel_id": "PCL-OH-01421",
+        "line1": "132 Netherfield Yard",
+        "postcode": "AM1 7XK"
+      },
+      "issued_on": "2021-09-24",
+      "expires_on": "2022-09-23",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000028",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000244",
+      "premises": {
+        "parcel_id": "PCL-CB-01631",
+        "line1": "234 Saltmarsh Passage",
+        "postcode": "AM7 7ZE"
+      },
+      "issued_on": "2026-01-24",
+      "expires_on": "2027-01-23",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000029",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000592",
+      "premises": {
+        "parcel_id": "PCL-OH-01937",
+        "line1": "86 Ferryman Way",
+        "postcode": "AM8 9BV"
+      },
+      "issued_on": "2026-03-03",
+      "expires_on": "2026-09-01",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000030",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000567",
+      "premises": {
+        "parcel_id": "PCL-SQ-00798",
+        "line1": "223 Vintners Passage",
+        "postcode": "AM7 7XB"
+      },
+      "issued_on": "2023-02-24",
+      "expires_on": "2024-02-23",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000031",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000377",
+      "premises": {
+        "parcel_id": "PCL-WH-00968",
+        "line1": "132 Netherfield Road",
+        "postcode": "AM8 5YY"
+      },
+      "issued_on": "2025-12-01",
+      "expires_on": "2028-11-29",
+      "status": "current",
+      "conditions": [
+        "no amplified music after 23:00",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000032",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000054",
+      "premises": {
+        "parcel_id": "PCL-VH-01765",
+        "line1": "188 Windlass Row",
+        "postcode": "AM8 8BT"
+      },
+      "issued_on": "2023-12-18",
+      "expires_on": "2024-12-16",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000033",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000591",
+      "premises": {
+        "parcel_id": "PCL-WH-01340",
+        "line1": "223 Paternoster Close",
+        "postcode": "AM8 5QW"
+      },
+      "issued_on": "2018-08-27",
+      "expires_on": "2019-08-26",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000034",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000192",
+      "premises": {
+        "parcel_id": null,
+        "line1": "66 Cattle Crescent",
+        "postcode": "AM3 1RT"
+      },
+      "issued_on": "2023-01-05",
+      "expires_on": "2024-01-04",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000035",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000045",
+      "premises": {
+        "parcel_id": "PCL-IH-00036",
+        "line1": "206 Hollybank Street",
+        "postcode": "AM4 4WK"
+      },
+      "issued_on": "2024-03-11",
+      "expires_on": "2025-03-10",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000036",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000279",
+      "premises": {
+        "parcel_id": "PCL-AR-02571",
+        "line1": "68B Saltmarsh Yard",
+        "postcode": "AM9 8ED"
+      },
+      "issued_on": "2022-08-18",
+      "expires_on": "2023-08-17",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "no trading on the highway",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000037",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000076",
+      "premises": {
+        "parcel_id": "PCL-PG-02890",
+        "line1": "193 Saltmarsh Row",
+        "postcode": "AM4 2RF"
+      },
+      "issued_on": "2023-06-28",
+      "expires_on": "2028-06-25",
+      "status": "current",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000038",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000065",
+      "premises": {
+        "parcel_id": "PCL-TF-00439",
+        "line1": "133 Netherfield Rise",
+        "postcode": "AM8 4DS"
+      },
+      "issued_on": "2020-09-14",
+      "expires_on": "2023-09-13",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000039",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000198",
+      "premises": {
+        "parcel_id": null,
+        "line1": "130 Sedge Yard",
+        "postcode": "AM3 1FR"
+      },
+      "issued_on": "2020-08-14",
+      "expires_on": "2023-08-13",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000040",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000018",
+      "premises": {
+        "parcel_id": null,
+        "line1": "162 Vintners Way",
+        "postcode": "AM7 8VH"
+      },
+      "issued_on": "2022-05-19",
+      "expires_on": "2027-05-17",
+      "status": "suspended",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000041",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000567",
+      "premises": {
+        "parcel_id": "PCL-SQ-00798",
+        "line1": "223 Vintners Passage",
+        "postcode": "AM7 7XB"
+      },
+      "issued_on": "2018-02-23",
+      "expires_on": "2021-02-21",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000042",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000139",
+      "premises": {
+        "parcel_id": "PCL-CB-00179",
+        "line1": "69 Saltmarsh Way",
+        "postcode": "AM9 3LN"
+      },
+      "issued_on": "2018-06-21",
+      "expires_on": "2023-06-19",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000043",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000326",
+      "premises": {
+        "parcel_id": null,
+        "line1": "129 Dovecote Way",
+        "postcode": "AM1 8SR"
+      },
+      "issued_on": "2026-01-12",
+      "expires_on": "2027-01-11",
+      "status": "current",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "no amplified music after 23:00",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000044",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000162",
+      "premises": {
+        "parcel_id": "PCL-PG-00538",
+        "line1": "110 Cattle Road",
+        "postcode": "AM4 5JS"
+      },
+      "issued_on": "2022-12-13",
+      "expires_on": "2025-12-11",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000045",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000243",
+      "premises": {
+        "parcel_id": "PCL-PG-01750",
+        "line1": "136B Hollybank Street",
+        "postcode": "AM1 5HZ"
+      },
+      "issued_on": "2020-03-02",
+      "expires_on": "2023-03-01",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "no amplified music after 23:00",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000046",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000555",
+      "premises": {
+        "parcel_id": "PCL-ND-01761",
+        "line1": "114 Vintners Yard",
+        "postcode": "AM3 5VK"
+      },
+      "issued_on": "2024-03-22",
+      "expires_on": "2025-03-21",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000047",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000597",
+      "premises": {
+        "parcel_id": "PCL-MB-00374",
+        "line1": "232 Lamplight Crescent",
+        "postcode": "AM6 3EV"
+      },
+      "issued_on": "2026-01-16",
+      "expires_on": "2029-01-14",
+      "status": "current",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000048",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000173",
+      "premises": {
+        "parcel_id": "PCL-CB-02327",
+        "line1": "190 Hollybank Terrace",
+        "postcode": "AM2 1DP"
+      },
+      "issued_on": "2023-11-16",
+      "expires_on": "2024-11-14",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000049",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000348",
+      "premises": {
+        "parcel_id": "PCL-AR-00039",
+        "line1": "61 Ferryman Passage",
+        "postcode": "AM3 4RA"
+      },
+      "issued_on": "2018-06-16",
+      "expires_on": "2019-06-15",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000050",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000008",
+      "premises": {
+        "parcel_id": "PCL-OH-01469",
+        "line1": "185 Pellet Way",
+        "postcode": "AM2 5KR"
+      },
+      "issued_on": "2021-03-09",
+      "expires_on": "2026-03-07",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "premises to be open to inspection at any reasonable time",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000051",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000047",
+      "premises": {
+        "parcel_id": "PCL-KF-01948",
+        "line1": "120 Pellet Yard",
+        "postcode": "AM6 6PS"
+      },
+      "issued_on": "2025-08-17",
+      "expires_on": "2028-08-15",
+      "status": "current",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "no amplified music after 23:00",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000052",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000507",
+      "premises": {
+        "parcel_id": "PCL-IH-02088",
+        "line1": "226 Ironmonger Passage",
+        "postcode": "AM1 7WE"
+      },
+      "issued_on": "2021-06-12",
+      "expires_on": "2022-06-11",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000053",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000323",
+      "premises": {
+        "parcel_id": "PCL-AR-00255",
+        "line1": "189 Paternoster Yard",
+        "postcode": "AM7 9GH"
+      },
+      "issued_on": "2023-05-14",
+      "expires_on": "2028-05-11",
+      "status": "current",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000054",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000061",
+      "premises": {
+        "parcel_id": "PCL-WH-02204",
+        "line1": "114 Quarry Lane",
+        "postcode": "AM9 9NS"
+      },
+      "issued_on": "2020-09-20",
+      "expires_on": "2027-03-31",
+      "status": "current",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000055",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000442",
+      "premises": {
+        "parcel_id": null,
+        "line1": "136A Hollybank Road",
+        "postcode": "AM6 9QZ"
+      },
+      "issued_on": "2020-10-19",
+      "expires_on": "2021-10-18",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000056",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000379",
+      "premises": {
+        "parcel_id": null,
+        "line1": "65 Ironmonger Walk",
+        "postcode": "AM9 6LP"
+      },
+      "issued_on": "2020-01-29",
+      "expires_on": "2021-01-27",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000057",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000247",
+      "premises": {
+        "parcel_id": null,
+        "line1": "28 Paternoster Crescent",
+        "postcode": "AM7 3GK"
+      },
+      "issued_on": "2018-05-09",
+      "expires_on": "2019-05-08",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000058",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000428",
+      "premises": {
+        "parcel_id": "PCL-VH-02077",
+        "line1": "158 Marrow Terrace",
+        "postcode": "AM2 9YA"
+      },
+      "issued_on": "2021-10-15",
+      "expires_on": "2026-10-13",
+      "status": "current",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "premises to be open to inspection at any reasonable time",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000059",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000122",
+      "premises": {
+        "parcel_id": "PCL-IH-00264",
+        "line1": "51 Bellrope Terrace",
+        "postcode": "AM7 3XR"
+      },
+      "issued_on": "2023-11-30",
+      "expires_on": "2024-11-28",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000060",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000424",
+      "premises": {
+        "parcel_id": "PCL-SQ-00630",
+        "line1": "44 Pellet Street",
+        "postcode": "AM7 2KW"
+      },
+      "issued_on": "2020-10-15",
+      "expires_on": "2023-10-14",
+      "status": "expired",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000061",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000103",
+      "premises": {
+        "parcel_id": "PCL-MB-00362",
+        "line1": "226 Ferryman Way",
+        "postcode": "AM6 6FA"
+      },
+      "issued_on": "2024-07-21",
+      "expires_on": "2025-07-20",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000062",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000306",
+      "premises": {
+        "parcel_id": "PCL-OH-02441",
+        "line1": "80 Tannery Street",
+        "postcode": "AM4 3HX"
+      },
+      "issued_on": "2026-01-18",
+      "expires_on": "2026-07-19",
+      "status": "suspended",
+      "conditions": [
+        "no amplified music after 23:00",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000063",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000362",
+      "premises": {
+        "parcel_id": "PCL-IH-01884",
+        "line1": "123A Ropewalk Terrace",
+        "postcode": "AM9 1FG"
+      },
+      "issued_on": "2023-11-23",
+      "expires_on": "2024-11-21",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000064",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000335",
+      "premises": {
+        "parcel_id": "PCL-WH-00200",
+        "line1": "80 Vintners Close",
+        "postcode": "AM9 3GD"
+      },
+      "issued_on": "2020-09-12",
+      "expires_on": "2021-09-11",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000065",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000151",
+      "premises": {
+        "parcel_id": "PCL-WH-00704",
+        "line1": "34 Bellrope Passage",
+        "postcode": "AM4 4PS"
+      },
+      "issued_on": "2024-07-02",
+      "expires_on": "2025-07-01",
+      "status": "expired",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000066",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000384",
+      "premises": {
+        "parcel_id": "PCL-SQ-00570",
+        "line1": "66 Sedge Rise",
+        "postcode": "AM1 4YN"
+      },
+      "issued_on": "2021-06-16",
+      "expires_on": "2022-06-15",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "responsible person to be present during opening hours",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000067",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000134",
+      "premises": {
+        "parcel_id": "PCL-OH-00053",
+        "line1": "52 Ostler Crescent",
+        "postcode": "AM2 9WY"
+      },
+      "issued_on": "2023-03-27",
+      "expires_on": "2024-03-25",
+      "status": "expired",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000068",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000018",
+      "premises": {
+        "parcel_id": null,
+        "line1": "162 Vintners Way",
+        "postcode": "AM7 8VH"
+      },
+      "issued_on": "2022-07-21",
+      "expires_on": "2023-07-20",
+      "status": "expired",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000069",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000465",
+      "premises": {
+        "parcel_id": "PCL-WH-02948",
+        "line1": "12 Weirside Row",
+        "postcode": "AM2 8WS"
+      },
+      "issued_on": "2019-05-24",
+      "expires_on": "2020-05-22",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000070",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000075",
+      "premises": {
+        "parcel_id": "PCL-KF-00676",
+        "line1": "25 Coldharbour Passage",
+        "postcode": "AM1 7ST"
+      },
+      "issued_on": "2023-12-30",
+      "expires_on": "2024-06-29",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000071",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000575",
+      "premises": {
+        "parcel_id": "PCL-PG-00838",
+        "line1": "217 Pellet Terrace",
+        "postcode": "AM7 3FF"
+      },
+      "issued_on": "2019-04-01",
+      "expires_on": "2020-03-30",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000072",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000570",
+      "premises": {
+        "parcel_id": "PCL-TF-00643",
+        "line1": "157 Vintners Close",
+        "postcode": "AM5 6RA"
+      },
+      "issued_on": "2018-06-30",
+      "expires_on": "2021-06-28",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000073",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000131",
+      "premises": {
+        "parcel_id": null,
+        "line1": "193 Saltmarsh Row",
+        "postcode": "AM4 2RF"
+      },
+      "issued_on": "2019-05-12",
+      "expires_on": "2022-05-10",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000074",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000307",
+      "premises": {
+        "parcel_id": "PCL-VH-00229",
+        "line1": "162 Sedge Road",
+        "postcode": "AM9 1DL"
+      },
+      "issued_on": "2018-02-03",
+      "expires_on": "2019-02-02",
+      "status": "expired",
+      "conditions": [
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000075",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000116",
+      "premises": {
+        "parcel_id": null,
+        "line1": "184B Marrow Crescent",
+        "postcode": "AM5 9NJ"
+      },
+      "issued_on": "2023-09-03",
+      "expires_on": "2026-09-01",
+      "status": "suspended",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000076",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000583",
+      "premises": {
+        "parcel_id": "PCL-SQ-02682",
+        "line1": "44 Ferryman Road",
+        "postcode": "AM2 4GP"
+      },
+      "issued_on": "2020-07-14",
+      "expires_on": "2023-07-13",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000077",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000261",
+      "premises": {
+        "parcel_id": null,
+        "line1": "1 Cattle Row",
+        "postcode": "AM3 3WB"
+      },
+      "issued_on": "2021-08-04",
+      "expires_on": "2022-08-03",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000078",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000115",
+      "premises": {
+        "parcel_id": "PCL-CB-01535",
+        "line1": "45 Weirside Lane",
+        "postcode": "AM6 5JZ"
+      },
+      "issued_on": "2024-03-22",
+      "expires_on": "2024-09-20",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "waste to be stored in the designated area",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000079",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000558",
+      "premises": {
+        "parcel_id": "PCL-KF-02044",
+        "line1": "23 Cattle Crescent",
+        "postcode": "AM7 1GY"
+      },
+      "issued_on": "2025-07-25",
+      "expires_on": "2026-07-24",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000080",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000587",
+      "premises": {
+        "parcel_id": "PCL-PG-01294",
+        "line1": "135 Ferryman Close",
+        "postcode": "AM4 8AK"
+      },
+      "issued_on": "2025-11-27",
+      "expires_on": "2026-11-26",
+      "status": "current",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "no amplified music after 23:00",
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000081",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000245",
+      "premises": {
+        "parcel_id": "PCL-CB-01787",
+        "line1": "160 Coldharbour Rise",
+        "postcode": "AM4 6GP"
+      },
+      "issued_on": "2025-09-07",
+      "expires_on": "2026-03-08",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000082",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000545",
+      "premises": {
+        "parcel_id": "PCL-AR-01239",
+        "line1": "228 Lamplight Yard",
+        "postcode": "AM5 8FR"
+      },
+      "issued_on": "2018-04-12",
+      "expires_on": "2019-04-11",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000083",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000334",
+      "premises": {
+        "parcel_id": "PCL-KF-00352",
+        "line1": "188 Dovecote Way",
+        "postcode": "AM4 9TH"
+      },
+      "issued_on": "2025-07-30",
+      "expires_on": "2030-07-28",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000084",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000273",
+      "premises": {
+        "parcel_id": "PCL-PG-01798",
+        "line1": "192 Kilnyard Rise",
+        "postcode": "AM5 9SW"
+      },
+      "issued_on": "2025-10-19",
+      "expires_on": "2026-10-18",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000085",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000476",
+      "premises": {
+        "parcel_id": "PCL-MB-00170",
+        "line1": "180 Windlass Street",
+        "postcode": "AM2 9KW"
+      },
+      "issued_on": "2020-05-06",
+      "expires_on": "2021-05-05",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000086",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000502",
+      "premises": {
+        "parcel_id": "PCL-KF-00412",
+        "line1": "63 Ostler Road",
+        "postcode": "AM5 3XQ"
+      },
+      "issued_on": "2021-01-20",
+      "expires_on": "2022-01-19",
+      "status": "expired",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000087",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000078",
+      "premises": {
+        "parcel_id": null,
+        "line1": "36 Marrow Yard",
+        "postcode": "AM6 9WH"
+      },
+      "issued_on": "2018-12-23",
+      "expires_on": "2019-12-22",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000088",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000216",
+      "premises": {
+        "parcel_id": "PCL-TF-02455",
+        "line1": "40 Windlass Road",
+        "postcode": "AM8 4BT"
+      },
+      "issued_on": "2024-07-27",
+      "expires_on": "2025-07-26",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000089",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000184",
+      "premises": {
+        "parcel_id": null,
+        "line1": "187 Weirside Passage",
+        "postcode": "AM2 4YA"
+      },
+      "issued_on": "2018-08-31",
+      "expires_on": "2019-08-30",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-STREET-TRD-000090",
+      "licence_type": {
+        "code": "STREET-TRD",
+        "description": "Street trading consent"
+      },
+      "business_registration_number": "BR-0000126",
+      "premises": {
+        "parcel_id": null,
+        "line1": "151 Coldharbour Street",
+        "postcode": "AM5 8YR"
+      },
+      "issued_on": "2020-03-14",
+      "expires_on": "2021-03-13",
+      "status": "expired",
+      "conditions": [
+        "no trading on the highway",
+        "responsible person to be present during opening hours",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000091",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000455",
+      "premises": {
+        "parcel_id": "PCL-SQ-01746",
+        "line1": "236 Hollybank Yard",
+        "postcode": "AM8 8HB"
+      },
+      "issued_on": "2019-05-04",
+      "expires_on": "2024-05-01",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000092",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000375",
+      "premises": {
+        "parcel_id": "PCL-SQ-00630",
+        "line1": "44 Pellet Street",
+        "postcode": "AM7 2KW"
+      },
+      "issued_on": "2021-03-10",
+      "expires_on": "2026-03-08",
+      "status": "expired",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-PUB-ENT-000093",
+      "licence_type": {
+        "code": "PUB-ENT",
+        "description": "Public entertainment licence"
+      },
+      "business_registration_number": "BR-0000143",
+      "premises": {
+        "parcel_id": "PCL-WH-01316",
+        "line1": "10C Gasworks Rise",
+        "postcode": "AM6 5XH"
+      },
+      "issued_on": "2019-08-11",
+      "expires_on": "2020-08-09",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-PET-BOARD-000094",
+      "licence_type": {
+        "code": "PET-BOARD",
+        "description": "Animal boarding licence"
+      },
+      "business_registration_number": "BR-0000434",
+      "premises": {
+        "parcel_id": null,
+        "line1": "174 Mallow Road",
+        "postcode": "AM9 7BG"
+      },
+      "issued_on": "2023-12-02",
+      "expires_on": "2024-11-30",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours",
+        "no amplified music after 23:00",
+        "no trading on the highway"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000095",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000152",
+      "premises": {
+        "parcel_id": "PCL-OH-00797",
+        "line1": "169 Vintners Walk",
+        "postcode": "AM5 5VW"
+      },
+      "issued_on": "2019-05-15",
+      "expires_on": "2020-05-13",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "no trading on the highway",
+        "waste to be stored in the designated area"
+      ]
+    },
+    {
+      "licence_number": "LIC-HACK-CARR-000096",
+      "licence_type": {
+        "code": "HACK-CARR",
+        "description": "Private hire operator licence"
+      },
+      "business_registration_number": "BR-0000546",
+      "premises": {
+        "parcel_id": "PCL-TF-00883",
+        "line1": "9 Sedge Walk",
+        "postcode": "AM8 3VR"
+      },
+      "issued_on": "2021-04-26",
+      "expires_on": "2026-04-24",
+      "status": "expired",
+      "conditions": [
+        "premises to be open to inspection at any reasonable time",
+        "no trading on the highway",
+        "no amplified music after 23:00"
+      ]
+    },
+    {
+      "licence_number": "LIC-LATE-HOURS-000097",
+      "licence_type": {
+        "code": "LATE-HOURS",
+        "description": "Late hours catering licence"
+      },
+      "business_registration_number": "BR-0000260",
+      "premises": {
+        "parcel_id": null,
+        "line1": "157 Threadneedle Walk",
+        "postcode": "AM4 4SF"
+      },
+      "issued_on": "2025-12-24",
+      "expires_on": "2026-12-23",
+      "status": "current",
+      "conditions": []
+    },
+    {
+      "licence_number": "LIC-SCRAP-MTL-000098",
+      "licence_type": {
+        "code": "SCRAP-MTL",
+        "description": "Scrap metal dealer licence"
+      },
+      "business_registration_number": "BR-0000547",
+      "premises": {
+        "parcel_id": "PCL-AR-01191",
+        "line1": "1 Mallow Walk",
+        "postcode": "AM8 1JX"
+      },
+      "issued_on": "2022-08-26",
+      "expires_on": "2025-08-24",
+      "status": "expired",
+      "conditions": [
+        "responsible person to be present during opening hours"
+      ]
+    },
+    {
+      "licence_number": "LIC-SKIP-PLACE-000099",
+      "licence_type": {
+        "code": "SKIP-PLACE",
+        "description": "Skip placement consent"
+      },
+      "business_registration_number": "BR-0000348",
+      "premises": {
+        "parcel_id": "PCL-AR-00039",
+        "line1": "61 Ferryman Passage",
+        "postcode": "AM3 4RA"
+      },
+      "issued_on": "2024-02-19",
+      "expires_on": "2024-08-19",
+      "status": "expired",
+      "conditions": [
+        "no amplified music after 23:00",
+        "premises to be open to inspection at any reasonable time"
+      ]
+    },
+    {
+      "licence_number": "LIC-FOOD-PREM-000100",
+      "licence_type": {
+        "code": "FOOD-PREM",
+        "description": "Food premises registration"
+      },
+      "business_registration_number": "BR-0000426",
+      "premises": {
+        "parcel_id": "PCL-SQ-01218",
+        "line1": "107 Pellet Street",
+        "postcode": "AM6 1FT"
+      },
+      "issued_on": "2023-05-23",
+      "expires_on": "2026-05-21",
+      "status": "current",
+      "conditions": []
+    }
+  ]
+}

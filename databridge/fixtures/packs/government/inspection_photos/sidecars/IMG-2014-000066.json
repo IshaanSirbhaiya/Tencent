@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000066",
+  "filename": "IMG-2014-000066.jpg",
+  "image_present": false,
+  "captured_at": "2014-12-30T12:30:28+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2014-000478",
+  "application_id": "APP-2014-000612",
+  "parcel_id": "PCL-SQ-00462",
+  "photo_batch_ref": "PHB-2014-000478",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-195557"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 433573,
+    "northing": 1209289,
+    "accuracy_m": 2.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2075,
+          120,
+          374,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-296448",
+        "confidence": 0.852,
+        "bbox": [
+          1252,
+          249,
+          621,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "232 BELLROPE ROAD, SABLE QUAY AM4 2FE",
+        "confidence": 0.849,
+        "bbox": [
+          865,
+          418,
+          1036,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-12-30",
+        "confidence": 0.932,
+        "bbox": [
+          309,
+          540,
+          986,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.849,
+        "bbox": [
+          327,
+          648,
+          384,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

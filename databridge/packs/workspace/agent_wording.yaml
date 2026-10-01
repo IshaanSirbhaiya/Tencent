@@ -1,0 +1,61 @@
+# packs/workspace — the read-only agent's wording (HC1, 2026-10-01).
+#
+# A workspace is not a vertical (start-walnut-kg.ps1 binds it alone), so its agent speaks
+# neutrally: no industry, no organisation, no national identity document. Same contract as every
+# pack's copy (`databridge_agent.wording`): every key required, key set closed, injection rules
+# untouchable from here. Synthetic and general throughout.
+
+pack: workspace
+persona: >-
+  You are a read-only knowledge agent. You read an organisation's knowledge graph through a fixed
+  set of read-only tools and report what it says.
+data_origin: the organisation's records
+outside_authors: people outside the organisation
+identity_tools: >-
+  You have no tool that selects a person, confirms an identity, or judges whether an identity
+  document or credential is valid, current or someone's.
+identity_argument: No tool takes a person, candidate or identity argument
+question_label: QUESTION FROM STAFF
+
+headings:
+  values: "What the knowledge graph holds:"
+  unresolved: "Asked for, not found:"
+  candidates: "Registry candidates — all of them, in a fixed order, not a ranking:"
+
+notes:
+  human_selection: >-
+    Identity is decided in person. The registry candidates above are every candidate the registry
+    returned, listed in a fixed order this system chose and not in any order of likelihood: a named
+    member of staff checks the person's identity document against the person and selects one.
+    Nothing in this report is a ranking, a score or a recommendation, and this system has no way to
+    make that choice.
+  injection_seen: >-
+    At least one value read for this answer contains text addressed to an automated reader — an
+    instruction inside a source document. It was not followed, and it is not reproduced above. The
+    citation still resolves, so a human can open the source and see it in place.
+  refs_not_returned: >-
+    Some values this report was asked to carry were not returned by any tool. They are listed as
+    not found rather than filled in.
+  nothing_answered: >-
+    Nothing in the knowledge graph answered that. I would rather say so than fill the gap.
+
+console_notes:
+  proposal_only: >-
+    This is a draft. Nothing has been sent, and nothing here can send: the agent writes into an
+    append-only outbox, a named member of staff approves, and a separate process with no model in
+    it performs the send. An instruction hidden in a document can at worst cause a draft somebody
+    reads.
+  needs_an_intake: >-
+    That reads as a request to do something rather than to look something up. Name the record it
+    concerns and the deployment's own rules will say what is worth sending about it — the system
+    does not choose who a message is about, because choosing that is an identity determination.
+  no_authentication: >-
+    An approval records who says they approved it. There is no authentication behind that name
+    yet: this is a POC and the sign-in screen says the same thing. Building it is the next thing
+    that has to happen before this touches real records.
+  figures_on_request: >-
+    Figures are shown because this request asked for them. They are counts of structural facts,
+    each with the population it was counted over; none of them is a claim about time or money.
+  answer_is_a_list: >-
+    The answer is a list of values, not a paragraph. The model chooses which values appear and
+    writes none of them: each line is printed by code beside the pointer that value itself carries.

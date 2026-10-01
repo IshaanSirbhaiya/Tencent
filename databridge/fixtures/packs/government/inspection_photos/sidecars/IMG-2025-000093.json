@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2025-000093",
+  "filename": "IMG-2025-000093.jpg",
+  "image_present": false,
+  "captured_at": "2025-10-19T08:16:17+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2025-000443",
+  "application_id": "APP-2025-000579",
+  "parcel_id": "PCL-AR-00027",
+  "photo_batch_ref": "PHB-2025-000443",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-530794"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 443431,
+    "northing": 1193686,
+    "accuracy_m": 12.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1373,
+          120,
+          286,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2025-878890",
+        "confidence": 0.95,
+        "bbox": [
+          816,
+          259,
+          702,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "238B MALLOW CLOSE, PELLING GREEN AM5 7XJ",
+        "confidence": 0.935,
+        "bbox": [
+          1359,
+          420,
+          1000,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2025-10-19",
+        "confidence": 0.805,
+        "bbox": [
+          898,
+          540,
+          667,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.954,
+        "bbox": [
+          2513,
+          576,
+          384,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

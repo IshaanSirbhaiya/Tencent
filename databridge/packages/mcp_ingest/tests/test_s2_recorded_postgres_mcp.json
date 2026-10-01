@@ -1,0 +1,585 @@
+{
+ "calls": {
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"contact_notes\\\" ORDER BY \\\"note_id\\\" LIMIT 1000\"}]": {
+   "is_error": false,
+   "text": "[{'note_id': 1, 'contact_id': 1, 'written_by': 'LA-007', 'written_on': datetime.date(2026, 7, 14), 'note': 'Rowan Achterberg is the day-to-day sponsor for PRJ-101; prefers weekly written updates.'}, {'note_id': 2, 'contact_id': 3, 'written_by': 'LA-012', 'written_on': datetime.date(2026, 8, 19), 'note': 'Hamish Oduya agreed Leeds-first rollout at the steering meeting; Harrogate after backtest.'}, {'note_id': 3, 'contact_id': 5, 'written_by': 'LA-001', 'written_on': datetime.date(2026, 9, 8), 'note': 'Oluwaseun Pettifer asked for a discovery proposal on leak detection for November.'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"contact_notes\\\" ORDER BY \\\"note_id\\\" LIMIT 500 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'note_id': 1, 'contact_id': 1, 'written_by': 'LA-007', 'written_on': datetime.date(2026, 7, 14), 'note': 'Rowan Achterberg is the day-to-day sponsor for PRJ-101; prefers weekly written updates.'}, {'note_id': 2, 'contact_id': 3, 'written_by': 'LA-012', 'written_on': datetime.date(2026, 8, 19), 'note': 'Hamish Oduya agreed Leeds-first rollout at the steering meeting; Harrogate after backtest.'}, {'note_id': 3, 'contact_id': 5, 'written_by': 'LA-001', 'written_on': datetime.date(2026, 9, 8), 'note': 'Oluwaseun Pettifer asked for a discovery proposal on leak detection for November.'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"contact_notes\\\" ORDER BY \\\"written_on\\\" DESC, \\\"note_id\\\" LIMIT 2000 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'note_id': 3, 'contact_id': 5, 'written_by': 'LA-001', 'written_on': datetime.date(2026, 9, 8), 'note': 'Oluwaseun Pettifer asked for a discovery proposal on leak detection for November.'}, {'note_id': 2, 'contact_id': 3, 'written_by': 'LA-012', 'written_on': datetime.date(2026, 8, 19), 'note': 'Hamish Oduya agreed Leeds-first rollout at the steering meeting; Harrogate after backtest.'}, {'note_id': 1, 'contact_id': 1, 'written_by': 'LA-007', 'written_on': datetime.date(2026, 7, 14), 'note': 'Rowan Achterberg is the day-to-day sponsor for PRJ-101; prefers weekly written updates.'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"contacts\\\" ORDER BY \\\"contact_id\\\" LIMIT 1000\"}]": {
+   "is_error": false,
+   "text": "[{'contact_id': 1, 'customer_id': 'C-1001', 'full_name': 'Rowan Achterberg', 'email': 'rowan.achterberg@pellucid-freightways.example', 'phone': '+44 20 7946 0321', 'role': 'Head of Network Planning'}, {'contact_id': 2, 'customer_id': 'C-1001', 'full_name': 'Selin Kaya-Morrow', 'email': 'selin.kaya-morrow@pellucid-freightways.example', 'phone': '+44 20 7946 0322', 'role': 'Head of Procurement'}, {'contact_id': 3, 'customer_id': 'C-1002', 'full_name': 'Hamish Oduya', 'email': 'hamish.oduya@corriedale-grocers.example', 'phone': '+44 20 7946 0455', 'role': 'Supply Chain Director'}, {'contact_id': 4, 'customer_id': 'C-1002', 'full_name': 'Petra Lindqvist-Shaw', 'email': 'petra.lindqvist-shaw@corriedale-grocers.example', 'phone': '+44 20 7946 0456', 'role': 'Category Analyst'}, {'contact_id': 5, 'customer_id': 'C-1003', 'full_name': 'Oluwaseun Pettifer', 'email': 'oluwaseun.pettifer@tamsinbay-water.example', 'phone': '+44 20 7946 0590', 'role': 'Asset Data Manager'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"contacts\\\" ORDER BY \\\"contact_id\\\" LIMIT 500 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'contact_id': 1, 'customer_id': 'C-1001', 'full_name': 'Rowan Achterberg', 'email': 'rowan.achterberg@pellucid-freightways.example', 'phone': '+44 20 7946 0321', 'role': 'Head of Network Planning'}, {'contact_id': 2, 'customer_id': 'C-1001', 'full_name': 'Selin Kaya-Morrow', 'email': 'selin.kaya-morrow@pellucid-freightways.example', 'phone': '+44 20 7946 0322', 'role': 'Head of Procurement'}, {'contact_id': 3, 'customer_id': 'C-1002', 'full_name': 'Hamish Oduya', 'email': 'hamish.oduya@corriedale-grocers.example', 'phone': '+44 20 7946 0455', 'role': 'Supply Chain Director'}, {'contact_id': 4, 'customer_id': 'C-1002', 'full_name': 'Petra Lindqvist-Shaw', 'email': 'petra.lindqvist-shaw@corriedale-grocers.example', 'phone': '+44 20 7946 0456', 'role': 'Category Analyst'}, {'contact_id': 5, 'customer_id': 'C-1003', 'full_name': 'Oluwaseun Pettifer', 'email': 'oluwaseun.pettifer@tamsinbay-water.example', 'phone': '+44 20 7946 0590', 'role': 'Asset Data Manager'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"customers\\\" ORDER BY \\\"customer_id\\\" LIMIT 1000\"}]": {
+   "is_error": false,
+   "text": "[{'customer_id': 'C-1001', 'name': 'Pellucid Freightways Ltd', 'domain': 'pellucid-freightways.example', 'sector': 'Logistics', 'city': 'Southampton', 'account_owner': 'LA-007', 'created_at': datetime.date(2026, 5, 12)}, {'customer_id': 'C-1002', 'name': 'Corriedale Grocers Co-operative', 'domain': 'corriedale-grocers.example', 'sector': 'Retail', 'city': 'Leeds', 'account_owner': 'LA-012', 'created_at': datetime.date(2026, 6, 3)}, {'customer_id': 'C-1003', 'name': 'Tamsinbay Water Authority', 'domain': 'tamsinbay-water.example', 'sector': 'Utilities', 'city': 'Tamsinbay', 'account_owner': 'LA-001', 'created_at': datetime.date(2026, 9, 8)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"customers\\\" ORDER BY \\\"customer_id\\\" LIMIT 500 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'customer_id': 'C-1001', 'name': 'Pellucid Freightways Ltd', 'domain': 'pellucid-freightways.example', 'sector': 'Logistics', 'city': 'Southampton', 'account_owner': 'LA-007', 'created_at': datetime.date(2026, 5, 12)}, {'customer_id': 'C-1002', 'name': 'Corriedale Grocers Co-operative', 'domain': 'corriedale-grocers.example', 'sector': 'Retail', 'city': 'Leeds', 'account_owner': 'LA-012', 'created_at': datetime.date(2026, 6, 3)}, {'customer_id': 'C-1003', 'name': 'Tamsinbay Water Authority', 'domain': 'tamsinbay-water.example', 'sector': 'Utilities', 'city': 'Tamsinbay', 'account_owner': 'LA-001', 'created_at': datetime.date(2026, 9, 8)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"employees\\\" ORDER BY \\\"employee_id\\\" LIMIT 1000\"}]": {
+   "is_error": false,
+   "text": "[{'employee_id': 'LA-001', 'full_name': 'Mira Oyelaran', 'email': 'mira.oyelaran@larkspur-analytics.example', 'title': 'Chief Executive', 'office': 'Bristol'}, {'employee_id': 'LA-007', 'full_name': 'Tobias Reinholt', 'email': 'tobias.reinholt@larkspur-analytics.example', 'title': 'Head of Delivery', 'office': 'Bristol'}, {'employee_id': 'LA-012', 'full_name': 'Ines Marchetti-Holm', 'email': 'ines.marchetti-holm@larkspur-analytics.example', 'title': 'Lead Data Scientist', 'office': 'Bristol'}, {'employee_id': 'LA-015', 'full_name': 'Callum Driscoll-Park', 'email': 'callum.driscoll-park@larkspur-analytics.example', 'title': 'Finance Manager', 'office': 'Bristol'}, {'employee_id': 'LA-019', 'full_name': 'Ada Nwachukwu-Barr', 'email': 'ada.nwachukwu-barr@larkspur-analytics.example', 'title': 'People & Culture Lead', 'office': 'Bristol'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"employees\\\" ORDER BY \\\"employee_id\\\" LIMIT 500 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'employee_id': 'LA-001', 'full_name': 'Mira Oyelaran', 'email': 'mira.oyelaran@larkspur-analytics.example', 'title': 'Chief Executive', 'office': 'Bristol'}, {'employee_id': 'LA-007', 'full_name': 'Tobias Reinholt', 'email': 'tobias.reinholt@larkspur-analytics.example', 'title': 'Head of Delivery', 'office': 'Bristol'}, {'employee_id': 'LA-012', 'full_name': 'Ines Marchetti-Holm', 'email': 'ines.marchetti-holm@larkspur-analytics.example', 'title': 'Lead Data Scientist', 'office': 'Bristol'}, {'employee_id': 'LA-015', 'full_name': 'Callum Driscoll-Park', 'email': 'callum.driscoll-park@larkspur-analytics.example', 'title': 'Finance Manager', 'office': 'Bristol'}, {'employee_id': 'LA-019', 'full_name': 'Ada Nwachukwu-Barr', 'email': 'ada.nwachukwu-barr@larkspur-analytics.example', 'title': 'People & Culture Lead', 'office': 'Bristol'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"invoices\\\" ORDER BY \\\"invoice_no\\\" LIMIT 1000\"}]": {
+   "is_error": false,
+   "text": "[{'invoice_no': 'INV-2026-0041', 'customer_id': 'C-1001', 'project_id': 'PRJ-101', 'issued_on': datetime.date(2026, 8, 31), 'due_on': datetime.date(2026, 9, 30), 'net_gbp': Decimal('18500.00'), 'vat_gbp': Decimal('3700.00'), 'total_gbp': Decimal('22200.00'), 'status': 'paid'}, {'invoice_no': 'INV-2026-0057', 'customer_id': 'C-1002', 'project_id': 'PRJ-102', 'issued_on': datetime.date(2026, 9, 15), 'due_on': datetime.date(2026, 10, 15), 'net_gbp': Decimal('12750.00'), 'vat_gbp': Decimal('2550.00'), 'total_gbp': Decimal('15300.00'), 'status': 'open'}, {'invoice_no': 'INV-2026-0063', 'customer_id': 'C-1001', 'project_id': 'PRJ-101', 'issued_on': datetime.date(2026, 9, 30), 'due_on': datetime.date(2026, 10, 30), 'net_gbp': Decimal('9250.00'), 'vat_gbp': Decimal('1850.00'), 'total_gbp': Decimal('11100.00'), 'status': 'open'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"invoices\\\" ORDER BY \\\"invoice_no\\\" LIMIT 500 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'invoice_no': 'INV-2026-0041', 'customer_id': 'C-1001', 'project_id': 'PRJ-101', 'issued_on': datetime.date(2026, 8, 31), 'due_on': datetime.date(2026, 9, 30), 'net_gbp': Decimal('18500.00'), 'vat_gbp': Decimal('3700.00'), 'total_gbp': Decimal('22200.00'), 'status': 'paid'}, {'invoice_no': 'INV-2026-0057', 'customer_id': 'C-1002', 'project_id': 'PRJ-102', 'issued_on': datetime.date(2026, 9, 15), 'due_on': datetime.date(2026, 10, 15), 'net_gbp': Decimal('12750.00'), 'vat_gbp': Decimal('2550.00'), 'total_gbp': Decimal('15300.00'), 'status': 'open'}, {'invoice_no': 'INV-2026-0063', 'customer_id': 'C-1001', 'project_id': 'PRJ-101', 'issued_on': datetime.date(2026, 9, 30), 'due_on': datetime.date(2026, 10, 30), 'net_gbp': Decimal('9250.00'), 'vat_gbp': Decimal('1850.00'), 'total_gbp': Decimal('11100.00'), 'status': 'open'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"projects\\\" ORDER BY \\\"project_id\\\" LIMIT 1000\"}]": {
+   "is_error": false,
+   "text": "[{'project_id': 'PRJ-101', 'name': 'Route Optimisation Pilot', 'customer_id': 'C-1001', 'manager_id': 'LA-007', 'contract_ref': 'MSA-2026-014', 'status': 'active', 'start_date': datetime.date(2026, 7, 1), 'end_date': datetime.date(2026, 12, 18)}, {'project_id': 'PRJ-102', 'name': 'Demand Forecasting Rollout', 'customer_id': 'C-1002', 'manager_id': 'LA-012', 'contract_ref': 'SOW-2026-021', 'status': 'active', 'start_date': datetime.date(2026, 8, 1), 'end_date': datetime.date(2027, 1, 29)}, {'project_id': 'PRJ-103', 'name': 'Leak Detection Discovery', 'customer_id': 'C-1003', 'manager_id': 'LA-001', 'contract_ref': None, 'status': 'proposal', 'start_date': None, 'end_date': None}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT * FROM \\\"public\\\".\\\"projects\\\" ORDER BY \\\"project_id\\\" LIMIT 500 OFFSET 0\"}]": {
+   "is_error": false,
+   "text": "[{'project_id': 'PRJ-101', 'name': 'Route Optimisation Pilot', 'customer_id': 'C-1001', 'manager_id': 'LA-007', 'contract_ref': 'MSA-2026-014', 'status': 'active', 'start_date': datetime.date(2026, 7, 1), 'end_date': datetime.date(2026, 12, 18)}, {'project_id': 'PRJ-102', 'name': 'Demand Forecasting Rollout', 'customer_id': 'C-1002', 'manager_id': 'LA-012', 'contract_ref': 'SOW-2026-021', 'status': 'active', 'start_date': datetime.date(2026, 8, 1), 'end_date': datetime.date(2027, 1, 29)}, {'project_id': 'PRJ-103', 'name': 'Leak Detection Discovery', 'customer_id': 'C-1003', 'manager_id': 'LA-001', 'contract_ref': None, 'status': 'proposal', 'start_date': None, 'end_date': None}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT 1 AS x WHERE false\"}]": {
+   "is_error": false,
+   "text": "[]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n FROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n FROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n FROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n FROM \\\"public\\\".\\\"employees\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n FROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n FROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"account_owner\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"account_owner\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"account_owner\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"account_owner\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"account_owner\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"account_owner\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"city\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"city\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"city\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"city\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"city\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"city\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('8.3333333333333333'), 'max_len': 11, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"contact_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"contact_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"contact_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"contact_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"contact_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"contact_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('1.00000000000000000000'), 'max_len': 1, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"contact_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"contact_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"contact_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"contact_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"contact_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"contact_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('1.00000000000000000000'), 'max_len': 1, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"contract_ref\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"contract_ref\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"contract_ref\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"contract_ref\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"contract_ref\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"contract_ref\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 2, 'distinct_n': 2, 'avg_len': Decimal('12.0000000000000000'), 'max_len': 12, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"created_at\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"created_at\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"created_at\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"created_at\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"created_at\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"created_at\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('10.0000000000000000'), 'max_len': 10, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"customer_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"customer_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"customer_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 3, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"customer_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"customer_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"customer_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"customer_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"customer_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"customer_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 2, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"customer_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"customer_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"customer_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"customer_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"domain\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"domain\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"domain\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"domain\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"domain\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"domain\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('25.6666666666666667'), 'max_len': 28, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"due_on\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"due_on\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"due_on\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"due_on\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"due_on\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"due_on\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('10.0000000000000000'), 'max_len': 10, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"email\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"email\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"email\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"email\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"email\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"email\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('43.8000000000000000'), 'max_len': 47, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"email\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"email\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"email\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"email\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"email\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"email\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"employees\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('44.0000000000000000'), 'max_len': 47, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"employee_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"employee_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"employee_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"employee_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"employee_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"employee_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"employees\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"end_date\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"end_date\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"end_date\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"end_date\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"end_date\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"end_date\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 2, 'distinct_n': 2, 'avg_len': Decimal('10.0000000000000000'), 'max_len': 10, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"full_name\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"full_name\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"full_name\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"full_name\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"full_name\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"full_name\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('16.6000000000000000'), 'max_len': 20, 'avg_spaces': Decimal('1.00000000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"full_name\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"full_name\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"full_name\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"full_name\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"full_name\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"full_name\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"employees\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('17.0000000000000000'), 'max_len': 20, 'avg_spaces': Decimal('1.00000000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"invoice_no\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"invoice_no\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"invoice_no\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"invoice_no\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"invoice_no\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"invoice_no\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('13.0000000000000000'), 'max_len': 13, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"issued_on\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"issued_on\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"issued_on\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"issued_on\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"issued_on\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"issued_on\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('10.0000000000000000'), 'max_len': 10, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"manager_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"manager_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"manager_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"manager_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"manager_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"manager_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"name\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"name\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"name\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"name\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"name\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"name\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('26.6666666666666667'), 'max_len': 31, 'avg_spaces': Decimal('2.0000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"name\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"name\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"name\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"name\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"name\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"name\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('24.6666666666666667'), 'max_len': 26, 'avg_spaces': Decimal('2.0000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"net_gbp\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"net_gbp\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"net_gbp\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"net_gbp\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"net_gbp\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"net_gbp\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('7.6666666666666667'), 'max_len': 8, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"note\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"note\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"note\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"note\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"note\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"note\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('86.0000000000000000'), 'max_len': 90, 'avg_spaces': Decimal('11.0000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"note_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"note_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"note_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"note_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"note_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"note_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('1.00000000000000000000'), 'max_len': 1, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"office\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"office\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"office\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"office\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"office\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"office\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"employees\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 1, 'avg_len': Decimal('7.0000000000000000'), 'max_len': 7, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"phone\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"phone\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"phone\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"phone\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"phone\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"phone\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('16.0000000000000000'), 'max_len': 16, 'avg_spaces': Decimal('3.0000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"project_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"project_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"project_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"project_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"project_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"project_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 2, 'avg_len': Decimal('7.0000000000000000'), 'max_len': 7, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"project_id\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"project_id\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"project_id\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"project_id\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"project_id\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"project_id\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('7.0000000000000000'), 'max_len': 7, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"role\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"role\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"role\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"role\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"role\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"role\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('19.6000000000000000'), 'max_len': 24, 'avg_spaces': Decimal('2.0000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"sector\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"sector\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"sector\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"sector\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"sector\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"sector\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('8.0000000000000000'), 'max_len': 9, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"start_date\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"start_date\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"start_date\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"start_date\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"start_date\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"start_date\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 2, 'distinct_n': 2, 'avg_len': Decimal('10.0000000000000000'), 'max_len': 10, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"status\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"status\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"status\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"status\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"status\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"status\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 2, 'avg_len': Decimal('4.0000000000000000'), 'max_len': 4, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"status\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"status\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"status\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"status\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"status\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"status\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 2, 'avg_len': Decimal('6.6666666666666667'), 'max_len': 8, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"title\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"title\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"title\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"title\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"title\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"title\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"employees\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 5, 'non_null': 5, 'distinct_n': 5, 'avg_len': Decimal('17.2000000000000000'), 'max_len': 21, 'avg_spaces': Decimal('1.8000000000000000')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"total_gbp\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"total_gbp\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"total_gbp\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"total_gbp\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"total_gbp\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"total_gbp\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('8.0000000000000000'), 'max_len': 8, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"vat_gbp\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"vat_gbp\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"vat_gbp\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"vat_gbp\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"vat_gbp\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"vat_gbp\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('7.0000000000000000'), 'max_len': 7, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"written_by\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"written_by\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"written_by\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"written_by\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"written_by\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"written_by\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('6.0000000000000000'), 'max_len': 6, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT COUNT(*) AS n, COUNT(\\\"written_on\\\") AS non_null,\\n       COUNT(DISTINCT CAST(\\\"written_on\\\" AS TEXT)) AS distinct_n,\\n       AVG(LENGTH(CAST(\\\"written_on\\\" AS TEXT))) AS avg_len,\\n       MAX(LENGTH(CAST(\\\"written_on\\\" AS TEXT))) AS max_len,\\n       AVG(LENGTH(CAST(\\\"written_on\\\" AS TEXT))\\n           - LENGTH(REPLACE(CAST(\\\"written_on\\\" AS TEXT), ' ', ''))) AS avg_spaces\\nFROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'n': 3, 'non_null': 3, 'distinct_n': 3, 'avg_len': Decimal('10.0000000000000000'), 'max_len': 10, 'avg_spaces': Decimal('0E-20')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"contact_id\\\") AS lo, MAX(\\\"contact_id\\\") AS hi FROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': 1, 'hi': 5}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"contact_id\\\") AS lo, MAX(\\\"contact_id\\\") AS hi FROM \\\"public\\\".\\\"contacts\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': 1, 'hi': 5}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"created_at\\\") AS lo, MAX(\\\"created_at\\\") AS hi FROM \\\"public\\\".\\\"customers\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': datetime.date(2026, 5, 12), 'hi': datetime.date(2026, 9, 8)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"due_on\\\") AS lo, MAX(\\\"due_on\\\") AS hi FROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': datetime.date(2026, 9, 30), 'hi': datetime.date(2026, 10, 30)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"end_date\\\") AS lo, MAX(\\\"end_date\\\") AS hi FROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': datetime.date(2026, 12, 18), 'hi': datetime.date(2027, 1, 29)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"issued_on\\\") AS lo, MAX(\\\"issued_on\\\") AS hi FROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': datetime.date(2026, 8, 31), 'hi': datetime.date(2026, 9, 30)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"net_gbp\\\") AS lo, MAX(\\\"net_gbp\\\") AS hi FROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': Decimal('9250.00'), 'hi': Decimal('18500.00')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"note_id\\\") AS lo, MAX(\\\"note_id\\\") AS hi FROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': 1, 'hi': 3}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"start_date\\\") AS lo, MAX(\\\"start_date\\\") AS hi FROM \\\"public\\\".\\\"projects\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': datetime.date(2026, 7, 1), 'hi': datetime.date(2026, 8, 1)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"total_gbp\\\") AS lo, MAX(\\\"total_gbp\\\") AS hi FROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': Decimal('11100.00'), 'hi': Decimal('22200.00')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"vat_gbp\\\") AS lo, MAX(\\\"vat_gbp\\\") AS hi FROM \\\"public\\\".\\\"invoices\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': Decimal('1850.00'), 'hi': Decimal('3700.00')}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT MIN(\\\"written_on\\\") AS lo, MAX(\\\"written_on\\\") AS hi FROM \\\"public\\\".\\\"contact_notes\\\"\"}]": {
+   "is_error": false,
+   "text": "[{'lo': datetime.date(2026, 7, 14), 'hi': datetime.date(2026, 9, 8)}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT TIMESTAMP '2026-09-30 18:28:45' AS naive_ts, TIMESTAMPTZ '2026-09-30 18:28:45.927051+00' AS ts, interval '1 day 2 hours' AS iv, '84cd3e34-b482-45ea-be14-2a457d8be836'::uuid AS u, '{\\\"a\\\": 1}'::jsonb AS j, NULL AS nothing, 'it''s Decimal(''3'')' AS tricky\"}]": {
+   "is_error": false,
+   "text": "[{'naive_ts': datetime.datetime(2026, 9, 30, 18, 28, 45), 'ts': datetime.datetime(2026, 9, 30, 18, 28, 45, 927051, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), 'iv': datetime.timedelta(days=1, seconds=7200), 'u': UUID('84cd3e34-b482-45ea-be14-2a457d8be836'), 'j': {'a': 1}, 'nothing': None, 'tricky': \"it's Decimal('3')\"}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT a.attname AS column_name,\\n       CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,\\n       rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column\\nFROM pg_catalog.pg_constraint c\\nJOIN pg_catalog.pg_class t ON t.oid = c.conrelid\\nJOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace\\nCROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)\\nJOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum\\nLEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid\\nLEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace\\nLEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]\\nWHERE n.nspname = 'public' AND t.relname = 'contact_notes' AND c.contype IN ('p', 'f')\\nORDER BY c.contype DESC, c.conname, k.ord\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'note_id', 'constraint_type': 'PRIMARY KEY', 'ref_schema': None, 'ref_table': None, 'ref_column': None}, {'column_name': 'contact_id', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'contacts', 'ref_column': 'contact_id'}, {'column_name': 'written_by', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'employees', 'ref_column': 'employee_id'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT a.attname AS column_name,\\n       CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,\\n       rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column\\nFROM pg_catalog.pg_constraint c\\nJOIN pg_catalog.pg_class t ON t.oid = c.conrelid\\nJOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace\\nCROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)\\nJOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum\\nLEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid\\nLEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace\\nLEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]\\nWHERE n.nspname = 'public' AND t.relname = 'contacts' AND c.contype IN ('p', 'f')\\nORDER BY c.contype DESC, c.conname, k.ord\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'contact_id', 'constraint_type': 'PRIMARY KEY', 'ref_schema': None, 'ref_table': None, 'ref_column': None}, {'column_name': 'customer_id', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'customers', 'ref_column': 'customer_id'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT a.attname AS column_name,\\n       CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,\\n       rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column\\nFROM pg_catalog.pg_constraint c\\nJOIN pg_catalog.pg_class t ON t.oid = c.conrelid\\nJOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace\\nCROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)\\nJOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum\\nLEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid\\nLEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace\\nLEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]\\nWHERE n.nspname = 'public' AND t.relname = 'customers' AND c.contype IN ('p', 'f')\\nORDER BY c.contype DESC, c.conname, k.ord\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'customer_id', 'constraint_type': 'PRIMARY KEY', 'ref_schema': None, 'ref_table': None, 'ref_column': None}, {'column_name': 'account_owner', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'employees', 'ref_column': 'employee_id'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT a.attname AS column_name,\\n       CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,\\n       rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column\\nFROM pg_catalog.pg_constraint c\\nJOIN pg_catalog.pg_class t ON t.oid = c.conrelid\\nJOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace\\nCROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)\\nJOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum\\nLEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid\\nLEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace\\nLEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]\\nWHERE n.nspname = 'public' AND t.relname = 'employees' AND c.contype IN ('p', 'f')\\nORDER BY c.contype DESC, c.conname, k.ord\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'employee_id', 'constraint_type': 'PRIMARY KEY', 'ref_schema': None, 'ref_table': None, 'ref_column': None}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT a.attname AS column_name,\\n       CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,\\n       rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column\\nFROM pg_catalog.pg_constraint c\\nJOIN pg_catalog.pg_class t ON t.oid = c.conrelid\\nJOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace\\nCROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)\\nJOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum\\nLEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid\\nLEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace\\nLEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]\\nWHERE n.nspname = 'public' AND t.relname = 'invoices' AND c.contype IN ('p', 'f')\\nORDER BY c.contype DESC, c.conname, k.ord\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'invoice_no', 'constraint_type': 'PRIMARY KEY', 'ref_schema': None, 'ref_table': None, 'ref_column': None}, {'column_name': 'customer_id', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'customers', 'ref_column': 'customer_id'}, {'column_name': 'project_id', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'projects', 'ref_column': 'project_id'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT a.attname AS column_name,\\n       CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,\\n       rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column\\nFROM pg_catalog.pg_constraint c\\nJOIN pg_catalog.pg_class t ON t.oid = c.conrelid\\nJOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace\\nCROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)\\nJOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum\\nLEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid\\nLEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace\\nLEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]\\nWHERE n.nspname = 'public' AND t.relname = 'projects' AND c.contype IN ('p', 'f')\\nORDER BY c.contype DESC, c.conname, k.ord\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'project_id', 'constraint_type': 'PRIMARY KEY', 'ref_schema': None, 'ref_table': None, 'ref_column': None}, {'column_name': 'customer_id', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'customers', 'ref_column': 'customer_id'}, {'column_name': 'manager_id', 'constraint_type': 'FOREIGN KEY', 'ref_schema': 'public', 'ref_table': 'employees', 'ref_column': 'employee_id'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contact_notes' ORDER BY ordinal_position\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'note_id', 'data_type': 'integer'}, {'column_name': 'contact_id', 'data_type': 'integer'}, {'column_name': 'written_by', 'data_type': 'character varying'}, {'column_name': 'written_on', 'data_type': 'date'}, {'column_name': 'note', 'data_type': 'text'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'contacts' ORDER BY ordinal_position\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'contact_id', 'data_type': 'integer'}, {'column_name': 'customer_id', 'data_type': 'character varying'}, {'column_name': 'full_name', 'data_type': 'character varying'}, {'column_name': 'email', 'data_type': 'character varying'}, {'column_name': 'phone', 'data_type': 'character varying'}, {'column_name': 'role', 'data_type': 'character varying'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'customers' ORDER BY ordinal_position\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'customer_id', 'data_type': 'character varying'}, {'column_name': 'name', 'data_type': 'character varying'}, {'column_name': 'domain', 'data_type': 'character varying'}, {'column_name': 'sector', 'data_type': 'character varying'}, {'column_name': 'city', 'data_type': 'character varying'}, {'column_name': 'account_owner', 'data_type': 'character varying'}, {'column_name': 'created_at', 'data_type': 'date'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'employees' ORDER BY ordinal_position\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'employee_id', 'data_type': 'character varying'}, {'column_name': 'full_name', 'data_type': 'character varying'}, {'column_name': 'email', 'data_type': 'character varying'}, {'column_name': 'title', 'data_type': 'character varying'}, {'column_name': 'office', 'data_type': 'character varying'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'invoices' ORDER BY ordinal_position\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'invoice_no', 'data_type': 'character varying'}, {'column_name': 'customer_id', 'data_type': 'character varying'}, {'column_name': 'project_id', 'data_type': 'character varying'}, {'column_name': 'issued_on', 'data_type': 'date'}, {'column_name': 'due_on', 'data_type': 'date'}, {'column_name': 'net_gbp', 'data_type': 'numeric'}, {'column_name': 'vat_gbp', 'data_type': 'numeric'}, {'column_name': 'total_gbp', 'data_type': 'numeric'}, {'column_name': 'status', 'data_type': 'character varying'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'projects' ORDER BY ordinal_position\"}]": {
+   "is_error": false,
+   "text": "[{'column_name': 'project_id', 'data_type': 'character varying'}, {'column_name': 'name', 'data_type': 'character varying'}, {'column_name': 'customer_id', 'data_type': 'character varying'}, {'column_name': 'manager_id', 'data_type': 'character varying'}, {'column_name': 'contract_ref', 'data_type': 'character varying'}, {'column_name': 'status', 'data_type': 'character varying'}, {'column_name': 'start_date', 'data_type': 'date'}, {'column_name': 'end_date', 'data_type': 'date'}]"
+  },
+  "[\"execute_sql\", {\"sql\": \"SELECT table_schema, table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name\"}]": {
+   "is_error": false,
+   "text": "[{'table_schema': 'public', 'table_name': 'contact_notes'}, {'table_schema': 'public', 'table_name': 'contacts'}, {'table_schema': 'public', 'table_name': 'customers'}, {'table_schema': 'public', 'table_name': 'employees'}, {'table_schema': 'public', 'table_name': 'invoices'}, {'table_schema': 'public', 'table_name': 'projects'}]"
+  }
+ },
+ "recorded_at": "2026-10-01",
+ "resources": [],
+ "server": "postgres-mcp (uvx --with 'mcp<2' postgres-mcp --access-mode=restricted), role walnut_reader, db larkspur",
+ "tools": [
+  {
+   "description": "List all schemas in the database",
+   "destructive": null,
+   "input_schema": {
+    "properties": {},
+    "title": "list_schemasArguments",
+    "type": "object"
+   },
+   "name": "list_schemas",
+   "read_only": null
+  },
+  {
+   "description": "List objects in a schema",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "object_type": {
+      "default": "table",
+      "description": "Object type: 'table', 'view', 'sequence', or 'extension'",
+      "title": "Object Type",
+      "type": "string"
+     },
+     "schema_name": {
+      "description": "Schema name",
+      "title": "Schema Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "schema_name"
+    ],
+    "title": "list_objectsArguments",
+    "type": "object"
+   },
+   "name": "list_objects",
+   "read_only": null
+  },
+  {
+   "description": "Show detailed information about a database object",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "object_name": {
+      "description": "Object name",
+      "title": "Object Name",
+      "type": "string"
+     },
+     "object_type": {
+      "default": "table",
+      "description": "Object type: 'table', 'view', 'sequence', or 'extension'",
+      "title": "Object Type",
+      "type": "string"
+     },
+     "schema_name": {
+      "description": "Schema name",
+      "title": "Schema Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "schema_name",
+     "object_name"
+    ],
+    "title": "get_object_detailsArguments",
+    "type": "object"
+   },
+   "name": "get_object_details",
+   "read_only": null
+  },
+  {
+   "description": "Explains the execution plan for a SQL query, showing how the database will execute it and provides detailed cost estimates.",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "analyze": {
+      "default": false,
+      "description": "When True, actually runs the query to show real execution statistics instead of estimates. Takes longer but provides more accurate information.",
+      "title": "Analyze",
+      "type": "boolean"
+     },
+     "hypothetical_indexes": {
+      "default": [],
+      "description": "A list of hypothetical indexes to simulate. Each index must be a dictionary with these keys:\n    - 'table': The table name to add the index to (e.g., 'users')\n    - 'columns': List of column names to include in the index (e.g., ['email'] or ['last_name', 'first_name'])\n    - 'using': Optional index method (default: 'btree', other options include 'hash', 'gist', etc.)\n\nExamples: [\n    {\"table\": \"users\", \"columns\": [\"email\"], \"using\": \"btree\"},\n    {\"table\": \"orders\", \"columns\": [\"user_id\", \"created_at\"]}\n]\nIf there is no hypothetical index, you can pass an empty list.",
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Hypothetical Indexes",
+      "type": "array"
+     },
+     "sql": {
+      "description": "SQL query to explain",
+      "title": "Sql",
+      "type": "string"
+     }
+    },
+    "required": [
+     "sql"
+    ],
+    "title": "explain_queryArguments",
+    "type": "object"
+   },
+   "name": "explain_query",
+   "read_only": null
+  },
+  {
+   "description": "Analyze frequently executed queries in the database and recommend optimal indexes",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "max_index_size_mb": {
+      "default": 10000,
+      "description": "Max index size in MB",
+      "title": "Max Index Size Mb",
+      "type": "integer"
+     },
+     "method": {
+      "default": "dta",
+      "description": "Method to use for analysis",
+      "enum": [
+       "dta",
+       "llm"
+      ],
+      "title": "Method",
+      "type": "string"
+     }
+    },
+    "title": "analyze_workload_indexesArguments",
+    "type": "object"
+   },
+   "name": "analyze_workload_indexes",
+   "read_only": null
+  },
+  {
+   "description": "Analyze a list of (up to 10) SQL queries and recommend optimal indexes",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "max_index_size_mb": {
+      "default": 10000,
+      "description": "Max index size in MB",
+      "title": "Max Index Size Mb",
+      "type": "integer"
+     },
+     "method": {
+      "default": "dta",
+      "description": "Method to use for analysis",
+      "enum": [
+       "dta",
+       "llm"
+      ],
+      "title": "Method",
+      "type": "string"
+     },
+     "queries": {
+      "description": "List of Query strings to analyze",
+      "items": {
+       "type": "string"
+      },
+      "title": "Queries",
+      "type": "array"
+     }
+    },
+    "required": [
+     "queries"
+    ],
+    "title": "analyze_query_indexesArguments",
+    "type": "object"
+   },
+   "name": "analyze_query_indexes",
+   "read_only": null
+  },
+  {
+   "description": "Analyzes database health. Here are the available health checks:\n- index - checks for invalid, duplicate, and bloated indexes\n- connection - checks the number of connection and their utilization\n- vacuum - checks vacuum health for transaction id wraparound\n- sequence - checks sequences at risk of exceeding their maximum value\n- replication - checks replication health including lag and slots\n- buffer - checks for buffer cache hit rates for indexes and tables\n- constraint - checks for invalid constraints\n- all - runs all checks\nYou can optionally specify a single health check or a comma-separated list of health checks. The default is 'all' checks.",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "health_type": {
+      "default": "all",
+      "description": "Optional. Valid values are: all, buffer, connection, constraint, index, replication, sequence, vacuum.",
+      "title": "Health Type",
+      "type": "string"
+     }
+    },
+    "title": "analyze_db_healthArguments",
+    "type": "object"
+   },
+   "name": "analyze_db_health",
+   "read_only": null
+  },
+  {
+   "description": "Reports the slowest or most resource-intensive queries using data from the 'pg_stat_statements' extension.",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "limit": {
+      "default": 10,
+      "description": "Number of queries to return when ranking based on mean_time or total_time",
+      "title": "Limit",
+      "type": "integer"
+     },
+     "sort_by": {
+      "default": "resources",
+      "description": "Ranking criteria: 'total_time' for total execution time or 'mean_time' for mean execution time per call, or 'resources' for resource-intensive queries",
+      "title": "Sort By",
+      "type": "string"
+     }
+    },
+    "title": "get_top_queriesArguments",
+    "type": "object"
+   },
+   "name": "get_top_queries",
+   "read_only": null
+  },
+  {
+   "description": "Execute a read-only SQL query",
+   "destructive": null,
+   "input_schema": {
+    "properties": {
+     "sql": {
+      "default": "all",
+      "description": "SQL to run",
+      "title": "Sql",
+      "type": "string"
+     }
+    },
+    "title": "execute_sqlArguments",
+    "type": "object"
+   },
+   "name": "execute_sql",
+   "read_only": null
+  }
+ ]
+}

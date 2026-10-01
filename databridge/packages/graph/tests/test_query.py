@@ -415,7 +415,12 @@ def test_no_attribute_reaches_the_answer_text_without_its_own_citation():
     offenders: list[str] = []
     for question, answer in grounded:
         printed = {v.value for v in answer.values}
-        residue = _uncited_text(answer.answer, printed)
+        # A cited node's LABEL is grounded by its entity citation (the module docstring's R-31
+        # note), so it is masked too. Without this, a linked node whose attribute happens to equal
+        # the primary's label (a rule's `package_code` "WELL2" beside the package "WELL2") reads as
+        # an uncited attribute when what was printed is the label.
+        labels = {c.label for c in answer.citations}
+        residue = _uncited_text(answer.answer, printed | labels)
         for citation in answer.citations:
             node = _node(store, citation.entity_id)
             for attr, raw in node.attrs.items():

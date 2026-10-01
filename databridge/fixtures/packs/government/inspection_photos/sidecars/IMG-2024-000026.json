@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2024-000026",
+  "filename": "IMG-2024-000026.jpg",
+  "image_present": false,
+  "captured_at": "2024-03-04T15:17:14+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2024-000184",
+  "application_id": "APP-2023-000258",
+  "parcel_id": "PCL-ND-02313",
+  "photo_batch_ref": "PHB-2024-000184",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-616182"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 422497,
+    "northing": 1193732,
+    "accuracy_m": 17.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1945,
+          120,
+          330,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2024-066252",
+        "confidence": 0.889,
+        "bbox": [
+          3204,
+          234,
+          756,
+          72
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "140 WEIRSIDE WAY, ISK HARBOUR AM4 5EN",
+        "confidence": 0.829,
+        "bbox": [
+          2151,
+          390,
+          1258,
+          64
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2024-03-04",
+        "confidence": 0.773,
+        "bbox": [
+          861,
+          567,
+          754,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.912,
+        "bbox": [
+          3440,
+          480,
+          400,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

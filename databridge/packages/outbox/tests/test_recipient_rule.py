@@ -198,7 +198,7 @@ def test_the_ledger_door_refuses_when_the_live_rows_name_two_patients(intake, le
         (intake.intake_id, "issuer.issuer_code", row["value_json"], row["source_pointer_json"],
          row["extracted_at"], "staff:front_desk_02", row["confirmed_at"], "pat:someone-else"))
     ledger.conn.commit()
-    with pytest.raises(ConflictingSelections, match="more than one selected patient"):
+    with pytest.raises(ConflictingSelections, match="more than one selected subject"):
         recipient_from_committed_ledger(intake.intake_id, ledger)
 
 

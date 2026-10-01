@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2016-000370",
+  "filename": "IMG-2016-000370.jpg",
+  "image_present": false,
+  "captured_at": "2016-04-30T15:26:32+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2016-000634",
+  "application_id": "APP-2015-000772",
+  "parcel_id": "PCL-WH-01712",
+  "photo_batch_ref": "PHB-2016-000634",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-367259"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 420156,
+    "northing": 1197845,
+    "accuracy_m": 8.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          775,
+          120,
+          275,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2016-120045",
+        "confidence": 0.861,
+        "bbox": [
+          619,
+          249,
+          675,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "218 LAMPLIGHT LANE, WEND HILL AM8 5FV",
+        "confidence": 0.69,
+        "bbox": [
+          1098,
+          378,
+          962,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 201G-04-30",
+        "confidence": 0.841,
+        "bbox": [
+          575,
+          567,
+          812,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.788,
+        "bbox": [
+          450,
+          696,
+          352,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

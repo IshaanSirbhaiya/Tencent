@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2017-000419",
+  "filename": "IMG-2017-000419.jpg",
+  "image_present": false,
+  "captured_at": "2017-08-20T09:22:54+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2017-000649",
+  "application_id": "APP-2017-000786",
+  "parcel_id": "PCL-CB-02243",
+  "photo_batch_ref": "PHB-2017-000649",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-207088"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 421678,
+    "northing": 1210513,
+    "accuracy_m": 15.5
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          301,
+          120,
+          352,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2017-113920",
+        "confidence": 0.794,
+        "bbox": [
+          701,
+          224,
+          675,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "200 BELLROPE PASSAGE, CORRISBECK AM8 4KP",
+        "confidence": 0.699,
+        "bbox": [
+          1370,
+          334,
+          880,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2017-08-20",
+        "confidence": 0.833,
+        "bbox": [
+          2332,
+          426,
+          870,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.828,
+        "bbox": [
+          3392,
+          592,
+          544,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

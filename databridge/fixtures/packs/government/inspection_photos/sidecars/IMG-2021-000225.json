@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2021-000225",
+  "filename": "IMG-2021-000225.jpg",
+  "image_present": false,
+  "captured_at": "2021-02-08T11:19:56+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2021-000343",
+  "application_id": "APP-2020-000444",
+  "parcel_id": "PCL-CB-01535",
+  "photo_batch_ref": "PHB-2021-000343",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-693703"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 432798,
+    "northing": 1211498,
+    "accuracy_m": 6.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          3148,
+          120,
+          352,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2021-516960",
+        "confidence": 0.809,
+        "bbox": [
+          386,
+          237,
+          675,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "45 WEIRSIOE LANE, CORRISBECK AM6 5JZ",
+        "confidence": 0.872,
+        "bbox": [
+          2618,
+          328,
+          1224,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2021-02-08",
+        "confidence": 0.894,
+        "bbox": [
+          1088,
+          519,
+          986,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.811,
+        "bbox": [
+          1906,
+          564,
+          496,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -1,4 +1,4 @@
-"""Coverage determination — a pure lookup against ``config/coverage_rules.yaml``.
+"""Coverage determination — a pure lookup against the active pack's ``coverage_rules.yaml``.
 
 **No issuer is named in this file.** Everything it knows about insurers, packages, age bands and
 tests it asks ``rules.py`` for, and ``rules.py`` reads YAML. That is what makes "adding an insurer
@@ -32,7 +32,7 @@ from databridge_core import SourcePointer
 from .history import ClinicHistory, NoHistory
 from .models import (AuthorisedTest, CoverageDetermination, CoverageStatus, DocumentType,
                      IntakeRecord, PatientRecord, QuestionnaireKind, ResolutionCandidate)
-from .registry import DATASET_TODAY
+from .clock import resolve_today
 from .rules import CoverageRules, Package, TestMatch, rules
 
 # Flags are closed-vocabulary strings so the UI can style them and the eval suite can assert on
@@ -300,7 +300,7 @@ def determine_coverage(record: IntakeRecord,
                        *,
                        selected_patient: Optional[PatientRecord] = None,
                        candidates: Sequence[ResolutionCandidate] = (),
-                       today: dt.date = DATASET_TODAY,
+                       today: Optional[dt.date] = None,
                        table: Optional[CoverageRules] = None,
                        history: Optional[ClinicHistory] = None) -> CoverageDetermination:
     """What the config table says this document entitles the patient to.
@@ -318,6 +318,7 @@ def determine_coverage(record: IntakeRecord,
     one of them. ``candidates`` alone therefore never constitutes a selection.
     """
     table = table or rules()
+    today = resolve_today(today)
     # NoHistory by default: the pipeline must produce the same card with no graph attached.
     history = history if history is not None else NoHistory()
     reasoning: list[str] = []

@@ -61,8 +61,11 @@ export function SchemaGraph({
       target: r.dst_table,
       label: r.name,
       animated: false,
-      style: { stroke: r.declared ? "#2563EB" : "#6b7280", strokeDasharray: r.declared ? undefined : "4 3" },
-      labelStyle: { fontSize: 9, fill: "#9ca3af" },
+      style: {
+        stroke: r.declared ? "hsl(var(--accent))" : "hsl(var(--subtle))",
+        strokeDasharray: r.declared ? undefined : "4 3",
+      },
+      labelStyle: { fontSize: 9, fill: "hsl(var(--subtle))" },
     }));
     return { nodes, edges };
   }, [schema]);
@@ -79,7 +82,7 @@ export function SchemaGraph({
         nodesDraggable={false}
         nodesConnectable={false}
       >
-        <Background color="#2a2f3a" gap={18} />
+        <Background color="hsl(var(--border))" gap={18} />
         <Controls showInteractive={false} className="!bg-elevated !border-border" />
       </ReactFlow>
     </div>

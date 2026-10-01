@@ -10,6 +10,8 @@ import datetime as dt
 
 import pytest
 
+from databridge_intake.registry import DATASET_TODAY
+
 from databridge_intake.guardrails import REFUSAL_CODE, REFUSAL_TEXT, check_question
 from databridge_intake.ledger import (EvidenceLedger, IdentityNotVerified, LedgerError,
                                       subject_fingerprint_for)
@@ -27,7 +29,7 @@ def _text(name: str) -> str:
 
 @pytest.fixture(scope="module")
 def drafts():
-    return {p.name: run_intake(p.read_text(encoding="utf-8"), document_id=p.name)
+    return {p.name: run_intake(p.read_text(encoding="utf-8"), document_id=p.name, today=DATASET_TODAY)
             for p in sorted((fixtures_dir() / "chits").glob("*"))}
 
 
@@ -407,7 +409,14 @@ def test_an_add_on_beyond_a_coded_package_is_patient_payable(drafts):
     billing = drafts["chit_07_mol_authorisation_pee226.txt"].billing
     assert billing.billed_to == "government_scheme"
     assert len(billing.patient_payable_items) == 2
-    assert billing.estimated_patient_payable_sgd == 105
+    # The sum of the YAML list prices of exactly those items (HC1, rule 6) — read from the
+    # catalogue, not from the billing draft under test and not written down here.
+    from databridge_intake.rules import rules
+
+    prices = [rules().test(item["canonical"]).list_price_sgd
+              for item in billing.patient_payable_items]
+    assert len(prices) >= 1 and all(p is not None for p in prices)
+    assert billing.estimated_patient_payable_sgd == sum(prices)
 
 
 def test_undetermined_coverage_bills_nobody(drafts):
@@ -444,7 +453,7 @@ def test_a_test_outside_the_catalogue_is_not_asserted_as_patient_payable(drafts)
             "requested_tests": [*record.authorisation.requested_tests,
                                 GroundedValue(value="Cranial Aura Scan", pointer=ptr,
                                               confidence=1.0)]})})
-    billing = draft_billing(tweaked, determine_coverage(tweaked))
+    billing = draft_billing(tweaked, determine_coverage(tweaked, today=DATASET_TODAY))
     assert all(i["as_printed"] != "Cranial Aura Scan" for i in billing.patient_payable_items)
     entry = next(i for i in billing.unknown_coverage_items
                  if i["as_printed"] == "Cranial Aura Scan")
@@ -474,7 +483,7 @@ def test_uncatalogued_tests_do_not_present_a_confident_zero_total(drafts):
             "requested_tests": [GroundedValue(value="Cranial Aura Scan", pointer=ptr,
                                               confidence=1.0)],
             "add_ons": []})})
-    billing = draft_billing(all_uncatalogued, determine_coverage(all_uncatalogued))
+    billing = draft_billing(all_uncatalogued, determine_coverage(all_uncatalogued, today=DATASET_TODAY))
     assert billing.patient_payable_items == []
     assert len(billing.unknown_coverage_items) == 1
     assert billing.estimated_patient_payable_sgd is None, (
@@ -491,7 +500,7 @@ def test_a_genuinely_zero_total_is_still_distinguishable_from_an_unknown_one(dra
     from databridge_intake.eligibility import determine_coverage
 
     record = drafts["chit_01_meridian_referral.txt"].record
-    billing = draft_billing(record, determine_coverage(record))
+    billing = draft_billing(record, determine_coverage(record, today=DATASET_TODAY))
     if not billing.patient_payable_items and not billing.unknown_coverage_items:
         assert billing.estimated_patient_payable_sgd == 0
         assert "TOTAL_IS_LOWER_BOUND" not in billing.caveats
@@ -507,7 +516,7 @@ def test_a_test_printed_twice_is_billed_once(drafts):
         "authorisation": record.authorisation.model_copy(update={
             "requested_tests": [*record.authorisation.requested_tests,
                                 *record.authorisation.requested_tests]})})
-    billing = draft_billing(doubled, determine_coverage(doubled))
+    billing = draft_billing(doubled, determine_coverage(doubled, today=DATASET_TODAY))
     canonicals = [i["canonical"] for i in billing.patient_payable_items if i["canonical"]]
     assert len(canonicals) == len(set(canonicals))
 
@@ -578,10 +587,10 @@ def test_the_questionnaire_is_blank_until_a_patient_is_selected(drafts):
 
 def test_selecting_a_patient_fills_the_questionnaire():
     text = _text("chit_02_everwell_voucher.txt")
-    draft = run_intake(text, document_id="chit_02_everwell_voucher.txt")
+    draft = run_intake(text, document_id="chit_02_everwell_voucher.txt", today=DATASET_TODAY)
     selected = draft.resolution.candidates[0].record
     confirmed = run_intake(text, document_id="chit_02_everwell_voucher.txt",
-                           confirmation=_attested(draft), selected_patient=selected)
+                           confirmation=_attested(draft), selected_patient=selected, today=DATASET_TODAY)
     assert confirmed.questionnaire.prefilled_count >= 10
 
 
@@ -598,7 +607,7 @@ def test_the_pipeline_cannot_write_to_the_ledger():
 
 
 def test_a_walk_in_produces_a_valid_self_pay_draft():
-    draft = run_intake("", document_id="walkin_01.json", channel="walk_in")
+    draft = run_intake("", document_id="walkin_01.json", channel="walk_in", today=DATASET_TODAY)
     assert draft.coverage.status is CoverageStatus.DETERMINED
     assert draft.billing.billed_to == "patient"
     assert draft.resolution.status.value == "insufficient_identifiers"
@@ -616,7 +625,7 @@ def test_every_billing_line_cites_each_of_its_four_claims(drafts):
 
     checked = 0
     for draft in drafts.values():
-        billing = draft_billing(draft.record, determine_coverage(draft.record))
+        billing = draft_billing(draft.record, determine_coverage(draft.record, today=DATASET_TODAY))
         lines = [*billing.covered_items, *billing.patient_payable_items,
                  *billing.unknown_coverage_items]
         for line in lines:
@@ -637,7 +646,7 @@ def test_the_billing_draft_cites_who_pays(drafts):
     from databridge_intake.eligibility import determine_coverage
 
     for draft in drafts.values():
-        billing = draft_billing(draft.record, determine_coverage(draft.record))
+        billing = draft_billing(draft.record, determine_coverage(draft.record, today=DATASET_TODAY))
         if billing.billed_to == "unknown":
             continue
         assert "billed_to" in billing.field_sources

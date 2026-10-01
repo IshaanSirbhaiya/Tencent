@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000045",
+  "filename": "IMG-2020-000045.jpg",
+  "image_present": false,
+  "captured_at": "2020-03-13T09:39:30+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2020-000434",
+  "application_id": "APP-2019-000567",
+  "parcel_id": "PCL-CB-02375",
+  "photo_batch_ref": "PHB-2020-000434",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-410234"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 442864,
+    "northing": 1184221,
+    "accuracy_m": 9.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1816,
+          120,
+          286,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-395862",
+        "confidence": 0.86,
+        "bbox": [
+          1879,
+          252,
+          675,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "237 COLDHARBOUR CLOSE, CORRISBECK AM8 8DG",
+        "confidence": 0.891,
+        "bbox": [
+          690,
+          340,
+          1107,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-03-13",
+        "confidence": 0.757,
+        "bbox": [
+          1938,
+          450,
+          870,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.812,
+        "bbox": [
+          310,
+          560,
+          384,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

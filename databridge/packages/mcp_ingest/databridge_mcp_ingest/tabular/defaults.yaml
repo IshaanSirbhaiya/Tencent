@@ -1,0 +1,72 @@
+# Tabular policy — the rules the database recipe runs on (KNOWLEDGE_SYSTEM_PRINCIPLES §3, §4).
+# Every threshold here is a STARTING constant: tune by measurement and record what changed.
+# A dialect file (`profiles/<source>/<dialect>.sql.yaml`) may override any key under
+# `tabular_policy:`; a per-connection override lives in `<source>.tabular.yaml` beside the
+# connection (same keys).
+
+# Column type classes, matched (case-insensitive regex, first hit wins) against the data_type the
+# server reported. `temporal` columns get a measured date range; `numeric` columns are measures.
+type_classes:
+  temporal: ['^date$', '^timestamp', '^time', 'datetime', '^interval$']
+  numeric: ['int', '^numeric', '^decimal', '^real$', '^double', '^float', '^money$', '^serial',
+            '^number']
+  boolean: ['^bool']
+  json: ['json']
+  text: ['char', 'text', '^string$', '^citext$', '^name$', '^uuid$']
+
+# A text column is PROSE (→ passages, not facts-only) when BOTH hold on the measured values.
+prose:
+  min_avg_chars: 40
+  min_avg_words: 6
+  # Prose passages are capped per table, newest first (by the table's first temporal column);
+  # the cap is stated on the schema card (P7).
+  max_rows: 2000
+
+# The facts store copies whole tables up to this many rows; above it the table is AGGREGATED.
+facts:
+  row_cap: 200000
+  page_size: 500
+  # Aggregation groups by the columns whose MEASURED distinct count falls in this band (grouping
+  # by name picks identifiers, by most-repetitive picks trivia). At most `max_group_columns`.
+  aggregate_min_distinct: 10
+  aggregate_max_distinct: 500
+  max_group_columns: 2
+  # Refuse to publish a facts file with fewer than this fraction of the previous file's rows (P11).
+  min_shrink_ratio: 0.5
+
+# History-snapshot tables (periodic copies of a current-state table) are excluded from the facts
+# store and the graph, and the exclusion is written down with its rule (P3, P7). A table is a
+# history snapshot when a NAME rule fires AND (a snapshot column exists OR another table has the
+# same columns minus the snapshot columns). Name alone is only a signal (P2).
+history_snapshot:
+  name_patterns: ['_history$', '_hist$', '_snapshots?$', '^snapshot_', '^snap_', '_archive$',
+                  '_weekly$', '_daily$', '_monthly$', '_versions$']
+  snapshot_columns: ['snapshot_date', 'snapshot_at', 'snapshot_ts', 'as_of', 'as_of_date',
+                     'extracted_at', 'extract_date', 'valid_to', 'period_end', 'captured_at']
+
+# When neither the rules nor the model find a kind, the table is PROPOSED (never approved) as the
+# kind bound to this Layer-0 meta-kind — a row is at least a record body — so a table the agents
+# write to (or any new table) is one human approval away from the graph instead of silently
+# staying facts-only (E2E F-23). Empty/null turns the fallback off. Engine vocabulary, no domain.
+unmapped_fallback_meta_kind: document
+
+# Mapping rules (P16: rules first, model second). A table whose name has no kind of its own is
+# matched to a Layer-0 META-KIND by these common relational names; it is proposed only when
+# EXACTLY ONE kind of the active vocabulary binds to that meta-kind (or one kind is named like the
+# meta-kind itself). Meta-kinds are engine vocabulary — this names no domain.
+meta_kind_hints:
+  organisation: [customer, client, account, company, supplier, vendor, partner, organisation,
+                 organization, tenant, firm, merchant]
+  location: [site, office, address, branch, region, location]
+
+# Columns whose name says they are a natural identifier, in preference order, for the node's
+# canonical_id (the exact-merge key that lets a document mention and a row meet). A subject kind
+# never has one (R-022 f2 #1): its declared identifier only proposes candidates. The chosen column must be MEASURED unique and
+# non-null in the rows read.
+# Tried AFTER a text primary key (the business key, E2E run 2 N-16), in this order: business-key
+# words first, contact-like columns (a fact about the row, not its key) last.
+canonical_columns: [code, reference, ref, number, "no", sku, slug, domain, email]
+
+# Foreign keys become edges. Meta-kinds tried, in preference order when two candidates score the
+# same. `about` (a claim) and `derived_from`/`supersedes` (lineage) are never inferred from a key.
+fk_edge_metas: [role_of, party_to, issued, authorises, part_of, at, references]

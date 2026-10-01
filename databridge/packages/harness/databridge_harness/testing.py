@@ -13,6 +13,7 @@ from typing import Any, Callable, Optional, Sequence, Union
 from pydantic import BaseModel
 
 from .backends import RawCompletion
+from .embedding import RawEmbedding, hashing_embed
 
 
 def valid_json(model_or_dict: Union[BaseModel, dict]) -> str:
@@ -30,6 +31,12 @@ class FakeBackend:
       * a sequence of ``str`` — consumed one per call (the last repeats once exhausted),
         which is how you script "invalid then corrected" to drive L2 retries;
       * a callable ``(model, messages, guided_json) -> str``.
+
+    ``embedder`` (additive, for ``Harness.embed``) is a callable ``(texts) -> list[vector]``.
+    Omitted, the fake embeds with the same deterministic hashing vectorizer as the offline
+    fallback — but results are NOT labelled offline, because a fake is a test double standing in
+    for a real embedding model. Tests that need "paraphrase is close" semantics pass their own.
+    Every ``embed()`` call is recorded in ``embed_calls``.
     """
 
     name = "fake"
@@ -41,8 +48,11 @@ class FakeBackend:
         tokens_in: int = 5,
         tokens_out: int = 5,
         cost_usd: float = 0.0,
+        embedder: Optional[Callable[[list[str]], list[list[float]]]] = None,
     ) -> None:
         self._responses = responses
+        self._embedder = embedder
+        self.embed_calls: list[dict] = []  # one record per embed() call
         self._i = 0
         self._tin = tokens_in
         self._tout = tokens_out
@@ -85,3 +95,12 @@ class FakeBackend:
         text = self._next_text(model, messages, guided_json)
         return RawCompletion(text=text, tokens_in=self._tin, tokens_out=self._tout,
                              cost_usd=self._cost, model_used=model)
+
+    def embed(self, *, model: str, inputs: list[str], **kwargs: Any) -> RawEmbedding:
+        texts = list(inputs)
+        self.embed_calls.append({"model": model, "inputs": texts})
+        vectors = (self._embedder(texts) if self._embedder is not None
+                   else hashing_embed(texts))
+        return RawEmbedding(vectors=[list(map(float, v)) for v in vectors],
+                            tokens=sum(len(t.split()) for t in texts),
+                            cost_usd=0.0, model_used=model)

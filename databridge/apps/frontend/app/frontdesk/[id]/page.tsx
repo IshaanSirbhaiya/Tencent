@@ -28,11 +28,14 @@ import {
   CoverageSection,
   HonestySection,
   QuestionnaireSection,
+  ReadSourceBanner,
 } from "@/components/frontdesk/card-sections";
 import { cn } from "@/lib/utils";
 import { useStaffSession } from "@/lib/staff-session";
+import { useNouns } from "@/lib/pack-context";
 
 export default function FrontDeskCardPage() {
+  const nouns = useNouns();
   const params = useParams<{ id: string }>();
   const intakeId = decodeURIComponent(params.id);
   const qc = useQueryClient();
@@ -151,6 +154,8 @@ export default function FrontDeskCardPage() {
         )}
       </header>
 
+      <ReadSourceBanner card={card} />
+
       {cardQ.isRefetchError && (
         <p
           role="alert"
@@ -187,7 +192,7 @@ export default function FrontDeskCardPage() {
           // "identity has not been verified" message the screen offers no way to act on.
           <p className="text-xs text-subtle" data-testid="no-candidate-path">
             No registry record matches this document, so there is nothing to confirm against.
-            Register this patient at the counter; the intake stays here as a record of what the
+            Register this {nouns.subject} at the counter; the intake stays here as a record of what the
             document said.
           </p>
         ) : gate?.committed ? (
@@ -201,7 +206,7 @@ export default function FrontDeskCardPage() {
             <p className="mb-2 flex items-start gap-1.5 text-xs text-subtle">
               <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {gate?.ready_to_commit
-                ? "A patient has been selected against an in-person check. Confirming writes these values to the append-only evidence ledger."
+                ? `A ${nouns.subject} has been selected against an in-person check. Confirming writes these values to the append-only evidence ledger.`
                 : (gate?.blocked_because ?? "The gate is closed.")}
             </p>
 
@@ -218,7 +223,7 @@ export default function FrontDeskCardPage() {
                   className="mt-0.5 h-3.5 w-3.5 accent-[var(--band-auto)]"
                 />
                 <span>
-                  I confirm I checked this patient&apos;s identity in person and that these values
+                  I confirm I checked this {nouns.subject}&apos;s identity in person and that these values
                   are correct. My staff ID will be recorded against every entry.
                 </span>
               </label>
@@ -232,7 +237,7 @@ export default function FrontDeskCardPage() {
               className={cn(
                 "rounded px-3 py-1.5 text-xs font-medium transition-colors",
                 canConfirm
-                  ? "bg-band-auto text-white hover:opacity-90"
+                  ? "bg-band-auto text-accent-fg hover:opacity-90"
                   : "cursor-not-allowed bg-muted text-subtle",
               )}
             >

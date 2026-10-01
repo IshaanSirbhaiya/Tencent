@@ -99,7 +99,8 @@ def test_the_human_selection_wording_is_added_by_code_whenever_candidates_were_r
 
     assert HUMAN_SELECTION in result.notes
     assert note_text(HUMAN_SELECTION) in result.answer
-    assert "a named member of clinic staff" in result.answer
+    # The sentence names a named HUMAN in person — in whatever words the bound pack uses (HC1).
+    assert "a named member of" in result.answer and "in person" in result.answer
 
 
 def test_the_human_selection_wording_appears_even_when_the_model_reports_nothing():

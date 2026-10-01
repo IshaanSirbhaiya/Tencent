@@ -288,16 +288,25 @@ def client():
 
     from databridge_gateway import create_app
 
-    previous = os.environ.get("DATABRIDGE_FORCE_GOLD")
+    from databridge_gateway.auth import reset_auth_state_for_tests
+
+    # Every /intake route requires a principal (INT1, 2026-10-01): this suite sets its own one-token
+    # directory, as a real deployment would, and restores whatever was there before.
+    token, principal = "test-token-intake-ocr", "staff"
+    saved = {k: os.environ.get(k) for k in ("DATABRIDGE_FORCE_GOLD", "WALNUT_API_TOKENS")}
     os.environ["DATABRIDGE_FORCE_GOLD"] = "1"       # CLAUDE.md: no test depends on a live model
+    os.environ["WALNUT_API_TOKENS"] = json.dumps({token: principal})
+    reset_auth_state_for_tests()
     try:
-        with TestClient(create_app()) as c:
+        with TestClient(create_app(), headers={"Authorization": f"Bearer {token}"}) as c:
             yield c
     finally:
-        if previous is None:
-            os.environ.pop("DATABRIDGE_FORCE_GOLD", None)
-        else:
-            os.environ["DATABRIDGE_FORCE_GOLD"] = previous
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        reset_auth_state_for_tests()
 
 
 def test_an_uploaded_referring_document_runs_the_same_pipeline_as_a_paste(client):

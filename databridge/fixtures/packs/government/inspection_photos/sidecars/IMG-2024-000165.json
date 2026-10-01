@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2024-000165",
+  "filename": "IMG-2024-000165.jpg",
+  "image_present": false,
+  "captured_at": "2024-08-22T10:49:02+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2024-000332",
+  "application_id": "APP-2023-000434",
+  "parcel_id": "PCL-KF-00784",
+  "photo_batch_ref": "PHB-2024-000332",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-272352"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 429647,
+    "northing": 1191425,
+    "accuracy_m": 16.7
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          137,
+          120,
+          297,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2024-420330",
+        "confidence": 0.82,
+        "bbox": [
+          1383,
+          239,
+          891,
+          91
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "231 NETHERFIELD WALK, KELDER FLATS AM2 6GA",
+        "confidence": 0.88,
+        "bbox": [
+          1893,
+          350,
+          1428,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2024-08-22",
+        "confidence": 0.706,
+        "bbox": [
+          2066,
+          405,
+          638,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.796,
+        "bbox": [
+          2770,
+          520,
+          432,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

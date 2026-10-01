@@ -1,0 +1,125 @@
+# =====================================================================
+# packs/government/agents/permit_assessment_drafter.yaml
+#
+# An **agent declaration** (AGENT_PLANE.md D11). The second of two in
+# this tree, and deliberately the harder case: its main adapter is a
+# GOVERNED MCP SERVER (fixtures/packs/government/adapters/
+# permits_registry_mcp.yaml), which is T3, capture-mandatory, and whose
+# fields are untrusted unless a named human wrote down why not.
+#
+# SYNTHETIC. The Aldermoor Territory, its permit office and every record
+# below are invented.
+# =====================================================================
+
+agent: permit_assessment_drafter
+version: 2
+supersedes: 1
+pack: government
+title: Permit assessment drafter
+description: >-
+  Drafts the assessment note for a permit application from the register
+  and the case file. It extracts spans, cites each one, and abstains
+  rather than guessing. It proposes; the determination is a caseworker's.
+
+# ---------------------------------------------------------------------
+# Purpose (spine D5), from packs/government/purposes.yaml.
+# `permits.assessment` is declared subject_scoped, so every read under
+# it carries a subject-read grant minted after a human attests.
+# ---------------------------------------------------------------------
+purpose: permits.assessment
+
+# ---------------------------------------------------------------------
+# Capabilities. Two shapes appear here, and both are checked against an
+# advertisement this file did not write:
+#
+#   permits_registry_mcp.*  named TOOLS, from the Adapter Builder
+#                           declaration's `capabilities.read` allowlist
+#                           (AGENT_PLANE §6.2). A tool the server
+#                           advertises and that allowlist omits can never
+#                           be invoked, and one the allowlist omits
+#                           cannot be granted here either.
+#   case_files.*            port verbs, from the estate's sources.yaml.
+#
+# The register's write set is EMPTY by declaration, so there is nothing
+# write-shaped to ask for. If there were, naming it here would be
+# refused: a write is an ActionType with a human gate (§6.4), never a
+# read capability with a misleading name.
+# ---------------------------------------------------------------------
+capabilities:
+  - permits_registry_mcp.permit_lookup
+  - permits_registry_mcp.permit_search
+  - case_files.resolve
+  - case_files.verify_against_capture
+
+# ---------------------------------------------------------------------
+# Trust ceiling. `untrusted`, necessarily: the register is a third-party
+# MCP surface whose applicant_name and applicant_notes are
+# applicant-supplied, and this estate plants two prompt-injection
+# payloads in the notes column on purpose. The compiled sink policy bars
+# every value this agent holds from all of TRUSTED_SINKS -- the payloads
+# are quoted with a citation and never followed.
+# ---------------------------------------------------------------------
+trust_ceiling: untrusted
+citation: required_per_field
+
+# ---------------------------------------------------------------------
+# The risk budget (spine D9, Kotte arXiv:2606.29054).
+#
+# This is a SPAN-EXTRACTION task -- short spans pulled out of an
+# application and a case file -- and that is exactly the class for which
+# Kotte found alpha = 0.10 uncertifiable across six models and eight
+# datasets. So the target is declared ABOVE it, at 0.15, and the
+# compiler refuses anything at or below 0.10 for this task_class with
+# the citation attached. Lowering the number here does not make the
+# agent safer; it makes it uncompilable.
+#
+#     (0.19 - 0.15) / (1 - 0.15) = 0.0471   <=   0.30 declared tolerance
+# ---------------------------------------------------------------------
+abstention:
+  abstain_when: "certificate.risk > 0.15"
+  target_alpha: 0.15
+  max_abstention_rate: 0.30
+  task_class: span_extraction
+  measured_base_risk: 0.19
+  measured_on: "2026-08-14"
+  measured_by: >-
+    Offline harness run over the bound golden set, 16 cases, scored by
+    the grounding checker against the estate's own ground truth.
+    Synthetic estate; no live model in the compiler.
+  golden_set_digest: "sha256:a0ff019e7c9f4107aa74c5eb51b0f70028ab0c2eb95918ba74aa67db7dadcfcf"
+
+# ---------------------------------------------------------------------
+# Actions (D12). The determination itself is subject-touching and can
+# only ever be `human_required`; recording an inbound consultee response
+# is not a determination about anybody and is notified rather than
+# gated.
+# ---------------------------------------------------------------------
+actions:
+  - draft_assessment_note:
+      description: >-
+        Emit the assessment note for one application, every paragraph
+        cited. It concerns one applicant, so it is subject-touching.
+      touches_subject: true
+      automation:
+        mode: human_required
+
+  - record_consultee_response:
+      description: >-
+        Append a received consultee response to the case file's
+        correspondence log, verbatim and cited. It records that a letter
+        arrived; it decides nothing about who anyone is and asserts
+        nothing about the outcome.
+      touches_subject: false
+      automation:
+        mode: human_notified
+
+budget:
+  tokens_per_run: 24000
+  escalations_per_day: 40
+  cost_ceiling_usd_per_day: 7.50
+
+evals:
+  golden_set: packs/government/evals/permit_assessment_v2.jsonl
+  gates:
+    grounding: 1.0
+    abstention_calibration: 0.95

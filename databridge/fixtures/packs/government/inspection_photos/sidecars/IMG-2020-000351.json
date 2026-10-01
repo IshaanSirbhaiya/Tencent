@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000351",
+  "filename": "IMG-2020-000351.jpg",
+  "image_present": false,
+  "captured_at": "2020-07-04T09:21:22+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2020-000390",
+  "application_id": "APP-2020-000517",
+  "parcel_id": "PCL-TF-01015",
+  "photo_batch_ref": "PHB-2020-000390",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-736811"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 444180,
+    "northing": 1181977,
+    "accuracy_m": 12.3
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          483,
+          120,
+          286,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-051736",
+        "confidence": 0.745,
+        "bbox": [
+          215,
+          223,
+          594,
+          55
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "30 MARROW CRESCENT, TARNFIELD AM9 4VK",
+        "confidence": 0.732,
+        "bbox": [
+          269,
+          408,
+          1110,
+          72
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-07-04",
+        "confidence": 0.946,
+        "bbox": [
+          995,
+          534,
+          725,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.96,
+        "bbox": [
+          1156,
+          508,
+          480,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

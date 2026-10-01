@@ -70,7 +70,7 @@ class Capability:
 # seeded graph and fails if the store changed, so a mutating addition cannot land quietly.
 READ_CAPABILITIES: tuple[Capability, ...] = (
     Capability("brain_query", "brain_query",
-               "Answer a question from the clinic graph, with a citation per value."),
+               "Answer a question from the knowledge graph, with a citation per value."),
     Capability("brain_neighbors", "brain_neighbors",
                "The subgraph around an entity, to a given depth."),
     Capability("brain_timeline", "brain_timeline",

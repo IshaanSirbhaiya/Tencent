@@ -1,0 +1,75 @@
+# SQLite dialect template (W4). The SHAPE every dialect template follows is documented once, in
+# `tabular/dialect_draft.py` (TEMPLATE_KEYS / RESULT_COLUMNS); `validate_template` enforces it.
+# Rendered by parse.render: `{x|literal}` quotes a value, `{x|ident}` quotes an identifier with
+# this template's `quote`, `{x|int}` coerces. Every statement is a read.
+name: sqlite
+engine: sqlite
+title: SQLite
+status: engine_tested
+verified: >-
+  2026-10-01 (W4) — every catalogue query probed against the real sqlite3 engine through a JSON
+  query tool (tests/test_w4_dialects.py). No SQLite MCP server was run live: the reference server
+  returns str(list_of_dicts), which tabular/pyrepr parses.
+detect:
+  priority: 5
+  tool_hints: [read_query, list_tables, describe_table]
+  probes:
+    - {sql: "SELECT sqlite_version() AS v", match: '^3\.\d+'}
+mcp:
+  rows: auto
+  error_prefixes: ["Error:", "Database error:"]
+# R-022 f1 #4: engine functions (beyond the generic allow-list in dialect_draft.py) that these
+# statements call. Each is a pure READ; a function not listed here is refused before any probe.
+read_functions: [pragma_table_info, pragma_foreign_key_list, sqlite_version]
+# R-022 f2 #3: the DATABASE refuses writes for the rest of the probe's session (`query_only`), and
+# the probe checks that it took. A dialect draft is approvable only when this is verified.
+read_only_session:
+  sql: PRAGMA query_only = ON
+  check: SELECT query_only AS v FROM pragma_query_only
+  expect: '^1$'
+quote: '"'
+list_tables: >-
+  SELECT 'main' AS table_schema, name AS table_name FROM sqlite_master
+  WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name
+describe: >-
+  SELECT name AS column_name, type AS data_type
+  FROM pragma_table_info({table|literal}, {schema|literal}) ORDER BY cid
+keys: >-
+  SELECT name AS column_name, 'PRIMARY KEY' AS constraint_type, NULL AS ref_schema,
+         NULL AS ref_table, NULL AS ref_column
+  FROM pragma_table_info({table|literal}, {schema|literal}) WHERE pk > 0
+  UNION ALL
+  SELECT "from" AS column_name, 'FOREIGN KEY' AS constraint_type, {schema|literal} AS ref_schema,
+         "table" AS ref_table, "to" AS ref_column
+  FROM pragma_foreign_key_list({table|literal}, {schema|literal})
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+row_estimate: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int} OFFSET {offset|int}
+column_stats: >-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         COUNT(DISTINCT CAST({column|ident} AS TEXT)) AS distinct_n,
+         AVG(LENGTH(CAST({column|ident} AS TEXT))) AS avg_len,
+         MAX(LENGTH(CAST({column|ident} AS TEXT))) AS max_len,
+         AVG(LENGTH(CAST({column|ident} AS TEXT))
+             - LENGTH(REPLACE(CAST({column|ident} AS TEXT), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+table_stats: >-
+  SELECT COUNT(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT({column|ident}) AS {p}_non_null,
+  COUNT(DISTINCT CAST({column|ident} AS TEXT)) AS {p}_distinct_n,
+  AVG(LENGTH(CAST({column|ident} AS TEXT))) AS {p}_avg_len,
+  MAX(LENGTH(CAST({column|ident} AS TEXT))) AS {p}_max_len,
+  AVG(LENGTH(CAST({column|ident} AS TEXT)) - LENGTH(REPLACE(CAST({column|ident} AS TEXT), ' ', ''))) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}

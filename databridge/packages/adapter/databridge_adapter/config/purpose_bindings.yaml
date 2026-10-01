@@ -1,0 +1,59 @@
+# Binding: PACK purpose id  ->  ESTATE purpose id.
+#
+# Two closed vocabularies exist and they were written independently:
+#
+#   * `packs/finance/purposes.yaml` declares the purposes a `Principal` may carry. They are
+#     dotted and namespaced (`lending.underwriting`) because ids must be unique across enabled
+#     packs, and each names a LAWFUL BASIS.
+#   * `fixtures/packs/finance/roles.yaml` declares the purposes the estate's ACCESS MODEL knows
+#     (`credit_assessment`). Each role lists the estate purposes it may act under.
+#
+# Nothing joins them. The Policy layer needs the join to answer "is this principal permitted to
+# read for the purpose it carried?", so the join is declared here, as data.
+#
+# **This file belongs in the pack.** It lives under `packages/adapter/` because the pack fixture
+# is another workstream's scope; move it to `fixtures/packs/<estate>/purpose_bindings.yaml` when
+# that scope allows, and delete the packaged copy. Nothing in the loader assumes this location.
+#
+# Rules the loader enforces, so that the omission below is a refusal and not a default:
+#   * a pack purpose with no binding is `PurposeNotBound` — the read is refused, naming both
+#     files. Guessing the nearest-looking estate purpose would attach a lawful basis nobody
+#     wrote down.
+#   * a binding naming an estate purpose `roles.yaml` does not declare is a load error.
+
+version: 1
+
+estates:
+
+  walnut-finance-synthetic:
+    pack: finance
+    bindings:
+      # Underwriting and covenant monitoring are both "assess this borrower against the book".
+      lending.underwriting:          credit_assessment
+      lending.covenant_monitoring:   credit_assessment
+      # Aggregate exposure reporting. The estate's portfolio_analyst is aggregate_only and its
+      # egress ceiling is INTERNAL, so a row read of a RESTRICTED_INTERNAL source under this
+      # purpose is refused at admission — which is the correct answer, not a gap.
+      lending.portfolio_reporting:   portfolio_analytics
+      # KYC/AML. `kyc.onboarding` covers RETRIEVING candidate evidence; the attestation that
+      # follows is a human Action and is not a read at all.
+      kyc.onboarding:                financial_crime_compliance
+      kyc.screening:                 financial_crime_compliance
+      finance.pointer_verification:  audit
+      finance.source_health:         system_operation
+
+      # DELIBERATELY UNBOUND — `finance.graph_build`.
+      #
+      # The pack declares it as "scheduled build-time crawl staging evidence into the graph".
+      # The estate has no counterpart. The nearest candidates are both wrong and wrong in the
+      # dangerous direction:
+      #
+      #   * `system_operation` is "Metadata and schema only, never values" — a crawl that stages
+      #     evidence reads values, so binding here would let a metadata-only role read them;
+      #   * `portfolio_analytics` is `aggregate_only: true` with `minimum_group_size: 5` — a
+      #     crawl emits rows, not aggregates.
+      #
+      # Leaving it unbound makes a build-time crawl of this estate a REFUSAL that names the two
+      # files, which is a question for the estate's data owner rather than a decision for an
+      # adapter. Use `lending.portfolio_reporting` for aggregate crawls until the estate declares
+      # a build purpose of its own.

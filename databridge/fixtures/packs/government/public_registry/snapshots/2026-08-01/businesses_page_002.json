@@ -1,0 +1,3388 @@
+{
+  "meta": {
+    "notice": "SYNTHETIC FIXTURE -- Aldermoor Territory public registry. No real business is represented.",
+    "api": "aldermoor-public-registry",
+    "api_version": "2.3.1",
+    "endpoint": "/v2/businesses",
+    "fetched_at": "2026-08-01T06:15:00Z",
+    "page": 2,
+    "page_size": 100,
+    "page_count": 7,
+    "total_records": 602,
+    "etag": "W/\"af42461770bcb8d1123b\"",
+    "next_cursor": "1ca5d2688c40835bacb5bd28",
+    "retention_notice": "The registry serves current state only. There is no as-at parameter and no change feed."
+  },
+  "data": [
+    {
+      "registration_number": "BR-0000105",
+      "legal_name": "Threadneedle Surveyors Ltd",
+      "trading_name": "Threadneedle Surveyors",
+      "status": "dissolved",
+      "registered_on": "2014-11-10",
+      "dissolved_on": "2025-10-08",
+      "activity": {
+        "code": "6519",
+        "description": "Surveying and inspection"
+      },
+      "registered_address": {
+        "line1": "86 Gasworks Walk",
+        "locality": "Wend Hill",
+        "postcode": "AM8 5PT",
+        "parcel_id": "PCL-WH-02108",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Pellwick, Halla",
+          "role": "director",
+          "appointed_on": "2020-06-17",
+          "resigned_on": null
+        },
+        {
+          "name": "Sarabley, Elowen Linnet",
+          "role": "director",
+          "appointed_on": "2020-02-05",
+          "resigned_on": null
+        },
+        {
+          "name": "Ashnall, F.",
+          "role": "secretary",
+          "appointed_on": "2023-10-27",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2026-03-18"
+    },
+    {
+      "registration_number": "BR-0000106",
+      "legal_name": "Lamplight Nursery Services Ltd",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2016-06-21",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6383",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "205 Ostler Terrace",
+        "locality": "Corrisbeck",
+        "postcode": "AM6 8XQ",
+        "parcel_id": "PCL-CB-02627",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Obbwick, Rhoda",
+          "role": "director",
+          "appointed_on": "2019-04-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-12-09"
+    },
+    {
+      "registration_number": "BR-0000107",
+      "legal_name": "Cattle Surveyors Services Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2018-12-31",
+      "dissolved_on": null,
+      "activity": {
+        "code": "5120",
+        "description": "Surveying and inspection"
+      },
+      "registered_address": {
+        "line1": "183 Ironmonger Yard",
+        "locality": "Tarnfield",
+        "postcode": "AM1 4FR",
+        "parcel_id": "PCL-TF-01291",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Nethport, Veda",
+          "role": "director",
+          "appointed_on": "2022-03-29",
+          "resigned_on": null
+        },
+        {
+          "name": "Gale, Rishthwaite",
+          "role": "director",
+          "appointed_on": "2024-10-02",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-11-05"
+    },
+    {
+      "registration_number": "BR-0000108",
+      "legal_name": "Cattle Printers Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2018-07-21",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7392",
+        "description": "Printing and reprographics"
+      },
+      "registered_address": {
+        "line1": "18 Saltmarsh Close",
+        "locality": "North Dunmoor",
+        "postcode": "AM7 9AB",
+        "parcel_id": "PCL-ND-01557",
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Xhemstone, Fira",
+          "role": "secretary",
+          "appointed_on": "2025-05-21",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-06-24"
+    },
+    {
+      "registration_number": "BR-0000109",
+      "legal_name": "Weirside Laundry and Sons Ltd",
+      "trading_name": "Weirside Laundry and Sons",
+      "status": "active",
+      "registered_on": "2017-06-23",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3911",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "12 Ropewalk Lane",
+        "locality": "Corrisbeck",
+        "postcode": "AM9 7ZS",
+        "parcel_id": "PCL-CB-00155",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Thornusk, Jory",
+          "role": "director",
+          "appointed_on": "2023-01-31",
+          "resigned_on": null
+        },
+        {
+          "name": "Underly, Rafe",
+          "role": "secretary",
+          "appointed_on": "2024-11-18",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-05-24"
+    },
+    {
+      "registration_number": "BR-0000110",
+      "legal_name": "Dovecote Foundry Ltd",
+      "trading_name": "Dovecote Foundry",
+      "status": "dissolved",
+      "registered_on": "1993-10-21",
+      "dissolved_on": "2018-07-28",
+      "activity": {
+        "code": "5992",
+        "description": "Metal casting"
+      },
+      "registered_address": {
+        "line1": "229 Threadneedle Street",
+        "locality": "Mirebrook",
+        "postcode": "AM4 7KG",
+        "parcel_id": "PCL-MB-00158",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Vasqdale, Hollis",
+          "role": "director",
+          "appointed_on": "2020-05-09",
+          "resigned_on": null
+        },
+        {
+          "name": "Uxovic, Odile Ivo",
+          "role": "secretary",
+          "appointed_on": "1999-08-15",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-08-11"
+    },
+    {
+      "registration_number": "BR-0000111",
+      "legal_name": "Marrow Grocer Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2004-11-11",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4522",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "178 Pellet Yard",
+        "locality": "Wend Hill",
+        "postcode": "AM1 1WV",
+        "parcel_id": "PCL-WH-00764",
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Kirrford, Ulla",
+          "role": "director",
+          "appointed_on": "2022-02-01",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-11-28"
+    },
+    {
+      "registration_number": "BR-0000112",
+      "legal_name": "Netherfield Haulage Co-operative",
+      "trading_name": "Netherfield Haulage Co-operative",
+      "status": "active",
+      "registered_on": "2020-02-05",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2794",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "150 Quarry Rise",
+        "locality": "Corrisbeck",
+        "postcode": "AM3 5FS",
+        "parcel_id": "PCL-CB-02639",
+        "ward_code": "PG"
+      },
+      "officers": [
+        {
+          "name": "Vasqdale, Hollis",
+          "role": "director",
+          "appointed_on": "2025-10-06",
+          "resigned_on": null
+        },
+        {
+          "name": "Ellridge, Kesh Ulla",
+          "role": "secretary",
+          "appointed_on": "2026-01-29",
+          "resigned_on": null
+        },
+        {
+          "name": "Embnall, Berrin",
+          "role": "secretary",
+          "appointed_on": "2022-02-28",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-04-30"
+    },
+    {
+      "registration_number": "BR-0000113",
+      "legal_name": "Weirside Printers Co-operative",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2016-11-04",
+      "dissolved_on": null,
+      "activity": {
+        "code": "5617",
+        "description": "Printing and reprographics"
+      },
+      "registered_address": {
+        "line1": "219 Ostler Passage",
+        "locality": "Pelling Green",
+        "postcode": "AM5 4AP",
+        "parcel_id": "PCL-PG-02494",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Tuilerly, Yvain",
+          "role": "director",
+          "appointed_on": "2023-05-02",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-06-19"
+    },
+    {
+      "registration_number": "BR-0000114",
+      "legal_name": "Saltmarsh Clinic and Sons Ltd",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "1999-10-28",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3849",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "90 Lamplight Yard",
+        "locality": "Old Harrowgate",
+        "postcode": "AM2 5KT",
+        "parcel_id": "PCL-OH-02861",
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Hollis, Zebthwaite",
+          "role": "partner",
+          "appointed_on": "2005-11-23",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-09-26"
+    },
+    {
+      "registration_number": "BR-0000115",
+      "legal_name": "Windlass Cafe and Sons Ltd",
+      "trading_name": "Windlass Cafe and Sons",
+      "status": "dormant",
+      "registered_on": "1999-08-24",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2421",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "45 Weirside Lane",
+        "locality": "Corrisbeck",
+        "postcode": "AM6 5JZ",
+        "parcel_id": "PCL-CB-01535",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Coveford, Ualan",
+          "role": "director",
+          "appointed_on": "2023-05-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-10-05"
+    },
+    {
+      "registration_number": "BR-0000116",
+      "legal_name": "Saltmarsh Garage Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2012-02-20",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4977",
+        "description": "Motor vehicle repair"
+      },
+      "registered_address": {
+        "line1": "184B Marrow Crescent",
+        "locality": "Corrisbeck",
+        "postcode": "AM5 9NJ",
+        "parcel_id": null,
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Zebacott, Gale",
+          "role": "director",
+          "appointed_on": "2018-02-28",
+          "resigned_on": null
+        },
+        {
+          "name": "Lomovic, Y.",
+          "role": "partner",
+          "appointed_on": "2020-06-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-11-04"
+    },
+    {
+      "registration_number": "BR-0000117",
+      "legal_name": "Paternoster Grocer Limited",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2000-04-03",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1061",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "124 Ferryman Yard",
+        "locality": "Pelling Green",
+        "postcode": "AM6 7RV",
+        "parcel_id": "PCL-PG-02482",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Brackstone, H.",
+          "role": "director",
+          "appointed_on": "2020-12-10",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-07-01"
+    },
+    {
+      "registration_number": "BR-0000118",
+      "legal_name": "Ropewalk Cafe Partners LLP",
+      "trading_name": null,
+      "status": "dissolved",
+      "registered_on": "2002-01-25",
+      "dissolved_on": "2018-09-13",
+      "activity": {
+        "code": "3382",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "85 Sedge Row",
+        "locality": "Pelling Green",
+        "postcode": "AM8 7RK",
+        "parcel_id": "PCL-PG-01954",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Embnall, B.",
+          "role": "partner",
+          "appointed_on": "2012-01-29",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-12-12"
+    },
+    {
+      "registration_number": "BR-0000119",
+      "legal_name": "Marrow Joinery Services Ltd",
+      "trading_name": "Marrow Joinery Services",
+      "status": "active",
+      "registered_on": "1991-12-31",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2372",
+        "description": "Joinery and carpentry"
+      },
+      "registered_address": {
+        "line1": "125 Ferryman Road",
+        "locality": "Isk Harbour",
+        "postcode": "AM7 1ZQ",
+        "parcel_id": "PCL-IH-01080",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Whitansk-Nkemnall, Quen",
+          "role": "partner",
+          "appointed_on": "2002-02-24",
+          "resigned_on": null
+        },
+        {
+          "name": "Nethridge, Zeno Berrin",
+          "role": "partner",
+          "appointed_on": "2013-06-11",
+          "resigned_on": null
+        },
+        {
+          "name": "Moransk, O.",
+          "role": "director",
+          "appointed_on": "2016-03-03",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-12-26"
+    },
+    {
+      "registration_number": "BR-0000120",
+      "legal_name": "Mallow Grocer Services Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2000-12-08",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3832",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "163 Ferryman Road",
+        "locality": "Sable Quay",
+        "postcode": "AM6 1BV",
+        "parcel_id": "PCL-SQ-01074",
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Obbansk, Linnet Soren",
+          "role": "director",
+          "appointed_on": "2004-05-18",
+          "resigned_on": null
+        },
+        {
+          "name": "Moransk, Odile",
+          "role": "partner",
+          "appointed_on": "2025-05-11",
+          "resigned_on": null
+        },
+        {
+          "name": "Rahmovic, Vesper",
+          "role": "director",
+          "appointed_on": "2003-04-03",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-10-03"
+    },
+    {
+      "registration_number": "BR-0000121",
+      "legal_name": "Kilnyard Laundry Partners LLP",
+      "trading_name": "Kilnyard Laundry Partners LLP",
+      "status": "dissolved",
+      "registered_on": "2019-03-04",
+      "dissolved_on": "2025-08-21",
+      "activity": {
+        "code": "5462",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "154 Lamplight Lane",
+        "locality": "Pelling Green",
+        "postcode": "AM5 3NL",
+        "parcel_id": "PCL-PG-00814",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Gorseport, Calla Junia",
+          "role": "secretary",
+          "appointed_on": "2020-08-10",
+          "resigned_on": null
+        },
+        {
+          "name": "Jennholt, Tamsin",
+          "role": "responsible_person",
+          "appointed_on": "2021-11-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-04-27"
+    },
+    {
+      "registration_number": "BR-0000122",
+      "legal_name": "Ropewalk Cafe Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2001-03-09",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1134",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "51 Bellrope Terrace",
+        "locality": "Isk Harbour",
+        "postcode": "AM7 3XR",
+        "parcel_id": "PCL-IH-00264",
+        "ward_code": "TF"
+      },
+      "officers": [
+        {
+          "name": "Sablejaru, Yvain",
+          "role": "secretary",
+          "appointed_on": "2001-06-30",
+          "resigned_on": null
+        },
+        {
+          "name": "Rishthwaite, Gale",
+          "role": "partner",
+          "appointed_on": "2002-10-24",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-02-18"
+    },
+    {
+      "registration_number": "BR-0000123",
+      "legal_name": "Saltmarsh Grocer and Sons Ltd",
+      "trading_name": "Saltmarsh Grocer and Sons",
+      "status": "active",
+      "registered_on": "2021-06-10",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6138",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "239 Weirside Walk",
+        "locality": "Corrisbeck",
+        "postcode": "AM4 9TY",
+        "parcel_id": "PCL-CB-02567",
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Frostport, Kesh",
+          "role": "responsible_person",
+          "appointed_on": "2024-10-22",
+          "resigned_on": null
+        },
+        {
+          "name": "Voreombe, Ivo",
+          "role": "partner",
+          "appointed_on": "2024-12-13",
+          "resigned_on": null
+        },
+        {
+          "name": "Thornusk, Jory",
+          "role": "secretary",
+          "appointed_on": "2025-08-23",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-06-29"
+    },
+    {
+      "registration_number": "BR-0000124",
+      "legal_name": "Saltmarsh Printers Co-operative",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2023-09-26",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8269",
+        "description": "Printing and reprographics"
+      },
+      "registered_address": {
+        "line1": "147 Ferryman Street",
+        "locality": "Sable Quay",
+        "postcode": "AM4 3AF",
+        "parcel_id": null,
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Sablejaru, Yvain",
+          "role": "partner",
+          "appointed_on": "2023-12-16",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-10-01"
+    },
+    {
+      "registration_number": "BR-0000125",
+      "legal_name": "Gasworks Grocer Partners LLP",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2017-10-09",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2686",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "135 Ironmonger Road",
+        "locality": "Mirebrook",
+        "postcode": "AM8 1RK",
+        "parcel_id": "PCL-MB-01706",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Sablejaru, Y.",
+          "role": "director",
+          "appointed_on": "2026-04-01",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-11-27"
+    },
+    {
+      "registration_number": "BR-0000126",
+      "legal_name": "Paternoster Nursery and Sons Ltd",
+      "trading_name": "Paternoster Nursery and Sons",
+      "status": "active",
+      "registered_on": "2015-04-13",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4250",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "151 Coldharbour Street",
+        "locality": "Sable Quay",
+        "postcode": "AM5 8YR",
+        "parcel_id": null,
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Rahmovic, Vesper Ulla",
+          "role": "secretary",
+          "appointed_on": "2022-08-26",
+          "resigned_on": null
+        },
+        {
+          "name": "Bracknall, Calla",
+          "role": "partner",
+          "appointed_on": "2018-06-07",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-03-15"
+    },
+    {
+      "registration_number": "BR-0000127",
+      "legal_name": "Tannery Joinery Limited",
+      "trading_name": "Tannery Joinery",
+      "status": "active",
+      "registered_on": "2000-12-14",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7746",
+        "description": "Joinery and carpentry"
+      },
+      "registered_address": {
+        "line1": "135 Ferryman Close",
+        "locality": "Pelling Green",
+        "postcode": "AM4 8AK",
+        "parcel_id": null,
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Ellridge, Kesh Ulla",
+          "role": "secretary",
+          "appointed_on": "2011-07-16",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-03-15"
+    },
+    {
+      "registration_number": "BR-0000128",
+      "legal_name": "Vintners Cafe and Sons Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2011-07-19",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7873",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "38 Hollybank Row",
+        "locality": "Tarnfield",
+        "postcode": "AM6 8HT",
+        "parcel_id": "PCL-TF-01531",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Gorseport, C.",
+          "role": "director",
+          "appointed_on": "2018-05-06",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-02-05"
+    },
+    {
+      "registration_number": "BR-0000129",
+      "legal_name": "Threadneedle Nursery Limited",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2026-03-05",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4414",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "72 Vintners Yard",
+        "locality": "Mirebrook",
+        "postcode": "AM6 1DQ",
+        "parcel_id": "PCL-MB-02462",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Iskwick, Kestrel",
+          "role": "director",
+          "appointed_on": "2026-03-05",
+          "resigned_on": null
+        },
+        {
+          "name": "Vellwick, Wren",
+          "role": "secretary",
+          "appointed_on": "2026-03-10",
+          "resigned_on": null
+        },
+        {
+          "name": "Ashnall, Ferren Jory",
+          "role": "director",
+          "appointed_on": "2026-03-07",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-01-20"
+    },
+    {
+      "registration_number": "BR-0000130",
+      "legal_name": "Marrow Surveyors Services Ltd",
+      "trading_name": "Marrow Surveyors Services",
+      "status": "active",
+      "registered_on": "2004-07-19",
+      "dissolved_on": "2008-03-06",
+      "activity": {
+        "code": "5465",
+        "description": "Surveying and inspection"
+      },
+      "registered_address": {
+        "line1": "133 Vintners Way",
+        "locality": "North Dunmoor",
+        "postcode": "AM7 2WN",
+        "parcel_id": "PCL-ND-00213",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Nethholt, Ualan",
+          "role": "responsible_person",
+          "appointed_on": "2015-01-25",
+          "resigned_on": null
+        },
+        {
+          "name": "Sablebury, Rafe",
+          "role": "director",
+          "appointed_on": "2019-04-17",
+          "resigned_on": null
+        },
+        {
+          "name": "Jarrowthwaite, Basten",
+          "role": "partner",
+          "appointed_on": "2005-07-06",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2026-06-30"
+    },
+    {
+      "registration_number": "BR-0000131",
+      "legal_name": "Quarry Laundry Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2002-12-27",
+      "dissolved_on": null,
+      "activity": {
+        "code": "9446",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "193 Saltmarsh Row",
+        "locality": "Pelling Green",
+        "postcode": "AM4 2RF",
+        "parcel_id": null,
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Rishthwaite, Gale",
+          "role": "director",
+          "appointed_on": "2007-01-20",
+          "resigned_on": null
+        },
+        {
+          "name": "Bracknall, C.",
+          "role": "director",
+          "appointed_on": "2023-11-14",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-11-21"
+    },
+    {
+      "registration_number": "BR-0000132",
+      "legal_name": "Ferryman Salon Group Ltd",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2001-05-26",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1087",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "183A Quarry Road",
+        "locality": "Wend Hill",
+        "postcode": "AM7 6DP",
+        "parcel_id": "PCL-WH-01532",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Pellwick, Halla",
+          "role": "director",
+          "appointed_on": "2001-11-17",
+          "resigned_on": null
+        },
+        {
+          "name": "Berrin, Embnall",
+          "role": "secretary",
+          "appointed_on": "2017-01-17",
+          "resigned_on": null
+        },
+        {
+          "name": "Vellgrove, Wren Dell",
+          "role": "director",
+          "appointed_on": "2021-01-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-12-14"
+    },
+    {
+      "registration_number": "BR-0000133",
+      "legal_name": "Tannery Nursery Services Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2013-06-09",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1991",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "69 Vintners Close",
+        "locality": "Tarnfield",
+        "postcode": "AM3 4GJ",
+        "parcel_id": "PCL-TF-00139",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Quillwick, Ualan",
+          "role": "partner",
+          "appointed_on": "2023-08-22",
+          "resigned_on": null
+        },
+        {
+          "name": "Thornusk, Jory",
+          "role": "director",
+          "appointed_on": "2025-10-25",
+          "resigned_on": null
+        },
+        {
+          "name": "Uxacott, Mira Nissa",
+          "role": "director",
+          "appointed_on": "2014-05-24",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-03-28"
+    },
+    {
+      "registration_number": "BR-0000134",
+      "legal_name": "Cattle Brewers Services Ltd",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2012-07-01",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4217",
+        "description": "Brewing and distribution"
+      },
+      "registered_address": {
+        "line1": "52 Ostler Crescent",
+        "locality": "Old Harrowgate",
+        "postcode": "AM2 9WY",
+        "parcel_id": "PCL-OH-00053",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Coveford, Ualan",
+          "role": "director",
+          "appointed_on": "2022-08-13",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-07-23"
+    },
+    {
+      "registration_number": "BR-0000135",
+      "legal_name": "Weirside Salon Trading Co",
+      "trading_name": "Weirside Salon Trading Co",
+      "status": "active",
+      "registered_on": "2011-01-28",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2880",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "33 Dovecote Terrace",
+        "locality": "North Dunmoor",
+        "postcode": "AM1 9WX",
+        "parcel_id": "PCL-ND-01389",
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Brackstone, H.",
+          "role": "secretary",
+          "appointed_on": "2014-03-09",
+          "resigned_on": null
+        },
+        {
+          "name": "Gildington, Q.",
+          "role": "responsible_person",
+          "appointed_on": "2014-04-25",
+          "resigned_on": null
+        },
+        {
+          "name": "Nethstone, Gale Vesper",
+          "role": "director",
+          "appointed_on": "2017-03-12",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-11-19"
+    },
+    {
+      "registration_number": "BR-0000136",
+      "legal_name": "Kilnyard Haulage Ltd",
+      "trading_name": "Kilnyard Haulage",
+      "status": "active",
+      "registered_on": "2022-10-31",
+      "dissolved_on": null,
+      "activity": {
+        "code": "9439",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "31 Gasworks Rise",
+        "locality": "Isk Harbour",
+        "postcode": "AM6 9WF",
+        "parcel_id": "PCL-IH-00252",
+        "ward_code": "PG"
+      },
+      "officers": [
+        {
+          "name": "Iskansk, Maro Greer",
+          "role": "partner",
+          "appointed_on": "2024-09-29",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-05-26"
+    },
+    {
+      "registration_number": "BR-0000137",
+      "legal_name": "Coldharbour Haulage Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2025-12-10",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6361",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "199 Hollybank Yard",
+        "locality": "Ashcombe Reach",
+        "postcode": "AM6 1FB",
+        "parcel_id": "PCL-AR-01143",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Veda, Ivesington",
+          "role": "director",
+          "appointed_on": "2026-02-14",
+          "resigned_on": null
+        },
+        {
+          "name": "Hawridge, Tamsin",
+          "role": "director",
+          "appointed_on": "2026-02-02",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-06-06"
+    },
+    {
+      "registration_number": "BR-0000138",
+      "legal_name": "Threadneedle Cafe Co-operative",
+      "trading_name": "Threadneedle Cafe Co-operative",
+      "status": "active",
+      "registered_on": "2009-01-12",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3028",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "26 Tannery Way",
+        "locality": "Kelder Flats",
+        "postcode": "AM8 8VL",
+        "parcel_id": "PCL-KF-00664",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Thornholt-Ellley, Yvain",
+          "role": "secretary",
+          "appointed_on": "2015-10-01",
+          "resigned_on": null
+        },
+        {
+          "name": "Ellkirk, Marek",
+          "role": "director",
+          "appointed_on": "2010-04-01",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-02-18"
+    },
+    {
+      "registration_number": "BR-0000139",
+      "legal_name": "Mallow Cafe Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2018-05-25",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7441",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "69 Saltmarsh Way",
+        "locality": "Corrisbeck",
+        "postcode": "AM9 3LN",
+        "parcel_id": "PCL-CB-00179",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Embjaru, Zeno",
+          "role": "director",
+          "appointed_on": "2025-09-12",
+          "resigned_on": null
+        },
+        {
+          "name": "Hawvale, Veda",
+          "role": "director",
+          "appointed_on": "2019-10-05",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-04-26"
+    },
+    {
+      "registration_number": "BR-0000140",
+      "legal_name": "Netherfield Haulage Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2023-02-26",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8627",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "151 Bellrope Close",
+        "locality": "Corrisbeck",
+        "postcode": "AM4 7WK",
+        "parcel_id": "PCL-CB-00167",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Voreombe, Ivo",
+          "role": "director",
+          "appointed_on": "2025-08-22",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-08-12"
+    },
+    {
+      "registration_number": "BR-0000141",
+      "legal_name": "Lamplight Laundry Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1996-01-18",
+      "dissolved_on": null,
+      "activity": {
+        "code": "5195",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "166 Ostler Walk",
+        "locality": "Kelder Flats",
+        "postcode": "AM5 2PW",
+        "parcel_id": "PCL-KF-00220",
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Iskansk, M.",
+          "role": "secretary",
+          "appointed_on": "2017-10-29",
+          "resigned_on": null
+        },
+        {
+          "name": "Sableotte, Fira Yara",
+          "role": "director",
+          "appointed_on": "2025-07-11",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-08-09"
+    },
+    {
+      "registration_number": "BR-0000142",
+      "legal_name": "Sedge Chandlers Services Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2021-01-01",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1898",
+        "description": "Marine supplies"
+      },
+      "registered_address": {
+        "line1": "149 Dovecote Lane",
+        "locality": "North Dunmoor",
+        "postcode": "AM9 7HG",
+        "parcel_id": "PCL-ND-02493",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Jennholt, Tamsin",
+          "role": "director",
+          "appointed_on": "2022-05-08",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-09-25"
+    },
+    {
+      "registration_number": "BR-0000143",
+      "legal_name": "Ropewalk Clinic Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2009-05-17",
+      "dissolved_on": null,
+      "activity": {
+        "code": "5869",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "10C Gasworks Rise",
+        "locality": "Wend Hill",
+        "postcode": "AM6 5XH",
+        "parcel_id": "PCL-WH-01316",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Quen, Whitansk-Nkemnall",
+          "role": "director",
+          "appointed_on": "2010-12-27",
+          "resigned_on": null
+        },
+        {
+          "name": "Whitbury, I.",
+          "role": "director",
+          "appointed_on": "2021-07-08",
+          "resigned_on": null
+        },
+        {
+          "name": "Rahmley, Ualan Imre",
+          "role": "partner",
+          "appointed_on": "2020-05-12",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-11-13"
+    },
+    {
+      "registration_number": "BR-0000144",
+      "legal_name": "Lamplight Joinery Limited",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1995-11-06",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3420",
+        "description": "Joinery and carpentry"
+      },
+      "registered_address": {
+        "line1": "11 Ferryman Passage",
+        "locality": "Kelder Flats",
+        "postcode": "AM8 3FT",
+        "parcel_id": "PCL-KF-01120",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Dornvale, Veda Perrin",
+          "role": "director",
+          "appointed_on": "2017-06-28",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-01-27"
+    },
+    {
+      "registration_number": "BR-0000145",
+      "legal_name": "Pellet Printers Group Ltd",
+      "trading_name": "Pellet Printers Group",
+      "status": "active",
+      "registered_on": "2004-05-14",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4659",
+        "description": "Printing and reprographics"
+      },
+      "registered_address": {
+        "line1": "149 Dovecote Lane",
+        "locality": "North Dunmoor",
+        "postcode": "AM9 7HG",
+        "parcel_id": null,
+        "ward_code": "PG"
+      },
+      "officers": [
+        {
+          "name": "Covevale, Yara Veda",
+          "role": "partner",
+          "appointed_on": "2008-10-03",
+          "resigned_on": null
+        },
+        {
+          "name": "Vellwick, Wren",
+          "role": "director",
+          "appointed_on": "2019-09-02",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-07-07"
+    },
+    {
+      "registration_number": "BR-0000146",
+      "legal_name": "Gasworks Garage Ltd",
+      "trading_name": null,
+      "status": "dissolved",
+      "registered_on": "2019-03-31",
+      "dissolved_on": "2020-02-25",
+      "activity": {
+        "code": "4635",
+        "description": "Motor vehicle repair"
+      },
+      "registered_address": {
+        "line1": "183 Netherfield Walk",
+        "locality": "Pelling Green",
+        "postcode": "AM9 1EQ",
+        "parcel_id": null,
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Iskwick, K.",
+          "role": "partner",
+          "appointed_on": "2019-06-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-08-11"
+    },
+    {
+      "registration_number": "BR-0000147",
+      "legal_name": "Kilnyard Bakery Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1998-09-07",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8461",
+        "description": "Bakery and confectionery"
+      },
+      "registered_address": {
+        "line1": "130 Netherfield Rise",
+        "locality": "Pelling Green",
+        "postcode": "AM5 6RQ",
+        "parcel_id": "PCL-PG-01234",
+        "ward_code": "PG"
+      },
+      "officers": [
+        {
+          "name": "Frostport, Kesh",
+          "role": "director",
+          "appointed_on": "2019-12-30",
+          "resigned_on": null
+        },
+        {
+          "name": "Iskyard, B.",
+          "role": "secretary",
+          "appointed_on": "1999-05-19",
+          "resigned_on": null
+        },
+        {
+          "name": "Whitgrove-Obbridge, Dov",
+          "role": "partner",
+          "appointed_on": "2010-03-01",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-01-08"
+    },
+    {
+      "registration_number": "BR-0000148",
+      "legal_name": "Coldharbour Printers Group Ltd",
+      "trading_name": "Coldharbour Printers Group",
+      "status": "in_liquidation",
+      "registered_on": "2023-01-10",
+      "dissolved_on": "2024-02-10",
+      "activity": {
+        "code": "2573",
+        "description": "Printing and reprographics"
+      },
+      "registered_address": {
+        "line1": "148 Dovecote Crescent",
+        "locality": "Corrisbeck",
+        "postcode": "AM8 3QA",
+        "parcel_id": "PCL-CB-00083",
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Wendthwaite, Nissa",
+          "role": "secretary",
+          "appointed_on": "2023-12-14",
+          "resigned_on": null
+        },
+        {
+          "name": "Saraberly, Wren",
+          "role": "partner",
+          "appointed_on": "2025-11-04",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-07-24"
+    },
+    {
+      "registration_number": "BR-0000149",
+      "legal_name": "Ostler Haulage Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2019-04-23",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7075",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "94 Marrow Close",
+        "locality": "North Dunmoor",
+        "postcode": "AM1 2HV",
+        "parcel_id": "PCL-ND-00621",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Nyleridge, K.",
+          "role": "secretary",
+          "appointed_on": "2020-06-14",
+          "resigned_on": null
+        },
+        {
+          "name": "Ashnall, Ferren Jory",
+          "role": "secretary",
+          "appointed_on": "2020-08-24",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2026-06-30"
+    },
+    {
+      "registration_number": "BR-0000150",
+      "legal_name": "Vintners Clinic Ltd",
+      "trading_name": "Vintners Clinic",
+      "status": "dissolved",
+      "registered_on": "1994-11-18",
+      "dissolved_on": "2007-03-08",
+      "activity": {
+        "code": "4724",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "71 Kilnyard Row",
+        "locality": "Vantry Hollow",
+        "postcode": "AM5 9DJ",
+        "parcel_id": "PCL-VH-02413",
+        "ward_code": "TF"
+      },
+      "officers": [
+        {
+          "name": "Gorseridge-Zeberly, Odile",
+          "role": "director",
+          "appointed_on": "2004-08-30",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-05-04"
+    },
+    {
+      "registration_number": "BR-0000151",
+      "legal_name": "Bellrope Haulage and Sons Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1992-05-11",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8352",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "34 Bellrope Passage",
+        "locality": "Wend Hill",
+        "postcode": "AM4 4PS",
+        "parcel_id": "PCL-WH-00704",
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Rishstone, L.",
+          "role": "director",
+          "appointed_on": "1992-10-21",
+          "resigned_on": null
+        },
+        {
+          "name": "Xhemkirk, Gale Quen",
+          "role": "secretary",
+          "appointed_on": "2014-06-18",
+          "resigned_on": null
+        },
+        {
+          "name": "Sablejaru, Yvain",
+          "role": "director",
+          "appointed_on": "2007-08-05",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-08-15"
+    },
+    {
+      "registration_number": "BR-0000152",
+      "legal_name": "Bellrope Printers Partners LLP",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2022-11-26",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1124",
+        "description": "Printing and reprographics"
+      },
+      "registered_address": {
+        "line1": "169 Vintners Walk",
+        "locality": "Old Harrowgate",
+        "postcode": "AM5 5VW",
+        "parcel_id": "PCL-OH-00797",
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Dornotte, Berrin Veda",
+          "role": "director",
+          "appointed_on": "2025-04-04",
+          "resigned_on": null
+        },
+        {
+          "name": "Hawvale, Veda",
+          "role": "director",
+          "appointed_on": "2025-03-23",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-06-23"
+    },
+    {
+      "registration_number": "BR-0000153",
+      "legal_name": "Threadneedle Foundry and Sons Ltd",
+      "trading_name": "Threadneedle Foundry and Sons",
+      "status": "active",
+      "registered_on": "1997-09-15",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3541",
+        "description": "Metal casting"
+      },
+      "registered_address": {
+        "line1": "96 Bellrope Road",
+        "locality": "Ashcombe Reach",
+        "postcode": "AM5 5ZD",
+        "parcel_id": "PCL-AR-00891",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Whitgrove-Obbridge, D.",
+          "role": "partner",
+          "appointed_on": "1997-10-04",
+          "resigned_on": null
+        },
+        {
+          "name": "Calla, Bracknall",
+          "role": "secretary",
+          "appointed_on": "2006-04-07",
+          "resigned_on": null
+        },
+        {
+          "name": "Voreombe, Ivo",
+          "role": "secretary",
+          "appointed_on": "1998-04-05",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-04-04"
+    },
+    {
+      "registration_number": "BR-0000154",
+      "legal_name": "Threadneedle Brewers Limited",
+      "trading_name": null,
+      "status": "dissolved",
+      "registered_on": "2009-02-03",
+      "dissolved_on": "2022-01-15",
+      "activity": {
+        "code": "6422",
+        "description": "Brewing and distribution"
+      },
+      "registered_address": {
+        "line1": "205B Lamplight Close",
+        "locality": "North Dunmoor",
+        "postcode": "AM1 7ZS",
+        "parcel_id": "PCL-ND-02757",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Coveford, Ualan",
+          "role": "partner",
+          "appointed_on": "2015-05-10",
+          "resigned_on": null
+        },
+        {
+          "name": "Fennjaru, Isolde Anwen",
+          "role": "director",
+          "appointed_on": "2022-12-21",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-12-29"
+    },
+    {
+      "registration_number": "BR-0000155",
+      "legal_name": "Bellrope Joinery Trading Co",
+      "trading_name": null,
+      "status": "dissolved",
+      "registered_on": "2025-04-09",
+      "dissolved_on": "2025-07-07",
+      "activity": {
+        "code": "3737",
+        "description": "Joinery and carpentry"
+      },
+      "registered_address": {
+        "line1": "51 Ropewalk Lane",
+        "locality": "Tarnfield",
+        "postcode": "AM1 4KZ",
+        "parcel_id": null,
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Ellusk, Zeno",
+          "role": "director",
+          "appointed_on": "2025-08-14",
+          "resigned_on": null
+        },
+        {
+          "name": "Halstone, Nore Ualan",
+          "role": "director",
+          "appointed_on": "2025-06-04",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-02-09"
+    },
+    {
+      "registration_number": "BR-0000156",
+      "legal_name": "Lamplight Grocer Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1991-12-14",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6718",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "107 Gasworks Crescent",
+        "locality": "Pelling Green",
+        "postcode": "AM7 5TJ",
+        "parcel_id": "PCL-PG-02974",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Zebthwaite, Hollis",
+          "role": "responsible_person",
+          "appointed_on": "2024-05-04",
+          "resigned_on": null
+        },
+        {
+          "name": "Ashnall, Ferren Jory",
+          "role": "partner",
+          "appointed_on": "1993-10-25",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-01-04"
+    },
+    {
+      "registration_number": "BR-0000157",
+      "legal_name": "Ironmonger Grocer Co-operative",
+      "trading_name": "Ironmonger Grocer Co-operative",
+      "status": "active",
+      "registered_on": "2001-06-13",
+      "dissolved_on": null,
+      "activity": {
+        "code": "5794",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "222 Gasworks Road",
+        "locality": "Mirebrook",
+        "postcode": "AM7 4FK",
+        "parcel_id": "PCL-MB-00410",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Lomovic, Y.",
+          "role": "director",
+          "appointed_on": "2017-11-20",
+          "resigned_on": null
+        },
+        {
+          "name": "Coveford, Ualan",
+          "role": "director",
+          "appointed_on": "2014-08-25",
+          "resigned_on": null
+        },
+        {
+          "name": "Nethwick, Wilder",
+          "role": "responsible_person",
+          "appointed_on": "2015-02-25",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-07-19"
+    },
+    {
+      "registration_number": "BR-0000158",
+      "legal_name": "Saltmarsh Laundry Trading Co",
+      "trading_name": "Saltmarsh Laundry Trading Co",
+      "status": "active",
+      "registered_on": "2021-11-29",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8979",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "177 Dovecote Street",
+        "locality": "Tarnfield",
+        "postcode": "AM5 9GT",
+        "parcel_id": "PCL-TF-02827",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Iskyard, Basten Fira",
+          "role": "director",
+          "appointed_on": "2021-12-12",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-12-05"
+    },
+    {
+      "registration_number": "BR-0000159",
+      "legal_name": "Marrow Foundry and Sons Ltd",
+      "trading_name": "Marrow Foundry and Sons",
+      "status": "active",
+      "registered_on": "2012-01-07",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6124",
+        "description": "Metal casting"
+      },
+      "registered_address": {
+        "line1": "72 Ironmonger Street",
+        "locality": "Kelder Flats",
+        "postcode": "AM9 9BH",
+        "parcel_id": "PCL-KF-01732",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Gildombe, Ivo",
+          "role": "director",
+          "appointed_on": "2013-02-23",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-12-06"
+    },
+    {
+      "registration_number": "BR-0000160",
+      "legal_name": "Gasworks Clinic Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2007-03-27",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1813",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "118 Mallow Passage",
+        "locality": "Ashcombe Reach",
+        "postcode": "AM4 2TK",
+        "parcel_id": "PCL-AR-02367",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Vellwick, Wren Imre",
+          "role": "director",
+          "appointed_on": "2015-02-21",
+          "resigned_on": null
+        },
+        {
+          "name": "Bracknall, Calla",
+          "role": "partner",
+          "appointed_on": "2009-12-04",
+          "resigned_on": null
+        },
+        {
+          "name": "Fennford, Nore",
+          "role": "director",
+          "appointed_on": "2023-01-10",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-07-09"
+    },
+    {
+      "registration_number": "BR-0000161",
+      "legal_name": "Marrow Salon Services Ltd",
+      "trading_name": "Marrow Salon Services",
+      "status": "active",
+      "registered_on": "2006-04-02",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1817",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "203 Windlass Close",
+        "locality": "Wend Hill",
+        "postcode": "AM2 7YB",
+        "parcel_id": null,
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Tamsin, Hawridge",
+          "role": "director",
+          "appointed_on": "2024-11-13",
+          "resigned_on": null
+        },
+        {
+          "name": "Nyleridge, Kesh",
+          "role": "partner",
+          "appointed_on": "2013-01-27",
+          "resigned_on": null
+        },
+        {
+          "name": "Zeno, Embjaru",
+          "role": "director",
+          "appointed_on": "2024-05-20",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-02-10"
+    },
+    {
+      "registration_number": "BR-0000162",
+      "legal_name": "Vintners Grocer Limited",
+      "trading_name": "Vintners Grocer",
+      "status": "active",
+      "registered_on": "2005-08-29",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7316",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "110 Cattle Road",
+        "locality": "Pelling Green",
+        "postcode": "AM4 5JS",
+        "parcel_id": "PCL-PG-00538",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Kirrthwaite, Alder",
+          "role": "partner",
+          "appointed_on": "2012-07-01",
+          "resigned_on": null
+        },
+        {
+          "name": "Ivesquist, Basten Yara",
+          "role": "partner",
+          "appointed_on": "2023-06-04",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-07-06"
+    },
+    {
+      "registration_number": "BR-0000163",
+      "legal_name": "Netherfield Clinic Limited",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2002-06-09",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1662",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "8 Marrow Road",
+        "locality": "Old Harrowgate",
+        "postcode": "AM5 8VS",
+        "parcel_id": "PCL-OH-01997",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Iskansk, M.",
+          "role": "director",
+          "appointed_on": "2023-02-27",
+          "resigned_on": null
+        },
+        {
+          "name": "Rueyard, Anwen",
+          "role": "partner",
+          "appointed_on": "2016-10-08",
+          "resigned_on": null
+        },
+        {
+          "name": "Ellnall, T.",
+          "role": "director",
+          "appointed_on": "2014-03-28",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-03-17"
+    },
+    {
+      "registration_number": "BR-0000164",
+      "legal_name": "Ferryman Laundry Ltd",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2001-06-17",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6221",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "21 Lamplight Road",
+        "locality": "Mirebrook",
+        "postcode": "AM3 4DK",
+        "parcel_id": "PCL-MB-01262",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Sableotte, Fira Yara",
+          "role": "secretary",
+          "appointed_on": "2024-11-24",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-09-26"
+    },
+    {
+      "registration_number": "BR-0000165",
+      "legal_name": "Netherfield Salon and Sons Ltd",
+      "trading_name": "Netherfield Salon and Sons",
+      "status": "active",
+      "registered_on": "2017-06-25",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8242",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "186 Pellet Walk",
+        "locality": "Sable Quay",
+        "postcode": "AM7 1LP",
+        "parcel_id": null,
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Ellusk, Zeno",
+          "role": "director",
+          "appointed_on": "2025-12-10",
+          "resigned_on": null
+        },
+        {
+          "name": "Thornjaru, Elowen",
+          "role": "director",
+          "appointed_on": "2019-10-12",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-10-17"
+    },
+    {
+      "registration_number": "BR-0000166",
+      "legal_name": "Coldharbour Salon Partners LLP",
+      "trading_name": null,
+      "status": "in_liquidation",
+      "registered_on": "2016-06-30",
+      "dissolved_on": "2019-11-06",
+      "activity": {
+        "code": "6927",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "171 Hollybank Lane",
+        "locality": "Vantry Hollow",
+        "postcode": "AM4 6AG",
+        "parcel_id": "PCL-VH-01633",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Hawley, D.",
+          "role": "director",
+          "appointed_on": "2017-11-23",
+          "resigned_on": null
+        },
+        {
+          "name": "Elowen, Dremridge",
+          "role": "partner",
+          "appointed_on": "2023-07-26",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-03-13"
+    },
+    {
+      "registration_number": "BR-0000167",
+      "legal_name": "Dovecote Joinery Partners LLP",
+      "trading_name": "Dovecote Joinery Partners LLP",
+      "status": "active",
+      "registered_on": "2025-06-29",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1148",
+        "description": "Joinery and carpentry"
+      },
+      "registered_address": {
+        "line1": "91 Sedge Lane",
+        "locality": "North Dunmoor",
+        "postcode": "AM1 6LV",
+        "parcel_id": "PCL-ND-01701",
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Jarrowstone, Ivo",
+          "role": "director",
+          "appointed_on": "2025-11-21",
+          "resigned_on": null
+        },
+        {
+          "name": "Vellwick, Wren Imre",
+          "role": "partner",
+          "appointed_on": "2026-01-01",
+          "resigned_on": null
+        },
+        {
+          "name": "Sablejaru, Yvain",
+          "role": "secretary",
+          "appointed_on": "2025-11-29",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-05-02"
+    },
+    {
+      "registration_number": "BR-0000168",
+      "legal_name": "Sedge Cafe Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1995-09-25",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7481",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "20 Ropewalk Terrace",
+        "locality": "Sable Quay",
+        "postcode": "AM7 8PQ",
+        "parcel_id": "PCL-SQ-01482",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Hawvale, Veda",
+          "role": "director",
+          "appointed_on": "2012-07-09",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-01-02"
+    },
+    {
+      "registration_number": "BR-0000169",
+      "legal_name": "Bellrope Haulage Services Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2008-11-21",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3989",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "162 Vintners Street",
+        "locality": "Pelling Green",
+        "postcode": "AM6 8LA",
+        "parcel_id": "PCL-PG-00910",
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Haljaru, Hollis",
+          "role": "partner",
+          "appointed_on": "2018-12-12",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-09-11"
+    },
+    {
+      "registration_number": "BR-0000170",
+      "legal_name": "Weirside Salon Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2008-07-15",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1721",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "183 Quarry Passage",
+        "locality": "Pelling Green",
+        "postcode": "AM2 7SP",
+        "parcel_id": "PCL-PG-01174",
+        "ward_code": "PG"
+      },
+      "officers": [
+        {
+          "name": "Whitbury, Ivo Nissa",
+          "role": "secretary",
+          "appointed_on": "2021-09-06",
+          "resigned_on": null
+        },
+        {
+          "name": "Quillwick, U.",
+          "role": "director",
+          "appointed_on": "2011-12-28",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-10-21"
+    },
+    {
+      "registration_number": "BR-0000171",
+      "legal_name": "Quarry Salon Partners LLP",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2018-07-25",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8973",
+        "description": "Hairdressing and beauty"
+      },
+      "registered_address": {
+        "line1": "210 Paternoster Rise",
+        "locality": "Wend Hill",
+        "postcode": "AM2 1VK",
+        "parcel_id": "PCL-WH-01736",
+        "ward_code": "TF"
+      },
+      "officers": [
+        {
+          "name": "Ferren, Fennquist",
+          "role": "partner",
+          "appointed_on": "2025-11-27",
+          "resigned_on": null
+        },
+        {
+          "name": "Undthwaite, Kestrel Ulla",
+          "role": "partner",
+          "appointed_on": "2022-04-19",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-03-15"
+    },
+    {
+      "registration_number": "BR-0000172",
+      "legal_name": "Ropewalk Nursery Ltd",
+      "trading_name": "Ropewalk Nursery",
+      "status": "active",
+      "registered_on": "2018-03-31",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2689",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "198 Quarry Walk",
+        "locality": "Tarnfield",
+        "postcode": "AM9 9AA",
+        "parcel_id": "PCL-TF-01663",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Rishthwaite, Gale",
+          "role": "secretary",
+          "appointed_on": "2023-03-04",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-07-06"
+    },
+    {
+      "registration_number": "BR-0000173",
+      "legal_name": "Threadneedle Laundry and Sons Ltd",
+      "trading_name": "Threadneedle Laundry and Sons",
+      "status": "in_liquidation",
+      "registered_on": "2016-02-20",
+      "dissolved_on": "2017-12-04",
+      "activity": {
+        "code": "8494",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "190 Hollybank Terrace",
+        "locality": "Corrisbeck",
+        "postcode": "AM2 1DP",
+        "parcel_id": "PCL-CB-02327",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Underly, Rafe",
+          "role": "director",
+          "appointed_on": "2017-09-01",
+          "resigned_on": null
+        },
+        {
+          "name": "Obbridge, Thea Hesper",
+          "role": "secretary",
+          "appointed_on": "2020-07-02",
+          "resigned_on": null
+        },
+        {
+          "name": "Obbdale, Rafe Sunniva",
+          "role": "secretary",
+          "appointed_on": "2024-09-05",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-04-04"
+    },
+    {
+      "registration_number": "BR-0000174",
+      "legal_name": "Bellrope Chandlers Services Ltd",
+      "trading_name": "Bellrope Chandlers Services",
+      "status": "active",
+      "registered_on": "1996-09-17",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8954",
+        "description": "Marine supplies"
+      },
+      "registered_address": {
+        "line1": "154 Threadneedle Close",
+        "locality": "Wend Hill",
+        "postcode": "AM9 1WK",
+        "parcel_id": "PCL-WH-00392",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Whitgrove-Obbridge, Dov Lorne",
+          "role": "director",
+          "appointed_on": "1996-12-13",
+          "resigned_on": null
+        },
+        {
+          "name": "Jennacott, Nissa Dell",
+          "role": "director",
+          "appointed_on": "2001-10-25",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-10-25"
+    },
+    {
+      "registration_number": "BR-0000175",
+      "legal_name": "Pellet Nursery Partners LLP",
+      "trading_name": null,
+      "status": "dissolved",
+      "registered_on": "2023-09-23",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7890",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "238 Lamplight Lane",
+        "locality": "Wend Hill",
+        "postcode": "AM6 5PY",
+        "parcel_id": "PCL-WH-02084",
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Kirrford, Ulla",
+          "role": "director",
+          "appointed_on": "2023-10-11",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-08-03"
+    },
+    {
+      "registration_number": "BR-0000176",
+      "legal_name": "Tannery Nursery Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2017-03-27",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3418",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "132 Netherfield Yard",
+        "locality": "Old Harrowgate",
+        "postcode": "AM1 7XK",
+        "parcel_id": "PCL-OH-01421",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Nethwick, Wilder Nore",
+          "role": "director",
+          "appointed_on": "2024-01-09",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-01-27"
+    },
+    {
+      "registration_number": "BR-0000177",
+      "legal_name": "Bellrope Cafe Group Ltd",
+      "trading_name": "Bellrope Cafe Group",
+      "status": "active",
+      "registered_on": "2015-01-18",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1498",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "113C Pellet Crescent",
+        "locality": "Ashcombe Reach",
+        "postcode": "AM2 2BH",
+        "parcel_id": "PCL-AR-00735",
+        "ward_code": "MB"
+      },
+      "officers": [
+        {
+          "name": "Ellridge, Kesh",
+          "role": "director",
+          "appointed_on": "2023-05-10",
+          "resigned_on": null
+        },
+        {
+          "name": "Hawvale, Veda",
+          "role": "director",
+          "appointed_on": "2021-04-29",
+          "resigned_on": null
+        },
+        {
+          "name": "Pyrevale, Nissa Esben",
+          "role": "director",
+          "appointed_on": "2022-03-27",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-06-18"
+    },
+    {
+      "registration_number": "BR-0000178",
+      "legal_name": "Paternoster Cafe Partners LLP",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2000-04-11",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4476",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "61 Saltmarsh Yard",
+        "locality": "Ashcombe Reach",
+        "postcode": "AM2 6JZ",
+        "parcel_id": null,
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Nethansk-Marridge, Linnet Halla",
+          "role": "director",
+          "appointed_on": "2012-05-30",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-06-19"
+    },
+    {
+      "registration_number": "BR-0000179",
+      "legal_name": "Ironmonger Joinery Group Ltd",
+      "trading_name": "Ironmonger Joinery Group",
+      "status": "active",
+      "registered_on": "1997-12-11",
+      "dissolved_on": null,
+      "activity": {
+        "code": "9143",
+        "description": "Joinery and carpentry"
+      },
+      "registered_address": {
+        "line1": "20 Saltmarsh Rise",
+        "locality": "Sable Quay",
+        "postcode": "AM3 5ZT",
+        "parcel_id": null,
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Halstone, Nore Ualan",
+          "role": "director",
+          "appointed_on": "2022-09-01",
+          "resigned_on": null
+        },
+        {
+          "name": "Hawley, Dell Ulla",
+          "role": "partner",
+          "appointed_on": "2018-10-23",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-03-25"
+    },
+    {
+      "registration_number": "BR-0000180",
+      "legal_name": "Hollybank Haulage Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2011-06-06",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6435",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "38 Bellrope Passage",
+        "locality": "Corrisbeck",
+        "postcode": "AM3 4ZW",
+        "parcel_id": "PCL-CB-01115",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Nethstone, Gale Vesper",
+          "role": "director",
+          "appointed_on": "2015-10-19",
+          "resigned_on": null
+        },
+        {
+          "name": "Brackstone, Hollis",
+          "role": "director",
+          "appointed_on": "2025-08-07",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-01-08"
+    },
+    {
+      "registration_number": "BR-0000181",
+      "legal_name": "Gasworks Clinic Ltd",
+      "trading_name": "Gasworks Clinic",
+      "status": "active",
+      "registered_on": "1997-03-23",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1790",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "205 Pellet Terrace",
+        "locality": "Vantry Hollow",
+        "postcode": "AM7 7PX",
+        "parcel_id": "PCL-VH-01549",
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Undthwaite, Kestrel",
+          "role": "director",
+          "appointed_on": "1999-05-25",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2026-02-25"
+    },
+    {
+      "registration_number": "BR-0000182",
+      "legal_name": "Lamplight Garage Group Ltd",
+      "trading_name": "Lamplight Garage Group",
+      "status": "active",
+      "registered_on": "1996-06-23",
+      "dissolved_on": null,
+      "activity": {
+        "code": "2039",
+        "description": "Motor vehicle repair"
+      },
+      "registered_address": {
+        "line1": "49 Windlass Street",
+        "locality": "Sable Quay",
+        "postcode": "AM7 6AG",
+        "parcel_id": "PCL-SQ-00666",
+        "ward_code": "PG"
+      },
+      "officers": [
+        {
+          "name": "Thornjaru, Elowen Marek",
+          "role": "secretary",
+          "appointed_on": "2006-01-24",
+          "resigned_on": null
+        },
+        {
+          "name": "Frostley, R.",
+          "role": "secretary",
+          "appointed_on": "2013-05-19",
+          "resigned_on": null
+        },
+        {
+          "name": "Dornvale, Veda Perrin",
+          "role": "partner",
+          "appointed_on": "2015-09-07",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-06-07"
+    },
+    {
+      "registration_number": "BR-0000183",
+      "legal_name": "Netherfield Bakery Limited",
+      "trading_name": "Netherfield Bakery",
+      "status": "active",
+      "registered_on": "2004-09-10",
+      "dissolved_on": null,
+      "activity": {
+        "code": "9682",
+        "description": "Bakery and confectionery"
+      },
+      "registered_address": {
+        "line1": "2 Quarry Way",
+        "locality": "Vantry Hollow",
+        "postcode": "AM4 8PD",
+        "parcel_id": null,
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Caldacott, Ualan",
+          "role": "secretary",
+          "appointed_on": "2011-11-24",
+          "resigned_on": null
+        },
+        {
+          "name": "Hawridge, Tamsin",
+          "role": "director",
+          "appointed_on": "2025-05-22",
+          "resigned_on": null
+        },
+        {
+          "name": "Junia, Ashford",
+          "role": "director",
+          "appointed_on": "2008-03-15",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-02-06"
+    },
+    {
+      "registration_number": "BR-0000184",
+      "legal_name": "Netherfield Surveyors and Sons Ltd",
+      "trading_name": "Netherfield Surveyors and Sons",
+      "status": "active",
+      "registered_on": "1995-06-26",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3159",
+        "description": "Surveying and inspection"
+      },
+      "registered_address": {
+        "line1": "187 Weirside Passage",
+        "locality": "Vantry Hollow",
+        "postcode": "AM2 4YA",
+        "parcel_id": null,
+        "ward_code": "TF"
+      },
+      "officers": [
+        {
+          "name": "Hawridge, Tamsin",
+          "role": "director",
+          "appointed_on": "2018-09-20",
+          "resigned_on": null
+        },
+        {
+          "name": "Kirrford, U.",
+          "role": "director",
+          "appointed_on": "2007-02-05",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-05-06"
+    },
+    {
+      "registration_number": "BR-0000185",
+      "legal_name": "Netherfield Grocer Group Ltd",
+      "trading_name": "Netherfield Grocer Group",
+      "status": "active",
+      "registered_on": "2015-03-29",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6838",
+        "description": "Grocery retail"
+      },
+      "registered_address": {
+        "line1": "230 Ropewalk Close",
+        "locality": "North Dunmoor",
+        "postcode": "AM5 6YR",
+        "parcel_id": null,
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Obbridge, T.",
+          "role": "director",
+          "appointed_on": "2018-03-24",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-04-08"
+    },
+    {
+      "registration_number": "BR-0000186",
+      "legal_name": "Ferryman Garage Co-operative",
+      "trading_name": null,
+      "status": "in_liquidation",
+      "registered_on": "1997-09-05",
+      "dissolved_on": "2022-03-08",
+      "activity": {
+        "code": "3021",
+        "description": "Motor vehicle repair"
+      },
+      "registered_address": {
+        "line1": "142 Ironmonger Rise",
+        "locality": "Pelling Green",
+        "postcode": "AM2 9ER",
+        "parcel_id": null,
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Frostthwaite-Hawusk, Corrin Anwen",
+          "role": "director",
+          "appointed_on": "2022-05-22",
+          "resigned_on": null
+        },
+        {
+          "name": "Rishthwaite, Gale",
+          "role": "responsible_person",
+          "appointed_on": "2022-05-21",
+          "resigned_on": null
+        },
+        {
+          "name": "Ellusk, Zeno",
+          "role": "responsible_person",
+          "appointed_on": "2000-12-21",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-10-10"
+    },
+    {
+      "registration_number": "BR-0000187",
+      "legal_name": "Windlass Garage and Sons Ltd",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2015-05-25",
+      "dissolved_on": "2017-02-01",
+      "activity": {
+        "code": "8329",
+        "description": "Motor vehicle repair"
+      },
+      "registered_address": {
+        "line1": "167 Ferryman Row",
+        "locality": "Mirebrook",
+        "postcode": "AM9 5QH",
+        "parcel_id": "PCL-MB-02738",
+        "ward_code": "SQ"
+      },
+      "officers": [
+        {
+          "name": "Obbansk, Linnet",
+          "role": "director",
+          "appointed_on": "2016-12-27",
+          "resigned_on": null
+        },
+        {
+          "name": "Dornotte, Berrin Veda",
+          "role": "secretary",
+          "appointed_on": "2024-11-26",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-12-03"
+    },
+    {
+      "registration_number": "BR-0000188",
+      "legal_name": "Vintners Haulage Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1998-03-31",
+      "dissolved_on": null,
+      "activity": {
+        "code": "4984",
+        "description": "Road haulage"
+      },
+      "registered_address": {
+        "line1": "230 Hollybank Road",
+        "locality": "Vantry Hollow",
+        "postcode": "AM4 9ER",
+        "parcel_id": "PCL-VH-00289",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Adeyiridge, L.",
+          "role": "director",
+          "appointed_on": "2000-02-10",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-07-16"
+    },
+    {
+      "registration_number": "BR-0000189",
+      "legal_name": "Lamplight Foundry Trading Co",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1997-01-02",
+      "dissolved_on": null,
+      "activity": {
+        "code": "1525",
+        "description": "Metal casting"
+      },
+      "registered_address": {
+        "line1": "69 Paternoster Walk",
+        "locality": "Kelder Flats",
+        "postcode": "AM5 2QB",
+        "parcel_id": "PCL-KF-01840",
+        "ward_code": "ND"
+      },
+      "officers": [
+        {
+          "name": "Xhemstone, Fira",
+          "role": "partner",
+          "appointed_on": "2006-01-01",
+          "resigned_on": null
+        },
+        {
+          "name": "Iskansk, Maro Greer",
+          "role": "director",
+          "appointed_on": "2009-08-20",
+          "resigned_on": null
+        },
+        {
+          "name": "Uxacott, Mira Nissa",
+          "role": "responsible_person",
+          "appointed_on": "2019-06-01",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-06-04"
+    },
+    {
+      "registration_number": "BR-0000190",
+      "legal_name": "Ferryman Chandlers Group Ltd",
+      "trading_name": "Ferryman Chandlers Group",
+      "status": "dissolved",
+      "registered_on": "2019-05-23",
+      "dissolved_on": "2022-07-23",
+      "activity": {
+        "code": "2384",
+        "description": "Marine supplies"
+      },
+      "registered_address": {
+        "line1": "29A Vintners Rise",
+        "locality": "Kelder Flats",
+        "postcode": "AM6 6NQ",
+        "parcel_id": "PCL-KF-01024",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Rishnall, Zeno",
+          "role": "director",
+          "appointed_on": "2025-08-31",
+          "resigned_on": null
+        },
+        {
+          "name": "Vasqdale, Hollis Rhoda",
+          "role": "director",
+          "appointed_on": "2022-04-09",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-03-29"
+    },
+    {
+      "registration_number": "BR-0000191",
+      "legal_name": "Pellet Brewers Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2009-01-20",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8057",
+        "description": "Brewing and distribution"
+      },
+      "registered_address": {
+        "line1": "140 Paternoster Road",
+        "locality": "Sable Quay",
+        "postcode": "AM9 7JE",
+        "parcel_id": "PCL-SQ-01122",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Yarrombe, Quen Rhoda",
+          "role": "director",
+          "appointed_on": "2009-04-23",
+          "resigned_on": null
+        },
+        {
+          "name": "Lomovic, Yara Zeno",
+          "role": "secretary",
+          "appointed_on": "2019-11-05",
+          "resigned_on": null
+        },
+        {
+          "name": "Nethansk-Marridge, Linnet",
+          "role": "director",
+          "appointed_on": "2009-06-19",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-08-22"
+    },
+    {
+      "registration_number": "BR-0000192",
+      "legal_name": "Ironmonger Laundry Partners LLP",
+      "trading_name": "Ironmonger Laundry Partners LLP",
+      "status": "active",
+      "registered_on": "1991-09-01",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6121",
+        "description": "Laundry services"
+      },
+      "registered_address": {
+        "line1": "66 Cattle Crescent",
+        "locality": "North Dunmoor",
+        "postcode": "AM3 1RT",
+        "parcel_id": null,
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Sablejaru, Yvain",
+          "role": "director",
+          "appointed_on": "2022-11-25",
+          "resigned_on": null
+        },
+        {
+          "name": "Quillwick, Ualan Faron",
+          "role": "secretary",
+          "appointed_on": "2016-05-09",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-08-26"
+    },
+    {
+      "registration_number": "BR-0000193",
+      "legal_name": "Coldharbour Cafe Limited",
+      "trading_name": "Coldharbour Cafe",
+      "status": "dissolved",
+      "registered_on": "2021-01-10",
+      "dissolved_on": "2024-12-08",
+      "activity": {
+        "code": "3846",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "21 Ferryman Street",
+        "locality": "Vantry Hollow",
+        "postcode": "AM4 3SJ",
+        "parcel_id": "PCL-VH-00709",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Uxacott, Mira Nissa",
+          "role": "director",
+          "appointed_on": "2023-11-19",
+          "resigned_on": null
+        },
+        {
+          "name": "Morthwaite, H.",
+          "role": "partner",
+          "appointed_on": "2023-07-18",
+          "resigned_on": null
+        },
+        {
+          "name": "Kirrford, Ulla Corrin",
+          "role": "director",
+          "appointed_on": "2021-02-10",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-07-31"
+    },
+    {
+      "registration_number": "BR-0000194",
+      "legal_name": "Hollybank Clinic and Sons Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2020-06-18",
+      "dissolved_on": null,
+      "activity": {
+        "code": "7562",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "220C Cattle Rise",
+        "locality": "Kelder Flats",
+        "postcode": "AM6 1LG",
+        "parcel_id": "PCL-KF-02872",
+        "ward_code": "TF"
+      },
+      "officers": [
+        {
+          "name": "Vellgrove, Wren Dell",
+          "role": "director",
+          "appointed_on": "2022-12-20",
+          "resigned_on": null
+        },
+        {
+          "name": "Embjaru, Zeno",
+          "role": "secretary",
+          "appointed_on": "2024-04-15",
+          "resigned_on": null
+        },
+        {
+          "name": "Wendwick, Dell Cass",
+          "role": "director",
+          "appointed_on": "2021-11-27",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-02-17"
+    },
+    {
+      "registration_number": "BR-0000195",
+      "legal_name": "Weirside Surveyors and Sons Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2026-02-20",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8152",
+        "description": "Surveying and inspection"
+      },
+      "registered_address": {
+        "line1": "48 Threadneedle Walk",
+        "locality": "Corrisbeck",
+        "postcode": "AM7 2TY",
+        "parcel_id": "PCL-CB-01451",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Pyrevale, Nissa",
+          "role": "secretary",
+          "appointed_on": "2026-03-28",
+          "resigned_on": null
+        },
+        {
+          "name": "Frostport, Kesh",
+          "role": "responsible_person",
+          "appointed_on": "2026-02-22",
+          "resigned_on": null
+        },
+        {
+          "name": "Zebthwaite, Hollis",
+          "role": "secretary",
+          "appointed_on": "2026-02-25",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-03-05"
+    },
+    {
+      "registration_number": "BR-0000196",
+      "legal_name": "Mallow Garage Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "1992-04-18",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8637",
+        "description": "Motor vehicle repair"
+      },
+      "registered_address": {
+        "line1": "86 Paternoster Close",
+        "locality": "Kelder Flats",
+        "postcode": "AM7 1RK",
+        "parcel_id": "PCL-KF-02092",
+        "ward_code": "IH"
+      },
+      "officers": [
+        {
+          "name": "Voreombe, Ivo",
+          "role": "secretary",
+          "appointed_on": "2019-09-20",
+          "resigned_on": null
+        },
+        {
+          "name": "Bramdale-Jennstone, Wren",
+          "role": "director",
+          "appointed_on": "2026-03-12",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-05-08"
+    },
+    {
+      "registration_number": "BR-0000197",
+      "legal_name": "Cattle Foundry Ltd",
+      "trading_name": "Cattle Foundry",
+      "status": "active",
+      "registered_on": "2015-11-21",
+      "dissolved_on": null,
+      "activity": {
+        "code": "6098",
+        "description": "Metal casting"
+      },
+      "registered_address": {
+        "line1": "224 Ostler Walk",
+        "locality": "Vantry Hollow",
+        "postcode": "AM1 4DA",
+        "parcel_id": "PCL-VH-01069",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Quillwick, Ualan Faron",
+          "role": "director",
+          "appointed_on": "2016-05-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-12-23"
+    },
+    {
+      "registration_number": "BR-0000198",
+      "legal_name": "Netherfield Brewers Co-operative",
+      "trading_name": "Netherfield Brewers Co-operative",
+      "status": "active",
+      "registered_on": "1992-11-12",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8312",
+        "description": "Brewing and distribution"
+      },
+      "registered_address": {
+        "line1": "130 Sedge Yard",
+        "locality": "Pelling Green",
+        "postcode": "AM3 1FR",
+        "parcel_id": null,
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Fennthwaite, S.",
+          "role": "responsible_person",
+          "appointed_on": "1999-06-07",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-10-05"
+    },
+    {
+      "registration_number": "BR-0000199",
+      "legal_name": "Paternoster Cafe Partners LLP",
+      "trading_name": null,
+      "status": "in_liquidation",
+      "registered_on": "2009-08-13",
+      "dissolved_on": "2019-12-15",
+      "activity": {
+        "code": "9239",
+        "description": "Cafe and refreshment"
+      },
+      "registered_address": {
+        "line1": "167 Saltmarsh Street",
+        "locality": "Kelder Flats",
+        "postcode": "AM7 1BJ",
+        "parcel_id": "PCL-KF-00052",
+        "ward_code": "VH"
+      },
+      "officers": [
+        {
+          "name": "Nyleridge, Kesh",
+          "role": "director",
+          "appointed_on": "2023-07-08",
+          "resigned_on": null
+        },
+        {
+          "name": "Embjaru, Z.",
+          "role": "director",
+          "appointed_on": "2021-02-28",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-03-15"
+    },
+    {
+      "registration_number": "BR-0000200",
+      "legal_name": "Weirside Brewers Group Ltd",
+      "trading_name": null,
+      "status": "active",
+      "registered_on": "2000-10-26",
+      "dissolved_on": null,
+      "activity": {
+        "code": "8326",
+        "description": "Brewing and distribution"
+      },
+      "registered_address": {
+        "line1": "217 Pellet Terrace",
+        "locality": "Pelling Green",
+        "postcode": "AM7 3FF",
+        "parcel_id": "PCL-PG-00838",
+        "ward_code": "CB"
+      },
+      "officers": [
+        {
+          "name": "Halgrove, Dell",
+          "role": "director",
+          "appointed_on": "2014-05-02",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-07-18"
+    },
+    {
+      "registration_number": "BR-0000201",
+      "legal_name": "Ferryman Chandlers Ltd",
+      "trading_name": null,
+      "status": "dissolved",
+      "registered_on": "2022-04-13",
+      "dissolved_on": "2022-06-27",
+      "activity": {
+        "code": "1510",
+        "description": "Marine supplies"
+      },
+      "registered_address": {
+        "line1": "127 Tannery Way",
+        "locality": "Corrisbeck",
+        "postcode": "AM3 8RA",
+        "parcel_id": "PCL-CB-02411",
+        "ward_code": "AR"
+      },
+      "officers": [
+        {
+          "name": "Brackyard, Imre",
+          "role": "secretary",
+          "appointed_on": "2024-02-28",
+          "resigned_on": null
+        },
+        {
+          "name": "Gorseridge-Zeberly, Odile",
+          "role": "secretary",
+          "appointed_on": "2025-01-23",
+          "resigned_on": null
+        },
+        {
+          "name": "Ellnall, Thea Ualan",
+          "role": "responsible_person",
+          "appointed_on": "2023-01-30",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-07-26"
+    },
+    {
+      "registration_number": "BR-0000202",
+      "legal_name": "Vintners Bakery Co-operative",
+      "trading_name": "Vintners Bakery Co-operative",
+      "status": "active",
+      "registered_on": "1998-03-22",
+      "dissolved_on": null,
+      "activity": {
+        "code": "5363",
+        "description": "Bakery and confectionery"
+      },
+      "registered_address": {
+        "line1": "171 Hollybank Walk",
+        "locality": "Isk Harbour",
+        "postcode": "AM3 4BX",
+        "parcel_id": "PCL-IH-02652",
+        "ward_code": "WH"
+      },
+      "officers": [
+        {
+          "name": "Coveombe, C.",
+          "role": "partner",
+          "appointed_on": "2015-10-05",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2024-01-21"
+    },
+    {
+      "registration_number": "BR-0000203",
+      "legal_name": "Dovecote Nursery Partners LLP",
+      "trading_name": null,
+      "status": "in_liquidation",
+      "registered_on": "2014-09-20",
+      "dissolved_on": "2024-06-29",
+      "activity": {
+        "code": "3511",
+        "description": "Childcare and early years"
+      },
+      "registered_address": {
+        "line1": "73C Ostler Terrace",
+        "locality": "Tarnfield",
+        "postcode": "AM5 1JS",
+        "parcel_id": "PCL-TF-00103",
+        "ward_code": "KF"
+      },
+      "officers": [
+        {
+          "name": "Nethridge, Zeno",
+          "role": "responsible_person",
+          "appointed_on": "2023-10-28",
+          "resigned_on": null
+        },
+        {
+          "name": "Neththwaite, Mira",
+          "role": "director",
+          "appointed_on": "2019-02-10",
+          "resigned_on": null
+        },
+        {
+          "name": "Fennquist, F.",
+          "role": "director",
+          "appointed_on": "2017-05-14",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2025-12-23"
+    },
+    {
+      "registration_number": "BR-0000204",
+      "legal_name": "Netherfield Clinic Limited",
+      "trading_name": null,
+      "status": "dormant",
+      "registered_on": "2010-01-27",
+      "dissolved_on": null,
+      "activity": {
+        "code": "3537",
+        "description": "Allied health practice"
+      },
+      "registered_address": {
+        "line1": "150 Cattle Way",
+        "locality": "Mirebrook",
+        "postcode": "AM7 5WS",
+        "parcel_id": "PCL-MB-01034",
+        "ward_code": "OH"
+      },
+      "officers": [
+        {
+          "name": "Iskyard, Basten Fira",
+          "role": "director",
+          "appointed_on": "2014-12-17",
+          "resigned_on": null
+        }
+      ],
+      "last_filing_on": "2023-11-10"
+    }
+  ]
+}

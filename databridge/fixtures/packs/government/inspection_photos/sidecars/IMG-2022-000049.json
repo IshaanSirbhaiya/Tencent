@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2022-000049",
+  "filename": "IMG-2022-000049.jpg",
+  "image_present": false,
+  "captured_at": "2022-12-31T16:22:28+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2022-000161",
+  "application_id": "APP-2022-000225",
+  "parcel_id": "PCL-CB-01367",
+  "photo_batch_ref": "PHB-2022-000161",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-569283"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 424892,
+    "northing": 1217173,
+    "accuracy_m": 8.1
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          605,
+          120,
+          286,
+          73
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2022-599321",
+        "confidence": 0.874,
+        "bbox": [
+          690,
+          262,
+          621,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "30 WEIRSIDE CRESCENT, CORRISBECK AM8 8TT",
+        "confidence": 0.787,
+        "bbox": [
+          266,
+          360,
+          1040,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2022-12-31",
+        "confidence": 0.795,
+        "bbox": [
+          700,
+          543,
+          725,
+          78
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.953,
+        "bbox": [
+          1189,
+          664,
+          432,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

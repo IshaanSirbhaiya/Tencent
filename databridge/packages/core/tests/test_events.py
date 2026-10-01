@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from databridge_core.events import PipelineEvent, content_hash
-from databridge_core.provenance import SourcePointer
+from databridge_core.provenance import SourcePointer, Trust
 
 
 def test_content_hash_is_order_independent():
@@ -17,7 +17,8 @@ def test_content_hash_changes_with_content():
 
 
 def test_content_hash_handles_pydantic_models():
-    p = SourcePointer(source_id="s", kind="table_cell", table="t", column="c", row_id="1")
+    p = SourcePointer(source_id="s", kind="table_cell", table="t", column="c",
+                      row_id="1", trust=Trust.TRUSTED)
     h = content_hash(p)
     assert isinstance(h, str) and len(h) == 64        # sha256 hex
 

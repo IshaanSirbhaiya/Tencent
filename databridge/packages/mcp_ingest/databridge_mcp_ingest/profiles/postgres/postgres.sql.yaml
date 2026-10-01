@@ -1,0 +1,115 @@
+# PostgreSQL dialect (pg_catalog for keys). Same templates as information_schema.sql.yaml except
+# `keys`: information_schema.table_constraints only lists constraints on tables the current role
+# OWNS or holds a non-SELECT privilege on, so a least-privilege reader (walnut_reader: SELECT
+# only) sees NO primary or foreign keys there — measured 2026-10-01 against the demo DB, every
+# table came back keyless and no FK edge could be built. pg_catalog.pg_constraint is readable by
+# any role. Rendered by parse.render; every statement is a read.
+name: postgres
+# --- dialect-template metadata (W4; shape: tabular/dialect_draft.py). The vetted template for the
+# engine `postgres`; `profiles/sql_dialects/` holds the other engines' templates.
+engine: postgres
+title: PostgreSQL
+status: verified
+verified: >-
+  2026-10-01 — live against the demo DB through postgres-mcp (restricted mode) as walnut_reader
+  (S2: tests/test_s2_integration.py); W4 re-probed every catalogue query, the keys fallback and
+  the combined table_stats statement live (tests/test_w4_integration.py).
+detect:
+  priority: 10
+  tool_hints: [execute_sql, list_schemas, list_objects, query]
+  probes:
+    - {sql: "SELECT version() AS v", match: '(?i)^postgresql'}
+mcp:
+  rows: auto            # postgres-mcp: Python repr of row dicts; the reference server: JSON
+  error_prefixes: ["Error:"]   # postgres-mcp reports a failed statement as text, isError false
+# R-022 f1 #4 (tabular cross-track 3): the probe first switches the session to READ ONLY and checks
+# it took, so a Postgres probe is read-only at the DATABASE level too, not only by the statement
+# allow-list. The probe report says which guard actually held.
+# INT5: postgres-mcp in `--access-mode=restricted` refuses the SET ("Error validating query") —
+# it already wraps EVERY statement in `BEGIN TRANSACTION READ ONLY`. The probe therefore still runs
+# the `check`; the database answering `on` is the proof either way (dialect_draft.read_only_session).
+# A server that refuses the SET and is not read-only answers `off` and is never approvable.
+read_only_session:
+  sql: SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY
+  check: SHOW transaction_read_only
+  expect: '^on$'
+quote: '"'
+# The FIRST keys catalogue a template would reach for — information_schema — is the one a
+# SELECT-only role cannot see keys through. `keys` above is pg_catalog; this is kept as the
+# alternative so the live probe can SHOW the difference (and pick the better one on a server
+# where pg_catalog is restricted instead).
+keys_alternatives:
+  - name: information_schema
+    note: >-
+      lists constraints only on tables the role OWNS or holds a non-SELECT privilege on — a
+      SELECT-only reader sees none
+    sql: >-
+      SELECT kcu.column_name AS column_name, tc.constraint_type AS constraint_type,
+             ccu.table_schema AS ref_schema, ccu.table_name AS ref_table,
+             ccu.column_name AS ref_column
+      FROM information_schema.table_constraints tc
+      JOIN information_schema.key_column_usage kcu
+        ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+       AND tc.table_name = kcu.table_name
+      LEFT JOIN information_schema.constraint_column_usage ccu
+        ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.constraint_schema
+      WHERE tc.table_schema = {schema|literal} AND tc.table_name = {table|literal}
+        AND tc.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+      ORDER BY kcu.ordinal_position
+# Planner statistics: never-analysed tables report -1 (unknown) → NULL, not a wrong number.
+row_estimate: >-
+  SELECT NULLIF(c.reltuples, -1)::bigint AS n FROM pg_catalog.pg_class c
+  JOIN pg_catalog.pg_namespace ns ON ns.oid = c.relnamespace
+  WHERE ns.nspname = {schema|literal} AND c.relname = {table|literal}
+# Combined profiling (W4): ONE statement per table instead of one per column. The engine builds
+# `{measures}` from `table_stats_column` (every column) and `table_stats_range` (temporal/numeric
+# columns), each rendered with the column and an engine-made alias prefix `{p}` (c0, c1, …).
+table_stats: >-
+  SELECT COUNT(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT({column|ident}) AS {p}_non_null,
+  COUNT(DISTINCT CAST({column|ident} AS TEXT)) AS {p}_distinct_n,
+  AVG(LENGTH(CAST({column|ident} AS TEXT))) AS {p}_avg_len,
+  MAX(LENGTH(CAST({column|ident} AS TEXT))) AS {p}_max_len,
+  AVG(LENGTH(CAST({column|ident} AS TEXT)) - LENGTH(REPLACE(CAST({column|ident} AS TEXT), ' ', ''))) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+list_tables: >-
+  SELECT table_schema, table_name FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema
+  NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name
+describe: >-
+  SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = {schema|literal}
+  AND table_name = {table|literal} ORDER BY ordinal_position
+keys: |-
+  SELECT a.attname AS column_name,
+         CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' ELSE 'FOREIGN KEY' END AS constraint_type,
+         rn.nspname AS ref_schema, rc.relname AS ref_table, ra.attname AS ref_column
+  FROM pg_catalog.pg_constraint c
+  JOIN pg_catalog.pg_class t ON t.oid = c.conrelid
+  JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
+  CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)
+  JOIN pg_catalog.pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum
+  LEFT JOIN pg_catalog.pg_class rc ON rc.oid = c.confrelid
+  LEFT JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace
+  LEFT JOIN pg_catalog.pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[k.ord]
+  WHERE n.nspname = {schema|literal} AND t.relname = {table|literal} AND c.contype IN ('p', 'f')
+  ORDER BY c.contype DESC, c.conname, k.ord
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+column_stats: |-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         COUNT(DISTINCT CAST({column|ident} AS TEXT)) AS distinct_n,
+         AVG(LENGTH(CAST({column|ident} AS TEXT))) AS avg_len,
+         MAX(LENGTH(CAST({column|ident} AS TEXT))) AS max_len,
+         AVG(LENGTH(CAST({column|ident} AS TEXT))
+             - LENGTH(REPLACE(CAST({column|ident} AS TEXT), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int} OFFSET {offset|int}
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident} GROUP BY {group_cols}
+  ORDER BY {group_cols}

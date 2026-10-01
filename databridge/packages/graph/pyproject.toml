@@ -1,9 +1,9 @@
-# packages/graph — the clinic operational brain. Bi-temporal knowledge graph over SQLite
-# (stdlib), grounded NL query, and the clinic seed. Reuses convert (claim_check, C15) + harness.
+# packages/graph — the operational graph. Bi-temporal knowledge graph over SQLite (stdlib),
+# grounded NL query, and the three-layer pack vocabulary. Reuses convert (claim_check, C15) + harness.
 [project]
 name = "databridge-graph"
 version = "0.0.0"
-description = "DataBridge graph: bi-temporal clinic knowledge graph (ADR-0009)"
+description = "DataBridge graph: bi-temporal knowledge graph + pack vocabulary (ADR-0009)"
 requires-python = ">=3.11"
 dependencies = [
   "databridge-core",
@@ -14,7 +14,15 @@ dependencies = [
   # primary entry point, not an optional extra. The test suite passes without it declared only
   # because the root pytest `pythonpath` lists every package; an installed wheel would not.
   "databridge-intake",
+  # adapter_ingest.py bridges estate_seed's readers to the adapter fleet's Cores (PostgresCore,
+  # DocumentCore) — an OPTIONAL path (`build_pack_graph(..., adapter_rows=...)`), but a real
+  # import-time dependency of that module and of the packs that wire it (government_seed.py). The
+  # test suite passes without it declared only because the root pytest `pythonpath` lists every
+  # package; an installed wheel would not.
+  "databridge-adapter",
   "pydantic>=2.7",
+  # packs.py reads packs/<name>/ontology.yaml (spine §4 Layer 1) at import of the vocabulary.
+  "pyyaml>=6",
 ]
 
 [build-system]

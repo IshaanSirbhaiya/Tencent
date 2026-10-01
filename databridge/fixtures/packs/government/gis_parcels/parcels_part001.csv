@@ -1,0 +1,1501 @@
+parcel_id,ward_code,locality,zoning_code,land_use,area_sqm,frontage_m,street_number,street_name,postcode,easting,northing,last_survey_on,title_status,heritage_flag,flood_zone
+PCL-VH-00001,VH,Vantry Hollow,AG,office,353,17.3,94,Tannery Crescent,AM1 8AV,444010,1213502,2022-08-31,leasehold_125,N,none
+PCL-MB-00002,MB,Mirebrook,SP,allotment,2313,38.1,67,Gasworks Passage,AM2 9SR,418410,1205820,2022-07-03,in_dispute,Y,none
+PCL-AR-00003,AR,Ashcombe Reach,I2,warehouse,25462,34.2,35A,Gasworks Street,AM5 8RF,439578,1217160,2013-11-28,freehold,N,none
+PCL-KF-00004,KF,Kelder Flats,I2,workshop,27354,39.8,14,Ferryman Passage,AM4 2SD,432535,1219233,2017-10-30,leasehold_99,N,none
+PCL-OH-00005,OH,Old Harrowgate,C1,allotment,2383,5.3,57,Gasworks Street,AM5 4HA,416090,1202807,2013-12-16,freehold,N,none
+PCL-SQ-00006,SQ,Sable Quay,I2,dwelling,21733,6.0,90,Tannery Row,AM5 3RS,424044,1204542,2000-09-27,unregistered,N,zone_1
+PCL-TF-00007,TF,Tarnfield,SP,place_of_worship,382,17.9,110,Cattle Yard,AM3 8NJ,444895,1216630,2020-03-13,leasehold_99,N,none
+PCL-WH-00008,WH,Wend Hill,I1,office,630,21.5,134,Ropewalk Crescent,AM4 5LQ,447174,1217159,2025-01-29,crown_lease,N,none
+PCL-ND-00009,ND,North Dunmoor,I1,dwelling_multi,163,28.3,211,Kilnyard Road,AM3 2EH,413564,1195791,2018-11-18,in_dispute,N,none
+PCL-PG-00010,PG,Pelling Green,MU,workshop,61,12.0,85,Mallow Row,AM4 4WE,441633,1205481,2012-08-17,unregistered,N,none
+PCL-CB-00011,CB,Corrisbeck,I1,civic,3079,12.9,109,Coldharbour Crescent,AM8 9BK,443823,1197860,2022-07-07,in_dispute,N,none
+PCL-IH-00012,IH,Isk Harbour,MU,dwelling_multi,9259,15.6,199,Quarry Walk,AM9 7JG,439545,1202963,2012-09-28,unregistered,N,none
+PCL-VH-00013,VH,Vantry Hollow,R1,dwelling_multi,855,25.2,202,Tannery Crescent,AM7 5QL,433550,1210566,1999-11-26,unregistered,N,none
+PCL-MB-00014,MB,Mirebrook,HC,workshop,20186,15.7,235,Mallow Lane,AM1 4DR,432947,1197240,2021-07-28,unregistered,N,none
+PCL-AR-00015,AR,Ashcombe Reach,MU,vacant,292,14.3,69,Ferryman Row,AM9 7QK,449136,1189390,2015-04-30,leasehold_125,N,none
+PCL-KF-00016,KF,Kelder Flats,C2,vacant,499,26.6,131,Weirside Row,AM1 2TB,418943,1187376,2005-10-08,leasehold_99,N,none
+PCL-OH-00017,OH,Old Harrowgate,OS,place_of_worship,20345,47.7,230,Saltmarsh Street,AM6 9GA,436870,1211241,2009-03-17,leasehold_99,N,none
+PCL-SQ-00018,SQ,Sable Quay,R1,school,652,27.3,5A,Hollybank Yard,AM1 8QH,443549,1208155,2013-05-22,in_dispute,N,none
+PCL-TF-00019,TF,Tarnfield,MU,workshop,356,41.8,98A,Pellet Lane,AM9 6FD,421662,1216284,1996-07-15,leasehold_99,N,none
+PCL-WH-00020,WH,Wend Hill,HC,retail,1911,34.0,3,Dovecote Row,AM4 4FV,429630,1180543,2004-05-07,freehold,N,none
+PCL-ND-00021,ND,North Dunmoor,AG,place_of_worship,379,28.0,104B,Ostler Row,AM7 4TL,424626,1206166,2016-12-04,leasehold_125,N,zone_1
+PCL-PG-00022,PG,Pelling Green,I2,carpark,238,33.9,17,Lamplight Yard,AM2 1GF,418164,1212818,1997-05-11,unregistered,N,none
+PCL-CB-00023,CB,Corrisbeck,I2,dwelling_multi,39679,21.5,206B,Kilnyard Crescent,AM1 6AW,445144,1201787,1996-01-05,in_dispute,N,none
+PCL-IH-00024,IH,Isk Harbour,R3,civic,369,25.7,47,Saltmarsh Rise,AM4 5JR,442284,1192485,2023-11-20,leasehold_125,N,zone_2
+PCL-VH-00025,VH,Vantry Hollow,HC,workshop,204,20.1,190,Ostler Lane,AM3 7QV,427404,1183385,2018-03-02,unregistered,N,zone_3b
+PCL-MB-00026,MB,Mirebrook,C1,allotment,266,23.0,168,Gasworks Row,AM2 8GY,419057,1206277,2002-01-19,leasehold_125,N,zone_3b
+PCL-AR-00027,AR,Ashcombe Reach,OS,allotment,18539,38.0,225,Marrow Row,AM4 5PH,420848,1206402,2011-03-08,leasehold_99,N,none
+PCL-KF-00028,KF,Kelder Flats,MU,allotment,950,7.5,221,Ferryman Yard,AM6 5JZ,446239,1182011,2017-03-19,leasehold_99,N,zone_3a
+PCL-OH-00029,OH,Old Harrowgate,R2,place_of_worship,138,4.1,13,Sedge Terrace,AM9 9BG,432110,1189292,2011-10-22,crown_lease,N,none
+PCL-SQ-00030,SQ,Sable Quay,C1,allotment,28557,29.4,12,Quarry Street,AM1 5GY,420534,1207620,2016-06-08,leasehold_99,N,none
+PCL-TF-00031,TF,Tarnfield,C1,warehouse,17762,42.8,205,Ostler Rise,AM9 9BX,432089,1182922,2012-11-23,leasehold_125,N,none
+PCL-WH-00032,WH,Wend Hill,C1,retail,1735,6.3,200,Threadneedle Street,AM6 6WA,446717,1200191,2003-01-07,unregistered,N,none
+PCL-ND-00033,ND,North Dunmoor,I1,civic,1127,40.4,158B,Sedge Close,AM8 9DA,446123,1196623,2016-12-29,in_dispute,N,none
+PCL-PG-00034,PG,Pelling Green,C2,workshop,4059,45.6,75,Ironmonger Walk,AM5 1FH,426519,1196688,2003-09-27,unregistered,N,none
+PCL-CB-00035,CB,Corrisbeck,C2,retail,177,21.3,49,Marrow Terrace,AM4 2EB,417379,1201672,2019-08-06,freehold,N,none
+PCL-IH-00036,IH,Isk Harbour,I1,retail,10247,7.9,206,Hollybank Street,AM4 4WK,425463,1200049,1997-03-06,leasehold_99,N,none
+PCL-VH-00037,VH,Vantry Hollow,HC,warehouse,343,17.3,10,Paternoster Walk,AM8 6EK,418357,1203069,1996-03-19,unregistered,N,none
+PCL-MB-00038,MB,Mirebrook,C1,vacant,1325,41.2,105,Vintners Lane,AM7 2PT,420464,1201237,2012-01-15,freehold,N,zone_3a
+PCL-AR-00039,AR,Ashcombe Reach,I1,school,310,23.5,61,Ferryman Passage,AM3 4RA,427603,1211469,2026-05-26,leasehold_99,N,none
+PCL-KF-00040,KF,Kelder Flats,SP,workshop,166,9.0,131,Paternoster Way,AM9 3SH,447013,1207722,2008-06-15,unregistered,N,none
+PCL-OH-00041,OH,Old Harrowgate,SP,school,23061,13.7,37,Ostler Street,AM4 3VL,440140,1199991,2006-10-23,unregistered,N,zone_1
+PCL-SQ-00042,SQ,Sable Quay,C2,allotment,37294,27.0,195,Cattle Close,AM1 6NE,444993,1211111,2004-08-25,in_dispute,N,none
+PCL-TF-00043,TF,Tarnfield,R1,carpark,38916,30.7,209,Ostler Crescent,AM9 9XV,432246,1188706,2009-05-26,unregistered,N,none
+PCL-WH-00044,WH,Wend Hill,C2,dwelling,1951,32.8,19,Ropewalk Way,AM6 4ZX,429691,1189467,2001-01-06,unregistered,N,none
+PCL-ND-00045,ND,North Dunmoor,MU,workshop,1089,31.9,163,Saltmarsh Walk,AM9 3YK,440088,1190473,2025-12-10,unregistered,N,zone_2
+PCL-PG-00046,PG,Pelling Green,MU,carpark,12089,24.8,98,Cattle Street,AM7 2YD,420659,1187662,2009-07-21,in_dispute,N,none
+PCL-CB-00047,CB,Corrisbeck,I1,school,295,6.8,225,Hollybank Way,AM5 3NH,440935,1210721,2002-05-31,freehold,N,none
+PCL-IH-00048,IH,Isk Harbour,HC,place_of_worship,119,15.2,153,Pellet Passage,AM3 9ZX,444514,1200643,2019-02-17,crown_lease,N,none
+PCL-VH-00049,VH,Vantry Hollow,SP,office,1654,18.5,194,Dovecote Crescent,AM5 1JV,432081,1206297,1998-01-28,freehold,N,none
+PCL-MB-00050,MB,Mirebrook,R2,warehouse,2270,4.2,114,Pellet Crescent,AM8 2EY,427573,1195800,2022-02-12,leasehold_125,N,zone_1
+PCL-AR-00051,AR,Ashcombe Reach,OS,retail,528,46.6,146,Dovecote Row,AM4 6GT,449867,1181329,2005-10-25,leasehold_125,N,zone_1
+PCL-KF-00052,KF,Kelder Flats,R1,vacant,2209,31.8,167,Saltmarsh Street,AM7 1BJ,436451,1186427,1999-11-06,crown_lease,N,zone_1
+PCL-OH-00053,OH,Old Harrowgate,MU,dwelling_multi,400,23.5,52,Ostler Crescent,AM2 9WY,431247,1200731,2012-11-28,crown_lease,N,none
+PCL-SQ-00054,SQ,Sable Quay,I2,school,18584,47.2,237,Windlass Road,AM4 8TK,448674,1192786,2013-03-05,leasehold_99,N,none
+PCL-TF-00055,TF,Tarnfield,R1,school,975,8.0,130,Cattle Lane,AM6 7QA,426405,1216945,2010-11-03,leasehold_125,N,zone_3a
+PCL-WH-00056,WH,Wend Hill,AG,workshop,1748,36.8,81,Marrow Lane,AM8 9LP,437824,1189810,2012-12-14,leasehold_125,N,none
+PCL-ND-00057,ND,North Dunmoor,R3,office,91,40.8,69B,Tannery Row,AM9 2TG,431128,1199615,2024-10-01,leasehold_99,N,none
+PCL-PG-00058,PG,Pelling Green,R2,allotment,144,13.3,234,Netherfield Rise,AM7 5KH,433035,1215745,2020-03-25,in_dispute,N,none
+PCL-CB-00059,CB,Corrisbeck,OS,carpark,902,27.4,204,Hollybank Terrace,AM6 5AB,413911,1216525,2021-07-16,crown_lease,N,zone_3a
+PCL-IH-00060,IH,Isk Harbour,OS,civic,2108,6.1,123C,Ironmonger Close,AM2 3XP,440982,1203619,2005-12-25,leasehold_125,N,none
+PCL-VH-00061,VH,Vantry Hollow,SP,retail,1670,6.4,116,Marrow Lane,AM6 4GK,414449,1215007,1996-05-16,unregistered,N,none
+PCL-MB-00062,MB,Mirebrook,SP,retail,1922,29.2,71,Threadneedle Close,AM5 1XP,411406,1206685,2025-07-07,freehold,N,none
+PCL-AR-00063,AR,Ashcombe Reach,C2,vacant,1451,22.1,100,Gasworks Way,AM7 8PQ,431801,1188283,2021-02-10,leasehold_99,N,none
+PCL-KF-00064,KF,Kelder Flats,R2,retail,832,15.2,1,Cattle Lane,AM6 1JE,435155,1190242,1999-10-04,freehold,N,none
+PCL-OH-00065,OH,Old Harrowgate,AG,place_of_worship,166,45.4,149,Ferryman Way,AM5 9HX,437843,1183761,2007-07-03,freehold,N,zone_3a
+PCL-SQ-00066,SQ,Sable Quay,I1,allotment,1221,11.5,170,Dovecote Street,AM3 7WS,423751,1195042,2023-02-22,crown_lease,N,zone_1
+PCL-TF-00067,TF,Tarnfield,I1,warehouse,319,28.8,156,Lamplight Lane,AM7 8YS,434627,1218020,2012-01-05,leasehold_99,N,none
+PCL-WH-00068,WH,Wend Hill,R1,school,1959,18.9,94,Hollybank Street,AM6 7PA,447455,1216102,2003-06-05,leasehold_99,N,none
+PCL-ND-00069,ND,North Dunmoor,SP,vacant,784,29.6,27,Ironmonger Crescent,AM6 2JF,428454,1204119,2008-03-25,leasehold_125,N,none
+PCL-PG-00070,PG,Pelling Green,I2,workshop,1452,25.3,130,Ferryman Rise,AM7 4KJ,426055,1203644,1998-08-08,unregistered,N,none
+PCL-CB-00071,CB,Corrisbeck,R3,dwelling,252,44.5,123,Dovecote Rise,AM8 7DP,443105,1208173,2016-06-08,crown_lease,N,none
+PCL-IH-00072,IH,Isk Harbour,I1,civic,933,43.6,193,Netherfield Passage,AM7 4VX,440542,1180789,2025-11-28,leasehold_99,N,zone_2
+PCL-VH-00073,VH,Vantry Hollow,AG,retail,32903,11.2,169,Pellet Close,AM2 7JG,427402,1186998,1998-09-08,leasehold_99,N,none
+PCL-MB-00074,MB,Mirebrook,HC,office,278,27.9,65,Kilnyard Street,AM1 6WV,416736,1209211,2025-07-14,leasehold_99,Y,none
+PCL-AR-00075,AR,Ashcombe Reach,R2,civic,1295,5.1,122,Bellrope Rise,AM9 1GH,427484,1199948,2021-12-01,in_dispute,N,none
+PCL-KF-00076,KF,Kelder Flats,HC,retail,37704,15.5,168,Kilnyard Street,AM7 5EX,445320,1182339,2023-11-28,leasehold_99,N,none
+PCL-OH-00077,OH,Old Harrowgate,OS,dwelling,8492,4.5,193,Sedge Lane,AM8 9AD,447255,1196566,2016-10-26,unregistered,N,none
+PCL-SQ-00078,SQ,Sable Quay,R3,warehouse,2392,6.0,31,Saltmarsh Way,AM7 8EJ,421214,1206329,2004-03-22,leasehold_125,N,none
+PCL-TF-00079,TF,Tarnfield,R2,civic,326,11.0,218,Tannery Close,AM6 2JV,435710,1206909,2012-07-10,crown_lease,N,zone_1
+PCL-WH-00080,WH,Wend Hill,R1,warehouse,2345,15.1,200,Mallow Close,AM4 9ZK,429293,1206794,1999-05-30,in_dispute,N,none
+PCL-ND-00081,ND,North Dunmoor,MU,retail,31322,24.3,205,Ostler Close,AM5 3NG,441122,1181424,2009-01-15,leasehold_99,N,zone_2
+PCL-PG-00082,PG,Pelling Green,SP,carpark,13061,41.6,3,Dovecote Road,AM6 7KK,440867,1190337,2025-06-29,freehold,N,zone_2
+PCL-CB-00083,CB,Corrisbeck,OS,retail,258,19.5,148,Dovecote Crescent,AM8 3QA,435356,1216917,2017-09-03,leasehold_125,N,zone_2
+PCL-IH-00084,IH,Isk Harbour,R2,dwelling_multi,249,34.3,174,Pellet Rise,AM9 5SR,433820,1205631,2012-06-17,crown_lease,N,zone_1
+PCL-VH-00085,VH,Vantry Hollow,I1,school,27177,26.0,187,Cattle Rise,AM3 6PN,431955,1183902,1999-07-04,freehold,N,none
+PCL-MB-00086,MB,Mirebrook,C2,retail,25909,36.9,94,Paternoster Row,AM5 3TY,420668,1207975,2022-03-08,in_dispute,Y,none
+PCL-AR-00087,AR,Ashcombe Reach,AG,office,763,35.4,142,Marrow Road,AM5 9GG,439381,1216499,2018-02-01,leasehold_99,N,none
+PCL-KF-00088,KF,Kelder Flats,I1,vacant,390,41.3,235,Bellrope Road,AM1 2RR,430873,1198398,2007-07-26,in_dispute,N,none
+PCL-OH-00089,OH,Old Harrowgate,AG,school,1316,21.0,233,Ironmonger Walk,AM4 4AB,433867,1183738,2008-10-19,in_dispute,N,zone_2
+PCL-SQ-00090,SQ,Sable Quay,C2,retail,1856,6.4,47,Kilnyard Close,AM2 1VL,430617,1189935,2025-04-05,freehold,N,none
+PCL-TF-00091,TF,Tarnfield,HC,vacant,216,31.0,126,Ropewalk Row,AM4 7NF,427269,1213650,2000-03-06,unregistered,N,none
+PCL-WH-00092,WH,Wend Hill,HC,place_of_worship,1053,35.2,198,Ropewalk Row,AM6 7ZF,440605,1180610,2011-05-18,unregistered,N,none
+PCL-ND-00093,ND,North Dunmoor,AG,carpark,259,11.0,102,Vintners Row,AM1 1KY,416225,1203154,2025-09-15,freehold,N,none
+PCL-PG-00094,PG,Pelling Green,SP,office,6639,21.4,28,Coldharbour Lane,AM2 9PJ,421080,1195859,2017-08-22,crown_lease,N,none
+PCL-CB-00095,CB,Corrisbeck,C1,civic,227,11.0,6,Windlass Walk,AM7 7QH,441900,1215598,2006-02-15,leasehold_99,N,zone_3b
+PCL-IH-00096,IH,Isk Harbour,R1,dwelling_multi,1253,24.7,65,Cattle Passage,AM2 5FJ,411222,1181690,2004-07-02,leasehold_125,N,none
+PCL-VH-00097,VH,Vantry Hollow,HC,dwelling_multi,1532,39.7,155,Lamplight Road,AM8 3GG,417028,1209060,2009-11-03,crown_lease,N,none
+PCL-MB-00098,MB,Mirebrook,I2,vacant,367,18.3,235C,Hollybank Yard,AM5 9RB,435219,1182165,2013-10-06,leasehold_99,N,none
+PCL-AR-00099,AR,Ashcombe Reach,I2,retail,21359,10.8,6,Dovecote Walk,AM7 6TJ,447534,1185256,2006-02-03,leasehold_99,N,none
+PCL-KF-00100,KF,Kelder Flats,SP,dwelling_multi,14802,46.5,6A,Ironmonger Passage,AM3 6AN,415077,1188114,2007-08-12,crown_lease,Y,none
+PCL-OH-00101,OH,Old Harrowgate,MU,school,64,41.2,95,Ferryman Yard,AM2 3LQ,421373,1190263,2005-11-09,in_dispute,N,zone_1
+PCL-SQ-00102,SQ,Sable Quay,C2,allotment,382,46.9,186,Sedge Passage,AM5 8AR,418971,1210839,2012-08-06,crown_lease,N,zone_3a
+PCL-TF-00103,TF,Tarnfield,I2,allotment,146,27.7,73C,Ostler Terrace,AM5 1JS,448343,1202606,2009-03-19,in_dispute,N,zone_3a
+PCL-WH-00104,WH,Wend Hill,OS,allotment,12800,12.4,204,Gasworks Close,AM1 2SF,428412,1219028,2024-04-11,unregistered,N,none
+PCL-ND-00105,ND,North Dunmoor,AG,dwelling_multi,387,45.1,44,Ostler Street,AM2 3DY,444445,1190657,2010-01-19,leasehold_125,N,none
+PCL-PG-00106,PG,Pelling Green,SP,place_of_worship,6333,46.5,177B,Pellet Walk,AM2 2KX,417410,1202500,2017-02-18,leasehold_99,N,zone_1
+PCL-CB-00107,CB,Corrisbeck,MU,vacant,7277,13.6,12,Pellet Passage,AM8 9QG,448912,1209183,2005-01-28,freehold,N,zone_3a
+PCL-IH-00108,IH,Isk Harbour,R3,carpark,20402,14.7,21,Cattle Rise,AM6 2NX,445125,1198958,2016-11-21,crown_lease,N,zone_3b
+PCL-VH-00109,VH,Vantry Hollow,I2,vacant,4414,7.5,40,Threadneedle Crescent,AM6 5GL,417303,1215972,2020-07-09,unregistered,N,zone_1
+PCL-MB-00110,MB,Mirebrook,AG,civic,18183,40.8,217,Sedge Row,AM5 7EZ,449660,1219785,2024-09-29,freehold,N,none
+PCL-AR-00111,AR,Ashcombe Reach,SP,school,2162,7.6,169,Quarry Road,AM4 8SL,426068,1192755,2002-03-13,in_dispute,N,none
+PCL-KF-00112,KF,Kelder Flats,I1,retail,1912,46.8,205,Coldharbour Rise,AM6 8PE,410589,1182411,2015-05-11,leasehold_125,N,zone_2
+PCL-OH-00113,OH,Old Harrowgate,I1,workshop,1153,29.8,63,Kilnyard Terrace,AM5 4WN,449252,1185258,2011-04-10,leasehold_99,N,zone_3a
+PCL-SQ-00114,SQ,Sable Quay,I1,retail,27770,26.0,107,Sedge Terrace,AM2 2FQ,447971,1203212,2006-02-18,freehold,N,none
+PCL-TF-00115,TF,Tarnfield,AG,office,20028,27.5,218,Marrow Terrace,AM2 2TN,435415,1208819,2011-09-21,leasehold_99,Y,zone_3a
+PCL-WH-00116,WH,Wend Hill,I1,retail,341,19.6,15,Saltmarsh Passage,AM2 3LB,445493,1197042,2007-02-23,in_dispute,N,none
+PCL-ND-00117,ND,North Dunmoor,OS,place_of_worship,342,13.2,187,Vintners Road,AM7 1FF,448266,1185241,2000-09-06,crown_lease,N,zone_3a
+PCL-PG-00118,PG,Pelling Green,C1,office,39619,14.3,177,Vintners Walk,AM6 9QL,432799,1199258,2018-10-06,crown_lease,N,none
+PCL-CB-00119,CB,Corrisbeck,MU,allotment,315,12.0,152,Kilnyard Passage,AM5 1FV,446176,1205910,2015-09-02,unregistered,N,zone_3a
+PCL-IH-00120,IH,Isk Harbour,OS,dwelling,1467,12.4,119,Quarry Yard,AM2 7DK,418489,1199049,2004-07-28,in_dispute,N,none
+PCL-VH-00121,VH,Vantry Hollow,MU,vacant,34529,4.0,201,Hollybank Lane,AM3 1XX,435760,1187833,2007-02-06,leasehold_125,Y,none
+PCL-MB-00122,MB,Mirebrook,HC,dwelling,11628,16.5,171,Weirside Row,AM5 1TD,427570,1216353,2000-10-21,in_dispute,N,none
+PCL-AR-00123,AR,Ashcombe Reach,I2,carpark,192,24.8,105,Windlass Close,AM3 9WG,412672,1207035,2024-12-14,leasehold_125,N,zone_1
+PCL-KF-00124,KF,Kelder Flats,I1,carpark,993,43.2,183,Netherfield Rise,AM5 6RS,426247,1209478,2013-02-13,in_dispute,N,none
+PCL-OH-00125,OH,Old Harrowgate,HC,civic,766,29.1,199,Ropewalk Rise,AM2 1VX,445476,1214631,2012-09-24,leasehold_99,N,none
+PCL-SQ-00126,SQ,Sable Quay,MU,vacant,941,14.9,34,Netherfield Crescent,AM5 3RL,422047,1205635,2013-06-26,freehold,N,zone_1
+PCL-TF-00127,TF,Tarnfield,I2,dwelling_multi,71,26.9,27,Netherfield Lane,AM9 7XZ,420585,1189179,2014-03-16,freehold,N,none
+PCL-WH-00128,WH,Wend Hill,MU,school,2111,36.8,83,Vintners Rise,AM6 4SV,439300,1193743,2025-10-19,crown_lease,N,zone_1
+PCL-ND-00129,ND,North Dunmoor,I2,warehouse,27342,34.2,33,Threadneedle Terrace,AM6 9KE,439796,1218207,2014-10-17,freehold,N,zone_2
+PCL-PG-00130,PG,Pelling Green,I1,workshop,1911,19.5,46,Lamplight Way,AM3 2AF,439295,1199990,2003-04-06,in_dispute,N,zone_3b
+PCL-CB-00131,CB,Corrisbeck,R3,vacant,1078,17.5,226,Coldharbour Way,AM5 2GG,441640,1211412,2007-08-26,in_dispute,N,zone_1
+PCL-IH-00132,IH,Isk Harbour,OS,workshop,313,18.3,210,Quarry Rise,AM8 1HG,422902,1184766,2019-05-04,unregistered,N,zone_1
+PCL-VH-00133,VH,Vantry Hollow,R1,place_of_worship,30474,17.2,68,Ironmonger Street,AM6 5PE,416185,1196494,2004-11-08,in_dispute,N,none
+PCL-MB-00134,MB,Mirebrook,R2,office,1810,28.2,50C,Threadneedle Terrace,AM9 7SR,429215,1219398,1996-07-12,freehold,N,zone_3a
+PCL-AR-00135,AR,Ashcombe Reach,OS,warehouse,191,39.5,130,Ironmonger Yard,AM2 2DR,437093,1219644,2009-04-16,crown_lease,N,zone_1
+PCL-KF-00136,KF,Kelder Flats,R3,civic,2319,39.6,152,Gasworks Terrace,AM6 9EH,423769,1184950,2000-11-22,in_dispute,N,none
+PCL-OH-00137,OH,Old Harrowgate,I2,vacant,254,41.1,130,Pellet Street,AM5 8WK,431523,1219541,2010-10-09,freehold,N,none
+PCL-SQ-00138,SQ,Sable Quay,I1,civic,247,20.8,203,Ironmonger Way,AM7 7HG,433656,1197453,1998-08-15,freehold,N,none
+PCL-TF-00139,TF,Tarnfield,R3,carpark,7699,12.0,69,Vintners Close,AM3 4GJ,437586,1185488,2022-08-09,in_dispute,N,zone_3a
+PCL-WH-00140,WH,Wend Hill,R3,retail,10172,24.9,7,Quarry Street,AM7 5XT,437495,1215648,2020-04-18,freehold,N,zone_2
+PCL-ND-00141,ND,North Dunmoor,HC,retail,2192,30.5,105,Ironmonger Row,AM6 7WW,429362,1186061,2021-09-16,leasehold_125,N,none
+PCL-PG-00142,PG,Pelling Green,MU,place_of_worship,24169,21.4,158,Netherfield Rise,AM1 3EH,448612,1192930,2020-05-15,leasehold_125,Y,none
+PCL-CB-00143,CB,Corrisbeck,I2,place_of_worship,263,41.3,112,Cattle Passage,AM6 8PF,411817,1217144,2007-09-19,crown_lease,N,none
+PCL-IH-00144,IH,Isk Harbour,OS,carpark,15275,39.9,113,Ostler Walk,AM5 3KH,446702,1216696,2015-02-13,crown_lease,N,none
+PCL-VH-00145,VH,Vantry Hollow,R2,warehouse,187,31.5,102,Bellrope Road,AM4 9YG,448298,1208776,2022-09-30,leasehold_125,Y,zone_1
+PCL-MB-00146,MB,Mirebrook,OS,dwelling_multi,1654,41.7,102,Marrow Road,AM7 5PE,438008,1187357,1997-04-25,leasehold_125,N,none
+PCL-AR-00147,AR,Ashcombe Reach,MU,office,34308,23.4,12,Paternoster Street,AM9 7BB,421276,1205911,2024-04-03,leasehold_125,N,zone_2
+PCL-KF-00148,KF,Kelder Flats,I1,workshop,82,45.3,144,Vintners Close,AM4 9WW,434627,1201024,2022-08-05,unregistered,N,zone_1
+PCL-OH-00149,OH,Old Harrowgate,R1,dwelling,354,29.6,32,Sedge Rise,AM1 8VK,440008,1189206,2010-07-03,leasehold_99,N,zone_2
+PCL-SQ-00150,SQ,Sable Quay,R3,office,38058,39.1,211,Tannery Rise,AM1 2VY,449108,1215163,2011-06-04,unregistered,N,none
+PCL-TF-00151,TF,Tarnfield,R2,workshop,2195,34.1,122,Kilnyard Close,AM9 1FT,424999,1189949,2006-07-17,leasehold_125,N,zone_3a
+PCL-WH-00152,WH,Wend Hill,C2,dwelling_multi,2130,25.8,134,Ironmonger Street,AM8 7YK,417375,1198596,2006-04-15,leasehold_125,N,none
+PCL-ND-00153,ND,North Dunmoor,R2,retail,24463,13.0,170,Ropewalk Crescent,AM1 5JS,428238,1197680,2005-09-24,leasehold_99,N,none
+PCL-PG-00154,PG,Pelling Green,SP,retail,330,41.5,78,Marrow Yard,AM2 9ZG,437789,1182022,2019-03-03,leasehold_99,N,zone_1
+PCL-CB-00155,CB,Corrisbeck,SP,allotment,2087,23.8,12,Ropewalk Lane,AM9 7ZS,413150,1196349,1996-12-18,crown_lease,N,zone_2
+PCL-IH-00156,IH,Isk Harbour,AG,school,314,40.8,202,Windlass Terrace,AM3 2JS,433816,1191825,1998-07-12,crown_lease,N,zone_2
+PCL-VH-00157,VH,Vantry Hollow,C1,warehouse,313,34.1,219,Ferryman Street,AM7 6EY,449543,1192523,2008-10-14,crown_lease,N,none
+PCL-MB-00158,MB,Mirebrook,R2,carpark,2249,27.0,229,Threadneedle Street,AM4 7KG,425014,1213390,2024-12-28,in_dispute,N,none
+PCL-AR-00159,AR,Ashcombe Reach,R1,carpark,4491,11.6,9,Saltmarsh Crescent,AM4 9NR,433722,1207641,2014-06-07,unregistered,Y,none
+PCL-KF-00160,KF,Kelder Flats,R1,allotment,152,33.7,194,Marrow Close,AM6 2XB,449496,1215880,2011-08-09,in_dispute,N,none
+PCL-OH-00161,OH,Old Harrowgate,MU,retail,2206,22.5,190,Ferryman Road,AM3 7DK,438823,1211188,2004-07-07,leasehold_125,Y,none
+PCL-SQ-00162,SQ,Sable Quay,OS,retail,652,20.2,208,Dovecote Rise,AM3 8RB,419253,1205855,2014-07-20,crown_lease,N,none
+PCL-TF-00163,TF,Tarnfield,I2,allotment,2314,7.8,125,Coldharbour Way,AM4 2XV,437910,1202204,2020-02-14,leasehold_125,Y,none
+PCL-WH-00164,WH,Wend Hill,OS,office,32936,38.3,158,Weirside Street,AM9 2NK,445776,1212824,2016-04-30,crown_lease,Y,none
+PCL-ND-00165,ND,North Dunmoor,R2,carpark,292,44.2,72,Coldharbour Way,AM6 7ZL,418879,1192023,2020-06-05,in_dispute,N,none
+PCL-PG-00166,PG,Pelling Green,MU,retail,204,44.2,188C,Cattle Way,AM3 5PD,418828,1206297,2025-01-28,unregistered,N,none
+PCL-CB-00167,CB,Corrisbeck,OS,warehouse,1057,33.5,151,Bellrope Close,AM4 7WK,412181,1183388,2020-01-09,in_dispute,N,none
+PCL-IH-00168,IH,Isk Harbour,I2,dwelling_multi,4142,23.4,158,Gasworks Road,AM1 5WD,438076,1215980,2003-10-19,crown_lease,N,none
+PCL-VH-00169,VH,Vantry Hollow,C1,carpark,2076,7.3,37,Ferryman Row,AM2 7BG,411290,1217921,2006-02-08,leasehold_99,N,zone_1
+PCL-MB-00170,MB,Mirebrook,C2,vacant,28589,28.3,180,Windlass Street,AM2 9KW,435088,1210189,2004-08-01,in_dispute,N,none
+PCL-AR-00171,AR,Ashcombe Reach,I2,school,276,29.0,167,Threadneedle Street,AM7 2RK,430289,1184651,2009-03-15,leasehold_125,N,none
+PCL-KF-00172,KF,Kelder Flats,HC,school,979,13.7,60,Lamplight Street,AM5 6FN,411319,1200834,2010-05-26,freehold,N,none
+PCL-OH-00173,OH,Old Harrowgate,C2,school,14966,19.0,238,Threadneedle Road,AM5 2BB,443416,1213726,2011-09-27,crown_lease,N,none
+PCL-SQ-00174,SQ,Sable Quay,MU,place_of_worship,29682,30.4,232,Dovecote Passage,AM7 4VR,432098,1209595,1998-07-05,in_dispute,N,none
+PCL-TF-00175,TF,Tarnfield,R1,allotment,2292,20.0,191,Ironmonger Terrace,AM1 3DP,424843,1218591,2002-10-24,unregistered,N,zone_2
+PCL-WH-00176,WH,Wend Hill,R1,office,36223,12.5,59,Hollybank Way,AM5 4WR,448709,1197554,2006-10-27,crown_lease,N,zone_1
+PCL-ND-00177,ND,North Dunmoor,AG,civic,644,45.3,22,Windlass Crescent,AM4 3XV,444099,1195121,1996-01-27,in_dispute,N,zone_3a
+PCL-PG-00178,PG,Pelling Green,MU,school,109,30.7,16,Pellet Row,AM4 6HD,410725,1184798,2019-12-26,crown_lease,N,zone_3a
+PCL-CB-00179,CB,Corrisbeck,C2,dwelling_multi,37448,41.7,69,Saltmarsh Way,AM9 3LN,417981,1218173,2005-02-06,in_dispute,Y,none
+PCL-IH-00180,IH,Isk Harbour,AG,civic,397,39.8,143,Saltmarsh Close,AM7 6KD,433837,1200071,2025-03-13,in_dispute,N,none
+PCL-VH-00181,VH,Vantry Hollow,I2,carpark,128,45.2,120,Lamplight Way,AM6 6SA,441786,1217985,2026-01-23,leasehold_99,N,none
+PCL-MB-00182,MB,Mirebrook,AG,workshop,206,17.8,147,Netherfield Row,AM9 3VQ,449193,1183446,2020-08-29,leasehold_99,N,none
+PCL-AR-00183,AR,Ashcombe Reach,C2,dwelling_multi,154,34.7,102,Coldharbour Passage,AM4 1AZ,440240,1186243,2010-04-02,in_dispute,N,none
+PCL-KF-00184,KF,Kelder Flats,R2,workshop,212,22.5,62,Saltmarsh Road,AM7 5DZ,438392,1183442,2021-04-19,freehold,N,none
+PCL-OH-00185,OH,Old Harrowgate,C1,office,197,20.2,96,Weirside Road,AM2 4AA,449259,1215840,2015-11-27,freehold,N,none
+PCL-SQ-00186,SQ,Sable Quay,I2,place_of_worship,1681,24.4,116,Quarry Row,AM6 5RR,435882,1185162,1999-07-05,crown_lease,N,zone_1
+PCL-TF-00187,TF,Tarnfield,MU,warehouse,12940,31.8,99,Ironmonger Close,AM3 5KZ,418784,1217034,2008-12-17,leasehold_99,N,none
+PCL-WH-00188,WH,Wend Hill,C2,warehouse,1174,17.1,123,Ostler Row,AM4 1YF,435462,1201861,2022-07-16,freehold,N,zone_1
+PCL-ND-00189,ND,North Dunmoor,C1,school,29192,7.4,104,Ropewalk Way,AM6 6DW,448739,1188942,2004-12-20,leasehold_99,N,zone_1
+PCL-PG-00190,PG,Pelling Green,C2,dwelling_multi,1151,45.3,180,Cattle Rise,AM5 5LA,417701,1201287,2005-01-01,crown_lease,N,none
+PCL-CB-00191,CB,Corrisbeck,SP,place_of_worship,278,40.7,25,Threadneedle Passage,AM1 2TL,445966,1191950,2017-04-19,unregistered,N,none
+PCL-IH-00192,IH,Isk Harbour,I1,dwelling,18652,47.9,133,Vintners Rise,AM8 1HP,436057,1182917,1998-04-26,leasehold_99,N,zone_2
+PCL-VH-00193,VH,Vantry Hollow,I1,school,1836,43.8,146A,Marrow Passage,AM9 9VE,444261,1185530,2001-03-13,crown_lease,N,none
+PCL-MB-00194,MB,Mirebrook,HC,dwelling_multi,1193,42.0,214,Hollybank Passage,AM4 9PD,428286,1216371,2012-11-24,crown_lease,N,none
+PCL-AR-00195,AR,Ashcombe Reach,R3,allotment,147,18.6,183,Dovecote Terrace,AM9 1QW,414250,1188541,2004-01-17,in_dispute,N,none
+PCL-KF-00196,KF,Kelder Flats,R3,dwelling_multi,236,43.7,183B,Quarry Terrace,AM6 9DP,436111,1188002,2022-11-07,leasehold_99,N,zone_2
+PCL-OH-00197,OH,Old Harrowgate,HC,allotment,11078,18.9,120,Cattle Way,AM8 6ZQ,428875,1206702,2009-12-25,unregistered,N,none
+PCL-SQ-00198,SQ,Sable Quay,R1,allotment,35635,15.3,46A,Ironmonger Walk,AM7 6WW,411018,1214333,2001-06-13,leasehold_99,N,none
+PCL-TF-00199,TF,Tarnfield,I1,civic,1661,24.4,56,Sedge Passage,AM9 4AN,438856,1214191,2001-03-01,in_dispute,N,none
+PCL-WH-00200,WH,Wend Hill,AG,dwelling,200,28.4,80,Vintners Close,AM9 3GD,441594,1204219,2020-12-23,leasehold_99,N,none
+PCL-ND-00201,ND,North Dunmoor,AG,dwelling,6539,34.0,114,Vintners Street,AM3 2YB,436985,1190314,2019-03-01,in_dispute,N,none
+PCL-PG-00202,PG,Pelling Green,OS,workshop,16358,24.7,151,Hollybank Row,AM1 3QD,431708,1214141,2025-12-28,leasehold_125,N,none
+PCL-CB-00203,CB,Corrisbeck,C1,warehouse,968,29.1,42B,Gasworks Close,AM3 8LX,423872,1192166,2011-09-21,crown_lease,N,none
+PCL-IH-00204,IH,Isk Harbour,AG,dwelling_multi,14945,45.0,27,Ironmonger Road,AM8 5SJ,449324,1203970,2019-03-10,leasehold_125,N,none
+PCL-VH-00205,VH,Vantry Hollow,SP,workshop,314,30.6,147,Saltmarsh Street,AM5 2EH,429510,1198124,1996-03-28,in_dispute,N,none
+PCL-MB-00206,MB,Mirebrook,C2,civic,370,46.0,20,Ferryman Walk,AM1 3EN,423871,1210242,1999-01-03,leasehold_125,N,zone_1
+PCL-AR-00207,AR,Ashcombe Reach,R3,office,1822,47.2,77,Tannery Walk,AM5 6DT,446129,1191858,2008-02-13,unregistered,N,none
+PCL-KF-00208,KF,Kelder Flats,C2,retail,104,24.2,228,Ferryman Yard,AM2 2ZT,426260,1187267,2015-04-25,leasehold_125,Y,none
+PCL-OH-00209,OH,Old Harrowgate,R3,retail,1495,24.0,205A,Marrow Close,AM9 5SZ,431279,1201510,2008-07-22,leasehold_99,N,zone_3a
+PCL-SQ-00210,SQ,Sable Quay,I1,school,280,22.0,108,Saltmarsh Yard,AM6 5NT,427844,1210192,2000-05-17,leasehold_99,N,none
+PCL-TF-00211,TF,Tarnfield,AG,school,5557,6.5,97,Paternoster Yard,AM8 4TX,423101,1211437,2004-03-02,leasehold_99,N,none
+PCL-WH-00212,WH,Wend Hill,SP,office,591,28.9,184,Lamplight Yard,AM3 8GG,435818,1204817,2017-11-15,in_dispute,N,none
+PCL-ND-00213,ND,North Dunmoor,SP,dwelling,23218,4.2,133,Vintners Way,AM7 2WN,412745,1208332,1999-02-27,unregistered,N,none
+PCL-PG-00214,PG,Pelling Green,HC,place_of_worship,2351,19.9,128,Ferryman Crescent,AM3 6TX,433633,1190148,2020-03-22,in_dispute,N,none
+PCL-CB-00215,CB,Corrisbeck,R1,civic,37714,30.0,91,Ropewalk Street,AM1 6PW,432684,1187298,2011-03-20,leasehold_99,N,none
+PCL-IH-00216,IH,Isk Harbour,I2,carpark,1865,41.9,102,Marrow Passage,AM8 8ZS,439489,1182843,1997-01-23,leasehold_99,Y,none
+PCL-VH-00217,VH,Vantry Hollow,SP,warehouse,422,31.8,113,Coldharbour Street,AM3 9GA,434818,1192011,2020-12-24,freehold,N,none
+PCL-MB-00218,MB,Mirebrook,R2,workshop,254,6.0,161,Ostler Passage,AM4 6PE,445446,1217878,2004-12-01,freehold,N,zone_2
+PCL-AR-00219,AR,Ashcombe Reach,I1,office,1411,13.3,203,Pellet Street,AM1 6ZT,430609,1200339,2024-10-21,freehold,N,zone_1
+PCL-KF-00220,KF,Kelder Flats,MU,office,38125,27.8,166,Ostler Walk,AM5 2PW,443769,1209932,2006-06-06,leasehold_125,N,zone_2
+PCL-OH-00221,OH,Old Harrowgate,AG,retail,1731,13.1,211,Hollybank Road,AM9 2GH,437922,1202263,2005-09-06,unregistered,N,none
+PCL-SQ-00222,SQ,Sable Quay,MU,warehouse,1693,47.6,195,Paternoster Close,AM3 3PL,446124,1210228,2025-03-03,leasehold_125,N,none
+PCL-TF-00223,TF,Tarnfield,R2,school,4512,22.5,14,Quarry Crescent,AM1 3XN,424182,1196376,1997-12-25,in_dispute,N,none
+PCL-WH-00224,WH,Wend Hill,MU,civic,360,30.2,118,Quarry Crescent,AM7 6WG,425799,1216387,1997-05-18,freehold,N,none
+PCL-ND-00225,ND,North Dunmoor,I2,warehouse,31859,18.9,150,Cattle Crescent,AM9 9DE,436667,1205469,1999-03-26,freehold,N,none
+PCL-PG-00226,PG,Pelling Green,R1,warehouse,1139,5.8,34B,Paternoster Street,AM5 7TH,413003,1210821,2022-09-25,crown_lease,N,zone_2
+PCL-CB-00227,CB,Corrisbeck,R1,allotment,23430,11.9,17,Dovecote Crescent,AM2 2JD,410471,1209078,2002-08-25,in_dispute,N,zone_2
+PCL-IH-00228,IH,Isk Harbour,SP,allotment,409,45.3,109,Weirside Yard,AM9 3ER,445913,1182710,2009-10-09,unregistered,N,none
+PCL-VH-00229,VH,Vantry Hollow,AG,school,313,37.9,162,Sedge Road,AM9 1DL,428976,1198169,2025-05-04,unregistered,N,none
+PCL-MB-00230,MB,Mirebrook,I2,retail,90,7.5,107,Dovecote Walk,AM5 6VY,424569,1206476,2020-02-26,in_dispute,N,none
+PCL-AR-00231,AR,Ashcombe Reach,MU,retail,155,16.1,77,Saltmarsh Close,AM1 3NT,445580,1180198,2018-10-24,in_dispute,N,zone_3a
+PCL-KF-00232,KF,Kelder Flats,C2,school,534,36.7,17,Mallow Row,AM3 9YZ,417312,1198038,1998-10-14,leasehold_99,N,none
+PCL-OH-00233,OH,Old Harrowgate,I2,dwelling,11222,36.4,1C,Vintners Walk,AM8 9VN,423827,1201951,2017-11-03,leasehold_125,N,none
+PCL-SQ-00234,SQ,Sable Quay,R3,vacant,1248,38.3,233,Dovecote Lane,AM4 7QB,445569,1203102,2016-01-09,crown_lease,N,zone_3a
+PCL-TF-00235,TF,Tarnfield,I2,school,92,31.2,105,Gasworks Terrace,AM2 3JD,422938,1185141,2011-02-27,leasehold_125,N,none
+PCL-WH-00236,WH,Wend Hill,HC,vacant,1063,41.6,84,Dovecote Yard,AM2 4ZA,433460,1195737,2020-07-07,freehold,N,none
+PCL-ND-00237,ND,North Dunmoor,OS,dwelling_multi,2362,19.4,100,Lamplight Yard,AM5 7QH,411777,1219511,2004-08-12,in_dispute,N,none
+PCL-PG-00238,PG,Pelling Green,R1,school,374,33.9,65,Tannery Rise,AM1 7TG,427462,1180793,2014-06-10,unregistered,N,zone_3a
+PCL-CB-00239,CB,Corrisbeck,OS,vacant,34207,19.0,140,Saltmarsh Crescent,AM4 9DL,443375,1202352,2025-07-13,unregistered,N,none
+PCL-IH-00240,IH,Isk Harbour,C1,dwelling,222,8.5,199,Bellrope Terrace,AM9 7XD,433396,1195853,2010-05-29,crown_lease,N,none
+PCL-VH-00241,VH,Vantry Hollow,R3,retail,2320,16.3,215,Hollybank Close,AM6 7TS,431391,1204048,2004-03-02,leasehold_99,Y,zone_2
+PCL-MB-00242,MB,Mirebrook,OS,workshop,1567,18.8,144,Ostler Walk,AM6 8WF,440671,1205339,2012-08-09,in_dispute,N,zone_2
+PCL-AR-00243,AR,Ashcombe Reach,OS,civic,1404,5.3,190A,Lamplight Street,AM9 7GP,412664,1197920,2022-01-26,unregistered,N,none
+PCL-KF-00244,KF,Kelder Flats,C1,vacant,292,40.1,182,Mallow Close,AM6 1ZX,426770,1191060,2003-12-21,unregistered,N,none
+PCL-OH-00245,OH,Old Harrowgate,R3,retail,2232,4.7,216,Lamplight Walk,AM5 8WE,414109,1194202,1999-10-01,in_dispute,N,none
+PCL-SQ-00246,SQ,Sable Quay,I2,vacant,21638,5.2,232,Sedge Row,AM1 6KL,438362,1200901,2023-09-22,in_dispute,N,zone_1
+PCL-TF-00247,TF,Tarnfield,R3,warehouse,130,30.3,24,Marrow Passage,AM2 1FD,442463,1204234,2020-02-29,in_dispute,N,none
+PCL-WH-00248,WH,Wend Hill,R2,vacant,1507,10.4,157,Pellet Street,AM8 8HY,411905,1182125,2025-10-04,in_dispute,Y,none
+PCL-ND-00249,ND,North Dunmoor,C1,carpark,117,42.0,228,Ironmonger Yard,AM2 9HZ,429477,1210496,1996-09-02,leasehold_125,N,none
+PCL-PG-00250,PG,Pelling Green,SP,place_of_worship,2218,31.0,118B,Mallow Road,AM9 8TK,415530,1195340,2019-06-17,leasehold_125,N,none
+PCL-CB-00251,CB,Corrisbeck,HC,dwelling_multi,351,7.3,45,Mallow Row,AM9 2DQ,446390,1182712,2003-12-22,in_dispute,N,zone_3a
+PCL-IH-00252,IH,Isk Harbour,R2,school,34448,42.0,31,Gasworks Rise,AM6 9WF,440487,1185386,2016-10-09,freehold,N,none
+PCL-VH-00253,VH,Vantry Hollow,C2,dwelling,1292,11.4,11,Hollybank Rise,AM3 9BA,417279,1219216,2020-09-01,crown_lease,N,zone_3a
+PCL-MB-00254,MB,Mirebrook,I1,dwelling_multi,36642,17.4,170,Bellrope Passage,AM6 8GZ,431022,1193338,2005-06-25,leasehold_125,N,none
+PCL-AR-00255,AR,Ashcombe Reach,OS,dwelling_multi,17247,10.6,189,Paternoster Yard,AM7 9GH,428909,1184148,2008-12-09,crown_lease,N,none
+PCL-KF-00256,KF,Kelder Flats,C2,dwelling,13273,4.2,188,Windlass Road,AM8 9BJ,436005,1206656,2007-08-17,crown_lease,N,zone_2
+PCL-OH-00257,OH,Old Harrowgate,I2,warehouse,19414,20.4,75,Dovecote Close,AM7 3QT,435168,1205944,2008-08-09,crown_lease,N,zone_1
+PCL-SQ-00258,SQ,Sable Quay,R3,warehouse,276,43.6,154,Netherfield Passage,AM4 6RZ,447733,1205234,1999-01-28,crown_lease,N,zone_1
+PCL-TF-00259,TF,Tarnfield,HC,allotment,156,11.3,74,Paternoster Street,AM4 8EZ,424372,1181144,2019-08-11,in_dispute,N,none
+PCL-WH-00260,WH,Wend Hill,R1,retail,249,30.8,83,Bellrope Street,AM4 6XK,448367,1185385,2012-10-02,unregistered,N,none
+PCL-ND-00261,ND,North Dunmoor,I1,dwelling,383,29.3,81,Saltmarsh Road,AM5 9DB,433618,1210257,2014-07-07,in_dispute,N,none
+PCL-PG-00262,PG,Pelling Green,MU,workshop,141,18.4,142,Ironmonger Rise,AM2 9ER,434477,1216652,2014-03-18,crown_lease,N,zone_2
+PCL-CB-00263,CB,Corrisbeck,R1,dwelling,1901,11.3,189,Mallow Street,AM1 2AX,411478,1219868,1996-12-21,freehold,Y,none
+PCL-IH-00264,IH,Isk Harbour,MU,dwelling,22479,47.0,51,Bellrope Terrace,AM7 3XR,434731,1215610,2010-07-01,freehold,N,zone_2
+PCL-VH-00265,VH,Vantry Hollow,I2,dwelling,3642,33.3,137,Gasworks Passage,AM6 6LX,416287,1196983,2007-11-09,in_dispute,N,zone_2
+PCL-MB-00266,MB,Mirebrook,R2,dwelling,1613,39.5,103,Bellrope Terrace,AM4 6XD,435539,1200089,2017-08-18,crown_lease,N,none
+PCL-AR-00267,AR,Ashcombe Reach,R1,allotment,13894,5.6,62,Ostler Way,AM7 4EJ,429425,1204906,2017-04-20,leasehold_99,N,none
+PCL-KF-00268,KF,Kelder Flats,R3,dwelling_multi,1889,36.9,65,Vintners Crescent,AM8 1RZ,415681,1181336,2025-10-03,unregistered,N,none
+PCL-OH-00269,OH,Old Harrowgate,R2,office,90,9.0,116,Threadneedle Rise,AM5 8TQ,447235,1200192,2009-12-25,unregistered,N,zone_1
+PCL-SQ-00270,SQ,Sable Quay,R1,vacant,2147,32.7,168,Netherfield Terrace,AM9 2QK,448877,1200253,2012-03-09,unregistered,N,zone_1
+PCL-TF-00271,TF,Tarnfield,MU,workshop,1438,33.3,10,Tannery Rise,AM4 9RQ,425364,1203767,2000-11-14,leasehold_125,N,none
+PCL-WH-00272,WH,Wend Hill,OS,carpark,2097,26.1,64,Ferryman Street,AM2 1WX,433772,1190427,2007-11-15,unregistered,N,zone_1
+PCL-ND-00273,ND,North Dunmoor,I1,carpark,1360,43.7,1,Threadneedle Crescent,AM8 8LQ,442195,1181892,2024-09-14,leasehold_99,N,none
+PCL-PG-00274,PG,Pelling Green,R1,retail,37204,17.2,86,Ostler Crescent,AM8 3VY,431506,1206116,2015-06-24,in_dispute,N,none
+PCL-CB-00275,CB,Corrisbeck,HC,workshop,1841,12.8,29,Cattle Passage,AM2 3QR,431363,1201912,1999-08-19,in_dispute,N,none
+PCL-IH-00276,IH,Isk Harbour,C2,dwelling_multi,161,13.3,10,Lamplight Road,AM6 6JY,429297,1218796,2002-07-14,unregistered,N,none
+PCL-VH-00277,VH,Vantry Hollow,AG,workshop,17336,43.0,177,Dovecote Road,AM2 2TK,434873,1217195,2015-10-05,leasehold_125,N,none
+PCL-MB-00278,MB,Mirebrook,R1,place_of_worship,1714,19.1,54,Netherfield Row,AM6 9XR,419313,1181260,2004-07-07,unregistered,N,none
+PCL-AR-00279,AR,Ashcombe Reach,SP,dwelling,36120,34.5,5,Dovecote Passage,AM8 8QA,447600,1196897,1998-01-25,leasehold_125,N,none
+PCL-KF-00280,KF,Kelder Flats,SP,warehouse,28410,47.8,146,Saltmarsh Terrace,AM2 4KD,420661,1190589,2008-07-01,leasehold_125,N,none
+PCL-OH-00281,OH,Old Harrowgate,R2,workshop,167,10.5,91,Threadneedle Close,AM1 3VZ,447216,1205517,1996-04-21,crown_lease,N,zone_1
+PCL-SQ-00282,SQ,Sable Quay,R3,warehouse,35831,42.0,136,Pellet Road,AM6 2BX,449177,1212066,2012-12-08,leasehold_99,N,zone_2
+PCL-TF-00283,TF,Tarnfield,I2,workshop,741,25.6,51C,Mallow Lane,AM3 3FB,441508,1198518,2024-01-04,freehold,N,none
+PCL-WH-00284,WH,Wend Hill,C2,vacant,6961,28.8,131C,Ironmonger Close,AM5 5GJ,444306,1209922,2019-06-17,leasehold_125,Y,zone_2
+PCL-ND-00285,ND,North Dunmoor,I1,office,62,34.6,174,Saltmarsh Crescent,AM3 8KD,444736,1186826,2011-06-09,leasehold_99,N,none
+PCL-PG-00286,PG,Pelling Green,OS,civic,1023,9.5,160,Hollybank Road,AM3 6ZV,439395,1214763,2008-10-31,in_dispute,N,zone_2
+PCL-CB-00287,CB,Corrisbeck,I2,dwelling,1209,39.0,141,Paternoster Rise,AM1 8SV,448027,1213953,2021-10-07,unregistered,N,zone_1
+PCL-IH-00288,IH,Isk Harbour,R3,vacant,19598,5.4,149,Paternoster Close,AM1 4GD,419361,1187425,1998-06-15,unregistered,N,none
+PCL-VH-00289,VH,Vantry Hollow,HC,dwelling,318,15.5,230,Hollybank Road,AM4 9ER,446111,1191442,2008-09-03,unregistered,N,none
+PCL-MB-00290,MB,Mirebrook,R1,allotment,564,15.2,83,Threadneedle Street,AM1 4WT,414882,1212138,1997-10-22,leasehold_99,N,none
+PCL-AR-00291,AR,Ashcombe Reach,R2,workshop,196,17.4,68,Paternoster Street,AM4 5TG,438395,1210765,2009-07-15,leasehold_99,Y,none
+PCL-KF-00292,KF,Kelder Flats,AG,vacant,290,38.0,85,Weirside Crescent,AM3 4YL,439468,1180787,1996-11-16,freehold,N,none
+PCL-OH-00293,OH,Old Harrowgate,AG,vacant,15941,39.1,46,Ropewalk Walk,AM6 4ZJ,423037,1187205,2025-03-30,in_dispute,N,zone_1
+PCL-SQ-00294,SQ,Sable Quay,AG,dwelling,28851,20.7,88,Cattle Walk,AM6 8KR,422828,1200855,2020-10-28,leasehold_99,N,none
+PCL-TF-00295,TF,Tarnfield,MU,place_of_worship,35817,34.5,21,Sedge Passage,AM2 2NP,422062,1201826,2007-01-19,in_dispute,N,none
+PCL-WH-00296,WH,Wend Hill,C1,allotment,1364,40.5,189,Ropewalk Passage,AM1 7QD,411155,1191033,2013-04-28,crown_lease,N,zone_3a
+PCL-ND-00297,ND,North Dunmoor,I2,retail,270,44.3,41,Sedge Crescent,AM3 3PX,447540,1187025,2003-11-17,unregistered,N,none
+PCL-PG-00298,PG,Pelling Green,R1,allotment,2064,6.2,80,Cattle Lane,AM9 2VB,415215,1192368,2001-04-07,in_dispute,N,none
+PCL-CB-00299,CB,Corrisbeck,R2,place_of_worship,116,28.6,159,Windlass Walk,AM6 4HV,411303,1218972,2010-11-16,leasehold_99,N,zone_2
+PCL-IH-00300,IH,Isk Harbour,C1,warehouse,21893,4.7,16A,Paternoster Way,AM9 4ER,414157,1187036,2003-07-22,freehold,N,zone_3a
+PCL-VH-00301,VH,Vantry Hollow,R1,civic,530,38.7,175,Hollybank Way,AM8 1NT,416028,1219639,2015-12-11,leasehold_125,N,zone_3b
+PCL-MB-00302,MB,Mirebrook,SP,office,11280,31.6,91,Quarry Row,AM8 9EV,429035,1196937,1999-12-12,leasehold_125,N,none
+PCL-AR-00303,AR,Ashcombe Reach,R2,office,205,23.7,77,Hollybank Passage,AM1 1QN,410619,1188814,2007-08-15,leasehold_125,N,none
+PCL-KF-00304,KF,Kelder Flats,OS,carpark,1285,46.5,199,Sedge Lane,AM7 8NJ,433329,1205644,2004-02-24,leasehold_125,N,none
+PCL-OH-00305,OH,Old Harrowgate,OS,place_of_worship,20329,40.4,206,Ironmonger Close,AM9 4DQ,441523,1192039,2002-03-07,unregistered,N,zone_1
+PCL-SQ-00306,SQ,Sable Quay,OS,vacant,22557,24.0,125,Windlass Street,AM7 1TT,422489,1200453,2002-03-30,freehold,N,none
+PCL-TF-00307,TF,Tarnfield,MU,civic,156,5.4,70C,Bellrope Row,AM1 3XP,425993,1207690,2007-07-01,crown_lease,N,zone_2
+PCL-WH-00308,WH,Wend Hill,R3,place_of_worship,270,34.1,126,Mallow Lane,AM1 1FA,426828,1184082,2016-11-27,crown_lease,N,none
+PCL-ND-00309,ND,North Dunmoor,AG,school,1011,42.7,95,Dovecote Yard,AM5 2YG,449581,1207390,2002-11-04,freehold,N,none
+PCL-PG-00310,PG,Pelling Green,OS,carpark,95,9.5,216C,Quarry Terrace,AM3 7GF,422553,1200700,2014-11-23,leasehold_125,N,zone_2
+PCL-CB-00311,CB,Corrisbeck,R2,retail,1446,28.0,50,Coldharbour Road,AM4 4AG,446033,1188990,2007-09-18,freehold,N,none
+PCL-IH-00312,IH,Isk Harbour,SP,warehouse,1966,25.3,128,Vintners Road,AM4 5VY,424792,1196226,2022-10-01,leasehold_99,N,none
+PCL-VH-00313,VH,Vantry Hollow,I1,school,136,14.5,217,Kilnyard Close,AM9 2TG,431662,1194956,2014-11-15,leasehold_99,N,zone_3b
+PCL-MB-00314,MB,Mirebrook,C2,place_of_worship,19489,19.0,221,Ostler Close,AM4 3ZH,422664,1186428,2017-12-19,freehold,N,zone_3b
+PCL-AR-00315,AR,Ashcombe Reach,AG,dwelling,78,38.9,24,Ironmonger Crescent,AM2 4LA,414396,1195951,2022-01-07,leasehold_99,N,none
+PCL-KF-00316,KF,Kelder Flats,R2,retail,21699,14.8,67B,Threadneedle Lane,AM3 6WD,420044,1218113,2010-11-30,leasehold_125,N,none
+PCL-OH-00317,OH,Old Harrowgate,MU,allotment,19147,39.4,14,Ropewalk Lane,AM1 4BJ,425810,1200095,2015-10-07,unregistered,N,zone_2
+PCL-SQ-00318,SQ,Sable Quay,SP,office,37279,19.2,141,Ironmonger Street,AM6 2YS,433321,1187459,2001-01-12,leasehold_125,N,none
+PCL-TF-00319,TF,Tarnfield,C2,retail,329,24.2,127,Coldharbour Yard,AM2 8XB,436471,1209760,2011-08-05,in_dispute,N,none
+PCL-WH-00320,WH,Wend Hill,C2,civic,2146,40.1,36,Ironmonger Passage,AM1 2SV,443427,1186681,2020-09-29,leasehold_99,N,none
+PCL-ND-00321,ND,North Dunmoor,HC,place_of_worship,461,35.8,112,Marrow Crescent,AM4 2KS,411784,1209565,2007-06-20,leasehold_125,N,zone_3b
+PCL-PG-00322,PG,Pelling Green,MU,civic,22545,27.4,129,Dovecote Way,AM1 8SR,449170,1190688,2021-08-22,leasehold_125,N,zone_3b
+PCL-CB-00323,CB,Corrisbeck,I1,place_of_worship,183,15.6,77,Netherfield Lane,AM9 7GG,426936,1201100,2007-07-28,leasehold_99,N,none
+PCL-IH-00324,IH,Isk Harbour,MU,dwelling_multi,22848,43.0,32,Hollybank Road,AM9 9WD,418252,1219761,2017-07-21,crown_lease,N,none
+PCL-VH-00325,VH,Vantry Hollow,HC,school,12075,12.3,232,Gasworks Walk,AM9 3WR,411485,1185493,2019-10-19,crown_lease,N,none
+PCL-MB-00326,MB,Mirebrook,R1,civic,28155,6.2,32,Marrow Way,AM5 7GL,432562,1184607,2001-09-08,leasehold_125,N,none
+PCL-AR-00327,AR,Ashcombe Reach,MU,retail,1582,7.8,84,Weirside Close,AM7 8FD,436883,1206206,1999-08-10,freehold,N,none
+PCL-KF-00328,KF,Kelder Flats,R2,dwelling,1571,32.9,149,Mallow Row,AM3 1BR,415190,1210755,2021-07-06,unregistered,N,none
+PCL-OH-00329,OH,Old Harrowgate,MU,school,181,42.1,172,Paternoster Yard,AM7 5FH,436742,1203313,2013-12-15,leasehold_125,N,zone_2
+PCL-SQ-00330,SQ,Sable Quay,C2,dwelling,208,6.1,2,Saltmarsh Crescent,AM9 7XP,414687,1188628,2021-10-13,leasehold_125,N,zone_1
+PCL-TF-00331,TF,Tarnfield,MU,allotment,638,33.5,65C,Bellrope Way,AM9 8LZ,424091,1198430,2009-02-08,leasehold_99,N,none
+PCL-WH-00332,WH,Wend Hill,I2,warehouse,32876,39.0,50,Dovecote Lane,AM9 9DA,429012,1187876,2009-05-12,leasehold_125,N,zone_2
+PCL-ND-00333,ND,North Dunmoor,C2,workshop,863,31.3,165,Ferryman Street,AM1 4LV,417768,1193665,2020-07-17,crown_lease,N,none
+PCL-PG-00334,PG,Pelling Green,R2,dwelling,266,45.3,60,Ropewalk Crescent,AM3 4EW,413512,1219769,2004-09-27,leasehold_125,N,zone_1
+PCL-CB-00335,CB,Corrisbeck,R2,vacant,35136,32.6,76C,Pellet Road,AM4 3YV,415956,1185901,1997-12-06,crown_lease,N,zone_1
+PCL-IH-00336,IH,Isk Harbour,AG,allotment,2107,25.8,97,Dovecote Row,AM6 4ZT,446793,1187628,2006-10-21,in_dispute,N,none
+PCL-VH-00337,VH,Vantry Hollow,R2,workshop,76,36.3,57,Ropewalk Terrace,AM6 7AQ,428974,1217584,2012-05-01,freehold,N,zone_2
+PCL-MB-00338,MB,Mirebrook,AG,allotment,39223,5.6,182,Ropewalk Crescent,AM8 2NA,419264,1197335,2009-08-28,in_dispute,N,zone_1
+PCL-AR-00339,AR,Ashcombe Reach,R3,school,156,10.5,102,Coldharbour Walk,AM3 3DY,418111,1195363,2025-06-17,crown_lease,N,zone_1
+PCL-KF-00340,KF,Kelder Flats,MU,place_of_worship,15350,20.3,175,Saltmarsh Passage,AM5 9KQ,441602,1214173,2012-04-17,freehold,N,none
+PCL-OH-00341,OH,Old Harrowgate,R2,workshop,22230,5.6,86,Coldharbour Way,AM7 3ZZ,410470,1189597,2019-08-15,freehold,N,none
+PCL-SQ-00342,SQ,Sable Quay,HC,dwelling_multi,20419,45.1,235,Tannery Crescent,AM7 8WF,410147,1219517,2013-09-27,leasehold_99,N,zone_1
+PCL-TF-00343,TF,Tarnfield,I1,place_of_worship,3205,24.6,75,Gasworks Lane,AM2 9HK,417908,1203686,2013-12-30,in_dispute,N,none
+PCL-WH-00344,WH,Wend Hill,SP,school,11130,12.4,207,Lamplight Close,AM5 5RN,420869,1187004,2025-04-24,crown_lease,N,none
+PCL-ND-00345,ND,North Dunmoor,AG,retail,217,42.3,62A,Ironmonger Rise,AM9 7GX,438954,1199984,2000-12-31,leasehold_99,N,none
+PCL-PG-00346,PG,Pelling Green,SP,dwelling,807,16.9,21,Ropewalk Street,AM9 5WA,416977,1185407,2020-10-15,leasehold_99,N,none
+PCL-CB-00347,CB,Corrisbeck,C1,warehouse,5073,32.6,14C,Pellet Way,AM4 6AP,445155,1200288,2019-11-19,freehold,N,zone_3a
+PCL-IH-00348,IH,Isk Harbour,R3,warehouse,1177,39.7,93,Quarry Rise,AM7 6QA,446088,1217013,2021-01-21,crown_lease,N,none
+PCL-VH-00349,VH,Vantry Hollow,R1,civic,303,39.8,43,Weirside Lane,AM7 9VT,412126,1186369,2002-05-11,freehold,N,none
+PCL-MB-00350,MB,Mirebrook,R3,civic,14285,45.6,225,Hollybank Road,AM2 2FK,429449,1203868,2020-03-26,leasehold_99,N,none
+PCL-AR-00351,AR,Ashcombe Reach,HC,office,248,42.9,183,Mallow Rise,AM9 6XW,448002,1188805,2025-08-31,crown_lease,N,zone_3a
+PCL-KF-00352,KF,Kelder Flats,C2,retail,11202,30.4,188,Dovecote Way,AM4 9TH,436022,1196922,2007-06-06,freehold,N,none
+PCL-OH-00353,OH,Old Harrowgate,C2,dwelling_multi,31828,4.3,18,Netherfield Terrace,AM1 6EA,448500,1190751,2001-03-04,unregistered,N,zone_1
+PCL-SQ-00354,SQ,Sable Quay,SP,dwelling,179,17.9,47C,Paternoster Terrace,AM1 1TQ,411579,1192192,2005-10-24,unregistered,N,zone_1
+PCL-TF-00355,TF,Tarnfield,MU,vacant,91,38.9,28,Coldharbour Row,AM5 9ZA,440192,1193901,1996-05-07,leasehold_125,N,none
+PCL-WH-00356,WH,Wend Hill,I1,dwelling,387,37.9,115,Windlass Passage,AM5 3DN,410176,1208265,2004-01-27,leasehold_99,N,zone_1
+PCL-ND-00357,ND,North Dunmoor,R1,workshop,170,16.5,118,Windlass Lane,AM9 2EN,430548,1193761,2002-06-16,in_dispute,N,zone_3a
+PCL-PG-00358,PG,Pelling Green,AG,workshop,219,22.5,232,Ropewalk Road,AM2 5QP,412381,1218391,2003-02-16,unregistered,N,zone_3a
+PCL-CB-00359,CB,Corrisbeck,I2,workshop,400,43.7,179,Ironmonger Crescent,AM8 3BP,425358,1195216,2000-05-27,freehold,N,none
+PCL-IH-00360,IH,Isk Harbour,HC,carpark,540,23.7,161,Ropewalk Lane,AM1 7QG,434574,1195124,2015-07-06,leasehold_125,N,none
+PCL-VH-00361,VH,Vantry Hollow,AG,place_of_worship,2127,16.1,89,Cattle Street,AM4 8LY,443416,1191262,2006-01-04,leasehold_99,N,zone_3b
+PCL-MB-00362,MB,Mirebrook,R1,place_of_worship,772,14.1,226,Ferryman Way,AM6 6FA,430985,1208702,2017-06-05,leasehold_125,N,zone_2
+PCL-AR-00363,AR,Ashcombe Reach,MU,allotment,4533,4.9,180,Coldharbour Walk,AM3 9JB,446615,1186440,2009-12-21,crown_lease,N,none
+PCL-KF-00364,KF,Kelder Flats,R1,workshop,258,38.3,176,Ironmonger Passage,AM8 9ZR,431422,1201365,2010-10-17,leasehold_99,N,zone_2
+PCL-OH-00365,OH,Old Harrowgate,HC,dwelling,25548,45.3,118,Hollybank Rise,AM8 3NR,419026,1200646,2025-12-23,freehold,N,none
+PCL-SQ-00366,SQ,Sable Quay,C2,retail,323,37.3,28,Mallow Lane,AM3 3VZ,437347,1184094,1996-10-15,freehold,N,zone_3a
+PCL-TF-00367,TF,Tarnfield,R2,school,9027,12.2,169,Paternoster Row,AM7 1RH,414416,1208902,1997-02-09,crown_lease,N,none
+PCL-WH-00368,WH,Wend Hill,I2,carpark,202,33.8,79,Coldharbour Lane,AM4 5PJ,423994,1200049,2019-10-05,leasehold_125,N,none
+PCL-ND-00369,ND,North Dunmoor,R3,dwelling_multi,100,7.0,193,Windlass Street,AM7 7DD,448355,1213532,2005-06-28,freehold,N,none
+PCL-PG-00370,PG,Pelling Green,C1,retail,186,43.4,82,Ferryman Row,AM6 9GP,443409,1218227,1996-01-12,unregistered,N,zone_3b
+PCL-CB-00371,CB,Corrisbeck,I2,warehouse,105,46.9,35,Ostler Close,AM2 2TT,442397,1219703,2011-09-02,leasehold_125,N,none
+PCL-IH-00372,IH,Isk Harbour,C2,allotment,2118,27.4,165,Weirside Row,AM6 9DD,427444,1181658,1998-06-29,unregistered,N,none
+PCL-VH-00373,VH,Vantry Hollow,C1,warehouse,78,27.5,5,Sedge Yard,AM2 2WA,415592,1191452,2006-03-31,crown_lease,N,none
+PCL-MB-00374,MB,Mirebrook,R3,office,28530,47.3,232,Lamplight Crescent,AM6 3EV,420078,1216645,2006-12-28,leasehold_99,N,zone_2
+PCL-AR-00375,AR,Ashcombe Reach,R2,carpark,2213,6.8,81,Netherfield Way,AM5 2WY,411432,1206980,2014-01-28,leasehold_125,N,none
+PCL-KF-00376,KF,Kelder Flats,SP,workshop,1134,28.5,167,Threadneedle Yard,AM9 6HW,411970,1201136,2021-01-14,in_dispute,N,zone_1
+PCL-OH-00377,OH,Old Harrowgate,I2,dwelling,2072,22.9,66,Marrow Row,AM5 7QA,439654,1190182,2018-11-08,in_dispute,N,none
+PCL-SQ-00378,SQ,Sable Quay,R3,dwelling_multi,14681,44.6,20,Saltmarsh Road,AM5 7DA,420241,1188216,2020-12-26,unregistered,N,none
+PCL-TF-00379,TF,Tarnfield,C2,workshop,1804,35.0,160,Dovecote Yard,AM7 7GH,419888,1180277,2014-02-08,freehold,N,zone_1
+PCL-WH-00380,WH,Wend Hill,C1,vacant,34304,39.3,101,Cattle Crescent,AM4 3KJ,416060,1181859,2011-01-05,crown_lease,N,none
+PCL-ND-00381,ND,North Dunmoor,C2,warehouse,288,15.7,46,Saltmarsh Way,AM1 2TR,438057,1189603,1999-03-28,crown_lease,Y,none
+PCL-PG-00382,PG,Pelling Green,R2,dwelling_multi,10844,48.0,185,Weirside Passage,AM3 4RW,446894,1215633,2014-06-25,freehold,N,none
+PCL-CB-00383,CB,Corrisbeck,C2,warehouse,34691,36.7,131,Hollybank Road,AM3 6AZ,411043,1219307,1998-12-10,leasehold_125,N,none
+PCL-IH-00384,IH,Isk Harbour,AG,allotment,25307,41.6,75,Mallow Way,AM8 3HF,427992,1219364,2025-03-08,freehold,N,none
+PCL-VH-00385,VH,Vantry Hollow,C1,dwelling,2319,46.2,7,Paternoster Crescent,AM1 7NX,421880,1218550,1998-10-16,leasehold_99,N,zone_1
+PCL-MB-00386,MB,Mirebrook,R1,office,217,7.7,99,Weirside Row,AM4 6RP,424010,1197989,2019-03-09,leasehold_125,N,none
+PCL-AR-00387,AR,Ashcombe Reach,SP,school,12045,14.3,16,Kilnyard Walk,AM8 9XP,416758,1184582,2000-02-08,freehold,Y,zone_2
+PCL-KF-00388,KF,Kelder Flats,HC,dwelling,190,17.6,78,Ironmonger Yard,AM8 3TD,424398,1185836,2004-01-05,freehold,N,zone_2
+PCL-OH-00389,OH,Old Harrowgate,R2,office,382,32.6,47,Ropewalk Rise,AM5 4PH,421281,1184011,2011-06-21,unregistered,N,none
+PCL-SQ-00390,SQ,Sable Quay,HC,office,94,33.5,163,Vintners Walk,AM3 4EG,435633,1211937,2026-05-18,freehold,N,none
+PCL-TF-00391,TF,Tarnfield,AG,office,229,47.7,239,Paternoster Lane,AM8 3YS,413594,1218534,2011-03-19,leasehold_125,N,none
+PCL-WH-00392,WH,Wend Hill,R1,warehouse,111,13.2,154,Threadneedle Close,AM9 1WK,427818,1201260,1998-12-14,in_dispute,Y,none
+PCL-ND-00393,ND,North Dunmoor,I1,warehouse,74,44.0,145,Dovecote Way,AM4 3WQ,415015,1204457,2009-12-10,freehold,Y,zone_1
+PCL-PG-00394,PG,Pelling Green,MU,carpark,23946,32.6,98,Pellet Road,AM1 8XP,412231,1217867,2007-06-04,unregistered,N,zone_2
+PCL-CB-00395,CB,Corrisbeck,R3,warehouse,3161,43.5,131,Hollybank Crescent,AM4 3WZ,431642,1194356,1998-10-14,freehold,N,none
+PCL-IH-00396,IH,Isk Harbour,AG,civic,292,19.6,97,Dovecote Terrace,AM1 9KX,443217,1202456,2003-09-07,unregistered,N,none
+PCL-VH-00397,VH,Vantry Hollow,SP,allotment,37634,26.2,143,Hollybank Yard,AM9 4HY,435058,1186485,2022-04-15,freehold,N,none
+PCL-MB-00398,MB,Mirebrook,AG,workshop,2812,13.0,79,Ropewalk Walk,AM2 9WS,438184,1195148,2002-08-28,leasehold_125,N,zone_2
+PCL-AR-00399,AR,Ashcombe Reach,OS,dwelling,18545,39.7,209,Marrow Terrace,AM9 3VZ,426275,1189983,2025-03-28,crown_lease,N,zone_1
+PCL-KF-00400,KF,Kelder Flats,R1,dwelling_multi,364,16.2,69,Sedge Way,AM3 3RP,448634,1206001,2024-01-28,in_dispute,N,none
+PCL-OH-00401,OH,Old Harrowgate,R1,allotment,119,14.8,135,Weirside Lane,AM8 4JG,447168,1204116,2010-10-18,leasehold_99,N,zone_3b
+PCL-SQ-00402,SQ,Sable Quay,R2,retail,175,40.2,17,Netherfield Way,AM3 1SW,443185,1188266,2000-09-03,leasehold_125,N,zone_1
+PCL-TF-00403,TF,Tarnfield,R2,dwelling_multi,3656,29.5,48,Ironmonger Passage,AM6 4DW,434296,1194427,2012-03-13,leasehold_99,N,none
+PCL-WH-00404,WH,Wend Hill,C2,office,367,19.0,140,Netherfield Walk,AM3 4NS,445279,1196311,2004-02-20,unregistered,N,none
+PCL-ND-00405,ND,North Dunmoor,AG,retail,1026,24.3,20,Pellet Terrace,AM5 6LE,427140,1183984,2025-04-10,freehold,N,none
+PCL-PG-00406,PG,Pelling Green,C1,warehouse,294,15.9,149,Ferryman Terrace,AM1 6FP,413121,1197317,2011-12-15,leasehold_99,N,none
+PCL-CB-00407,CB,Corrisbeck,I2,workshop,30049,22.1,206,Mallow Way,AM4 4TF,446546,1202372,2016-01-14,leasehold_125,N,none
+PCL-IH-00408,IH,Isk Harbour,C2,allotment,209,34.7,30,Threadneedle Rise,AM4 6DH,414006,1212876,2023-03-29,crown_lease,N,zone_3a
+PCL-VH-00409,VH,Vantry Hollow,AG,vacant,1188,27.0,8C,Weirside Street,AM8 3GH,418551,1219845,2001-09-12,crown_lease,N,none
+PCL-MB-00410,MB,Mirebrook,C1,civic,1770,31.7,222,Gasworks Road,AM7 4FK,426764,1187658,2016-10-26,unregistered,N,none
+PCL-AR-00411,AR,Ashcombe Reach,R2,carpark,209,16.7,94,Kilnyard Terrace,AM3 8LL,440192,1205493,2025-11-30,leasehold_99,N,none
+PCL-KF-00412,KF,Kelder Flats,I1,place_of_worship,696,46.5,63,Ostler Road,AM5 3XQ,436150,1215722,2004-07-13,leasehold_125,N,zone_1
+PCL-OH-00413,OH,Old Harrowgate,OS,workshop,282,5.0,158,Quarry Walk,AM5 6WG,428638,1196303,1997-01-18,in_dispute,N,none
+PCL-SQ-00414,SQ,Sable Quay,OS,retail,200,40.8,115,Kilnyard Terrace,AM2 2TX,445650,1206130,2015-02-06,leasehold_125,N,none
+PCL-TF-00415,TF,Tarnfield,AG,carpark,28820,8.1,29,Pellet Lane,AM7 1PB,441408,1182300,2025-04-10,leasehold_125,N,none
+PCL-WH-00416,WH,Wend Hill,C1,warehouse,6845,12.9,92,Sedge Road,AM8 7EH,418703,1215044,2019-07-28,leasehold_125,Y,none
+PCL-ND-00417,ND,North Dunmoor,SP,vacant,312,17.7,149,Coldharbour Row,AM8 8FN,414944,1187153,2011-04-18,leasehold_99,N,none
+PCL-PG-00418,PG,Pelling Green,I1,vacant,264,43.2,152,Cattle Passage,AM5 7ZT,424184,1189201,2015-03-26,crown_lease,N,zone_2
+PCL-CB-00419,CB,Corrisbeck,AG,dwelling,5390,22.0,27,Lamplight Street,AM6 2FW,411092,1182784,2002-11-21,in_dispute,N,none
+PCL-IH-00420,IH,Isk Harbour,C1,dwelling,807,8.1,135,Hollybank Row,AM9 5PF,441864,1209504,2018-01-18,leasehold_99,N,none
+PCL-VH-00421,VH,Vantry Hollow,I2,dwelling_multi,29775,40.4,28,Ostler Lane,AM4 9LH,427133,1180100,2001-07-03,unregistered,N,zone_3b
+PCL-MB-00422,MB,Mirebrook,C2,place_of_worship,167,37.6,180,Quarry Street,AM5 6SF,424160,1219085,1996-10-11,unregistered,N,zone_3a
+PCL-AR-00423,AR,Ashcombe Reach,SP,warehouse,419,35.6,211,Tannery Yard,AM9 3FK,432509,1214244,2008-05-28,freehold,N,zone_3b
+PCL-KF-00424,KF,Kelder Flats,R2,retail,2298,20.6,229C,Sedge Walk,AM5 8YF,411725,1183709,2007-05-22,unregistered,N,none
+PCL-OH-00425,OH,Old Harrowgate,OS,carpark,758,38.9,6C,Hollybank Crescent,AM4 2KB,415767,1194584,2022-04-18,leasehold_99,Y,zone_1
+PCL-SQ-00426,SQ,Sable Quay,I1,civic,31135,7.1,41,Dovecote Yard,AM6 7VA,414062,1183408,2000-11-29,crown_lease,N,zone_3a
+PCL-TF-00427,TF,Tarnfield,MU,civic,31799,17.2,137,Sedge Crescent,AM6 2LD,430975,1214059,2007-08-16,freehold,N,zone_2
+PCL-WH-00428,WH,Wend Hill,I1,dwelling_multi,25530,23.0,97,Dovecote Terrace,AM8 1TB,424454,1215752,2018-07-05,freehold,N,zone_2
+PCL-ND-00429,ND,North Dunmoor,HC,office,251,42.9,185,Netherfield Yard,AM1 2YA,412018,1191799,2025-02-06,leasehold_99,N,zone_2
+PCL-PG-00430,PG,Pelling Green,MU,dwelling_multi,116,38.8,71,Marrow Terrace,AM3 5DL,411043,1197280,2007-09-26,freehold,Y,none
+PCL-CB-00431,CB,Corrisbeck,AG,school,22677,28.9,27,Pellet Way,AM9 3NE,432338,1216195,2014-03-18,leasehold_99,N,none
+PCL-IH-00432,IH,Isk Harbour,R3,office,31902,32.6,62,Marrow Lane,AM2 4TD,418010,1191445,2009-05-06,leasehold_125,N,zone_1
+PCL-VH-00433,VH,Vantry Hollow,R1,school,33079,29.6,30,Threadneedle Yard,AM3 6NP,416487,1196890,2005-08-09,freehold,N,none
+PCL-MB-00434,MB,Mirebrook,AG,dwelling_multi,2329,46.3,114,Paternoster Crescent,AM7 7NT,413328,1188116,2019-03-25,in_dispute,Y,none
+PCL-AR-00435,AR,Ashcombe Reach,R2,school,389,46.2,50A,Gasworks Walk,AM7 3TB,445792,1189785,2006-03-28,leasehold_125,N,zone_1
+PCL-KF-00436,KF,Kelder Flats,I2,civic,6388,10.9,169,Tannery Row,AM2 4FT,444740,1189613,2022-06-02,freehold,N,none
+PCL-OH-00437,OH,Old Harrowgate,I2,carpark,8475,28.8,78,Quarry Yard,AM4 5KS,410873,1205707,2017-06-19,freehold,N,zone_1
+PCL-SQ-00438,SQ,Sable Quay,SP,dwelling,9082,19.0,23,Quarry Road,AM8 7PB,433358,1186575,2017-10-14,unregistered,N,zone_1
+PCL-TF-00439,TF,Tarnfield,AG,workshop,32581,27.4,133,Netherfield Rise,AM8 4DS,419699,1194961,1997-08-16,leasehold_125,N,none
+PCL-WH-00440,WH,Wend Hill,R3,dwelling_multi,9805,34.2,215,Lamplight Yard,AM5 2FS,426043,1213256,2006-09-23,leasehold_99,N,none
+PCL-ND-00441,ND,North Dunmoor,R3,civic,2243,26.2,226A,Gasworks Lane,AM8 2BF,411973,1208533,2011-05-26,freehold,N,none
+PCL-PG-00442,PG,Pelling Green,I1,warehouse,891,36.4,214,Ropewalk Lane,AM6 8HR,410116,1187526,2004-01-29,freehold,N,none
+PCL-CB-00443,CB,Corrisbeck,AG,place_of_worship,20698,16.0,118,Sedge Yard,AM5 1QV,418206,1188824,2011-11-21,leasehold_125,N,zone_3a
+PCL-IH-00444,IH,Isk Harbour,C1,allotment,201,20.0,88,Vintners Rise,AM8 8BL,440654,1191224,2020-06-02,crown_lease,N,zone_2
+PCL-VH-00445,VH,Vantry Hollow,OS,dwelling,23642,39.2,55,Ropewalk Street,AM3 6KT,413019,1206585,2000-09-19,in_dispute,N,none
+PCL-MB-00446,MB,Mirebrook,AG,carpark,251,31.0,61,Weirside Crescent,AM9 8AH,434420,1217223,2015-06-23,unregistered,N,none
+PCL-AR-00447,AR,Ashcombe Reach,HC,place_of_worship,4190,17.7,93,Marrow Way,AM8 7SF,444202,1181256,2017-10-01,leasehold_125,N,none
+PCL-KF-00448,KF,Kelder Flats,R2,place_of_worship,295,15.4,108,Mallow Way,AM6 6FD,441293,1207239,2006-06-23,in_dispute,Y,none
+PCL-OH-00449,OH,Old Harrowgate,HC,allotment,982,8.9,146,Gasworks Yard,AM8 3BJ,446913,1183108,2024-05-08,leasehold_125,Y,zone_1
+PCL-SQ-00450,SQ,Sable Quay,C1,place_of_worship,1240,5.3,42,Coldharbour Close,AM2 5VR,422425,1198097,2005-09-16,crown_lease,N,none
+PCL-TF-00451,TF,Tarnfield,AG,carpark,102,9.5,120,Kilnyard Close,AM3 6QT,425789,1185858,2021-11-09,freehold,N,none
+PCL-WH-00452,WH,Wend Hill,AG,allotment,27646,8.0,76,Weirside Close,AM6 5GA,441656,1219930,2010-08-05,unregistered,N,none
+PCL-ND-00453,ND,North Dunmoor,SP,vacant,348,45.8,143,Weirside Road,AM8 4KE,438488,1195569,2018-08-25,unregistered,N,zone_2
+PCL-PG-00454,PG,Pelling Green,R2,place_of_worship,1499,8.5,116,Threadneedle Row,AM1 2RK,410421,1203448,2010-11-03,unregistered,N,zone_3a
+PCL-CB-00455,CB,Corrisbeck,AG,allotment,865,25.8,52,Ferryman Row,AM4 3LW,434232,1188079,2020-11-22,unregistered,N,zone_3a
+PCL-IH-00456,IH,Isk Harbour,R2,dwelling,413,9.0,150,Vintners Crescent,AM4 2BK,444531,1213357,1999-06-30,crown_lease,N,none
+PCL-VH-00457,VH,Vantry Hollow,C1,vacant,1036,12.4,122,Pellet Walk,AM9 7GW,430749,1198380,2024-11-13,leasehold_99,N,none
+PCL-MB-00458,MB,Mirebrook,C1,warehouse,36413,12.6,80,Quarry Rise,AM7 9KK,447454,1196629,2023-12-10,freehold,N,none
+PCL-AR-00459,AR,Ashcombe Reach,SP,place_of_worship,260,24.4,67,Saltmarsh Yard,AM6 5QQ,417785,1197304,2001-01-21,leasehold_125,N,zone_2
+PCL-KF-00460,KF,Kelder Flats,C1,retail,367,13.6,72,Lamplight Crescent,AM6 9SV,435388,1185398,2006-07-10,in_dispute,N,none
+PCL-OH-00461,OH,Old Harrowgate,MU,retail,241,10.2,174,Lamplight Lane,AM1 1WW,442829,1186300,2002-11-13,freehold,N,zone_2
+PCL-SQ-00462,SQ,Sable Quay,HC,allotment,1543,16.0,232,Bellrope Road,AM4 2FE,435800,1215687,1996-10-01,freehold,N,none
+PCL-TF-00463,TF,Tarnfield,HC,civic,1268,45.3,148,Hollybank Walk,AM9 9AG,425304,1200847,2001-09-23,freehold,N,none
+PCL-WH-00464,WH,Wend Hill,AG,school,12046,32.0,69,Mallow Street,AM2 4TK,428939,1212707,1997-08-31,unregistered,N,zone_1
+PCL-ND-00465,ND,North Dunmoor,C2,dwelling,310,17.9,88,Dovecote Passage,AM5 3KZ,414141,1188089,2003-10-10,in_dispute,N,none
+PCL-PG-00466,PG,Pelling Green,MU,school,29727,21.1,186,Ironmonger Street,AM1 7VW,435489,1197524,1997-02-20,in_dispute,N,zone_1
+PCL-CB-00467,CB,Corrisbeck,HC,dwelling,31638,41.8,135,Kilnyard Road,AM4 4FY,438732,1181966,2023-04-01,crown_lease,N,none
+PCL-IH-00468,IH,Isk Harbour,C2,carpark,2303,5.8,94,Vintners Walk,AM1 5FY,412018,1191736,1997-02-15,freehold,N,zone_1
+PCL-VH-00469,VH,Vantry Hollow,MU,carpark,160,37.2,203,Gasworks Way,AM5 2NX,425679,1190886,2007-07-20,leasehold_99,N,zone_1
+PCL-MB-00470,MB,Mirebrook,R2,workshop,20377,36.8,225,Gasworks Passage,AM8 5JZ,430074,1195706,2013-05-14,in_dispute,N,none
+PCL-AR-00471,AR,Ashcombe Reach,HC,dwelling_multi,277,18.5,5,Cattle Rise,AM4 6JL,415167,1184077,2003-12-22,leasehold_125,N,none
+PCL-KF-00472,KF,Kelder Flats,I1,civic,159,26.1,169B,Weirside Street,AM7 3QR,429925,1195988,2025-07-13,in_dispute,Y,none
+PCL-OH-00473,OH,Old Harrowgate,OS,dwelling,37993,8.4,184A,Weirside Yard,AM6 1XB,412237,1181068,1999-09-18,unregistered,N,none
+PCL-SQ-00474,SQ,Sable Quay,OS,school,303,45.2,141,Quarry Terrace,AM3 8WP,430274,1202140,1999-07-01,freehold,N,none
+PCL-TF-00475,TF,Tarnfield,MU,dwelling,18058,11.8,83,Lamplight Row,AM5 8SP,414632,1217885,2007-05-14,freehold,Y,zone_2
+PCL-WH-00476,WH,Wend Hill,HC,vacant,17398,27.4,178,Hollybank Walk,AM5 7EX,440985,1199424,2018-09-07,in_dispute,N,none
+PCL-ND-00477,ND,North Dunmoor,C1,workshop,14105,23.0,165,Threadneedle Way,AM4 3FP,448455,1217221,2023-10-14,leasehold_125,N,none
+PCL-PG-00478,PG,Pelling Green,C2,workshop,2178,25.5,159,Coldharbour Passage,AM5 2YE,412894,1207154,2024-12-27,leasehold_125,N,none
+PCL-CB-00479,CB,Corrisbeck,I2,allotment,375,47.0,20,Windlass Road,AM6 1GQ,416538,1180056,2014-02-05,freehold,N,none
+PCL-IH-00480,IH,Isk Harbour,HC,vacant,411,7.4,226B,Gasworks Passage,AM3 2AA,417705,1193537,2008-10-28,freehold,N,zone_1
+PCL-VH-00481,VH,Vantry Hollow,SP,dwelling_multi,74,29.5,29,Weirside Lane,AM5 4ZL,425388,1181274,2026-01-24,leasehold_99,N,none
+PCL-MB-00482,MB,Mirebrook,R1,dwelling_multi,946,27.7,149,Kilnyard Road,AM9 2LN,430830,1191175,2003-04-11,freehold,N,zone_3a
+PCL-AR-00483,AR,Ashcombe Reach,C2,workshop,286,21.6,65,Kilnyard Lane,AM6 7SX,449029,1198017,2015-11-17,leasehold_125,N,zone_3a
+PCL-KF-00484,KF,Kelder Flats,R3,vacant,21679,36.5,17,Windlass Crescent,AM3 6JJ,440710,1210759,2017-09-17,leasehold_125,N,none
+PCL-OH-00485,OH,Old Harrowgate,I1,place_of_worship,111,39.6,81,Ironmonger Rise,AM6 9WY,425109,1212649,2003-05-01,freehold,N,zone_1
+PCL-SQ-00486,SQ,Sable Quay,SP,dwelling_multi,1093,5.7,166,Tannery Passage,AM3 3LR,427300,1208050,2007-12-14,crown_lease,N,none
+PCL-TF-00487,TF,Tarnfield,R2,civic,317,24.5,76,Ferryman Passage,AM1 4EE,426147,1182317,1998-09-08,freehold,N,none
+PCL-WH-00488,WH,Wend Hill,I1,school,2370,43.0,59,Ferryman Walk,AM9 2JP,421586,1206805,2011-10-17,crown_lease,N,zone_1
+PCL-ND-00489,ND,North Dunmoor,I1,workshop,202,42.9,116,Bellrope Lane,AM8 8JN,422076,1210350,2004-04-06,freehold,N,none
+PCL-PG-00490,PG,Pelling Green,R1,allotment,15193,8.9,184,Threadneedle Terrace,AM4 2NQ,434120,1189593,2007-12-02,leasehold_99,N,none
+PCL-CB-00491,CB,Corrisbeck,I2,workshop,29343,46.5,112,Mallow Street,AM2 3BD,413393,1188920,2007-06-30,unregistered,N,none
+PCL-IH-00492,IH,Isk Harbour,C2,dwelling,8022,4.5,158,Windlass Road,AM9 9KL,448257,1187217,2005-05-23,unregistered,N,zone_3a
+PCL-VH-00493,VH,Vantry Hollow,AG,retail,31971,40.1,211,Marrow Yard,AM1 8GJ,418169,1194564,2010-11-25,freehold,N,none
+PCL-MB-00494,MB,Mirebrook,C2,dwelling_multi,1025,28.7,209C,Pellet Terrace,AM8 6VP,430635,1217738,2010-11-05,unregistered,N,zone_3a
+PCL-AR-00495,AR,Ashcombe Reach,R1,warehouse,22478,36.4,36,Kilnyard Close,AM3 4YS,449264,1194127,2019-03-16,freehold,N,none
+PCL-KF-00496,KF,Kelder Flats,AG,place_of_worship,12342,33.8,96,Sedge Lane,AM5 7AG,435065,1197293,1996-11-29,unregistered,N,zone_1
+PCL-OH-00497,OH,Old Harrowgate,OS,carpark,71,28.7,94,Hollybank Close,AM4 4LT,445321,1213661,1997-04-20,leasehold_125,N,zone_3a
+PCL-SQ-00498,SQ,Sable Quay,AG,allotment,374,41.2,213,Ferryman Street,AM1 4BH,414434,1192270,2023-07-27,leasehold_125,N,zone_3a
+PCL-TF-00499,TF,Tarnfield,C1,place_of_worship,972,17.4,237,Lamplight Lane,AM6 8DK,414782,1206435,2008-01-28,leasehold_125,N,zone_2
+PCL-WH-00500,WH,Wend Hill,C1,dwelling_multi,25825,27.9,191,Tannery Terrace,AM7 1LB,447074,1208385,2014-05-03,crown_lease,N,zone_1
+PCL-ND-00501,ND,North Dunmoor,HC,retail,953,7.7,233,Netherfield Yard,AM8 9PQ,420485,1213519,2007-06-16,leasehold_99,N,zone_3a
+PCL-PG-00502,PG,Pelling Green,SP,retail,2143,41.6,183,Gasworks Crescent,AM8 8PL,441947,1190670,1998-09-24,leasehold_99,Y,none
+PCL-CB-00503,CB,Corrisbeck,I2,warehouse,19581,26.8,210,Mallow Row,AM8 1VK,443808,1202295,2008-07-01,in_dispute,N,none
+PCL-IH-00504,IH,Isk Harbour,MU,retail,179,46.8,17,Paternoster Close,AM2 1ND,417373,1204146,2008-08-31,leasehold_99,N,zone_2
+PCL-VH-00505,VH,Vantry Hollow,C2,place_of_worship,1705,20.1,62,Cattle Street,AM4 6GS,428564,1196322,2020-04-06,freehold,N,none
+PCL-MB-00506,MB,Mirebrook,C1,civic,35665,47.6,43B,Hollybank Terrace,AM8 3NP,429995,1185399,2018-01-05,crown_lease,N,none
+PCL-AR-00507,AR,Ashcombe Reach,R2,allotment,30941,33.1,64,Mallow Yard,AM8 8GG,411978,1180427,2004-12-16,leasehold_99,N,zone_3a
+PCL-KF-00508,KF,Kelder Flats,R1,allotment,182,40.0,26,Quarry Crescent,AM2 7LN,444773,1198901,2007-11-25,unregistered,N,none
+PCL-OH-00509,OH,Old Harrowgate,AG,retail,826,26.3,70,Cattle Close,AM7 3FK,414005,1214886,2024-04-14,unregistered,N,none
+PCL-SQ-00510,SQ,Sable Quay,MU,civic,20450,44.9,41,Tannery Way,AM4 2LS,420239,1216213,2000-03-08,freehold,N,none
+PCL-TF-00511,TF,Tarnfield,I1,carpark,260,5.8,213,Ropewalk Passage,AM3 9PW,422264,1199001,2005-05-03,freehold,N,zone_1
+PCL-WH-00512,WH,Wend Hill,OS,warehouse,1910,39.9,69,Paternoster Walk,AM9 4XT,440875,1197841,2018-05-20,in_dispute,N,zone_1
+PCL-ND-00513,ND,North Dunmoor,R1,carpark,993,30.6,217,Cattle Terrace,AM5 5LB,420792,1205736,2012-05-22,freehold,N,none
+PCL-PG-00514,PG,Pelling Green,SP,retail,19396,6.8,219,Bellrope Terrace,AM1 2DX,421638,1195840,2000-05-03,crown_lease,N,none
+PCL-CB-00515,CB,Corrisbeck,HC,workshop,91,48.0,17,Kilnyard Terrace,AM1 7HN,432808,1214121,2012-02-06,freehold,N,none
+PCL-IH-00516,IH,Isk Harbour,I2,carpark,1530,21.0,171,Vintners Walk,AM7 2QK,417778,1203432,2011-11-12,leasehold_99,N,zone_3b
+PCL-VH-00517,VH,Vantry Hollow,C1,retail,390,31.5,101,Threadneedle Rise,AM2 8BN,435210,1214370,2024-10-12,crown_lease,N,none
+PCL-MB-00518,MB,Mirebrook,HC,vacant,1020,47.0,165,Tannery Rise,AM3 1QG,424364,1183093,2022-01-11,unregistered,Y,none
+PCL-AR-00519,AR,Ashcombe Reach,R2,warehouse,390,33.9,38,Hollybank Crescent,AM5 5GS,440897,1204789,2016-11-19,crown_lease,N,none
+PCL-KF-00520,KF,Kelder Flats,C1,school,1629,31.6,184C,Ferryman Walk,AM2 5PD,438223,1188801,2011-11-13,leasehold_99,Y,none
+PCL-OH-00521,OH,Old Harrowgate,R2,dwelling_multi,1280,4.9,50,Ropewalk Street,AM6 6RJ,425914,1196657,2024-03-28,unregistered,N,zone_2
+PCL-SQ-00522,SQ,Sable Quay,OS,vacant,232,20.8,130,Quarry Street,AM5 9SS,425925,1217028,2022-06-29,crown_lease,N,zone_1
+PCL-TF-00523,TF,Tarnfield,HC,office,226,13.3,64,Marrow Road,AM7 3TW,435673,1212849,1998-08-03,crown_lease,N,zone_3b
+PCL-WH-00524,WH,Wend Hill,AG,allotment,883,12.9,119,Cattle Lane,AM5 3HB,431332,1219841,2010-08-11,freehold,N,none
+PCL-ND-00525,ND,North Dunmoor,SP,allotment,20824,34.9,138,Hollybank Passage,AM2 4RG,437413,1187967,1999-04-02,in_dispute,N,zone_2
+PCL-PG-00526,PG,Pelling Green,I2,warehouse,17004,40.3,60,Marrow Road,AM3 5HH,437558,1197421,2000-10-03,in_dispute,N,zone_3a
+PCL-CB-00527,CB,Corrisbeck,R2,warehouse,36134,15.0,75,Weirside Street,AM3 4TV,417902,1213737,2025-09-05,in_dispute,N,none
+PCL-IH-00528,IH,Isk Harbour,I2,civic,1674,12.4,136,Quarry Close,AM8 6KK,441087,1198866,2006-05-05,leasehold_125,N,zone_1
+PCL-VH-00529,VH,Vantry Hollow,MU,allotment,34711,15.9,234,Quarry Walk,AM1 2LE,415292,1213473,2018-08-07,crown_lease,N,zone_2
+PCL-MB-00530,MB,Mirebrook,OS,retail,2064,47.2,209,Cattle Rise,AM6 9GQ,430608,1196568,2024-09-25,leasehold_125,N,zone_3a
+PCL-AR-00531,AR,Ashcombe Reach,C1,dwelling_multi,2121,35.4,61,Saltmarsh Yard,AM2 6JZ,413233,1212738,1997-01-07,in_dispute,N,none
+PCL-KF-00532,KF,Kelder Flats,I1,dwelling_multi,331,41.1,55,Weirside Lane,AM6 5PH,419395,1213035,2007-10-11,freehold,N,zone_3b
+PCL-OH-00533,OH,Old Harrowgate,R3,workshop,1317,19.4,149,Netherfield Walk,AM3 5ZZ,430413,1199207,2008-02-28,unregistered,N,none
+PCL-SQ-00534,SQ,Sable Quay,HC,office,296,26.5,163,Threadneedle Rise,AM4 7YA,427369,1202075,2024-07-24,in_dispute,N,zone_3a
+PCL-TF-00535,TF,Tarnfield,HC,carpark,1686,9.5,154,Ironmonger Lane,AM8 3YJ,438227,1209819,1996-12-07,in_dispute,N,none
+PCL-WH-00536,WH,Wend Hill,C1,place_of_worship,179,19.5,85,Pellet Crescent,AM8 1TZ,445108,1181178,2006-08-26,freehold,N,zone_1
+PCL-ND-00537,ND,North Dunmoor,I1,dwelling,35849,5.2,39,Threadneedle Lane,AM9 9KX,445424,1214720,2013-08-05,unregistered,N,none
+PCL-PG-00538,PG,Pelling Green,OS,warehouse,93,20.9,110,Cattle Road,AM4 5JS,449236,1204370,1999-10-12,leasehold_99,N,zone_1
+PCL-CB-00539,CB,Corrisbeck,HC,retail,438,37.1,136A,Hollybank Road,AM6 9QZ,414388,1188893,2007-06-08,freehold,N,none
+PCL-IH-00540,IH,Isk Harbour,AG,office,1670,42.5,181,Saltmarsh Terrace,AM5 2EV,436200,1187269,1998-08-27,leasehold_99,N,zone_3a
+PCL-VH-00541,VH,Vantry Hollow,C2,school,11107,18.7,234,Tannery Yard,AM3 3TR,441626,1216491,1996-06-13,leasehold_125,N,none
+PCL-MB-00542,MB,Mirebrook,HC,carpark,360,11.6,193,Marrow Passage,AM6 8ZQ,429406,1216902,2003-06-19,freehold,N,none
+PCL-AR-00543,AR,Ashcombe Reach,HC,dwelling_multi,1343,6.8,101,Pellet Lane,AM3 3LD,428626,1202095,2011-07-11,unregistered,N,zone_1
+PCL-KF-00544,KF,Kelder Flats,C1,place_of_worship,197,8.6,212,Cattle Rise,AM4 8YE,411329,1182845,2018-11-14,crown_lease,N,zone_3b
+PCL-OH-00545,OH,Old Harrowgate,R1,civic,1405,26.2,197B,Threadneedle Passage,AM1 6ER,420282,1188535,1998-05-02,freehold,Y,zone_3b
+PCL-SQ-00546,SQ,Sable Quay,OS,civic,445,28.0,200,Hollybank Terrace,AM5 8LZ,441911,1202120,2025-12-26,leasehold_99,N,none
+PCL-TF-00547,TF,Tarnfield,AG,allotment,19066,21.5,99,Dovecote Yard,AM7 7VP,426712,1184127,2016-01-08,in_dispute,N,zone_3a
+PCL-WH-00548,WH,Wend Hill,C2,place_of_worship,857,25.3,207,Coldharbour Street,AM1 7XZ,433144,1190701,1999-02-27,leasehold_125,N,zone_1
+PCL-ND-00549,ND,North Dunmoor,R3,dwelling_multi,14289,6.2,80,Threadneedle Passage,AM7 2LJ,415290,1216407,1998-08-30,leasehold_125,N,zone_2
+PCL-PG-00550,PG,Pelling Green,AG,place_of_worship,211,46.6,108,Dovecote Close,AM2 4QQ,416752,1203738,2015-03-20,crown_lease,N,zone_2
+PCL-CB-00551,CB,Corrisbeck,AG,vacant,35543,39.9,177,Ropewalk Rise,AM5 3FK,420396,1215107,2009-07-22,unregistered,N,none
+PCL-IH-00552,IH,Isk Harbour,MU,place_of_worship,28842,44.0,140,Ironmonger Close,AM8 2NK,448271,1201161,2003-12-31,unregistered,N,none
+PCL-VH-00553,VH,Vantry Hollow,HC,retail,1182,20.9,238,Sedge Yard,AM6 8XQ,411277,1199322,2000-12-09,freehold,N,zone_1
+PCL-MB-00554,MB,Mirebrook,MU,office,3549,13.0,78,Netherfield Walk,AM2 6RQ,448358,1198128,2023-04-17,leasehold_99,N,none
+PCL-AR-00555,AR,Ashcombe Reach,R3,civic,359,27.8,122,Marrow Close,AM4 2LL,444953,1193882,1996-09-16,in_dispute,N,zone_2
+PCL-KF-00556,KF,Kelder Flats,R1,place_of_worship,333,29.9,77,Quarry Road,AM3 7DG,411478,1187031,2018-10-21,leasehold_99,N,none
+PCL-OH-00557,OH,Old Harrowgate,I1,workshop,234,13.1,14C,Kilnyard Terrace,AM2 8LJ,419868,1185810,1997-02-05,in_dispute,Y,zone_2
+PCL-SQ-00558,SQ,Sable Quay,C1,place_of_worship,1852,14.7,167,Threadneedle Street,AM5 6SS,413196,1215896,2021-07-30,crown_lease,N,none
+PCL-TF-00559,TF,Tarnfield,AG,dwelling,284,8.5,87,Ferryman Row,AM4 5LR,431338,1190261,2015-12-13,leasehold_125,N,zone_2
+PCL-WH-00560,WH,Wend Hill,R3,office,154,24.1,86,Ferryman Street,AM5 7AA,421251,1208236,1999-04-08,in_dispute,N,zone_1
+PCL-ND-00561,ND,North Dunmoor,R3,carpark,103,30.7,189,Dovecote Passage,AM8 4FX,439435,1205429,2016-10-10,leasehold_99,N,none
+PCL-PG-00562,PG,Pelling Green,R1,civic,203,29.6,76,Weirside Yard,AM1 4WY,412653,1180683,2026-01-17,unregistered,N,none
+PCL-CB-00563,CB,Corrisbeck,OS,place_of_worship,1780,47.5,78,Coldharbour Way,AM3 8LN,434870,1199617,1998-01-26,unregistered,Y,none
+PCL-IH-00564,IH,Isk Harbour,OS,carpark,519,23.8,125,Bellrope Way,AM4 2EV,440894,1197790,2025-06-13,unregistered,Y,zone_2
+PCL-VH-00565,VH,Vantry Hollow,AG,allotment,84,20.3,193A,Marrow Crescent,AM5 2HF,417112,1195157,2002-08-04,leasehold_99,N,none
+PCL-MB-00566,MB,Mirebrook,I2,dwelling_multi,33821,28.7,152,Windlass Way,AM8 8NB,420925,1215699,2012-07-08,leasehold_125,N,zone_3a
+PCL-AR-00567,AR,Ashcombe Reach,MU,carpark,372,24.3,191,Mallow Passage,AM7 3WZ,436133,1189533,2020-03-05,leasehold_125,N,none
+PCL-KF-00568,KF,Kelder Flats,MU,allotment,36190,23.0,37,Mallow Walk,AM4 7KF,448271,1187899,2004-09-13,in_dispute,N,none
+PCL-OH-00569,OH,Old Harrowgate,R2,warehouse,26620,15.2,224,Marrow Way,AM4 8XK,438617,1185275,2022-07-08,freehold,N,none
+PCL-SQ-00570,SQ,Sable Quay,HC,dwelling_multi,2002,38.6,66,Sedge Rise,AM1 4YN,422930,1211132,1996-07-30,in_dispute,N,zone_2
+PCL-TF-00571,TF,Tarnfield,I2,warehouse,80,43.2,224,Netherfield Close,AM5 5QZ,416551,1190334,2008-09-12,in_dispute,N,zone_2
+PCL-WH-00572,WH,Wend Hill,MU,civic,91,23.4,220,Mallow Lane,AM3 8FZ,421831,1193303,1999-06-08,unregistered,N,zone_3a
+PCL-ND-00573,ND,North Dunmoor,R2,office,245,43.3,165B,Lamplight Row,AM1 2SN,427042,1215941,2006-09-23,in_dispute,N,none
+PCL-PG-00574,PG,Pelling Green,I1,dwelling,420,28.0,150,Dovecote Close,AM7 8NW,441363,1192588,1997-04-21,unregistered,N,none
+PCL-CB-00575,CB,Corrisbeck,MU,retail,15161,32.5,130,Coldharbour Row,AM6 2XP,430478,1208390,2005-04-13,freehold,N,zone_3b
+PCL-IH-00576,IH,Isk Harbour,SP,vacant,1499,13.4,31,Netherfield Terrace,AM8 6GK,436978,1194113,2021-06-18,in_dispute,N,none
+PCL-VH-00577,VH,Vantry Hollow,R3,school,32148,38.8,40,Mallow Passage,AM2 7PJ,427604,1186232,2024-05-30,leasehold_125,N,zone_1
+PCL-MB-00578,MB,Mirebrook,R1,school,30362,32.5,207,Mallow Road,AM5 1BK,420244,1213346,2014-07-09,crown_lease,N,none
+PCL-AR-00579,AR,Ashcombe Reach,C2,vacant,378,15.3,212,Windlass Road,AM5 3FQ,421356,1191602,2003-08-13,leasehold_125,Y,none
+PCL-KF-00580,KF,Kelder Flats,R2,dwelling_multi,5721,9.8,171C,Paternoster Rise,AM6 6HE,439209,1190150,2002-02-06,crown_lease,N,none
+PCL-OH-00581,OH,Old Harrowgate,I2,dwelling_multi,1770,21.0,166,Kilnyard Close,AM6 6PD,438916,1185373,1996-08-28,leasehold_125,Y,zone_1
+PCL-SQ-00582,SQ,Sable Quay,AG,allotment,174,30.5,75,Quarry Terrace,AM5 6GT,424559,1181583,2014-01-12,crown_lease,N,none
+PCL-TF-00583,TF,Tarnfield,I1,allotment,2016,12.7,92,Ferryman Lane,AM2 1FS,430629,1180875,2005-12-01,crown_lease,Y,none
+PCL-WH-00584,WH,Wend Hill,C1,warehouse,318,27.8,36,Mallow Street,AM2 3RN,425816,1187085,2012-10-07,in_dispute,N,none
+PCL-ND-00585,ND,North Dunmoor,R1,carpark,140,35.2,7A,Ferryman Terrace,AM8 4TN,421979,1210143,2002-09-29,leasehold_99,N,zone_2
+PCL-PG-00586,PG,Pelling Green,C2,office,373,8.1,189,Ferryman Yard,AM7 1DL,448442,1216303,2014-11-29,leasehold_99,N,zone_3a
+PCL-CB-00587,CB,Corrisbeck,C1,allotment,132,11.6,139,Saltmarsh Yard,AM6 3YB,428092,1198156,2024-11-25,in_dispute,N,none
+PCL-IH-00588,IH,Isk Harbour,R3,dwelling_multi,154,22.4,21,Kilnyard Row,AM3 6VG,433657,1201317,2022-11-15,unregistered,N,none
+PCL-VH-00589,VH,Vantry Hollow,R2,allotment,18346,45.1,72,Paternoster Road,AM7 7TT,437549,1203510,1996-06-29,crown_lease,N,zone_3a
+PCL-MB-00590,MB,Mirebrook,C1,school,2303,32.5,234,Tannery Close,AM7 4BJ,440856,1195565,2024-11-23,in_dispute,N,zone_2
+PCL-AR-00591,AR,Ashcombe Reach,R1,workshop,221,17.8,9,Saltmarsh Row,AM7 3ZY,447943,1192361,1996-01-01,in_dispute,N,none
+PCL-KF-00592,KF,Kelder Flats,C2,civic,15840,17.4,168,Coldharbour Lane,AM6 8KH,437372,1196367,2018-09-16,in_dispute,N,none
+PCL-OH-00593,OH,Old Harrowgate,SP,dwelling,1781,29.8,27B,Ropewalk Close,AM8 7BQ,424170,1197807,2002-01-19,in_dispute,N,zone_1
+PCL-SQ-00594,SQ,Sable Quay,R1,allotment,12376,22.8,222,Ferryman Lane,AM6 3LD,412531,1214668,2001-06-11,freehold,N,none
+PCL-TF-00595,TF,Tarnfield,SP,place_of_worship,30519,12.9,195,Vintners Close,AM2 4AJ,435717,1210695,2019-11-19,in_dispute,N,zone_2
+PCL-WH-00596,WH,Wend Hill,R1,civic,199,38.1,155,Weirside Row,AM6 1ZD,440931,1185557,2009-01-13,leasehold_125,N,zone_1
+PCL-ND-00597,ND,North Dunmoor,OS,retail,37228,14.1,182,Windlass Street,AM5 5WZ,433839,1217759,2020-03-05,in_dispute,N,zone_2
+PCL-PG-00598,PG,Pelling Green,C2,dwelling_multi,1146,38.7,10,Quarry Lane,AM9 9HT,417571,1183913,1998-05-05,leasehold_125,N,none
+PCL-CB-00599,CB,Corrisbeck,C1,civic,35560,15.7,121,Marrow Street,AM5 6XT,441013,1193722,2017-04-21,in_dispute,N,none
+PCL-IH-00600,IH,Isk Harbour,I1,carpark,168,9.9,208,Coldharbour Yard,AM6 4AA,428136,1202095,1996-02-24,leasehold_99,Y,none
+PCL-VH-00601,VH,Vantry Hollow,MU,civic,72,31.2,61,Vintners Way,AM7 5BZ,449583,1196486,2007-08-29,leasehold_125,N,none
+PCL-MB-00602,MB,Mirebrook,C2,allotment,2254,40.1,190,Lamplight Crescent,AM6 8DW,415480,1198671,2013-03-08,leasehold_125,N,none
+PCL-AR-00603,AR,Ashcombe Reach,R1,dwelling_multi,83,41.7,32,Mallow Road,AM4 7SB,440177,1211837,2012-10-18,crown_lease,N,none
+PCL-KF-00604,KF,Kelder Flats,SP,allotment,392,41.8,149C,Ferryman Lane,AM7 7YA,434203,1183385,2022-09-11,crown_lease,N,zone_2
+PCL-OH-00605,OH,Old Harrowgate,AG,place_of_worship,274,19.7,47,Ropewalk Crescent,AM7 3QA,434801,1196459,1998-04-24,leasehold_99,N,none
+PCL-SQ-00606,SQ,Sable Quay,OS,retail,1019,22.4,39,Marrow Street,AM9 4QT,438002,1200928,2023-02-22,leasehold_125,N,none
+PCL-TF-00607,TF,Tarnfield,I1,carpark,28418,36.2,156,Sedge Terrace,AM5 2ZD,428697,1190689,2025-02-17,in_dispute,Y,none
+PCL-WH-00608,WH,Wend Hill,MU,retail,20727,9.8,194A,Vintners Terrace,AM6 2KZ,446248,1207458,1996-03-02,leasehold_99,N,zone_1
+PCL-ND-00609,ND,North Dunmoor,SP,school,630,41.8,183,Ironmonger Rise,AM3 2QE,418736,1192860,2017-05-21,freehold,N,none
+PCL-PG-00610,PG,Pelling Green,C2,school,39277,23.1,45,Ropewalk Lane,AM5 2WY,412521,1192268,2020-03-18,in_dispute,N,zone_1
+PCL-CB-00611,CB,Corrisbeck,AG,dwelling,317,7.2,224,Quarry Crescent,AM3 6WJ,434507,1194166,2006-06-20,unregistered,N,zone_1
+PCL-IH-00612,IH,Isk Harbour,MU,workshop,30267,22.1,68,Lamplight Terrace,AM3 9XE,445198,1184379,2023-08-07,freehold,N,none
+PCL-VH-00613,VH,Vantry Hollow,AG,dwelling,39373,23.7,144,Windlass Passage,AM7 5DB,440464,1194404,2015-01-09,unregistered,N,none
+PCL-MB-00614,MB,Mirebrook,MU,carpark,8688,25.8,129,Dovecote Rise,AM6 7QQ,430207,1191242,2004-04-25,leasehold_125,Y,none
+PCL-AR-00615,AR,Ashcombe Reach,R3,carpark,2169,24.6,83,Mallow Street,AM7 1LW,423148,1216355,2003-03-16,leasehold_125,N,none
+PCL-KF-00616,KF,Kelder Flats,HC,allotment,515,6.7,201,Tannery Passage,AM5 2YX,420352,1195508,2004-09-17,leasehold_99,Y,none
+PCL-OH-00617,OH,Old Harrowgate,AG,office,288,17.0,179,Windlass Rise,AM2 8TZ,430258,1200744,2024-06-20,freehold,N,none
+PCL-SQ-00618,SQ,Sable Quay,OS,civic,1728,19.8,205,Bellrope Street,AM4 5PA,433035,1219542,2025-05-05,freehold,Y,zone_2
+PCL-TF-00619,TF,Tarnfield,R2,school,28484,15.8,152,Cattle Row,AM2 1ND,442618,1212608,2024-08-24,unregistered,N,zone_2
+PCL-WH-00620,WH,Wend Hill,C2,warehouse,908,6.9,91,Netherfield Yard,AM7 7RP,449288,1202617,2017-11-11,leasehold_99,N,zone_3a
+PCL-ND-00621,ND,North Dunmoor,C1,dwelling,749,23.5,94,Marrow Close,AM1 2HV,433696,1207083,2008-08-20,freehold,N,zone_1
+PCL-PG-00622,PG,Pelling Green,R1,dwelling_multi,190,11.5,219,Windlass Road,AM5 7BP,419948,1200885,2018-08-20,in_dispute,N,none
+PCL-CB-00623,CB,Corrisbeck,OS,carpark,1865,26.4,218C,Sedge Close,AM5 2ZY,440780,1183760,2026-04-28,leasehold_125,N,none
+PCL-IH-00624,IH,Isk Harbour,R3,warehouse,188,14.6,46,Lamplight Crescent,AM9 7TA,446590,1184551,1997-12-17,freehold,N,zone_2
+PCL-VH-00625,VH,Vantry Hollow,SP,office,1459,47.8,82,Marrow Row,AM3 6HL,419898,1186402,2014-11-09,leasehold_99,Y,none
+PCL-MB-00626,MB,Mirebrook,C2,allotment,367,29.0,160,Netherfield Street,AM8 2HG,412165,1207147,2020-03-16,freehold,N,none
+PCL-AR-00627,AR,Ashcombe Reach,SP,warehouse,19423,31.5,163,Hollybank Rise,AM2 1LK,434408,1182505,2014-12-20,leasehold_125,N,zone_1
+PCL-KF-00628,KF,Kelder Flats,SP,retail,170,15.1,5,Ropewalk Rise,AM7 1ES,422472,1206333,2008-11-12,crown_lease,N,zone_1
+PCL-OH-00629,OH,Old Harrowgate,HC,retail,551,43.7,172,Hollybank Close,AM8 2YS,415846,1214153,2020-03-09,freehold,N,none
+PCL-SQ-00630,SQ,Sable Quay,R1,retail,211,17.6,44,Pellet Street,AM7 2KW,419748,1182404,1999-05-05,unregistered,N,none
+PCL-TF-00631,TF,Tarnfield,SP,civic,73,20.7,62,Ostler Road,AM8 8XH,412446,1215236,2022-05-10,crown_lease,N,none
+PCL-WH-00632,WH,Wend Hill,MU,office,113,30.1,12,Gasworks Passage,AM2 4RA,419578,1219760,2015-07-13,crown_lease,N,none
+PCL-ND-00633,ND,North Dunmoor,C2,allotment,106,32.6,49,Ropewalk Yard,AM3 7XV,415615,1215468,2015-04-18,crown_lease,N,none
+PCL-PG-00634,PG,Pelling Green,C2,warehouse,18336,25.8,55,Bellrope Terrace,AM9 7XL,445908,1184227,2021-10-21,in_dispute,N,none
+PCL-CB-00635,CB,Corrisbeck,C2,workshop,18931,35.4,72,Lamplight Rise,AM8 6RV,423889,1198633,2018-12-11,in_dispute,N,none
+PCL-IH-00636,IH,Isk Harbour,HC,dwelling_multi,2217,37.2,81,Cattle Passage,AM2 5NV,449458,1212214,2025-11-12,freehold,N,none
+PCL-VH-00637,VH,Vantry Hollow,OS,vacant,1234,30.7,172,Coldharbour Close,AM8 5LA,416150,1185517,2021-01-13,freehold,N,zone_1
+PCL-MB-00638,MB,Mirebrook,HC,vacant,35333,25.7,118,Hollybank Lane,AM5 6QT,410414,1186343,2010-10-10,freehold,N,zone_1
+PCL-AR-00639,AR,Ashcombe Reach,AG,workshop,623,19.8,165,Ropewalk Terrace,AM7 3KL,420957,1181724,1999-03-18,unregistered,N,none
+PCL-KF-00640,KF,Kelder Flats,C1,place_of_worship,234,24.1,66,Ferryman Yard,AM9 9KP,437599,1193172,2010-02-14,unregistered,N,none
+PCL-OH-00641,OH,Old Harrowgate,HC,vacant,427,42.1,193,Cattle Passage,AM6 5YQ,440934,1185459,2011-01-20,leasehold_99,N,zone_1
+PCL-SQ-00642,SQ,Sable Quay,C2,vacant,139,24.8,4,Windlass Crescent,AM2 9XR,422035,1202879,2024-07-07,leasehold_125,N,none
+PCL-TF-00643,TF,Tarnfield,I1,allotment,24503,43.6,157,Vintners Close,AM5 6RA,444330,1212496,2026-04-18,crown_lease,N,none
+PCL-WH-00644,WH,Wend Hill,SP,vacant,88,28.1,45,Saltmarsh Row,AM7 9GS,446432,1213259,2019-06-18,crown_lease,N,none
+PCL-ND-00645,ND,North Dunmoor,I2,office,376,32.7,106,Sedge Way,AM5 2WL,444599,1213959,2015-02-14,in_dispute,N,none
+PCL-PG-00646,PG,Pelling Green,I2,carpark,81,4.1,51,Vintners Passage,AM7 8GZ,447275,1219048,2023-12-08,unregistered,N,zone_3a
+PCL-CB-00647,CB,Corrisbeck,SP,warehouse,76,34.7,18,Dovecote Lane,AM7 9DR,449652,1190779,1998-07-07,unregistered,N,none
+PCL-IH-00648,IH,Isk Harbour,MU,place_of_worship,2285,17.4,63,Kilnyard Row,AM7 5SZ,432289,1189513,2002-05-12,unregistered,N,none
+PCL-VH-00649,VH,Vantry Hollow,SP,dwelling,61,39.1,51,Marrow Walk,AM3 7WR,434842,1212354,2024-11-29,unregistered,N,zone_3a
+PCL-MB-00650,MB,Mirebrook,HC,civic,61,35.6,205,Saltmarsh Rise,AM2 8AN,412759,1201118,2015-11-08,in_dispute,N,zone_1
+PCL-AR-00651,AR,Ashcombe Reach,R3,warehouse,5741,16.5,156A,Ostler Close,AM4 8BL,441838,1210858,2005-03-25,unregistered,N,none
+PCL-KF-00652,KF,Kelder Flats,OS,workshop,28180,39.4,16,Lamplight Yard,AM2 6TR,416116,1208474,2018-03-25,freehold,Y,none
+PCL-OH-00653,OH,Old Harrowgate,R2,vacant,1917,32.8,144,Ferryman Row,AM1 7ZL,444718,1186918,2012-11-22,unregistered,N,none
+PCL-SQ-00654,SQ,Sable Quay,AG,place_of_worship,21974,38.2,4,Dovecote Road,AM5 8FZ,433237,1183354,2008-04-12,freehold,N,zone_3b
+PCL-TF-00655,TF,Tarnfield,AG,vacant,243,35.7,63,Kilnyard Walk,AM8 1HK,440091,1199972,1996-10-03,unregistered,N,none
+PCL-WH-00656,WH,Wend Hill,R3,workshop,277,45.7,69B,Coldharbour Walk,AM4 6BZ,449738,1209589,1999-12-01,unregistered,N,zone_1
+PCL-ND-00657,ND,North Dunmoor,SP,civic,20770,40.9,30,Gasworks Close,AM7 8NV,421748,1207979,2016-07-13,crown_lease,Y,none
+PCL-PG-00658,PG,Pelling Green,C2,allotment,339,10.6,166,Lamplight Way,AM2 1ZV,442766,1194392,2018-04-04,in_dispute,N,none
+PCL-CB-00659,CB,Corrisbeck,HC,place_of_worship,4052,11.5,209,Lamplight Way,AM6 4XZ,432818,1219011,2010-12-17,crown_lease,N,none
+PCL-IH-00660,IH,Isk Harbour,SP,vacant,64,32.8,119,Windlass Crescent,AM2 9GY,426984,1180954,2009-09-07,crown_lease,N,zone_3a
+PCL-VH-00661,VH,Vantry Hollow,SP,workshop,17587,38.9,73,Ropewalk Close,AM7 3TP,448988,1198136,2014-09-02,leasehold_99,N,zone_1
+PCL-MB-00662,MB,Mirebrook,HC,workshop,663,17.9,9,Bellrope Row,AM8 3PE,416017,1200816,2020-06-25,leasehold_125,N,zone_2
+PCL-AR-00663,AR,Ashcombe Reach,HC,office,15466,28.3,10C,Pellet Way,AM9 3LD,415658,1196873,2024-03-25,in_dispute,N,none
+PCL-KF-00664,KF,Kelder Flats,C1,workshop,134,35.1,26,Tannery Way,AM8 8VL,429007,1191608,2016-06-28,in_dispute,N,zone_1
+PCL-OH-00665,OH,Old Harrowgate,R1,allotment,181,27.1,150,Tannery Yard,AM4 8EX,422002,1208939,2015-04-12,freehold,Y,zone_2
+PCL-SQ-00666,SQ,Sable Quay,SP,workshop,2129,19.5,49,Windlass Street,AM7 6AG,424104,1184113,2016-02-27,in_dispute,N,zone_3b
+PCL-TF-00667,TF,Tarnfield,OS,office,348,8.7,27,Gasworks Crescent,AM9 6KN,446064,1217454,2020-12-29,in_dispute,Y,zone_2
+PCL-WH-00668,WH,Wend Hill,C1,allotment,69,32.2,183,Saltmarsh Row,AM6 8QN,448924,1214868,2003-03-29,unregistered,N,none
+PCL-ND-00669,ND,North Dunmoor,C1,allotment,2203,31.6,124,Ferryman Street,AM4 8NL,423576,1191147,2012-11-13,in_dispute,Y,zone_3a
+PCL-PG-00670,PG,Pelling Green,AG,civic,427,33.0,123,Hollybank Terrace,AM7 5VQ,429378,1184044,2019-11-02,unregistered,Y,none
+PCL-CB-00671,CB,Corrisbeck,MU,vacant,309,24.0,201,Marrow Way,AM2 4YR,421557,1198382,2024-12-01,leasehold_125,N,none
+PCL-IH-00672,IH,Isk Harbour,MU,dwelling,17309,15.7,9,Gasworks Way,AM4 3AE,420658,1199550,2015-09-11,leasehold_99,N,none
+PCL-VH-00673,VH,Vantry Hollow,R2,carpark,1751,45.5,183,Ropewalk Street,AM8 4EE,432339,1186173,2003-06-23,crown_lease,N,none
+PCL-MB-00674,MB,Mirebrook,R1,school,1994,32.8,1,Paternoster Crescent,AM7 2VZ,441307,1194899,2019-06-25,freehold,N,zone_1
+PCL-AR-00675,AR,Ashcombe Reach,I1,workshop,1456,7.2,226,Ropewalk Way,AM7 6EH,448047,1211326,1998-02-01,leasehold_99,N,zone_3a
+PCL-KF-00676,KF,Kelder Flats,AG,workshop,768,43.9,25,Coldharbour Passage,AM1 7ST,415904,1198620,1999-05-17,crown_lease,N,none
+PCL-OH-00677,OH,Old Harrowgate,HC,school,246,7.1,66,Ropewalk Rise,AM7 6VA,441071,1188241,2007-07-18,freehold,N,zone_2
+PCL-SQ-00678,SQ,Sable Quay,I2,carpark,39725,33.9,204,Ironmonger Terrace,AM2 9AD,427930,1184610,2015-09-06,crown_lease,N,none
+PCL-TF-00679,TF,Tarnfield,I2,vacant,206,42.6,220B,Saltmarsh Way,AM7 3FQ,418756,1199074,2004-10-01,leasehold_125,N,none
+PCL-WH-00680,WH,Wend Hill,R2,carpark,1636,26.2,51,Tannery Passage,AM3 1DD,423326,1195166,2021-09-30,leasehold_125,N,none
+PCL-ND-00681,ND,North Dunmoor,I2,dwelling_multi,4660,31.8,221,Saltmarsh Terrace,AM6 8EL,443871,1186810,2017-08-16,crown_lease,N,none
+PCL-PG-00682,PG,Pelling Green,HC,retail,36754,12.6,105C,Cattle Lane,AM1 5NG,416427,1187811,2026-04-02,leasehold_125,N,none
+PCL-CB-00683,CB,Corrisbeck,MU,office,75,36.8,140,Hollybank Rise,AM2 9FW,427219,1214631,1997-04-05,crown_lease,N,zone_3a
+PCL-IH-00684,IH,Isk Harbour,OS,place_of_worship,17077,29.5,94,Pellet Street,AM5 8TH,441624,1187194,2007-04-22,freehold,N,zone_3b
+PCL-VH-00685,VH,Vantry Hollow,OS,civic,325,6.7,28B,Coldharbour Lane,AM3 9LY,413490,1203090,2016-08-08,crown_lease,N,zone_3a
+PCL-MB-00686,MB,Mirebrook,I2,warehouse,19884,42.5,198,Saltmarsh Close,AM4 8SS,439120,1208847,2010-11-08,freehold,N,zone_1
+PCL-AR-00687,AR,Ashcombe Reach,R1,school,1842,32.8,17,Quarry Rise,AM6 8GB,421410,1198113,2017-04-20,leasehold_99,N,none
+PCL-KF-00688,KF,Kelder Flats,C2,place_of_worship,22949,14.2,231,Gasworks Way,AM7 3NF,436995,1197135,2000-04-25,leasehold_125,N,none
+PCL-OH-00689,OH,Old Harrowgate,C1,dwelling_multi,234,43.2,26,Paternoster Way,AM7 8PS,422828,1192725,2018-09-03,in_dispute,N,none
+PCL-SQ-00690,SQ,Sable Quay,I2,vacant,1563,21.7,66,Weirside Walk,AM5 9SE,444934,1193322,2012-01-14,in_dispute,N,zone_1
+PCL-TF-00691,TF,Tarnfield,AG,vacant,128,27.2,198,Threadneedle Lane,AM6 4WQ,444503,1208755,1996-12-26,in_dispute,Y,none
+PCL-WH-00692,WH,Wend Hill,R3,civic,1377,23.0,112,Gasworks Passage,AM5 4DP,423382,1212109,2005-12-14,freehold,Y,none
+PCL-ND-00693,ND,North Dunmoor,I1,retail,181,23.4,34,Ironmonger Road,AM1 6BE,417716,1199845,2009-07-03,freehold,N,zone_1
+PCL-PG-00694,PG,Pelling Green,SP,warehouse,262,11.8,198,Vintners Close,AM4 4XF,439414,1185002,2011-09-09,crown_lease,N,zone_3b
+PCL-CB-00695,CB,Corrisbeck,C1,office,125,19.2,113,Ironmonger Walk,AM7 3TB,439316,1211216,2015-09-02,leasehold_99,N,none
+PCL-IH-00696,IH,Isk Harbour,R2,retail,377,13.8,85,Vintners Walk,AM8 4ZP,447334,1205623,2003-02-16,unregistered,N,none
+PCL-VH-00697,VH,Vantry Hollow,C1,workshop,173,34.7,139,Threadneedle Close,AM2 5AN,440609,1187355,2009-01-24,unregistered,N,none
+PCL-MB-00698,MB,Mirebrook,R3,dwelling,35998,15.9,234,Sedge Rise,AM2 2DF,423157,1217337,2026-01-07,crown_lease,N,none
+PCL-AR-00699,AR,Ashcombe Reach,OS,vacant,16012,11.7,237A,Marrow Crescent,AM4 4AK,431714,1219459,2012-10-22,unregistered,Y,zone_2
+PCL-KF-00700,KF,Kelder Flats,I2,place_of_worship,1010,34.8,157,Pellet Way,AM3 2XX,424113,1216738,2011-02-19,leasehold_125,N,zone_1
+PCL-OH-00701,OH,Old Harrowgate,I2,warehouse,1422,7.8,84,Weirside Passage,AM5 4YN,441252,1188002,2024-05-04,leasehold_99,Y,zone_3b
+PCL-SQ-00702,SQ,Sable Quay,MU,warehouse,3430,30.0,151,Coldharbour Street,AM5 8YR,416430,1198909,2014-05-17,in_dispute,N,zone_3a
+PCL-TF-00703,TF,Tarnfield,MU,workshop,897,32.1,2,Paternoster Lane,AM5 3TA,437002,1219718,2003-08-11,leasehold_99,N,none
+PCL-WH-00704,WH,Wend Hill,AG,civic,826,18.0,34,Bellrope Passage,AM4 4PS,412068,1189360,2012-11-16,unregistered,N,none
+PCL-ND-00705,ND,North Dunmoor,R3,place_of_worship,36543,31.8,71,Dovecote Way,AM3 1VX,434828,1196216,1996-12-23,leasehold_125,N,none
+PCL-PG-00706,PG,Pelling Green,MU,allotment,399,11.6,19,Tannery Row,AM9 8AQ,415924,1214061,2004-08-13,in_dispute,N,none
+PCL-CB-00707,CB,Corrisbeck,SP,retail,1105,26.1,236,Lamplight Way,AM2 7XB,431234,1207527,2010-11-21,in_dispute,Y,none
+PCL-IH-00708,IH,Isk Harbour,R1,school,2219,41.9,177,Hollybank Crescent,AM9 4NW,430451,1189328,1997-07-20,leasehold_125,N,none
+PCL-VH-00709,VH,Vantry Hollow,HC,warehouse,4877,19.1,21,Ferryman Street,AM4 3SJ,423294,1196441,2007-02-06,leasehold_125,N,none
+PCL-MB-00710,MB,Mirebrook,HC,carpark,5980,12.7,34,Windlass Crescent,AM6 3ZK,417368,1187633,2017-06-17,freehold,N,none
+PCL-AR-00711,AR,Ashcombe Reach,I2,dwelling,28199,36.6,20,Windlass Yard,AM2 8PN,438852,1181251,2015-11-30,unregistered,N,zone_3a
+PCL-KF-00712,KF,Kelder Flats,HC,place_of_worship,2379,31.7,60,Ironmonger Rise,AM4 6SV,424645,1214306,1996-12-15,leasehold_99,N,zone_3b
+PCL-OH-00713,OH,Old Harrowgate,R3,warehouse,589,17.9,148C,Dovecote Walk,AM6 7GD,421938,1200267,2018-12-26,leasehold_125,N,none
+PCL-SQ-00714,SQ,Sable Quay,R2,dwelling_multi,346,11.7,24,Marrow Rise,AM8 1BG,434914,1216588,2011-04-30,in_dispute,N,none
+PCL-TF-00715,TF,Tarnfield,I1,warehouse,383,23.0,71,Dovecote Street,AM1 4RZ,423445,1193302,2025-08-20,in_dispute,N,none
+PCL-WH-00716,WH,Wend Hill,C2,place_of_worship,29333,22.9,81,Ferryman Street,AM3 1XN,433717,1216014,2016-09-20,in_dispute,Y,none
+PCL-ND-00717,ND,North Dunmoor,HC,school,347,44.4,134,Windlass Passage,AM1 7NZ,440216,1209646,1999-07-21,crown_lease,N,none
+PCL-PG-00718,PG,Pelling Green,MU,allotment,1777,36.5,84,Pellet Row,AM8 4WW,423292,1190242,1997-05-04,crown_lease,N,zone_2
+PCL-CB-00719,CB,Corrisbeck,I1,allotment,15952,22.1,217,Pellet Lane,AM6 5XB,412462,1216754,1999-06-05,leasehold_125,N,none
+PCL-IH-00720,IH,Isk Harbour,SP,dwelling_multi,12152,23.9,19,Cattle Rise,AM9 8SY,418329,1213230,2001-05-11,leasehold_125,N,none
+PCL-VH-00721,VH,Vantry Hollow,I2,carpark,167,46.2,79,Ferryman Close,AM5 8NW,420585,1217977,2024-02-12,leasehold_125,N,zone_3a
+PCL-MB-00722,MB,Mirebrook,I2,place_of_worship,2535,23.1,236,Cattle Row,AM5 7HS,445814,1187865,2006-06-17,freehold,N,zone_3a
+PCL-AR-00723,AR,Ashcombe Reach,R1,place_of_worship,1527,35.0,92,Ferryman Walk,AM3 3GP,447950,1209929,2005-12-07,leasehold_99,N,none
+PCL-KF-00724,KF,Kelder Flats,C2,school,1679,28.1,153,Lamplight Passage,AM7 6XT,417232,1201922,1997-12-30,freehold,N,none
+PCL-OH-00725,OH,Old Harrowgate,MU,allotment,18218,30.0,112,Mallow Rise,AM8 6WQ,421560,1205053,1996-10-06,crown_lease,N,none
+PCL-SQ-00726,SQ,Sable Quay,R1,school,174,38.4,153,Paternoster Crescent,AM6 4LK,436792,1204853,2021-04-29,crown_lease,N,none
+PCL-TF-00727,TF,Tarnfield,C1,allotment,9362,29.0,180,Weirside Crescent,AM2 8EL,442677,1190533,1999-02-10,leasehold_99,N,zone_2
+PCL-WH-00728,WH,Wend Hill,R1,school,403,34.2,29,Marrow Terrace,AM3 4PF,421360,1202238,2004-05-17,freehold,N,zone_1
+PCL-ND-00729,ND,North Dunmoor,I1,dwelling_multi,272,35.2,105,Weirside Terrace,AM2 9PB,446418,1190990,2019-04-17,crown_lease,N,none
+PCL-PG-00730,PG,Pelling Green,AG,retail,98,11.8,69,Gasworks Lane,AM8 8AT,423650,1213769,2019-03-22,leasehold_99,N,none
+PCL-CB-00731,CB,Corrisbeck,AG,carpark,4123,25.1,71C,Ironmonger Rise,AM8 5YP,449850,1216841,2015-12-16,leasehold_125,N,zone_1
+PCL-IH-00732,IH,Isk Harbour,C2,vacant,284,35.2,191,Sedge Crescent,AM6 3YH,444260,1206003,2011-08-07,freehold,N,none
+PCL-VH-00733,VH,Vantry Hollow,R2,vacant,384,39.7,238,Pellet Terrace,AM7 1YH,436427,1182132,1999-09-16,leasehold_99,Y,none
+PCL-MB-00734,MB,Mirebrook,R3,civic,27983,13.2,89,Gasworks Street,AM6 2HZ,413229,1209590,2007-05-03,freehold,N,zone_2
+PCL-AR-00735,AR,Ashcombe Reach,R3,dwelling,326,15.2,113C,Pellet Crescent,AM2 2BH,429209,1185497,2007-08-28,freehold,N,none
+PCL-KF-00736,KF,Kelder Flats,HC,carpark,25488,22.5,16,Ostler Walk,AM8 9XA,422325,1208065,2025-03-14,unregistered,N,zone_2
+PCL-OH-00737,OH,Old Harrowgate,R3,dwelling_multi,240,15.7,37,Netherfield Rise,AM7 9ZY,429967,1205069,2006-03-10,freehold,N,none
+PCL-SQ-00738,SQ,Sable Quay,C1,office,474,27.8,11,Windlass Close,AM2 3QY,434345,1186388,2001-07-20,crown_lease,N,none
+PCL-TF-00739,TF,Tarnfield,MU,retail,115,9.7,225,Paternoster Way,AM6 9ZZ,421591,1180385,1999-08-05,in_dispute,N,none
+PCL-WH-00740,WH,Wend Hill,R3,school,335,10.1,234,Quarry Yard,AM8 5JF,418136,1206607,2013-11-01,leasehold_99,N,none
+PCL-ND-00741,ND,North Dunmoor,C2,vacant,11646,33.6,127,Weirside Lane,AM1 1TN,447505,1205377,2004-03-15,unregistered,N,zone_3a
+PCL-PG-00742,PG,Pelling Green,MU,warehouse,22687,34.6,145,Windlass Lane,AM8 7EE,443162,1214688,2009-09-18,leasehold_99,N,none
+PCL-CB-00743,CB,Corrisbeck,R2,workshop,62,17.3,228,Netherfield Walk,AM2 8NN,429419,1194141,2018-09-15,leasehold_99,N,none
+PCL-IH-00744,IH,Isk Harbour,I2,dwelling,109,44.4,119,Marrow Passage,AM8 2FB,449809,1190009,1997-04-11,in_dispute,Y,zone_2
+PCL-VH-00745,VH,Vantry Hollow,OS,retail,35474,41.1,18,Windlass Crescent,AM8 9EW,411787,1190659,2019-01-02,leasehold_99,N,none
+PCL-MB-00746,MB,Mirebrook,C1,office,1374,18.3,131,Netherfield Close,AM8 7NE,426623,1182156,2010-07-27,leasehold_125,N,none
+PCL-AR-00747,AR,Ashcombe Reach,I2,carpark,391,24.3,201,Tannery Row,AM3 5SX,435183,1197644,1997-06-02,leasehold_125,N,zone_1
+PCL-KF-00748,KF,Kelder Flats,R3,dwelling,1495,8.8,151,Ironmonger Street,AM4 5KG,446900,1195854,2004-04-17,crown_lease,N,none
+PCL-OH-00749,OH,Old Harrowgate,R1,warehouse,908,28.8,30,Dovecote Lane,AM6 4TB,422790,1209037,1996-08-21,freehold,Y,zone_2
+PCL-SQ-00750,SQ,Sable Quay,MU,workshop,100,34.4,51,Mallow Way,AM4 5BT,449083,1209819,2002-07-14,leasehold_125,N,none
+PCL-TF-00751,TF,Tarnfield,R3,civic,6275,23.0,80,Pellet Row,AM1 6VS,426250,1216097,2000-09-18,freehold,N,none
+PCL-WH-00752,WH,Wend Hill,R1,workshop,1367,32.3,206,Coldharbour Walk,AM4 6AG,429441,1194400,2019-06-09,leasehold_99,N,zone_2
+PCL-ND-00753,ND,North Dunmoor,C2,carpark,1153,47.6,150,Dovecote Passage,AM2 2AT,410554,1206557,2003-06-21,crown_lease,N,none
+PCL-PG-00754,PG,Pelling Green,SP,vacant,651,12.3,182,Tannery Street,AM4 1DJ,414176,1204955,2010-05-26,unregistered,N,none
+PCL-CB-00755,CB,Corrisbeck,MU,place_of_worship,207,37.8,108,Lamplight Road,AM2 4BS,414149,1191277,2023-07-15,leasehold_99,N,none
+PCL-IH-00756,IH,Isk Harbour,OS,dwelling,1620,45.4,193,Threadneedle Way,AM7 1VW,435514,1211552,2000-02-10,leasehold_125,Y,zone_2
+PCL-VH-00757,VH,Vantry Hollow,R1,dwelling,15579,21.6,208,Saltmarsh Street,AM7 8QQ,412423,1187958,1997-12-14,in_dispute,N,zone_2
+PCL-MB-00758,MB,Mirebrook,MU,place_of_worship,281,24.3,73C,Hollybank Rise,AM6 6YR,447051,1216143,2026-02-28,in_dispute,N,none
+PCL-AR-00759,AR,Ashcombe Reach,C1,school,33159,30.8,160,Saltmarsh Street,AM2 3DE,432038,1181798,2011-04-03,unregistered,N,zone_2
+PCL-KF-00760,KF,Kelder Flats,HC,dwelling_multi,328,15.2,220,Paternoster Yard,AM6 1VR,433652,1207725,2015-03-03,unregistered,N,zone_3a
+PCL-OH-00761,OH,Old Harrowgate,R3,civic,2178,47.6,226,Ferryman Lane,AM3 2VH,445441,1212070,2025-10-13,in_dispute,N,zone_1
+PCL-SQ-00762,SQ,Sable Quay,R3,school,866,8.3,50,Hollybank Street,AM4 4FL,433832,1219109,2011-12-29,crown_lease,N,zone_3a
+PCL-TF-00763,TF,Tarnfield,R2,workshop,39581,8.6,223,Mallow Street,AM3 9QG,447173,1217479,2017-08-13,crown_lease,N,zone_3b
+PCL-WH-00764,WH,Wend Hill,R1,carpark,140,10.6,178,Pellet Yard,AM1 1WV,414986,1188210,2022-05-02,leasehold_99,N,zone_2
+PCL-ND-00765,ND,North Dunmoor,R3,workshop,5418,17.9,236,Lamplight Crescent,AM8 1QF,414134,1211904,2012-11-21,crown_lease,Y,none
+PCL-PG-00766,PG,Pelling Green,R3,place_of_worship,235,45.2,107,Ostler Yard,AM8 7RR,430326,1204446,2022-03-02,leasehold_125,N,zone_3a
+PCL-CB-00767,CB,Corrisbeck,OS,dwelling,1005,38.9,123A,Quarry Close,AM7 2BZ,429345,1185601,2013-08-15,leasehold_125,N,none
+PCL-IH-00768,IH,Isk Harbour,HC,civic,13715,42.2,87,Lamplight Walk,AM4 5KQ,430284,1188860,2022-10-13,in_dispute,N,none
+PCL-VH-00769,VH,Vantry Hollow,MU,dwelling,2108,37.4,211,Ropewalk Terrace,AM6 1FX,434596,1191995,2022-03-28,in_dispute,N,zone_2
+PCL-MB-00770,MB,Mirebrook,I1,vacant,2016,6.2,139,Ferryman Close,AM4 1GR,427382,1184977,2002-01-18,leasehold_99,N,zone_1
+PCL-AR-00771,AR,Ashcombe Reach,I1,workshop,141,19.8,136,Ostler Walk,AM1 4PD,444669,1186767,2003-11-06,leasehold_125,N,zone_3b
+PCL-KF-00772,KF,Kelder Flats,C2,place_of_worship,375,20.1,5,Paternoster Close,AM7 3ER,428570,1182560,2000-10-17,crown_lease,N,none
+PCL-OH-00773,OH,Old Harrowgate,AG,civic,211,35.3,127,Pellet Road,AM6 4TX,440039,1211413,2001-04-01,leasehold_125,N,zone_2
+PCL-SQ-00774,SQ,Sable Quay,SP,warehouse,1709,26.9,99,Ironmonger Yard,AM1 9XG,415830,1203379,2025-02-21,crown_lease,N,none
+PCL-TF-00775,TF,Tarnfield,HC,school,1055,23.5,215,Marrow Terrace,AM3 4YV,432895,1184581,2011-08-28,in_dispute,N,zone_2
+PCL-WH-00776,WH,Wend Hill,R1,dwelling,322,27.8,224,Ironmonger Road,AM3 3VB,441273,1214612,2002-02-19,leasehold_99,N,zone_1
+PCL-ND-00777,ND,North Dunmoor,C1,carpark,970,5.3,100,Mallow Walk,AM1 4SR,440716,1200780,2006-05-12,crown_lease,N,none
+PCL-PG-00778,PG,Pelling Green,SP,school,764,27.7,118,Coldharbour Road,AM6 5NG,448734,1195644,2001-07-27,in_dispute,N,none
+PCL-CB-00779,CB,Corrisbeck,MU,retail,36303,21.2,96,Ironmonger Lane,AM4 2SD,433429,1217113,1999-02-22,unregistered,Y,zone_2
+PCL-IH-00780,IH,Isk Harbour,R1,retail,9150,33.1,222,Tannery Street,AM6 5LX,439761,1194647,2021-02-08,unregistered,N,zone_3a
+PCL-VH-00781,VH,Vantry Hollow,MU,vacant,1341,27.3,166,Lamplight Rise,AM7 6KH,448965,1200156,2000-11-14,unregistered,N,zone_3a
+PCL-MB-00782,MB,Mirebrook,I2,workshop,134,47.7,140,Lamplight Terrace,AM6 9TX,439268,1201848,2024-04-01,crown_lease,N,zone_2
+PCL-AR-00783,AR,Ashcombe Reach,I2,civic,322,18.8,51,Kilnyard Way,AM4 7QN,434859,1188361,2010-11-10,in_dispute,N,none
+PCL-KF-00784,KF,Kelder Flats,AG,civic,1521,10.3,231,Netherfield Walk,AM2 6GA,417031,1199409,2025-06-21,unregistered,N,zone_3a
+PCL-OH-00785,OH,Old Harrowgate,R2,workshop,1754,40.8,4C,Lamplight Row,AM6 4FS,421452,1203945,1996-11-26,unregistered,N,none
+PCL-SQ-00786,SQ,Sable Quay,I2,vacant,166,35.6,131,Paternoster Yard,AM3 5XE,436832,1198144,2007-02-08,crown_lease,N,none
+PCL-TF-00787,TF,Tarnfield,AG,place_of_worship,2195,31.0,106,Pellet Road,AM5 1TQ,412407,1194018,2007-09-02,unregistered,N,none
+PCL-WH-00788,WH,Wend Hill,I2,retail,1238,16.3,89,Dovecote Passage,AM3 8SZ,425630,1197936,2010-12-01,leasehold_125,Y,zone_1
+PCL-ND-00789,ND,North Dunmoor,I1,dwelling,33605,16.0,33,Cattle Crescent,AM9 3AS,439469,1219956,2008-05-31,leasehold_125,N,none
+PCL-PG-00790,PG,Pelling Green,HC,civic,1446,35.7,69C,Weirside Crescent,AM8 5XT,430402,1198715,2017-09-05,unregistered,N,none
+PCL-CB-00791,CB,Corrisbeck,AG,carpark,350,43.7,40A,Coldharbour Close,AM8 7BJ,432382,1202800,2017-03-25,leasehold_125,N,none
+PCL-IH-00792,IH,Isk Harbour,C2,warehouse,19045,47.1,196,Dovecote Yard,AM1 6DP,413557,1205682,2019-04-17,freehold,N,none
+PCL-VH-00793,VH,Vantry Hollow,R3,school,369,6.0,36,Marrow Yard,AM6 9WH,415181,1180351,1999-11-21,in_dispute,N,none
+PCL-MB-00794,MB,Mirebrook,HC,carpark,286,39.9,177A,Bellrope Yard,AM4 6BX,431760,1195304,2005-03-08,leasehold_99,N,none
+PCL-AR-00795,AR,Ashcombe Reach,C2,place_of_worship,5945,27.9,81B,Kilnyard Road,AM8 2GP,430110,1199268,1998-02-04,leasehold_99,N,none
+PCL-KF-00796,KF,Kelder Flats,C1,place_of_worship,841,11.4,42,Ropewalk Close,AM5 3HE,429182,1184285,2006-06-23,crown_lease,N,zone_1
+PCL-OH-00797,OH,Old Harrowgate,C1,office,68,47.9,169,Vintners Walk,AM5 5VW,443585,1209879,2000-06-07,leasehold_125,N,zone_1
+PCL-SQ-00798,SQ,Sable Quay,OS,dwelling,17593,47.8,223,Vintners Passage,AM7 7XB,445932,1217067,2020-07-18,freehold,N,none
+PCL-TF-00799,TF,Tarnfield,I2,office,35751,20.0,140,Quarry Street,AM8 8DQ,439524,1217216,2000-10-07,freehold,N,none
+PCL-WH-00800,WH,Wend Hill,R2,warehouse,1321,11.2,89,Ropewalk Walk,AM3 6PB,415504,1219296,2024-04-15,crown_lease,N,none
+PCL-ND-00801,ND,North Dunmoor,MU,school,32087,18.8,190A,Paternoster Walk,AM5 4PD,411883,1197928,2016-05-08,unregistered,N,none
+PCL-PG-00802,PG,Pelling Green,C1,carpark,60,47.3,184,Vintners Terrace,AM3 6DT,423355,1186329,1999-10-22,freehold,N,zone_1
+PCL-CB-00803,CB,Corrisbeck,MU,dwelling,851,32.2,204,Pellet Terrace,AM8 1JD,437009,1210833,2008-08-28,in_dispute,N,none
+PCL-IH-00804,IH,Isk Harbour,AG,warehouse,1158,17.2,234A,Quarry Yard,AM7 1RS,436178,1218523,1999-04-22,leasehold_99,N,zone_2
+PCL-VH-00805,VH,Vantry Hollow,R1,civic,2641,17.2,4,Mallow Lane,AM4 4BQ,445222,1180915,2009-06-06,leasehold_99,Y,zone_2
+PCL-MB-00806,MB,Mirebrook,I1,office,210,33.2,35,Saltmarsh Walk,AM4 2KG,419996,1212718,2024-06-27,freehold,N,zone_3a
+PCL-AR-00807,AR,Ashcombe Reach,AG,vacant,23264,8.7,191B,Dovecote Yard,AM1 1WK,437641,1182465,2008-07-19,crown_lease,N,none
+PCL-KF-00808,KF,Kelder Flats,AG,dwelling,1620,20.8,77,Kilnyard Street,AM5 4XT,434058,1196683,2017-07-19,unregistered,N,none
+PCL-OH-00809,OH,Old Harrowgate,MU,school,279,46.4,24A,Sedge Road,AM8 1RB,444542,1196306,2014-10-16,leasehold_99,N,zone_3b
+PCL-SQ-00810,SQ,Sable Quay,MU,retail,1549,7.3,185,Paternoster Passage,AM8 8EG,414315,1204076,2001-11-08,leasehold_99,N,zone_1
+PCL-TF-00811,TF,Tarnfield,SP,dwelling_multi,2371,25.0,232,Netherfield Close,AM3 1NH,448456,1217029,2025-05-20,leasehold_99,N,none
+PCL-WH-00812,WH,Wend Hill,R3,dwelling,39714,46.0,86,Coldharbour Street,AM2 1FB,410990,1203667,2013-07-12,in_dispute,N,zone_3a
+PCL-ND-00813,ND,North Dunmoor,R3,retail,509,36.0,106,Mallow Lane,AM6 2JQ,449418,1218786,1996-01-04,crown_lease,N,zone_2
+PCL-PG-00814,PG,Pelling Green,MU,warehouse,167,13.8,154,Lamplight Lane,AM5 3NL,415176,1187295,1998-06-18,leasehold_125,N,none
+PCL-CB-00815,CB,Corrisbeck,I2,dwelling,107,23.5,152,Netherfield Street,AM6 7AJ,420604,1202036,2010-05-03,in_dispute,N,none
+PCL-IH-00816,IH,Isk Harbour,SP,place_of_worship,288,10.1,46,Ostler Row,AM2 4YY,418414,1182378,1996-05-26,leasehold_99,Y,none
+PCL-VH-00817,VH,Vantry Hollow,R1,dwelling_multi,1168,37.2,225,Ropewalk Row,AM7 2WX,444948,1188602,1996-02-10,in_dispute,N,none
+PCL-MB-00818,MB,Mirebrook,OS,vacant,6488,39.9,201,Ironmonger Lane,AM8 9PR,410850,1215739,2001-01-20,leasehold_99,N,none
+PCL-AR-00819,AR,Ashcombe Reach,HC,warehouse,209,34.5,24,Weirside Passage,AM2 5ZQ,440338,1194951,2023-09-12,crown_lease,N,none
+PCL-KF-00820,KF,Kelder Flats,AG,school,470,36.0,57,Bellrope Street,AM6 2NG,442053,1210769,2000-08-19,leasehold_125,N,none
+PCL-OH-00821,OH,Old Harrowgate,R1,warehouse,34906,4.7,220,Paternoster Rise,AM2 9GY,417146,1205179,2000-07-16,crown_lease,N,zone_1
+PCL-SQ-00822,SQ,Sable Quay,R3,carpark,312,22.3,124,Kilnyard Street,AM5 9RV,440527,1186329,2009-02-24,freehold,Y,none
+PCL-TF-00823,TF,Tarnfield,I1,school,284,9.8,73,Cattle Rise,AM6 5SV,442099,1189832,2013-05-08,leasehold_125,N,none
+PCL-WH-00824,WH,Wend Hill,SP,dwelling,19401,42.6,134,Ostler Road,AM2 6VG,422711,1208286,2003-02-05,leasehold_99,N,none
+PCL-ND-00825,ND,North Dunmoor,AG,place_of_worship,19431,11.1,60,Gasworks Street,AM2 8YD,438867,1186557,2012-01-18,leasehold_99,N,none
+PCL-PG-00826,PG,Pelling Green,I2,dwelling,9567,35.6,193,Kilnyard Terrace,AM7 6RG,441244,1212015,2018-06-23,freehold,N,zone_1
+PCL-CB-00827,CB,Corrisbeck,R3,dwelling,724,22.6,90,Bellrope Rise,AM6 5RD,426448,1216509,2017-07-14,leasehold_99,N,zone_3b
+PCL-IH-00828,IH,Isk Harbour,I1,carpark,388,30.5,75,Mallow Close,AM3 8NS,433251,1203452,1997-07-11,leasehold_99,N,none
+PCL-VH-00829,VH,Vantry Hollow,C1,dwelling_multi,743,38.3,44,Hollybank Road,AM6 4FS,448931,1191222,2009-04-22,leasehold_99,N,none
+PCL-MB-00830,MB,Mirebrook,HC,warehouse,4609,39.8,65,Ironmonger Yard,AM5 9VB,418224,1208021,2012-08-05,in_dispute,N,none
+PCL-AR-00831,AR,Ashcombe Reach,R3,office,1909,17.6,59,Cattle Passage,AM3 4HP,431699,1204750,1997-07-03,crown_lease,N,none
+PCL-KF-00832,KF,Kelder Flats,MU,place_of_worship,87,14.0,104,Weirside Yard,AM3 3RP,413494,1219539,2026-06-25,unregistered,N,none
+PCL-OH-00833,OH,Old Harrowgate,C2,school,8756,45.9,108,Windlass Terrace,AM1 3BH,439448,1198185,1998-08-14,freehold,N,zone_1
+PCL-SQ-00834,SQ,Sable Quay,HC,school,8278,26.9,207,Hollybank Terrace,AM6 3QR,448384,1194046,2026-05-27,leasehold_125,Y,zone_3a
+PCL-TF-00835,TF,Tarnfield,OS,retail,329,26.9,158,Marrow Road,AM2 9VK,448498,1199995,1997-07-28,freehold,N,none
+PCL-WH-00836,WH,Wend Hill,I1,dwelling,35003,46.8,147,Ironmonger Street,AM4 8RS,411749,1214565,2010-12-02,unregistered,N,none
+PCL-ND-00837,ND,North Dunmoor,C1,warehouse,1003,37.9,154,Kilnyard Crescent,AM7 7HS,421901,1204018,2014-03-21,in_dispute,Y,zone_1
+PCL-PG-00838,PG,Pelling Green,R1,carpark,2287,31.6,217,Pellet Terrace,AM7 3FF,446171,1195066,2021-01-23,unregistered,N,none
+PCL-CB-00839,CB,Corrisbeck,AG,warehouse,261,28.7,65B,Tannery Way,AM9 4XS,434715,1215444,2013-10-06,crown_lease,N,none
+PCL-IH-00840,IH,Isk Harbour,OS,school,70,34.9,205A,Vintners Street,AM7 9QA,418106,1212690,2012-10-11,leasehold_99,N,none
+PCL-VH-00841,VH,Vantry Hollow,I1,allotment,250,20.6,72,Hollybank Road,AM2 6PX,416696,1213917,2009-09-23,leasehold_99,N,none
+PCL-MB-00842,MB,Mirebrook,I1,warehouse,195,41.6,27,Lamplight Rise,AM6 4KL,416017,1218447,2010-12-19,freehold,N,none
+PCL-AR-00843,AR,Ashcombe Reach,R2,office,2894,18.2,30,Tannery Terrace,AM5 2AZ,422665,1203144,2011-11-23,leasehold_99,N,zone_1
+PCL-KF-00844,KF,Kelder Flats,C2,workshop,38452,35.4,148,Windlass Street,AM2 6VS,424705,1201387,1999-02-14,unregistered,N,zone_1
+PCL-OH-00845,OH,Old Harrowgate,MU,dwelling,504,17.9,59,Weirside Way,AM1 8XT,425816,1208285,2005-05-23,in_dispute,N,none
+PCL-SQ-00846,SQ,Sable Quay,R3,civic,75,47.3,55,Pellet Crescent,AM7 2AB,433125,1213547,2013-01-26,leasehold_125,N,none
+PCL-TF-00847,TF,Tarnfield,R1,retail,574,17.5,19,Netherfield Road,AM3 5FK,438767,1180990,2020-04-22,in_dispute,N,none
+PCL-WH-00848,WH,Wend Hill,R3,warehouse,9104,44.7,171,Threadneedle Close,AM4 4YW,426512,1183292,1998-12-06,freehold,Y,none
+PCL-ND-00849,ND,North Dunmoor,R3,school,2262,38.3,4,Threadneedle Lane,AM2 7RV,414393,1217818,2010-11-07,in_dispute,N,none
+PCL-PG-00850,PG,Pelling Green,OS,retail,1077,15.0,89,Marrow Rise,AM6 2AP,432140,1212874,2008-08-28,freehold,N,none
+PCL-CB-00851,CB,Corrisbeck,I2,dwelling_multi,297,32.6,204,Cattle Walk,AM5 6WZ,434072,1213365,1998-07-29,leasehold_99,N,none
+PCL-IH-00852,IH,Isk Harbour,HC,place_of_worship,1858,46.5,194,Quarry Lane,AM4 4LL,425709,1185261,2021-07-13,leasehold_125,N,zone_1
+PCL-VH-00853,VH,Vantry Hollow,I1,vacant,243,31.0,208,Gasworks Way,AM3 7KD,429082,1214520,2000-07-22,unregistered,N,zone_3a
+PCL-MB-00854,MB,Mirebrook,HC,dwelling,2169,4.1,56,Ironmonger Terrace,AM9 2NK,425160,1194989,2023-08-24,crown_lease,N,none
+PCL-AR-00855,AR,Ashcombe Reach,OS,civic,342,38.1,214,Sedge Way,AM7 2WQ,432780,1197878,2002-02-06,freehold,N,zone_1
+PCL-KF-00856,KF,Kelder Flats,HC,allotment,111,42.6,228,Pellet Road,AM4 7XF,415065,1185156,2000-06-02,unregistered,N,none
+PCL-OH-00857,OH,Old Harrowgate,MU,school,379,12.2,114,Vintners Terrace,AM3 2VZ,414664,1192679,2016-04-05,in_dispute,N,none
+PCL-SQ-00858,SQ,Sable Quay,C1,retail,70,17.0,56,Ironmonger Walk,AM8 6VG,428947,1200529,2021-07-24,crown_lease,N,zone_2
+PCL-TF-00859,TF,Tarnfield,C2,workshop,326,25.8,217,Lamplight Walk,AM4 3AQ,433274,1199033,2006-02-12,freehold,N,none
+PCL-WH-00860,WH,Wend Hill,C1,allotment,38112,25.4,223,Vintners Yard,AM9 4EZ,427265,1192603,2004-06-22,leasehold_125,N,none
+PCL-ND-00861,ND,North Dunmoor,R1,allotment,1677,15.3,78,Paternoster Passage,AM3 2BE,414820,1192931,2020-07-24,in_dispute,N,zone_1
+PCL-PG-00862,PG,Pelling Green,HC,allotment,291,28.4,43,Coldharbour Street,AM3 3VW,411337,1186654,2006-07-03,crown_lease,Y,none
+PCL-CB-00863,CB,Corrisbeck,C1,dwelling,877,22.2,232,Mallow Crescent,AM7 6JX,435927,1194083,2023-04-02,crown_lease,N,zone_2
+PCL-IH-00864,IH,Isk Harbour,I1,workshop,583,12.7,111,Kilnyard Close,AM1 9WV,424499,1218889,2011-09-07,freehold,N,zone_2
+PCL-VH-00865,VH,Vantry Hollow,R3,vacant,13831,15.6,122,Cattle Row,AM6 5NG,412230,1188878,1998-08-03,leasehold_99,N,zone_1
+PCL-MB-00866,MB,Mirebrook,C2,vacant,375,35.1,66,Lamplight Lane,AM5 1GG,436204,1200777,2005-01-25,unregistered,N,zone_1
+PCL-AR-00867,AR,Ashcombe Reach,I1,workshop,307,35.1,104,Netherfield Lane,AM7 2BP,424371,1191513,2018-01-17,unregistered,N,zone_3a
+PCL-KF-00868,KF,Kelder Flats,HC,place_of_worship,1257,19.6,179,Mallow Close,AM8 4DV,423906,1182867,2003-02-02,in_dispute,N,none
+PCL-OH-00869,OH,Old Harrowgate,R3,vacant,1887,8.6,45,Cattle Crescent,AM6 1GQ,445730,1182956,1996-09-27,freehold,N,none
+PCL-SQ-00870,SQ,Sable Quay,MU,office,34555,22.9,65,Threadneedle Rise,AM5 1KH,440065,1186178,2004-07-14,unregistered,N,none
+PCL-TF-00871,TF,Tarnfield,I1,retail,341,11.1,112,Windlass Crescent,AM7 9TF,411211,1218446,2020-07-05,leasehold_125,N,zone_2
+PCL-WH-00872,WH,Wend Hill,I1,school,1460,11.1,170,Ropewalk Crescent,AM2 3VF,430525,1192768,2020-09-26,in_dispute,N,zone_2
+PCL-ND-00873,ND,North Dunmoor,AG,workshop,464,30.3,207,Tannery Way,AM1 1AJ,432618,1214231,2009-03-10,leasehold_99,N,zone_2
+PCL-PG-00874,PG,Pelling Green,SP,workshop,729,45.9,89,Gasworks Close,AM8 5FA,423115,1182243,2015-11-03,unregistered,N,zone_2
+PCL-CB-00875,CB,Corrisbeck,SP,dwelling_multi,1664,35.0,167,Lamplight Yard,AM5 4AY,426751,1214757,2013-11-11,crown_lease,N,none
+PCL-IH-00876,IH,Isk Harbour,I2,dwelling,297,30.6,21,Cattle Crescent,AM7 3RW,427433,1182066,2025-07-18,unregistered,N,zone_2
+PCL-VH-00877,VH,Vantry Hollow,R1,workshop,1025,13.5,229,Quarry Crescent,AM2 9FB,422763,1196387,2026-05-05,leasehold_99,N,zone_3a
+PCL-MB-00878,MB,Mirebrook,MU,vacant,3965,6.8,43,Weirside Passage,AM4 3JT,432749,1180903,2008-06-01,freehold,N,zone_2
+PCL-AR-00879,AR,Ashcombe Reach,C2,school,387,16.4,211,Netherfield Lane,AM3 2NK,444919,1202032,2021-12-09,crown_lease,N,none
+PCL-KF-00880,KF,Kelder Flats,R1,warehouse,2044,5.5,4,Saltmarsh Road,AM1 9KW,432011,1199938,2003-07-29,leasehold_125,N,zone_3a
+PCL-OH-00881,OH,Old Harrowgate,MU,civic,937,32.6,216,Ropewalk Rise,AM9 5EP,425837,1191601,2010-08-10,crown_lease,N,zone_2
+PCL-SQ-00882,SQ,Sable Quay,I2,carpark,149,42.3,128,Cattle Close,AM7 4TJ,425802,1209996,2010-04-22,freehold,N,none
+PCL-TF-00883,TF,Tarnfield,AG,warehouse,20560,36.5,9,Sedge Walk,AM8 3VR,424305,1219856,2010-09-25,unregistered,N,none
+PCL-WH-00884,WH,Wend Hill,C1,office,230,33.7,32,Threadneedle Street,AM3 8BL,410839,1207341,2008-11-10,leasehold_99,N,none
+PCL-ND-00885,ND,North Dunmoor,AG,place_of_worship,5378,17.3,117B,Weirside Road,AM6 5ED,436401,1189767,2015-02-20,crown_lease,N,none
+PCL-PG-00886,PG,Pelling Green,I2,dwelling,100,19.2,43,Quarry Close,AM1 2ZB,418294,1200872,2019-07-14,leasehold_99,N,zone_3a
+PCL-CB-00887,CB,Corrisbeck,AG,workshop,10023,32.9,131,Threadneedle Close,AM3 1NK,448805,1209490,2005-10-03,in_dispute,N,zone_3a
+PCL-IH-00888,IH,Isk Harbour,C2,workshop,1631,20.6,184,Paternoster Street,AM2 7GG,445857,1198300,2005-04-02,in_dispute,N,none
+PCL-VH-00889,VH,Vantry Hollow,SP,civic,730,11.1,105,Netherfield Road,AM9 5LY,413816,1203200,2014-06-23,freehold,N,none
+PCL-MB-00890,MB,Mirebrook,AG,allotment,663,27.7,43,Lamplight Passage,AM3 8FY,421802,1183329,2013-04-11,unregistered,N,none
+PCL-AR-00891,AR,Ashcombe Reach,AG,warehouse,178,38.4,96,Bellrope Road,AM5 5ZD,423737,1182303,1999-03-31,leasehold_99,N,zone_3a
+PCL-KF-00892,KF,Kelder Flats,I2,workshop,360,47.2,203,Ropewalk Way,AM7 1ZH,429560,1188618,2010-02-27,freehold,N,zone_3a
+PCL-OH-00893,OH,Old Harrowgate,R3,dwelling_multi,329,42.0,228A,Ironmonger Terrace,AM1 4NY,419441,1186763,1997-09-10,leasehold_99,N,zone_2
+PCL-SQ-00894,SQ,Sable Quay,HC,dwelling_multi,37439,27.1,125,Tannery Road,AM5 9LH,440913,1205029,2010-07-10,leasehold_99,N,none
+PCL-TF-00895,TF,Tarnfield,SP,retail,311,24.8,110,Sedge Lane,AM7 8GA,428663,1212583,1996-01-11,unregistered,N,none
+PCL-WH-00896,WH,Wend Hill,OS,civic,26341,11.2,87,Tannery Way,AM6 7PD,422421,1217973,2009-11-04,leasehold_99,N,none
+PCL-ND-00897,ND,North Dunmoor,AG,dwelling,213,18.7,151,Weirside Rise,AM7 8PP,426444,1214842,1997-02-28,leasehold_99,Y,none
+PCL-PG-00898,PG,Pelling Green,I2,place_of_worship,122,47.9,142,Saltmarsh Street,AM5 9KP,418860,1208357,2019-11-22,leasehold_99,N,zone_3a
+PCL-CB-00899,CB,Corrisbeck,C2,office,21843,10.9,214,Windlass Way,AM9 9TY,445169,1216544,1998-09-26,crown_lease,N,zone_1
+PCL-IH-00900,IH,Isk Harbour,I2,workshop,95,35.5,151,Windlass Passage,AM9 7GG,413849,1210235,2021-07-28,freehold,N,zone_1
+PCL-VH-00901,VH,Vantry Hollow,I2,school,2098,29.3,181,Vintners Road,AM8 3AL,411135,1210020,2008-02-10,unregistered,N,zone_3a
+PCL-MB-00902,MB,Mirebrook,SP,civic,17029,28.6,12,Ferryman Rise,AM2 4GJ,445196,1184157,2023-03-23,in_dispute,N,none
+PCL-AR-00903,AR,Ashcombe Reach,R2,warehouse,32176,33.3,206,Sedge Way,AM4 4VR,410603,1189760,2004-02-06,in_dispute,N,zone_1
+PCL-KF-00904,KF,Kelder Flats,R2,warehouse,439,44.4,210,Ironmonger Crescent,AM8 3SY,439625,1196954,2025-05-04,leasehold_125,N,none
+PCL-OH-00905,OH,Old Harrowgate,HC,school,643,30.9,83,Kilnyard Rise,AM7 4EB,417049,1215271,2006-02-14,leasehold_125,N,zone_2
+PCL-SQ-00906,SQ,Sable Quay,HC,place_of_worship,542,25.5,113,Lamplight Row,AM3 8BK,444877,1216778,2019-09-23,in_dispute,N,none
+PCL-TF-00907,TF,Tarnfield,R3,dwelling_multi,257,22.2,116B,Hollybank Yard,AM3 2YW,417591,1189390,1997-08-02,unregistered,N,none
+PCL-WH-00908,WH,Wend Hill,HC,dwelling_multi,572,5.9,16,Saltmarsh Street,AM7 9ZZ,447367,1180198,2004-05-03,crown_lease,N,zone_1
+PCL-ND-00909,ND,North Dunmoor,C2,warehouse,177,25.6,104,Ferryman Street,AM2 6JN,426250,1218168,2017-09-01,crown_lease,N,none
+PCL-PG-00910,PG,Pelling Green,C2,retail,205,35.3,162,Vintners Street,AM6 8LA,447777,1182530,2020-09-03,unregistered,N,none
+PCL-CB-00911,CB,Corrisbeck,R1,vacant,113,27.9,46,Netherfield Yard,AM2 6FX,420134,1215186,2008-11-05,leasehold_125,N,zone_2
+PCL-IH-00912,IH,Isk Harbour,C2,workshop,1482,19.5,197,Ferryman Close,AM9 4AN,448842,1209350,2015-08-12,crown_lease,N,zone_2
+PCL-VH-00913,VH,Vantry Hollow,R1,workshop,2002,47.4,47,Pellet Way,AM5 6HA,437766,1191019,2014-12-18,crown_lease,N,zone_1
+PCL-MB-00914,MB,Mirebrook,I1,school,237,4.5,82,Quarry Yard,AM5 1ZZ,440021,1203212,2022-02-08,crown_lease,N,none
+PCL-AR-00915,AR,Ashcombe Reach,C1,workshop,88,29.5,192,Pellet Way,AM5 2GR,442683,1191885,1999-05-29,freehold,N,none
+PCL-KF-00916,KF,Kelder Flats,I2,office,2297,23.9,209,Pellet Yard,AM9 8ZS,440986,1216861,1999-10-18,freehold,Y,zone_1
+PCL-OH-00917,OH,Old Harrowgate,I2,retail,5174,37.0,224,Kilnyard Rise,AM4 3AB,418144,1208772,2025-07-24,freehold,N,zone_3b
+PCL-SQ-00918,SQ,Sable Quay,C1,school,20273,8.6,181,Cattle Lane,AM3 5KY,434442,1189149,2025-01-27,in_dispute,N,none
+PCL-TF-00919,TF,Tarnfield,R2,dwelling,396,9.3,203,Threadneedle Terrace,AM4 8JX,439330,1219211,2003-03-15,unregistered,N,zone_3a
+PCL-WH-00920,WH,Wend Hill,I2,place_of_worship,36007,41.2,96,Kilnyard Way,AM1 3NE,413002,1190637,2020-10-03,freehold,N,none
+PCL-ND-00921,ND,North Dunmoor,I1,vacant,356,29.6,53,Paternoster Way,AM7 3DB,430707,1195481,1997-12-24,freehold,N,zone_3b
+PCL-PG-00922,PG,Pelling Green,C1,vacant,790,34.3,192,Sedge Road,AM4 5RT,412536,1181273,2007-01-10,leasehold_99,N,none
+PCL-CB-00923,CB,Corrisbeck,OS,school,1608,14.9,82A,Saltmarsh Passage,AM1 2EP,410355,1213245,2001-09-06,unregistered,N,none
+PCL-IH-00924,IH,Isk Harbour,SP,school,135,43.7,5C,Gasworks Passage,AM6 7FA,436032,1191457,2026-01-25,unregistered,N,none
+PCL-VH-00925,VH,Vantry Hollow,AG,allotment,30996,21.1,73,Netherfield Rise,AM2 3LB,446875,1180154,2007-07-18,crown_lease,N,zone_2
+PCL-MB-00926,MB,Mirebrook,I1,carpark,991,47.6,183,Ropewalk Rise,AM5 1RR,436229,1188700,2025-10-06,leasehold_125,N,zone_3a
+PCL-AR-00927,AR,Ashcombe Reach,AG,school,239,43.4,181,Netherfield Road,AM6 3RX,411942,1215434,2011-01-06,freehold,Y,zone_1
+PCL-KF-00928,KF,Kelder Flats,R3,civic,29281,12.8,133,Netherfield Street,AM1 4EE,420307,1187592,2023-06-15,crown_lease,N,none
+PCL-OH-00929,OH,Old Harrowgate,I1,allotment,35272,5.8,181,Ferryman Street,AM7 9JQ,443155,1192330,2005-12-01,crown_lease,N,none
+PCL-SQ-00930,SQ,Sable Quay,MU,warehouse,384,41.6,28,Lamplight Crescent,AM2 1PZ,438013,1189185,2003-08-28,in_dispute,N,zone_3b
+PCL-TF-00931,TF,Tarnfield,MU,vacant,117,17.1,40,Weirside Crescent,AM9 7RW,434622,1209805,2004-03-17,leasehold_125,N,none
+PCL-WH-00932,WH,Wend Hill,C2,retail,504,26.4,89,Windlass Street,AM8 9RD,430546,1206759,2013-01-17,leasehold_125,N,zone_2
+PCL-ND-00933,ND,North Dunmoor,R2,vacant,23292,11.6,156,Netherfield Terrace,AM5 5YA,412016,1219592,2019-10-23,leasehold_99,N,zone_2
+PCL-PG-00934,PG,Pelling Green,R1,retail,202,7.8,155,Lamplight Road,AM9 7QH,429097,1182872,2007-01-18,crown_lease,N,none
+PCL-CB-00935,CB,Corrisbeck,MU,vacant,1199,41.3,166,Ropewalk Row,AM2 9KF,446503,1218823,2014-06-26,unregistered,N,zone_3a
+PCL-IH-00936,IH,Isk Harbour,OS,carpark,36933,12.2,164,Lamplight Rise,AM3 1FA,443644,1204157,2000-12-21,in_dispute,N,zone_1
+PCL-VH-00937,VH,Vantry Hollow,AG,civic,32701,17.9,215,Weirside Close,AM9 6FY,437600,1208462,2009-07-07,crown_lease,N,none
+PCL-MB-00938,MB,Mirebrook,SP,retail,2328,37.2,137,Quarry Yard,AM1 5JK,441153,1200406,2023-01-30,leasehold_125,N,none
+PCL-AR-00939,AR,Ashcombe Reach,I1,dwelling_multi,185,39.6,12,Windlass Way,AM3 2AD,443597,1183331,2002-08-01,in_dispute,Y,none
+PCL-KF-00940,KF,Kelder Flats,R3,civic,227,37.0,77,Gasworks Close,AM2 1SN,438415,1209036,2010-02-12,crown_lease,N,none
+PCL-OH-00941,OH,Old Harrowgate,SP,school,381,37.4,126,Netherfield Road,AM1 2GJ,441216,1210831,2019-11-28,leasehold_99,N,zone_3a
+PCL-SQ-00942,SQ,Sable Quay,MU,carpark,12510,13.9,144,Bellrope Lane,AM2 5PF,418808,1209015,2000-11-11,leasehold_125,N,zone_3a
+PCL-TF-00943,TF,Tarnfield,C1,school,39348,8.7,131,Pellet Street,AM5 3WL,434612,1183769,2024-09-15,unregistered,N,zone_2
+PCL-WH-00944,WH,Wend Hill,I2,dwelling_multi,4235,5.2,48,Hollybank Yard,AM5 1SS,428551,1189745,2013-08-17,leasehold_99,N,none
+PCL-ND-00945,ND,North Dunmoor,HC,carpark,29052,15.6,79,Mallow Walk,AM6 7YX,417852,1180936,2008-02-28,leasehold_125,N,zone_1
+PCL-PG-00946,PG,Pelling Green,SP,civic,121,16.0,73C,Vintners Close,AM8 6QH,424256,1199198,2014-12-24,leasehold_99,N,none
+PCL-CB-00947,CB,Corrisbeck,C2,vacant,191,9.3,203,Ferryman Row,AM9 8XK,433719,1199033,2000-05-27,unregistered,N,none
+PCL-IH-00948,IH,Isk Harbour,HC,warehouse,38454,37.4,35,Saltmarsh Way,AM3 7BP,411184,1199160,1996-03-21,unregistered,N,zone_3b
+PCL-VH-00949,VH,Vantry Hollow,OS,civic,32366,36.5,51,Paternoster Close,AM2 7AF,435501,1180534,2023-11-06,crown_lease,N,none
+PCL-MB-00950,MB,Mirebrook,R1,civic,36674,16.8,1,Cattle Row,AM3 2WD,420288,1195846,2024-07-22,leasehold_99,Y,zone_3a
+PCL-AR-00951,AR,Ashcombe Reach,MU,vacant,24987,44.7,200,Paternoster Way,AM6 8EZ,424988,1183225,2015-07-17,unregistered,N,none
+PCL-KF-00952,KF,Kelder Flats,R1,dwelling_multi,1403,5.8,158,Hollybank Close,AM4 7BZ,421722,1185513,1997-12-23,leasehold_99,N,none
+PCL-OH-00953,OH,Old Harrowgate,I1,warehouse,25295,37.7,13,Gasworks Yard,AM2 8TB,438620,1196497,2000-04-05,unregistered,N,zone_1
+PCL-SQ-00954,SQ,Sable Quay,R3,office,431,31.1,219,Cattle Close,AM4 8VY,437746,1205854,2003-11-19,crown_lease,N,none
+PCL-TF-00955,TF,Tarnfield,R1,place_of_worship,17457,32.3,100,Sedge Close,AM1 3WJ,429383,1209929,2023-01-23,crown_lease,N,none
+PCL-WH-00956,WH,Wend Hill,C2,carpark,25831,41.9,119,Ferryman Road,AM9 1DJ,437047,1199890,2014-04-11,leasehold_125,N,none
+PCL-ND-00957,ND,North Dunmoor,R3,office,383,41.6,114,Quarry Close,AM4 9JJ,434824,1202780,2000-07-27,leasehold_125,N,none
+PCL-PG-00958,PG,Pelling Green,R2,dwelling,33132,25.4,113,Ironmonger Street,AM8 3NK,428479,1181927,2001-08-27,leasehold_125,N,none
+PCL-CB-00959,CB,Corrisbeck,R3,workshop,176,13.1,136,Paternoster Road,AM6 5SJ,411002,1209176,2012-11-19,leasehold_99,N,none
+PCL-IH-00960,IH,Isk Harbour,C1,warehouse,3954,30.5,191,Cattle Rise,AM1 5FR,431389,1198394,2019-02-09,leasehold_99,N,zone_3a
+PCL-VH-00961,VH,Vantry Hollow,R3,allotment,24663,14.0,124,Windlass Road,AM8 5JD,447328,1190470,2014-08-10,leasehold_125,N,none
+PCL-MB-00962,MB,Mirebrook,AG,retail,343,32.8,143,Ostler Passage,AM9 7WD,419483,1218761,2002-05-21,freehold,N,none
+PCL-AR-00963,AR,Ashcombe Reach,SP,warehouse,644,19.8,88,Ropewalk Rise,AM7 8FD,431612,1198597,2022-11-12,crown_lease,N,none
+PCL-KF-00964,KF,Kelder Flats,R2,vacant,1980,35.2,111A,Paternoster Crescent,AM9 8SB,412724,1185671,2010-08-10,crown_lease,N,zone_1
+PCL-OH-00965,OH,Old Harrowgate,I2,vacant,844,24.8,155,Coldharbour Rise,AM9 7TH,427204,1208401,2013-06-24,crown_lease,N,zone_1
+PCL-SQ-00966,SQ,Sable Quay,AG,civic,1562,31.2,47,Netherfield Walk,AM3 9XE,443929,1219417,2000-02-12,crown_lease,N,none
+PCL-TF-00967,TF,Tarnfield,R2,workshop,321,30.3,200,Dovecote Crescent,AM3 1HD,434687,1197052,2008-08-27,leasehold_125,N,zone_3a
+PCL-WH-00968,WH,Wend Hill,SP,carpark,348,25.6,132,Netherfield Road,AM8 5YY,411118,1186643,2006-08-29,unregistered,N,none
+PCL-ND-00969,ND,North Dunmoor,R1,school,1523,8.0,234,Kilnyard Close,AM2 8DZ,436469,1203163,2009-08-06,freehold,N,none
+PCL-PG-00970,PG,Pelling Green,R1,workshop,954,9.2,98,Cattle Rise,AM2 8HB,413730,1203240,2006-01-14,in_dispute,N,zone_3a
+PCL-CB-00971,CB,Corrisbeck,C2,warehouse,381,17.7,69,Bellrope Way,AM9 3XQ,435945,1185063,2019-08-04,leasehold_125,N,zone_2
+PCL-IH-00972,IH,Isk Harbour,R2,vacant,805,25.2,229,Ostler Yard,AM6 9TG,447351,1186013,2001-01-30,leasehold_99,N,none
+PCL-VH-00973,VH,Vantry Hollow,R3,allotment,1328,29.3,187,Mallow Way,AM3 3QE,423163,1218928,2025-07-23,in_dispute,N,zone_3a
+PCL-MB-00974,MB,Mirebrook,HC,school,1184,5.9,106,Quarry Terrace,AM7 4GG,444160,1193093,2006-01-08,crown_lease,N,none
+PCL-AR-00975,AR,Ashcombe Reach,MU,dwelling_multi,829,21.0,57,Lamplight Walk,AM6 4LJ,411634,1193246,2001-02-16,leasehold_99,N,zone_1
+PCL-KF-00976,KF,Kelder Flats,MU,carpark,36078,13.9,217,Saltmarsh Way,AM6 9GS,434711,1212084,2025-12-10,leasehold_125,N,none
+PCL-OH-00977,OH,Old Harrowgate,HC,workshop,1082,39.8,124,Threadneedle Street,AM5 3TD,415412,1183757,2020-03-15,unregistered,N,zone_2
+PCL-SQ-00978,SQ,Sable Quay,R1,workshop,31475,8.1,56A,Pellet Road,AM2 2SR,417270,1183644,2014-05-22,unregistered,N,none
+PCL-TF-00979,TF,Tarnfield,AG,place_of_worship,11271,44.1,225,Lamplight Terrace,AM3 2WJ,422937,1197757,2012-07-26,leasehold_125,N,none
+PCL-WH-00980,WH,Wend Hill,OS,dwelling_multi,1475,8.2,80,Threadneedle Yard,AM1 4VH,419205,1214587,2015-09-13,leasehold_125,N,zone_3a
+PCL-ND-00981,ND,North Dunmoor,I2,vacant,382,10.3,171,Mallow Passage,AM5 3BF,431385,1201357,2012-11-21,freehold,N,none
+PCL-PG-00982,PG,Pelling Green,R1,carpark,1365,36.9,163,Lamplight Rise,AM4 1BL,415376,1194885,2003-01-13,crown_lease,N,none
+PCL-CB-00983,CB,Corrisbeck,HC,carpark,309,29.7,143,Windlass Walk,AM5 2RE,432353,1203512,2013-04-10,unregistered,N,zone_1
+PCL-IH-00984,IH,Isk Harbour,R1,warehouse,1021,21.5,234,Saltmarsh Lane,AM4 3ZP,422279,1188439,2025-07-23,leasehold_99,N,zone_3a
+PCL-VH-00985,VH,Vantry Hollow,R1,retail,22783,45.0,136,Gasworks Row,AM9 6WG,425765,1208434,2005-11-16,crown_lease,N,none
+PCL-MB-00986,MB,Mirebrook,HC,place_of_worship,68,23.5,5,Dovecote Crescent,AM4 1LB,430838,1205154,2013-02-03,leasehold_125,N,zone_2
+PCL-AR-00987,AR,Ashcombe Reach,I2,allotment,1380,34.9,186,Kilnyard Way,AM3 3FN,410999,1180374,1997-05-18,crown_lease,N,none
+PCL-KF-00988,KF,Kelder Flats,R1,vacant,35428,37.0,40,Pellet Road,AM3 3AQ,420625,1207133,2017-06-16,unregistered,N,zone_2
+PCL-OH-00989,OH,Old Harrowgate,C1,retail,1212,39.0,126,Saltmarsh Passage,AM3 4JK,427626,1197953,2019-08-17,leasehold_125,Y,zone_2
+PCL-SQ-00990,SQ,Sable Quay,AG,school,307,39.1,197,Paternoster Passage,AM1 9XJ,436223,1204824,2022-01-05,in_dispute,N,zone_1
+PCL-TF-00991,TF,Tarnfield,MU,warehouse,239,7.8,223,Dovecote Close,AM4 5ZL,420092,1203614,2019-12-26,freehold,N,none
+PCL-WH-00992,WH,Wend Hill,I1,retail,248,6.3,22,Netherfield Passage,AM1 6NX,445980,1182620,2009-07-30,crown_lease,N,none
+PCL-ND-00993,ND,North Dunmoor,C1,warehouse,121,32.1,83,Netherfield Yard,AM8 6AL,413666,1217025,2008-02-02,unregistered,N,zone_3a
+PCL-PG-00994,PG,Pelling Green,AG,retail,39540,16.1,103,Threadneedle Close,AM9 9DJ,438334,1183702,2024-04-01,unregistered,N,none
+PCL-CB-00995,CB,Corrisbeck,AG,warehouse,20821,44.2,25,Dovecote Way,AM5 9RN,412477,1201673,2007-01-13,in_dispute,N,none
+PCL-IH-00996,IH,Isk Harbour,R3,retail,1556,17.5,96,Paternoster Passage,AM8 4GT,448773,1199877,2022-01-05,crown_lease,N,zone_3b
+PCL-VH-00997,VH,Vantry Hollow,I1,civic,462,13.4,97,Ropewalk Close,AM4 1QG,423669,1214482,2008-08-23,leasehold_99,Y,zone_2
+PCL-MB-00998,MB,Mirebrook,HC,workshop,17121,31.0,206,Windlass Yard,AM4 8VK,433054,1183054,2009-07-20,freehold,N,none
+PCL-AR-00999,AR,Ashcombe Reach,MU,civic,2121,13.2,154,Paternoster Way,AM6 6HJ,415120,1188555,2001-09-16,crown_lease,N,none
+PCL-KF-01000,KF,Kelder Flats,I2,civic,1100,33.8,153,Pellet Passage,AM6 6ST,432821,1189684,2010-02-08,leasehold_125,Y,none
+PCL-OH-01001,OH,Old Harrowgate,C2,warehouse,674,29.7,17,Mallow Crescent,AM9 9HA,429783,1189859,2006-07-17,leasehold_99,N,none
+PCL-SQ-01002,SQ,Sable Quay,R3,warehouse,23652,32.2,15,Weirside Crescent,AM7 5YZ,417236,1198043,1999-06-25,unregistered,N,zone_1
+PCL-TF-01003,TF,Tarnfield,SP,civic,399,11.7,9,Netherfield Passage,AM2 7QB,449160,1198796,2022-01-09,leasehold_99,N,zone_3a
+PCL-WH-01004,WH,Wend Hill,R1,carpark,218,37.0,54,Ostler Passage,AM8 9SP,429971,1202097,2024-09-06,crown_lease,N,zone_3a
+PCL-ND-01005,ND,North Dunmoor,I1,vacant,28371,13.2,42,Gasworks Row,AM9 2VS,425575,1200096,2022-08-20,unregistered,N,zone_2
+PCL-PG-01006,PG,Pelling Green,R3,carpark,34126,5.9,198,Dovecote Road,AM4 6AT,431301,1204493,2019-11-21,leasehold_125,N,none
+PCL-CB-01007,CB,Corrisbeck,SP,school,30105,38.0,53,Tannery Rise,AM5 5KH,423381,1183440,2025-08-26,unregistered,N,zone_3a
+PCL-IH-01008,IH,Isk Harbour,SP,dwelling_multi,11330,33.5,92,Saltmarsh Passage,AM6 3WF,445264,1183909,1998-04-12,unregistered,N,none
+PCL-VH-01009,VH,Vantry Hollow,OS,dwelling,286,5.2,141,Gasworks Passage,AM4 4SQ,429095,1206955,2020-09-17,leasehold_99,N,zone_2
+PCL-MB-01010,MB,Mirebrook,C1,vacant,287,32.2,156B,Windlass Road,AM5 1TL,437880,1193962,2008-03-02,freehold,N,none
+PCL-AR-01011,AR,Ashcombe Reach,AG,carpark,10922,33.4,138,Tannery Street,AM8 6TA,437938,1211987,1997-03-18,leasehold_99,N,none
+PCL-KF-01012,KF,Kelder Flats,I1,school,2594,19.3,6,Tannery Rise,AM5 3DL,424291,1213313,1999-09-16,freehold,N,zone_2
+PCL-OH-01013,OH,Old Harrowgate,AG,allotment,1949,38.1,215,Lamplight Passage,AM7 6KP,413004,1216651,2012-04-10,in_dispute,N,none
+PCL-SQ-01014,SQ,Sable Quay,HC,place_of_worship,293,10.1,224,Netherfield Close,AM2 1JS,418234,1199225,2006-06-24,unregistered,N,none
+PCL-TF-01015,TF,Tarnfield,R3,carpark,399,23.8,30,Marrow Crescent,AM9 4VK,427742,1216655,1998-04-22,unregistered,N,none
+PCL-WH-01016,WH,Wend Hill,AG,workshop,868,36.0,192,Vintners Way,AM9 2JS,446125,1198655,2001-09-11,freehold,N,zone_2
+PCL-ND-01017,ND,North Dunmoor,OS,allotment,2304,45.4,184,Paternoster Passage,AM1 5AK,421834,1219415,2021-10-05,leasehold_125,N,zone_3b
+PCL-PG-01018,PG,Pelling Green,R1,office,223,21.4,46A,Ostler Crescent,AM7 5ZE,425690,1200041,2025-02-02,crown_lease,N,none
+PCL-CB-01019,CB,Corrisbeck,AG,carpark,14824,16.8,132,Pellet Close,AM7 4ZP,427116,1194497,2025-10-25,leasehold_99,N,none
+PCL-IH-01020,IH,Isk Harbour,C2,civic,2224,27.0,59,Tannery Road,AM3 5RG,433186,1215405,2009-05-26,crown_lease,N,none
+PCL-VH-01021,VH,Vantry Hollow,I2,vacant,221,43.3,2,Quarry Way,AM4 8PD,437597,1200534,2022-01-01,in_dispute,Y,none
+PCL-MB-01022,MB,Mirebrook,I2,workshop,1259,11.3,2,Hollybank Street,AM3 8FP,426863,1185697,2020-02-10,freehold,N,zone_3a
+PCL-AR-01023,AR,Ashcombe Reach,OS,place_of_worship,184,11.4,203,Windlass Terrace,AM3 9JZ,412187,1217557,2010-07-21,unregistered,N,none
+PCL-KF-01024,KF,Kelder Flats,MU,civic,351,35.9,29A,Vintners Rise,AM6 6NQ,426542,1190447,2012-07-03,freehold,N,zone_3a
+PCL-OH-01025,OH,Old Harrowgate,AG,place_of_worship,2557,14.2,175,Lamplight Lane,AM9 2JX,410195,1193165,2021-08-23,freehold,N,none
+PCL-SQ-01026,SQ,Sable Quay,AG,place_of_worship,378,40.2,160,Vintners Terrace,AM3 3BL,447081,1217436,2017-03-12,in_dispute,N,zone_3a
+PCL-TF-01027,TF,Tarnfield,R2,carpark,7819,22.4,238,Lamplight Close,AM2 9RA,432175,1208860,2001-11-09,freehold,N,none
+PCL-WH-01028,WH,Wend Hill,HC,school,33173,37.0,2,Paternoster Lane,AM7 7DL,424812,1181369,2000-12-04,in_dispute,N,none
+PCL-ND-01029,ND,North Dunmoor,HC,allotment,1721,4.1,114,Marrow Lane,AM6 8BP,435459,1195231,2004-03-01,crown_lease,N,none
+PCL-PG-01030,PG,Pelling Green,SP,workshop,20724,43.7,218,Ostler Lane,AM8 7PJ,412384,1198757,2006-01-11,unregistered,Y,none
+PCL-CB-01031,CB,Corrisbeck,MU,dwelling_multi,1969,33.1,82,Pellet Crescent,AM1 2LX,424943,1200501,2022-03-10,in_dispute,N,none
+PCL-IH-01032,IH,Isk Harbour,R1,office,165,7.8,66,Pellet Crescent,AM7 1FD,412146,1205457,2006-07-02,unregistered,N,zone_1
+PCL-VH-01033,VH,Vantry Hollow,SP,dwelling,1151,9.5,18,Dovecote Row,AM4 8SS,425313,1187103,1996-11-12,in_dispute,N,none
+PCL-MB-01034,MB,Mirebrook,AG,office,175,36.5,150,Cattle Way,AM7 5WS,417437,1185436,2015-04-26,unregistered,N,none
+PCL-AR-01035,AR,Ashcombe Reach,R2,civic,198,5.5,183,Bellrope Rise,AM4 6XG,417632,1214393,2003-05-13,leasehold_125,N,none
+PCL-KF-01036,KF,Kelder Flats,OS,dwelling_multi,24584,35.3,82,Windlass Crescent,AM9 1EX,424891,1182102,2005-10-30,leasehold_99,N,none
+PCL-OH-01037,OH,Old Harrowgate,I1,carpark,644,39.4,12,Lamplight Road,AM6 2QJ,431305,1192229,2004-09-29,in_dispute,Y,zone_3b
+PCL-SQ-01038,SQ,Sable Quay,R2,dwelling,9997,6.2,98,Ferryman Crescent,AM4 4GW,442960,1185935,2010-08-24,crown_lease,N,zone_1
+PCL-TF-01039,TF,Tarnfield,C2,dwelling_multi,1318,21.2,76,Weirside Passage,AM7 8GN,411964,1215658,2025-08-31,freehold,N,none
+PCL-WH-01040,WH,Wend Hill,OS,workshop,2257,44.6,167,Netherfield Close,AM2 3VW,420594,1194262,1999-02-14,leasehold_99,N,none
+PCL-ND-01041,ND,North Dunmoor,I1,school,390,13.6,192,Tannery Rise,AM8 5XE,418240,1203231,2008-02-08,unregistered,N,zone_3a
+PCL-PG-01042,PG,Pelling Green,I2,allotment,1033,42.1,17,Cattle Way,AM5 4AK,416054,1187455,2018-04-04,leasehold_99,N,none
+PCL-CB-01043,CB,Corrisbeck,SP,dwelling_multi,29881,21.4,172,Netherfield Crescent,AM1 4YZ,419751,1184213,2014-10-14,unregistered,N,none
+PCL-IH-01044,IH,Isk Harbour,OS,carpark,15619,36.3,155,Dovecote Rise,AM5 5BL,422941,1183140,2018-07-08,in_dispute,N,none
+PCL-VH-01045,VH,Vantry Hollow,MU,civic,1682,14.1,14,Threadneedle Lane,AM3 2SZ,432434,1191850,1997-10-20,leasehold_99,N,none
+PCL-MB-01046,MB,Mirebrook,R3,dwelling,565,24.7,130B,Dovecote Way,AM3 4QV,428904,1190024,2006-11-11,leasehold_125,N,zone_3a
+PCL-AR-01047,AR,Ashcombe Reach,R2,carpark,1079,47.6,38,Cattle Yard,AM2 6AY,424554,1192291,2007-08-06,leasehold_99,N,none
+PCL-KF-01048,KF,Kelder Flats,R1,retail,225,37.4,217,Ironmonger Street,AM3 1YX,421105,1212133,2022-05-28,leasehold_99,N,none
+PCL-OH-01049,OH,Old Harrowgate,OS,workshop,270,18.1,21,Quarry Passage,AM3 6ST,418408,1184819,2024-07-30,leasehold_125,N,zone_2
+PCL-SQ-01050,SQ,Sable Quay,OS,carpark,220,40.1,44,Ropewalk Way,AM7 1ZW,431782,1205888,2013-11-18,leasehold_99,N,none
+PCL-TF-01051,TF,Tarnfield,R3,dwelling,1084,35.5,202,Quarry Way,AM1 8TE,422021,1214218,2012-09-01,crown_lease,N,none
+PCL-WH-01052,WH,Wend Hill,R1,school,1046,32.5,24C,Mallow Lane,AM1 9RV,433648,1185801,1996-02-07,leasehold_99,N,zone_3b
+PCL-ND-01053,ND,North Dunmoor,HC,carpark,1422,28.4,150,Pellet Passage,AM9 9GJ,410439,1215492,2009-05-10,leasehold_99,N,zone_1
+PCL-PG-01054,PG,Pelling Green,R3,dwelling_multi,2156,41.4,154,Windlass Walk,AM5 9RL,446226,1208963,1996-10-23,unregistered,N,zone_2
+PCL-CB-01055,CB,Corrisbeck,R3,carpark,1838,16.6,26,Pellet Yard,AM8 8GN,446386,1184299,2009-05-25,crown_lease,N,none
+PCL-IH-01056,IH,Isk Harbour,I2,retail,128,29.0,14,Threadneedle Yard,AM4 2TS,420350,1202802,2009-05-21,leasehold_99,N,zone_2
+PCL-VH-01057,VH,Vantry Hollow,C2,office,455,28.1,187,Weirside Passage,AM2 4YA,419439,1195751,2006-09-26,freehold,N,zone_3a
+PCL-MB-01058,MB,Mirebrook,C2,dwelling,1955,7.2,177,Saltmarsh Terrace,AM9 6SP,431123,1219298,2004-04-10,unregistered,N,none
+PCL-AR-01059,AR,Ashcombe Reach,I1,vacant,1212,29.5,233,Quarry Yard,AM8 1QY,415703,1194205,2006-02-27,crown_lease,N,zone_3a
+PCL-KF-01060,KF,Kelder Flats,C2,office,2359,12.1,45,Vintners Way,AM2 8LK,441676,1215950,2001-11-09,in_dispute,N,none
+PCL-OH-01061,OH,Old Harrowgate,OS,civic,146,40.5,2,Cattle Lane,AM2 6XF,422493,1216407,2008-02-14,crown_lease,N,none
+PCL-SQ-01062,SQ,Sable Quay,OS,warehouse,30819,21.7,29,Hollybank Walk,AM7 1QD,418037,1210818,2014-12-29,unregistered,N,none
+PCL-TF-01063,TF,Tarnfield,R3,school,31271,29.9,229,Saltmarsh Street,AM8 3NF,441647,1196665,2013-10-04,leasehold_125,N,none
+PCL-WH-01064,WH,Wend Hill,R1,school,32840,17.7,152A,Cattle Terrace,AM3 2PR,448612,1214781,2005-08-28,freehold,N,none
+PCL-ND-01065,ND,North Dunmoor,C2,workshop,34269,31.7,91,Ironmonger Way,AM3 5QZ,414319,1195934,2013-11-17,freehold,N,none
+PCL-PG-01066,PG,Pelling Green,MU,office,697,19.0,157,Threadneedle Walk,AM4 4SF,418484,1217278,2009-08-19,in_dispute,Y,none
+PCL-CB-01067,CB,Corrisbeck,C2,warehouse,1357,45.2,193C,Sedge Yard,AM7 2VA,436042,1198651,1999-04-17,crown_lease,N,none
+PCL-IH-01068,IH,Isk Harbour,I1,warehouse,185,12.6,212,Weirside Terrace,AM8 1TQ,433676,1190210,1999-07-28,freehold,N,none
+PCL-VH-01069,VH,Vantry Hollow,C1,allotment,362,29.8,224,Ostler Walk,AM1 4DA,421301,1187502,2013-11-15,leasehold_125,N,zone_1
+PCL-MB-01070,MB,Mirebrook,C2,dwelling_multi,532,17.5,107,Pellet Row,AM9 8WG,425016,1183569,2012-06-04,in_dispute,N,zone_3a
+PCL-AR-01071,AR,Ashcombe Reach,SP,civic,870,20.3,29,Marrow Walk,AM3 3EB,426495,1187921,2005-07-15,leasehold_125,N,none
+PCL-KF-01072,KF,Kelder Flats,R2,retail,23388,32.6,75,Tannery Way,AM9 6QJ,428469,1216231,2016-05-31,leasehold_125,N,none
+PCL-OH-01073,OH,Old Harrowgate,C2,retail,8798,24.6,170,Sedge Passage,AM7 4YJ,436502,1219956,2022-07-18,freehold,N,none
+PCL-SQ-01074,SQ,Sable Quay,AG,allotment,2057,20.1,163,Ferryman Road,AM6 1BV,446780,1214469,2009-10-27,unregistered,N,none
+PCL-TF-01075,TF,Tarnfield,R3,dwelling_multi,941,46.2,51,Ropewalk Lane,AM1 4KZ,445481,1189910,2000-07-12,leasehold_99,N,none
+PCL-WH-01076,WH,Wend Hill,AG,retail,186,24.5,203,Windlass Close,AM2 7YB,426427,1201359,2004-03-27,crown_lease,N,zone_1
+PCL-ND-01077,ND,North Dunmoor,MU,allotment,37490,10.4,78,Ostler Street,AM7 7AW,448620,1193245,1996-01-08,unregistered,N,zone_2
+PCL-PG-01078,PG,Pelling Green,AG,office,256,38.2,227,Hollybank Street,AM1 9ES,447185,1218790,2006-12-11,unregistered,N,none
+PCL-CB-01079,CB,Corrisbeck,SP,place_of_worship,310,20.2,97,Bellrope Lane,AM8 4BJ,446550,1208471,2025-10-15,leasehold_99,N,none
+PCL-IH-01080,IH,Isk Harbour,C2,allotment,27970,42.9,125,Ferryman Road,AM7 1ZQ,443798,1208544,1997-06-16,unregistered,N,none
+PCL-VH-01081,VH,Vantry Hollow,HC,carpark,333,36.9,61,Ostler Close,AM8 8EB,422567,1205753,2009-03-11,freehold,N,none
+PCL-MB-01082,MB,Mirebrook,R1,school,18327,27.3,40,Netherfield Terrace,AM6 2HG,422262,1202657,2024-11-20,unregistered,N,zone_1
+PCL-AR-01083,AR,Ashcombe Reach,OS,civic,1913,21.3,187,Quarry Yard,AM7 9QR,417404,1210100,2001-04-19,leasehold_99,N,none
+PCL-KF-01084,KF,Kelder Flats,R2,civic,62,44.6,27,Ironmonger Terrace,AM5 1YG,435466,1180683,2025-12-03,in_dispute,N,none
+PCL-OH-01085,OH,Old Harrowgate,HC,place_of_worship,19017,17.6,74,Vintners Walk,AM1 9SR,442535,1206307,2003-08-22,freehold,N,none
+PCL-SQ-01086,SQ,Sable Quay,R1,allotment,779,44.0,156,Pellet Terrace,AM8 5ND,429293,1193967,2009-04-30,in_dispute,N,none
+PCL-TF-01087,TF,Tarnfield,R1,allotment,30311,4.3,227,Weirside Yard,AM3 2LL,417626,1182339,2020-03-24,crown_lease,N,zone_3a
+PCL-WH-01088,WH,Wend Hill,C1,school,75,32.1,43,Threadneedle Crescent,AM3 5HQ,411901,1218264,2026-01-11,leasehold_99,N,none
+PCL-ND-01089,ND,North Dunmoor,HC,workshop,21114,43.8,193,Lamplight Road,AM2 2BH,436997,1212921,2018-02-25,leasehold_99,N,zone_3a
+PCL-PG-01090,PG,Pelling Green,I2,dwelling,74,18.0,221,Vintners Yard,AM9 3QW,440830,1182263,1999-04-14,freehold,N,none
+PCL-CB-01091,CB,Corrisbeck,HC,workshop,129,26.9,188,Cattle Crescent,AM3 6RX,440505,1190492,2006-01-27,in_dispute,N,none
+PCL-IH-01092,IH,Isk Harbour,R3,place_of_worship,159,13.4,208,Saltmarsh Passage,AM7 9HN,443742,1182203,2007-09-22,leasehold_99,N,none
+PCL-VH-01093,VH,Vantry Hollow,R1,workshop,367,43.0,118,Bellrope Road,AM4 8JW,441664,1213357,2000-10-05,crown_lease,N,zone_1
+PCL-MB-01094,MB,Mirebrook,R2,workshop,23374,11.6,181A,Netherfield Street,AM7 7EW,442953,1195142,2012-03-22,in_dispute,N,none
+PCL-AR-01095,AR,Ashcombe Reach,C2,warehouse,2249,11.3,105,Threadneedle Road,AM5 1BG,435027,1215437,2003-05-02,in_dispute,N,zone_1
+PCL-KF-01096,KF,Kelder Flats,R3,vacant,344,18.3,42,Ostler Way,AM6 9SX,413333,1185536,2004-06-20,leasehold_125,N,zone_1
+PCL-OH-01097,OH,Old Harrowgate,C1,warehouse,27186,34.1,1,Ostler Close,AM8 3DL,422378,1200250,2024-07-29,leasehold_99,N,none
+PCL-SQ-01098,SQ,Sable Quay,HC,carpark,1955,42.4,190,Saltmarsh Yard,AM9 1JV,419454,1201518,1997-08-27,leasehold_99,N,zone_2
+PCL-TF-01099,TF,Tarnfield,AG,workshop,73,13.3,122,Marrow Walk,AM7 8LX,443153,1200657,2022-02-13,freehold,N,none
+PCL-WH-01100,WH,Wend Hill,AG,workshop,20007,25.8,51,Saltmarsh Row,AM2 4HE,424974,1208194,2010-05-30,leasehold_99,N,zone_2
+PCL-ND-01101,ND,North Dunmoor,C2,civic,242,26.5,96,Sedge Crescent,AM8 2VK,433561,1191382,2013-08-25,freehold,N,none
+PCL-PG-01102,PG,Pelling Green,HC,warehouse,26848,30.3,222,Kilnyard Passage,AM3 9YT,429810,1195663,2017-02-26,leasehold_125,N,none
+PCL-CB-01103,CB,Corrisbeck,C2,place_of_worship,147,42.4,130,Lamplight Way,AM6 8RL,414834,1202554,2005-07-25,in_dispute,N,zone_3a
+PCL-IH-01104,IH,Isk Harbour,R1,dwelling_multi,3280,5.5,125,Bellrope Road,AM3 4FH,411570,1207318,2008-06-04,leasehold_125,N,zone_3a
+PCL-VH-01105,VH,Vantry Hollow,SP,warehouse,10340,17.6,46,Paternoster Street,AM3 5WZ,435064,1201851,2016-04-24,in_dispute,N,none
+PCL-MB-01106,MB,Mirebrook,SP,dwelling,33502,41.8,171,Kilnyard Walk,AM9 7FB,444886,1198056,2015-07-19,unregistered,N,none
+PCL-AR-01107,AR,Ashcombe Reach,I1,vacant,1549,38.3,40,Vintners Passage,AM6 2WL,413515,1199536,2021-05-01,leasehold_99,N,none
+PCL-KF-01108,KF,Kelder Flats,C2,school,15861,40.2,234,Paternoster Way,AM6 4HB,431913,1217713,2007-06-14,unregistered,N,none
+PCL-OH-01109,OH,Old Harrowgate,SP,retail,124,22.0,47,Ostler Rise,AM5 3RH,422985,1198273,2021-04-21,crown_lease,N,zone_2
+PCL-SQ-01110,SQ,Sable Quay,HC,office,1343,36.1,30,Ferryman Street,AM4 1VJ,414861,1218058,1999-10-11,leasehold_125,N,zone_2
+PCL-TF-01111,TF,Tarnfield,I2,allotment,380,39.1,44,Quarry Road,AM1 4WE,432371,1183478,2019-11-26,unregistered,N,none
+PCL-WH-01112,WH,Wend Hill,HC,carpark,10683,5.5,109,Hollybank Lane,AM2 5JV,443009,1212475,2024-01-05,freehold,N,none
+PCL-ND-01113,ND,North Dunmoor,I2,office,87,12.9,35,Quarry Road,AM2 5GB,444040,1219882,2022-03-05,freehold,N,none
+PCL-PG-01114,PG,Pelling Green,C1,civic,18051,41.0,152,Weirside Crescent,AM2 1KD,444795,1214155,1997-04-22,leasehold_99,N,none
+PCL-CB-01115,CB,Corrisbeck,SP,vacant,264,32.2,38,Bellrope Passage,AM3 4ZW,421961,1184409,2025-03-21,leasehold_125,N,none
+PCL-IH-01116,IH,Isk Harbour,OS,place_of_worship,102,41.3,190,Ferryman Street,AM6 9YZ,416155,1193379,2019-11-25,leasehold_125,N,zone_3a
+PCL-VH-01117,VH,Vantry Hollow,R3,vacant,17923,46.8,204,Ostler Crescent,AM7 7XP,419175,1204003,2009-01-15,unregistered,N,zone_3a
+PCL-MB-01118,MB,Mirebrook,AG,civic,1825,16.8,141,Ferryman Row,AM9 8AB,422719,1183213,2004-01-19,leasehold_99,N,none
+PCL-AR-01119,AR,Ashcombe Reach,R2,warehouse,1439,46.9,58,Coldharbour Terrace,AM3 8DE,448476,1184065,2007-08-04,crown_lease,N,none
+PCL-KF-01120,KF,Kelder Flats,AG,workshop,11351,34.6,11,Ferryman Passage,AM8 3FT,441173,1200016,2004-10-23,freehold,N,none
+PCL-OH-01121,OH,Old Harrowgate,MU,warehouse,1712,26.7,159,Tannery Passage,AM1 7ZD,440767,1195213,2019-03-17,leasehold_125,N,none
+PCL-SQ-01122,SQ,Sable Quay,C1,school,160,25.1,140,Paternoster Road,AM9 7JE,416987,1184810,2009-08-16,in_dispute,N,none
+PCL-TF-01123,TF,Tarnfield,SP,vacant,78,43.3,170,Paternoster Lane,AM1 9YD,438187,1206846,2016-11-04,in_dispute,N,zone_2
+PCL-WH-01124,WH,Wend Hill,MU,warehouse,26322,12.9,87,Coldharbour Walk,AM1 5XG,437387,1190037,2023-11-17,leasehold_125,N,none
+PCL-ND-01125,ND,North Dunmoor,C2,warehouse,696,35.1,186,Threadneedle Crescent,AM9 4TA,413800,1213267,1999-02-04,in_dispute,N,none
+PCL-PG-01126,PG,Pelling Green,SP,dwelling_multi,95,44.8,21,Ropewalk Yard,AM1 8HG,413326,1191583,2018-09-22,crown_lease,Y,none
+PCL-CB-01127,CB,Corrisbeck,OS,allotment,17176,13.7,124,Mallow Walk,AM4 5TH,422057,1218421,2018-05-06,freehold,Y,none
+PCL-IH-01128,IH,Isk Harbour,I1,allotment,1260,30.0,80B,Marrow Road,AM4 5VZ,417129,1210980,1996-09-18,freehold,N,zone_1
+PCL-VH-01129,VH,Vantry Hollow,I1,office,22015,32.9,184,Lamplight Row,AM5 8HR,430076,1183603,2019-06-04,crown_lease,N,none
+PCL-MB-01130,MB,Mirebrook,SP,office,147,32.4,226,Kilnyard Walk,AM2 9QE,446174,1219876,2000-03-08,freehold,Y,zone_1
+PCL-AR-01131,AR,Ashcombe Reach,R1,dwelling,28867,9.0,75,Ferryman Walk,AM9 9WF,442645,1207384,2024-03-12,in_dispute,N,zone_1
+PCL-KF-01132,KF,Kelder Flats,C1,retail,1824,33.9,12,Vintners Close,AM2 5RT,414497,1217145,2013-07-26,unregistered,N,none
+PCL-OH-01133,OH,Old Harrowgate,C1,dwelling,33032,40.8,229,Mallow Yard,AM1 9GD,421286,1218172,2000-10-25,in_dispute,N,zone_1
+PCL-SQ-01134,SQ,Sable Quay,I1,dwelling_multi,3778,11.0,160,Windlass Passage,AM5 9WV,423666,1196943,2017-03-06,crown_lease,N,none
+PCL-TF-01135,TF,Tarnfield,I2,dwelling_multi,306,6.8,173,Quarry Crescent,AM9 9WG,422154,1184142,2014-06-22,leasehold_99,N,zone_2
+PCL-WH-01136,WH,Wend Hill,C1,dwelling,254,19.0,94,Dovecote Walk,AM9 7PA,418404,1197508,2008-11-22,unregistered,N,none
+PCL-ND-01137,ND,North Dunmoor,HC,carpark,17531,27.6,210,Paternoster Passage,AM8 9EJ,431615,1197333,2022-10-07,unregistered,N,none
+PCL-PG-01138,PG,Pelling Green,I1,office,13355,32.4,240,Ostler Walk,AM1 5YW,427444,1212559,2022-12-27,unregistered,N,zone_3a
+PCL-CB-01139,CB,Corrisbeck,OS,vacant,727,23.0,151,Saltmarsh Passage,AM9 4PP,413968,1204969,2014-10-29,crown_lease,N,none
+PCL-IH-01140,IH,Isk Harbour,R1,school,2141,47.2,4,Threadneedle Close,AM4 3KX,422617,1199138,2007-02-14,leasehold_99,N,zone_3b
+PCL-VH-01141,VH,Vantry Hollow,C2,warehouse,1384,39.4,143,Ropewalk Terrace,AM6 9EP,421701,1180508,2003-12-01,leasehold_99,N,zone_1
+PCL-MB-01142,MB,Mirebrook,R1,allotment,33859,42.0,141,Windlass Row,AM6 2VZ,432454,1208825,2015-09-25,crown_lease,N,none
+PCL-AR-01143,AR,Ashcombe Reach,SP,dwelling_multi,38243,47.0,199,Hollybank Yard,AM6 1FB,440416,1219896,2022-06-13,crown_lease,N,none
+PCL-KF-01144,KF,Kelder Flats,R2,place_of_worship,11419,38.7,237,Saltmarsh Crescent,AM9 7VF,419219,1209223,1997-02-14,unregistered,N,none
+PCL-OH-01145,OH,Old Harrowgate,I1,vacant,36175,10.7,192,Lamplight Way,AM8 6QX,419023,1188160,2008-08-14,in_dispute,N,none
+PCL-SQ-01146,SQ,Sable Quay,MU,school,21023,43.3,70B,Saltmarsh Road,AM1 8SD,438810,1200167,2021-11-01,unregistered,N,none
+PCL-TF-01147,TF,Tarnfield,AG,place_of_worship,25308,8.7,118,Weirside Row,AM1 1EJ,436336,1199761,2013-11-15,leasehold_99,N,none
+PCL-WH-01148,WH,Wend Hill,R2,dwelling_multi,163,28.0,180,Ostler Yard,AM4 3EK,424918,1186272,1998-07-29,leasehold_99,N,zone_1
+PCL-ND-01149,ND,North Dunmoor,MU,school,35187,15.8,139,Ironmonger Walk,AM9 8SK,412237,1215237,2006-12-05,crown_lease,N,none
+PCL-PG-01150,PG,Pelling Green,MU,place_of_worship,970,29.4,70,Vintners Row,AM2 7SJ,447692,1217591,2019-09-07,crown_lease,N,none
+PCL-CB-01151,CB,Corrisbeck,C2,allotment,38743,28.0,32,Saltmarsh Yard,AM4 3LF,434570,1205615,2015-04-27,in_dispute,N,none
+PCL-IH-01152,IH,Isk Harbour,C1,warehouse,31551,42.9,190,Netherfield Street,AM3 4RP,411006,1195432,2023-12-30,leasehold_99,N,zone_3a
+PCL-VH-01153,VH,Vantry Hollow,MU,dwelling_multi,378,16.2,71,Paternoster Terrace,AM5 4DE,444677,1199146,2003-03-02,leasehold_99,N,zone_1
+PCL-MB-01154,MB,Mirebrook,SP,warehouse,3877,19.8,56,Sedge Road,AM3 6XV,422400,1193875,2016-12-07,freehold,N,none
+PCL-AR-01155,AR,Ashcombe Reach,R1,vacant,2314,8.1,128,Vintners Way,AM7 3FT,436092,1202162,1997-02-16,crown_lease,N,none
+PCL-KF-01156,KF,Kelder Flats,HC,office,398,14.3,45,Mallow Row,AM6 1SE,445961,1207365,2012-05-28,unregistered,N,none
+PCL-OH-01157,OH,Old Harrowgate,I1,workshop,31344,19.2,203,Bellrope Way,AM9 7JQ,412260,1212691,2015-04-23,leasehold_99,N,zone_2
+PCL-SQ-01158,SQ,Sable Quay,OS,vacant,126,38.5,147,Paternoster Street,AM2 8KQ,449488,1188181,2008-01-05,leasehold_99,N,zone_1
+PCL-TF-01159,TF,Tarnfield,R1,dwelling_multi,1963,29.3,152,Lamplight Lane,AM2 6QQ,424955,1181196,2008-09-20,crown_lease,N,none
+PCL-WH-01160,WH,Wend Hill,R2,office,16393,19.7,134,Mallow Passage,AM8 8KV,437408,1190237,2016-01-18,crown_lease,N,zone_2
+PCL-ND-01161,ND,North Dunmoor,R1,school,294,6.9,65,Saltmarsh Close,AM6 5JQ,434629,1212771,1998-02-28,in_dispute,N,none
+PCL-PG-01162,PG,Pelling Green,R1,dwelling,33391,21.8,24,Sedge Row,AM9 7ND,446529,1181033,2011-06-24,leasehold_99,N,none
+PCL-CB-01163,CB,Corrisbeck,HC,dwelling,331,15.6,164,Gasworks Street,AM3 4EA,419607,1190641,1996-10-07,freehold,N,none
+PCL-IH-01164,IH,Isk Harbour,I1,workshop,268,15.5,87,Cattle Lane,AM9 2HD,422128,1212878,2015-01-09,leasehold_125,N,zone_1
+PCL-VH-01165,VH,Vantry Hollow,OS,warehouse,16968,17.4,86C,Cattle Yard,AM2 7AF,416764,1181572,2015-03-09,in_dispute,N,none
+PCL-MB-01166,MB,Mirebrook,R3,dwelling_multi,2240,11.1,4,Netherfield Lane,AM4 4DK,414456,1204792,2013-06-25,leasehold_99,N,none
+PCL-AR-01167,AR,Ashcombe Reach,C1,allotment,348,36.8,132,Windlass Lane,AM2 9NG,447031,1183874,2012-08-31,in_dispute,N,none
+PCL-KF-01168,KF,Kelder Flats,C1,allotment,8277,14.0,115A,Quarry Street,AM3 8VP,436232,1203337,2007-05-15,in_dispute,N,none
+PCL-OH-01169,OH,Old Harrowgate,I1,place_of_worship,18226,34.4,209,Sedge Walk,AM7 7WR,426531,1216679,2017-04-22,freehold,N,zone_1
+PCL-SQ-01170,SQ,Sable Quay,SP,dwelling,1290,6.3,202,Lamplight Lane,AM9 2WR,431488,1190628,2000-12-27,in_dispute,N,none
+PCL-TF-01171,TF,Tarnfield,R2,dwelling_multi,343,10.2,175,Pellet Yard,AM4 7YT,422218,1217631,2020-09-10,leasehold_125,N,zone_3a
+PCL-WH-01172,WH,Wend Hill,HC,office,30682,9.6,124,Pellet Way,AM8 3VQ,430716,1187807,2020-08-28,in_dispute,N,none
+PCL-ND-01173,ND,North Dunmoor,R1,workshop,24162,43.3,235,Kilnyard Walk,AM6 6AF,425655,1204879,1999-03-29,in_dispute,N,none
+PCL-PG-01174,PG,Pelling Green,OS,school,755,45.8,183,Quarry Passage,AM2 7SP,417218,1186557,2000-05-31,crown_lease,N,none
+PCL-CB-01175,CB,Corrisbeck,C2,school,246,11.6,224,Mallow Way,AM5 7FD,446396,1213533,2000-09-25,unregistered,N,none
+PCL-IH-01176,IH,Isk Harbour,R2,retail,3008,15.7,210,Lamplight Terrace,AM2 4BW,441025,1189821,1996-07-04,freehold,N,none
+PCL-VH-01177,VH,Vantry Hollow,C2,dwelling_multi,198,41.5,53,Ostler Street,AM7 2NT,411945,1219367,2014-04-12,crown_lease,Y,none
+PCL-MB-01178,MB,Mirebrook,R3,vacant,193,5.1,142,Quarry Road,AM4 8TD,443054,1183137,2022-01-18,leasehold_125,N,none
+PCL-AR-01179,AR,Ashcombe Reach,C2,school,10118,46.0,145,Ropewalk Yard,AM4 6NP,433245,1194182,2017-05-12,leasehold_99,N,none
+PCL-KF-01180,KF,Kelder Flats,HC,dwelling_multi,212,40.9,28,Dovecote Close,AM1 8QZ,441061,1218761,2017-03-25,freehold,N,none
+PCL-OH-01181,OH,Old Harrowgate,R3,allotment,38931,5.7,29,Threadneedle Close,AM8 8RF,412679,1217663,2024-10-20,crown_lease,N,none
+PCL-SQ-01182,SQ,Sable Quay,I1,allotment,5918,23.8,208,Lamplight Rise,AM2 1ZT,447312,1201094,2014-08-07,in_dispute,Y,none
+PCL-TF-01183,TF,Tarnfield,HC,vacant,181,15.4,9,Quarry Passage,AM9 6DD,411481,1214991,2007-05-31,crown_lease,N,none
+PCL-WH-01184,WH,Wend Hill,C2,vacant,396,14.9,14,Gasworks Way,AM1 5GW,413168,1180079,2001-04-02,freehold,N,zone_1
+PCL-ND-01185,ND,North Dunmoor,R2,vacant,310,30.7,117,Mallow Way,AM3 9RR,414123,1181756,2007-03-22,in_dispute,N,zone_3a
+PCL-PG-01186,PG,Pelling Green,SP,school,10161,17.0,59C,Marrow Crescent,AM1 6LQ,422093,1195790,2008-09-03,in_dispute,N,none
+PCL-CB-01187,CB,Corrisbeck,C2,civic,662,6.3,72,Coldharbour Passage,AM6 7SP,423491,1197286,2020-12-29,freehold,N,none
+PCL-IH-01188,IH,Isk Harbour,HC,office,1071,40.9,225,Kilnyard Close,AM4 9YE,432709,1215524,2016-09-02,crown_lease,N,none
+PCL-VH-01189,VH,Vantry Hollow,AG,retail,8090,8.7,81,Quarry Road,AM8 2EX,423911,1219856,1999-04-10,freehold,N,none
+PCL-MB-01190,MB,Mirebrook,HC,place_of_worship,24976,21.5,132,Tannery Way,AM8 6VE,420220,1192902,2009-12-26,leasehold_125,N,none
+PCL-AR-01191,AR,Ashcombe Reach,C2,retail,8843,7.9,1,Mallow Walk,AM8 1JX,423342,1184571,2005-03-04,leasehold_125,N,zone_1
+PCL-KF-01192,KF,Kelder Flats,C2,carpark,14388,4.3,39,Pellet Terrace,AM8 9LL,414816,1217191,2019-02-03,in_dispute,N,none
+PCL-OH-01193,OH,Old Harrowgate,I1,retail,337,25.3,192,Gasworks Walk,AM6 1RY,420618,1219745,2023-06-23,freehold,N,none
+PCL-SQ-01194,SQ,Sable Quay,R2,civic,351,22.8,16,Weirside Road,AM8 8KB,418473,1195891,2019-05-23,in_dispute,N,none
+PCL-TF-01195,TF,Tarnfield,R3,workshop,1830,8.2,174C,Lamplight Yard,AM8 1NL,432096,1202072,2012-07-10,crown_lease,N,none
+PCL-WH-01196,WH,Wend Hill,R2,office,1916,10.6,166,Ironmonger Close,AM8 2PS,447896,1187923,2024-07-18,crown_lease,N,none
+PCL-ND-01197,ND,North Dunmoor,HC,dwelling,34876,10.5,100,Ferryman Way,AM7 9JV,429128,1218326,2016-08-27,in_dispute,N,zone_3a
+PCL-PG-01198,PG,Pelling Green,R2,retail,2281,43.2,143,Sedge Close,AM8 9RA,414601,1218917,2008-07-30,in_dispute,N,zone_1
+PCL-CB-01199,CB,Corrisbeck,R2,allotment,454,33.5,182,Weirside Yard,AM2 7BF,448718,1182864,2006-06-01,crown_lease,N,none
+PCL-IH-01200,IH,Isk Harbour,AG,retail,24237,36.2,114,Ferryman Street,AM8 7NQ,428767,1186499,2009-05-07,unregistered,N,zone_3a
+PCL-VH-01201,VH,Vantry Hollow,R3,dwelling,211,9.2,94,Lamplight Rise,AM8 4NG,416771,1203438,2024-09-08,unregistered,N,zone_3a
+PCL-MB-01202,MB,Mirebrook,OS,retail,394,11.5,128,Gasworks Walk,AM9 2YP,439326,1200789,2018-08-23,unregistered,N,none
+PCL-AR-01203,AR,Ashcombe Reach,R2,retail,1972,21.8,154,Sedge Crescent,AM5 8JG,435788,1218367,1998-01-15,leasehold_99,N,none
+PCL-KF-01204,KF,Kelder Flats,R3,place_of_worship,218,47.9,135,Pellet Walk,AM4 7VL,413417,1203230,2007-05-18,leasehold_99,N,zone_2
+PCL-OH-01205,OH,Old Harrowgate,MU,civic,39642,31.7,149,Coldharbour Walk,AM5 5EB,413778,1195830,2010-01-23,in_dispute,N,none
+PCL-SQ-01206,SQ,Sable Quay,R2,school,295,29.9,64,Gasworks Passage,AM6 5KE,431411,1197166,2022-06-20,unregistered,N,zone_2
+PCL-TF-01207,TF,Tarnfield,OS,workshop,1939,25.3,165B,Kilnyard Passage,AM2 1PG,445923,1214769,2004-08-03,freehold,N,zone_1
+PCL-WH-01208,WH,Wend Hill,I2,place_of_worship,20571,13.6,152,Mallow Lane,AM7 3XT,446095,1192246,2023-07-01,leasehold_99,N,zone_3b
+PCL-ND-01209,ND,North Dunmoor,C1,workshop,286,17.9,84,Quarry Close,AM5 9YQ,439045,1201495,2025-06-23,in_dispute,N,zone_1
+PCL-PG-01210,PG,Pelling Green,SP,dwelling_multi,223,22.2,233,Quarry Way,AM7 1WG,427379,1189504,1999-04-08,in_dispute,N,none
+PCL-CB-01211,CB,Corrisbeck,I2,office,68,5.8,45,Windlass Walk,AM6 2NF,413515,1215081,1996-07-09,leasehold_125,N,zone_2
+PCL-IH-01212,IH,Isk Harbour,R3,office,338,5.9,200,Windlass Close,AM8 2VB,442258,1189638,2001-03-23,leasehold_125,N,none
+PCL-VH-01213,VH,Vantry Hollow,I2,warehouse,18836,24.9,226,Tannery Passage,AM6 9KP,422884,1211226,2005-02-06,leasehold_125,N,none
+PCL-MB-01214,MB,Mirebrook,C1,place_of_worship,206,9.8,123,Lamplight Way,AM9 8NY,432363,1218479,2021-01-08,leasehold_99,N,zone_2
+PCL-AR-01215,AR,Ashcombe Reach,R1,dwelling_multi,7478,44.7,31,Threadneedle Way,AM4 6XD,433073,1213461,2004-03-28,leasehold_125,N,none
+PCL-KF-01216,KF,Kelder Flats,C1,warehouse,191,47.9,48,Dovecote Close,AM2 9DZ,421663,1195272,2004-12-31,crown_lease,N,zone_2
+PCL-OH-01217,OH,Old Harrowgate,I1,place_of_worship,233,28.2,51,Netherfield Terrace,AM4 3HT,435577,1182789,2014-11-11,unregistered,N,zone_3a
+PCL-SQ-01218,SQ,Sable Quay,R3,office,7739,8.3,107,Pellet Street,AM6 1FT,436392,1212645,2006-11-21,crown_lease,N,none
+PCL-TF-01219,TF,Tarnfield,HC,civic,566,29.2,194,Pellet Walk,AM5 3YH,439059,1207085,1998-11-05,leasehold_125,N,none
+PCL-WH-01220,WH,Wend Hill,I2,allotment,473,47.2,214A,Sedge Lane,AM4 3LF,448061,1216399,1998-01-30,crown_lease,N,none
+PCL-ND-01221,ND,North Dunmoor,R2,warehouse,1939,30.9,84,Threadneedle Terrace,AM5 1QP,438195,1203556,2009-12-11,leasehold_125,N,zone_1
+PCL-PG-01222,PG,Pelling Green,C2,civic,308,45.8,85,Hollybank Lane,AM1 7EX,417800,1213403,2007-01-16,in_dispute,N,none
+PCL-CB-01223,CB,Corrisbeck,I2,warehouse,274,47.4,125,Weirside Crescent,AM2 9JH,444947,1192738,2012-10-27,unregistered,N,none
+PCL-IH-01224,IH,Isk Harbour,AG,school,177,47.7,151,Ferryman Rise,AM6 5YP,413491,1196981,1996-11-01,crown_lease,N,none
+PCL-VH-01225,VH,Vantry Hollow,SP,place_of_worship,144,20.3,174,Hollybank Passage,AM5 3ZA,417376,1202571,2014-02-12,leasehold_125,N,none
+PCL-MB-01226,MB,Mirebrook,C1,retail,154,23.3,149,Bellrope Terrace,AM4 3DA,444326,1193703,2019-11-23,freehold,N,none
+PCL-AR-01227,AR,Ashcombe Reach,R1,vacant,2328,33.8,214,Ostler Yard,AM7 4YB,414982,1196163,2003-11-07,unregistered,N,zone_1
+PCL-KF-01228,KF,Kelder Flats,I2,retail,282,37.1,31,Windlass Way,AM1 1PZ,416837,1183749,2009-06-04,leasehold_99,N,none
+PCL-OH-01229,OH,Old Harrowgate,R3,dwelling,542,9.1,166,Weirside Rise,AM7 5ZW,444787,1180848,2021-05-03,leasehold_125,N,none
+PCL-SQ-01230,SQ,Sable Quay,I1,office,27613,11.3,98B,Marrow Rise,AM1 1NR,412829,1193640,2026-05-07,leasehold_125,N,none
+PCL-TF-01231,TF,Tarnfield,MU,warehouse,335,17.4,98,Ironmonger Close,AM9 8DQ,446537,1186817,2006-09-21,leasehold_125,N,none
+PCL-WH-01232,WH,Wend Hill,AG,workshop,941,41.8,50,Saltmarsh Road,AM9 2JA,432761,1209031,2021-03-23,crown_lease,Y,none
+PCL-ND-01233,ND,North Dunmoor,SP,carpark,2845,10.1,165,Bellrope Terrace,AM3 8FH,438340,1187508,1998-01-08,in_dispute,N,none
+PCL-PG-01234,PG,Pelling Green,SP,place_of_worship,1783,41.5,130,Netherfield Rise,AM5 6RQ,431687,1186100,2004-08-07,crown_lease,N,zone_3a
+PCL-CB-01235,CB,Corrisbeck,R3,school,9004,18.6,23,Coldharbour Yard,AM9 6LA,410842,1212508,2020-08-28,freehold,N,zone_1
+PCL-IH-01236,IH,Isk Harbour,AG,retail,256,10.7,234,Ironmonger Way,AM9 6LS,440053,1216572,2015-03-26,leasehold_125,N,none
+PCL-VH-01237,VH,Vantry Hollow,C2,dwelling,269,43.1,101C,Marrow Yard,AM4 3GV,412043,1209595,2003-12-03,in_dispute,N,zone_2
+PCL-MB-01238,MB,Mirebrook,I1,office,83,22.4,44,Quarry Lane,AM7 8EJ,420125,1207235,2011-12-08,unregistered,N,none
+PCL-AR-01239,AR,Ashcombe Reach,R2,vacant,319,12.3,228,Lamplight Yard,AM5 8FR,437448,1191962,2005-05-13,in_dispute,N,zone_1
+PCL-KF-01240,KF,Kelder Flats,C1,civic,1835,27.9,72,Saltmarsh Way,AM2 7LX,422227,1214561,2003-02-23,freehold,N,zone_3a
+PCL-OH-01241,OH,Old Harrowgate,MU,retail,714,47.5,141C,Mallow Yard,AM2 1QL,444004,1198060,2007-10-27,unregistered,N,none
+PCL-SQ-01242,SQ,Sable Quay,R3,dwelling_multi,37213,30.9,78,Netherfield Row,AM5 5XK,436814,1183117,2003-04-13,leasehold_99,N,none
+PCL-TF-01243,TF,Tarnfield,C2,office,68,29.3,33,Weirside Close,AM1 6VB,416033,1187573,2007-02-01,crown_lease,N,none
+PCL-WH-01244,WH,Wend Hill,R2,allotment,32804,12.5,62,Windlass Close,AM1 9XY,429974,1191674,2001-10-11,leasehold_99,N,zone_1
+PCL-ND-01245,ND,North Dunmoor,I1,civic,91,18.0,95,Mallow Rise,AM2 3JD,417760,1190461,1996-05-16,unregistered,N,none
+PCL-PG-01246,PG,Pelling Green,C2,dwelling,37924,47.1,171,Lamplight Street,AM1 7LR,429837,1191757,2009-02-20,leasehold_99,N,none
+PCL-CB-01247,CB,Corrisbeck,R3,workshop,230,16.4,162,Ironmonger Yard,AM5 2NK,442862,1211900,2017-10-14,unregistered,N,zone_2
+PCL-IH-01248,IH,Isk Harbour,C2,civic,28096,13.0,195,Ferryman Yard,AM7 4ZD,447653,1188957,2000-05-12,unregistered,N,zone_2
+PCL-VH-01249,VH,Vantry Hollow,AG,carpark,331,12.1,110,Vintners Walk,AM7 8WB,441750,1196661,2003-09-16,leasehold_125,N,zone_1
+PCL-MB-01250,MB,Mirebrook,C2,dwelling_multi,1527,23.1,31,Quarry Terrace,AM9 3FZ,444774,1192558,2003-04-10,leasehold_99,N,zone_1
+PCL-AR-01251,AR,Ashcombe Reach,OS,civic,37027,41.0,113,Bellrope Row,AM3 5PQ,445646,1212621,2009-01-26,freehold,N,zone_1
+PCL-KF-01252,KF,Kelder Flats,SP,carpark,38121,8.4,83B,Windlass Walk,AM7 3YK,420643,1182248,2003-06-27,leasehold_99,Y,zone_3a
+PCL-OH-01253,OH,Old Harrowgate,OS,allotment,39738,28.5,65,Ferryman Yard,AM4 9XT,449647,1182116,2004-07-24,crown_lease,N,none
+PCL-SQ-01254,SQ,Sable Quay,SP,allotment,293,36.5,118,Windlass Street,AM9 4JH,446691,1197567,2018-05-31,in_dispute,N,zone_3a
+PCL-TF-01255,TF,Tarnfield,R1,warehouse,2049,25.6,79C,Tannery Yard,AM1 5ZR,430294,1213667,2017-04-26,freehold,N,none
+PCL-WH-01256,WH,Wend Hill,OS,dwelling_multi,31074,12.7,167,Marrow Terrace,AM4 7LK,432194,1189092,1999-06-17,in_dispute,N,none
+PCL-ND-01257,ND,North Dunmoor,R3,vacant,303,43.7,167,Dovecote Way,AM5 3XV,429258,1216810,1996-03-02,leasehold_125,N,none
+PCL-PG-01258,PG,Pelling Green,C1,civic,103,41.2,117,Paternoster Row,AM1 7SK,433633,1201066,2006-10-01,unregistered,N,none
+PCL-CB-01259,CB,Corrisbeck,C2,workshop,39520,7.7,117,Gasworks Close,AM5 8RR,413654,1183512,2015-11-16,freehold,N,none
+PCL-IH-01260,IH,Isk Harbour,R2,vacant,34629,10.2,133,Sedge Passage,AM8 9FY,439017,1216549,2010-11-06,leasehold_99,N,none
+PCL-VH-01261,VH,Vantry Hollow,I1,school,1619,41.2,75,Gasworks Passage,AM9 5HF,435195,1208123,2002-03-07,freehold,N,zone_3a
+PCL-MB-01262,MB,Mirebrook,MU,office,3591,5.6,21,Lamplight Road,AM3 4DK,415489,1194079,2020-02-19,leasehold_99,N,none
+PCL-AR-01263,AR,Ashcombe Reach,AG,dwelling,338,10.2,43,Netherfield Lane,AM8 9YV,411640,1219739,2008-06-30,unregistered,N,zone_2
+PCL-KF-01264,KF,Kelder Flats,SP,place_of_worship,23873,18.7,34,Weirside Way,AM6 5SW,449951,1215443,2019-01-07,leasehold_125,N,none
+PCL-OH-01265,OH,Old Harrowgate,R2,place_of_worship,4420,32.8,148,Weirside Street,AM4 9WF,436535,1207616,2007-07-13,leasehold_125,N,zone_3b
+PCL-SQ-01266,SQ,Sable Quay,MU,civic,25849,41.0,143,Paternoster Terrace,AM6 7PH,430049,1208589,2001-09-17,freehold,N,none
+PCL-TF-01267,TF,Tarnfield,R1,civic,391,32.6,122,Netherfield Row,AM4 3GZ,444782,1218696,2000-09-05,in_dispute,N,none
+PCL-WH-01268,WH,Wend Hill,I2,office,541,17.6,10,Threadneedle Yard,AM6 3ZZ,442114,1208940,2001-10-16,unregistered,N,none
+PCL-ND-01269,ND,North Dunmoor,R1,allotment,38167,45.0,203,Ostler Row,AM3 7YF,411329,1211565,2014-11-05,crown_lease,N,none
+PCL-PG-01270,PG,Pelling Green,MU,warehouse,204,44.6,97,Kilnyard Road,AM7 1HN,427982,1198519,2004-02-16,in_dispute,N,none
+PCL-CB-01271,CB,Corrisbeck,R2,allotment,385,44.7,45,Cattle Street,AM6 2QQ,415048,1193379,2022-03-16,in_dispute,N,zone_3a
+PCL-IH-01272,IH,Isk Harbour,SP,warehouse,109,13.7,128,Marrow Crescent,AM7 7FP,417059,1184742,2019-03-09,leasehold_125,N,zone_2
+PCL-VH-01273,VH,Vantry Hollow,OS,vacant,11109,33.6,14,Bellrope Way,AM1 7AG,417254,1212695,2000-01-07,unregistered,N,none
+PCL-MB-01274,MB,Mirebrook,R2,place_of_worship,76,31.8,19,Marrow Close,AM8 6VX,421757,1211318,2017-11-30,crown_lease,N,none
+PCL-AR-01275,AR,Ashcombe Reach,C2,place_of_worship,66,30.7,103,Paternoster Crescent,AM7 2LN,445447,1189912,2016-09-28,leasehold_99,N,none
+PCL-KF-01276,KF,Kelder Flats,R2,dwelling_multi,1532,18.0,45,Weirside Rise,AM6 1DV,430059,1207689,2005-12-15,unregistered,Y,zone_1
+PCL-OH-01277,OH,Old Harrowgate,C2,workshop,1427,10.5,14,Tannery Passage,AM7 6AT,411273,1216129,2023-05-07,in_dispute,N,zone_2
+PCL-SQ-01278,SQ,Sable Quay,AG,office,14545,36.7,218,Paternoster Terrace,AM8 4NN,416967,1211569,2025-12-03,crown_lease,N,zone_1
+PCL-TF-01279,TF,Tarnfield,C2,school,206,18.2,149,Marrow Passage,AM9 8GE,426862,1218717,2013-09-21,unregistered,N,none
+PCL-WH-01280,WH,Wend Hill,AG,workshop,228,35.4,13,Netherfield Yard,AM5 4YP,432691,1203069,1998-05-21,crown_lease,N,none
+PCL-ND-01281,ND,North Dunmoor,C2,workshop,5867,39.0,189,Windlass Crescent,AM4 9VW,439970,1186752,2013-05-15,leasehold_125,N,zone_2
+PCL-PG-01282,PG,Pelling Green,C1,vacant,77,30.8,214C,Hollybank Road,AM3 9QW,419862,1209874,2012-02-24,freehold,N,zone_3a
+PCL-CB-01283,CB,Corrisbeck,R3,carpark,34037,39.1,5,Tannery Walk,AM2 6DY,429118,1192359,2000-08-22,in_dispute,N,none
+PCL-IH-01284,IH,Isk Harbour,I1,allotment,1706,13.6,208,Tannery Lane,AM5 1LS,443249,1185713,2007-06-09,in_dispute,N,none
+PCL-VH-01285,VH,Vantry Hollow,AG,retail,12118,10.1,54,Paternoster Lane,AM2 2XE,424046,1204956,2017-04-04,leasehold_99,N,none
+PCL-MB-01286,MB,Mirebrook,SP,dwelling,10760,43.4,32,Threadneedle Row,AM7 5RY,439481,1192876,2004-01-18,leasehold_125,N,zone_2
+PCL-AR-01287,AR,Ashcombe Reach,AG,carpark,441,7.7,56,Marrow Way,AM1 5HL,435698,1207843,2011-09-23,freehold,N,none
+PCL-KF-01288,KF,Kelder Flats,OS,dwelling_multi,544,45.7,96,Netherfield Lane,AM9 6BA,433446,1219458,2004-02-07,freehold,N,zone_2
+PCL-OH-01289,OH,Old Harrowgate,R1,office,25604,12.3,128,Threadneedle Terrace,AM2 9AH,434303,1209685,2019-04-07,in_dispute,N,none
+PCL-SQ-01290,SQ,Sable Quay,SP,retail,2396,41.7,208,Netherfield Rise,AM5 2ES,436650,1202499,1999-05-09,unregistered,N,none
+PCL-TF-01291,TF,Tarnfield,C2,dwelling,1661,31.5,183,Ironmonger Yard,AM1 4FR,434816,1213293,2026-02-27,leasehold_125,N,none
+PCL-WH-01292,WH,Wend Hill,I1,carpark,7662,31.6,149,Paternoster Passage,AM5 2GP,428992,1210543,2025-01-28,in_dispute,N,none
+PCL-ND-01293,ND,North Dunmoor,HC,school,1061,17.7,230,Coldharbour Crescent,AM9 6FN,438240,1180466,2017-05-10,unregistered,N,none
+PCL-PG-01294,PG,Pelling Green,AG,civic,1115,20.0,135,Ferryman Close,AM4 8AK,421344,1191967,2015-11-30,in_dispute,N,none
+PCL-CB-01295,CB,Corrisbeck,R1,workshop,29617,38.0,223,Netherfield Close,AM4 9TT,427690,1203244,2015-09-19,in_dispute,N,zone_1
+PCL-IH-01296,IH,Isk Harbour,R1,allotment,20985,34.5,75,Dovecote Close,AM4 5VR,433477,1191611,2006-06-26,unregistered,N,none
+PCL-VH-01297,VH,Vantry Hollow,C2,office,1309,13.8,24,Pellet Terrace,AM2 6LP,410498,1198170,2004-10-31,freehold,N,none
+PCL-MB-01298,MB,Mirebrook,HC,civic,1239,4.8,51,Saltmarsh Passage,AM2 4RF,426840,1188187,2001-06-08,unregistered,N,zone_1
+PCL-AR-01299,AR,Ashcombe Reach,AG,vacant,295,17.8,162,Dovecote Lane,AM5 6SD,418417,1218033,2003-07-02,unregistered,N,none
+PCL-KF-01300,KF,Kelder Flats,SP,place_of_worship,544,39.7,26,Windlass Terrace,AM3 2YW,430625,1209737,2001-10-19,leasehold_99,N,zone_1
+PCL-OH-01301,OH,Old Harrowgate,OS,warehouse,2645,40.4,174,Dovecote Way,AM4 8HS,434257,1192501,2003-06-10,freehold,N,zone_1
+PCL-SQ-01302,SQ,Sable Quay,AG,workshop,5187,46.4,153,Quarry Row,AM3 3RL,433315,1214274,2018-08-13,unregistered,N,zone_2
+PCL-TF-01303,TF,Tarnfield,R1,allotment,1587,38.3,64,Tannery Yard,AM1 8QP,440318,1203855,2023-10-15,freehold,N,none
+PCL-WH-01304,WH,Wend Hill,I2,dwelling_multi,948,22.5,13,Sedge Crescent,AM4 8DS,410696,1204291,2007-08-12,leasehold_99,N,none
+PCL-ND-01305,ND,North Dunmoor,I2,allotment,7819,38.5,160,Ostler Terrace,AM8 1VH,413025,1212875,2001-04-20,leasehold_99,N,zone_3b
+PCL-PG-01306,PG,Pelling Green,C2,vacant,194,16.6,35,Threadneedle Rise,AM8 7FQ,431547,1205777,1998-12-11,leasehold_99,N,none
+PCL-CB-01307,CB,Corrisbeck,C1,retail,267,33.1,177,Bellrope Yard,AM8 9RR,420339,1216312,2013-10-12,unregistered,N,none
+PCL-IH-01308,IH,Isk Harbour,C2,carpark,559,11.0,120,Weirside Crescent,AM1 4DR,424883,1180360,2009-08-16,crown_lease,N,none
+PCL-VH-01309,VH,Vantry Hollow,C2,carpark,125,30.4,86,Hollybank Yard,AM5 2SH,430038,1189444,2014-06-28,freehold,N,zone_1
+PCL-MB-01310,MB,Mirebrook,I2,warehouse,66,10.1,220,Ironmonger Rise,AM7 8YK,417619,1183597,2000-06-18,crown_lease,N,none
+PCL-AR-01311,AR,Ashcombe Reach,HC,workshop,36401,47.6,74,Pellet Passage,AM5 5LK,443233,1219981,2023-10-02,freehold,N,none
+PCL-KF-01312,KF,Kelder Flats,C1,carpark,6500,37.2,104,Pellet Close,AM9 1AY,445939,1214800,2006-05-17,leasehold_99,N,none
+PCL-OH-01313,OH,Old Harrowgate,MU,workshop,27452,19.7,54,Ropewalk Terrace,AM7 7ZT,444958,1208883,1997-05-28,in_dispute,N,zone_1
+PCL-SQ-01314,SQ,Sable Quay,C1,office,330,45.2,121A,Tannery Street,AM3 3ZS,413494,1195338,2026-03-30,in_dispute,N,none
+PCL-TF-01315,TF,Tarnfield,I2,retail,1661,10.8,224,Ironmonger Walk,AM4 1BS,427681,1195347,2007-03-09,freehold,N,none
+PCL-WH-01316,WH,Wend Hill,I1,dwelling,1361,25.1,10C,Gasworks Rise,AM6 5XH,422550,1213402,1997-12-16,leasehold_125,N,none
+PCL-ND-01317,ND,North Dunmoor,SP,allotment,299,4.0,11,Weirside Yard,AM7 8DF,438553,1186318,2009-07-26,leasehold_125,N,zone_2
+PCL-PG-01318,PG,Pelling Green,I2,warehouse,27526,35.6,109,Mallow Street,AM5 7ZA,436392,1207743,2021-02-07,unregistered,N,zone_2
+PCL-CB-01319,CB,Corrisbeck,R1,place_of_worship,7020,22.4,91,Netherfield Rise,AM8 2HF,427636,1201397,1996-05-06,in_dispute,N,none
+PCL-IH-01320,IH,Isk Harbour,HC,office,242,17.5,44,Vintners Rise,AM4 4DD,425981,1198935,2004-03-22,leasehold_125,N,none
+PCL-VH-01321,VH,Vantry Hollow,R3,vacant,2131,25.1,14,Netherfield Row,AM6 8WJ,416031,1219693,2026-03-30,leasehold_125,N,none
+PCL-MB-01322,MB,Mirebrook,AG,place_of_worship,607,10.4,22,Windlass Yard,AM2 5PH,426339,1189187,2012-01-03,crown_lease,N,none
+PCL-AR-01323,AR,Ashcombe Reach,I2,office,161,24.1,30,Paternoster Terrace,AM8 1AA,423112,1203545,2008-04-23,in_dispute,N,none
+PCL-KF-01324,KF,Kelder Flats,R3,warehouse,14164,7.5,206,Dovecote Street,AM4 2GH,410839,1182090,2017-08-04,in_dispute,N,none
+PCL-OH-01325,OH,Old Harrowgate,I2,carpark,8369,18.1,156,Quarry Road,AM1 5BQ,446085,1210486,2018-04-10,in_dispute,Y,zone_1
+PCL-SQ-01326,SQ,Sable Quay,OS,school,187,12.6,22,Ropewalk Terrace,AM9 1WG,429716,1193011,2000-01-19,unregistered,N,none
+PCL-TF-01327,TF,Tarnfield,MU,civic,1196,13.6,118,Netherfield Row,AM1 9PK,429623,1182315,2000-11-05,unregistered,N,none
+PCL-WH-01328,WH,Wend Hill,SP,vacant,10865,28.3,115,Hollybank Rise,AM3 2FG,448579,1202837,2006-04-21,in_dispute,N,zone_1
+PCL-ND-01329,ND,North Dunmoor,C1,allotment,20786,37.8,4,Paternoster Close,AM4 6XF,428536,1191923,2011-04-24,crown_lease,N,zone_2
+PCL-PG-01330,PG,Pelling Green,C2,workshop,72,37.4,45,Dovecote Passage,AM5 4RF,431960,1219813,2020-01-10,unregistered,N,zone_2
+PCL-CB-01331,CB,Corrisbeck,MU,retail,1017,23.4,172,Sedge Close,AM1 2SN,426095,1203723,1998-07-21,crown_lease,N,zone_2
+PCL-IH-01332,IH,Isk Harbour,C2,carpark,2022,8.4,153,Hollybank Way,AM3 1QV,423550,1196946,2003-04-10,unregistered,N,none
+PCL-VH-01333,VH,Vantry Hollow,R2,warehouse,24793,29.4,235,Dovecote Crescent,AM2 7SD,446209,1213562,2012-12-06,unregistered,N,none
+PCL-MB-01334,MB,Mirebrook,AG,carpark,8552,31.5,238,Mallow Terrace,AM3 4WX,429632,1212483,1997-07-04,crown_lease,N,zone_2
+PCL-AR-01335,AR,Ashcombe Reach,AG,carpark,761,5.7,157,Pellet Walk,AM2 6NX,433261,1189694,2000-02-19,in_dispute,N,none
+PCL-KF-01336,KF,Kelder Flats,R1,dwelling,890,45.3,19,Ironmonger Terrace,AM6 5YG,439274,1212412,2007-12-03,in_dispute,Y,zone_3a
+PCL-OH-01337,OH,Old Harrowgate,R2,school,309,9.1,37,Marrow Passage,AM2 2DG,424687,1198744,2005-05-11,freehold,N,none
+PCL-SQ-01338,SQ,Sable Quay,R2,dwelling,620,22.8,107,Gasworks Rise,AM8 8GE,421861,1185012,2003-06-10,unregistered,N,none
+PCL-TF-01339,TF,Tarnfield,C1,warehouse,23574,21.8,131A,Threadneedle Yard,AM8 9YS,420961,1193062,2022-03-12,freehold,N,none
+PCL-WH-01340,WH,Wend Hill,I2,school,1088,39.6,223,Paternoster Close,AM8 5QW,438617,1214438,2011-04-30,crown_lease,N,none
+PCL-ND-01341,ND,North Dunmoor,AG,office,144,32.7,234A,Cattle Road,AM5 4LF,446256,1181670,2019-10-07,leasehold_99,N,none
+PCL-PG-01342,PG,Pelling Green,C2,dwelling_multi,687,33.6,68,Mallow Passage,AM5 4ES,446386,1181609,2007-05-02,leasehold_125,N,zone_3a
+PCL-CB-01343,CB,Corrisbeck,HC,place_of_worship,1405,33.4,170,Gasworks Passage,AM3 8YB,441382,1218327,2015-10-07,leasehold_99,N,zone_3b
+PCL-IH-01344,IH,Isk Harbour,R1,vacant,16001,12.5,44,Coldharbour Terrace,AM4 5QZ,432820,1219670,2020-04-16,leasehold_99,N,none
+PCL-VH-01345,VH,Vantry Hollow,I1,civic,97,43.2,142,Saltmarsh Crescent,AM5 5HN,415862,1180428,1999-10-05,leasehold_125,N,none
+PCL-MB-01346,MB,Mirebrook,MU,dwelling,1291,32.7,232,Marrow Passage,AM7 4NQ,416190,1191804,2007-08-01,leasehold_125,N,none
+PCL-AR-01347,AR,Ashcombe Reach,I2,civic,623,43.8,201,Vintners Walk,AM2 8LX,419062,1205783,1998-06-17,freehold,N,none
+PCL-KF-01348,KF,Kelder Flats,R2,dwelling_multi,118,22.9,17,Windlass Walk,AM9 7JJ,440262,1215548,2016-09-05,freehold,N,none
+PCL-OH-01349,OH,Old Harrowgate,R1,school,4359,22.9,51,Saltmarsh Way,AM9 4NS,435608,1182571,2006-06-19,in_dispute,N,zone_3a
+PCL-SQ-01350,SQ,Sable Quay,SP,office,1178,43.4,163,Cattle Walk,AM1 7FX,438323,1208213,2007-02-28,leasehold_125,N,none
+PCL-TF-01351,TF,Tarnfield,I1,school,1699,39.2,31,Quarry Street,AM3 1SF,441117,1187227,1996-09-14,in_dispute,N,zone_1
+PCL-WH-01352,WH,Wend Hill,R1,allotment,4277,38.1,134,Lamplight Street,AM6 9XB,446141,1189950,2004-03-27,crown_lease,N,zone_1
+PCL-ND-01353,ND,North Dunmoor,OS,place_of_worship,1030,28.0,48B,Ironmonger Crescent,AM1 5KE,442730,1215586,2007-02-20,crown_lease,N,zone_2
+PCL-PG-01354,PG,Pelling Green,R2,workshop,1917,13.4,49,Vintners Close,AM7 4DX,443237,1211671,2007-07-25,in_dispute,N,zone_3b
+PCL-CB-01355,CB,Corrisbeck,R1,allotment,124,40.7,71,Tannery Rise,AM1 6AW,422754,1192551,1999-07-25,crown_lease,N,none
+PCL-IH-01356,IH,Isk Harbour,C1,warehouse,179,7.9,239A,Ropewalk Road,AM8 4VG,411714,1184736,2016-02-20,freehold,N,none
+PCL-VH-01357,VH,Vantry Hollow,HC,carpark,1744,46.3,27,Pellet Crescent,AM7 9QA,445606,1210265,2011-06-26,freehold,N,none
+PCL-MB-01358,MB,Mirebrook,R3,workshop,1243,37.3,160,Lamplight Passage,AM6 7BH,418533,1219709,1996-04-10,leasehold_99,N,none
+PCL-AR-01359,AR,Ashcombe Reach,MU,carpark,33363,22.0,64C,Windlass Rise,AM7 7KE,434665,1194015,2011-04-15,crown_lease,N,none
+PCL-KF-01360,KF,Kelder Flats,I1,place_of_worship,148,17.7,22,Coldharbour Row,AM7 3HL,443034,1213934,2019-03-04,leasehold_99,N,zone_3a
+PCL-OH-01361,OH,Old Harrowgate,SP,dwelling,20146,40.0,154,Ironmonger Passage,AM7 2HF,418417,1180776,1999-04-27,freehold,N,zone_1
+PCL-SQ-01362,SQ,Sable Quay,C1,dwelling_multi,1521,27.6,198,Kilnyard Crescent,AM1 8WR,416198,1195993,2023-09-09,unregistered,N,zone_2
+PCL-TF-01363,TF,Tarnfield,MU,workshop,494,16.6,228C,Quarry Road,AM2 4YE,430199,1199615,1998-12-25,leasehold_125,N,none
+PCL-WH-01364,WH,Wend Hill,I1,dwelling_multi,2116,38.2,8,Bellrope Rise,AM4 1KY,439760,1181713,2004-11-28,unregistered,N,zone_2
+PCL-ND-01365,ND,North Dunmoor,SP,school,2224,16.4,123,Saltmarsh Row,AM7 8BP,427640,1213005,2024-07-27,in_dispute,N,none
+PCL-PG-01366,PG,Pelling Green,R3,school,395,12.7,145,Windlass Yard,AM7 4PJ,427837,1209414,2009-07-16,unregistered,N,zone_2
+PCL-CB-01367,CB,Corrisbeck,I1,dwelling_multi,4435,23.1,30,Weirside Crescent,AM8 8TT,442722,1215211,2016-01-03,leasehold_99,N,zone_3a
+PCL-IH-01368,IH,Isk Harbour,MU,vacant,1384,11.6,202,Ironmonger Rise,AM2 7WY,414845,1196047,2008-08-01,leasehold_125,N,none
+PCL-VH-01369,VH,Vantry Hollow,MU,workshop,33671,39.5,232,Coldharbour Passage,AM9 6VT,439398,1193775,2015-01-18,in_dispute,N,zone_2
+PCL-MB-01370,MB,Mirebrook,C2,retail,74,18.7,139,Quarry Yard,AM4 1KK,418409,1196025,2013-12-29,leasehold_125,N,none
+PCL-AR-01371,AR,Ashcombe Reach,C1,dwelling_multi,36790,37.4,158,Cattle Passage,AM2 5TF,410531,1218124,2007-03-24,leasehold_99,N,zone_3b
+PCL-KF-01372,KF,Kelder Flats,OS,dwelling,299,5.0,70,Bellrope Yard,AM9 3VL,440981,1202793,2007-12-12,crown_lease,N,none
+PCL-OH-01373,OH,Old Harrowgate,C1,vacant,20420,17.1,92,Dovecote Row,AM7 8QY,424528,1218499,2010-01-11,freehold,N,zone_1
+PCL-SQ-01374,SQ,Sable Quay,R2,workshop,275,25.6,200,Bellrope Passage,AM1 9TX,424796,1216162,2004-05-05,crown_lease,N,none
+PCL-TF-01375,TF,Tarnfield,OS,dwelling,107,9.5,18,Windlass Street,AM3 5ER,428328,1186392,2012-04-19,leasehold_99,N,zone_2
+PCL-WH-01376,WH,Wend Hill,C2,dwelling_multi,34366,38.7,236,Paternoster Terrace,AM8 5VB,431239,1183509,2021-09-06,unregistered,N,none
+PCL-ND-01377,ND,North Dunmoor,SP,allotment,63,32.4,231,Tannery Passage,AM7 2EV,438271,1204947,2002-03-02,leasehold_99,N,none
+PCL-PG-01378,PG,Pelling Green,R3,allotment,1165,6.0,207,Paternoster Way,AM7 1ZD,424861,1190296,2021-02-28,freehold,N,none
+PCL-CB-01379,CB,Corrisbeck,OS,workshop,907,11.5,163,Pellet Lane,AM9 2AE,433525,1207191,1999-02-03,freehold,N,none
+PCL-IH-01380,IH,Isk Harbour,OS,dwelling_multi,161,8.5,89,Vintners Way,AM8 8BJ,448578,1205282,2009-01-06,leasehold_99,N,zone_3a
+PCL-VH-01381,VH,Vantry Hollow,I2,vacant,355,26.1,149,Netherfield Row,AM7 2DD,411366,1185887,2014-08-16,in_dispute,N,none
+PCL-MB-01382,MB,Mirebrook,C1,dwelling,26245,24.8,23,Paternoster Walk,AM5 9GE,430568,1209165,2003-05-16,freehold,N,none
+PCL-AR-01383,AR,Ashcombe Reach,SP,dwelling,6112,37.2,18,Coldharbour Way,AM3 2YT,437458,1198881,1998-04-08,leasehold_99,N,none
+PCL-KF-01384,KF,Kelder Flats,R3,dwelling,238,31.9,228,Gasworks Passage,AM1 4HY,420511,1189248,2002-09-29,freehold,N,none
+PCL-OH-01385,OH,Old Harrowgate,C2,place_of_worship,1031,20.4,70,Quarry Rise,AM8 2PT,447923,1211547,2020-07-08,crown_lease,N,zone_2
+PCL-SQ-01386,SQ,Sable Quay,C2,place_of_worship,350,6.8,28,Netherfield Yard,AM7 1WW,427053,1189284,2012-06-04,leasehold_125,N,zone_2
+PCL-TF-01387,TF,Tarnfield,OS,retail,182,12.2,212,Saltmarsh Walk,AM1 3YQ,430561,1185249,2003-07-11,crown_lease,N,none
+PCL-WH-01388,WH,Wend Hill,R1,civic,35883,15.4,111,Mallow Way,AM2 8DF,445363,1208638,2000-03-02,unregistered,N,zone_3b
+PCL-ND-01389,ND,North Dunmoor,C1,workshop,2315,29.1,33,Dovecote Terrace,AM1 9WX,439139,1211225,2013-12-07,freehold,N,zone_1
+PCL-PG-01390,PG,Pelling Green,R2,dwelling_multi,12797,16.0,190,Ironmonger Lane,AM6 5WR,440511,1212369,2022-10-26,in_dispute,N,zone_3a
+PCL-CB-01391,CB,Corrisbeck,R3,office,1099,6.9,184,Quarry Street,AM1 6ZP,419448,1197213,2011-02-04,leasehold_99,N,none
+PCL-IH-01392,IH,Isk Harbour,R2,office,23200,26.4,201,Ostler Walk,AM5 6YX,444755,1215538,1997-01-06,freehold,N,none
+PCL-VH-01393,VH,Vantry Hollow,SP,dwelling,3738,23.0,31,Gasworks Close,AM7 1HE,439262,1201838,1997-10-08,unregistered,N,zone_1
+PCL-MB-01394,MB,Mirebrook,AG,dwelling_multi,127,13.0,136,Cattle Close,AM5 6BV,417412,1190959,2021-12-29,leasehold_99,N,none
+PCL-AR-01395,AR,Ashcombe Reach,R3,carpark,30935,20.4,184,Pellet Walk,AM8 4XP,437412,1208949,2024-04-11,freehold,N,none
+PCL-KF-01396,KF,Kelder Flats,AG,civic,8051,33.7,2,Threadneedle Close,AM8 6SD,438267,1201517,2023-03-24,leasehold_125,Y,zone_3a
+PCL-OH-01397,OH,Old Harrowgate,HC,school,179,27.2,65C,Tannery Terrace,AM4 9ST,432162,1189332,2021-08-03,in_dispute,N,zone_2
+PCL-SQ-01398,SQ,Sable Quay,OS,retail,5320,22.6,33,Bellrope Street,AM5 3QT,443211,1186533,2007-09-20,unregistered,N,zone_1
+PCL-TF-01399,TF,Tarnfield,SP,civic,1593,37.1,114,Quarry Walk,AM5 5GV,422894,1202141,2006-04-07,leasehold_125,N,zone_1
+PCL-WH-01400,WH,Wend Hill,C1,dwelling,1697,33.4,70,Threadneedle Lane,AM5 5QX,412556,1184302,2024-08-26,leasehold_125,N,none
+PCL-ND-01401,ND,North Dunmoor,I2,dwelling,10636,8.8,91,Weirside Walk,AM5 4XX,439874,1211182,2000-04-14,freehold,N,none
+PCL-PG-01402,PG,Pelling Green,MU,workshop,5528,40.6,208,Ferryman Yard,AM9 7DH,440152,1188644,2012-07-19,freehold,N,zone_2
+PCL-CB-01403,CB,Corrisbeck,R2,vacant,251,18.6,82,Lamplight Close,AM6 1EP,441247,1212252,2018-05-05,leasehold_125,N,none
+PCL-IH-01404,IH,Isk Harbour,MU,vacant,1800,42.3,29C,Hollybank Lane,AM5 2RK,437643,1213996,2023-01-12,unregistered,N,none
+PCL-VH-01405,VH,Vantry Hollow,MU,allotment,598,23.1,61,Paternoster Crescent,AM6 4BN,415247,1184078,2014-10-26,crown_lease,N,zone_2
+PCL-MB-01406,MB,Mirebrook,OS,dwelling_multi,4268,12.0,32,Ferryman Lane,AM4 2KA,438073,1206489,2000-07-19,leasehold_99,N,none
+PCL-AR-01407,AR,Ashcombe Reach,R2,dwelling,2254,42.4,24,Sedge Row,AM8 4ZX,424565,1203903,2003-03-17,unregistered,N,zone_2
+PCL-KF-01408,KF,Kelder Flats,HC,retail,2152,10.7,196,Pellet Walk,AM8 2YT,413023,1215393,1996-02-18,unregistered,N,zone_2
+PCL-OH-01409,OH,Old Harrowgate,R1,school,679,10.7,204,Paternoster Close,AM3 1EL,427867,1185661,2008-08-15,freehold,N,zone_2
+PCL-SQ-01410,SQ,Sable Quay,HC,workshop,1875,21.9,13,Marrow Terrace,AM2 8RR,448522,1196925,1999-05-03,freehold,N,zone_3a
+PCL-TF-01411,TF,Tarnfield,R2,office,245,38.7,44,Netherfield Lane,AM9 9WE,431220,1216555,2003-05-27,leasehold_99,N,zone_1
+PCL-WH-01412,WH,Wend Hill,OS,place_of_worship,384,8.2,181,Cattle Crescent,AM2 1ZT,440613,1219089,2016-07-10,in_dispute,N,zone_1
+PCL-ND-01413,ND,North Dunmoor,I1,civic,171,27.3,214,Ostler Terrace,AM8 1JR,437618,1214764,2015-03-30,leasehold_125,Y,none
+PCL-PG-01414,PG,Pelling Green,R1,warehouse,232,19.5,84,Pellet Terrace,AM7 9HS,416809,1189695,2005-04-22,in_dispute,N,none
+PCL-CB-01415,CB,Corrisbeck,OS,allotment,66,16.4,137C,Lamplight Terrace,AM6 7LJ,418124,1212546,1997-10-15,unregistered,N,none
+PCL-IH-01416,IH,Isk Harbour,I1,carpark,108,17.8,143,Hollybank Walk,AM1 1YV,436268,1188021,2010-03-24,crown_lease,N,zone_2
+PCL-VH-01417,VH,Vantry Hollow,OS,retail,12802,4.8,126A,Mallow Street,AM2 8ZP,429882,1192693,2022-12-11,leasehold_125,Y,none
+PCL-MB-01418,MB,Mirebrook,R3,place_of_worship,530,33.5,91C,Threadneedle Way,AM5 6QA,428692,1212615,2000-01-26,crown_lease,N,none
+PCL-AR-01419,AR,Ashcombe Reach,HC,office,1566,20.7,195,Saltmarsh Close,AM4 8NW,420497,1206669,2013-04-07,leasehold_99,Y,zone_2
+PCL-KF-01420,KF,Kelder Flats,I2,office,162,9.4,210,Ropewalk Road,AM6 1KA,418352,1191727,2008-05-09,unregistered,N,none
+PCL-OH-01421,OH,Old Harrowgate,I2,dwelling,1803,27.6,132,Netherfield Yard,AM1 7XK,422783,1200421,2010-04-16,leasehold_125,N,none
+PCL-SQ-01422,SQ,Sable Quay,C1,warehouse,1277,22.9,98,Vintners Terrace,AM1 9LB,429446,1215026,2015-11-07,in_dispute,N,zone_1
+PCL-TF-01423,TF,Tarnfield,I1,dwelling_multi,20408,22.4,43,Sedge Road,AM8 9AL,449432,1181466,2022-01-27,unregistered,Y,none
+PCL-WH-01424,WH,Wend Hill,I1,office,1225,42.2,227,Ferryman Terrace,AM7 7AQ,423467,1200800,2016-06-18,unregistered,N,none
+PCL-ND-01425,ND,North Dunmoor,HC,workshop,10024,14.0,75,Threadneedle Street,AM1 4NF,411667,1188048,2011-07-28,unregistered,N,none
+PCL-PG-01426,PG,Pelling Green,R1,workshop,2384,31.0,94,Pellet Way,AM4 7JY,414605,1187179,2021-07-11,freehold,N,none
+PCL-CB-01427,CB,Corrisbeck,C2,vacant,1763,23.2,6,Weirside Crescent,AM2 1QK,427229,1191225,2011-06-27,leasehold_99,N,zone_1
+PCL-IH-01428,IH,Isk Harbour,HC,office,27251,36.8,174,Tannery Walk,AM3 9KZ,425235,1194354,1999-08-11,leasehold_99,N,none
+PCL-VH-01429,VH,Vantry Hollow,AG,vacant,1295,36.5,136,Sedge Row,AM7 5NJ,447113,1199251,2009-12-08,leasehold_99,N,zone_2
+PCL-MB-01430,MB,Mirebrook,C1,allotment,400,15.8,227C,Sedge Rise,AM9 2WS,410787,1199104,2020-05-30,unregistered,N,zone_3a
+PCL-AR-01431,AR,Ashcombe Reach,C1,office,1473,22.5,164,Bellrope Passage,AM4 7ZA,420299,1180429,2022-09-02,unregistered,N,none
+PCL-KF-01432,KF,Kelder Flats,I2,workshop,299,13.2,216,Weirside Row,AM2 4SD,432466,1200696,1998-04-24,crown_lease,N,zone_2
+PCL-OH-01433,OH,Old Harrowgate,I1,warehouse,1755,20.4,20,Paternoster Way,AM4 7GA,413600,1207329,2008-07-21,freehold,N,none
+PCL-SQ-01434,SQ,Sable Quay,MU,warehouse,1961,35.5,85,Paternoster Row,AM4 9XY,446462,1199093,2023-01-16,in_dispute,N,zone_1
+PCL-TF-01435,TF,Tarnfield,OS,dwelling,461,9.3,122,Bellrope Yard,AM2 4HW,425406,1180046,2021-05-17,in_dispute,N,none
+PCL-WH-01436,WH,Wend Hill,R2,retail,149,31.0,16B,Vintners Lane,AM9 2PT,433810,1185802,1996-07-08,in_dispute,N,none
+PCL-ND-01437,ND,North Dunmoor,SP,school,162,17.1,45A,Saltmarsh Crescent,AM8 4GS,418634,1219711,2014-10-03,freehold,N,zone_1
+PCL-PG-01438,PG,Pelling Green,R3,workshop,8421,7.8,129,Weirside Close,AM5 8BR,441626,1218007,2007-03-02,leasehold_99,N,zone_3a
+PCL-CB-01439,CB,Corrisbeck,SP,office,2205,4.9,224,Quarry Terrace,AM5 5BT,447617,1203869,2008-09-09,leasehold_99,N,zone_2
+PCL-IH-01440,IH,Isk Harbour,I1,warehouse,14821,10.3,79A,Sedge Road,AM7 3NJ,436991,1210587,2001-08-29,crown_lease,N,zone_2
+PCL-VH-01441,VH,Vantry Hollow,AG,civic,364,46.3,48,Quarry Street,AM7 1SB,444128,1218872,2000-07-09,crown_lease,N,none
+PCL-MB-01442,MB,Mirebrook,C1,place_of_worship,180,4.3,177,Mallow Yard,AM8 5ED,416885,1184474,2000-04-04,in_dispute,N,zone_2
+PCL-AR-01443,AR,Ashcombe Reach,AG,carpark,14015,40.6,212,Dovecote Row,AM2 9EX,446029,1186904,2017-03-20,unregistered,N,none
+PCL-KF-01444,KF,Kelder Flats,OS,allotment,1655,37.9,51,Bellrope Passage,AM5 5ZE,430811,1215667,2015-06-06,leasehold_99,N,none
+PCL-OH-01445,OH,Old Harrowgate,OS,office,1587,33.1,75,Coldharbour Lane,AM2 9WP,420738,1195855,2016-04-29,freehold,N,none
+PCL-SQ-01446,SQ,Sable Quay,C2,workshop,2041,37.1,186,Pellet Walk,AM7 1LP,448512,1196955,1998-07-15,freehold,N,none
+PCL-TF-01447,TF,Tarnfield,R1,vacant,36711,38.7,68,Quarry Walk,AM4 2GV,412295,1207000,2004-05-23,crown_lease,N,none
+PCL-WH-01448,WH,Wend Hill,HC,allotment,16467,38.9,5,Paternoster Way,AM4 8FN,433160,1181395,2010-03-14,unregistered,N,none
+PCL-ND-01449,ND,North Dunmoor,C1,office,2050,18.6,194,Lamplight Way,AM8 1TB,413590,1189386,2020-05-27,freehold,N,zone_1
+PCL-PG-01450,PG,Pelling Green,R3,school,164,5.3,138,Weirside Street,AM5 5XF,424833,1219644,2003-04-10,crown_lease,N,zone_2
+PCL-CB-01451,CB,Corrisbeck,AG,dwelling_multi,315,14.6,48,Threadneedle Walk,AM7 2TY,433569,1184509,2008-08-29,in_dispute,N,zone_2
+PCL-IH-01452,IH,Isk Harbour,OS,warehouse,1971,42.6,154,Mallow Way,AM9 6HT,430726,1197401,2001-01-18,leasehold_125,N,zone_3a
+PCL-VH-01453,VH,Vantry Hollow,I1,dwelling_multi,334,43.7,125,Tannery Terrace,AM5 5JS,434215,1188927,2008-01-31,in_dispute,Y,none
+PCL-MB-01454,MB,Mirebrook,C2,retail,17807,31.4,108,Hollybank Yard,AM8 4PL,438652,1208189,2005-02-03,unregistered,N,none
+PCL-AR-01455,AR,Ashcombe Reach,I1,workshop,224,38.3,62,Pellet Terrace,AM3 7LA,423619,1200296,2009-09-02,leasehold_125,N,none
+PCL-KF-01456,KF,Kelder Flats,MU,allotment,1824,40.3,134,Mallow Passage,AM5 5RJ,431093,1202007,2024-11-24,freehold,N,none
+PCL-OH-01457,OH,Old Harrowgate,C2,dwelling,203,23.6,185,Netherfield Close,AM6 8AD,432262,1207198,2012-09-21,freehold,N,none
+PCL-SQ-01458,SQ,Sable Quay,C1,warehouse,934,20.5,145,Ostler Crescent,AM7 4NN,411527,1214900,2021-08-10,crown_lease,N,zone_1
+PCL-TF-01459,TF,Tarnfield,I2,workshop,490,32.2,149,Kilnyard Rise,AM5 1DK,435075,1207224,2007-06-04,leasehold_125,N,zone_1
+PCL-WH-01460,WH,Wend Hill,HC,retail,366,30.3,110,Coldharbour Rise,AM3 9TA,412954,1187921,2006-07-31,crown_lease,N,none
+PCL-ND-01461,ND,North Dunmoor,MU,place_of_worship,6753,33.2,172,Dovecote Crescent,AM5 9YJ,419257,1182765,2004-05-29,leasehold_99,N,none
+PCL-PG-01462,PG,Pelling Green,MU,place_of_worship,1079,5.4,147,Tannery Rise,AM1 5QK,418453,1187314,1998-07-29,in_dispute,N,none
+PCL-CB-01463,CB,Corrisbeck,SP,allotment,37395,22.5,78,Sedge Road,AM8 8FD,429683,1194644,2021-02-14,freehold,N,none
+PCL-IH-01464,IH,Isk Harbour,R3,carpark,8362,31.7,226,Kilnyard Row,AM4 4RH,437569,1193741,2009-01-21,in_dispute,N,none
+PCL-VH-01465,VH,Vantry Hollow,I2,office,13544,43.2,45,Vintners Road,AM8 4QR,444559,1206853,2009-11-29,freehold,N,zone_1
+PCL-MB-01466,MB,Mirebrook,AG,dwelling_multi,429,37.2,134,Pellet Walk,AM6 9GF,415773,1191170,2026-01-23,leasehold_125,N,none
+PCL-AR-01467,AR,Ashcombe Reach,C2,place_of_worship,14571,35.3,42,Marrow Street,AM6 2ED,442551,1190119,2024-04-22,unregistered,N,none
+PCL-KF-01468,KF,Kelder Flats,SP,dwelling,211,9.3,206,Ironmonger Street,AM9 8FK,437897,1212978,2017-05-09,leasehold_125,N,none
+PCL-OH-01469,OH,Old Harrowgate,C1,retail,2216,30.8,185,Pellet Way,AM2 5KR,431649,1192476,2018-06-09,freehold,N,none
+PCL-SQ-01470,SQ,Sable Quay,AG,carpark,27329,20.4,129,Quarry Lane,AM7 5GJ,416233,1180092,2011-02-20,leasehold_125,N,zone_2
+PCL-TF-01471,TF,Tarnfield,SP,vacant,79,41.3,14,Quarry Terrace,AM1 6PT,424669,1188598,2006-04-05,crown_lease,N,zone_3a
+PCL-WH-01472,WH,Wend Hill,OS,warehouse,32883,32.4,136,Ferryman Row,AM5 9HP,446963,1213912,2011-10-13,unregistered,N,none
+PCL-ND-01473,ND,North Dunmoor,SP,dwelling_multi,258,9.0,87,Tannery Way,AM2 9GL,423286,1197047,2024-07-20,in_dispute,N,none
+PCL-PG-01474,PG,Pelling Green,HC,dwelling_multi,333,10.7,130,Sedge Yard,AM3 1FR,421950,1210612,2000-03-13,unregistered,N,zone_2
+PCL-CB-01475,CB,Corrisbeck,AG,dwelling,176,35.4,159,Mallow Close,AM2 6EL,448775,1204331,2003-02-09,leasehold_125,N,none
+PCL-IH-01476,IH,Isk Harbour,R3,workshop,217,15.2,104,Ironmonger Street,AM4 5WF,434764,1185261,2003-01-21,leasehold_125,N,none
+PCL-VH-01477,VH,Vantry Hollow,R3,office,574,40.6,180,Netherfield Passage,AM6 5GV,437419,1193982,2012-11-20,freehold,N,none
+PCL-MB-01478,MB,Mirebrook,AG,school,7334,45.7,66,Netherfield Rise,AM8 5HF,421120,1185287,1999-08-31,leasehold_99,N,none
+PCL-AR-01479,AR,Ashcombe Reach,C1,dwelling_multi,164,7.4,100,Hollybank Passage,AM3 5SD,433287,1205131,2023-07-16,freehold,N,zone_3a
+PCL-KF-01480,KF,Kelder Flats,C1,warehouse,15543,45.7,29,Netherfield Lane,AM2 2TT,422652,1195287,2006-08-05,in_dispute,N,none
+PCL-OH-01481,OH,Old Harrowgate,I2,workshop,3257,42.6,61,Sedge Terrace,AM4 1DL,421172,1191298,2006-07-02,crown_lease,N,zone_2
+PCL-SQ-01482,SQ,Sable Quay,HC,workshop,713,11.8,20,Ropewalk Terrace,AM7 8PQ,440226,1191497,2003-11-08,unregistered,N,zone_3a
+PCL-TF-01483,TF,Tarnfield,R2,place_of_worship,1570,41.4,118,Saltmarsh Lane,AM1 8FP,422711,1180944,1996-12-11,freehold,N,none
+PCL-WH-01484,WH,Wend Hill,I1,office,1493,35.5,76B,Ferryman Way,AM7 8ND,416587,1212650,2023-11-14,leasehold_99,N,none
+PCL-ND-01485,ND,North Dunmoor,R2,retail,8727,13.6,28,Marrow Terrace,AM6 1VB,418953,1186208,2012-02-14,freehold,N,none
+PCL-PG-01486,PG,Pelling Green,MU,school,560,4.5,190,Netherfield Passage,AM1 5WK,433122,1210314,2021-11-02,in_dispute,N,none
+PCL-CB-01487,CB,Corrisbeck,I2,dwelling,502,25.4,23,Paternoster Passage,AM3 6SV,423122,1213165,2012-10-10,crown_lease,N,zone_1
+PCL-IH-01488,IH,Isk Harbour,OS,carpark,3741,19.8,195,Bellrope Lane,AM4 2KG,422830,1209332,2014-04-27,crown_lease,N,none
+PCL-VH-01489,VH,Vantry Hollow,C2,school,31628,34.3,240,Dovecote Crescent,AM4 2EL,413162,1210456,2004-10-01,unregistered,N,none
+PCL-MB-01490,MB,Mirebrook,HC,office,36700,45.4,52,Tannery Row,AM5 8ZT,420748,1193584,2017-04-26,leasehold_125,N,none
+PCL-AR-01491,AR,Ashcombe Reach,R3,civic,328,29.3,59,Mallow Row,AM5 2JQ,411403,1180877,2015-08-10,freehold,N,none
+PCL-KF-01492,KF,Kelder Flats,MU,warehouse,358,6.3,104,Cattle Crescent,AM3 1HQ,415057,1201507,2005-07-28,crown_lease,N,none
+PCL-OH-01493,OH,Old Harrowgate,R2,workshop,128,40.6,219,Mallow Street,AM8 2SY,418375,1199833,2013-04-04,leasehold_99,N,none
+PCL-SQ-01494,SQ,Sable Quay,R3,retail,24494,27.3,187,Ferryman Rise,AM1 5PH,426445,1200591,2004-11-27,crown_lease,N,none
+PCL-TF-01495,TF,Tarnfield,I1,warehouse,218,19.5,9,Threadneedle Lane,AM4 9RG,448597,1207827,2001-01-03,in_dispute,N,none
+PCL-WH-01496,WH,Wend Hill,HC,dwelling,185,31.7,148C,Gasworks Yard,AM4 7YD,422226,1217788,2011-05-16,freehold,N,none
+PCL-ND-01497,ND,North Dunmoor,R1,carpark,339,24.7,45A,Bellrope Rise,AM5 6JY,413752,1203548,1997-09-09,leasehold_125,N,none
+PCL-PG-01498,PG,Pelling Green,C1,warehouse,343,18.4,170,Hollybank Way,AM3 6FT,421033,1207005,2009-10-08,unregistered,N,none
+PCL-CB-01499,CB,Corrisbeck,MU,warehouse,157,17.9,38C,Lamplight Walk,AM7 3WK,423529,1201855,2015-07-16,unregistered,N,none
+PCL-IH-01500,IH,Isk Harbour,SP,workshop,978,23.9,169,Quarry Street,AM9 8KE,420868,1201657,1999-11-11,unregistered,N,none

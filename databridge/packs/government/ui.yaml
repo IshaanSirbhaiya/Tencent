@@ -1,0 +1,70 @@
+# packs/government — the pack's OPERATOR-SURFACE vocabulary (Layer 1, presentation half).
+#
+# `ontology.yaml` says what KINDS this pack has. This file says what a person is shown: every
+# domain noun the UI is otherwise forbidden to hardcode, the operator surfaces the pack declares,
+# its roster, its demo trials and its graph colours.
+#
+# It lives HERE, beside the ontology, because it is the pack's own vocabulary — not the frontend's.
+# `GET /packs` (apps/gateway/databridge_gateway/pack_routes.py) reads this file and serves it; the
+# frontend's `config/packs.json` is the offline fallback for the same shape and is the copy to
+# delete once the gateway is always reachable. Two copies is a drift hazard and is temporary.
+#
+# `available` is NOT declared here. Whether a pack is available is a property of the DEPLOYMENT
+# (`packs/deployment.yaml` / DATABRIDGE_PACKS), not of the pack, and the gateway computes it from
+# the binding. A pack that declared its own availability could claim to be enabled when nothing
+# had enabled it.
+#
+# Synthetic throughout: every person, organisation and document named here is fictional.
+
+pack: government
+label: Government
+tagline: Permit and benefit determinations over a T3 document drop
+nouns:
+  subject: applicant
+  subject_plural: applicants
+  subject_title: Applicant
+  org: agency
+  org_plural: agencies
+  org_title: Agency
+  registry: applicant registry
+  record: agency record
+  graph: case graph
+  workspace: Case brain
+  counterparty: issuing body
+  counterparty_plural: issuing bodies
+  document: supporting document
+  determination: eligibility determination
+  operator_surface: Case desk
+  operator_role: case desk
+  queue: Queue
+  identifier: national identifier
+  pitch: Reads an applicant's supporting documents before a caseworker opens the file.
+  credential: benefit card
+  document_examples: an application form, authorisation notice or agency letter
+  subject_plural_title: Applicants
+roster: []
+surfaces: []
+trials:
+  intelligence: []
+  evidence: []
+  intake: []
+demo_steps: []
+graph_vocabulary:
+  node_kinds:
+    applicant:
+      color: '#6f9fd8'
+      label: Applicant
+    case:
+      color: '#5fa98d'
+      label: Case
+    permit:
+      color: '#c2a163'
+      label: Permit
+  edge_labels:
+    applies_for: applies for
+    authorises: authorises
+    evidences: evidences
+demo_focus_node: ''
+demo_as_of: ''
+demo_question: ''
+brain_suggested_fallback: []

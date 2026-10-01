@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2013-000060",
+  "filename": "IMG-2013-000060.jpg",
+  "image_present": false,
+  "captured_at": "2013-03-12T08:23:17+00:00",
+  "captured_by": "OFF-0036",
+  "inspection_id": "INS-2013-000151",
+  "application_id": "APP-2013-000214",
+  "parcel_id": "PCL-OH-00905",
+  "photo_batch_ref": "PHB-2013-000151",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-974886"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 8
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 420964,
+    "northing": 1193161,
+    "accuracy_m": 15.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          3275,
+          120,
+          374,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2013-160145",
+        "confidence": 0.936,
+        "bbox": [
+          329,
+          230,
+          864,
+          75
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "83 KILNYARD RISE, OLD HARROWGATE AM7 4EB",
+        "confidence": 0.75,
+        "bbox": [
+          355,
+          316,
+          1040,
+          85
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2013-03-12",
+        "confidence": 0.73,
+        "bbox": [
+          224,
+          456,
+          812,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0036",
+        "confidence": 0.906,
+        "bbox": [
+          63,
+          624,
+          480,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

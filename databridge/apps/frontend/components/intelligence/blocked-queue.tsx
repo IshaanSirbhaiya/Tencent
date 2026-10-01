@@ -2,22 +2,24 @@
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import type { QueueSummary } from "@/lib/intelligence-api";
+import { useNouns } from "@/lib/pack-context";
 
 /**
- * What the counter is waiting on, and on what.
+ * What the intake queue is waiting on, and on what. Shown only when an intake queue is mounted.
  *
  * This is the one block on the page that is not a graph traversal: it is counted over the intakes
  * actually held by the gateway, and `blocked_because` is read straight from the confirm gate
  * (`ConfirmationState.is_ready_to_commit`) rather than re-derived — a second definition of
  * "blocked" would drift from the gate, and the gate is the one that decides.
  *
- * **It reports a queue; it never works it.** `candidate_count` says how many registry rows a
+ * **It reports a queue; it never works it.** `candidate_count` says how many rows a
  * document matched. There is no name, no ordering and no "most likely" here, because the backend
  * does not send one: staff check identity in person, and a dashboard that pre-selected for them
  * would be automating exactly the step this system refuses to automate
  * (CLAUDE.md §Hard constraints 1).
  */
 export function BlockedQueue({ queue }: { queue: QueueSummary }) {
+  const nouns = useNouns();
   if (queue.intakes === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-xs text-subtle">
@@ -44,7 +46,7 @@ export function BlockedQueue({ queue }: { queue: QueueSummary }) {
             <tr className="border-b border-border">
               <th className="py-1.5 pr-2 font-medium">Document</th>
               <th className="px-2 py-1.5 font-medium">Waiting on</th>
-              <th className="px-2 py-1.5 font-medium">Registry candidates</th>
+              <th className="px-2 py-1.5 font-medium">Candidates in the {nouns.registry}</th>
               <th className="px-2 py-1.5 font-medium">Coverage</th>
             </tr>
           </thead>
@@ -72,7 +74,7 @@ export function BlockedQueue({ queue }: { queue: QueueSummary }) {
                   {/* HOW MANY, never WHICH. */}
                   {b.candidate_count}
                   <span className="ml-1 text-2xs text-subtle">
-                    {b.candidate_count === 1 ? "candidate" : "candidates"} — staff select in person
+                    {b.candidate_count === 1 ? "candidate" : "candidates"} — a person selects, in person
                   </span>
                 </td>
                 <td className="px-2 py-2 text-subtle">

@@ -1,0 +1,126 @@
+# packs/common — the connector catalogue entries that belong to no vertical (HC1, 2026-10-01).
+#
+# `/connectors` searches a reviewed, local catalogue of MCP servers; nothing is resolved at runtime
+# (see apps/gateway/databridge_gateway/connector_routes.py). The catalogue used to be a Python
+# literal in that module, including one pack's entry. It is now DATA: each pack lists its own
+# servers in `packs/<pack>/connectors.yaml`, and the entries here are the general ones.
+#
+# An entry's `pack` is NOT declared — it is the directory the file sits in (`common` means none).
+# Two states only: `vendored` (needs `vendored_path` and `template`, both repo-relative paths this
+# file — not a caller — chooses) or `not_yet_vendored` (needs `not_vendored_reason`).
+
+connectors:
+- id: slack_channel_history_mcp
+  name: Slack — channel history
+  vendor: Slack
+  summary: Messages and threads from a workspace's channels.
+  reads:
+  - channel
+  - author
+  - posted_at
+  - text
+  - thread_id
+  status: not_yet_vendored
+  not_vendored_reason: Slack's own MCP server is archived upstream (R03-adapter-agents-and-mcp.md §2).
+    There is no reviewed artefact to vendor and pin yet, and forking an unreviewed community server would
+    be the exact risk this catalogue exists to close.
+  tags:
+  - slack
+  - chat
+  - messaging
+  - channel
+- id: google_drive_documents_mcp
+  name: Google Drive — shared documents
+  vendor: Google
+  summary: File metadata and text content from shared drives and folders.
+  reads:
+  - file_id
+  - name
+  - modified_at
+  - owner
+  - text_content
+  status: not_yet_vendored
+  not_vendored_reason: Google Drive's own MCP server is archived upstream. Nothing reviewable to vendor
+    and pin yet — recorded honestly rather than pointed at a moving target.
+  tags:
+  - google
+  - drive
+  - documents
+  - files
+- id: github_repository_mcp
+  name: GitHub — repository and issues
+  vendor: GitHub
+  summary: Issues, pull requests and commit metadata for a repository.
+  reads:
+  - issue_id
+  - title
+  - state
+  - author
+  - opened_at
+  - body
+  status: not_yet_vendored
+  not_vendored_reason: GitHub's own MCP server is archived upstream. No reviewed artefact under fixtures/mcp/
+    yet.
+  tags:
+  - github
+  - issues
+  - repository
+  - pull request
+  - git
+- id: salesforce_crm_mcp
+  name: Salesforce — cases and contacts
+  vendor: Salesforce
+  summary: Support cases, contacts and account records.
+  reads:
+  - case_id
+  - contact_name
+  - status
+  - opened_at
+  - description
+  status: not_yet_vendored
+  not_vendored_reason: No vendored artefact has passed review yet. 91.8% of audited internet-facing MCP
+    servers carry no OAuth at all (arXiv 2608.00150) — reaching a CRM without a specific review is not
+    a shortcut this catalogue takes.
+  tags:
+  - salesforce
+  - crm
+  - cases
+  - contacts
+- id: zendesk_support_mcp
+  name: Zendesk — support tickets
+  vendor: Zendesk
+  summary: Support tickets, requesters and ticket comment threads.
+  reads:
+  - ticket_id
+  - requester
+  - status
+  - created_at
+  - subject
+  - comments
+  status: not_yet_vendored
+  not_vendored_reason: Not yet vendored. A candidate artefact is being sourced and will be pinned with
+    a digest before it appears here as configurable — not before.
+  tags:
+  - zendesk
+  - support
+  - tickets
+  - helpdesk
+- id: notion_workspace_mcp
+  name: Notion — workspace pages
+  vendor: Notion
+  summary: Page content and metadata from a shared workspace.
+  reads:
+  - page_id
+  - title
+  - edited_at
+  - edited_by
+  - text_content
+  status: not_yet_vendored
+  not_vendored_reason: Not yet vendored. 41.6% of audited public MCP servers vanish within three days
+    (arXiv 2608.00150), so a server is pinned here only after someone has reviewed the exact copy this
+    deployment will run — not the copy that answered a probe last week.
+  tags:
+  - notion
+  - workspace
+  - pages
+  - docs

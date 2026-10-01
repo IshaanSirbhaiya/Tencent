@@ -32,7 +32,7 @@ or raw HTML, so a label containing a blank line and ``<!--`` could comment out e
 it — including the identity caveat — or inject headings into the model's context. ``_text()`` is
 now the only way a foreign string reaches this document.
 
-**The ``FOR_PATIENT`` caveat is structural.** A document naming a patient is a CLAIM, resolved
+**The identity-claim caveat is structural.** A document naming a patient is a CLAIM, resolved
 against the registry into candidates a human chooses between. Those claims render in their own
 section, under a caveat emitted before any untrusted text and outside every line that contains
 any — so there is no string an attacker can supply that lands inside the warning or ahead of it.
@@ -57,12 +57,44 @@ from urllib.parse import quote
 
 from databridge_core import SourcePointer
 
-from .schema import EdgeKind, GraphEdge, GraphNode, NodeKind
+from .kinds import edge_kinds_binding_to
+from .meta import CLAIM_META_KINDS
+from .packs import active_vocabulary
+from .schema import EdgeKind, GraphEdge, GraphNode
 
-# The relation that carries an unresolved identity claim. Named once; every renderer below checks
-# against this rather than matching a string, so renaming the vocabulary cannot silently drop the
-# caveat — which is precisely how `ARROW_KINDS` lost every arrowhead after ADR-0009.
-CLAIMED_IDENTITY_EDGES = {EdgeKind.FOR_PATIENT}
+
+def claimed_identity_edges() -> frozenset[EdgeKind]:
+    """Every enabled edge kind that carries an unresolved identity CLAIM.
+
+    This was a literal — one vertical's edge kind written into the engine — and a literal is
+    wrong twice over. It is a domain member in domain-free code, and it is *silently* wrong under
+    any other deployment: bind the finance or government pack and the set matches nothing, so
+    every claim edge renders as an ordinary relationship, under no caveat, which is the exact
+    identity assertion the caveat exists to refuse (CLAUDE.md §Hard constraints 1). A missing
+    warning is the failure mode that looks like success.
+
+    It is now DERIVED from the meta-model: the edge kinds binding to `CLAIM_META_KINDS` (`ABOUT`
+    — "this artefact claims to concern that entity"), as opposed to `ATTESTED_META_KINDS`
+    (`RESOLVED_TO` — the determination, written only behind a human attestation). A pack that
+    declares a claim edge gets the caveat by declaring it; there is no second place to remember.
+
+    Computed per call, never cached at import: the deployment binding is rebindable
+    (`bind_deployment` / `deployment(...)`), and a set frozen at import time would answer for
+    whichever packs happened to be bound when this module was first imported.
+    """
+    return frozenset(kind for meta in CLAIM_META_KINDS
+                     for kind in edge_kinds_binding_to(meta))
+
+
+def _is_subject_kind(kind) -> bool:
+    """Whether this node kind is one the system may never auto-identify (spine D4b).
+
+    The caveat below used to key on one pack's node kind by name. Same objection: naming a member is
+    naming a domain, and under any other pack the test is simply never true. A pack declares its
+    subject kinds; the engine asks the vocabulary.
+    """
+    return active_vocabulary().is_subject(str(kind))
+
 
 IDENTITY_CAVEAT = (
     "**CLAIMED ON THE DOCUMENT — NOT VERIFIED.** These link a document to registry candidates. "
@@ -137,8 +169,9 @@ def _vocab(value: object) -> str:
     """A member of a CLOSED vocabulary — a NodeKind, EdgeKind or SourcePointerKind.
 
     These come from `schema.py` and `provenance.py`, never from a document, so they are the one
-    class of string here that is ours. Encoding them would render `for_patient` as `for\\_patient`,
-    which is unreadable to a person and, worse, stops matching for anything reading these sheets.
+    class of string here that is ours. Encoding them would render a snake_case kind name with a
+    backslash before every underscore, which is unreadable to a person and, worse, stops matching
+    for anything reading these sheets.
     """
     return str(value)
 
@@ -323,7 +356,7 @@ def node_markdown(store,
         lines.append(f"**Canonical id:** {_code(node.canonical_id)}")
     lines.append("_Title, id and canonical id are grounded by the entity citations at the foot of "
                  "this sheet. Everything else carries its own citation inline._")
-    if node.kind is NodeKind.PATIENT:
+    if _is_subject_kind(node.kind):
         # Keyed on the KIND, never on whether a claim edge happens to exist. It is emitted here —
         # early, on its own line, before any attribute value — for the same reason the claims
         # caveat is: no supplied label, attribute or id can sit inside it or comment it out.
@@ -357,6 +390,7 @@ def node_markdown(store,
 
     claims: list[str] = []
     relations: list[str] = []
+    claim_kinds = claimed_identity_edges()
     for edge_row in store.edges_touching(node.id):
         if edge_row["system_to"] is not None:
             # A SUPERSEDED belief, not a relationship. `edges_touching` returns every version of
@@ -379,9 +413,9 @@ def node_markdown(store,
         else:
             label = other.label
         line = _relation_line(edge, label, other_id, outgoing)
-        (claims if edge.kind in CLAIMED_IDENTITY_EDGES else relations).append(
+        (claims if edge.kind in claim_kinds else relations).append(
             line + (f"\n  - {_candidate_phrase(edge)}"
-                    if edge.kind in CLAIMED_IDENTITY_EDGES else ""))
+                    if edge.kind in claim_kinds else ""))
 
     if claims:
         # A SEPARATE, TRUSTED BLOCK. The caveat is emitted before any untrusted text and is not
@@ -389,7 +423,7 @@ def node_markdown(store,
         # inside it, precede it, or comment it out.
         lines += ["", "## Claimed identity — NOT VERIFIED", "", f"> {IDENTITY_CAVEAT}", ""]
         lines += claims
-    elif node.kind is NodeKind.PATIENT:
+    elif _is_subject_kind(node.kind):
         # An empty section rather than none: "no document names this person" is an ANSWER, and
         # the absence of a heading reads as the question never having been asked.
         lines += ["", "## Claimed identity — NOT VERIFIED", "",
@@ -413,7 +447,7 @@ def node_markdown(store,
 
 def _edge_from_row(store, row) -> GraphEdge:
     # Pointers for THIS version of the edge. Reading them unscoped puts a superseded claim's
-    # evidence beside the current one — on a FOR_PATIENT edge that means a citation for a
+    # evidence beside the current one — on a CLAIM edge that means a citation for a
     # candidate the resolver no longer returns, under the identity caveat.
     version = row["rowid_pk"]
     return GraphEdge(

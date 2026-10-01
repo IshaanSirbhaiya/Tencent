@@ -1,0 +1,48 @@
+# SQL templates over the SQL-standard information_schema (PostgreSQL; also the synthetic fixture).
+# Rendered by parse.render: `{x|literal}` quotes a value, `{x|ident}` quotes an identifier,
+# `{x|int}` coerces. `{order_by}` is built by the engine from quoted key columns.
+# Every statement is a read. The engine never composes SQL outside these templates.
+name: information_schema
+list_tables: >-
+  SELECT table_schema, table_name FROM information_schema.tables
+  WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema')
+  ORDER BY table_schema, table_name
+describe: >-
+  SELECT column_name, data_type FROM information_schema.columns
+  WHERE table_schema = {schema|literal} AND table_name = {table|literal}
+  ORDER BY ordinal_position
+keys: >-
+  SELECT kcu.column_name AS column_name, tc.constraint_type AS constraint_type,
+         ccu.table_schema AS ref_schema, ccu.table_name AS ref_table, ccu.column_name AS ref_column
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+   AND tc.table_name = kcu.table_name
+  LEFT JOIN information_schema.constraint_column_usage ccu
+    ON ccu.constraint_name = tc.constraint_name AND ccu.constraint_schema = tc.constraint_schema
+  WHERE tc.table_schema = {schema|literal} AND tc.table_name = {table|literal}
+    AND tc.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+  ORDER BY kcu.ordinal_position
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+# --- profiling + facts store (tabular/, workstream S2). Standard SQL that PostgreSQL and the
+# SQLite fixture both accept. `{group_cols}` / `{measures}` / `{order_by}` are built by the engine
+# ONLY from identifiers the server reported, each quoted with the ident filter's rule.
+column_stats: >-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         COUNT(DISTINCT CAST({column|ident} AS TEXT)) AS distinct_n,
+         AVG(LENGTH(CAST({column|ident} AS TEXT))) AS avg_len,
+         MAX(LENGTH(CAST({column|ident} AS TEXT))) AS max_len,
+         AVG(LENGTH(CAST({column|ident} AS TEXT))
+             - LENGTH(REPLACE(CAST({column|ident} AS TEXT), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by}
+  LIMIT {limit|int} OFFSET {offset|int}
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}

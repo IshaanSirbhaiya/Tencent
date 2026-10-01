@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2021-000111",
+  "filename": "IMG-2021-000111.jpg",
+  "image_present": false,
+  "captured_at": "2021-10-25T15:34:49+00:00",
+  "captured_by": "OFF-0040",
+  "inspection_id": "INS-2021-000490",
+  "application_id": "APP-2021-000624",
+  "parcel_id": "PCL-MB-02990",
+  "photo_batch_ref": "PHB-2021-000490",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-253113"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 411959,
+    "northing": 1195728,
+    "accuracy_m": 13.9
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          816,
+          120,
+          286,
+          74
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2021-221726",
+        "confidence": 0.93,
+        "bbox": [
+          2535,
+          238,
+          783,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "88 ROPEWALK CRESCENT, SABLE QUAY AM4 4RS",
+        "confidence": 0.929,
+        "bbox": [
+          751,
+          346,
+          1000,
+          54
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2021-10-25",
+        "confidence": 0.892,
+        "bbox": [
+          2652,
+          465,
+          841,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0040",
+        "confidence": 0.896,
+        "bbox": [
+          2900,
+          496,
+          384,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

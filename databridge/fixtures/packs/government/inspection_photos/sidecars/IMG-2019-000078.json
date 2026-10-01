@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000078",
+  "filename": "IMG-2019-000078.jpg",
+  "image_present": false,
+  "captured_at": "2019-02-11T15:19:30+00:00",
+  "captured_by": "OFF-0038",
+  "inspection_id": "INS-2019-000140",
+  "application_id": "APP-2018-000202",
+  "parcel_id": "PCL-VH-01777",
+  "photo_batch_ref": "PHB-2019-000140",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-714387"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 434138,
+    "northing": 1196334,
+    "accuracy_m": 10.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1303,
+          120,
+          297,
+          83
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-16Z25Z",
+        "confidence": 0.875,
+        "bbox": [
+          847,
+          220,
+          729,
+          80
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "173 PELLET LANE, VANTRY HOLLOW AM3 4SL",
+        "confidence": 0.907,
+        "bbox": [
+          705,
+          390,
+          1254,
+          51
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2019-02-11",
+        "confidence": 0.818,
+        "bbox": [
+          509,
+          486,
+          667,
+          60
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0038",
+        "confidence": 0.908,
+        "bbox": [
+          1081,
+          708,
+          480,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

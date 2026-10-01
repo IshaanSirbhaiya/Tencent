@@ -45,4 +45,7 @@ def test_ev_sql_against_local_ollama(capsys):
             mark = "OK " if q["match"] else ("REF" if q["refusal"] else "xx ")
             print(f"  [{mark}] {q['question']}")
 
-    assert res.total == 12                                  # ran end-to-end; number recorded above
+    # Derived (HC2, SWEEP #24-34): every gold pair was scored — none skipped, none invented.
+    from databridge_evals.e_sql import PAIRS
+    assert len(PAIRS) >= 1 and len({q for q, _ in PAIRS}) == len(PAIRS)   # non-vacuous, distinct
+    assert res.total == len(PAIRS) and len(res.per_question) == len(PAIRS)

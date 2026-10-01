@@ -189,7 +189,11 @@ def test_an_empty_report_becomes_an_honest_one(registry):
     result = ClinicAgent(registry, harness).ask("What did the graph say about tomorrow?")
     assert not result.refused
     assert NOTHING_ANSWERED in result.notes
-    assert "Nothing in the clinic graph answered that" in result.answer
+    # Derived from the bound pack's wording (HC1), never a literal naming one pack's graph.
+    from databridge_agent.render import note_text
+
+    assert note_text(NOTHING_ANSWERED).strip()
+    assert note_text(NOTHING_ANSWERED) in result.answer
 
 
 def test_a_second_call_to_one_tool_does_not_renumber_the_first():

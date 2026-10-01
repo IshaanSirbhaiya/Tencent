@@ -8,7 +8,7 @@
 // Nothing in this file computes. Every figure is computed server-side by
 // `databridge_graph.analytics.compute` (a traversal) or by the confirm gate itself; the browser
 // only renders and links.
-import { GATEWAY } from "./api";
+import { GATEWAY, authHeaders } from "./api";
 import type { ActionCard, BlockedProposal } from "./outbox-api";
 import type { Refusal, SourcePointer } from "./types";
 
@@ -20,10 +20,9 @@ export interface Count {
   of: number;
   pct: number;
   members: string[];
-  /** Set when a figure was counted but cannot be listed — `conflicts` counts registry ROWS, so
-   *  naming its members would name patients (CLAUDE.md §Hard constraints 1). The reason is a
-   *  backend string, rendered as-is: an empty `members` with no explanation reads as a bug, or
-   *  worse, as a zero. */
+  /** Set when a figure was counted but cannot be listed — a figure counting SUBJECT rows would
+   *  name people by listing them (CLAUDE.md §Hard constraints 1). Rendered as-is: an empty
+   *  `members` with no explanation reads as a bug, or worse, as a zero. */
   members_withheld?: string;
 }
 
@@ -40,30 +39,86 @@ export interface IssuerRow {
   members: string[];
 }
 
-export interface GraphAnalytics {
+/** One kind present in the graph. `meta` is its domain-free shape; `subject` comes from the pack's
+ *  own `subject_kinds` declaration; `declared: false` marks a stored kind no bound pack declares. */
+export interface KindRow {
+  kind: string;
+  n: number;
+  meta: string | null;
+  pack: string | null;
+  subject: boolean;
+  declared: boolean;
+}
+
+export interface RankedConnected {
+  id: string;
+  degree: number;
+}
+
+export interface RankedRecent {
+  id: string;
+  system_from: string | null;
+}
+
+export interface SourceRow {
+  /** The source id the documents' pointers cite — or a `src-…` handle when a document it holds
+   *  carries a subject's information. */
+  source: string;
   documents: number;
-  /** `n` = registry rows a document has claimed (patients this clinic has SEEN);
-   *  `of` = rows the registry holds (patients ON FILE). It was `number`, which meant whichever
-   *  of those the seed happened to produce — the two now differ by ~25x, so the denominator has
-   *  to travel with the number. `members` always arrives empty with `members_withheld` set:
-   *  listing them would name patients. */
-  patients: Count | null;
-  packages: number;
-  tests_in_catalogue: number;
+  entities: number;
+  members: string[];
+}
+
+export interface GraphAnalytics {
   nodes: number;
   edges: number;
+  documents: number;
+  kinds: KindRow[];
+  meta_kinds: Record<string, number>;
+  /** `n` = subject rows a document has claimed; `of` = subject rows on file. Null when no bound
+   *  pack declares a subject kind — not applicable, never zero. */
+  subjects: Count | null;
   issuer_mix: IssuerRow[];
   ambiguity: Count | null;
   unlinked_documents: Count | null;
   conflicts: Count | null;
-  tests_outside_any_package: Entity[];
+  /** Entities a document references that no agreement includes. Null when nothing in the graph
+   *  is includable by an agreement. */
+  uncovered_references: Count | null;
+  most_connected: RankedConnected[];
+  recently_ingested: RankedRecent[];
+  documents_by_source: SourceRow[];
+  cross_source: Count | null;
+  orphans: Count | null;
   as_of: string | null;
+  vocabulary: { packs?: string[]; subject_kinds?: string[]; identity_figures?: boolean };
+  withholding?: { subject_kinds: string[]; claim_capable_kinds: string[] };
   entities: Record<string, Entity>;
 }
 
-/** An intake the counter cannot commit yet, and what it is waiting on.
+export interface IngestionSource {
+  source: string;
+  runs: number;
+  run_ids: string[];
+  latest: {
+    run_id: string;
+    ledger_files: string[];
+    counts: Record<string, number>;
+    excluded: number;
+    exclusion_reasons: { reason: string; n: number }[];
+    truncated: boolean;
+  };
+}
+
+export interface IngestionSummary {
+  sources: IngestionSource[];
+  excluded: number;
+  note: string | null;
+}
+
+/** An intake that cannot commit yet, and what it is waiting on.
  *
- *  `candidate_count` is how MANY registry rows the document matched. There is deliberately no
+ *  `candidate_count` is how MANY rows the document matched. There is deliberately no
  *  field naming or ordering them: a screen that ranked candidates would be doing identity
  *  verification with extra steps (CLAUDE.md §Hard constraints 1). */
 export interface BlockedIntake {
@@ -92,6 +147,10 @@ export interface IntelligenceResponse {
   graph_unavailable: string | null;
   queue: QueueSummary | null;
   queue_unavailable: string | null;
+  /** Coverage and exclusions per ingestion source, from the run ledgers. Absent from older
+   *  gateways, so optional. */
+  ingestion?: IngestionSummary | null;
+  ingestion_unavailable?: string | null;
   note: string;
 }
 
@@ -180,7 +239,11 @@ export interface AgentAsk {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${GATEWAY}${path}`, { cache: "no-store", ...init });
+  const res = await fetch(`${GATEWAY}${path}`, {
+    cache: "no-store",
+    ...init,
+    headers: { ...authHeaders(), ...(init?.headers ?? {}) },
+  });
   const body = await res.json().catch(() => ({}));
   // Refusals ride in the body with a 4xx (house convention) — surface them, do not throw.
   if (!res.ok && !("refusal" in body)) throw new Error(`${path} → ${res.status}`);
@@ -242,7 +305,7 @@ export function kindOf(graph: GraphAnalytics | null, id: string): string | null 
 // (`databridge_agent.screen_question`), never by a model. That matters more than it looks: the
 // screen that already refuses "email the blocked list to someone" is the same one that routes a
 // request implying an act to the draft path, so nothing a document could write chooses between
-// "read the graph" and "write to a patient".
+// "read the graph" and "write to a person".
 
 
 /** A code-authored sentence, addressed by key. Both halves come from a closed table in
@@ -279,7 +342,7 @@ export interface ConsoleRequest {
   as_of?: string | null;
   /** Which registration this concerns. Named by a PERSON — the agent may not choose. */
   intake_id?: string | null;
-  /** Door (b) of the recipient rule: an address a member of staff typed. Read only by a clinic
+  /** Door (b) of the recipient rule: an address a member of staff typed. Read only by a policy
    *  rule that declares that door; a rule declaring `committed_ledger` refuses one outright. */
   typed_address?: string | null;
   typed_by?: string | null;

@@ -16,6 +16,8 @@ import re
 
 import pytest
 
+from databridge_intake.registry import DATASET_TODAY
+
 from databridge_intake.metrics import aggregate, baseline, measure
 from databridge_intake.ledger import subject_fingerprint_for
 from databridge_intake.models import ConfirmationState
@@ -38,7 +40,7 @@ def figures():
     metrics = []
     for path in sorted((fixtures_dir() / "chits").glob("*")):
         text = path.read_text(encoding="utf-8")
-        draft = run_intake(text, document_id=path.name)
+        draft = run_intake(text, document_id=path.name, today=DATASET_TODAY)
         if draft.resolution.candidates:
             selected = draft.resolution.candidates[0].record
             state = (ConfirmationState(intake_id=draft.intake_id)
@@ -47,7 +49,7 @@ def figures():
                                      subject_fingerprint=subject_fingerprint_for(
                                          draft.record, draft.resolution, selected.patient_id)))
             draft = run_intake(text, document_id=path.name, intake_id=draft.intake_id,
-                               confirmation=state, selected_patient=selected)
+                               confirmation=state, selected_patient=selected, today=DATASET_TODAY)
         metrics.append(measure(draft, confirmed=True))
     return metrics, aggregate(metrics)
 
@@ -113,7 +115,19 @@ def test_the_quoted_playwright_count_matches_the_spec():
     e2e = root / "databridge" / "apps" / "frontend" / "e2e"
     specs = sorted(e2e.glob("*.spec.ts"))
     assert specs, "no Playwright specs found — the path moved"
-    declared = sum(len(re.findall(r"^test\(", p.read_text(encoding="utf-8"), re.M)) for p in specs)
+    # A declaration is a `test(` (or `test.only/skip/fixme/fail(`) call whose first argument is a
+    # title string, at ANY indentation. The earlier rule matched only column-0 `test(`, so it missed
+    # every test inside a `test.describe` block (it reported 57 when 131 were declared).
+    # `test.skip(!cond, "reason")` inside a test body is not a declaration: its first argument is
+    # not a string, so it is not counted. Specs declare no tests in loops (see staff-gate.spec.ts).
+    decl = re.compile(r"""^\s*test(?:\.(?:only|skip|fixme|fail))?\(\s*["'`]""", re.M)
+    texts = [p.read_text(encoding="utf-8") for p in specs]
+    declared = sum(len(decl.findall(t)) for t in texts)
+    # Non-vacuous: the rule sees every column-0 declaration AND reaches inside a describe block,
+    # or it has silently regressed to the old undercount.
+    top_level = sum(len(re.findall(r"^test\(", t, re.M)) for t in texts)
+    assert declared >= top_level > 0
+    assert any(re.search(r"""^\s+test\(\s*["'`]""", t, re.M) for t in texts)
     assert f"{declared} Playwright tests" in _submission(), (
         f"{len(specs)} spec file(s) declare {declared} tests")
 

@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2025-000173",
+  "filename": "IMG-2025-000173.jpg",
+  "image_present": false,
+  "captured_at": "2025-03-05T13:28:52+00:00",
+  "captured_by": "OFF-0037",
+  "inspection_id": "INS-2025-000409",
+  "application_id": "APP-2024-000535",
+  "parcel_id": "PCL-AR-01191",
+  "photo_batch_ref": "PHB-2025-000409",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-309946"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 445701,
+    "northing": 1219796,
+    "accuracy_m": 9.5
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1359,
+          120,
+          297,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2025-383140",
+        "confidence": 0.941,
+        "bbox": [
+          380,
+          261,
+          918,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "189 WINDLASS CLOSE, SABLE QUAY AM1 6TG",
+        "confidence": 0.818,
+        "bbox": [
+          200,
+          302,
+          1216,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2025-03-05",
+        "confidence": 0.828,
+        "bbox": [
+          626,
+          432,
+          928,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0037",
+        "confidence": 0.827,
+        "bbox": [
+          1625,
+          664,
+          352,
+          63
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

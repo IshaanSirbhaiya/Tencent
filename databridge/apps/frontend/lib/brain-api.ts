@@ -1,12 +1,13 @@
 // Company-Brain gateway client (T08). Read-only render layer — all logic is server-side (D-FE-2).
-import { GATEWAY } from "./api";
+import { GATEWAY, authHeaders } from "./api";
 import type { Refusal } from "./types";
-import type { BrainAnswer, BrainGraph, IngestResult, Insight, NodeDetail, TimelineEvent } from "./brain-types";
+import type { BrainGraph, BrainQueryResult, IngestResult, Insight, NodeDetail, TimelineEvent } from "./brain-types";
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${GATEWAY}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    // INT1: every /brain route requires a principal (E2E F-25) — send the credential
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
     cache: "no-store",
   });
   const body = await res.json().catch(() => ({}));
@@ -18,14 +19,18 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 export const brainApi = {
   graph: () => call<BrainGraph>("/brain/graph"),
   seed: () =>
+    // POST: the seed WRITES the shared graph (R-019 main #6 — GET is kept only for old clients)
     call<{ stats: { nodes_created: number; edges_created: number; sources_attached: number } } & BrainGraph>(
       "/brain/graph/seed",
+      { method: "POST" },
     ),
   insights: () => call<{ insights: Insight[] }>("/brain/insights"),
   // grounded answer (200) OR a refusal object (422) — a discriminated union, not a merge, so a
   // consumer can't mistake the refusal object for the string `BrainAnswer.refusal`.
   query: (question: string, as_of?: string) =>
-    call<BrainAnswer | { grounded?: false; refusal: Refusal }>("/brain/query", {
+    // N-14: a cross-source question comes back DELEGATED (`routed_to: "federated"`), with the
+    // computed table, coverage and candidate flags; anything else is the graph answer.
+    call<BrainQueryResult>("/brain/query", {
       method: "POST",
       body: JSON.stringify({ question, as_of: as_of ?? null }),
     }),
@@ -61,7 +66,10 @@ export const brainApi = {
    * arrives as a value this app can show instead of raw JSON replacing the page. */
   downloadSheets: async (asOf?: string | null): Promise<{ filename: string; blob: Blob }> => {
     const query = asOf ? `?as_of=${encodeURIComponent(asOf)}` : "";
-    const res = await fetch(`${GATEWAY}/brain/export/sheets${query}`, { cache: "no-store" });
+    const res = await fetch(`${GATEWAY}/brain/export/sheets${query}`, {
+      cache: "no-store",
+      headers: authHeaders(),
+    });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { refusal?: Refusal };
       throw new Error(body.refusal?.message ?? `Export failed (${res.status})`);
@@ -70,7 +78,7 @@ export const brainApi = {
     // if the header is absent — `Content-Disposition` is readable here because the route exposes it.
     const disposition = res.headers.get("content-disposition") ?? "";
     const match = /filename="([^"\\]+)"/.exec(disposition);
-    return { filename: match?.[1] ?? "clinic-evidence-sheets.zip", blob: await res.blob() };
+    return { filename: match?.[1] ?? "evidence-sheets.zip", blob: await res.blob() };
   },
   // drag-and-drop ingest (Part 2): a registered fixture filename (or inline text) → grounded
   // extraction → new graph nodes. Returns the genuinely NEW entity labels.

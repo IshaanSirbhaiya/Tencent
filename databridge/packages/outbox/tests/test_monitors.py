@@ -282,7 +282,7 @@ def test_a_monitor_pointer_resolves_to_the_config_row_it_names(table):
     monitor = table.by_id("questionnaire_outstanding")
     pointer = monitor.pointer("body_template")
     assert (pointer.source_id, pointer.table, pointer.column, pointer.row_id) == \
-        ("clinic_monitors.yaml", "monitors", "body_template", "questionnaire_outstanding")
+        (monitors_path().name, "monitors", "body_template", "questionnaire_outstanding")
     # And the cell it names really holds that text.
     import yaml
 

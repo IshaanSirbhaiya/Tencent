@@ -18,21 +18,30 @@ routing:
   verification_pass:        sonnet_alt      # DIFFERENT model than generator (adversarial separation, C17 §12.3b)
   brain_query:              primary_llm     # T08 — Company-Brain NL answer over the graph context
   brain_analysis:           primary_llm     # T08 — labelled [ANALYSIS] reasoning over the graph
+  brain_routing:            primary_llm     # /brain router: graph vs federated, for a question the rules leave undecided (INT5)
   # --- Hack4Health Walnut (PLAN.md Phase 1) ---
   intake_extraction:        sonnet          # referring document → normalized IntakeRecord draft
   intake_classification:    sonnet          # document-type classification (deterministic today)
   agent_reasoning:          sonnet          # the read-only clinic agent's plan + answer steps
+  # --- Knowledge platform (BUILD_PLAN §5.5) ---
+  agent:                    frontier        # agent_runtime planner loop (plan tools, write the answer/drafts)
+  embed:                    embedding       # passage embeddings (packages/retrieval). No key for the
+                                            # provider ⇒ the harness uses its LABELLED offline
+                                            # hashing embedding instead (lexical, not semantic)
 
 aliases:
-  sonnet:      {model: "anthropic/claude-sonnet-4-6"}
-  frontier:    {model: "anthropic/claude-fable-5"}
+  # 2026-10-01 (founder): current generation. Opus 5.5 is the frontier tier (strong agentic planning at
+  # $4/$20 vs Fable's $10/$50); Sonnet 5.5 is the high-volume tier. Was sonnet-4-6 / fable-5.
+  sonnet:      {model: "anthropic/claude-sonnet-5-5"}
+  frontier:    {model: "anthropic/claude-opus-5-5"}
   sonnet_alt:  {model: "openai/gpt-4.1"}            # or a second local model
   local_main:  {model: "ollama_chat/qwen3:72b"}    # customer override target
   # T08 demo primary LLM — gateway auto-detects from env: OPENAI_API_KEY → gpt-4o (default below),
   # else ANTHROPIC_API_KEY → remapped to primary_llm_anthropic at runtime, else FakeBackend.
   primary_llm:           {model: "openai/gpt-4o"}
-  primary_llm_anthropic: {model: "anthropic/claude-sonnet-4-6"}
+  primary_llm_anthropic: {model: "anthropic/claude-sonnet-5-5"}
   ollama_local:          {model: "ollama_chat/qwen2.5:7b"}
+  embedding:             {model: "openai/text-embedding-3-small"}
 
 profiles:
   cloud:   {}                                       # use aliases as-is
@@ -40,3 +49,4 @@ profiles:
     sonnet: local_main
     frontier: local_main
     sonnet_alt: {model: "ollama_chat/llama3.3:70b"}
+    embedding: {model: "ollama/nomic-embed-text"}

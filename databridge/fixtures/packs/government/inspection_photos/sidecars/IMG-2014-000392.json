@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000392",
+  "filename": "IMG-2014-000392.jpg",
+  "image_present": false,
+  "captured_at": "2014-01-12T14:58:47+00:00",
+  "captured_by": "OFF-0040",
+  "inspection_id": "INS-2014-000166",
+  "application_id": "APP-2013-000233",
+  "parcel_id": "PCL-ND-01677",
+  "photo_batch_ref": "PHB-2014-000166",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-959711"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 432817,
+    "northing": 1187267,
+    "accuracy_m": 16.2
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1226,
+          120,
+          330,
+          66
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2014-610220",
+        "confidence": 0.851,
+        "bbox": [
+          758,
+          227,
+          756,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "182 PELLET PASSAGE, NORTH DUNMOOR AM7 6LA",
+        "confidence": 0.714,
+        "bbox": [
+          47,
+          300,
+          1312,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-01-12",
+        "confidence": 0.844,
+        "bbox": [
+          1076,
+          489,
+          725,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0040",
+        "confidence": 0.887,
+        "bbox": [
+          2107,
+          700,
+          352,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

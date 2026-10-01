@@ -1,0 +1,755 @@
+# packs/government — permits, benefits and case files.
+#
+# Layer 1 of the three-layer schema (00_SPINE.md §4). Government is the spine's default worked
+# example wherever a **T3** source is needed: unversioned document drops, which must be captured
+# because they cannot be re-read.
+#
+# ---------------------------------------------------------------------------------------------
+# This is a PREDEFINED ontology library, and that is the point of the government pack.
+# ---------------------------------------------------------------------------------------------
+# The finance graph is built *by agents*, which discover their kinds as they go. The government
+# graph is built from this file and from nothing else: `government_seed` may only emit kinds
+# declared here, and anything the estate contains that has no kind here goes through the growth
+# protocol (`growth.py`) rather than being coined at build time.
+#
+# The library is therefore deliberately LARGE. An organisation adopting the pack should find the
+# kind it means already written down, with a description telling it when to use that one rather
+# than its neighbour — because the alternative is an operator inventing a near-duplicate, which is
+# the single most common way an ontology stops being able to answer "what kinds of thing are in
+# here?". Every `description` below is UI text and agent-facing text: it says what the kind holds
+# and, where two kinds are close, which one to pick.
+#
+# Derived from `fixtures/packs/government/ONTOLOGY_NOTES.md`, which enumerates the natural kinds in
+# the estate (eight sources, six of which describe the same real-world objects incompatibly). Where
+# this file and that one disagree, the disagreements are called out inline.
+#
+# Ontology only. The synthetic estate this vocabulary describes is generated separately.
+
+pack: government
+title: Permits, benefits and case files
+version: "2.0"
+
+node_kinds:
+
+  # --- people and organisations (the protected end of the ontology) ----------------------------
+  - name: person
+    binds_to: entity
+    description: >
+      A human being as some register holds them: an applicant, a claimant, an appellant, a
+      correspondent, a company officer, a subject of a legacy record. ONE kind, not four — the
+      proceeding a person is in is a ROLE (see `applicant`, `claimant`, `acts_as`), and modelling
+      roles as species of person is how an estate loses the ability to answer "is this the same
+      human?". Use this for the register row itself; use a role kind for what the row is doing in
+      a case. A subject (D4b): candidates only, never an automatic merge.
+
+  - name: organisation
+    binds_to: organisation
+    description: >
+      A registered business, contractor, advocacy service or other body that is not the deciding
+      agency. A subject (D4b) for a stronger reason than `person` is: public-registry officer
+      records carry NO identifier at all, so name and address are the entire basis for a match.
+      Use `agency` instead when the body is the one deciding, inspecting or paying.
+
+  - name: applicant
+    binds_to: entity
+    description: >
+      The ROLE a person or organisation occupies in a permit application. A separate node from
+      `person` on purpose, joined by `acts_as`: "which human is this applicant?" is then a question
+      with a visible answer rather than an assumption baked into one node. Use this as the source
+      of `submitted`; never as the thing you resolve identity onto.
+
+  - name: claimant
+    binds_to: entity
+    description: >
+      The ROLE a person occupies in a benefit claim. Same construction as `applicant`, and a
+      distinct kind because the two roles are attested at different moments and carry different
+      identifiers (a claim reference is not an application reference).
+
+  - name: officer
+    binds_to: entity
+    description: >
+      An agency staff member whose decisions, inspections and assignments are attributable.
+      A human in the world, held apart from `person` on purpose: staff identity is administrative
+      and IS keyed (`officer_ref`), so it merges exactly and never fuzzily. Fuzzy-merging two staff
+      records would silently reassign a caseload — and because assignment is an access predicate,
+      it would rewrite who may READ the case too.
+
+  - name: agency
+    binds_to: organisation
+    description: >
+      The department, statutory board or external consultee body that decides, inspects, pays or
+      is consulted. Use this rather than `organisation` whenever the body is acting in an official
+      capacity in the process; `organisation` is for the governed party.
+
+  # --- what a government processes -------------------------------------------------------------
+  - name: application
+    binds_to: document
+    description: >
+      A submitted request for a permit, licence or registration, in progress or concluded. The
+      spine of the permits half of the graph. Bound to `document` because that is what pointers
+      resolve into — the row, the scanned form and the case file all cite the same thing.
+
+  - name: claim
+    binds_to: document
+    description: A submitted request for assistance under a benefit programme. The spine of the
+      benefits half of the graph.
+
+  - name: appeal
+    binds_to: document
+    description: >
+      A challenge to a decision. May be sealed, which is a POLICY state and not an absence: a
+      sealed appeal is withheld, and withheld is distinct from missing (spine D4).
+
+  - name: case_file
+    binds_to: document
+    description: >
+      The bundle an officer works from — the container that makes "everything on this case" one
+      traversal. Use `part_of_case` to attach members. In a T3 document drop it is the only thing
+      that can be re-read at all.
+
+  - name: permit
+    binds_to: agreement
+    description: >
+      The instrument that exists once an application is granted: a licence, permit or registration
+      with conditions and a validity window. NOT the same node as the `decision` that created it —
+      a permit persists, can be revoked, and outlives the case that produced it.
+
+  - name: licence
+    binds_to: agreement
+    description: >
+      A premises or activity licence held by an organisation, as the public registry publishes it.
+      Distinct from `permit`: this one is sourced from the registry rather than from the case
+      system, and the two do not share an identifier space.
+
+  - name: decision
+    binds_to: event
+    description: >
+      A determination made on an application at an instant. Immutable: a correction is a NEW
+      decision node pointing back through `supersedes_decision`, never an edit.
+
+  - name: determination
+    binds_to: event
+    description: >
+      An eligibility outcome on a claim at an instant, with its own effective window. Kept as a
+      distinct kind from `decision`, with its own supersession edge, so that nothing can traverse
+      out of a permit decision chain into a benefits chain — a union signature over two unrelated
+      chains is an invitation to do exactly that.
+
+  - name: condition
+    binds_to: rule
+    description: >
+      One obligation attached to a permit, with its own lifecycle (a compliance date, a discharge
+      date). A `rule` rather than an attribute, so "which permits still carry an undischarged
+      condition?" is a graph question with citations.
+
+  - name: inspection
+    binds_to: event
+    description: >
+      An attended site or desk visit with an outcome. May exist with NO outcome (no access
+      obtained), which is itself a recorded fact and not a gap.
+
+  - name: payment
+    binds_to: event
+    description: >
+      Money moved on a claim — a disbursement or a recovery. A reversal is a NEW payment node
+      pointing back through `reverses`, never an update to the original.
+
+  - name: review
+    binds_to: event
+    description: A scheduled or triggered re-examination of a claim.
+
+  - name: case_event
+    binds_to: event
+    description: >
+      Something that happened on a case at a time. The highest-cardinality kind in the estate by an
+      order of magnitude, and the kind that carries the bi-temporal disagreement worth seeing: it
+      occurred days before it was recorded, because counter staff key in batches.
+
+  # --- places -----------------------------------------------------------------------------------
+  - name: parcel
+    binds_to: location
+    description: >
+      A unit of land with a boundary and a zoning classification. Never merged by similarity:
+      parcels are renumbered and subdivided, and two parcels with adjacent ids and similar geometry
+      are DIFFERENT land. Join by exact id or by a declared renumbering lineage.
+
+  - name: address_point
+    binds_to: location
+    description: >
+      An addressable unit on a parcel, as surveyed. A fact about the world. Use this as the
+      destination of `addresses` when a typed address string resolves.
+
+  - name: address
+    binds_to: location
+    description: >
+      An address AS RECORDED on some record — abbreviated, stale, unit-prefixed or mistyped. It
+      exists to PRESERVE that evidence: merging two of these destroys the signal that a person
+      moved, which is a matching signal rather than noise. Resolve it onto an `address_point` with
+      `addresses`; that resolution may fail, and its failure is informative.
+
+  - name: office
+    binds_to: location
+    description: The agency office a case is handled at.
+
+  # --- artefacts ---------------------------------------------------------------------------------
+  - name: document
+    binds_to: document
+    description: >
+      A scanned case document with an OCR text layer — a form, a statutory declaration, a home
+      visit record. Use this for anything captured as pages; use `message` for correspondence and
+      `photo` for a site image.
+
+  - name: message
+    binds_to: document
+    description: >
+      One item of correspondence, inbound or outbound. Its headers are attacker-controlled: a case
+      reference read off an inbound header is a PROPOSAL (`claims_case_ref`), never a binding.
+
+  - name: photo
+    binds_to: document
+    description: >
+      A site photograph, held as metadata plus an OCR text layer. A document rather than an event
+      because what is citable is the capture, not the visit; the visit is the `inspection`.
+
+  - name: legacy_record
+    binds_to: document
+    description: >
+      One fixed-width record from the pre-migration system. A node kind rather than "a source of
+      attributes" on purpose: it is often the ONLY evidence that something happened, and a
+      meaningful fraction of them resolve to nobody at all — dissolving them into attributes would
+      silently discard exactly those.
+
+  - name: business_registration
+    binds_to: document
+    description: >
+      The registration record of an organisation. An organisation may hold SEVERAL over time (they
+      re-register, change legal form, register in more than one jurisdiction); the historical ones
+      must stay reachable, because a permit granted years ago cites the registration that existed
+      then.
+
+  # --- reference vocabularies (closed; a new code is a new code, never a merge) -------------------
+  - name: permit_type
+    binds_to: rule
+    description: The catalogue entry an application is made under — fee, target decision time,
+      whether an inspection is required.
+
+  - name: benefit_program
+    binds_to: rule
+    description: The programme a claim is made under — its ceiling, whether it is means tested,
+      its review interval.
+
+  - name: zoning_code
+    binds_to: rule
+    description: A zoning classification, with the constraints that follow from it.
+
+  - name: statute
+    binds_to: rule
+    description: >
+      The statutory provision a permit type, programme, condition or decision rests on. It earns a
+      kind because "which decisions rest on the provision that changed?" is the question a
+      government graph exists to answer.
+
+  - name: eligibility_rule
+    binds_to: rule
+    description: One testable condition on an application or claim — config as a graph object, so
+      that a determination can cite the rule it applied.
+
+  # --- the agent plane (spine D10–D12) -----------------------------------------------------------
+  - name: determination_action
+    binds_to: action_type
+    description: >
+      The declared write path by which an eligibility or permit determination may change a case's
+      state. Actions are the only write path, so the action type is itself an ontology object with
+      an automation mode.
+
+  - name: case_handling_action
+    binds_to: action_type
+    description: A declared write path for routine case handling — assignment, scheduling,
+      requesting information. Lower stakes than a determination, and still declared.
+
+  - name: agent
+    binds_to: agent
+    description: An agent as an ontology object (spine D10) — versioned, grounded in the pack file
+      that declares it, and invalidated rather than deleted when replaced.
+
+  - name: adapter
+    binds_to: adapter
+    description: >
+      A source connector as an ontology object: which source it reads, at which pinning
+      tier, under which capture policy.
+
+  - name: capability_grant
+    binds_to: capability_grant
+    description: A minted capability (spine D11) — what an attestation or a compiled declaration
+      produced, bound to one adapter and one purpose.
+
+edge_kinds:
+
+  # --- roles ------------------------------------------------------------------------------------
+  - name: acts_as
+    binds_to: role_of
+    src: [person, organisation]
+    dst: [applicant, claimant]
+    description: >
+      The register row and the proceeding role are DIFFERENT nodes joined by an explicit edge, so
+      that "which person is this applicant?" is a question with a visible answer rather than an
+      assumption baked into one node.
+
+  - name: officer_of
+    binds_to: role_of
+    src: [person]
+    dst: [organisation]
+    description: A person appointed to an organisation, with appointment and resignation dates.
+      In the public registry these records carry no identifier at all.
+
+  - name: handled_by
+    binds_to: role_of
+    src: [officer]
+    dst: [case_file, application, claim, appeal, review]
+    description: The officer accountable for the item. Use `assigned_to` / `caseworked_by` where
+      the source supplies only a current value with no assignment events.
+
+  - name: assigned_to
+    binds_to: role_of
+    src: [officer]
+    dst: [application]
+    description: >
+      OBSERVATION ONLY. The source is a current-value column with no assignment events, so this
+      records "observed assigned to X when we looked", with valid time open at both ends. It must
+      NOT be given a manufactured interval by differencing two reads — that fabricates a transition
+      date the source never asserted and loses every change between the reads.
+
+  - name: caseworked_by
+    binds_to: role_of
+    src: [officer]
+    dst: [claim]
+    description: Observation only, exactly as `assigned_to`. Caseload transfers happen and the
+      source keeps no transfer events.
+
+  - name: decided_by
+    binds_to: role_of
+    src: [officer]
+    dst: [decision, determination]
+    description: >
+      The named official the determination is attributable to. Attribution is the point:
+      a decision with no author is not auditable.
+
+  - name: inspected_by
+    binds_to: role_of
+    src: [officer]
+    dst: [inspection]
+    description: >
+      The named official who attended. An inspection with no outcome still has one of these.
+
+  - name: reviewed_by
+    binds_to: role_of
+    src: [officer]
+    dst: [review]
+    description: >
+      The named official who carried out the re-examination.
+
+  - name: claims_agent_for
+    binds_to: role_of
+    src: [organisation]
+    dst: [application]
+    description: >
+      PROPOSAL, not assertion. Derived from a free-text "agent of record" field keyed at a counter:
+      untrusted, displayable, citable, and never traversed for access or for a determination. It
+      becomes an assertion only when a named officer confirms it, at which point it is re-emitted
+      carrying the attesting principal.
+
+  # --- who produced what ------------------------------------------------------------------------
+  - name: submitted
+    binds_to: issued
+    src: [applicant, claimant, person, organisation]
+    dst: [application, claim, appeal]
+    description: >
+      The role that lodged the document. Bound to `issued` (actor → artefact) rather than to
+      `party_to`, so the direction the meta-kind promises is the direction the edge actually runs.
+
+  - name: issued_by
+    binds_to: issued
+    src: [agency]
+    dst: [permit, decision, determination, payment, licence, message, document]
+    description: >
+      The body that produced the instrument, payment or letter, acting in its official
+      capacity.
+
+  - name: sent_by
+    binds_to: issued
+    src: [person, organisation, agency, officer]
+    dst: [message]
+
+  # --- the decision chain -----------------------------------------------------------------------
+    description: >
+      The originator of a message. For an inbound message this is read from headers and is
+      therefore untrusted for anything but display.
+
+  - name: decides
+    binds_to: references
+    src: [decision, determination]
+    dst: [application, claim, appeal]
+    description: >
+      Deliberately NOT `about`. `about` carries the identity-claim rule, and a decision citing the
+      application it disposed of is not a claim about a person — binding it there would make every
+      decision render an unresolved-identity caveat under a domain-free renderer.
+
+  - name: grants
+    binds_to: authorises
+    src: [decision, determination, eligibility_rule]
+    dst: [permit, payment]
+    description: The determination or rule under which the instrument or payment is permitted.
+      Only a granting decision creates a permit.
+
+  - name: governs
+    binds_to: authorises
+    src: [eligibility_rule, condition, permit_type, benefit_program, zoning_code]
+    dst: [application, claim, permit, payment, parcel]
+    description: The declarative row that constrains the item. A breach or a discharge is then a
+      graph object with a citation rather than a spreadsheet cell.
+
+  - name: licensed
+    binds_to: authorises
+    src: [licence]
+    dst: [organisation]
+    description: The licence and the body it permits to trade. Issue and expiry are its valid-time
+      window.
+
+  - name: of_type
+    binds_to: references
+    src: [application, claim, permit, licence]
+    dst: [permit_type, benefit_program]
+    description: >
+      The catalogue entry the case was made under. A closed reference vocabulary: a new
+      code is a new code, and merging it into a similar one hides a statutory change.
+
+  - name: has_condition
+    binds_to: part_of
+    src: [condition]
+    dst: [permit]
+    description: Part → whole. The condition is a component of the instrument, and is discharged
+      on its own clock.
+
+  - name: inspects
+    binds_to: references
+    src: [inspection]
+    dst: [application, permit]
+    description: >
+      The case or instrument an inspection was carried out against.
+
+  - name: appeals
+    binds_to: references
+    src: [appeal]
+    dst: [decision, determination]
+    description: >
+      The determination being challenged.
+
+  - name: pays
+    binds_to: references
+    src: [payment]
+    dst: [claim]
+    description: The claim a payment moved money on. Its valid time is the period paid for; its
+      recording clock is when it was posted, and those are different clocks.
+
+  - name: reverses
+    binds_to: supersedes
+    src: [payment]
+    dst: [payment]
+    description: A reversal is a new payment pointing back at the one it undoes. Never an update.
+
+  - name: reviews
+    binds_to: references
+    src: [review]
+    dst: [claim]
+    description: >
+      The claim a re-examination was opened on.
+
+  - name: event_on
+    binds_to: references
+    src: [case_event]
+    dst: [application, claim]
+    description: The case an event happened on. Valid time trails the recording clock by days here;
+      getting the two the wrong way round loses rows.
+
+  - name: supersedes_decision
+    binds_to: supersedes
+    src: [decision]
+    dst: [decision]
+    description: >
+      A correction chain within the permits half. A DISTINCT kind from `supersedes_determination`
+      rather than one union signature over two unrelated chains — which would be an invitation to
+      traverse from a permit decision into a benefits chain.
+
+  - name: supersedes_determination
+    binds_to: supersedes
+    src: [determination]
+    dst: [determination]
+    description: The correction chain within the benefits half. See `supersedes_decision`.
+
+  - name: supersedes
+    binds_to: supersedes
+    src: [permit, licence, business_registration, legacy_record, application, claim]
+    dst: [permit, licence, business_registration, legacy_record, application, claim]
+    description: Replacement of a standing instrument or record by a later one. The two decision
+      chains have their own kinds; this is for everything else.
+
+  # --- identity CLAIMS (never determinations) ---------------------------------------------------
+  - name: about_subject
+    binds_to: about
+    src: [application, claim, case_file, inspection, appeal, document, message, photo,
+          legacy_record, business_registration]
+    dst: [person, applicant, claimant, organisation]
+    description: >
+      A CLAIM that the artefact concerns this person, role or body. Two candidates yield two edges
+      and neither is a determination — the `about` meta-kind carries that rule for every pack, and
+      every surface that renders one must attach the caveat.
+
+  - name: mentions
+    binds_to: about
+    src: [document, message, photo, legacy_record]
+    dst: [person, organisation]
+    description: >
+      A name recovered from OCR or from free text. UNTRUSTED and weaker than `about_subject`: it is
+      a hypothesis with a pointer, storable, citable and displayable, and it may never influence
+      control flow — including access control.
+
+  - name: legacy_for
+    binds_to: about
+    src: [legacy_record]
+    dst: [person]
+    description: >
+      The person a pre-migration record appears to concern. Often ABSENT by design: a meaningful
+      fraction of legacy records resolve to nobody, and that absence is a fact the graph keeps
+      rather than a row it drops.
+
+  - name: claims_case_ref
+    binds_to: references
+    src: [message, document]
+    dst: [application, claim]
+    description: >
+      PROPOSAL, not assertion. A case reference taken from an inbound header or OCR'd off a scanned
+      form — attacker-controlled. Stored, citable, displayable; never traversed for access, routing
+      or a determination. `corresponds_on` is the trusted counterpart.
+
+  - name: corresponds_on
+    binds_to: references
+    src: [message]
+    dst: [application, claim]
+    description: >
+      The case a message genuinely belongs to. Requires a TRUSTED binding — an agency outbound
+      thread record or a human attestation — and is never created from an inbound header.
+
+  # --- the determinations, gated by attestation --------------------------------------------------
+  - name: resolved_to
+    binds_to: resolved_to
+    src: [application, claim, case_file, document, message, legacy_record, business_registration]
+    dst: [person, applicant, claimant, organisation]
+    description: >
+      THE determination: this artefact is about THIS subject. Written only on the far side of a
+      named human's attestation against a declared identifier, and never produced by a score, a
+      similarity or a model. The engine enforces this: an edge bound to `resolved_to` refuses
+      construction without a valid `Attestation`.
+
+  - name: same_as
+    binds_to: resolved_to
+    src: [person, organisation]
+    dst: [person, organisation]
+    description: >
+      The output of identity resolution between two subject records, generalised over BOTH
+      protected subject kinds rather than written once for people. A machine may propose it; only a
+      named human may assert it, and it never crosses kinds — a person is never `same_as` an
+      organisation, however a sole trader appears in the data. An unattested proposal is a
+      candidate held outside the graph, never an edge.
+
+  # --- places ------------------------------------------------------------------------------------
+  - name: attached_to
+    binds_to: at
+    src: [application, permit, licence]
+    dst: [parcel, address_point]
+    description: >
+      The land or premises the instrument attaches to. MAY DANGLE: a small tail of
+      parcel references resolve to nothing in the survey, and a dangling reference is a finding.
+
+  - name: at_parcel
+    binds_to: at
+    src: [inspection, photo, address_point, legacy_record]
+    dst: [parcel]
+    description: >
+      The land the item was observed on or attaches to. May dangle where the survey has no
+      such parcel, and a dangling one is a finding.
+
+  - name: handled_at
+    binds_to: at
+    src: [application, claim, case_event, inspection]
+    dst: [office]
+    description: >
+      The office the item was processed at.
+
+  - name: resides_at
+    binds_to: at
+    src: [person, organisation]
+    dst: [address]
+    description: >
+      The most temporal edge in the estate. Stale addresses are everywhere and are a MATCHING
+      SIGNAL rather than noise, so old ones are invalidated and kept, never overwritten.
+
+  - name: addresses
+    binds_to: references
+    src: [address]
+    dst: [address_point]
+    description: The resolution of a typed string onto a surveyed point. It may fail, and its
+      failure is informative — it is usually the trace of a move or a rename.
+
+  - name: on_parcel
+    binds_to: part_of
+    src: [address_point]
+    dst: [parcel]
+    description: >
+      Part -> whole. The addressable unit is a component of the land parcel.
+
+  - name: zoned
+    binds_to: references
+    src: [parcel]
+    dst: [zoning_code]
+    description: Observation only. The survey ships a current cut with no retained prior cuts, so
+      successive reads are observations and not a rezoning history.
+
+  # --- containment, evidence and lineage ---------------------------------------------------------
+  - name: part_of_case
+    binds_to: part_of
+    src: [application, claim, decision, determination, inspection, appeal, payment, review,
+          case_event, condition, document, message, photo]
+    dst: [case_file]
+    description: >
+      Membership of the bundle an officer works from. The edge that makes "everything on
+      this case" one traversal.
+
+  - name: in_thread
+    binds_to: part_of
+    src: [message]
+    dst: [message]
+    description: Reply threading, from the message headers that name a parent.
+
+  - name: evidences
+    binds_to: references
+    src: [document, photo, legacy_record]
+    dst: [application, claim, inspection]
+    description: The artefact offered as evidence for the case. Distinct from `about_subject`,
+      which is a claim about a person rather than about the case.
+
+  - name: evidenced_by
+    binds_to: references
+    src: [inspection, decision, determination]
+    dst: [photo, document]
+    description: >
+      The captured artefact offered in support. The reverse direction of `evidences`, and
+      both exist because the two sources assert it in opposite directions.
+
+  - name: sent_to
+    binds_to: references
+    src: [message]
+    dst: [person, organisation, agency, officer]
+    description: >
+      A recipient of the message. Read from headers, so untrusted for routing.
+
+  - name: registered_as
+    binds_to: references
+    src: [organisation]
+    dst: [business_registration]
+    description: >
+      NOT 1:1. Organisations re-register and change legal form; at most one registration is current
+      per jurisdiction and the rest are historical and must stay reachable.
+
+  - name: cites
+    binds_to: references
+    src: [decision, determination, permit_type, benefit_program, eligibility_rule, condition]
+    dst: [statute]
+    description: >
+      The statutory provision the item rests on. Makes "which decisions rest on the provision
+      that changed?" a traversal.
+
+  - name: derived_from
+    binds_to: derived_from
+    src: [decision, determination, payment, case_file, permit, eligibility_rule]
+    dst: [application, claim, inspection, document, legacy_record, eligibility_rule]
+    description: >
+      Provenance WITHIN the graph: this node was computed from those. Not a citation of
+      a source span — that is what `sources` on the node itself carries.
+
+  # --- the agent plane ---------------------------------------------------------------------------
+  - name: granted_capability
+    binds_to: authorises
+    src: [agent]
+    dst: [capability_grant]
+    description: The capability an agent holds (spine D11). Its own bi-temporal history, so "when
+      did this widen, and who authorised it?" is answerable.
+
+  - name: may_invoke
+    binds_to: authorises
+    src: [agent]
+    dst: [determination_action, case_handling_action]
+    description: The declared write paths an agent may propose through. A capability not declared
+      here cannot be requested at runtime; there is no escalation path that adds one.
+
+  - name: resolved_through
+    binds_to: references
+    src: [capability_grant]
+    dst: [adapter]
+    description: >
+      The connector a capability is exercised against. A grant with no adapter is a
+      permission with nowhere to go.
+
+  - name: reads_from
+    binds_to: references
+    src: [adapter]
+    dst: [application, claim, document, message, legacy_record, business_registration, licence,
+          parcel, case_event]
+    description: Which kinds an adapter is the writer for. The reverse index that answers "if this
+      source drifted, what in the graph moves?".
+
+  - name: references
+    binds_to: references
+    src: ["*"]
+    dst: ["*"]
+    description: a cites b, with no stronger claim. The fallback when nothing more specific is
+      true — and if it is being used often, that is the signal to run the growth protocol.
+
+subject_kinds:
+  # Spine D4b. A subject is the entity whose identity the system may never auto-confirm.
+  #
+  # FOUR kinds, and the composition is a deliberate reading of two documents that disagree.
+  # D4b's table names government's subjects as `applicant` and `claimant` — the two roles in which
+  # identity is attested, at eligibility determination. `ONTOLOGY_NOTES.md` names them as `Person`
+  # and `Organisation`, and argues (correctly) that roles are not species of person. Declaring all
+  # four is not a compromise: it is what the split-node model requires. `person` and `organisation`
+  # are the register rows an identity resolver would otherwise be free to fuzzy-merge — namesakes
+  # are as common in a national register as anywhere, and registry officer records carry no
+  # identifier at all — while `applicant` and `claimant` are the nodes an attestation is recorded
+  # AGAINST at the statutory moment. A kind left off this list loses `never_fuzzy_merge` with it,
+  # so the failure mode of omission is silent and one-directional; the failure mode of inclusion is
+  # an extra confirmation step.
+  - kind: person
+    identifiers: [national_id, passport, register_id, legacy_key]
+    never_fuzzy_merge: true
+    attestation: in_person
+    grant_type: PersonReadGrant
+
+  - kind: organisation
+    identifiers: [company_registration, licence_number, registered_address]
+    never_fuzzy_merge: true
+    # A company cannot appear in person. The attestable act is a named human checking a registry
+    # document against the record, which is what `verified_channel` means here.
+    attestation: verified_channel
+    grant_type: OrganisationReadGrant
+
+  - kind: applicant
+    identifiers: [national_id, passport, company_registration, application_reference]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: ApplicantReadGrant
+
+  - kind: claimant
+    identifiers: [national_id, passport, claim_reference, benefits_reference]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: ClaimantReadGrant

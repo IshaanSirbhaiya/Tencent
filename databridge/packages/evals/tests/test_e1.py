@@ -6,6 +6,8 @@ import re
 
 from databridge_evals import gold_backend, run_e1
 from databridge_harness import FakeBackend, Harness
+from databridge_ingest import fintech_fixture
+from databridge_semantic import build_report
 
 CFG = {
     "routing": {"schema_annotation": "m", "cross_table_inference": "m"},
@@ -22,13 +24,20 @@ def test_gold_backend_scores_perfect():
     res = run_e1(_gold_harness())
     assert res.accuracy == 1.0
     assert res.role_accuracy == 1.0
-    assert res.total == 36
+    # Derived (HC2, SWEEP #24-34): E1 scores every column of the fixture it annotates.
+    columns = sum(len(t.columns) for t in fintech_fixture().tables)
+    assert columns >= 1                                          # non-vacuous
+    assert res.total == columns
 
 
 def test_airtight_provenance_is_always_correct():
     res = run_e1(_gold_harness())
     det = res.per_provenance.get("deterministic")
-    assert det and det["accuracy"] == 1.0 and det["n"] == 18      # the 50% resolved with no LLM
+    # Derived: the deterministic slice is exactly the Stage-A airtight columns of the fixture
+    # (pinned against the rule itself in semantic/tests/test_schema_graph.py).
+    airtight = build_report(fintech_fixture()).airtight_columns
+    assert 1 <= airtight < res.total                             # non-vacuous, and not all of it
+    assert det and det["accuracy"] == 1.0 and det["n"] == airtight
 
 
 def test_reliability_buckets_present():

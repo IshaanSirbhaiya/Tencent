@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2014-000008",
+  "filename": "IMG-2014-000008.jpg",
+  "image_present": false,
+  "captured_at": "2014-07-05T15:13:50+00:00",
+  "captured_by": "OFF-0041",
+  "inspection_id": "INS-2014-000445",
+  "application_id": "APP-2013-000581",
+  "parcel_id": "PCL-SQ-02730",
+  "photo_batch_ref": "PHB-2014-000445",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-388053"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 432784,
+    "northing": 1195848,
+    "accuracy_m": 4.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          2149,
+          120,
+          242,
+          48
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2O14-764124",
+        "confidence": 0.84,
+        "bbox": [
+          3045,
+          210,
+          918,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "160 GASWORKS YARD, SABLE QUAY AM9 7DZ",
+        "confidence": 0.787,
+        "bbox": [
+          1140,
+          342,
+          1221,
+          77
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2014-07-05",
+        "confidence": 0.837,
+        "bbox": [
+          2604,
+          450,
+          667,
+          61
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0041",
+        "confidence": 0.789,
+        "bbox": [
+          1711,
+          580,
+          528,
+          88
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

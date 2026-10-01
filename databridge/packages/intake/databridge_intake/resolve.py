@@ -29,7 +29,8 @@ from typing import Iterable, Optional, Sequence
 from .ground import canonicalise_id
 from .models import (PatientRecord, ResolutionCandidate, ResolutionResult, ResolutionStatus,
                      SubjectBlock)
-from .registry import DATASET_TODAY, parse_dob_two_digit_year, registry
+from .clock import resolve_today
+from .registry import parse_dob_two_digit_year, registry
 
 # Signal weights (PLAN.md §5 Phase 2). They sum to 1.0: an exact identifier, a corroborating date
 # of birth, the name, and demographic agreement is everything a referring document can offer.
@@ -65,7 +66,7 @@ def _norm_nationality(s: object) -> Optional[str]:
     return cleaned or None
 
 
-def parse_claimed_dob(raw: object, *, today: dt.date = DATASET_TODAY) -> Optional[dt.date]:
+def parse_claimed_dob(raw: object, *, today: Optional[dt.date] = None) -> Optional[dt.date]:
     """Parse a date of birth as *printed on a document*, or return ``None``.
 
     The sample forms print ``DD/MM/YY`` (``20/05/77``), the same two-digit-year ambiguity the
@@ -212,7 +213,7 @@ def _score(claimed: _Claimed, record: PatientRecord) -> tuple[float, list[str], 
 def resolve(subject: SubjectBlock,
             *,
             records: Optional[Sequence[PatientRecord]] = None,
-            today: dt.date = DATASET_TODAY) -> ResolutionResult:
+            today: Optional[dt.date] = None) -> ResolutionResult:
     """Rank registry candidates for a claimed subject. **Returns candidates; never confirms.**
 
     Candidate selection, in one rule: *a positive identifier match is decisive.* When the document
@@ -228,7 +229,8 @@ def resolve(subject: SubjectBlock,
     carries a note: two people sharing a name is routine in this registry (chits 3 and 5 both hit
     it), so a name-only match must never present as a confident one.
     """
-    pool: Iterable[PatientRecord] = records if records is not None else registry()
+    today = resolve_today(today)
+    pool: Iterable[PatientRecord] = records if records is not None else registry(today)
     claimed = _Claimed(subject, today=today)
 
     if not claimed.has_strong_identifier:

@@ -1,0 +1,52 @@
+ Westerlin Packaging Sdn Bhd
+
+Annual Report for the financial year ended 31 December 2023
+
+> SYNTHETIC DOCUMENT. Fictional entity, fictional figures. Generated for the
+> Walnut finance estate. Not a real filing and not derived from one.
+
+  Field   Value
+------|
+  Registered name   Westerlin Packaging Sdn Bhd
+  Registration number   SYN-CRN-2007792
+  Country of incorporation   US
+  Principal activity   Precision Engineering
+  Reporting currency   SGD
+  Date of incorporation   2003-05-20
+
+ Directors' commentary
+
+The Board notes continued pressure on freight rates and has renegotiated the Group's principal charter commitments.
+
+ Financial summary
+
+All figures in SGD thousands unless stated.
+
+  Line item   FY2023   FY2022
+------:---:|
+  Revenue   49   46
+  Gross profit   16   15
+  EBITDA   12   11
+  Depreciation and amortisation   -5   -4
+  Finance costs   -0   -0
+  Profit after tax   5   6
+  Total assets   91   94
+  Total borrowings   34   37
+  Cash and cash equivalents   15   11
+  Total equity   38   41
+
+ Key ratios
+
+  Ratio   FY2023   Covenant reference
+------:---|
+  Net debt / EBITDA   1.63x   Tested quarterly under the syndicated facility
+  Interest cover   18.52x   Tested quarterly
+  Current ratio   0.99x   -
+
+ Banking arrangements
+
+Facilities were renewed during the year on substantially the same terms.
+
+ Auditor's note
+
+We draw attention to note 14, which describes a material uncertainty related to the renewal of the Group's principal facility. Our opinion is not modified in this respect.

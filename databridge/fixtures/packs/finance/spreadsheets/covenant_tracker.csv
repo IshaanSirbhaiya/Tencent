@@ -1,0 +1,181 @@
+facility_id,borrower,covenant,threshold,last_observed,headroom,status,last_test_date_serial
+CB-F-000126,Kelbrokoe Shipping,Maximum Capex,2.28,1.86,-0.42,BREACH,46203
+CB-F-000262,Westerlin Fabrication,Debt Service Coverage Ratio,3.87,4.62,0.75,OK,46048
+CB-F-000208,Dunmarch Analytics,Interest Cover,2.94,3.29,0.35,OK,46129
+CB-F-000078,Yewbank Bioworks,Current Ratio,4.14,6.33,2.19,OK,46140
+CB-F-000047,Foxhollow Holdings,Interest Cover,3.63,2.61,-1.02,BREACH,46234
+CB-F-000180,Dellamar Robotics,Debt Service Coverage Ratio,2.31,2.53,0.22,OK,46106
+CB-F-000200,Westerlin Pharma Supply,Minimum Tangible Net Worth,2.22,2.48,0.26,OK,46158
+CB-F-000128,Kytherra Nutrition,Interest Cover,1.61,2.04,0.43,OK,46089
+CB-F-000254,Belmoray Biowoorks,Current Ratio,3.25,4.04,0.79,OK,46104
+CB-F-000092,Silvercrag Textiles,Debt Service Coverage Ratio,3.38,2.84,-0.54,BREACH,46198
+CB-F-000286,Kirkhaven Ventures,Minimum Tangible Net Worth,3.32,2.05,-1.27,BREACH,46233
+CB-F-000106,Foxhollow Holdings,Minimum Tangible Net Worth,1.73,1.36,-0.37,BREACH,46102
+CB-F-000035,Verrant Packaging,Minimum Tangible Net Worth,2.65,2.13,-0.52,BREACH,46171
+CB-F-000188,Ashcombe Shipping,Minimum Tangible Net Worth,1.94,2.32,0.38,OK,46209
+CB-F-000240,Kirkhaven Ventures,Minimum Tangible Net Worth,1.45,1.83,0.38,OK,46111
+CB-F-000085,Fennmark Aviation Services,Interest Cover,3.92,2.41,-1.51,BREACH,46061
+CB-F-000173,Glenholt Nutrition,Debt Service Coverage Ratio,1.31,1.55,0.24,OK,46130
+CB-F-000013,Redbourne Utilities,Current Ratio,1.37,1.67,0.3,OK,46182
+CB-F-000116,Vellacott Ventures,Maximum Capex,1.53,1.09,-0.44,BREACH,46246
+CB-F-000043,Ravenhurst Aviation Marine,Interest Cover,3.77,2.49,-1.28,BREACH,46228
+CB-F-000133,Kelbrooke Shipping,Current Ratio,2.51,3.92,1.41,OK,46092
+CB-F-000148,Amberfell Instruments,Interest Cover,1.14,1.22,0.08,OK,46148
+CB-F-000088,Larkspiree Textiles,Debt Service Coverage Ratio,2.77,2.16,-0.61,BREACH,46138
+CB-F-000291,Vellacott Ventures,Current Ratio,3.98,4.53,0.55,OK,46148
+CB-F-000296,Rushmoor Chemicals,Minimum Tangible Net Worth,3.28,5.17,1.89,OK,46219
+CB-F-000052,Ambervale Packaging,Current Ratio,3.67,3.21,-0.46,BREACH,46128
+CB-F-000175,Yewbank Bioworks,Interest Cover,1.69,2.68,0.99,OK,46156
+CB-F-000064,Aldermoor Foods,Net Debt / EBITDA,2.66,1.74,-0.92,BREACH,46113
+CB-F-000061,Calidon Industries,Interest Cover,1.96,1.74,-0.22,BREACH,46052
+CB-F-000001,Oakenshade Offshore,Maximum Capex,1.24,0.79,-0.45,BREACH,46195
+CB-F-000093,Lanthorn Aviation Services,Debt Service Coverage Ratio,3.31,3.13,-0.18,BREACH,46162
+CB-F-000136,Netherby Mining,Current Ratio,2.5,3.6,1.1,OK,46028
+CB-F-000212,Xanthe Utilities,Net Debt / EBITDA,3.27,4.2,0.93,OK,46134
+CB-F-000309,Westerlin Industries,Net Debt / EBITDA,1.31,0.87,-0.44,BREACH,46056
+CB-F-000012,Jessamy Grain,Maximum Capex,2.9,4.29,1.39,OK,46156
+CB-F-000270,Glenholt Analytics,Debt Service Coverage Ratio,3.5,4.91,1.41,OK,46035
+CB-F-000193,Cindervale Solar,Net Debt / EBITDA,1.8,2.42,0.62,OK,46184
+CB-F-000182,Umberly Pharma Supply,Current Ratio,3.92,5.88,1.96,OK,46032
+CB-F-000142,Cindervale Fabrication,Maximum Capex,4.11,6.33,2.22,OK,46109
+CB-F-000049,Juniperton Optics,Net Debt / EBITDA,2.16,2.09,-0.07,BREACH,46085
+CB-F-000191,Jessamy Grain,Net Debt / EBITDA,2.13,2.91,0.78,OK,46034
+CB-F-000103,Vellacott Ventures,Debt Service Coverage Ratio,2.26,1.37,-0.89,BREACH,46152
+CB-F-000264,Ostrander Mining,Interest Cover,3.88,4.67,0.79,OK,46106
+CB-F-000084,Umberly Diagnostics,Minimum Tangible Net Worth,2.4,3.08,0.68,OK,46245
+CB-F-000201,Ashcombe Ventures,Debt Service Coverage Ratio,3.76,3.03,-0.73,BREACH,46069
+CB-F-000018,Eevrley Grain,Maximum Capex,1.78,1.51,-0.27,BREACH,46158
+CB-F-000094,Foxhollow Property,Debt Service Coverage Ratio,2.35,3.06,0.71,OK,46045
+CB-F-000312,Quarrenden Textiles,Minimum Tangible Net Worth,2.61,2.68,0.07,OK,46060
+CB-F-000101,Ulverbay Precision,Current Ratio,2.93,4.61,1.68,OK,46219
+CB-F-000042,Jarnwick Freight,Net Debt / EBITDA,2.67,3.69,1.02,OK,46056
+CB-F-000246,Ulverbay Precision,Interest Cover,3.52,4.54,1.02,OK,46123
+CB-F-000245,Vellacott Packaging,Debt Service Coverage Ratio,1.26,1.39,0.13,OK,46056
+CB-F-000275,Kirkhaven Ventures,Net Debt / EBITDA,2.96,2.09,-0.87,BREACH,46164
+CB-F-000134,Northgale Logistics,Minimum Tangible Net Worth,2.05,3.21,1.16,OK,46068
+CB-F-000166,Greyfen Offshore,Debt Service Coverage Ratio,2.48,3.0,0.52,OK,46113
+CB-F-000226,Silvercrag Textiles,Interest Cover,2.19,3.18,0.99,OK,46234
+CB-F-000053,Jessamy Wire and Cable,Interest Cover,3.68,3.71,0.03,OK,46233
+CB-F-000038,Harrowby Cold Chain,Interest Cover,3.01,3.97,0.96,OK,46170
+CB-F-000194,Dellamar Pharma Supply,Maximum Capex,2.87,2.49,-0.38,BREACH,46199
+CB-F-000075,Foxhollow Holdings,Debt Service Coverage Ratio,1.23,1.78,0.55,OK,46110
+CB-F-000105,Ashcombe Pharma Supply,Net Debt / EBITDA,2.58,3.33,0.75,OK,46237
+CB-F-000218,Kelbrooke Property,Maximum Capex,1.25,1.24,-0.01,BREACH,46102
+CB-F-000238,Quarrenden Property,Interest Cover,1.36,0.83,-0.53,BREACH,46189
+CB-F-000051,Redbourne Water Systems,Interest Cover,2.67,4.21,1.54,OK,46066
+CB-F-000265,Everley Grain,Minimum Tangible Net Worth,4.1,6.18,2.08,OK,46228
+CB-F-000186,Eastvane Energy,Minimum Tangible Net Worth,2.93,3.88,0.95,OK,46199
+CB-F-000304,Harrowby Aggregates,Minimum Tangible Net Worth,4.17,4.98,0.81,OK,46151
+CB-F-000251,Windermoor Capital,Current Ratio,1.99,1.54,-0.45,BREACH,46072
+CB-F-000289,Silvercrag Ventures,Net Debt / EBITDA,1.58,2.22,0.64,OK,46036
+CB-F-000074,Dunmarch Composites,Current Ratio,2.47,3.06,0.59,OK,46190
+CB-F-000196,Everley Grain,Minimum Tangible Net Worth,3.19,3.71,0.52,OK,46096
+CB-F-000232,Zarrowby Agritech,Minimum Tangible Net Worth,1.62,1.88,0.26,OK,46127
+CB-F-000199,Thornbury Automotive,Debt Service Coverage Ratio,3.59,4.68,1.09,OK,46214
+CB-F-000046,Lanthorn Foods,Interest Cover,3.91,4.42,0.51,OK,46246
+CB-F-000179,Amberfell Aviation Services,Maximum Capex,3.13,4.2,1.07,OK,46064
+CB-F-000241,Ostrander Precision,Minimum Tangible Net Worth,2.06,2.81,0.75,OK,46129
+CB-F-000112,Merriscourt Wire and Cable,Interest Cover,4.17,2.76,-1.41,BREACH,46040
+CB-F-000192,Juniperton Chemicals,Current Ratio,2.19,1.85,-0.34,BREACH,46166
+CB-F-000307,Marlowe Metals,Maximum Capex,2.92,2.58,-0.34,BREACH,46194
+CB-F-000067,Quillane Solar,Interest Cover,1.46,1.41,-0.05,BREACH,46216
+CB-F-000300,Zephrine Robotics,Current Ratio,2.0,1.37,-0.63,BREACH,46156
+CB-F-000217,Kirkhaven Ventures,Current Ratio,3.25,5.02,1.77,OK,46224
+CB-F-000216,Silvercrag Ventures,Interest Cover,3.95,5.56,1.61,OK,46151
+CB-F-000029,Ulverbay Precision,Current Ratio,1.62,2.31,0.69,OK,46103
+CB-F-000227,Yarrowmede Precision,Net Debt / EBITDA,1.53,1.14,-0.39,BREACH,46157
+CB-F-000065,Loamfield Chemicals,Minimum Tangible Net Worth,2.74,3.8,1.06,OK,46207
+CB-F-000320,Kelbrooke Shipping,Minimum Tangible Net Worth,3.93,3.2,-0.73,BREACH,46131
+CB-F-000104,Ashcombe Terminals,Minimum Tangible Net Worth,3.58,2.18,-1.4,BREACH,46029
+CB-F-000295,Xanthe Utilities,Current Ratio,2.72,3.05,0.33,OK,46137
+CB-F-000284,Harrowby Aggregates,Interest Cover,3.62,4.49,0.87,OK,46124
+CB-F-000202,Corvane Composites,Interest Cover,2.67,3.19,0.52,OK,46071
+CB-F-000110,Ironvale Grain,Interest Cover,2.0,1.92,-0.08,BREACH,46162
+CB-F-000131,Kelbrooke Packaging,Minimum Tangible Net Worth,1.97,1.51,-0.46,BREACH,46058
+CB-F-000225,Quillane Bioworks,Debt Service Coverage Ratio,3.06,2.36,-0.7,BREACH,46230
+CB-F-000107,Fennmark Textiles,Maximum Capex,3.16,3.65,0.49,OK,46049
+CB-F-000024,Glenholt Analytics,Minimum Tangible Net Worth,3.64,3.79,0.15,OK,46178
+CB-F-000306,Northgale Logistics,Minimum Tangible Net Worth,2.76,2.89,0.13,OK,46027
+CB-F-000198,Yewbank Bioworks,Net Debt / EBITDA,1.27,0.99,-0.28,BREACH,46121
+CB-F-000150,Fennmark Aviation Services,Interest Cover,3.47,2.4,-1.07,BREACH,46075
+CB-F-000159,Dellamar Pharma Supply,Net Debt / EBITDA,2.34,2.82,0.48,OK,46118
+CB-F-000151,Kelbrooke Shipping,Interest Cover,3.43,4.14,0.71,OK,46145
+CB-F-000090,Tidewater Pharma Supply,Debt Service Coverage Ratio,3.53,2.96,-0.57,BREACH,46217
+CB-F-000020,Merriscourt Wire and Cable,Debt Service Coverage Ratio,4.12,3.32,-0.8,BREACH,46085
+CB-F-000073,Cindervale Shipping,Net Debt / EBITDA,2.04,1.48,-0.56,BREACH,46194
+CB-F-000004,Yewbank Bioworks,Net Debt / EBITDA,2.1,1.78,-0.32,BREACH,46075
+CB-F-000023,Tidewater Utilities,Current Ratio,2.95,2.53,-0.42,BREACH,46239
+CB-F-000089,Zarrowby Marine,Net Debt / EBITDA,2.58,3.67,1.09,OK,46127
+CB-F-000219,Orrinshaw Wire and Cable,Net Debt / EBITDA,2.45,3.51,1.06,OK,46187
+CB-F-000210,Westerlin Packaging,Debt Service Coverage Ratio,3.55,5.15,1.6,OK,46057
+CB-F-000177,Amberfell Robotics,Current Ratio,3.24,3.63,0.39,OK,46088
+CB-F-000123,Hexbury Ventures,Minimum Tangible Net Worth,1.47,1.8,0.33,OK,46043
+CB-F-000224,Amberfell Automotive,Maximum Capex,4.11,2.85,-1.26,BREACH,46151
+CB-F-000233,Eastvane Industries,Maximum Capex,1.53,2.12,0.59,OK,46203
+CB-F-000097,Pellaton Logistics,Net Debt / EBITDA,2.21,3.53,1.32,OK,46095
+CB-F-000285,Nordvale Property,Current Ratio,1.18,1.11,-0.07,BREACH,46192
+CB-F-000315,Dunmarch Composites,Interest Cover,3.03,4.78,1.75,OK,46127
+CB-F-000063,Rushmoor Chemicals,Net Debt / EBITDA,1.46,0.99,-0.47,BREACH,46180
+CB-F-000008,Vellacott Freight,Maximum Capex,2.85,2.71,-0.14,BREACH,46216
+CB-F-000060,Vondrel Logistics,Net Debt / EBITDA,4.15,3.51,-0.64,BREACH,46162
+CB-F-000253,Corvane Composites,Net Debt / EBITDA,2.73,2.81,0.08,OK,46172
+CB-F-000115,Verrant Shipping,Maximum Capex,3.95,4.49,0.54,OK,46202
+CB-F-000243,Silvercrag Textiles,Debt Service Coverage Ratio,1.93,2.38,0.45,OK,46197
+CB-F-000283,Everley Solar,Net Debt / EBITDA,1.29,1.99,0.7,OK,46202
+CB-F-000229,Glenholt Energy,Current Ratio,3.18,3.94,0.76,OK,46060
+CB-F-000058,Xanthe Utilities,Net Debt / EBITDA,3.7,3.43,-0.27,BREACH,46170
+CB-F-000025,Whitmarsh Grain,Current Ratio,2.86,4.29,1.43,OK,46076
+CB-F-000062,Foxhollow Holdings,Current Ratio,1.61,2.28,0.67,OK,46041
+CB-F-000021,Eastvane Offshore,Debt Service Coverage Ratio,2.21,2.75,0.54,OK,46097
+CB-F-000099,Yolande Mining,Interest Cover,1.29,1.37,0.08,OK,46187
+CB-F-000098,Ulverbay Precision,Current Ratio,2.33,1.45,-0.88,BREACH,46062
+CB-F-000317,Inverwold Composites,Current Ratio,4.15,6.36,2.21,OK,46027
+CB-F-000237,Eastvane Offshore,Maximum Capex,4.06,3.31,-0.75,BREACH,46177
+CB-F-000066,Eastvane Offshore,Debt Service Coverage Ratio,3.55,2.41,-1.14,BREACH,46037
+CB-F-000120,Orrinshaw Diagnostics,Debt Service Coverage Ratio,1.94,2.36,0.42,OK,46241
+CB-F-000263,Ironvale Grain,Debt Service Coverage Ratio,3.37,2.78,-0.59,BREACH,46046
+CB-F-000242,Larkspiree Textiles,Debt Service Coverage Ratio,2.46,2.69,0.23,OK,46099
+CB-F-000082,Belmoray Metals,Debt Service Coverage Ratio,3.03,4.41,1.38,OK,46100
+CB-F-000149,Dunmarch Composites,Net Debt / EBITDA,3.06,2.45,-0.61,BREACH,46134
+CB-F-000072,Quintrell Logistics,Net Debt / EBITDA,3.48,3.81,0.33,OK,46141
+CB-F-000197,Hexbury Cold Chain,Debt Service Coverage Ratio,2.34,2.0,-0.34,BREACH,46186
+CB-F-000080,Jarnwick Textiles,Debt Service Coverage Ratio,4.14,3.09,-1.05,BREACH,46235
+CB-F-000032,Fairmont Reach Property,Current Ratio,3.16,4.39,1.23,OK,46058
+CB-F-000096,Zarrowby Metals,Minimum Tangible Net Worth,1.87,2.66,0.79,OK,46215
+CB-F-000278,Yewbank Textiles,Debt Service Coverage Ratio,2.25,2.32,0.07,OK,46023
+CB-F-000071,Ambervale Water Systems,Current Ratio,3.63,5.15,1.52,OK,46172
+CB-F-000057,Hexbury Cold Chain,Debt Service Coverage Ratio,2.84,2.92,0.08,OK,46132
+CB-F-000297,Everley Pharma Supply,Minimum Tangible Net Worth,1.21,1.29,0.08,OK,46065
+CB-F-000299,Oakenshade Aviation Services,Maximum Capex,2.72,1.97,-0.75,BREACH,46125
+CB-F-000102,Dellamar Utilities,Debt Service Coverage Ratio,3.98,5.07,1.09,OK,46178
+CB-F-000277,Zarrowby Semiconductors,Current Ratio,2.39,3.69,1.3,OK,46026
+CB-F-000184,Quillane Mining,Current Ratio,3.95,5.95,2.0,OK,46109
+CB-F-000121,Marlowe Water Systems,Net Debt / EBITDA,1.68,2.24,0.56,OK,46096
+CB-F-000234,Everley Grain,Debt Service Coverage Ratio,4.05,2.87,-1.18,BREACH,46028
+CB-F-000167,Dunmarch Optics,Minimum Tangible Net Worth,1.7,1.8,0.1,OK,46198
+CB-F-000022,Eastvane Energy,Maximum Capex,2.85,3.6,0.75,OK,46160
+CB-F-000269,Juniperton Agritech,Interest Cover,3.92,4.04,0.12,OK,46098
+CB-F-000168,Ilexa Packaging,Net Debt / EBITDA,3.87,3.74,-0.13,BREACH,46224
+CB-F-000152,Thornbury Automotive,Net Debt / EBITDA,3.09,4.12,1.03,OK,46227
+CB-F-000260,Palliser Automotive,Net Debt / EBITDA,1.68,2.39,0.71,OK,46100
+CB-F-000308,Inverwold Composites,Interest Cover,3.36,4.97,1.61,OK,46150
+CB-F-000144,Zarrowby Metals,Debt Service Coverage Ratio,3.97,5.99,2.02,OK,46195
+CB-F-000239,Thornbury Automotive,Minimum Tangible Net Worth,1.38,0.98,-0.4,BREACH,46075
+CB-F-000079,Eastvane Energy,Interest Cover,1.19,1.31,0.12,OK,46082
+CB-F-000095,Juniperton Agritech,Interest Cover,1.72,1.13,-0.59,BREACH,46169
+CB-F-000036,Zephrine Grain,Current Ratio,3.02,3.81,0.79,OK,46068
+CB-F-000176,Aldermoor Foods,Maximum Capex,1.76,2.09,0.33,OK,46199
+CB-F-000266,Zarrowby Semiconductors,Minimum Tangible Net Worth,3.81,4.74,0.93,OK,46037
+CB-F-000280,Netherby Terminals,Current Ratio,2.53,2.77,0.24,OK,46065
+CB-F-000316,Glenholt Energy,Debt Service Coverage Ratio,1.36,1.65,0.29,OK,46086
+CB-F-000154,Dunmarch Optics,Debt Service Coverage Ratio,3.66,2.9,-0.76,BREACH,46089
+CB-F-000117,Eastvane Industries,Debt Service Coverage Ratio,3.14,4.97,1.83,OK,46175
+CB-F-000273,Greyfen Solar,Maximum Capex,3.91,3.29,-0.62,BREACH,46076
+CB-F-000203,Ulverbay Precision,Interest Cover,3.8,2.37,-1.43,BREACH,46096
+CB-F-000169,Quillane Solar,Debt Service Coverage Ratio,1.2,1.86,0.66,OK,46025
+CB-F-000111,Verrant Shipping,Current Ratio,2.61,1.74,-0.87,BREACH,46087
+CB-F-000108,Quillane Mining,Debt Service Coverage Ratio,1.44,2.1,0.66,OK,46174
+CB-F-000172,Yewbank Bioworks,Current Ratio,3.14,3.75,0.61,OK,46099
+CB-F-000301,Tidewater Textiles,Debt Service Coverage Ratio,2.29,2.48,0.19,OK,46189
+CB-F-000157,Oakenshade Optics,Net Debt / EBITDA,3.85,2.65,-1.2,BREACH,46245
+CB-F-000294,Drummore Energy,Interest Cover,3.47,4.91,1.44,OK,46046

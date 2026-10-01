@@ -50,7 +50,20 @@ DEFAULT_SMTP_TIMEOUT = 10.0
 
 #: ``.invalid`` is reserved by RFC 2606 and can never resolve. If this default is ever used against
 #: a real relay, the mail bounces instead of arriving from an address somebody might reply to.
-DEFAULT_SENDER = "walnut-frontdesk@clinic.invalid"
+DEFAULT_SENDER = "walnut@databridge.invalid"
+
+
+def message_id_domain(sender: str) -> str:
+    """The Message-Id's domain: the sender's own, so the two can never disagree.
+
+    Accepts a bare address or a ``Name <addr>`` form; anything without an ``@`` falls back to the
+    default sender's domain (still ``.invalid``).
+    """
+    addr = sender.strip()
+    if "<" in addr and addr.endswith(">"):
+        addr = addr[addr.rindex("<") + 1:-1]
+    domain = addr.rpartition("@")[2].strip()
+    return domain or DEFAULT_SENDER.rpartition("@")[2]
 
 _HEADER_INJECTION = re.compile(r"[\r\n\x00]")
 
@@ -147,7 +160,7 @@ class SmtpTransport:
         message["To"] = to
         message["Subject"] = subject
         message["Date"] = dt.datetime.now(dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
-        message_id = make_msgid(domain="walnut.clinic.invalid")
+        message_id = make_msgid(domain=message_id_domain(self.sender))
         message["Message-Id"] = message_id
         # Says out loud, in the message itself, that a person approved this. The alternative is a
         # patient receiving clinic mail with no way to tell whether anybody read it first.

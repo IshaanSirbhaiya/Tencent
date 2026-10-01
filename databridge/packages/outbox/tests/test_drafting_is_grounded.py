@@ -16,7 +16,7 @@ import yaml
 from databridge_core import GroundedValue, SourcePointer
 from databridge_outbox.drafting import build_outbound_draft
 from databridge_outbox.models import DraftRefused, OutboundDraft
-from databridge_outbox.monitors import Observation, monitors_path
+from databridge_outbox.monitors import MONITORS_SOURCE_ID, Observation, monitors_path
 from databridge_outbox.recipients import recipient_from_committed_ledger, recipient_typed_by_human
 
 #: Defined here rather than imported from ``conftest``: two test trees each have a top-level
@@ -74,7 +74,7 @@ def test_every_config_pointer_the_draft_cites_resolves_to_the_row_it_names(draft
     rows = {r["id"]: r for r in
             yaml.safe_load(monitors_path().read_text(encoding="utf-8"))["monitors"]}
     cells = [p for p in draft.because
-             if p.kind == "table_cell" and p.source_id == "clinic_monitors.yaml"]
+             if p.kind == "table_cell" and p.source_id == monitors_path().name == MONITORS_SOURCE_ID]
     assert cells
     for pointer in cells:
         assert pointer.row_id in rows, pointer
@@ -84,7 +84,7 @@ def test_every_config_pointer_the_draft_cites_resolves_to_the_row_it_names(draft
 def test_the_subject_and_body_carry_derived_pointers_naming_their_template(draft):
     for grounded in (draft.subject, draft.body):
         assert grounded.pointer.kind == "derived"
-        assert "clinic_monitors.yaml" in (grounded.pointer.derivation or "")
+        assert MONITORS_SOURCE_ID in (grounded.pointer.derivation or "")
         cited = grounded.pointer.derived_from or []
         assert any(p.table == "monitors" for p in cited), "the template row is not cited"
 
@@ -180,8 +180,23 @@ def test_a_draft_cannot_be_built_without_a_reason(draft):
 
 
 def test_a_draft_whose_citations_omit_its_own_provenance_is_refused(draft):
-    """`because` that does not list the recipient's pointer is `because` a reviewer cannot use."""
-    without_recipient = tuple(p for p in draft.because if p is not draft.recipient.pointer)
+    """`because` that does not list the recipient's pointer is `because` a reviewer cannot use.
+
+    Filtered by **equality**, not identity. It used to use `is not`, and that quietly stopped
+    working when `SourcePointer` gained `revalidate_instances="always"` (part of closing the
+    trust-laundering bypasses): reading `draft.recipient.pointer` now returns a re-validated
+    instance, so an identity filter matched nothing, the recipient's pointer stayed in `because`,
+    and the refusal this test exists to prove never fired.
+
+    Equality is also the *correct* comparison on its own terms. The rule is "the citations must
+    include the pointer that cites the recipient" — a statement about which location is cited, not
+    about which object holds it. A frozen `SourcePointer` compares structurally, so equality asks
+    the question the rule actually asks.
+    """
+    without_recipient = tuple(p for p in draft.because if p != draft.recipient.pointer)
+    assert len(without_recipient) < len(draft.because), (
+        "the filter removed nothing, so this test would pass vacuously — the recipient's pointer "
+        "must actually be present in `because` for its removal to prove anything")
     with pytest.raises(DraftRefused, match="recipient"):
         OutboundDraft(draft_id=draft.draft_id, recipient=draft.recipient, subject=draft.subject,
                       body=draft.body, playbook_id=draft.playbook_id,

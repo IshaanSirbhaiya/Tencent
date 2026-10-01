@@ -1,0 +1,45 @@
+# A PostgreSQL server for the synthetic estates.
+#
+#   docker compose -f docker-compose.estates.yml up -d
+#   python scripts/estates.py provision --backend postgres
+#   python scripts/estates.py status    --backend postgres
+#   docker compose -f docker-compose.estates.yml down -v      # discard everything
+#
+# This is OPTIONAL. The estates declare a PostgreSQL dialect and this runs their DDL
+# unaltered, which is the only way to exercise it for real — but SQLite is the default
+# for a reason: CI and a laptop demo must work with no daemon at all. If Docker is not
+# running, `estates.py --backend postgres` says so and exits; it never pretends.
+#
+# Everything loaded here is synthetic. No credential below protects anything.
+
+services:
+  estates-postgres:
+    image: postgres:16-alpine
+    container_name: walnut-estates-postgres
+    environment:
+      POSTGRES_USER: walnut
+      POSTGRES_PASSWORD: walnut
+      POSTGRES_DB: walnut_estates
+      # the estates are ~50k rows of INSERTs; durability buys nothing for a fixture
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+      -c shared_buffers=256MB
+      -c max_wal_size=2GB
+    ports:
+      # 55432, not 5432 — a developer machine usually already has one
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - estates-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U walnut -d walnut_estates"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  estates-pgdata:

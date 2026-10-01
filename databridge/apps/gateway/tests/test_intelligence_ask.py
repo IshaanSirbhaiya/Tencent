@@ -33,13 +33,17 @@ from fastapi.testclient import TestClient
 
 from databridge_gateway.intelligence_routes import _register_intelligence_routes
 
+from conftest import AUTH_HEADERS
+
 BUSINESS_QUESTION = ("which issuers sent the most documents this week, and what is still "
                      "blocked?")
 
 #: The exact JSON key set of `databridge_agent.AgentResponse`. Written out rather than derived from
 #: the model, because a test that reads the same source it is guarding cannot notice a new field.
+#: `planner` (HC1, 2026-10-01): which planner chose the values — "live" or "offline_gold" — so an
+#: offline answer is never presented as a model's reading.
 RESPONSE_KEYS = {"question", "answer", "refused", "refusal_code", "requires_human_selection",
-                 "values", "unresolved", "notes", "reads", "model_calls"}
+                 "values", "unresolved", "notes", "reads", "model_calls", "planner"}
 VALUE_KEYS = {"key", "tool", "row", "field", "scope", "text", "redacted", "citation", "source"}
 READ_KEYS = {"tool", "status"}
 NOTE_KEYS = {"key", "text"}
@@ -68,7 +72,7 @@ def app():
 
 @pytest.fixture(scope="module")
 def client(app):
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         yield c
 
 
@@ -93,19 +97,32 @@ def test_the_route_builds_structural_reads_and_nothing_else(app):
     registry = build_structural_registry(app.state.brain.store)
     assert registry.scopes() == ("clinic_structural",)
     assert registry.patient_scoped() == ()
+    with_arguments = 0
     for tool in registry:
         assert tool.effect == "read"
         assert tool.requires_human_selection is False
-        # No argument at all — stronger than screening the arguments, because there is nothing
-        # for an injected document to fill in.
-        assert tool.parameters.get("properties") == {}
         assert tool.parameters.get("additionalProperties") is False
+        declared = set(tool.parameters.get("properties") or {})
+        if not declared:
+            continue            # a figure tool: nothing for an injected document to fill in
+        # An entity tool: every argument it declares is GROUNDED — each word must already be in
+        # the staff question or in something a tool returned — and the tool is declared broad,
+        # which is what makes the agent loop enforce that.
+        with_arguments += 1
+        assert tool.breadth == "broad"
+        assert declared == set(tool.grounded_arguments), tool.name
+    assert with_arguments, "the entity tools are part of the registry the route builds"
 
 
-def test_only_the_registered_tools_ever_ran(answered):
-    names = {read["tool"] for read in answered["reads"]}
-    assert names == {"coverage_gaps", "documents_needing_a_person", "issuer_document_mix"}
-    assert all(read["status"] == "ok" for read in answered["reads"]), answered["reads"]
+def test_only_the_registered_tools_ever_ran(app, answered):
+    from databridge_gateway.agent_tools import build_structural_registry
+
+    registered = set(build_structural_registry(app.state.brain.store).names())
+    ran = {read["tool"] for read in answered["reads"] if read["status"] == "ok"}
+    assert ran and ran <= registered
+    # Every registered read is accounted for: it ran, or it is recorded as not read.
+    assert {read["tool"] for read in answered["reads"]} == registered
+    assert {read["status"] for read in answered["reads"]} <= {"ok", "not_read"}
 
 
 # --- 2. the wire contract ------------------------------------------------------------
@@ -257,7 +274,7 @@ def test_no_graph_is_a_refusal_not_an_empty_answer():
     "the graph was not loaded" is not something a short answer lets them infer."""
     bare = FastAPI()
     _register_intelligence_routes(bare)
-    with TestClient(bare) as c:
+    with TestClient(bare, headers=AUTH_HEADERS) as c:
         r = c.post("/intelligence/ask", json={"question": "what is blocked?"})
     assert r.status_code == 503
     assert r.json()["refusal"]["code"] == "GRAPH_UNAVAILABLE"
@@ -360,7 +377,8 @@ def _planner(app, monkeypatch, plans, report_from_reads=True):
         return _json.dumps({"tool": plan.get("tool"), "arguments": {}, "reason": "scripted"})
 
     monkeypatch.setattr(intelligence_routes, "_reasoning_harness",
-                        lambda _app: Harness(FakeBackend(backend), profile="cloud", cache=None))
+                        lambda _app: (Harness(FakeBackend(backend), profile="cloud", cache=None),
+                                      "live"))
 
 
 def test_a_planner_that_reads_one_tool_and_stops_still_says_what_it_did_not_read(
@@ -373,13 +391,16 @@ def test_a_planner_that_reads_one_tool_and_stops_still_says_what_it_did_not_read
     _planner(app, monkeypatch, [{"tool": "issuer_document_mix"}, {"tool": None}])
     body = client.post("/intelligence/ask", json={"question": BUSINESS_QUESTION}).json()
 
+    from databridge_gateway.agent_tools import build_structural_registry
+
     reads = {read["tool"]: read["status"] for read in body["reads"]}
     assert reads["issuer_document_mix"] == "ok"
-    assert reads["documents_needing_a_person"] == "not_read"
-    assert reads["coverage_gaps"] == "not_read"
+    others = set(build_structural_registry(app.state.brain.store).names()) - {
+        "issuer_document_mix"}
+    assert others and "documents_needing_a_person" in others
+    assert {reads[name] for name in others} == {"not_read"}
     unread = {u for u in body["unresolved"] if u.endswith("(not_read)")}
-    assert unread == {"documents_needing_a_person: not read (not_read)",
-                      "coverage_gaps: not read (not_read)"}
+    assert unread == {f"{name}: not read (not_read)" for name in others}
 
 
 def test_a_planner_that_invents_a_tool_named_after_a_person_publishes_no_such_name(
@@ -426,7 +447,7 @@ def test_an_identity_question_is_refused_before_the_graph_is_even_looked_at():
     going wrong."""
     bare = FastAPI()
     _register_intelligence_routes(bare)
-    with TestClient(bare) as c:
+    with TestClient(bare, headers=AUTH_HEADERS) as c:
         r = c.post("/intelligence/ask",
                    json={"question": "is this the same person as the one on the chit?"})
     assert r.status_code == 200, r.text
@@ -435,3 +456,51 @@ def test_an_identity_question_is_refused_before_the_graph_is_even_looked_at():
     assert body["refusal_code"] == "IDENTITY_VERIFICATION_OUT_OF_SCOPE"
     assert body["model_calls"] == 0
     assert body["values"] == []
+
+
+def test_the_nothing_answered_refusal_is_pack_neutral(client, monkeypatch):
+    """E2E run 2, N-15: under the workspace pack this said "Nothing in the clinic graph answered
+    that." The route now speaks for every binding, and points at the surface that answers what a
+    record says. Checked with the repo's own domain-word scanner, non-vacuously."""
+    import importlib.util
+    from pathlib import Path
+
+    from databridge_agent import ToolRegistry
+    from databridge_gateway import agent_tools
+
+    path = Path(__file__).resolve().parents[3] / "packages" / "graph" / "tests" / \
+        "test_no_domain_branching.py"
+    spec = importlib.util.spec_from_file_location("_ndb_guard_n15", path)
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+
+    monkeypatch.setattr(agent_tools, "build_structural_registry",
+                        lambda *a, **k: ToolRegistry([]))
+    r = client.post("/intelligence/ask", json={"question": "what is the status of INV-1?"})
+    assert r.status_code == 422
+    ref = r.json()["refusal"]
+    assert ref["code"] == "NO_GROUNDED_ANSWER"
+    for text in (ref["message"], ref.get("nearest_alternative") or ""):
+        assert not guard._WORD.search(text.lower()), text
+    assert ref["nearest_alternative"] and "/brain/query" in ref["nearest_alternative"]
+    assert guard._WORD.search("nothing in the clinic graph answered that.")   # non-vacuous
+
+
+# --- HC1 (2026-10-01): the planner is labelled, and a configured-but-unreachable model refuses -----
+def test_an_offline_answer_says_it_was_planned_offline(client):
+    """The suite runs under `DATABRIDGE_FORCE_GOLD=1`, so the deterministic planner ran — and the
+    response must say so rather than look like a model's reading."""
+    body = client.post("/intelligence/ask", json={"question": BUSINESS_QUESTION}).json()
+    assert body.get("planner") == "offline_gold"
+
+
+def test_a_key_with_no_reachable_model_refuses_instead_of_planning_offline(
+        client, monkeypatch):
+    from databridge_gateway import llm as gateway_llm
+
+    monkeypatch.delenv("DATABRIDGE_FORCE_GOLD", raising=False)
+    monkeypatch.setenv(next(iter(gateway_llm._PROVIDER_KEY_ENV.values())), "sk-test-not-real")
+    monkeypatch.setattr(gateway_llm, "build_extraction_harness", lambda detected: None)
+    r = client.post("/intelligence/ask", json={"question": BUSINESS_QUESTION})
+    assert r.status_code == 503, r.text
+    assert "LIVE_MODEL_UNAVAILABLE" in r.text

@@ -78,14 +78,14 @@ def _selection_row(intake_id: str, ledger: EvidenceLedger) -> dict:
     if len(selections) > 1:
         raise ConflictingSelections(
             f"the committed evidence for intake {intake_id!r} names more than one selected "
-            f"patient ({', '.join(sorted(selections))}). No message is addressed until a human "
+            f"subject ({', '.join(sorted(selections))}). No message is addressed until a human "
             f"establishes which record this encounter belongs to; the system does not choose "
             f"between them (CLAUDE.md §Hard constraints 1).")
     row = max((r for r in rows.values() if r[SELECTION_COLUMN]),
               key=lambda r: r["rowid_pk"], default=None)
     if row is None:
         raise NoCommittedSelection(
-            f"intake {intake_id!r} has committed evidence but no row records a patient a human "
+            f"intake {intake_id!r} has committed evidence but no row records a subject a human "
             f"selected, so there is nobody this message is established to be about")
     return row
 
@@ -113,13 +113,13 @@ def recipient_from_committed_ledger(
     patient = table.get(patient_id)
     if patient is None:
         raise NoAddressOnFile(
-            f"the committed selection for intake {intake_id!r} names patient {patient_id!r}, "
+            f"the committed selection for intake {intake_id!r} names subject {patient_id!r}, "
             f"which is not in the registry. The system does not search for a near match — that "
             f"would be choosing who this is (CLAUDE.md §Hard constraints 1).")
     address = str(patient.email.value or "").strip()
     if not address:
         raise NoAddressOnFile(
-            f"patient {patient_id!r} has no email address on file, so there is no address to write "
+            f"subject {patient_id!r} has no email address on file, so there is no address to write "
             f"to. Somebody at the counter can ask for one and type it (door (b)); nothing here "
             f"guesses one from a name or a document.")
 
@@ -129,8 +129,8 @@ def recipient_from_committed_ledger(
     pointer = SourcePointer(
         source_id=f"{LEDGER_SOURCE_PREFIX}{intake_id}", kind="derived",
         derivation=(
-            f"the address on file for patient {patient_id}, which {row['confirmed_by']} selected "
-            f"after an in-person identity check on {row['confirmed_at']}. The clinic never "
+            f"the address on file for subject {patient_id}, which {row['confirmed_by']} selected "
+            f"after an in-person identity check on {row['confirmed_at']}. This system never "
             f"verified this identity; a named human did, and this cites the row that records it"),
         derived_from=[ledger_pointer, patient.email.pointer])
     return Recipient(via_=_RECIPIENT_TOKEN, address=address, origin="committed_ledger",

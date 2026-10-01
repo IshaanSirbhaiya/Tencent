@@ -1,11 +1,17 @@
-"""Clinic monitors — the conditions that produce drafts, as DATA.
+"""Monitors — the conditions that produce drafts, as DATA.
 
 The same argument as ``coverage_rules.yaml`` and ``agent_playbooks.yaml``, pointed at workflows:
-*which* situation is worth telling somebody about is a clinic policy, and a clinic that wants to
-chase outstanding questionnaires after 24 hours instead of 48 should not need a Python diff
-(CLAUDE.md §Hard constraints 3). Adding a monitor is a row in
-``config/clinic_monitors.yaml``; there is no ``if monitor.id == ...`` anywhere in this package, and
-``tests/test_monitors.py`` asserts that against the source.
+*which* situation is worth telling somebody about is an organisation's policy, and one that wants
+to chase an outstanding form after 24 hours instead of 48 should not need a Python diff
+(CLAUDE.md §Hard constraints 3). Adding a monitor is a row in the bound pack's
+``packs/<pack>/config/monitors.yaml``; there is no ``if monitor.id == ...`` anywhere in this
+package, and ``tests/test_monitors.py`` asserts that against the source.
+
+**Where the table lives (HC1, 2026-10-01; SWEEP hardcode audit #11).** It used to be
+``packages/outbox/databridge_outbox/config/clinic_monitors.yaml`` — one vertical's behaviour inside
+an engine package, read under every deployment. It is now read from the active pack's ``config/``
+directory, resolved the same way the determination rules are (``databridge_intake.paths.
+config_dir``), so the outbox engine names no pack and ships no rows of its own.
 
 Three things this loader refuses, because a config file is edited more casually than code:
 
@@ -40,7 +46,7 @@ from databridge_core import GroundedValue, SourcePointer
 from .models import Channel, RecipientOrigin
 
 #: The config file, as a source id, so a pointer into it resolves to a file a human can open.
-MONITORS_SOURCE_ID = "clinic_monitors.yaml"
+MONITORS_SOURCE_ID = "monitors.yaml"
 MONITORS_TABLE = "monitors"
 
 #: ``{fact_name}`` and nothing more. No format specs, no attribute access, no nesting — a template
@@ -180,7 +186,7 @@ class Monitor(BaseModel):
                 raise ValueError(
                     f"monitor {self.id!r}: {column} contains a brace that is not a simple "
                     f"{{fact_name}} placeholder. This template language has no expressions on "
-                    f"purpose — it interpolates values read off a patient's record")
+                    f"purpose — it interpolates values read off a person's record")
         return self
 
     def placeholders(self, column: str) -> tuple[str, ...]:
@@ -247,9 +253,15 @@ class Monitors(BaseModel):
 
 
 def config_dir() -> pathlib.Path:
-    """``packages/outbox/databridge_outbox/config`` — resolved from ``__file__``, never the cwd, so
-    pytest, uvicorn and the dispatcher all read the same file."""
-    return pathlib.Path(__file__).resolve().parent / "config"
+    """``packs/<active pack>/config`` — the same directory the determination rules come from.
+
+    Resolved through the deployment binding, never the cwd, so pytest, uvicorn and the dispatcher
+    all read the same file. A deployment with no rule-carrying pack raises
+    ``databridge_intake.pack.PackConfigError`` here rather than reading a default table.
+    """
+    from databridge_intake.paths import config_dir as pack_config_dir
+
+    return pack_config_dir()
 
 
 def monitors_path() -> pathlib.Path:
@@ -259,7 +271,7 @@ def monitors_path() -> pathlib.Path:
 def load_monitors(path: Optional[pathlib.Path] = None) -> Monitors:
     config_path = pathlib.Path(path) if path is not None else monitors_path()
     if not config_path.exists():
-        raise MonitorError(f"clinic monitors not found at {config_path}")
+        raise MonitorError(f"monitors not found at {config_path}")
     raw = config_path.read_text(encoding="utf-8")
     offending = ADDRESS_SHAPED.findall(raw)
     if offending:
@@ -274,7 +286,15 @@ def load_monitors(path: Optional[pathlib.Path] = None) -> Monitors:
     return Monitors.model_validate(data)
 
 
-@functools.lru_cache(maxsize=1)
+@functools.lru_cache(maxsize=8)
+def _monitors_at(path: str, mtime_ns: int) -> Monitors:            # noqa: ARG001 — cache key
+    return load_monitors(pathlib.Path(path))
+
+
 def monitors() -> Monitors:
-    """The shipped table, cached. Pass a path to ``load_monitors`` for a test fixture."""
-    return load_monitors()
+    """The bound pack's table, cached per file version. Pass a path to ``load_monitors`` for a
+    test fixture."""
+    path = monitors_path()
+    if not path.exists():
+        raise MonitorError(f"monitors not found at {path}")
+    return _monitors_at(str(path), path.stat().st_mtime_ns)

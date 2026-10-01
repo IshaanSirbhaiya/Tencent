@@ -414,6 +414,20 @@ def _patient_node(patient) -> GraphNode:
         "sex": (patient.sex.value, patient.sex.pointer),
         "nationality": (patient.nationality.value, patient.nationality.pointer),
         "date_of_birth": (str(patient.date_of_birth.value), patient.date_of_birth.pointer)})
+    # `canonical_id` carries its OWN pointer, not just the entity-level pair below. It is the
+    # exact-merge key — the value that decides two records are the same person — and until
+    # 2026-08-16 it was a top-level field that escaped the per-attribute wall entirely (review
+    # finding A4). `merge._resolve_existing` now refuses to merge a SUBJECT on an ungrounded
+    # identifier, so an unciteable one would simply stop resolving and duplicate the registry.
+    #
+    # The honest pointer is `derived`, not a table_cell: `patient_id` is COMPUTED from the
+    # identifier column (`registry.patient_id_for`), so citing a cell that holds something else
+    # would be a citation for a value that page never printed.
+    attr_ptrs = dict(attr_ptrs)
+    attr_ptrs["canonical_id"] = SourcePointer(
+        source_id=patient.id_number.pointer.source_id, kind="derived",
+        derivation="patient_id_for(id_number) — the registry identifier, normalised",
+        derived_from=[patient.id_number.pointer])
     return _node(NodeKind.PATIENT, patient_key(patient.patient_id),
                  str(patient.full_name.value),
                  [patient.full_name.pointer, patient.id_number.pointer],

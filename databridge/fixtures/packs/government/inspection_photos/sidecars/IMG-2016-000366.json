@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2016-000366",
+  "filename": "IMG-2016-000366.jpg",
+  "image_present": false,
+  "captured_at": "2016-08-18T13:55:02+00:00",
+  "captured_by": "OFF-0032",
+  "inspection_id": "INS-2016-000101",
+  "application_id": "APP-2016-000146",
+  "parcel_id": "PCL-VH-00421",
+  "photo_batch_ref": "PHB-2016-000101",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-410080"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 434080,
+    "northing": 1185731,
+    "accuracy_m": 7.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1645,
+          120,
+          352,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2016-850642",
+        "confidence": 0.773,
+        "bbox": [
+          935,
+          223,
+          702,
+          49
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "56 QUARRY LANE, PELLING GREEN AM3 9QS",
+        "confidence": 0.906,
+        "bbox": [
+          1009,
+          410,
+          999,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2016-08-18",
+        "confidence": 0.703,
+        "bbox": [
+          101,
+          549,
+          986,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0032",
+        "confidence": 0.905,
+        "bbox": [
+          51,
+          556,
+          544,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

@@ -14,12 +14,40 @@ members = ["packages/*", "apps/*"]
 # run the suite). `scripts` exposes the vendor-import checker to its test.
 pythonpath = ["packages/core", "packages/harness", "packages/ingest", "packages/semantic",
               "packages/convert", "packages/graph", "packages/intake", "packages/agent",
-              "packages/outbox", "packages/evals", "apps/cli", "apps/gateway",
+              "packages/adapter", "packages/agentdef", "packages/outbox", "packages/evals",
+              "packages/orchestrator",
+              # Knowledge platform (BUILD_PLAN_KNOWLEDGE_PLATFORM.md) — mirrored in serve.py.
+              "packages/workflow_spec", "packages/mcp_ingest", "packages/retrieval",
+              "packages/agent_runtime", "packages/automation", "packages/adapter_agents",
+              "packages/federated",
+              "apps/cli", "apps/gateway",
               "apps/mcp_server", "apps/dispatcher", "scripts"]
 testpaths = ["tests", "packages/core/tests", "packages/harness/tests",
              "packages/ingest/tests", "packages/semantic/tests",
              "packages/convert/tests", "packages/graph/tests", "packages/intake/tests",
+             "packages/adapter/tests",
+             # `packages/adapter` and `packages/agentdef` were promoted onto `pythonpath` (and,
+             # in the same change, onto apps/gateway/serve.py::_PACKAGES, which a test asserts
+             # agrees) when the gateway first imported them: `/evidence/verify` calls a real
+             # adapter's verify(), and `/builder` calls the real agent compiler.
+             "packages/agentdef/tests",
+             # `packages/materialise/tests` was absent, so the documented `python -m pytest` ran
+             # green while SILENTLY SKIPPING every test that proves the plan compiler refuses a
+             # leaky plan — features on the wrong temporal axis, labels read at decision time, a
+             # missing maturity lag, `require_pointer_for_every_cell: false`. A skipped proof of
+             # the strongest claim in the submission is worse than a failing one: the run looks
+             # fine. Its conftest.py puts the package on sys.path, as adapter's used to.
+             "packages/materialise/tests",
              "packages/agent/tests", "packages/evals/tests", "apps/cli/tests",
              "packages/outbox/tests", "apps/gateway/tests", "apps/mcp_server/tests",
-             "apps/dispatcher/tests"]
+             "apps/dispatcher/tests",
+             # The orchestrator (the main agent) — packages/orchestrator/tests + the gateway route
+             # tests in apps/gateway/tests both exercise it; this entry is the package's own unit
+             # suite against a real two-adapter finance fleet.
+             "packages/orchestrator/tests",
+             # Knowledge platform packages (build plan §4).
+             "packages/workflow_spec/tests", "packages/mcp_ingest/tests",
+             "packages/retrieval/tests", "packages/agent_runtime/tests",
+             "packages/automation/tests", "packages/adapter_agents/tests",
+             "packages/federated/tests"]
 markers = ["integration: hits a real backend (Ollama/LiteLLM); skips when unavailable"]

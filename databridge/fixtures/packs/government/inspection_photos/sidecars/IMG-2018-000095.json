@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2018-000095",
+  "filename": "IMG-2018-000095.jpg",
+  "image_present": false,
+  "captured_at": "2018-03-09T16:40:59+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2018-000281",
+  "application_id": "APP-2017-000373",
+  "parcel_id": "PCL-CB-02147",
+  "photo_batch_ref": "PHB-2018-000281",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-605684"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 435053,
+    "northing": 1198809,
+    "accuracy_m": 5.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          714,
+          120,
+          275,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2018-909020",
+        "confidence": 0.866,
+        "bbox": [
+          223,
+          264,
+          702,
+          67
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "41 NETHERFIELD PASSAGE, OLD HARROWGATE AM1 4ZQ",
+        "confidence": 0.858,
+        "bbox": [
+          198,
+          404,
+          1472,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2018-03-09",
+        "confidence": 0.792,
+        "bbox": [
+          78,
+          405,
+          783,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.864,
+        "bbox": [
+          1410,
+          716,
+          432,
+          65
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

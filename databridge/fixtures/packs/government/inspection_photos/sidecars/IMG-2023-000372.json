@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2023-000372",
+  "filename": "IMG-2023-000372.jpg",
+  "image_present": false,
+  "captured_at": "2023-10-06T12:13:25+00:00",
+  "captured_by": "OFF-0033",
+  "inspection_id": "INS-2023-000217",
+  "application_id": "APP-2023-000294",
+  "parcel_id": "PCL-SQ-00018",
+  "photo_batch_ref": "PHB-2023-000217",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-138906"
+  },
+  "image": {
+    "width": 3024,
+    "height": 4032,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 420799,
+    "northing": 1215821,
+    "accuracy_m": 3.8
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          505,
+          120,
+          297,
+          70
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2023-295519",
+        "confidence": 0.885,
+        "bbox": [
+          1323,
+          269,
+          594,
+          57
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "5A HOLLYBANK YARD, SABLE QUAY AM1 8QH",
+        "confidence": 0.888,
+        "bbox": [
+          220,
+          304,
+          1110,
+          69
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "OATE OF INSPECTION 2023-10-06",
+        "confidence": 0.787,
+        "bbox": [
+          1849,
+          522,
+          783,
+          53
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0033",
+        "confidence": 0.758,
+        "bbox": [
+          1730,
+          628,
+          352,
+          89
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

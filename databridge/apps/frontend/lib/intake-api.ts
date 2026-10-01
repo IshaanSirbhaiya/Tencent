@@ -4,7 +4,7 @@
 // defaulted here, and it is not inferred from a staff id being present, because the gateway
 // refuses without it. A client that forgets it gets a refusal rather than a silent success —
 // which is the behaviour we want the UI to be built against.
-import { GATEWAY } from "./api";
+import { GATEWAY, authHeaders } from "./api";
 import type {
   EvidenceView,
   LedgerRow,
@@ -16,7 +16,8 @@ import type {
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${GATEWAY}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    // INT1: every /intake route requires a principal — send the credential
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
     cache: "no-store",
   });
   const body = await res.json().catch(() => ({}));
@@ -72,6 +73,7 @@ export const intakeApi = {
     const res = await fetch(`${GATEWAY}/intake/upload-file`, {
       method: "POST",
       body: form,
+      headers: authHeaders(),         // no Content-Type: the browser sets the multipart boundary
       cache: "no-store",
     });
     const body = await res.json().catch(() => ({}));

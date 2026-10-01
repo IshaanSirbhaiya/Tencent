@@ -10,12 +10,14 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from conftest import AUTH_HEADERS
+
 from databridge_gateway import create_app
 
 
 @pytest.fixture(scope="module")
 def client():
-    with TestClient(create_app()) as c:                  # `with` runs the lifespan
+    with TestClient(create_app(), headers=AUTH_HEADERS) as c:                  # `with` runs the lifespan
         yield c
 
 
@@ -437,7 +439,13 @@ IDENTITY_QUESTIONS = [
 
 @pytest.mark.parametrize("question", IDENTITY_QUESTIONS)
 def test_the_ask_endpoint_refuses_identity_questions(client, question):
-    r = client.post("/brain/query", json={"question": question})
+    from conftest import AUTH_HEADERS
+
+    # /brain/query is gated (E2E F-25, R-019): anonymous is refused before anything is screened,
+    # and a signed-in caller still gets the identity refusal, never an answer.
+    assert TestClient(client.app).post(                   # a second client with no credential
+        "/brain/query", json={"question": question}).status_code == 401
+    r = client.post("/brain/query", json={"question": question}, headers=AUTH_HEADERS)
     assert r.status_code == 422
     assert r.json()["refusal"]["code"] == "IDENTITY_VERIFICATION_OUT_OF_SCOPE"
 

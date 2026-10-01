@@ -1,0 +1,161 @@
+# A TEST-ONLY transcription of what `fixtures/packs/government/roles.yaml` says about
+# `correspondence`, in the mapping shape `databridge_adapter.rolemodel.load_role_model` reads.
+#
+# WHY IT EXISTS
+# -------------
+# The shipped government role model is **v2**: `roles` is a LIST of `{id, grants[], denied[]}` and
+# `row_scope` is written against named `scopes:` aliases, while the loader implements the finance
+# **v1** mapping shape and raises `'roles' must be a mapping`. The same gap was found independently
+# by the document-adapter workstream, which built `tests/government_estate.py` to translate the
+# file mechanically — the better long-term home for this, and the place it should move once
+# `OBJECT_ENTITIES` there carries a `correspondence -> (correspondence, message)` row. Until it
+# does, this transcription covers the mailbox source alone.
+#
+# WHAT IT TRANSCRIBES, LINE FOR LINE
+# ----------------------------------
+# * `adapter_service`, instance `adapter_service:correspondence` — the estate's own ingest
+#   principal. Its correspondence grant reads, verbatim:
+#
+#       - object: correspondence
+#         purposes: [ingest]
+#         condition: ":principal.bound_source_id == 'correspondence'"
+#         row_scope: {predicate: null, outside: n/a}
+#         columns: "*"
+#         capabilities: [describe, plan, resolve, verify_against_capture]
+#         trust_default: untrusted
+#         emits_claimed_only: [claimed_case_ref]
+#
+#   so: unscoped by declaration, the whole projection, everything untrusted, and `claimed_case_ref`
+#   never a trusted `case_ref` — "binding happens above it — review finding H12". The `condition`
+#   is a workload-identity check made at AUTHENTICATION ("an unbound instance is refused at
+#   authentication, not at authorisation") and has no counterpart in the v1 shape, so it is not
+#   expressed here; it is asserted directly against the shipped file by a test instead.
+#
+# * `benefits_caseworker` — a human role whose correspondence grant IS scoped, on
+#   `case_ref_trusted IN @benefits.my_caseload`, expanded from the estate's own `scopes:` block to
+#   `SELECT claim_id FROM benefits.claims WHERE caseworker_ref = :principal.caseworker_ref`. That
+#   subquery is in ANOTHER SOURCE, so this build refuses the read with
+#   `POLICY_ROW_SCOPE_UNCOMPILABLE` — one request reaches one adapter and one adapter holds one
+#   source's credentials. That refusal is the estate's own `cross_source_rule` enforced, not a
+#   limitation being worked around, and a test asserts it.
+#
+# * `gis_analyst` — carried only so a refusal can be shown beside a grant. The shipped
+#   `permits_inspector` denies `correspondence` outright with `POLICY_PURPOSE_MISMATCH`; this is
+#   the same shape under a shorter name.
+#
+# It grants nothing the shipped estate does not, and nothing outside these tests loads it.
+
+version: 2
+estate: aldermoor-government-synthetic
+
+purposes:
+  - id: ingest
+    description: >-
+      A bound adapter instance staging evidence into the graph. Reads the whole source by
+      definition, because it is building the graph; nothing it stages is a determination.
+  - id: correspondence
+    description: "Writing to, or reading correspondence from, a person on an assigned case."
+  - id: quality_assurance
+    description: "Reviewing a team member's decision for correctness and consistency."
+
+reason_codes:
+  POLICY_COLUMN_DENIED: the role denies this column explicitly
+  POLICY_FREE_TEXT_UNREVIEWED: free text is withheld from every role except by named exception
+  POLICY_THIRD_PARTY_DATA: the column holds a third party's data
+  POLICY_PURPOSE_MISMATCH: the purpose does not reach this object
+  POLICY_ROLE_SCOPE: the object is outside the role's allow list
+  POLICY_SCOPE_UNDISCLOSED: the row is outside the principal's scope and its existence is not disclosed
+  ROW_NOT_IN_SCOPE: the row is outside the role's row-level scope
+
+masks:
+  classify_only:
+    emit: "classifier(value) -> label"
+    cell_type: Withheld
+    reason: POLICY_FREE_TEXT_UNREVIEWED
+    note: >-
+      "a classification is a DERIVED assertion about the text. It is a Withheld cell carrying a
+      transform record, never a GroundedValue."
+
+column_classification:
+  free_text_may_contain_personal_data:
+    - correspondence.message.subject
+    - correspondence.message.body
+    - correspondence.message.attachment
+  untrusted_third_party_text:
+    - correspondence.message.subject
+    - correspondence.message.body
+    - correspondence.message.attachment
+    - correspondence.message.claimed_case_ref
+    - correspondence.message.from_address
+    - correspondence.message.to_address
+
+free_text_policy:
+  default_reason: POLICY_FREE_TEXT_UNREVIEWED
+  rule: >-
+    Withheld from every role by default. The ingest grant with `columns: "*"` IS the named
+    exception, written as a grant — and `INJECTIONS.md` is explicit that it has to be: "A system
+    that refuses to ingest these has not passed. It has just moved the failure somewhere harder to
+    see."
+  exceptions:
+    - role: adapter_service
+      purposes: [ingest]
+      columns: "all free text"
+      condition: "the instance is bound to this source id at authentication"
+
+purpose_scoped_grants:
+  adapter_service:
+    ingest:
+      objects: [correspondence.message]
+  benefits_caseworker:
+    correspondence:
+      objects: [correspondence.message]
+
+roles:
+  adapter_service:
+    description: >-
+      One bound instance per source. "No adapter instance holds two bindings, and no instance may
+      read a second source to resolve a reference it found in its own. Cross-source joins happen in
+      the graph, above the adapters, where the pointers meet."
+    purposes: [ingest]
+    egress_ceiling: RESTRICTED_INTERNAL
+    allow:
+      correspondence: [message]
+    row_filters: {}
+    unscoped_objects:
+      - object: correspondence.message
+        justification: >-
+          `row_scope: {predicate: null}` in the shipped grant. An ingest principal reads the whole
+          source because it is building the graph; nothing it stages is a determination, and the
+          promotion path from staged to committed runs through a human attestation it cannot reach.
+    deny_columns: []
+    deny_sources: []
+    obligations: [log_every_read_with_purpose]
+
+  benefits_caseworker:
+    description: >-
+      A human caseworker. Correspondence is scoped on the TRUSTED binding column, never on the
+      claimed header: "A forged X-Case-Reference reaches no caseload."
+    purposes: [correspondence, quality_assurance]
+    egress_ceiling: RESTRICTED_INTERNAL
+    allow:
+      correspondence: [message]
+    row_filters:
+      correspondence.message: >-
+        case_ref_trusted IN (SELECT claim_id FROM benefits.claims
+        WHERE caseworker_ref = :principal.caseworker_ref)
+    unscoped_objects: []
+    deny_columns: []
+    deny_sources: []
+    obligations: [log_every_read_with_purpose]
+
+  gis_analyst:
+    description: Parcels and zoning only. Correspondence is denied outright.
+    purposes: [correspondence]
+    egress_ceiling: PUBLIC
+    allow:
+      gis_parcels: [parcel]
+    deny_sources: [correspondence]
+    row_filters: {}
+    unscoped_objects:
+      - object: gis_parcels.parcel
+        justification: Public parcel data carries no subject.

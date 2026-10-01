@@ -62,7 +62,7 @@ def _render(monitor: Monitor, column: str, observation: Observation
         raise DraftRefused(
             f"monitor {monitor.id!r} REFUSED: {column} needs {missing}, and the observation for "
             f"intake {observation.intake_id!r} has no grounded value for them. A sentence a "
-            f"patient reads is held to the same rule as an extracted field: if it is not in a "
+            f"recipient reads is held to the same rule as an extracted field: if it is not in a "
             f"source, it is not emitted (CLAUDE.md §Hard constraints 2).")
 
     def substitute(match) -> str:
@@ -77,7 +77,7 @@ def _render(monitor: Monitor, column: str, observation: Observation
     text = PLACEHOLDER.sub(substitute, template).strip()
     pointer = SourcePointer(
         source_id=MONITORS_SOURCE_ID, kind="derived",
-        derivation=(f"clinic_monitors.yaml monitors[{monitor.id}].{column}, interpolated with "
+        derivation=(f"{MONITORS_SOURCE_ID} monitors[{monitor.id}].{column}, interpolated with "
                     f"grounded values from intake {observation.intake_id}"),
         derived_from=[template_pointer, *used])
     return text, pointer, [template_pointer, *used]
@@ -109,7 +109,7 @@ def build_outbound_draft(monitor: Monitor,
         raise DraftRefused(
             f"build_outbound_draft REFUSED: monitor {monitor.id!r} declares "
             f"recipient_from={monitor.recipient_from!r} but this recipient came through "
-            f"{recipient.origin!r}. Which door an address comes through is a clinic policy stated "
+            f"{recipient.origin!r}. Which door an address comes through is a policy stated "
             f"in the config table, not something a call site chooses.")
 
     subject_text, subject_pointer, subject_cited = _render(monitor, "subject_template", observation)

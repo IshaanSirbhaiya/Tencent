@@ -249,12 +249,45 @@ def test_no_acme_branding_in_the_python_product_code():
     assert offenders == [], "Acme references in product code:\n" + "\n".join(offenders)
 
 
-@pytest.mark.parametrize("path,expected", [
-    ("apps/frontend/app/layout.tsx", "Parkway Shenton"),
-    ("apps/frontend/components/brain/brain-header.tsx", "Clinic brain"),
+@pytest.mark.parametrize("path", [
+    "apps/frontend/app/layout.tsx",
+    "apps/frontend/components/brain/brain-header.tsx",
 ])
-def test_the_visible_branding_is_the_clinics(path, expected):
-    assert expected in (_root() / path).read_text(encoding="utf-8")
+def test_the_visible_branding_comes_from_the_active_pack(path):
+    """Phase 1 replaces this check's subject without weakening it.
+
+    The original asserted two literals — "Parkway Shenton" and "Clinic brain" — were *present*,
+    because the failure it was written for was Acme branding deleted from the sidebar and left
+    everywhere else. That was the right check while one vertical was the product.
+
+    It is the wrong check now, and keeping it would be worse than deleting it: it would pin the
+    platform to one pack's vocabulary and fail the moment a deployment enabled finance. The
+    engine must know no domain by name (CLAUDE.md), and a *test* asserting a domain literal is
+    the same violation as code doing it.
+
+    So the intent is preserved and generalised: branding must still be *deliberate* rather than
+    deleted — it now comes from the active pack, and never from a literal in the component.
+    """
+    source = (_root() / path).read_text(encoding="utf-8")
+
+    # A file participates in pack vocabulary either by MOUNTING the provider (layouts) or by
+    # CONSUMING it (components). Requiring the consumer form only would fail the layout that makes
+    # every consumer possible.
+    participates = re.search(r"PackProvider|usePack|useNouns|pack\.", source)
+    assert participates is not None, (
+        f"{path} neither provides nor consumes pack vocabulary. Branding must come from the "
+        f"active pack — not hardcoded, and not simply deleted.")
+
+    # The forbidden set is what the platform must never name: any single pack's identity.
+    # `FORBIDDEN` already covers the Acme fixtures; these are the vertical's own literals.
+    # Scanned on CODE ONLY — prose explaining the removal is allowed, same rule as `_offenders`.
+    domain_literals = re.compile(r"parkway|shenton|hack4health|\bclinic\b", re.I)
+    offenders = [f"line {n}: {line.strip()[:100]}"
+                 for n, line in enumerate(_code_lines(_root() / path, source), 1)
+                 if domain_literals.search(line)]
+    assert offenders == [], (
+        f"{path} hardcodes one pack's vocabulary:\n" + "\n".join(offenders) +
+        "\nUse the pack nouns so a finance or government deployment reads correctly.")
 
 
 def test_the_ask_panel_takes_its_questions_from_config():

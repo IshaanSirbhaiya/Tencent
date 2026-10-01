@@ -1,0 +1,108 @@
+# Default deterministic screen — used when no enabled pack ships `packs/<pack>/screen.yaml`.
+# Same schema as packs/workspace/screen.yaml (version 1; see that file for the full description).
+# The DECISIVE rules here are ENGINE POLICY (screen.mandatory_rules): ALWAYS applied, even when a pack
+# supplies its own file or reuses one of these ids with another pattern. A pack may add
+# rules, never remove the credential gate (KNOWLEDGE_SYSTEM_PRINCIPLES P1, P2).
+version: 1
+pack: defaults
+
+thresholds:
+  block: 2
+  review: 1
+  min_signals_to_block: 2
+
+decisive:
+  - id: private_key_block
+    description: PEM private key material.
+    pattern: '-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----'
+    reverse: Remove the key from the source item (and rotate it). Key material is never ingested.
+  - id: cloud_access_key_id
+    description: A cloud access-key identifier.
+    pattern: '\b(?:AKIA|ASIA)[0-9A-Z]{16}\b'
+    reverse: Remove and rotate the key; re-run the source.
+  - id: provider_token
+    description: A recognisable provider token (GitHub, Slack, OpenAI-style, Google API key).
+    pattern: '\b(?:ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{35})\b'
+    reverse: Remove and rotate the token; re-run the source.
+  - id: credential_assignment
+    description: >
+      A password, API key, secret or token assigned a DEMONSTRABLY secret-shaped value on one line:
+      8+ characters with no spaces carrying a digit, a symbol or an inner capital (quoted or not),
+      or a lowercase token joined by - . or _ that is the whole value on its line
+      (api_key=sk-proj-abcdefghijklmnop). Placeholders (quoted or not: ********, ${VAR}, <...>,
+      [REDACTED], ...) and policy prose never match; a quoted all-word value goes to the
+      credential_like_assignment signal (review). Same rule as packs/workspace (R-021, ported by EF3).
+    pattern: '(?m)\b(?i:password|passwd|pwd|api[_-]?key|secret[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token)\b["'']?[ \t]*[:=][ \t]*(?:"(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)")(?![^"\n]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*(?:[0-9]|[!@#$%^&*+=/~?|\\]|[a-z][^\s"''<>{}\[\]]*[A-Z]))[^\s"''<>{}\[\]]{8,}"|''(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)'')(?![^''\n]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*(?:[0-9]|[!@#$%^&*+=/~?|\\]|[a-z][^\s"''<>{}\[\]]*[A-Z]))[^\s"''<>{}\[\]]{8,}''|(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)(?![^\s,;]))(?![^\s"''<>{}\[\]]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*(?:[0-9]|[!@#$%^&*+=/~?|\\]|[a-z][^\s"''<>{}\[\]]*[A-Z]))[^\s"''<>{}\[\]]{8,}|(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)(?![^\s,;]))(?![^\s"''<>{}\[\]]*[*\u2022\u00b7]{3})(?=[^\s"''<>{}\[\]]*[-._])[^\s"''<>{}\[\]]{8,}(?=[ \t]*[,;]?[ \t]*(?:#.*)?\r?$))'
+    reverse: Move the credential to a secret store and replace it with a reference; re-run the source.
+
+signals:
+  - id: confidentiality_marking_line
+    description: A confidentiality marking standing on its own line (prose does not match).
+    pattern: '(?im)^[ \t#*_>-]*(?:classification[ \t]*:[ \t]*)?(?:strictly[ \t]+)?confidential[ \t*_.]*$'
+    weight: 1
+    reverse: An authenticated owner approves the item (screen.approve_override) and the source is re-run.
+  - id: pricing_heading
+    description: A heading that introduces pricing or a rate card.
+    pattern: '(?im)^[ \t#*]*(?:pricing|price[ \t]+list|rate[ \t]+card|discount[ \t]+schedule|fee[ \t]+schedule)\b'
+    weight: 1
+    reverse: An authenticated owner approves the item (screen.approve_override) and the source is re-run.
+  - id: contract_value_wording
+    description: Headline-value phrasing.
+    pattern: '(?i)\b(?:total[ \t]+contract[ \t]+value|notice[ \t]+of[ \t]+award|contract[ \t]+sum)\b'
+    weight: 1
+    reverse: An authenticated owner approves the item (screen.approve_override) and the source is re-run.
+  - id: compensation_terms
+    description: Pay and compensation vocabulary.
+    pattern: '(?i)\b(?:salary|salaries|compensation[ \t]+bands?|bonus[ \t]+pool|pay[ \t]+grade)\b'
+    weight: 1
+    reverse: An authenticated owner approves the item (screen.approve_override) and the source is re-run.
+
+  - id: credential_like_assignment
+    description: >
+      A password / API key / secret / token assigned a QUOTED value that is not demonstrably
+      secret-shaped (spaces, or all ordinary words): a passphrase and quoted policy prose look the
+      same, so this is a signal (review on its own; needs corroboration to block), never a veto.
+    pattern: '\b(?i:password|passwd|pwd|api[_-]?key|secret[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token)\b["'']?[ \t]*[:=][ \t]*(?:"(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)")(?![^"\n]*[*\u2022\u00b7]{3})[^"\n<>{}\[\]]{8,}"|''(?!(?:[xX*\u2022\u00b7#._-]+|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|%\(\w+\)s)'')(?![^''\n]*[*\u2022\u00b7]{3})[^''\n<>{}\[\]]{8,}'')'
+    weight: 1
+    reverse: If the quoted value is prose, an authenticated owner approves the item (screen.approve_override); if it is a secret, move it to a secret store and re-run the source.
+
+redactions:
+  - id: email
+    description: Email addresses.
+    pattern: '(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b'
+    validate: none
+    replacement: '[EMAIL]'
+  - id: iban
+    description: >
+      IBANs, masked only if the ISO 13616 mod-97 check passes (part numbers share the shape).
+      Country + check digits, then the BBAN written EITHER compact (11–30 characters: the ISO
+      lengths 15 to 34) OR in space-separated groups of 4 with an optional 1–3 character tail —
+      never a mix, so a compact IBAN cannot swallow the word after it as a "tail"; the validator
+      bounds the length. Case-insensitive (R-021): `gb82 west 1234 …` is the same account as
+      `GB82 WEST 1234 …`, and the mod97 validator upper-cases before checking. A spaced tail must
+      start with a digit or a CAPITAL letter, so "… 1332 by Friday" never reads "by" as part of
+      the account (known limit: a fully lower-case, spaced IBAN whose last group is letters only,
+      e.g. Mauritius "… 000m ur", is left unmasked).
+    pattern: '(?i)\b[A-Z]{2}\d{2}(?:[A-Z0-9]{11,30}|(?: [A-Z0-9]{4}){2,7}(?: (?:\d|(?-i:[A-Z]))[A-Z0-9]{0,2})?)\b'
+    validate: mod97
+    replacement: '[IBAN]'
+
+  - id: iban_whole_groups
+    description: >
+      The second reading of a SPACED IBAN that ends on a whole group of 4 and is followed by a short
+      number ("… 0005 1332 12 items"): the iban rule above reads " 12" as the tail, fails mod-97
+      and leaves it; this rule reads whole groups only. Same checksum, same mask. Runs after iban,
+      so an IBAN the first rule masked is never seen twice.
+    pattern: '(?i)\b[A-Z]{2}\d{2}(?: [A-Z0-9]{4}){2,7}\b'
+    validate: mod97
+    replacement: '[IBAN]'
+  - id: card_number
+    description: Payment card numbers, masked only if Luhn-valid.
+    pattern: '(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)'
+    validate: luhn
+    replacement: '[CARD]'
+  - id: phone
+    description: Phone numbers with an international prefix or a leading trunk zero.
+    pattern: '(?<![\w+])(?:\+\d{1,3}[ -]?|0)\d{2,4}[ -]?\d{3,4}[ -]?\d{3,4}(?!\w)'
+    validate: none
+    replacement: '[PHONE]'

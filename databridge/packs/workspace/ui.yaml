@@ -1,0 +1,88 @@
+# packs/workspace — the pack's OPERATOR-SURFACE vocabulary (presentation half; `ontology.yaml` is
+# the kinds). `GET /packs` (apps/gateway/.../pack_routes.py) reads this sibling file for every pack
+# on disk and the frontend's `isRegistry` requires a non-empty `nouns`. Unlike `common`, this pack
+# IS a workspace a user signs into (start-walnut-kg.ps1 binds it alone), so it declares surfaces —
+# otherwise `available` would be False and the app would open with no screen.
+#
+# Surfaces point at the platform screens that run on the shared graph store (KNOWLEDGE_SYSTEM_
+# PRINCIPLES §6). Icons are keys of SURFACE_ICONS in apps/frontend/components/sidebar.tsx.
+# Synthetic and general throughout.
+
+pack: workspace
+label: Workspace
+tagline: Your organisation's files, databases and drives as one cited knowledge graph.
+nouns:
+  subject: person
+  subject_plural: people
+  subject_title: Person
+  subject_plural_title: People
+  org: organisation
+  org_plural: organisations
+  org_title: Organisation
+  registry: directory
+  record: record
+  graph: knowledge graph
+  workspace: Workspace brain
+  counterparty: organisation
+  counterparty_plural: organisations
+  document: document
+  determination: link
+  operator_surface: Knowledge graph
+  operator_role: knowledge owner
+  queue: sources
+  identifier: email address
+  credential: verified email or directory record
+  document_examples: a contract, invoice, meeting note, project brief or policy
+  pitch: >
+    Connect files, a database and a Google Drive through MCP. Walnut screens every document
+    before any model sees it, then builds a graph in which every node and link cites its source.
+roster: []
+surfaces:
+  - href: /graph
+    label: Knowledge graph
+    icon: graph
+  - href: /brain
+    label: Ask
+    icon: brain
+  - href: /connectors
+    label: Connect a source
+    icon: upload
+  - href: /intelligence
+    label: Intelligence
+    icon: chart
+trials:
+  intelligence: []
+  evidence: []
+  intake: []
+demo_steps: []
+demo_focus_node: ""
+demo_as_of: ""
+demo_question: ""
+graph_vocabulary:
+  node_kinds:
+    person:       {color: "#6f9fd8", label: Person}
+    organisation: {color: "#5fa98d", label: Organisation}
+    document:     {color: "#9a8fc9", label: Document}
+    invoice:      {color: "#c4827a", label: Invoice}
+    contract:     {color: "#c9a25f", label: Contract}
+    project:      {color: "#5f9fb0", label: Project}
+    meeting:      {color: "#b58fb0", label: Meeting}
+    product:      {color: "#8fae6a", label: Product}
+    location:     {color: "#a3a3a3", label: Location}
+    topic:        {color: "#7c9ab8", label: Topic}
+  edge_labels:
+    works_for: works for
+    manages: manages
+    authored: authored
+    mentions: mentions
+    about: about
+    party_to: party to
+    billed_to: billed to
+    part_of: has part
+    located_in: located in
+    derived_from: derived from
+    supersedes: supersedes
+brain_suggested_fallback:
+  - Which invoices are still open, and for which customer?
+  - Who is the customer sponsor on the route optimisation pilot?
+  - Which documents were excluded from ingestion, and why?

@@ -735,4 +735,6 @@ def test_every_for_patient_edge_cites_the_span_its_document_named_a_subject_from
         document = by_id[edge.src_id]
         subject_pointer = document.attr_sources.get("claimed_subject_field")
         assert subject_pointer is not None, f"{document.id} claims a patient but named no subject"
-        assert edge.sources == [subject_pointer], edge.id
+        # `sources` is a tuple since 2026-08-16 (immutable, so a validated edge's
+        # grounding cannot be emptied in place). Compare against a tuple.
+        assert edge.sources == (subject_pointer,), edge.id

@@ -29,12 +29,19 @@ import datetime as dt
 import logging
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
+
+from .auth import install_auth_handler, require_principal
 
 from databridge_graph.sheet_export import DEFAULT_ROOT, SheetExport, iter_zip_chunks
 
 log = logging.getLogger("databridge.gateway")
+
+
+#: INT1 (2026-10-01): every route in this module requires an authenticated principal — the gateway
+#: serves nothing anonymously except `/health` (`test_every_route_on_the_app_is_gated`).
+_AUTH = [Depends(require_principal)]
 
 
 def _refusal(code: str, message: str, status: int = 422) -> JSONResponse:
@@ -42,6 +49,11 @@ def _refusal(code: str, message: str, status: int = 422) -> JSONResponse:
     # `code`, a human message, and the alternative if there is one.
     return JSONResponse(status_code=status, content={"refusal": {
         "code": code, "message": message, "nearest_alternative": None}})
+
+
+#: The download's fixed prefix. It names what the archive holds, not a domain: the same export
+#: runs under every pack.
+ARCHIVE_PREFIX = "evidence-sheets"
 
 
 def _archive_name(as_of: Optional[dt.datetime], generated_at: dt.datetime) -> str:
@@ -53,8 +65,8 @@ def _archive_name(as_of: Optional[dt.datetime], generated_at: dt.datetime) -> st
     """
     stamp = generated_at.strftime("%Y%m%dT%H%M%SZ")
     if as_of is not None:
-        return f"clinic-evidence-sheets-as-of-{as_of.strftime('%Y%m%d')}-{stamp}.zip"
-    return f"clinic-evidence-sheets-{stamp}.zip"
+        return f"{ARCHIVE_PREFIX}-as-of-{as_of.strftime('%Y%m%d')}-{stamp}.zip"
+    return f"{ARCHIVE_PREFIX}-{stamp}.zip"
 
 
 def register_export_routes(app: FastAPI) -> None:
@@ -63,14 +75,15 @@ def register_export_routes(app: FastAPI) -> None:
     NOT called by ``create_app()``. Wiring it into the running gateway is a one-line addition to
     ``main.py``: ``register_export_routes(app)`` alongside ``register_evidence_routes(app)``.
     """
+    install_auth_handler(app)
 
-    @app.get("/brain/export/sheets")
+    @app.get("/brain/export/sheets", dependencies=_AUTH)
     def export_sheets(as_of: Optional[str] = None):
         brain = getattr(app.state, "brain", None)
         store = getattr(brain, "store", None)
         if store is None:
             return _refusal("EXPORT_UNAVAILABLE",
-                            "the clinic graph is not initialised; nothing to export", status=503)
+                            "the knowledge graph is not initialised; nothing to export", status=503)
 
         when: Optional[dt.datetime] = None
         if as_of:

@@ -42,6 +42,8 @@ from fastapi.testclient import TestClient
 from databridge_gateway.intelligence_routes import _register_intelligence_routes
 from databridge_gateway.outbox_routes import register_outbox_routes
 
+from conftest import AUTH_HEADERS
+
 #: A chit that orders a test its own package does not include AND prints a package code — so the
 #: `coverage_conflict_on_file` rule both fires and can be filled from grounded values alone.
 CHIT = "chit_07_mol_authorisation_pee226.txt"
@@ -168,7 +170,9 @@ def app(tmp_path, intake, ledger, chit_text, transport):
 
 @pytest.fixture()
 def client(app):
-    with TestClient(app) as c:
+    # R-015: `/intelligence/console` is gated; `/outbox/*` is not (out of R-015's scope), and the
+    # header is harmless there.
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         yield c
 
 
@@ -264,7 +268,7 @@ def test_the_read_half_still_returns_the_agent_response_and_not_the_audit_record
     assert answer is not None and answer["refused"] is False
     assert set(answer) == {"question", "answer", "refused", "refusal_code",
                            "requires_human_selection", "values", "unresolved", "notes", "reads",
-                           "model_calls"}
+                           "model_calls", "planner"}   # planner: HC1, which planner ran
     assert not (set(answer) & AUDIT_ONLY_KEYS)
     assert answer["values"], "the read half must still answer with grounded values"
 
@@ -609,7 +613,7 @@ def test_an_ungroundable_answer_is_a_stated_reason_not_an_empty_list(client, mon
     from databridge_gateway import intelligence_routes as routes
 
     monkeypatch.setattr(routes, "_run_agent",
-                        lambda app, question, parsed: (None, routes.RefusalBody(
+                        lambda app, question, parsed, **_kw: (None, routes.RefusalBody(
                             code="NO_GROUNDED_ANSWER", message="nothing answered that"), 422))
     r = client.post("/intelligence/console", json={"request": "how many documents are here?"})
     assert r.status_code == 200, r.text

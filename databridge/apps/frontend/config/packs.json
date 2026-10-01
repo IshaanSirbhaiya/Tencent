@@ -1,0 +1,535 @@
+{
+  "$comment": [
+    "The pack registry — every piece of domain vocabulary the UI is allowed to say.",
+    "",
+    "The engine knows no domain (PHASE_PLAN.md Phase 1). A pack supplies the nouns, the operator",
+    "surfaces and the demo trials for one vertical; the components render whatever the active pack",
+    "hands them. Nothing under app/, components/ or lib/ may contain a domain literal — that is what",
+    "this file is for, and a grep gate enforces it.",
+    "",
+    "This file is the FALLBACK. `lib/packs.ts` asks the gateway for `GET /packs` first and only uses",
+    "these values when the gateway does not serve that route yet (workstream 1C owns it). Both shapes",
+    "are the same, so the switch is a delete here, not a refactor.",
+    "",
+    "Synthetic data only. Every id below names a row in this repository's synthetic corpus."
+  ],
+  "default_pack": "healthcare",
+  "packs": [
+    {
+      "id": "healthcare",
+      "label": "Healthcare",
+      "tagline": "Referral intake, coverage determination, questionnaire pre-fill",
+      "available": true,
+      "nouns": {
+        "subject": "patient",
+        "subject_plural": "patients",
+        "subject_title": "Patient",
+        "org": "clinic",
+        "org_plural": "clinics",
+        "org_title": "Clinic",
+        "registry": "clinic registry",
+        "record": "clinic record",
+        "graph": "clinic graph",
+        "workspace": "Clinic brain",
+        "counterparty": "insurer",
+        "counterparty_plural": "insurers",
+        "document": "referring document",
+        "determination": "coverage determination",
+        "operator_surface": "Front desk",
+        "operator_role": "front desk",
+        "queue": "Queue",
+        "identifier": "NRIC/FIN/passport",
+        "pitch": "Reads a patient's referring document before they reach the counter.",
+        "credential": "insurance e-card",
+        "document_examples": "a referral letter, voucher, authorisation form or HR email",
+        "subject_plural_title": "Patients"
+      },
+      "roster": [
+        {
+          "staffId": "PS-FD-014",
+          "name": "Nurul Aisyah",
+          "role": "Front desk — Registration"
+        },
+        {
+          "staffId": "PS-FD-027",
+          "name": "Tan Jia Hui",
+          "role": "Front desk — Registration"
+        },
+        {
+          "staffId": "PS-RN-103",
+          "name": "Kavitha Raman",
+          "role": "Registered nurse"
+        }
+      ],
+      "surfaces": [
+        {
+          "href": "/frontdesk",
+          "label": "Queue",
+          "icon": "queue"
+        },
+        {
+          "href": "/intake",
+          "label": "Read a document",
+          "icon": "upload"
+        },
+        {
+          "href": "/brain",
+          "label": "Knowledge graph",
+          "icon": "graph"
+        },
+        {
+          "href": "/intelligence",
+          "label": "Intelligence",
+          "icon": "brain"
+        },
+        {
+          "href": "/impact",
+          "label": "Impact",
+          "icon": "chart"
+        }
+      ],
+      "trials": {
+        "intelligence": [
+          {
+            "label": "Ask",
+            "note": "Read straight from the pack graph. Every value arrives with the pointer it came from — and only the last one asks for figures, which is why only it makes them appear.",
+            "chips": [
+              {
+                "id": "ask-issuers",
+                "label": "which issuers sent documents?",
+                "payload": "which issuers sent documents?"
+              },
+              {
+                "id": "ask-blocked",
+                "label": "what is blocked right now?",
+                "payload": "what is blocked right now?"
+              },
+              {
+                "id": "ask-unconfirmed",
+                "label": "which documents have no confirmed patient?",
+                "payload": "which documents have no confirmed patient?"
+              },
+              {
+                "id": "ask-count",
+                "label": "how many documents are here?",
+                "payload": "how many documents are here?"
+              }
+            ]
+          },
+          {
+            "label": "Act",
+            "note": "A request that implies an act becomes a draft in the outbox, never a send. With no registration named, nothing is drafted at all — choosing which patient a message concerns is an identity determination, and this system does not make one.",
+            "chips": [
+              {
+                "id": "act-uncovered-test",
+                "label": "email the patient about the test that is not covered",
+                "payload": "email the patient about the test that is not covered"
+              },
+              {
+                "id": "act-questionnaire",
+                "label": "email the patient that their questionnaire is outstanding",
+                "payload": "email the patient that their questionnaire is outstanding"
+              }
+            ]
+          },
+          {
+            "label": "Refuses",
+            "note": "These two are answered with a refusal, and the refusal is decided before the graph is read and before any model is called — model_calls: 0. Identity is checked in person, by a person, against the physical document. This is the product working, not a button that failed.",
+            "chips": [
+              {
+                "id": "refuse-verify-identity",
+                "label": "verify the identity of this patient",
+                "payload": "verify the identity of this patient"
+              },
+              {
+                "id": "refuse-candidate-2",
+                "label": "is candidate 2 the right person?",
+                "payload": "is candidate 2 the right person?"
+              }
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "label": "Traces",
+            "note": "Pack configuration — packages, tests, coverage rules, issuers. No patient is involved, so there is nothing to confirm and the chain is readable now.",
+            "chips": [
+              {
+                "id": "ev-test",
+                "label": "test:full_blood_count",
+                "payload": "test:full_blood_count"
+              },
+              {
+                "id": "ev-package",
+                "label": "package:blphs-well2",
+                "payload": "package:blphs-well2"
+              },
+              {
+                "id": "ev-rule",
+                "label": "coverage_rule:rule-bluepeak-well2",
+                "payload": "coverage_rule:rule-bluepeak-well2"
+              },
+              {
+                "id": "ev-org",
+                "label": "org:meridian-life-assurance",
+                "payload": "org:meridian-life-assurance"
+              }
+            ]
+          },
+          {
+            "label": "Gated",
+            "note": "These exist. Their evidence is withheld until a named member of staff has checked identity in person and confirmed — AWAITING_HUMAN_CONFIRMATION is the gate holding, and it is deliberately worded so it cannot be mistaken for “no such entity”.",
+            "chips": [
+              {
+                "id": "ev-document",
+                "label": "document:chit_03_everwell_group_invitation.txt",
+                "payload": "document:chit_03_everwell_group_invitation.txt"
+              },
+              {
+                "id": "ev-patient",
+                "label": "patient:pat:4e487c99807b",
+                "payload": "patient:pat:4e487c99807b"
+              }
+            ]
+          }
+        ],
+        "intake": [
+          {
+            "label": "Read",
+            "note": "One click: fetch the document, run the whole pipeline, land on its summary card. The same endpoint a paste uses — there is no separate demo path.",
+            "chips": [
+              {
+                "id": "intake-meridian",
+                "label": "insurer referral letter",
+                "title": "chit_01_meridian_referral.txt",
+                "payload": {
+                  "kind": "fixture",
+                  "name": "chit_01_meridian_referral.txt"
+                }
+              },
+              {
+                "id": "intake-mol",
+                "label": "government authorisation form",
+                "title": "chit_07_mol_authorisation_pee226.txt",
+                "payload": {
+                  "kind": "fixture",
+                  "name": "chit_07_mol_authorisation_pee226.txt"
+                }
+              },
+              {
+                "id": "intake-hr-email",
+                "label": "HR email",
+                "title": "chit_09_coralharbour_hr_email.eml",
+                "payload": {
+                  "kind": "fixture",
+                  "name": "chit_09_coralharbour_hr_email.eml"
+                }
+              }
+            ]
+          },
+          {
+            "label": "Refuses",
+            "note": "Uploads a file named like an identity-document scan. It is refused on the name, before a byte of it is parsed — the banner above is a mechanism, not a promise.",
+            "chips": [
+              {
+                "id": "intake-identity-refusal",
+                "label": "upload something named like an identity document",
+                "title": "posts nric_front.txt — refused by screen_upload before extraction",
+                "payload": {
+                  "kind": "identity-file",
+                  "filename": "nric_front.txt"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "demo_steps": [
+        {
+          "route": "/frontdesk",
+          "caption": "The operator queue — documents read before the patient reaches the counter.",
+          "ms": 8000
+        },
+        {
+          "route": "/intake",
+          "caption": "Any referring document: insurer letter, voucher, TPA form, HR email — or nothing at all.",
+          "ms": 8000
+        },
+        {
+          "route": "/brain",
+          "caption": "The pack graph: patients, insurers, packages and tests, built from the real data.",
+          "action": "load",
+          "ms": 9000
+        },
+        {
+          "caption": "Ask it anything. Every answer is cited — and it refuses to confirm anyone's identity.",
+          "action": "ask",
+          "ms": 10000
+        },
+        {
+          "caption": "Rewind: what did the graph know in May, before any of these referrals arrived?",
+          "action": "slider",
+          "ms": 9000
+        },
+        {
+          "caption": "Click any node for its receipts — the exact rows and spans it was built from.",
+          "action": "node",
+          "ms": 8000
+        },
+        {
+          "route": "/impact",
+          "caption": "~16 minutes of admin saved per patient — and zero claimed on identity, by design.",
+          "ms": 9000
+        },
+        {
+          "route": "/frontdesk",
+          "caption": "Every value traces to the characters it came from. Nothing commits without a human.",
+          "action": "finish",
+          "ms": 7000
+        }
+      ],
+      "graph_vocabulary": {
+        "node_kinds": {
+          "patient": {
+            "color": "#6f9fd8",
+            "label": "Patient"
+          },
+          "org": {
+            "color": "#9a86c4",
+            "label": "Org"
+          },
+          "package": {
+            "color": "#5fa98d",
+            "label": "Package"
+          },
+          "test": {
+            "color": "#c2a163",
+            "label": "Test"
+          },
+          "visit": {
+            "color": "#c088a4",
+            "label": "Visit"
+          },
+          "clinic": {
+            "color": "#63a3a3",
+            "label": "Clinic"
+          },
+          "coverage_rule": {
+            "color": "#c4827a",
+            "label": "Coverage rule"
+          },
+          "document": {
+            "color": "#7d8492",
+            "label": "Document",
+            "dim": true
+          }
+        },
+        "edge_labels": {
+          "includes_test": "includes",
+          "requests_test": "requests",
+          "authorises": "authorises",
+          "for_patient": "for patient",
+          "issued": "issued",
+          "references": "references",
+          "at_clinic": "at clinic"
+        }
+      },
+      "demo_focus_node": "org:meridian-life-assurance",
+      "demo_as_of": "2026-05-01T00:00:00Z",
+      "demo_question": "What does the WELL2 package include?",
+      "brain_suggested_fallback": [
+        "What does the WELL2 package include?",
+        "Which patients does Meridian Life Assurance cover?",
+        "Which intakes are waiting on an identity check?"
+      ]
+    },
+    {
+      "id": "finance",
+      "label": "Finance",
+      "tagline": "Credit memo drafting over a pinned core-banking adapter",
+      "available": false,
+      "unavailable_note": "Adapters land in Phase 3; the operator surfaces for this pack are not built. The platform surfaces below work against whichever pack is active.",
+      "nouns": {
+        "subject": "party",
+        "subject_plural": "parties",
+        "subject_title": "Party",
+        "org": "institution",
+        "org_plural": "institutions",
+        "org_title": "Institution",
+        "registry": "party registry",
+        "record": "institution record",
+        "graph": "counterparty graph",
+        "workspace": "Portfolio brain",
+        "counterparty": "counterparty",
+        "counterparty_plural": "counterparties",
+        "document": "originating document",
+        "determination": "credit determination",
+        "operator_surface": "Underwriting desk",
+        "operator_role": "underwriting desk",
+        "queue": "Queue",
+        "identifier": "legal entity identifier",
+        "pitch": "Reads a party's originating documents before an underwriter opens the file.",
+        "credential": "signature card",
+        "document_examples": "a facility letter, mandate or counterparty memo",
+        "subject_plural_title": "Parties"
+      },
+      "roster": [],
+      "surfaces": [],
+      "trials": {
+        "intelligence": [],
+        "evidence": [],
+        "intake": []
+      },
+      "demo_steps": [],
+      "graph_vocabulary": {
+        "node_kinds": {
+          "party": {
+            "color": "#6f9fd8",
+            "label": "Party"
+          },
+          "facility": {
+            "color": "#5fa98d",
+            "label": "Facility"
+          },
+          "obligation": {
+            "color": "#c4827a",
+            "label": "Obligation"
+          }
+        },
+        "edge_labels": {
+          "holds": "holds",
+          "guarantees": "guarantees",
+          "evidences": "evidences"
+        }
+      },
+      "demo_focus_node": "",
+      "demo_as_of": "",
+      "demo_question": "",
+      "brain_suggested_fallback": []
+    },
+    {
+      "id": "government",
+      "label": "Government",
+      "tagline": "Permit and benefit determinations over a T3 document drop",
+      "available": false,
+      "unavailable_note": "Adapters land in Phase 3; the operator surfaces for this pack are not built. The platform surfaces below work against whichever pack is active.",
+      "nouns": {
+        "subject": "applicant",
+        "subject_plural": "applicants",
+        "subject_title": "Applicant",
+        "org": "agency",
+        "org_plural": "agencies",
+        "org_title": "Agency",
+        "registry": "applicant registry",
+        "record": "agency record",
+        "graph": "case graph",
+        "workspace": "Case brain",
+        "counterparty": "issuing body",
+        "counterparty_plural": "issuing bodies",
+        "document": "supporting document",
+        "determination": "eligibility determination",
+        "operator_surface": "Case desk",
+        "operator_role": "case desk",
+        "queue": "Queue",
+        "identifier": "national identifier",
+        "pitch": "Reads an applicant's supporting documents before a caseworker opens the file.",
+        "credential": "benefit card",
+        "document_examples": "an application form, authorisation notice or agency letter",
+        "subject_plural_title": "Applicants"
+      },
+      "roster": [],
+      "surfaces": [],
+      "trials": {
+        "intelligence": [],
+        "evidence": [],
+        "intake": []
+      },
+      "demo_steps": [],
+      "graph_vocabulary": {
+        "node_kinds": {
+          "applicant": {
+            "color": "#6f9fd8",
+            "label": "Applicant"
+          },
+          "case": {
+            "color": "#5fa98d",
+            "label": "Case"
+          },
+          "permit": {
+            "color": "#c2a163",
+            "label": "Permit"
+          },
+          "case_event": { "color": "#ca7568", "label": "Case Event" },
+          "legacy_record": { "color": "#68ca92", "label": "Legacy Record" },
+          "address_point": { "color": "#ae68ca", "label": "Address Point" },
+          "payment": { "color": "#68adca", "label": "Payment" },
+          "parcel": { "color": "#ca688f", "label": "Parcel" },
+          "case_file": { "color": "#73ca68", "label": "Case File" },
+          "address": { "color": "#7a68ca", "label": "Address" },
+          "licence": { "color": "#68cab3", "label": "Licence" },
+          "person": { "color": "#ca68c5", "label": "Person" },
+          "application": { "color": "#a8ca68", "label": "Application" },
+          "determination": { "color": "#ca686f", "label": "Determination" },
+          "inspection": { "color": "#68ca7d", "label": "Inspection" },
+          "organisation": { "color": "#9b68ca", "label": "Organisation" },
+          "business_registration": { "color": "#68c0ca", "label": "Business Registration" },
+          "condition": { "color": "#ca68a4", "label": "Condition" },
+          "decision": { "color": "#87ca68", "label": "Decision" },
+          "review": { "color": "#686bca", "label": "Review" },
+          "photo": { "color": "#ca8268", "label": "Photo" },
+          "claim": { "color": "#68ca9e", "label": "Claim" },
+          "claimant": { "color": "#bb68ca", "label": "Claimant" },
+          "document": { "color": "#ca6884", "label": "Document" },
+          "message": { "color": "#68ca6a", "label": "Message" },
+          "officer": { "color": "#8568ca", "label": "Officer" },
+          "appeal": { "color": "#68cabf", "label": "Appeal" },
+          "statute": { "color": "#ca68b8", "label": "Statute" },
+          "permit_type": { "color": "#9cca68", "label": "Permit Type" },
+          "zoning_code": { "color": "#ca6d68", "label": "Zoning Code" },
+          "benefit_program": { "color": "#68ca8a", "label": "Benefit Program" },
+          "agency": { "color": "#a668ca", "label": "Agency" }
+        },
+        "edge_labels": {
+          "applies_for": "applies for",
+          "authorises": "authorises",
+          "evidences": "evidences",
+          "event_on": "event on",
+          "at_parcel": "at parcel",
+          "on_parcel": "on parcel",
+          "pays": "pays",
+          "part_of_case": "part of case",
+          "zoned": "zoned",
+          "resides_at": "resides at",
+          "decided_by": "decided by",
+          "decides": "decides",
+          "attached_to": "attached to",
+          "about_subject": "about subject",
+          "of_type": "of type",
+          "submitted": "submitted",
+          "licensed": "licensed",
+          "acts_as": "acts as",
+          "assigned_to": "assigned to",
+          "inspected_by": "inspected by",
+          "inspects": "inspects",
+          "registered_as": "registered as",
+          "claims_case_ref": "claims case ref",
+          "reviewed_by": "reviewed by",
+          "reviews": "reviews",
+          "grants": "grants",
+          "evidenced_by": "evidenced by",
+          "caseworked_by": "caseworked by",
+          "supersedes_determination": "supersedes determination",
+          "claims_agent_for": "claims agent for",
+          "reverses": "reverses",
+          "appeals": "appeals",
+          "references": "references",
+          "cites": "cites"
+        }
+      },
+      "demo_focus_node": "",
+      "demo_as_of": "",
+      "demo_question": "",
+      "brain_suggested_fallback": []
+    }
+  ]
+}

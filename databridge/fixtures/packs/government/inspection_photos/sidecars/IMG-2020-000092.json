@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2020-000092",
+  "filename": "IMG-2020-000092.jpg",
+  "image_present": false,
+  "captured_at": "2020-01-31T16:28:38+00:00",
+  "captured_by": "OFF-0040",
+  "inspection_id": "INS-2020-000608",
+  "application_id": "APP-2019-000751",
+  "parcel_id": "PCL-PG-00178",
+  "photo_batch_ref": "PHB-2020-000608",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-958905"
+  },
+  "image": {
+    "width": 2048,
+    "height": 1536,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 416514,
+    "northing": 1219818,
+    "accuracy_m": 11.4
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          861,
+          120,
+          352,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2020-700729",
+        "confidence": 0.844,
+        "bbox": [
+          388,
+          253,
+          594,
+          87
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "170 ROPEWALK CRESCENT, WEND HILL AM2 3VF",
+        "confidence": 0.705,
+        "bbox": [
+          696,
+          336,
+          1200,
+          82
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2020-01-31",
+        "confidence": 0.732,
+        "bbox": [
+          840,
+          462,
+          957,
+          50
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0040",
+        "confidence": 0.859,
+        "bbox": [
+          1598,
+          560,
+          352,
+          84
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

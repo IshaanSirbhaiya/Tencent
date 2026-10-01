@@ -15,7 +15,8 @@ import {
 import type { ActionCard as ActionCardData, ExecutionResult } from "@/lib/outbox-api";
 import { ActionCard } from "@/components/intelligence/action-card";
 import { TryChips } from "@/components/try-chips";
-import { INTELLIGENCE_TRIALS } from "@/components/try-prompts";
+import { usePackTrials } from "@/components/try-prompts";
+import { useNouns } from "@/lib/pack-context";
 
 /**
  * The request box — the whole point of this page.
@@ -59,6 +60,8 @@ export function ConsolePanel({
   onFigures: (analytics: ConsoleResponse["analytics"]) => void;
 }) {
   const { staff } = useStaffSession();
+  const nouns = useNouns();
+  const trials = usePackTrials("intelligence");
   const [request, setRequest] = React.useState("");
   const [intakeId, setIntakeId] = React.useState("");
   const [typedAddress, setTypedAddress] = React.useState("");
@@ -131,7 +134,7 @@ export function ConsolePanel({
               value={request}
               onChange={(e) => setRequest(e.target.value)}
               maxLength={500}
-              placeholder="Which issuers sent documents, and what is still blocked?"
+              placeholder={`What kinds of thing are in the graph? What are the neighbours of "…"?`}
               data-testid="console-input"
               className="w-full rounded border border-border bg-bg py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
             />
@@ -171,7 +174,7 @@ export function ConsolePanel({
           <input
             value={typedAddress}
             onChange={(e) => setTypedAddress(e.target.value)}
-            placeholder="or type an address, if a clinic rule asks a human to"
+            placeholder="or type an address, if a policy rule asks a human to"
             aria-label="An address a member of staff types"
             data-testid="console-typed-address"
             className="flex-1 rounded border border-border bg-bg px-2 py-1 text-2xs text-fg placeholder:text-subtle focus:border-accent focus:outline-none"
@@ -183,7 +186,7 @@ export function ConsolePanel({
             sharing a fixed-height panel with them, and the whole point of the row is that a visitor
             clicks one from each tier and sees three different behaviours out of one box. */}
         <TryChips
-          groups={INTELLIGENCE_TRIALS}
+          groups={trials}
           onPick={(chip) => run(chip.payload)}
           disabled={ask.isPending}
           testId="console-try-chips"
@@ -193,9 +196,9 @@ export function ConsolePanel({
         <p className="text-2xs text-subtle">
           Reading happens immediately. Anything that would act on the world becomes a{" "}
           <span className="text-fg">draft</span> a named person approves — the agent proposes and
-          performs nothing, which is what makes it safe enough to point at a clinic. Naming the
-          registration is required for that half: choosing which patient a message concerns is an
-          identity determination, and this system does not make one.
+          performs nothing, which is what makes it safe enough to point at a real operation. Naming
+          the registration is required for that half: choosing which {nouns.subject} a message
+          concerns is an identity determination, and this system does not make one.
         </p>
       </form>
 

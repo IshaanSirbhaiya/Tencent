@@ -1,0 +1,48 @@
+# SYNTHETIC - Walnut finance estate / source: spreadsheets
+# Sidecar describing what the workbook did before it was exported to CSV. The CSVs hold VALUES
+# ONLY: every formula, merged cell, hidden row and cell comment was lost in the export. This
+# sidecar is hand-maintained by the model owner and is therefore itself a T3 artefact that can
+# silently disagree with the CSVs.
+workbook: "Group Credit Risk Pack.xlsx"
+exported_at: "2026-08-01T18:20:00+08:00"
+exported_by: "credit-risk-ops"
+export_tool: "Save As > CSV (UTF-8), one sheet per file"
+
+sheets:
+  risk_model_pd_lgd:
+    file: risk_model_pd_lgd.csv
+    formulas:
+      ecl: "=pd_12m * lgd * ead"
+      pd_12m: "=VLOOKUP(borrower_name, 'PD Grid'!A:D, 4, FALSE)   # 'PD Grid' sheet was NOT exported"
+    hazards:
+      - "pd_12m is stored as TEXT with a trailing percent sign; a numeric read yields NULL."
+      - "ead is stored as TEXT with thousands separators."
+      - "override_flag='Y' rows have a HARDCODED ecl that does not satisfy the stated formula."
+      - "#DIV/0! and #REF! appear as literal strings in a numeric column."
+      - "model_owner_comment is free text and carries untrusted content."
+  exposure_summary_by_sector:
+    file: exposure_summary_by_sector.csv
+    formulas:
+      utilisation: "=drawn_total_sgd_equiv / limit_total_sgd_equiv"
+      rag: "=IF(utilisation>0.8,\"AMBER\",IF(utilisation<0.6,\"GREEN\",\"YELLOW\"))"
+    hazards:
+      - "The final TOTAL row was HIDDEN in the workbook and is still present in the export."
+      - "The header row was a merged cell across A1:G1 in the workbook; the merge is gone."
+      - "Amounts are 'SGD equivalent' converted at an undocumented rate on an undocumented date."
+  covenant_tracker:
+    file: covenant_tracker.csv
+    formulas:
+      headroom: "=last_observed - threshold"
+      status: "=IF(last_observed<threshold,\"BREACH\",\"OK\")"
+    hazards:
+      - "last_test_date_serial is an Excel 1900-system serial number, not a date."
+      - "The comparison assumes every covenant is a minimum; maximum-style covenants are wrong."
+  limit_utilisation:
+    file: limit_utilisation.csv
+    formulas: {}
+    hazards:
+      - "as_of_serial is an Excel 1900-system serial number (includes the 1900 leap-year bug)."
+
+pinning:
+  tier: T3
+  reason: "A drop of exported values. No version, no watermark, no delete detection."

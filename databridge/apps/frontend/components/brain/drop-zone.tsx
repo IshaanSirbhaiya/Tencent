@@ -1,65 +1,47 @@
 "use client";
 import * as React from "react";
-import { Upload, FileText, FileSignature, Loader2 } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { brainApi } from "@/lib/brain-api";
 import type { IngestResult } from "@/lib/brain-types";
 
-// Drag-and-drop ingest zone (above the graph). Dropping (or clicking a fixture) runs the REAL
-// grounded extraction + bi-temporal upsert on the backend and the new nodes animate into the graph.
+// Drag-and-drop ingest zone (above the graph). Dropping a file sends ITS text to `/brain/ingest`,
+// which runs the real grounded extraction + bi-temporal upsert; the new nodes then appear in the
+// graph.
 //
-// The quick-ingest button resolves to a source the gateway REGISTERS server-side; an unknown text
-// file is read client-side and sent inline. The three Acme fixtures that used to live here
-// (email_001.eml, meeting_001.txt, contract_001.pdf) were deleted with the rest of the Acme demo
-// in Phase 2 — leaving the buttons behind meant three visible controls on a linked page that
-// failed on click.
+// What this used to show, and why it no longer does (2026-10-01, ROADMAP §3 item 17):
+//   - a simulated upload bar (setInterval to 100%) and a 900 ms "thinking" pause — progress that
+//     measured nothing. The only honest states are "sending", "done" and "failed".
+//   - a hard-coded "Referral" chip that ingested `demo_sample.txt`, a source the gateway registers
+//     only when the clinic seed is opted in. The fixture stays on disk; it is no longer wired in.
+//   - a silent catch that fell back to idle. A failed ingest now says why.
 
-type Phase = "idle" | "uploading" | "extracting" | "done";
-
-const FIXTURES = [
-  // `demo_sample.txt` is the gateway's one registered ingest source (see `main.py` lifespan): the
-  // EV-INTAKE fixture text, which extracts a referral document, its issuer, its tests and the
-  // employer — and deliberately no patient.
-  { file: "demo_sample.txt", label: "Referral", icon: FileSignature },
-];
-const KNOWN = new Set(FIXTURES.map((f) => f.file));
+type Phase = "idle" | "sending" | "done" | "error";
 
 export function DropZone({ onIngested }: { onIngested: (r: IngestResult) => void }) {
   const [phase, setPhase] = React.useState<Phase>("idle");
-  const [progress, setProgress] = React.useState(0);
   const [active, setActive] = React.useState(false);
   const [current, setCurrent] = React.useState<string>("");
+  const [message, setMessage] = React.useState<string>("");
 
-  async function ingest(sourcePath: string, inlineText?: string | null) {
-    if (phase !== "idle") return;
+  async function ingest(sourcePath: string, inlineText: string) {
+    if (phase === "sending") return;
     setCurrent(sourcePath);
-    setPhase("uploading");
-    // simulated upload bar (~0.8s) then "extracting" (~1.2s) → ~2s total before nodes appear
-    setProgress(0);
-    await new Promise<void>((resolve) => {
-      let p = 0;
-      const id = setInterval(() => {
-        p += 12;
-        setProgress(Math.min(p, 100));
-        if (p >= 100) {
-          clearInterval(id);
-          resolve();
-        }
-      }, 90);
-    });
-    setPhase("extracting");
+    setMessage("");
+    setPhase("sending");
     try {
-      const res = await brainApi.ingest(sourcePath, inlineText ?? null);
-      await new Promise((r) => setTimeout(r, 900)); // let the spinner read as "thinking"
+      const res = (await brainApi.ingest(sourcePath, inlineText)) as IngestResult & {
+        refusal?: { code: string; message: string };
+      };
+      if (res.refusal) {
+        setPhase("error");
+        setMessage(`${res.refusal.code}: ${res.refusal.message}`);
+        return;
+      }
       setPhase("done");
-      if (!("refusal" in res)) onIngested(res as IngestResult);
-    } catch {
-      // fail quietly back to idle (gateway offline)
-    } finally {
-      setTimeout(() => {
-        setPhase("idle");
-        setProgress(0);
-        setCurrent("");
-      }, 1200);
+      onIngested(res);
+    } catch (e) {
+      setPhase("error");
+      setMessage(e instanceof Error ? e.message : "ingest failed (is the gateway running?)");
     }
   }
 
@@ -68,15 +50,19 @@ export function DropZone({ onIngested }: { onIngested: (r: IngestResult) => void
     setActive(false);
     const f = e.dataTransfer.files?.[0];
     if (!f) return;
-    if (KNOWN.has(f.name)) {
-      ingest(f.name); // registered fixture → deterministic server-side text
-    } else {
-      const text = await f.text().catch(() => "");
-      ingest(f.name, text); // unknown file → send its text inline
+    let text: string;
+    try {
+      text = await f.text();
+    } catch {
+      setCurrent(f.name);
+      setPhase("error");
+      setMessage(`could not read ${f.name} in the browser`);
+      return;
     }
+    ingest(f.name, text);
   }
 
-  const busy = phase === "uploading" || phase === "extracting";
+  const busy = phase === "sending";
 
   return (
     <div
@@ -100,41 +86,25 @@ export function DropZone({ onIngested }: { onIngested: (r: IngestResult) => void
           {phase === "idle" && (
             <>
               <div className="text-xs font-medium text-fg">Drop files here to add to the Company Brain</div>
-              <div className="text-2xs text-subtle">Supports PDF, DOCX, .eml, .txt, Slack export</div>
+              <div className="text-2xs text-subtle">The file is read as text in the browser (.txt, .eml, .md); binary formats are not parsed here</div>
             </>
           )}
-          {phase === "uploading" && (
-            <>
-              <div className="text-xs font-medium text-fg">Uploading {current}…</div>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-accent transition-all duration-100" style={{ width: `${progress}%` }} />
-              </div>
-            </>
-          )}
-          {phase === "extracting" && (
+          {phase === "sending" && (
             <div className="text-xs font-medium text-accent">Extracting entities from {current}…</div>
           )}
-          {phase === "done" && <div className="text-xs font-medium text-band-auto">Added to the brain ✓</div>}
+          {phase === "done" && (
+            <div className="text-xs font-medium text-band-auto">
+              {current} added to the brain ✓{" "}
+              <button onClick={() => setPhase("idle")} className="ml-2 text-2xs text-subtle underline">dismiss</button>
+            </div>
+          )}
+          {phase === "error" && (
+            <div className="text-xs font-medium text-band-review" role="alert">
+              Could not ingest {current}: {message}{" "}
+              <button onClick={() => setPhase("idle")} className="ml-2 text-2xs text-subtle underline">dismiss</button>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* quick-ingest the registered demo source */}
-      <div className="flex shrink-0 items-center gap-1.5">
-        {FIXTURES.map((f) => {
-          const Icon = f.icon;
-          return (
-            <button
-              key={f.file}
-              onClick={() => ingest(f.file)}
-              disabled={busy}
-              title={`Ingest ${f.file}`}
-              className="flex items-center gap-1.5 rounded border border-border bg-bg px-2 py-1 text-2xs text-subtle transition-colors hover:border-accent/40 hover:text-fg disabled:opacity-50"
-            >
-              <Icon className="h-3 w-3" />
-              {f.label}
-            </button>
-          );
-        })}
       </div>
     </div>
   );

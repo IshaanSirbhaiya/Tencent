@@ -37,11 +37,14 @@ export interface AuthorisedTest {
   as_printed: string;
   canonical: string | null;
   in_package: boolean;
+  /** Currency-neutral price; its currency is `billing.currency`. Optional: older gateways omit it. */
+  list_price?: string | null;
+  /** @deprecated currency baked into the name; read `list_price`. */
   list_price_sgd: string | null;
   source_field: string | null;
 }
 
-/** Something the clinic GRAPH knows that this document does not say.
+/** Something the GRAPH knows that this document does not say.
  *
  *  Kept separate from `reasoning` because the provenance differs in kind: `reasoning` traces this
  *  document against the config table, whereas a finding is the product of a traversal over other
@@ -74,10 +77,18 @@ export interface BillingDraft {
   billed_to: string;
   covered_items: Record<string, unknown>[];
   patient_payable_items: Record<string, unknown>[];
-  estimated_patient_payable_sgd: string | null;
+  /** ISO 4217 code the pack's rules table declares (SWEEP #15). null = none declared: show the
+   *  bare number, never a guessed unit. Optional because a gateway older than HC3 omits it. */
+  currency?: string | null;
+  /** The estimated total, currency-neutral. Read with `currency`. */
+  estimated_patient_payable?: string | null;
   // What DID price, when the total could not be completed. Named separately so it can never be
   // rendered as the amount owed.
-  known_subtotal_sgd: string | null;
+  known_subtotal?: string | null;
+  /** @deprecated currency baked into the name; read `estimated_patient_payable` + `currency`. */
+  estimated_patient_payable_sgd?: string | null;
+  /** @deprecated currency baked into the name; read `known_subtotal` + `currency`. */
+  known_subtotal_sgd?: string | null;
   tpa_claim_required: boolean;
   caveats: string[];
   /** Literal "draft". There is no other value. */
@@ -126,6 +137,10 @@ export interface ExtractionReport {
   regions: number;
   warnings: string[];
   loss_report: unknown[];
+  /** The field paths whose value describes a SELECTION on a checkbox form, when the gateway sends
+   *  them (the server's `extract.CHECKBOX_SENSITIVE`). Sent since HC3; optional because an older
+   *  gateway omits it, and then the report lists every unresolved field (the conservative notice). */
+  selection_paths?: string[];
 }
 
 export interface SummaryCard {
@@ -147,7 +162,15 @@ export interface SummaryCard {
   confirmation?: ConfirmationView;
   /** Only on a file upload. Absent for a paste — there was no extraction to report. */
   extraction?: ExtractionReport;
+  /** How the values were read (HC1, SWEEP #1). `true`: no extraction model is configured, so the
+   *  values were RECALLED from the bundled offline sample for a known fixture — not read from this
+   *  document. `false`: a live model read it. `null`/absent: the gateway did not record it. The
+   *  card must say which, visibly; see `ReadSourceBanner`. */
+  offline_gold?: boolean | null;
+  extraction_backend?: ExtractionBackend;
 }
+
+export type ExtractionBackend = "live" | "offline_gold" | "unrecorded";
 
 export interface QueueRow {
   intake_id: string;
@@ -159,6 +182,8 @@ export interface QueueRow {
   eligibility_flags: string[];
   committed: boolean;
   identity_verified: boolean;
+  /** As on `SummaryCard`: `true` means the row's values are an offline sample, not a live read. */
+  offline_gold?: boolean | null;
 }
 
 export interface EvidenceView {

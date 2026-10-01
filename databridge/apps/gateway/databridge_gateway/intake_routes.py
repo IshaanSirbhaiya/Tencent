@@ -1,4 +1,16 @@
-"""The ``/intake/*`` routes — the front-desk surface, and the confirmation gate.
+"""The **determination** routes — the front-desk surface, and the confirmation gate.
+
+Served at ``/determination/*``, and at ``/intake/*`` as an alias. The vertical name came first and
+the frontend, the e2e specs and every saved bookmark still use it, so the old prefix answers
+identically rather than being broken in the same change that generalises the engine — one handler
+object, two paths, so there is no second implementation to drift and a route added to one is a
+route added to both. ``/determination`` is the documented prefix (it is the one that appears in
+the OpenAPI schema); ``/intake`` is a compatibility alias.
+
+*Determination* is the domain-free word for what this surface does: read an artefact, resolve it
+against a registry, decide what it entitles the subject to, and refuse to commit any of it until
+a named human attests. A clinic calls that intake; a lender calls it underwriting; a benefits
+office calls it assessment. The mechanics are the product; the noun is a pack's.
 
 The route order tells the story the product tells: upload a document, read the card, click through
 to the evidence, **select a patient after checking their ID in person**, then confirm. Only the
@@ -31,10 +43,14 @@ import logging
 import threading
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 
+from .auth import install_auth_handler, require_principal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from databridge_intake.clock import deployment_today
+from databridge_intake.extract import CHECKBOX_SENSITIVE
 from databridge_intake.guardrails import check_question
 from databridge_intake.id_document_guard import (screen_extracted_text, screen_upload)
 from databridge_intake.ledger import (AlreadyCommitted, EvidenceLedger, IdentityNotVerified,
@@ -48,6 +64,99 @@ from databridge_intake.pipeline import evidence_for, run_intake, summary_card
 log = logging.getLogger("databridge.gateway.intake")
 
 MAX_DOCUMENT_CHARS = 200_000
+
+#: The platform's route prefix, and the vertical alias it grew out of. FIRST WINS for
+#: documentation: only the neutral prefix appears in the OpenAPI schema, so the alias cannot
+#: quietly become the name of the thing.
+DETERMINATION_PREFIX = "/determination"
+LEGACY_PREFIX = "/intake"
+ROUTE_PREFIXES = (DETERMINATION_PREFIX, LEGACY_PREFIX)
+
+
+#: INT1 (2026-10-01): every route in this module requires an authenticated principal — the gateway
+#: serves nothing anonymously except `/health` (`test_every_route_on_the_app_is_gated`).
+_AUTH = [Depends(require_principal)]
+
+
+def subject_id_fields() -> tuple[str, ...]:
+    """The payload keys that may carry a subject's registry id, READ FROM THE ACTIVE PACK.
+
+    ``patient_id`` is not written down here. The enabled packs declare their subject kinds
+    (spine D4b), and the wire name for each is ``f"{kind}_id"`` — so the healthcare pack's
+    ``patient`` kind is what makes ``patient_id`` an accepted field, and binding a different pack
+    accepts that pack's noun instead. ``subject_id`` is always accepted as the neutral spelling.
+
+    A key no pack declares is REFUSED rather than ignored: a client that sends ``customer_id`` to
+    a deployment with no such subject kind has misunderstood something, and silently dropping the
+    field would turn that into "no id supplied" — which on this surface means selecting nobody,
+    quietly.
+
+    Computed per call: the deployment binding is rebindable, and a tuple frozen at import time
+    would answer for whichever packs happened to be bound when this module was first imported.
+    """
+    from databridge_graph.packs import active_vocabulary
+
+    return tuple(sorted(f"{kind}_id" for kind in active_vocabulary().subject_kinds))
+
+
+#: The file a pack ships, beside its ``ontology.yaml``, naming the gateway route groups it needs.
+ROUTES_FILENAME = "gateway_routes.yaml"
+
+#: The route groups a pack may declare. Closed: an unknown name is a typo or a route this gateway
+#: does not have, and either way booting quietly without it would hide the mistake.
+ROUTE_GROUPS = frozenset({"determination", "outbox"})
+
+
+class PackRoutesError(RuntimeError):
+    """A pack's ``gateway_routes.yaml`` is malformed or names an unknown route group."""
+
+
+def pack_declared_routes() -> frozenset[str]:
+    """The route groups the BOUND packs declare (HC1, 2026-10-01; SWEEP hardcode audit #10).
+
+    ``/intake`` and ``/outbox`` used to be registered for every deployment, so a finance or
+    workspace binding served one vertical's refusal copy from routes it had no use for. Now a group
+    is mounted only when a pack the deployment binds declares it. Read through the graph loader's
+    ``configured_packs`` so an in-process ``deployment(...)`` binding is honoured too. Computed
+    from the deployment, never from a pack's name.
+    """
+    import yaml
+    from databridge_graph.packs import configured_packs, packs_root
+
+    root = packs_root()
+    declared: set[str] = set()
+    for name in configured_packs(root):
+        path = root / name / ROUTES_FILENAME
+        if not path.is_file():
+            continue
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        routes = data.get("routes") if isinstance(data, dict) else None
+        if not isinstance(routes, list) or not all(isinstance(r, str) for r in routes):
+            raise PackRoutesError(f"{path}: `routes` must be a list of route-group names")
+        unknown = sorted(set(routes) - ROUTE_GROUPS)
+        if unknown:
+            raise PackRoutesError(f"{path}: unknown route group(s) {unknown}; known: "
+                                  f"{sorted(ROUTE_GROUPS)}")
+        declared.update(routes)
+    return frozenset(declared)
+
+
+def _pack_noun(key: str, neutral: str) -> str:
+    """A noun from the active pack's ``ui.yaml`` (``nouns``), for refusal copy (HC1).
+
+    The wording used to name one country's identity documents in code. ``neutral`` is what the
+    sentence says when the pack declares no such noun — a plain word, never another pack's term.
+    """
+    import yaml
+
+    try:
+        from databridge_intake.pack import pack_dir
+
+        data = yaml.safe_load((pack_dir() / "ui.yaml").read_text(encoding="utf-8")) or {}
+        value = str(((data.get("nouns") or {}).get(key)) or "").strip()
+    except Exception:                                                # noqa: BLE001
+        value = ""
+    return value or neutral
 
 
 def _refusal(code: str, message: str, status: int = 422) -> JSONResponse:
@@ -70,12 +179,63 @@ class IntakeUploadRequest(BaseModel):
 STAFF_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,63}$"
 
 
-class SelectPatientRequest(BaseModel):
-    patient_id: str = Field(min_length=1)
+class SelectSubjectRequest(BaseModel):
+    """The candidate a human picked, after checking their identity in person.
+
+    The subject id may arrive as ``subject_id`` (the neutral spelling) or under the wire name the
+    active pack declares for its subject kind — ``patient_id`` under the healthcare pack. Exactly
+    one of them, and the alias is resolved through `subject_id_fields()`, so it is the pack that
+    decides which nouns this endpoint answers to rather than this file.
+
+    Nothing about the gate moved. ``attested_in_person`` is still a required, explicit boolean and
+    still defaults to the refusing value.
+    """
+
+    # `extra="allow"` so a pack-declared alias reaches the validator at all; the validator then
+    # REFUSES every extra key it does not recognise, which is `extra="forbid"` with one
+    # pack-computed exception rather than an open door.
+    model_config = ConfigDict(extra="allow")
+
+    subject_id: Optional[str] = Field(default=None, min_length=1)
     staff_id: str = Field(pattern=STAFF_ID_PATTERN)
     # Not inferred from `staff_id` being present: a client that forgets the attestation must get a
     # refusal, not a default that happens to be permissive.
     attested_in_person: bool = False
+
+    @model_validator(mode="after")
+    def _exactly_one_subject_id(self) -> "SelectSubjectRequest":
+        aliases = subject_id_fields()
+        extra = dict(self.model_extra or {})
+        unknown = sorted(k for k in extra if k not in aliases)
+        if unknown:
+            raise ValueError(
+                f"unknown field(s) {unknown}: a subject id must be sent as 'subject_id' or as "
+                f"one of {list(aliases)}, the wire names the enabled packs declare")
+        supplied = {k: v for k, v in extra.items() if v not in (None, "")}
+        if self.subject_id and supplied:
+            raise ValueError(
+                f"send the subject id once: both 'subject_id' and {sorted(supplied)} were given")
+        if not self.subject_id:
+            if len(supplied) > 1:
+                raise ValueError(f"send the subject id once: {sorted(supplied)} were all given")
+            if not supplied:
+                raise ValueError(
+                    f"a subject id is required, as 'subject_id' or as one of {list(aliases)}")
+            value = str(next(iter(supplied.values()))).strip()
+            if not value:
+                raise ValueError("the subject id is empty")
+            self.subject_id = value
+        return self
+
+    @property
+    def patient_id(self) -> str:
+        """Back-compatible read for call sites written against the vertical's noun."""
+        return self.subject_id or ""
+
+
+#: The name this model had while the surface was a clinic's. Kept as an alias so the rename is
+#: invisible to anything importing it.
+SelectPatientRequest = SelectSubjectRequest
 
 
 class ConfirmRequest(BaseModel):
@@ -85,7 +245,36 @@ class ConfirmRequest(BaseModel):
 
 
 def _register_intake_routes(app: FastAPI) -> None:
-    """Attach the intake surface. State lives on ``app.state`` so tests can inspect it."""
+    """Attach the determination surface under BOTH prefixes. State lives on ``app.state``.
+
+    Only when a bound pack declares the ``determination`` route group (`pack_declared_routes`).
+    Otherwise nothing is mounted and ``app.state.intakes`` stays unset — every reader of it
+    already treats a missing queue as "no intake surface in this deployment".
+    """
+    if "determination" not in pack_declared_routes():
+        log.info("no bound pack declares the determination routes; /intake is not mounted")
+        return
+    install_auth_handler(app)
+
+    def _route(method: str, suffix: str, *, documented: bool = True, **kw):
+        """Register one handler at ``/determination<suffix>`` AND at ``/intake<suffix>``.
+
+        Registration order within each prefix is preserved, which is load-bearing: ``/fixtures``
+        must be declared before ``/{intake_id}`` or the literal path would be swallowed by the
+        parameter.
+
+        ``documented=False`` for a suffix that is itself a compatibility spelling, so the schema
+        describes one name per operation and a vertical noun cannot arrive on the neutral prefix
+        as though it were the platform's word for the thing.
+        """
+        def register(fn):
+            for i, prefix in enumerate(ROUTE_PREFIXES):
+                getattr(app, method)(prefix + suffix,
+                                     include_in_schema=documented and i == 0,
+                                     dependencies=_AUTH, **kw)(fn)
+            return fn
+        return register
+
     # intake_id → {"draft": IntakeDraft, "text": str, "media": MediaIndex | None}. `text` is the
     # ONE extraction of the document and `media` indexes into those exact offsets, so the two are
     # stored and re-read as a pair — see `_ingest`.
@@ -117,38 +306,120 @@ def _register_intake_routes(app: FastAPI) -> None:
 
             return GraphClinicHistory(brain.store)
         except Exception:                                            # noqa: BLE001
-            log.exception("clinic history unavailable; continuing without it")
+            log.exception("subject history unavailable; continuing without it")
             return NoHistory()
 
-    def _extraction_harness():
-        """The live model for document extraction, or ``None`` to keep the gold backend.
+    class _LiveModelUnavailable(Exception):
+        """A model is configured for extraction and could not be used. Refused, never papered over."""
 
-        `run_intake` defaults to `gold_harness()`, which answers the ten chit fixtures from a
-        marker table and returns an EMPTY draft for anything else. Correct for the library and for
-        an offline demo; wrong here, because this route is the only caller whose job is a document
-        it has never seen. Until review caught it, no call site passed a harness at all — so a
-        judge pasting their own referral letter got a silently blank card while `/health` cheerfully
-        reported a live model.
+    def _extraction_backend():
+        """``(harness, offline_gold)`` for one document read, or raise ``_LiveModelUnavailable``.
 
-        Composed here for the same reason `_history()` is: `packages/intake` stays deterministic and
-        offline by default, and the application decides what it can reach.
+        HC1 (2026-10-01, SWEEP hardcode audit #1). The gold backend is an input→answer table keyed
+        on fixture markers (`databridge_intake.gold`): it RECALLS a reading, it does not compute
+        one. It is therefore allowed here in exactly one situation — no model is configured at all
+        (no provider key, or ``DATABRIDGE_FORCE_GOLD=1``, which `detect_llm` treats as "no key") —
+        and the card then carries ``offline_gold: true`` so nobody mistakes it for a reading.
 
-        `DATABRIDGE_FORCE_GOLD=1` pins the gold backend even when a key is present. The e2e suite
-        sets it, because `CLAUDE.md` requires that no test depend on a live model.
+        Everything else is a refusal, mirroring ``/brain/ingest``'s ``NO_EXTRACTION_MODEL``:
+
+        * building the configured harness throws → ``LIVE_MODEL_UNAVAILABLE``. This used to log
+          and return ``None``, which silently handed the document to the gold table;
+        * a provider key is set but no extraction route is reachable → the same refusal, naming
+          the routing reason. A deployment that configured a model expects that model.
+
+        ``DATABRIDGE_FORCE_GOLD=1`` still pins gold: the e2e suite sets it because ``CLAUDE.md``
+        requires that no test depend on a live model, and it is labelled like any other gold read.
         """
         import os
 
-        if os.getenv("DATABRIDGE_FORCE_GOLD") == "1":
-            return None
-        try:
-            from .llm import build_extraction_harness, detect_llm
+        from databridge_intake.gold import gold_harness
 
-            return build_extraction_harness(detect_llm())
-        except Exception:                                            # noqa: BLE001
-            # An unreachable model must degrade to the deterministic backend, never 500 the
-            # counter. The card then shows an unread document, which is a visible state.
-            log.exception("live extraction harness unavailable; using the gold backend")
-            return None
+        from . import llm as gateway_llm
+
+        if os.getenv("DATABRIDGE_FORCE_GOLD") == "1":
+            return gold_harness(), True
+        try:
+            detected = gateway_llm.detect_llm()
+            harness = gateway_llm.build_extraction_harness(detected)
+        except Exception as exc:                                     # noqa: BLE001
+            log.exception("the configured extraction model could not be built")
+            raise _LiveModelUnavailable(
+                "a model is configured for document extraction but could not be started "
+                f"({type(exc).__name__}). The document was not read; nothing was queued. "
+                "Check the gateway log and /health.") from None
+        if harness is not None:
+            return harness, False
+        keyed = [env for env in gateway_llm._PROVIDER_KEY_ENV.values() if os.getenv(env)]
+        if keyed:
+            reasons = sorted({str(r.get("reason")) for r in (detected.get("routing") or {}).values()
+                              if r.get("effective") is None})
+            raise _LiveModelUnavailable(
+                f"{', '.join(sorted(keyed))} is set but no extraction model is reachable"
+                + (f" ({'; '.join(reasons)})" if reasons else "")
+                + ". The document was not read; nothing was queued.")
+        return gold_harness(), True
+
+    def _backend_or_refusal():
+        try:
+            return _extraction_backend(), None
+        except _LiveModelUnavailable as exc:
+            return (None, None), _refusal("LIVE_MODEL_UNAVAILABLE", str(exc), status=503)
+
+    def _label(card: dict, offline_gold: Optional[bool]) -> dict:
+        """Say on the card how it was read. ``offline_gold`` is the label the UI must show.
+
+        ``None`` means the entry was queued by something other than ``_ingest`` (a test, a seed)
+        and nobody recorded how it was read — reported as such, never guessed to be live.
+        """
+        card["offline_gold"] = offline_gold
+        card["extraction_backend"] = ("unrecorded" if offline_gold is None
+                                      else "offline_gold" if offline_gold else "live")
+        return _currency_neutral(card)
+
+    def _currency_neutral(card: dict) -> dict:
+        """SWEEP #15 (HC3): say the currency, and name every amount without it.
+
+        `billing.currency` is read from the active pack's `coverage_rules.yaml` and cited by a
+        pointer to that key. Every key that ends in `_<currency>` under `billing` and
+        `coverage.authorised_tests` gets a currency-neutral alias with the same value, including
+        the pointer under `field_sources`. The suffix is computed from the declared currency, so
+        no currency is written here. If the table declares none, `currency` is null and no alias
+        is made.
+
+        DEPRECATED: the `_<currency>` keys (`estimated_patient_payable_sgd`, `known_subtotal_sgd`,
+        `list_price_sgd`) are still sent for one release so older clients keep working. New
+        readers use the neutral key plus `currency`.
+        """
+        from databridge_core import SourcePointer
+        from databridge_intake.billing import RULES_SOURCE_ID
+        from databridge_intake.rules import rules
+
+        billing = card.get("billing")
+        if not isinstance(billing, dict):
+            return card
+        currency = rules().currency
+        billing["currency"] = currency
+        if currency is None:
+            return card
+        billing.setdefault("field_sources", {})["currency"] = SourcePointer(
+            source_id=RULES_SOURCE_ID, kind="table_cell", table="coverage_rules",
+            column="currency", row_id="currency").model_dump(mode="json")
+        suffix = "_" + currency.lower()
+
+        def alias(node) -> None:
+            if isinstance(node, dict):
+                for key in list(node):
+                    alias(node[key])
+                    if isinstance(key, str) and key.endswith(suffix) and len(key) > len(suffix):
+                        node.setdefault(key[: -len(suffix)], node[key])
+            elif isinstance(node, list):
+                for item in node:
+                    alias(item)
+
+        alias(billing)
+        alias((card.get("coverage") or {}).get("authorised_tests"))
+        return card
 
     def _ingest(text: str, *, document_id: str, channel: str, media_type: str, media=None):
         """Read one document into the queue and return its card, or a refusal.
@@ -164,10 +435,13 @@ def _register_intake_routes(app: FastAPI) -> None:
         if len(text) > MAX_DOCUMENT_CHARS:
             return _refusal("DOCUMENT_TOO_LARGE",
                             f"document exceeds {MAX_DOCUMENT_CHARS} characters")
+        (harness, offline_gold), refused = _backend_or_refusal()
+        if refused is not None:
+            return refused
         try:
             draft = run_intake(text, document_id=document_id, channel=channel,
                                media_type=media_type, history=_history(),
-                               harness=_extraction_harness(), media=media)
+                               harness=harness, media=media, today=deployment_today())
         except Exception:                                            # noqa: BLE001
             # Logged in full server-side; the RESPONSE carries only a stable code and the exception
             # type. A raw exception message can quote document content back to the caller.
@@ -200,14 +474,14 @@ def _register_intake_routes(app: FastAPI) -> None:
                 if selected is None:
                     return _refusal(
                         "SELECTION_NO_LONGER_A_CANDIDATE",
-                        "this document was re-read and the previously selected patient is no "
+                        "this document was re-read and the previously selected subject is no "
                         "longer among its candidates; start a new intake")
                 try:
                     draft = run_intake(
                         text, document_id=document_id, channel=channel,
                         media_type=media_type, intake_id=draft.intake_id,
                         confirmation=existing, selected_patient=selected, history=_history(),
-                        harness=_extraction_harness(), media=media)
+                        harness=harness, media=media, today=deployment_today())
                 except Exception:                                    # noqa: BLE001
                     # Guarded like the first call: a bare raise here would 500 and could quote
                     # document content back to the caller.
@@ -245,16 +519,17 @@ def _register_intake_routes(app: FastAPI) -> None:
             # many times a file was dropped.
             app.state.confirmations.setdefault(
                 draft.intake_id, ConfirmationState(intake_id=draft.intake_id))
-            app.state.intakes[draft.intake_id] = {"draft": draft, "text": text, "media": media}
-        return summary_card(draft)
+            app.state.intakes[draft.intake_id] = {"draft": draft, "text": text, "media": media,
+                                                  "offline_gold": offline_gold}
+        return _label(summary_card(draft), offline_gold)
 
-    @app.post("/intake/upload")
+    @_route("post", "/upload")
     def intake_upload(req: IntakeUploadRequest):
         """Run the pipeline and return the DRAFT. Nothing is committed."""
         return _ingest(req.text, document_id=req.document_id, channel=req.channel,
                        media_type=req.media_type)
 
-    @app.post("/intake/upload-file")
+    @_route("post", "/upload-file")
     def intake_upload_file(file: UploadFile = File(...),
                            document_id: Optional[str] = Form(None),
                            channel: str = Form("upload")):
@@ -345,10 +620,14 @@ def _register_intake_routes(app: FastAPI) -> None:
             "regions": len(extraction.media.regions),
             "warnings": list(extraction.warnings),
             "loss_report": extraction.meta.get("loss_report", []),
+            # SWEEP #16 (HC3): which field paths describe a tick-box SELECTION. This is the same
+            # set the grounding step masks unticked options for, so the UI's "take these from
+            # the original" notice and the masking cannot drift apart.
+            "selection_paths": sorted(CHECKBOX_SENSITIVE),
         }
         return card
 
-    @app.get("/intake/fixtures")
+    @_route("get", "/fixtures")
     def intake_fixtures():
         """The demo corpus, by name. An ALLOW-LIST derived from the fixtures directory — this
         never opens a path the client supplies, for the same reason `brain_ingest` does not."""
@@ -357,7 +636,7 @@ def _register_intake_routes(app: FastAPI) -> None:
         chits = sorted(p.name for p in (fixtures_dir() / "chits").glob("*"))
         return {"fixtures": chits}
 
-    @app.get("/intake/fixtures/{name}")
+    @_route("get", "/fixtures/{name}")
     def intake_fixture_text(name: str):
         from databridge_intake.paths import fixtures_dir
 
@@ -368,7 +647,7 @@ def _register_intake_routes(app: FastAPI) -> None:
             return _refusal("UNKNOWN_FIXTURE", f"no such fixture '{name}'", status=404)
         return {"document_id": name, "text": path.read_text(encoding="utf-8")}
 
-    @app.get("/intake")
+    @_route("get", "")
     def intake_queue():
         """The front-desk queue: every intake awaiting the counter."""
         out = []
@@ -387,6 +666,7 @@ def _register_intake_routes(app: FastAPI) -> None:
                 "coverage_status": draft.coverage.status.value,
                 "eligibility_flags": draft.coverage.eligibility_flags,
                 "committed": state.committed,
+                "offline_gold": held.get("offline_gold"),
                 # NOT `bool(identity_checked_in_person_by)`. That reports an attestation made
                 # about a previous reading of this document as verification of the draft now in
                 # the queue — the same stale join R-22 found on `/intelligence`.
@@ -395,12 +675,12 @@ def _register_intake_routes(app: FastAPI) -> None:
             })
         return {"intakes": out}
 
-    @app.get("/intake/{intake_id}")
+    @_route("get", "/{intake_id}")
     def intake_card(intake_id: str):
         held = _get(intake_id)
         if held is None:
             return _refusal("UNKNOWN_INTAKE", f"no such intake '{intake_id}'", status=404)
-        card = summary_card(held["draft"])
+        card = _label(summary_card(held["draft"]), held.get("offline_gold"))
         state = app.state.confirmations.get(intake_id) or ConfirmationState(intake_id=intake_id)
         # `is_ready_to_commit()` asks whether the STATE is complete; this asks whether it is
         # complete *about this draft*. A re-upload re-reads the document and deliberately keeps
@@ -412,6 +692,8 @@ def _register_intake_routes(app: FastAPI) -> None:
             "identity_checked_in_person_by": state.identity_checked_in_person_by,
             "identity_checked_at": (state.identity_checked_at.isoformat()
                                     if state.identity_checked_at else None),
+            # One value, two spellings — the platform's and the one already on the wire.
+            "selected_subject_id": state.selected_patient_id,
             "selected_patient_id": state.selected_patient_id,
             "committed": state.committed,
             "ready_to_commit": applies,
@@ -419,7 +701,7 @@ def _register_intake_routes(app: FastAPI) -> None:
         }
         return card
 
-    @app.get("/intake/{intake_id}/evidence/{field_path:path}")
+    @_route("get", "/{intake_id}/evidence/{field_path:path}")
     def intake_evidence(intake_id: str, field_path: str):
         """The click-through: the pointer behind a value, plus the source span it names."""
         held = _get(intake_id)
@@ -431,8 +713,9 @@ def _register_intake_routes(app: FastAPI) -> None:
                             f"'{field_path}' is not a value this document carries", status=404)
         return found
 
-    @app.post("/intake/{intake_id}/select-patient")
-    def intake_select_patient(intake_id: str, req: SelectPatientRequest):
+    @_route("post", "/{intake_id}/select-subject")
+    @_route("post", "/{intake_id}/select-patient", documented=False)
+    def intake_select_subject(intake_id: str, req: SelectSubjectRequest):
         """Record the candidate a HUMAN picked, after they checked the ID in person."""
         held = _get(intake_id)
         if held is None:
@@ -440,8 +723,9 @@ def _register_intake_routes(app: FastAPI) -> None:
         if not req.attested_in_person:
             return _refusal(
                 "IDENTITY_NOT_VERIFIED",
-                "selecting a patient requires an explicit in-person identity attestation: staff "
-                "check NRIC/FIN/passport against the person. The system never confirms identity.")
+                f"selecting a {_pack_noun('subject', 'subject')} requires an explicit in-person "
+                f"identity attestation: staff check the {_pack_noun('identifier', 'identity document')} "
+                "against the person. The system never confirms identity.")
         draft = held["draft"]
         known = {c.patient_id for c in draft.resolution.candidates}
         if req.patient_id not in known:
@@ -493,6 +777,9 @@ def _register_intake_routes(app: FastAPI) -> None:
         # Outside the lock: the pipeline re-run can be a live model call.
         if True:
             draft, selected, state = pending_rerun
+            (harness, offline_gold), refused = _backend_or_refusal()
+            if refused is not None:
+                return refused
             try:
                 rerun = run_intake(
                     held["text"], document_id=draft.record.document.document_id,
@@ -504,7 +791,7 @@ def _register_intake_routes(app: FastAPI) -> None:
                     media_type=draft.record.document.media_type,
                     received_at=draft.record.document.received_at,
                     intake_id=draft.intake_id, confirmation=state, selected_patient=selected,
-                    history=_history(), harness=_extraction_harness(),
+                    history=_history(), harness=harness, today=deployment_today(),
                     # The stored index belongs to the stored text. Re-running without it would
                     # rebuild every pointer without its `ocr_bbox` child, so selecting a patient
                     # would silently strip the scan regions off an uploaded document's evidence.
@@ -513,7 +800,7 @@ def _register_intake_routes(app: FastAPI) -> None:
                 log.exception("pipeline re-run failed after selection for intake_id=%r", intake_id)
                 return _refusal(
                     "SELECTION_FAILED",
-                    "the patient was not selected: re-reading this document against that "
+                    "the subject was not selected: re-reading this document against that "
                     "registry record failed. Nothing has been recorded.")
             with app.state.intake_lock:
                 # COMPARE-AND-SWAP. The pipeline re-run above happens OUTSIDE the lock (it can be a
@@ -538,7 +825,7 @@ def _register_intake_routes(app: FastAPI) -> None:
                     return _refusal(
                         "INTAKE_CHANGED",
                         "this intake changed while the document was being re-read — someone else "
-                        "selected a patient or re-uploaded it. Nothing has been changed. Reload "
+                        "selected a subject or re-uploaded it. Nothing has been changed. Reload "
                         "the card and try again.", status=409)
                 # The re-run above re-extracts the document, so its resolution can differ from the
                 # one the human was shown a moment ago — a live model is not bit-identical run to
@@ -559,15 +846,22 @@ def _register_intake_routes(app: FastAPI) -> None:
                 # pre-selection record, which is exactly the divergence this re-run exists to stop.
                 app.state.confirmations[intake_id] = state
                 app.state.intakes[intake_id] = {"draft": rerun, "text": held["text"],
-                                                "media": held.get("media")}
+                                                "media": held.get("media"),
+                                                "offline_gold": offline_gold}
                 held = app.state.intakes[intake_id]
 
-        return {"intake_id": intake_id, "selected_patient_id": state.selected_patient_id,
+        # Both spellings. `selected_subject_id` is the platform's; `selected_patient_id` is what
+        # the frontend and the e2e specs read, and it is the SAME value — not a second field that
+        # could ever disagree about who was selected.
+        return {"intake_id": intake_id,
+                "selected_subject_id": state.selected_patient_id,
+                "selected_patient_id": state.selected_patient_id,
                 "identity_checked_in_person_by": state.identity_checked_in_person_by,
                 "ready_to_commit": state.is_ready_to_commit()[0],
-                "questionnaire_prefilled": held["draft"].questionnaire.prefilled_count}
+                "questionnaire_prefilled": held["draft"].questionnaire.prefilled_count,
+                "offline_gold": held.get("offline_gold")}
 
-    @app.post("/intake/{intake_id}/confirm")
+    @_route("post", "/{intake_id}/confirm")
     def intake_confirm(intake_id: str, req: ConfirmRequest):
         """**The gate.** Writes to the append-only evidence ledger, or refuses."""
         if _get(intake_id) is None:
@@ -643,7 +937,7 @@ def _register_intake_routes(app: FastAPI) -> None:
                 "ledger_rows_before": before,
                 "ledger_rows_after": app.state.ledger.count(intake_id)}
 
-    @app.get("/intake/{intake_id}/ledger")
+    @_route("get", "/{intake_id}/ledger")
     def intake_ledger(intake_id: str):
         """What was actually committed, with each row's provenance."""
         if _get(intake_id) is None:
@@ -659,7 +953,7 @@ def _register_intake_routes(app: FastAPI) -> None:
             "pointer": app.state.ledger.pointer_of(r).model_dump(mode="json", exclude_none=True),
         } for r in rows]}
 
-    @app.get("/intake/{intake_id}/claim-draft")
+    @_route("get", "/{intake_id}/claim-draft")
     def intake_claim_draft(intake_id: str):
         """The post-visit TPA claim draft — the single largest time sink after document reading.
 
@@ -698,7 +992,7 @@ def _register_intake_routes(app: FastAPI) -> None:
             return _refusal("AMBIGUOUS_PACKAGE_RULE", str(exc))
         return claim.to_payload()
 
-    @app.get("/impact")
+    @app.get("/impact", dependencies=_AUTH)
     def impact():
         """Time saved, measured over the intakes actually in the queue.
 
@@ -741,9 +1035,22 @@ def _register_intake_routes(app: FastAPI) -> None:
             },
             "measured": agg.model_dump(mode="json"),
             "per_intake": [m.model_dump(mode="json") for m in measured],
+            # HC1 (2026-10-01, SWEEP UNSURE → VIOLATION): the aggregate sits under "measured", but
+            # each saving is `baseline_min - with_copilot_min`, and `with_copilot_min` is an
+            # ESTIMATE in the pack's time_baseline.yaml — nothing times a counter. What IS measured
+            # is which stages completed for which intakes. Say so on the wire, so no consumer can
+            # present the minutes as a stopwatch reading. (The key name stays for compatibility.)
+            "saving_basis": {
+                "minutes": "estimate",
+                "stages_completed": "measured",
+                "source": "time_baseline.yaml: with_copilot_min per step",
+                "note": ("Minutes saved are the configured baseline minus an ESTIMATE of each "
+                         "step's time with this system, counted only for stages that actually "
+                         "completed on the intakes in the queue. No counter time was measured."),
+            },
         }
 
-    @app.get("/brain/suggested")
+    @app.get("/brain/suggested", dependencies=_AUTH)
     def brain_suggested():
         """Suggested questions from `assistant.yaml`, so the demo's prompts are config rather than
         strings compiled into the frontend bundle."""
@@ -752,7 +1059,7 @@ def _register_intake_routes(app: FastAPI) -> None:
         config = assistant_config()
         return {"questions": config.suggested_questions, "scope_note": config.scope_note}
 
-    @app.post("/brain/screen")
+    @app.post("/brain/screen", dependencies=_AUTH)
     def brain_screen(payload: dict):
         """Expose the deterministic guardrail on its own, so the UI can grey out the ask box
         before a question is sent rather than after it is refused."""

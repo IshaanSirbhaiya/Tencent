@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2019-000209",
+  "filename": "IMG-2019-000209.jpg",
+  "image_present": false,
+  "captured_at": "2019-04-04T14:38:44+00:00",
+  "captured_by": "OFF-0034",
+  "inspection_id": "INS-2019-000481",
+  "application_id": "APP-2018-000615",
+  "parcel_id": "PCL-MB-01010",
+  "photo_batch_ref": "PHB-2019-000481",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-363709"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 1
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 418225,
+    "northing": 1216091,
+    "accuracy_m": 13.5
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          625,
+          120,
+          374,
+          71
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2019-651738",
+        "confidence": 0.906,
+        "bbox": [
+          1197,
+          221,
+          648,
+          86
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "156B WINDLASS ROAD, MIREBROOK AM5 1TL",
+        "confidence": 0.897,
+        "bbox": [
+          112,
+          406,
+          999,
+          92
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2019-04-04",
+        "confidence": 0.723,
+        "bbox": [
+          2036,
+          441,
+          638,
+          59
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0034",
+        "confidence": 0.832,
+        "bbox": [
+          2008,
+          532,
+          464,
+          81
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

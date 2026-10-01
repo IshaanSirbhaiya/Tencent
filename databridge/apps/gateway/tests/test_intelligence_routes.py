@@ -1,4 +1,9 @@
-"""`/intelligence` — the Business Intelligence surface (T-42/T-43).
+"""`/intelligence` — the Business Intelligence surface (T-42/T-43), under the HEALTHCARE pack.
+
+This file is the healthcare-bound fixture for the generic surface: the clinic seed is loaded into
+an in-memory store explicitly (`BrainTools.load_seed()` — the gateway itself only loads it when
+`WALNUT_LOAD_CLINIC_SEED=1`), and the generic figures are asserted to still say what the clinical
+ones said. `test_intelligence_generic.py` covers the same surface under a synthetic pack.
 
 The router is mounted onto a bare app here rather than exercised through `create_app()`. That is
 deliberate and it is the point of the test: `/intelligence` must not depend on the demo state the
@@ -26,6 +31,8 @@ from fastapi.testclient import TestClient
 from databridge_gateway.intake_routes import _register_intake_routes
 from databridge_gateway.intelligence_routes import _register_intelligence_routes
 
+from conftest import AUTH_HEADERS
+
 
 def _brain():
     from brain_server import BrainTools
@@ -48,7 +55,9 @@ def app():
 
 @pytest.fixture(scope="module")
 def client(app):
-    with TestClient(app) as c:
+    # R-015: `/intelligence*` now requires a credential. `/intake/*` on this same app does not
+    # (out of R-015's scope), so sending the header on every call is harmless there too.
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         yield c
 
 
@@ -67,16 +76,20 @@ def test_the_graph_figures_are_present_and_counted_over_the_seed(client):
     assert graph["documents"] > 0
     assert graph["nodes"] > 0 and graph["edges"] > 0
     assert graph["issuer_mix"], "the seed's paperwork came from somewhere"
-    # `patients` is a Count, and both halves are asserted separately because they are different
-    # claims: `n` is the registry rows a document has claimed, `of` is the rows on file. It was a
-    # bare int, which meant whichever the seed happened to produce — and the seed changed.
-    assert graph["patients"]["n"] > 0
-    assert graph["patients"]["of"] > graph["patients"]["n"]
+    # `subjects` is a Count, and both halves are asserted separately because they are different
+    # claims: `n` is the registry rows a document has claimed, `of` is the rows on file.
+    assert graph["subjects"]["n"] > 0
+    assert graph["subjects"]["of"] > graph["subjects"]["n"]
+    # The kinds present, from the pack's own declarations — and the subject kind is flagged.
+    assert any(k["subject"] for k in graph["kinds"])
+    assert sum(k["n"] for k in graph["kinds"]) == graph["nodes"]
 
 
 def test_every_figure_carries_its_denominator_and_the_ids_behind_it(client):
     graph = client.get("/intelligence").json()["graph"]
-    for key in ("patients", "ambiguity", "unlinked_documents", "conflicts"):
+    from databridge_gateway.intelligence_surface import COUNT_FIGURES
+
+    for key in COUNT_FIGURES:
         count = graph[key]
         assert count["label"], f"{key} is a bare number with no label"
         assert count["of"] >= count["n"]
@@ -102,13 +115,16 @@ def test_every_figure_carries_its_denominator_and_the_ids_behind_it(client):
         assert issuer["issuer_id"] in graph["entities"]
 
 
-def test_the_coverage_gap_names_the_tests_no_package_includes(client):
+def test_the_coverage_gap_names_what_no_agreement_includes(client):
     graph = client.get("/intelligence").json()["graph"]
-    for test in graph["tests_outside_any_package"]:
-        assert test["id"] and test["label"] and test["kind"] == "test"
+    gap = graph["uncovered_references"]
+    assert gap["n"] == len(gap["members"]) > 0, "the seed has a coverage gap"
+    for member in gap["members"]:
+        entity = graph["entities"][member]
+        assert entity["label"] and entity["kind"]
 
 
-def test_the_patients_figure_keeps_its_numbers_and_withholds_its_members(client):
+def test_the_subjects_figure_keeps_its_numbers_and_withholds_its_members(client):
     """`patients` used to pass through the sanitiser untouched — not because it was safe, but
     because it was an `int` with nothing in it to sanitise. As a `Count` its members are PATIENT
     node ids, and this page never names a patient (constraint 1). The numbers survive; the ids do
@@ -117,13 +133,18 @@ def test_the_patients_figure_keeps_its_numbers_and_withholds_its_members(client)
     from databridge_gateway.intelligence_surface import MEMBERS_WITHHELD
 
     graph = client.get("/intelligence").json()["graph"]
-    patients = graph["patients"]
-    assert patients["n"] > 0 and patients["of"] > patients["n"]
-    assert patients["label"]
-    assert patients["members"] == []
-    assert patients["members_withheld"] == MEMBERS_WITHHELD
-    # …and no patient reached the entity table this page renders labels from, either.
-    assert all(e["kind"] != "patient" for e in graph["entities"].values())
+    subjects = graph["subjects"]
+    assert subjects["n"] > 0 and subjects["of"] > subjects["n"]
+    assert subjects["label"]
+    assert subjects["members"] == []
+    assert subjects["members_withheld"] == MEMBERS_WITHHELD
+    # …and no subject reached the entity table this page renders labels from, either — derived
+    # from the pack's subject declaration rather than a kind name.
+    subject_kinds = set(graph["withholding"]["subject_kinds"])
+    assert subject_kinds
+    assert all(e["kind"] not in subject_kinds for e in graph["entities"].values())
+    for ranked in (*graph["most_connected"], *graph["recently_ingested"]):
+        assert graph["entities"][ranked["id"]]["kind"] not in subject_kinds
 
 
 # --- the bi-temporal rewind --------------------------------------------------------
@@ -135,8 +156,8 @@ def test_as_of_rewinds_the_graph_figures(client):
     # The registry and the rule table predate the paperwork, so the rows are on file — but nobody
     # has been claimed yet, because no document exists to claim them. Rewinding must move the two
     # halves of the Count independently; a single number could not have said this.
-    assert early["graph"]["patients"]["of"] > 0
-    assert early["graph"]["patients"]["n"] == 0
+    assert early["graph"]["subjects"]["of"] > 0
+    assert early["graph"]["subjects"]["n"] == 0
 
 
 def test_as_of_accepts_a_naive_iso_datetime_and_a_z_suffix(client):
@@ -155,7 +176,7 @@ def test_a_malformed_as_of_is_refused_rather_than_silently_ignored(client):
 def test_no_graph_degrades_to_a_reason_not_a_500_and_not_a_zero():
     bare = FastAPI()
     _register_intelligence_routes(bare)
-    with TestClient(bare) as c:
+    with TestClient(bare, headers=AUTH_HEADERS) as c:
         r = c.get("/intelligence")
     assert r.status_code == 200
     body = r.json()
@@ -170,7 +191,7 @@ def test_a_traversal_that_raises_degrades_to_a_reason_not_a_500(app, monkeypatch
         raise RuntimeError("traversal exploded")
 
     monkeypatch.setattr(analytics_mod, "compute", boom)
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         body = c.get("/intelligence").json()
     assert body["graph"] is None
     assert "failed" in body["graph_unavailable"]
@@ -184,7 +205,7 @@ def test_a_broken_intake_queue_degrades_the_same_way(app, monkeypatch):
             raise RuntimeError("queue exploded")
 
     monkeypatch.setattr(app.state, "intakes", Exploding())
-    with TestClient(app) as c:
+    with TestClient(app, headers=AUTH_HEADERS) as c:
         body = c.get("/intelligence").json()
     assert body["queue"] is None and body["queue_unavailable"]
     assert body["graph"] is not None
@@ -234,8 +255,11 @@ def test_the_queue_does_not_report_a_replaced_draft_as_identity_verified(client,
     assert sel.status_code == 200, sel.text
 
     def entry():
+        # Ready-to-commit intakes are listed apart from blocked ones (R-017 t08 #7); the R-22
+        # question — is the attestation still about THIS draft — is asked of both.
         queue = client.get("/intelligence").json()["queue"]
-        return next(b for b in queue["blocked"] if b["intake_id"] == intake_id)
+        return next(b for b in queue["blocked"] + queue["ready_to_commit"]
+                    if b["intake_id"] == intake_id)
 
     assert entry()["identity_verified"] is True
 
@@ -251,6 +275,30 @@ def test_the_queue_does_not_report_a_replaced_draft_as_identity_verified(client,
         "blocked row is the silent zero this page refuses everywhere else")
 
 
+def test_a_ready_to_commit_intake_is_not_counted_as_blocked(client, chit):
+    """R-017 t08 #7. Attested and selected, not yet committed: the gate would open, so nothing is
+    blocking it. It used to be appended to `blocked` with an empty reason, inflating
+    `blocked_count`. It is listed as ready instead, and what it waits on is said."""
+    card = client.post("/intake/upload", json={"document_id": "intel__ready__chit_01.txt",
+                                               "text": chit}).json()
+    intake_id = card["intake_id"]
+    before = client.get("/intelligence").json()["queue"]
+    assert intake_id in {b["intake_id"] for b in before["blocked"]}
+    sel = client.post(f"/intake/{intake_id}/select-patient", json={
+        "patient_id": card["identity"]["candidates"][0]["patient_id"],
+        "staff_id": "staff:front_desk_01", "attested_in_person": True})
+    assert sel.status_code == 200, sel.text
+    queue = client.get("/intelligence").json()["queue"]
+    assert intake_id not in {b["intake_id"] for b in queue["blocked"]}
+    ready = next(b for b in queue["ready_to_commit"] if b["intake_id"] == intake_id)
+    assert ready["identity_verified"] is True and ready["waiting_on"]
+    assert queue["blocked_count"] == len(queue["blocked"])
+    assert queue["ready_count"] == len(queue["ready_to_commit"])
+    assert all(b["blocked_because"] for b in queue["blocked"]), "a blocked row names its reason"
+    assert (queue["committed"] + queue["blocked_count"] + queue["ready_count"]
+            == queue["intakes"])
+
+
 # --- structural counts are not performance claims ----------------------------------
 def test_the_payload_carries_no_time_saving_claim(client, chit):
     client.post("/intake/upload", json={"document_id": "intel__chit_01c.txt", "text": chit})
@@ -260,6 +308,14 @@ def test_the_payload_carries_no_time_saving_claim(client, chit):
         assert forbidden not in flat, (
             f"{forbidden} belongs to /impact; a structural count rendered beside a performance "
             "claim reads as one")
+
+
+def test_the_ingestion_register_is_present_and_empty_when_nothing_ran(client, tmp_path,
+                                                                     monkeypatch):
+    monkeypatch.setenv("WALNUT_INGEST_DIR", str(tmp_path / "none"))
+    body = client.get("/intelligence").json()
+    assert body["ingestion_unavailable"] is None
+    assert body["ingestion"]["sources"] == [] and body["ingestion"]["note"]
 
 
 def test_the_response_says_what_kind_of_numbers_these_are(client):
@@ -351,3 +407,12 @@ def test_every_entity_the_drilldown_returns_is_cited(client, app):
     assert body["nodes"], "nothing traversed, so nothing was checked"
     for node in body["nodes"]:
         assert body["sources"].get(node["id"]), f"{node['id']} returned with no citation"
+
+
+# --- R-015: no credential, no BI surface ---------------------------------------------
+def test_both_routes_refuse_an_unauthenticated_caller(app):
+    bare = TestClient(app)
+    entity = app.state.brain.store.open_nodes()[0]["id"]
+    for resp in (bare.get("/intelligence"), bare.get(f"/intelligence/subgraph/{entity}")):
+        assert resp.status_code == 401
+        assert resp.json()["refusal"]["code"] == "UNAUTHENTICATED"

@@ -31,6 +31,8 @@ from databridge_intake.models import ConfirmationState
 from databridge_intake.paths import fixtures_dir
 from databridge_intake.pipeline import run_intake
 
+from conftest import AUTH_HEADERS
+
 CHIT_01 = "chit_01_meridian_referral.txt"  # matches the graph seed's document_id exactly
 # The two fixtures the seed resolves to TWO registry candidates each — the whole point of R-26 is
 # what happens to the candidate the human does not pick, and it needs a document that has one.
@@ -60,7 +62,8 @@ def app(store):
 
 @pytest.fixture()
 def client(app):
-    return TestClient(app)
+    # R-015: the route now requires a credential.
+    return TestClient(app, headers=AUTH_HEADERS)
 
 
 def confirm(app, document_id: str, *, candidate_index: int = 0,
@@ -105,6 +108,16 @@ def test_unknown_entity_id_is_a_404_refusal(client):
     r = client.get("/evidence/trace/nothing:like-this")
     assert r.status_code == 404
     assert r.json()["refusal"]["code"] == "UNKNOWN_ENTITY"
+
+
+def test_an_unauthenticated_caller_is_refused_before_r28_even_runs(app):
+    """R-015. This used to be reachable by anyone; the R-28 confirmation gate below is a
+    different, additional question ("has a human confirmed this yet"), not a substitute for one
+    asking whether the caller may be here at all."""
+    bare = TestClient(app)
+    r = bare.get(f"/evidence/trace/document:{CHIT_03}")
+    assert r.status_code == 401
+    assert r.json()["refusal"]["code"] == "UNAUTHENTICATED"
 
 
 def test_a_malformed_ledger_id_is_refused_not_guessed(client):
@@ -153,9 +166,10 @@ def test_a_for_patient_edge_on_an_unconfirmed_document_is_refused(client, store)
 
 def test_a_coverage_rules_pointer_is_readable_with_an_empty_ledger(client, app, store):
     """The other side of the R-28 boundary. A coverage_rule node is grounded in
-    `coverage_rules.yaml` (a `table_cell` pointer) — app configuration, identical for every
-    patient, carrying no patient data. There is no confirmation that could gate it, refusing it
-    would make the page useless for explaining a billing determination, and it protects nobody.
+    `coverage_rules.yaml` (a `table_cell` pointer) — configuration, identical for every patient,
+    carrying no patient data. It is released by POINTER PROVENANCE: the exposure policy derived
+    from the bound vocabulary finds no subject kind, no claim edge and no pointer into material
+    that names a subject — no file name is special-cased any more.
     """
     assert app.state.ledger.count() == 0, "this test is only meaningful with an empty ledger"
     rule_rows = store.open_nodes_of_kind(NodeKind.COVERAGE_RULE)
@@ -164,12 +178,15 @@ def test_a_coverage_rules_pointer_is_readable_with_an_empty_ledger(client, app, 
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["node"]["kind"] == "coverage_rule"
-    assert body["authorisation"]["basis"] == "static_configuration"
+    assert body["authorisation"]["basis"] == "pointer_provenance"
     assert body["sources"]
     for src in body["sources"]:
         assert src["document_id"] is None
         assert src["document"] is None
-        assert src["ingestion_route"] == "config"
+        # A structured-source cell, reported as one — and shown as source/table/column/row.
+        assert src["ingestion_route"] == "table"
+        assert src["table_cell"]["table"] and src["table_cell"]["column"]
+        assert src["verify"]["status"] == "no_capture_binding"
 
 
 def test_a_node_carrying_any_document_evidence_is_not_treated_as_configuration(client, store):

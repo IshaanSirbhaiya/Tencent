@@ -1,0 +1,100 @@
+{
+  "notice": "SYNTHETIC FIXTURE. The image file this sidecar describes does not exist and never did; only the metadata is shipped.",
+  "image_id": "IMG-2018-000334",
+  "filename": "IMG-2018-000334.jpg",
+  "image_present": false,
+  "captured_at": "2018-03-15T12:43:59+00:00",
+  "captured_by": "OFF-0035",
+  "inspection_id": "INS-2018-000600",
+  "application_id": "APP-2017-000745",
+  "parcel_id": "PCL-IH-02016",
+  "photo_batch_ref": "PHB-2018-000600",
+  "device": {
+    "make": "Kestrel",
+    "model": "FieldCam 3",
+    "serial": "KF3-199833"
+  },
+  "image": {
+    "width": 4032,
+    "height": 3024,
+    "orientation": 6
+  },
+  "geo": {
+    "crs": "AMG-1 (fictional local grid)",
+    "easting": 438275,
+    "northing": 1207103,
+    "accuracy_m": 18.0
+  },
+  "ocr": {
+    "engine": "synthetic-ocr/0.4",
+    "language": "en",
+    "page": 1,
+    "coordinate_origin": "top_left",
+    "blocks": [
+      {
+        "line": 0,
+        "text": "SITE NOTICE",
+        "confidence": 0.97,
+        "bbox": [
+          1138,
+          120,
+          308,
+          76
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 1,
+        "text": "PERMIT No. AM-P-2018-614239",
+        "confidence": 0.755,
+        "bbox": [
+          992,
+          225,
+          729,
+          68
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 2,
+        "text": "73 COLDHARBOUR CRESCENT, ISK HARBOUR AM5 2AG",
+        "confidence": 0.881,
+        "bbox": [
+          2290,
+          304,
+          1452,
+          52
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 3,
+        "text": "DATE OF INSPECTION 2018-03-15",
+        "confidence": 0.787,
+        "bbox": [
+          902,
+          513,
+          870,
+          62
+        ],
+        "bbox_format": "xywh_pixels"
+      },
+      {
+        "line": 4,
+        "text": "OFFICER OFF-0035",
+        "confidence": 0.862,
+        "bbox": [
+          2466,
+          676,
+          512,
+          58
+        ],
+        "bbox_format": "xywh_pixels"
+      }
+    ]
+  },
+  "capture": {
+    "captured_into": "capture_store",
+    "note": "An ocr_bbox pointer resolves against the captured copy, never against the live filesystem."
+  }
+}

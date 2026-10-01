@@ -1,22 +1,26 @@
 "use client";
 import * as React from "react";
 import { ArrowRight, Search, ShieldAlert } from "lucide-react";
-import { GATEWAY } from "@/lib/api";
+import { GATEWAY, authHeaders } from "@/lib/api";
 import { brainApi } from "@/lib/brain-api";
-import type { BrainAnswer, BrainGraph } from "@/lib/brain-types";
+import type {
+  BrainAnswer,
+  BrainGraph,
+  BrainRefused,
+  BrainQueryResult,
+  DelegatedAnswer,
+} from "@/lib/brain-types";
+import { DelegatedAnswerView, DelegationNote, RouteNote } from "@/components/brain/delegated-answer";
 import { Grounded } from "@/components/grounded";
 import { nodeStyle } from "@/lib/brain-layout";
 import { cn } from "@/lib/utils";
+import { usePack } from "@/lib/pack-context";
 
-// Fallback only. The real list comes from `GET /brain/suggested`, which serves
-// `config/assistant.yaml` — built in Phase 4a specifically so the demo's prompts are config rather
-// than strings compiled into this bundle. This panel was still ignoring it and showing the Acme
-// questions.
-const SUGGESTED_FALLBACK = [
-  "What does the WELL2 package include?",
-  "Which patients does Meridian Life Assurance cover?",
-  "Which intakes are waiting on an identity check?",
-];
+// The real list comes from `GET /brain/suggested`, which serves the assistant config — built so
+// the demo's prompts are config rather than strings compiled into this bundle. The fallback, for
+// when the gateway is unreachable, is the ACTIVE PACK's, for the same reason: a question about one
+// vertical's data, hardcoded here, is wrong on every other pack and unanswerable on this one the
+// moment the seed changes.
 
 // Column 1 — Ask the Brain (§Part 1). `/brain/query` already retrieves from the graph BEFORE
 // calling the model — `link_entities` (BM25, §6.5) → `build_context` → LLM — but until T-34 this
@@ -44,8 +48,14 @@ export function AskPanel({
   // (e.g. an ungrounded-quantity claim-check failure) still has `matched_entities` worth showing;
   // only a network/gateway failure has nothing to show at all (`fetchError`, below).
   const [result, setResult] = React.useState<BrainAnswer | null>(null);
+  // N-14: a cross-source answer (the computed table) and a refusal with its candidates are their
+  // own states — they used to be cast to `BrainAnswer`, and reading `matched_entities` off a
+  // refusal threw, so every candidate list surfaced as "Query failed".
+  const [delegated, setDelegated] = React.useState<DelegatedAnswer | null>(null);
+  const [refused, setRefused] = React.useState<BrainRefused | null>(null);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
-  const [suggested, setSuggested] = React.useState<string[]>(SUGGESTED_FALLBACK);
+  const { pack } = usePack();
+  const [suggested, setSuggested] = React.useState<string[]>([...pack.brain_suggested_fallback]);
   const [scopeNote, setScopeNote] = React.useState<string>("");
 
   const nodeById = React.useMemo(
@@ -56,7 +66,7 @@ export function AskPanel({
   // Config-driven, so the questions on screen and the assistant's persona cannot drift apart.
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`${GATEWAY}/brain/suggested`, { cache: "no-store" })
+    fetch(`${GATEWAY}/brain/suggested`, { cache: "no-store", headers: authHeaders() })
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
         if (cancelled || !body?.questions?.length) return;
@@ -75,7 +85,21 @@ export function AskPanel({
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await brainApi.query(question);
+      const res: BrainQueryResult = await brainApi.query(question);
+      setDelegated(null);
+      setRefused(null);
+      if ("refusal" in res && typeof res.refusal === "object" && res.refusal !== null) {
+        setResult(null);
+        setRefused(res as BrainRefused);
+        onAnswer(null);
+        return;
+      }
+      if ((res as DelegatedAnswer).routed_to === "federated") {
+        setResult(null);
+        setDelegated(res as DelegatedAnswer);
+        onAnswer(null);
+        return;
+      }
       const a = res as BrainAnswer;
       setResult(a);
       // Highlight whatever retrieval actually matched — including a match that then got refused
@@ -85,6 +109,8 @@ export function AskPanel({
       onAnswer(a.matched_entities.length > 0 ? a : null);
     } catch {
       setResult(null);
+      setDelegated(null);
+      setRefused(null);
       setFetchError("Query failed — is the gateway running?");
       onAnswer(null);
     } finally {
@@ -113,7 +139,7 @@ export function AskPanel({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Ask about a package, an insurer, or today’s intakes…"
+          placeholder="Ask about a record, a document, or a total across sources…"
           aria-label="Ask the brain"
           className="h-10 w-full rounded border border-border bg-bg pl-9 pr-10 text-sm text-fg outline-none transition-colors placeholder:text-subtle focus:border-accent"
         />
@@ -130,7 +156,12 @@ export function AskPanel({
       {/* The suggestions are a way IN, not a permanent fixture. Once an answer exists they are
           costing the answer ~60px of the panel's height, which is how a correct reply ended up
           rendered into a two-line window. They come back the moment the panel is cleared. */}
-      <div className={cn("flex flex-wrap gap-1.5", result !== null && "hidden")}>
+      <div
+        className={cn(
+          "flex flex-wrap gap-1.5",
+          (result !== null || delegated !== null || refused !== null) && "hidden",
+        )}
+      >
         {suggested.map((s) => (
           <button
             key={s}
@@ -151,14 +182,66 @@ export function AskPanel({
             <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-band-review" />
             <span className="text-xs text-fg">{fetchError}</span>
           </div>
+        ) : delegated ? (
+          <DelegatedAnswerView answer={delegated} />
+        ) : refused ? (
+          <div className="space-y-2" data-testid="brain-refusal">
+            <div className="flex items-start gap-2 rounded border border-band-review/30 bg-band-review/[0.06] px-3 py-2">
+              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-band-review" />
+              <span className="text-xs text-fg">{refused.refusal.message}</span>
+            </div>
+            {(refused.refusal.candidate_details ?? []).length > 0 ? (
+              <div className="space-y-1">
+                <span className="text-2xs uppercase tracking-wide text-subtle">
+                  Records it could mean — nothing was chosen
+                </span>
+                <ul className="space-y-1">
+                  {(refused.refusal.candidate_details ?? []).map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex flex-wrap items-center gap-2 rounded border border-border bg-surface px-2 py-1 text-2xs text-fg"
+                    >
+                      <Grounded pointer={d.pointers?.[0] ?? null}>
+                        <span className="font-medium">{d.label ?? d.id}</span>
+                      </Grounded>
+                      {d.kind ? <span className="text-subtle">{d.kind}</span> : null}
+                      {d.source_ids?.length ? (
+                        <span className="text-subtle">from {d.source_ids.join(", ")}</span>
+                      ) : null}
+                      {d.subject ? (
+                        <span className="text-band-review">candidate — a human selects</span>
+                      ) : null}
+                      <span className="font-mono text-subtle">{d.id}</span>
+                      <button
+                        type="button"
+                        onClick={() => ask(`${q} (${d.id})`)}
+                        disabled={loading}
+                        className="ml-auto rounded border border-border px-1.5 py-0.5 text-2xs text-accent hover:border-accent/40 disabled:opacity-50"
+                      >
+                        Ask about this record
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (refused.refusal.candidates ?? []).length > 0 ? (
+              <p className="text-2xs text-subtle">
+                Candidates: {(refused.refusal.candidates ?? []).join(", ")}
+              </p>
+            ) : null}
+            <RouteNote route={refused.route} />
+          </div>
         ) : result ? (
           result.matched_entities.length === 0 ? (
             // `link_entities` found nothing above its BM25 floor — a deliberate decline (§6.5), not
             // an empty answer. It used to hand back the least-bad node rather than admit no match;
             // this is what showing the difference looks like.
-            <div className="flex items-start gap-2 rounded border border-band-review/30 bg-band-review/[0.06] px-3 py-2">
-              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-band-review" />
-              <span className="text-xs text-fg">No entity in this graph matches that question.</span>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 rounded border border-band-review/30 bg-band-review/[0.06] px-3 py-2">
+                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-band-review" />
+                <span className="text-xs text-fg">No entity in this graph matches that question.</span>
+              </div>
+              <DelegationNote route={result.route} attempt={result.delegation_attempt} />
             </div>
           ) : (
             <div className="space-y-3">
@@ -178,7 +261,7 @@ export function AskPanel({
                       >
                         <span
                           className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ background: style?.color ?? "#7d8492" }}
+                          style={{ background: style?.color ?? "hsl(var(--subtle))" }}
                         />
                         {n?.label ?? id}
                       </span>
@@ -200,6 +283,9 @@ export function AskPanel({
                   </span>
                 </div>
               )}
+
+              <RouteNote route={result.route} />
+              <DelegationNote route={result.route} attempt={result.delegation_attempt} />
 
               {/* Stage 3 — citations. */}
               {result.citations.length > 0 ? (

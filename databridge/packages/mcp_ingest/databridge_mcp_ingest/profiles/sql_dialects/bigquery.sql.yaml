@@ -1,0 +1,67 @@
+# Google BigQuery dialect template (W4). DRAFT — UNVERIFIED: written from the documented
+# INFORMATION_SCHEMA, never run against BigQuery here. `draft_dialect` live-probes it before anyone
+# can approve it for a connection. Shape: tabular/dialect_draft.py. A "schema" is a dataset.
+name: bigquery
+engine: bigquery
+title: Google BigQuery
+status: draft
+unverified: >-
+  Not run against BigQuery. KNOWN GAPS: list_tables reads the REGION view `region-us` — edit the
+  region for a project outside the US multi-region; string literals are rendered with doubled
+  quotes (''), which BigQuery does NOT accept (it wants \') — a table name containing a quote will
+  fail the probe; primary/foreign keys are declared-only (not enforced).
+detect:
+  priority: 5
+  tool_hints: [execute-query, execute_query, list-tables, describe-table, list_datasets]
+  probes:
+    - {sql: "SELECT @@project_id AS v", match: '^[a-z][a-z0-9-]{4,}$'}
+mcp:
+  rows: auto
+  error_prefixes: ["Error:", "Error executing"]
+quote: '`'
+list_tables: >-
+  SELECT table_schema, table_name FROM `region-us`.INFORMATION_SCHEMA.TABLES
+  WHERE table_type = 'BASE TABLE' ORDER BY table_schema, table_name
+describe: >-
+  SELECT column_name, data_type FROM {schema|ident}.INFORMATION_SCHEMA.COLUMNS
+  WHERE table_name = {table|literal} ORDER BY ordinal_position
+keys: >-
+  SELECT k.column_name AS column_name, t.constraint_type AS constraint_type,
+         c.table_schema AS ref_schema, c.table_name AS ref_table, c.column_name AS ref_column
+  FROM {schema|ident}.INFORMATION_SCHEMA.TABLE_CONSTRAINTS t
+  JOIN {schema|ident}.INFORMATION_SCHEMA.KEY_COLUMN_USAGE k
+    ON k.constraint_name = t.constraint_name AND k.table_name = t.table_name
+  LEFT JOIN {schema|ident}.INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE c
+    ON c.constraint_name = t.constraint_name AND t.constraint_type = 'FOREIGN KEY'
+  WHERE t.table_name = {table|literal} AND t.constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY')
+count: >-
+  SELECT COUNT(*) AS n FROM {schema|ident}.{table|ident}
+row_estimate: >-
+  SELECT row_count AS n FROM {schema|ident}.__TABLES__ WHERE table_id = {table|literal}
+select: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int}
+select_page: >-
+  SELECT * FROM {schema|ident}.{table|ident} ORDER BY {order_by} LIMIT {limit|int} OFFSET {offset|int}
+column_stats: >-
+  SELECT COUNT(*) AS n, COUNT({column|ident}) AS non_null,
+         COUNT(DISTINCT CAST({column|ident} AS STRING)) AS distinct_n,
+         AVG(LENGTH(CAST({column|ident} AS STRING))) AS avg_len,
+         MAX(LENGTH(CAST({column|ident} AS STRING))) AS max_len,
+         AVG(LENGTH(CAST({column|ident} AS STRING))
+             - LENGTH(REPLACE(CAST({column|ident} AS STRING), ' ', ''))) AS avg_spaces
+  FROM {schema|ident}.{table|ident}
+column_range: >-
+  SELECT MIN({column|ident}) AS lo, MAX({column|ident}) AS hi FROM {schema|ident}.{table|ident}
+table_stats: >-
+  SELECT COUNT(*) AS n{measures} FROM {schema|ident}.{table|ident}
+table_stats_column: >-
+  COUNT({column|ident}) AS {p}_non_null,
+  COUNT(DISTINCT CAST({column|ident} AS STRING)) AS {p}_distinct_n,
+  AVG(LENGTH(CAST({column|ident} AS STRING))) AS {p}_avg_len,
+  MAX(LENGTH(CAST({column|ident} AS STRING))) AS {p}_max_len,
+  AVG(LENGTH(CAST({column|ident} AS STRING)) - LENGTH(REPLACE(CAST({column|ident} AS STRING), ' ', ''))) AS {p}_avg_spaces
+table_stats_range: >-
+  MIN({column|ident}) AS {p}_lo, MAX({column|ident}) AS {p}_hi
+aggregate: >-
+  SELECT {group_cols}, COUNT(*) AS row_count{measures} FROM {schema|ident}.{table|ident}
+  GROUP BY {group_cols} ORDER BY {group_cols}

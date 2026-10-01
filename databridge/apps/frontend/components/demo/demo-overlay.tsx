@@ -10,33 +10,16 @@ import {
   togglePause,
   useDemoState,
 } from "@/lib/demo";
+import { usePack } from "@/lib/pack-context";
 
-// The automated 90-second investor demo (Part 4). Mounted globally; when playing it navigates the
-// real pages, narrates each beat, and emits page actions (load data, ask, slider, node, …). Just
-// router pushes + a pausable timeline — no special framework. [Skip] and [Pause] for live demos.
-
-interface Step {
-  route?: string;
-  caption: string;
-  action?: string;
-  ms: number;
-}
-
-// The scripted tour, opt-in via `/demo`. Retargeted from the Acme investor script to the clinic
-// story — and ordered the way the argument runs: the queue, then the constraint, then the evidence.
+// The automated 90-second scripted demo. Mounted globally; when playing it navigates the real
+// pages, narrates each beat, and emits page actions (load data, ask, slider, node, …). Just router
+// pushes + a pausable timeline — no special framework. [Skip] and [Pause] for live demos.
 //
-// It deliberately does NOT route to `/connectors`, `/schema`, `/convert`, `/ask` or `/artifacts`:
-// those are the DataBridge conversion-engine screens, retired from the nav in Phase 4b.
-const STEPS: Step[] = [
-  { route: "/frontdesk", caption: "The front desk queue — documents read before the patient reaches the counter.", ms: 8000 },
-  { route: "/intake", caption: "Any referring document: insurer letter, voucher, TPA form, HR email — or nothing at all.", ms: 8000 },
-  { route: "/brain", caption: "The clinic brain: patients, insurers, packages and tests, built from the real data.", action: "load", ms: 9000 },
-  { caption: "Ask it anything. Every answer is cited — and it refuses to confirm anyone's identity.", action: "ask", ms: 10000 },
-  { caption: "Rewind: what did the clinic know in May, before any of these referrals arrived?", action: "slider", ms: 9000 },
-  { caption: "Click any node for its receipts — the exact rows and spans it was built from.", action: "node", ms: 8000 },
-  { route: "/impact", caption: "~16 minutes of admin saved per patient — and zero claimed on identity, by design.", ms: 9000 },
-  { route: "/frontdesk", caption: "Every value traces to the characters it came from. Nothing commits without a human.", action: "finish", ms: 7000 },
-];
+// The script is NOT written here. It is `demo_steps` on the active pack (`config/packs.json`), for
+// the same reason every other noun is: a tour that walks one vertical's surfaces, compiled into the
+// platform shell, is a vertical compiled into the platform shell. A pack with no steps simply has
+// no tour, and this component says so rather than playing someone else's.
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -46,9 +29,21 @@ export function DemoOverlay() {
   const pathname = usePathname();
   const pathRef = React.useRef(pathname);
   pathRef.current = pathname;
+  const { pack } = usePack();
+  const steps = pack.demo_steps;
+  // Read through a ref inside the run loop: a pack switch mid-tour must not restart the effect and
+  // replay the tour from step one.
+  const stepsRef = React.useRef(steps);
+  stepsRef.current = steps;
 
   React.useEffect(() => {
     if (!demo.playing) return;
+    const STEPS = stepsRef.current;
+    if (STEPS.length === 0) {
+      // Nothing to play. Stop rather than render an empty progress bar forever.
+      stopDemo();
+      return;
+    }
     let alive = true;
     const timers = new Set<ReturnType<typeof setInterval>>();
 
@@ -108,7 +103,7 @@ export function DemoOverlay() {
       <div className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 rounded-lg border border-border bg-elevated px-5 py-3 shadow-lg">
         <div className="flex items-center justify-between gap-3">
           <span className="text-2xs font-medium uppercase tracking-wider text-accent">
-            Investor demo · step {demo.step + 1}/{STEPS.length}
+            {pack.label} tour · step {demo.step + 1}/{steps.length}
           </span>
           <div className="flex items-center gap-1.5">
             <button
@@ -130,7 +125,7 @@ export function DemoOverlay() {
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-accent transition-all duration-500"
-            style={{ width: `${((demo.step + 1) / STEPS.length) * 100}%` }}
+            style={{ width: `${((demo.step + 1) / Math.max(steps.length, 1)) * 100}%` }}
           />
         </div>
       </div>
