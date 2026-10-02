@@ -3,7 +3,8 @@ import * as React from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertTriangle, Check, EyeOff, Send, ShieldCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStaffSession } from "@/lib/staff-session";
+import { describeValueState, isValueState } from "@/lib/value-state";
+import { DevTokenMark, useWhoAmI } from "@/components/auth-chip";
 import {
   citationText,
   flattenCitations,
@@ -41,9 +42,10 @@ import {
  * and imports no transport. So the two buttons are two different acts by two different actors, and
  * the card says which is which rather than collapsing them into one "confirm".
  *
- * **The approver's name comes from the staff session, and there is no authentication behind it.**
- * That is stated on the card, not only in a design document. Writing "verified by" here would be
- * the single most dishonest string on this screen.
+ * **The approver is the signed-in principal, minted by the gateway.** This card sends no name: the
+ * gateway records the principal it authenticated the request as, and refuses a body that names an
+ * approver (R-027 ONE, Codex round 1). The name shown beside the buttons is read from
+ * `GET /auth/whoami`, the same source the gateway uses, and a dev-token sign-in is marked as such.
  */
 export function ActionCard({
   card,
@@ -53,17 +55,16 @@ export function ActionCard({
   /** Hand the updated row back to the console so the list and the result view stay in step. */
   onChanged: (updated: ActionCardData, result?: ExecutionResult) => void;
 }) {
-  const { staff } = useStaffSession();
+  const me = useWhoAmI();
+  const signedIn = me.data?.principal_id ?? null;
   const [reason, setReason] = React.useState("");
   const [rejecting, setRejecting] = React.useState(false);
   const [refusal, setRefusal] = React.useState<{ code: string; message: string } | null>(null);
-
-  // The name written into the record. Both halves, because the ledger keys on the id and a
-  // reviewer six months later reads the name.
-  const approver = staff ? `${staff.name} (${staff.staffId})` : "";
+  // R-028 #12: withheld text arrives as the standard envelope, never as a redaction string.
+  const withheld = isValueState(card.subject) || isValueState(card.body);
 
   const approve = useMutation({
-    mutationFn: () => outboxApi.approve(card.draft_id, approver),
+    mutationFn: () => outboxApi.approve(card.draft_id),
     onSuccess: (updated) => {
       // A refusal arrives in the body with a 4xx, not as a thrown error: "this has not been
       // approved" is an answer, and an answer belongs on the card rather than in a toast.
@@ -76,7 +77,7 @@ export function ActionCard({
   });
 
   const reject = useMutation({
-    mutationFn: () => outboxApi.reject(card.draft_id, approver, reason.trim()),
+    mutationFn: () => outboxApi.reject(card.draft_id, reason.trim()),
     onSuccess: (updated) => {
       if (updated.refusal) setRefusal(updated.refusal);
       else {
@@ -142,18 +143,23 @@ export function ActionCard({
 
       {/* WHAT it would say — in full, above the buttons. */}
       <section className="flex flex-col gap-1">
-        <p className="text-xs font-medium text-fg">{card.subject}</p>
+        <p
+          className={cn("text-xs font-medium", typeof card.subject === "string" ? "text-fg" : "italic text-band-spot")}
+          data-testid="action-subject"
+        >
+          {typeof card.subject === "string" ? card.subject : describeValueState(card.subject)}
+        </p>
         <p
           className={cn(
             "whitespace-pre-line text-xs",
-            card.redacted ? "flex items-start gap-1 italic text-band-spot" : "text-subtle",
+            withheld ? "flex items-start gap-1 italic text-band-spot" : "text-subtle",
           )}
           data-testid="action-body"
         >
-          {card.redacted && <EyeOff className="mt-0.5 h-3 w-3 shrink-0" />}
-          {card.body}
+          {withheld && <EyeOff className="mt-0.5 h-3 w-3 shrink-0" />}
+          {typeof card.body === "string" ? card.body : describeValueState(card.body)}
         </p>
-        {card.redacted && (
+        {withheld && (
           <p className="text-2xs text-band-spot">
             This draft&rsquo;s own text is addressed to an automated reader — an instruction inside
             a restricted document. It is not reproduced, and the citations below still resolve, so it
@@ -205,16 +211,16 @@ export function ActionCard({
 
       {/* The two human decisions, and the one machine act that follows them. */}
       <footer className="flex flex-col gap-2 border-t border-border/60 pt-2">
-        {!staff && (
+        {!signedIn && !me.isLoading && (
           <p className="text-2xs text-band-spot">
-            Sign in before approving. An approval has to name somebody.
+            Sign in before approving. An approval is recorded against the signed-in principal.
           </p>
         )}
         {card.status === "drafted" && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              disabled={pending || !staff}
+              disabled={pending || !signedIn}
               onClick={() => approve.mutate()}
               data-testid="action-approve"
               className="flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-fg hover:border-accent/60 disabled:opacity-40"
@@ -224,7 +230,7 @@ export function ActionCard({
             </button>
             <button
               type="button"
-              disabled={pending || !staff}
+              disabled={pending || !signedIn}
               onClick={() => setRejecting((r) => !r)}
               data-testid="action-reject"
               className="flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-fg hover:border-band-review/60 disabled:opacity-40"
@@ -232,9 +238,10 @@ export function ActionCard({
               <X className="h-3.5 w-3.5" />
               Reject
             </button>
-            {staff && (
-              <span className="text-2xs text-subtle">
-                will be recorded as <span className="text-fg">{approver}</span>
+            {signedIn && (
+              <span className="text-2xs text-subtle" data-testid="action-recorded-as">
+                will be recorded as <span className="font-mono text-fg">{signedIn}</span>
+                {me.data?.dev_only && <DevTokenMark testId="action-dev-token" />}
               </span>
             )}
           </div>
@@ -286,9 +293,9 @@ export function ActionCard({
 
         <p className="flex items-start gap-1.5 text-2xs text-subtle">
           <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0" />
-          An approval records who says they approved it. There is no authentication behind that
-          name yet — this is a proof of concept, and building it is the next thing that has to
-          happen before this touches a real deployment.
+          An approval is recorded against the principal this page is signed in as, never a name it
+          sends. Only the draft&rsquo;s owner or an operator can approve, reject or hand it to the
+          dispatcher.
         </p>
       </footer>
     </article>

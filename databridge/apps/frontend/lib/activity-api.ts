@@ -2,35 +2,131 @@
  * `/activity` — the gateway's read-only feed of what the agents did (`activity_routes.py`).
  *
  * Every row is a record some producer already wrote (agent runs, federated runs, adapter-agent
- * syncs, automation firings, approval decisions, drift and ontology proposals). This module only
+ * syncs and set-up steps, one-time tasks, automation firings, approval decisions, drift and
+ * ontology proposals, and — R-028 — every human decision family: plan, mapping and link
+ * approvals, set-up documents decisions and hand-offs, dataset design approvals and builds,
+ * outbox decisions). Each names its actor with the common actor object. This module only
  * fetches and projects; it never fills a gap. A `null` from the gateway is "not recorded" on the
- * page — never 0, never a guess. The pure helpers at the bottom are covered by `@unit` specs in
+ * page — never 0, never a guess; a withheld or absent value is the `{status, reason}` envelope and
+ * is shown as such. The pure helpers at the bottom are covered by `@unit` specs in
  * `e2e/activity.spec.ts`.
  */
 import { GATEWAY, authHeaders } from "./api";
 import { adaptGatewayTrace, type GatewayTrace } from "./trace-adapt";
 import type { TracePreview } from "./platform-preview";
+import { describeValueState, isValueState, type ValueState } from "./value-state";
 
 // ---------------------------------------------------------------------------------------------
-// contracts (mirroring activity_routes.py)
+// contracts (mirroring activity_routes.py / activity_decisions.py / activity_actor.py)
 // ---------------------------------------------------------------------------------------------
-export const ACTIVITY_KINDS = [
+/** The run and proposal producers. */
+export const RUN_FEED_KINDS = [
   "agent_run",
   "federated_run",
   "adapter_sync",
+  "adapter_setup",
+  "one_time_task",
   "firing",
   "approval",
   "drift_proposal",
   "ontology_proposal",
 ] as const;
+/** R-028 CONS #8: every human-decision family is its own kind. */
+export const DECISION_KINDS = [
+  "plan_approval",
+  "mapping_approval",
+  "link_decision",
+  "setup_documents",
+  "setup_handoff",
+  "design_approval",
+  "design_build",
+  "outbox_decision",
+  "decision_log",
+] as const;
+export const ACTIVITY_KINDS = [...RUN_FEED_KINDS, ...DECISION_KINDS] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
-export type ActorType = "agent" | "adapter_agent" | "automation" | "person";
+/**
+ * R-028 CONS #12 — a value the feed does not serve (`withheld`) or that its producer did not
+ * record (`absent`), with a closed reason code. It stands IN PLACE of the value: never a bare
+ * null meaning "hidden", never a dropped key.
+ */
+export type ValueEnvelope = ValueState;
+
+/** The shared, strict check (`lib/value-state.ts`): exactly the envelope's keys. */
+export function isEnvelope(v: unknown): v is ValueEnvelope {
+  return isValueState(v);
+}
+
+/** Plain words for the closed reason codes the gateway uses. */
+export const ENVELOPE_REASON: Record<string, string> = {
+  not_recorded_by_producer: "not recorded",
+  machine_actor: "does not apply to a machine",
+  not_in_allow_list: "outside this page's allow-list",
+  sensitive_field: "sensitive; not shown here",
+  free_text: "free text; not shown here",
+  error_text: "error text; in the server log",
+  too_deep: "nested too deeply to show",
+  unexpected_shape: "not in the recorded shape",
+  sql_with_literals: "SQL holding a value; not shown",
+};
+
+/** "withheld — free text; not shown here" / "not recorded"; a reason this page does not name is
+ *  said by the shared describer (`describeValueState`), never dropped. */
+export function envelopeText(v: ValueEnvelope): string {
+  const why = ENVELOPE_REASON[v.reason];
+  if (!why) return describeValueState(v);
+  return v.status === "absent" ? why : `withheld — ${why}`;
+}
+
+/** A served value as text: itself, its envelope in words, or "not recorded" for null. */
+export function valueText(v: unknown): string {
+  if (v === null || v === undefined || v === "") return NOT_RECORDED;
+  if (isEnvelope(v)) return envelopeText(v);
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+/** The string a field holds, or null when it holds an envelope / nothing. */
+export function served(v: string | ValueEnvelope | null | undefined): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+export type ActorField<T> = T | ValueEnvelope;
+
+/**
+ * R-028 CONS #7 — the common actor object, as every Activity row carries it. `principal_id` is
+ * never decorated: a decision made with the development token says so in `dev_only`.
+ */
 export interface Actor {
-  type: ActorType;
-  id: string | null;
-  /** FIN-16: a person authenticated with the public development token, not a real sign-in. */
-  dev_only?: boolean;
+  principal_id: ActorField<string>;
+  authenticated_by: ActorField<string>;
+  principal_type: ActorField<string>;
+  dev_only: ActorField<boolean>;
+  delegation?: Record<string, unknown> | null;
+}
+
+/** Principal types that are machines, never people (`activity_actor.MACHINE_TYPES`). */
+export const MACHINE_TYPES = ["agent", "adapter_agent", "automation"] as const;
+export type ActorType = (typeof MACHINE_TYPES)[number] | "person";
+
+/** What an actor is: one of the machine types, or a person (any other recorded type). */
+export function actorType(a: Actor | null | undefined): ActorType | null {
+  if (!a) return null;
+  const t = a.principal_type;
+  if (typeof t === "string" && (MACHINE_TYPES as readonly string[]).includes(t)) {
+    return t as ActorType;
+  }
+  return "person";
+}
+
+export function isPerson(a: Actor | null | undefined): boolean {
+  return actorType(a) === "person";
+}
+
+/** The actor's principal id, or null when the producer did not record one. */
+export function actorId(a: Actor | null | undefined): string | null {
+  return a && typeof a.principal_id === "string" ? a.principal_id : null;
 }
 
 /** The plain words shown after a person who acted under the development token (FIN-16). */
@@ -40,6 +136,17 @@ export const DEV_TOKEN_NOTE = "dev token, not a real sign-in";
 export function deciderText(by: string | null | undefined, devOnly: boolean | null | undefined): string {
   if (!by) return NOT_RECORDED;
   return devOnly ? `${by} (${DEV_TOKEN_NOTE})` : by;
+}
+
+/** How a person's decision was authenticated, in words: the dev token is said plainly; a sign-in
+ *  the producer did not record is said as not recorded — never presented as a real sign-in. */
+export function authText(a: Actor | null | undefined): string | null {
+  if (!a || !isPerson(a)) return null;
+  if (a.dev_only === true) return DEV_TOKEN_NOTE;
+  if (isEnvelope(a.dev_only) || isEnvelope(a.authenticated_by)) {
+    return "how they signed in was not recorded";
+  }
+  return null;
 }
 
 /** §5.8 — who produced a thing. Every key may be absent or null. */
@@ -64,16 +171,16 @@ export interface HistoryEvent {
   by?: string | null;
   at?: string | null;
   detail?: string;
-  reason?: string;
+  /** A code, or the withheld envelope standing in for free text (R-028 #12). */
+  reason?: string | ValueEnvelope;
   note?: string;
   outcome?: string;
   recorded_at?: string;
   attempt?: number;
-  error?: string;
+  /** A firing's error text is never served: it is the withheld envelope (R-028 #12). */
+  error?: string | ValueEnvelope;
   /** A firing's error: only the exception TYPE is served; its text is not (Codex f2 #9). */
   error_type?: string | null;
-  error_withheld?: string;
-  reason_withheld?: string;
   // `decision_refused` (agent_runtime `_log_refusal`)
   decision?: string;
   reason_code?: string;
@@ -126,7 +233,8 @@ export interface ActivityItem {
   refused_delegations?: number | null;
   coverage_reduced?: boolean | null;
   trace_request_id?: string | null;
-  reason?: string | null;
+  /** A code or sentence the producer wrote, or the withheld envelope for free text. */
+  reason?: string | ValueEnvelope | null;
   trigger?: Record<string, unknown>;
   // firings
   idempotency_key?: string;
@@ -151,8 +259,9 @@ export interface ActivityItem {
   history?: HistoryEvent[];
   /** Every refused decision on this action, oldest first. */
   refusals?: DecisionRefusal[];
-  /** The latest refusal when it IS the row's outcome (`outcome === "refused"`), else null. */
-  refusal?: DecisionRefusal | null;
+  /** The latest refusal when it IS the row's outcome (`outcome === "refused"`), else null; on a
+   *  `decision_log` row, the standard refusal (`LEDGER_INTEGRITY_FAILED`). */
+  refusal?: DecisionRefusal | LedgerRefusal | null;
   // proposals
   adapter_agent?: string | null;
   connection?: string | null;
@@ -166,6 +275,53 @@ export interface ActivityItem {
   document_count?: number | null;
   touches_subject?: boolean | null;
   forwarded?: Record<string, unknown> | null;
+  // R-028 CONS #8 — decision rows (activity_decisions.py)
+  /** approved | rejected | built | handed_off | sent … */
+  decision?: string | null;
+  /** What was verified about the record: sealed_and_anchored · append_only_store · unverified ·
+   *  failed. Never more than what was checked. */
+  integrity?: string | null;
+  source_id?: string | null;
+  table?: string | null;
+  column?: string | null;
+  target?: string | null;
+  target_kind?: string | null;
+  plan_digest?: string | null;
+  mapping_digest?: string | null;
+  design_id?: string | null;
+  design_digest?: string | null;
+  rev?: number | null;
+  build_id?: string | null;
+  draft_id?: string | null;
+  playbook_id?: string | null;
+  channel?: string | null;
+  recipient_origin?: string | null;
+  discovery_run_id?: string | null;
+  documents_digest?: string | null;
+  tables_bound?: number | null;
+  deferred?: number | null;
+  delegated?: boolean | null;
+  task_id?: string | null;
+  error_ref?: string | null;
+  step?: string | null;
+  decided_by_person?: boolean | null;
+  /** decision_log: the family whose log did not verify, and the standard refusal. */
+  family?: string | null;
+  log?: string | null;
+}
+
+/** `integrity` in words: what was verified about a decision record — and only that. */
+export const INTEGRITY_TEXT: Record<string, string> = {
+  sealed_and_anchored: "sealed, chained and anchored — verified",
+  append_only_store: "an append-only store (no seal)",
+  unverified: "recorded, not verified (a plain record)",
+  failed: "does not verify — nothing in this log is trusted",
+};
+
+/** The standard refusal envelope a `decision_log` row carries (`LEDGER_INTEGRITY_FAILED`). */
+export interface LedgerRefusal {
+  code: string;
+  message: string;
 }
 
 export interface ActivityPage {
@@ -191,8 +347,10 @@ export interface SubtaskNode {
   decision: string | null;
   method: string | null;
   pushed_down: boolean | null;
-  query: string | null;
-  delegate_note: string | null;
+  /** null: no SQL recorded; the withheld envelope: SQL holding a value (R-028 #12). */
+  query: string | ValueEnvelope | null;
+  /** The delegate's sentence is never served: the withheld envelope when one was recorded. */
+  delegate_note: string | ValueEnvelope | null;
   rows_returned: number | null;
   rows_basis: string;
   pointers_recorded: number | null;
@@ -217,7 +375,7 @@ export interface DelegationTree {
     method: string | null;
     /** the questions the plan asked (E2E3 P-08); null when the record keeps none */
     questions: string[] | null;
-    questions_text: string | null;
+    questions_text: string | ValueEnvelope | null;
     questions_note: string | null;
     assumptions: string[] | null;
     assumptions_note: string | null;
@@ -378,10 +536,21 @@ export const KIND_LABEL: Record<ActivityKind, string> = {
   agent_run: "agent run",
   federated_run: "delegated question",
   adapter_sync: "adapter-agent sync",
+  adapter_setup: "set-up step",
+  one_time_task: "one-time task",
   firing: "automation firing",
   approval: "approval",
   drift_proposal: "drift proposal",
   ontology_proposal: "ontology proposal",
+  plan_approval: "plan approval",
+  mapping_approval: "mapping approval",
+  link_decision: "link decision",
+  setup_documents: "documents decision",
+  setup_handoff: "hand-off",
+  design_approval: "design approval",
+  design_build: "design build",
+  outbox_decision: "outbox decision",
+  decision_log: "decision log integrity",
 };
 
 export const NOT_RECORDED = "not recorded";
@@ -431,24 +600,36 @@ export function formatCost(usd: number | null | undefined): string {
 }
 
 /** "approve refused — principal_not_authenticated (claimed by x, not verified)". */
-export function decisionRefusalText(r: DecisionRefusal): string {
+export function decisionRefusalText(r: DecisionRefusal | LedgerRefusal): string {
+  if (isLedgerRefusal(r)) return `${r.code}: ${r.message}`;
   const who = r.by ? ` (asked by ${r.by})` : r.claimed_by ? ` (claimed by ${r.claimed_by}, not verified)` : "";
   return `${r.decision ?? "decision"} refused — ${r.reason_code ?? NOT_RECORDED}${who}`;
 }
 
+/** Who acted, from the structured actor object (R-028 #7). A person's dev-token decision is said
+ *  plainly; an authentication the producer did not record is said as such; a delegated decision
+ *  names its delegation. Never reads identity out of a decorated id. */
 export function actorText(a: Actor | null | undefined): string {
   if (!a) return NOT_RECORDED;
-  const id = a.id ?? NOT_RECORDED;
-  switch (a.type) {
-    case "person":
-      return a.dev_only ? `person ${id} (${DEV_TOKEN_NOTE})` : `person ${id}`;
+  const id = actorId(a) ?? NOT_RECORDED;
+  switch (actorType(a)) {
     case "adapter_agent":
       return `adapter agent ${id}`;
     case "automation":
       return `automation (${id})`;
-    default:
+    case "agent":
       return `agent ${id}`;
+    default: {
+      const how = authText(a);
+      const via = a.delegation ? " (through a delegation)" : "";
+      return `person ${id}${via}${how ? ` (${how})` : ""}`;
+    }
   }
+}
+
+/** True for a `decision_log` row's refusal (the standard envelope), not an approval refusal. */
+export function isLedgerRefusal(r: DecisionRefusal | LedgerRefusal | null | undefined): r is LedgerRefusal {
+  return !!r && typeof (r as LedgerRefusal).code === "string" && !("reason_code" in r);
 }
 
 export type Tone = "good" | "warn" | "bad" | "neutral";
@@ -482,9 +663,12 @@ export function mergePages(held: ActivityItem[], more: ActivityItem[]): Activity
   );
 }
 
+/** Kinds that never open a run: proposals filed outside a run, and every decision family. */
+export const RUNLESS_KINDS: readonly ActivityKind[] = ["ontology_proposal", ...DECISION_KINDS];
+
 /** Which run an item opens in the inspector (runs, approvals, firings and drift carry one). */
 export function runIdOf(item: ActivityItem): string | null {
-  if (item.kind === "ontology_proposal") return null;
+  if (RUNLESS_KINDS.includes(item.kind)) return null;
   return item.run_id ?? null;
 }
 

@@ -57,7 +57,8 @@ from typing import Any, Callable, Optional
 import yaml
 
 from . import capture, paths
-from .build import (ProseBuilder, anchor_id_for, build_tables, consolidate_identity_after_run,
+from .build import (ProseBuilder, anchor_id_for, assert_may_build, build_tables,
+                    capture_only as _capture_only_guard, consolidate_identity_after_run,
                     document_kind, store_batch,
                     unbuilt_completeness)
 from .client import McpClientError, ReadOnlyClient, ToolChanged, open_client
@@ -352,6 +353,11 @@ class _source_lock:
         self._release()
 
 
+#: the public name of the per-source run lock (one run per source): a caller that must not race
+#: a run's mapping proposals (the setup's explanation-bound mapping approval) holds it
+source_run_lock = _source_lock
+
+
 def _digest(obj: Any) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
 
@@ -391,6 +397,10 @@ def _bind_run(run_dir: Path, binding: dict, *, resuming: bool, stages_done: dict
         except ValueError:
             before = {}
         changed = sorted(k for k in binding if before.get(k) != binding[k])
+        if before.get("mode") != binding.get("mode") and "mode" not in changed:
+            # FEAT8 (R-027 AAX f1 #1): a capture-only discovery is never resumed as a build, and
+            # a build is never resumed as a discovery
+            changed.append("mode")
         if changed:
             raise ResumeRefused(
                 f"run {run_dir.name} cannot resume: its {', '.join(changed)} changed since it "
@@ -783,7 +793,7 @@ def run_ingest(source_id: str, store=None, harness=None,
                verbose: bool = False, vocab=None, concurrency: Optional[int] = None,
                passages: Optional[bool] = None, cache: bool = True,
                bridges: bool = True, tabular: Optional[bool] = None,
-               event_attrs: Optional[dict] = None) -> RunReport:
+               event_attrs: Optional[dict] = None, capture_only: bool = False) -> RunReport:
     """Run an APPROVED plan for one source end to end. `run_id` of an existing run resumes it:
     stages already marked done are skipped, collection skips items already decided, and the
     build skips items already built. `harness=None` builds document anchors only and says so.
@@ -807,7 +817,18 @@ def run_ingest(source_id: str, store=None, harness=None,
                    over a caller's key of the same name.
 
     Drift holds (`<sources>/<id>.holds.yaml`, see `HONOURS_DRIFT_HOLDS`) are honoured on every
-    run: a held table / path is captured but not built, a held step is not enumerated."""
+    run: a held table / path is captured but not built, a held step is not enumerated.
+
+    `capture_only` a DISCOVERY run (FEAT8, Codex R-027 AAX f1 #1): collect, extract, screen, and
+                   propose the table mapping from the captured snapshots - and BUILD NOTHING, for
+                   tables and documents alike. No graph store is opened; every graph-writing
+                   entry point refuses on this thread (`build.capture_only`); the source's
+                   incremental state is not advanced; no item or run event is emitted; the
+                   database recipe (facts store, schema cards) does not run. The run writes
+                   `discovery.json` (each captured table's capture digest and the mapping digest
+                   proposed from it) and reports `discovered` (not `ok`: it is no sync, and never
+                   freshness evidence) when it captured something and verified. See
+                   `latest_discovery`."""
     conn = load_connection(source_id, sources_root)
     if getattr(conn, "purpose", "ingest") != "ingest":
         raise NotAnIngestConnection(
@@ -820,6 +841,15 @@ def run_ingest(source_id: str, store=None, harness=None,
             f"the plan for {source_id!r} is {plan.status!r}; a signed-in person approves it "
             f"before it runs (auto_approve approves nothing)")
     approval_note = _require_plan_approval(plan, sources_root)
+    if capture_only:
+        if getattr(_TABULAR, "kwargs", None) is not None or _inside_tabular_recipe():
+            raise PlanError("a capture-only discovery cannot run inside the database recipe")
+        with _source_lock(source_id), _capture_only_guard():
+            return _run_core(source_id, conn, plan, None, harness, progress_cb, run_id=run_id,
+                             client=client, sources_root=sources_root, verbose=verbose,
+                             vocab=vocab, concurrency=concurrency, passages=False, cache=cache,
+                             bridges=bridges, nested=False, event_attrs=event_attrs,
+                             approval_note=approval_note, discovery=True)
     outer = getattr(_TABULAR, "kwargs", None)
     nested = outer is not None and outer.get("source_id") == source_id
     if nested:
@@ -857,10 +887,13 @@ def run_ingest(source_id: str, store=None, harness=None,
 
 def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id, client,
               sources_root, verbose, vocab, concurrency, passages, cache, bridges, nested,
-              event_attrs, approval_note) -> RunReport:
-    """The body of `run_ingest`, entered holding the source's run lock."""
+              event_attrs, approval_note, discovery: bool = False) -> RunReport:
+    """The body of `run_ingest`, entered holding the source's run lock. `discovery`: the
+    capture-only mode (no store is opened; nothing is built; see `run_ingest`)."""
     extra_attrs = dict(event_attrs or {})
-    if store is None:
+    if discovery:
+        store = None                             # a discovery never holds a graph store
+    elif store is None:
         from databridge_graph.store import GraphStore
 
         db = paths.graph_db_path()
@@ -884,6 +917,14 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
                              "steps": [s.id for s in plan.steps]})
     if approval_note:
         report.notes.append(approval_note)
+    if discovery and not resuming:
+        # the manifest exists from the first moment, so a discovery that fails is the LATEST
+        # discovery (reported failed by its report), never hidden behind an older success
+        _atomic_text(run_dir / DISCOVERY_FILE, json.dumps(
+            {"mode": DISCOVERY_MODE, "source_id": source_id, "run_id": run_id,
+             "plan_digest": plan_digest(plan), "status": "running", "tables": {},
+             "documents": {}, "built": 0, "at": now_iso(), "started_ns": time.time_ns()},
+            sort_keys=True, indent=1))
     progress = _Progress(progress_cb, verbose)
     workers = _resolve_concurrency(concurrency)
     stages_file = run_dir / "stages.json"
@@ -900,6 +941,8 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         # to every stage, so an approval or revocation mid-run cannot change what this run does
         overrides = load_overrides(source_id, sources_root)
         binding = _run_binding(plan, screen_cfg, overrides, holds)
+        if discovery:
+            binding["mode"] = DISCOVERY_MODE
         _bind_run(run_dir, binding, resuming=resuming, stages_done=stages_done)
         if resuming:
             # f2 #8 / #3: nobody advanced the source's state since, and the approved table
@@ -912,8 +955,9 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         report.status = "failed"
         report.message = _plain_error(exc, limit=1000)
         _write_report(report, run_dir)                  # durable first, then the event (f2 #13)
-        emit_event("run_failed", source_id=source_id, run_id=run_id,
-                   attrs={**extra_attrs, "error": report.message})
+        if not discovery:
+            emit_event("run_failed", source_id=source_id, run_id=run_id,
+                       attrs={**extra_attrs, "error": report.message})
         if nested:
             _TABULAR.report = report
         raise
@@ -1002,8 +1046,19 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
             mark("screen", time.monotonic() - t0)
         decisions = {r["item_id"]: r for r in read_jsonl(run_dir / "governance.jsonl")}
 
+        # ---------------------------------------------------------------- discover
+        # FEAT8 / Codex R-027 AAX f1 #1: a capture-only discovery proposes the table mapping from
+        # what was captured and screened, and skips build, index and identity below - nothing
+        # is built, indexed, consolidated or written to the source's state
+        found: dict = {}
+        if discovery:
+            t0 = time.monotonic()
+            found = _discover(conn, vocab, harness, captured, decisions, ledgers, run_dir,
+                              sources_root, report)
+            mark("discover", time.monotonic() - t0)
+
         # ---------------------------------------------------------------- build
-        if "build" not in stages_done:
+        if not discovery and "build" not in stages_done:
             t0 = time.monotonic()
             doc_kind, note = document_kind(vocab, conn.document_kind)
             report.notes.append(note)
@@ -1039,7 +1094,7 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
             mark("build", time.monotonic() - t0)
 
         # ---------------------------------------------------------------- index (retrieval)
-        if "index" not in stages_done:
+        if not discovery and "index" not in stages_done:
             t0 = time.monotonic()
             _index_passages(conn.id, run_dir, _passages_enabled(passages), harness, timings,
                             report)
@@ -1049,7 +1104,7 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         # the pack's APPROVED identity rules recognise as one the organisations this run wrote
         # and the records already in the graph; inert until a named human approves a rule, never
         # touching a subject kind. Before verify, so verification checks the consolidated graph.
-        if "identity" not in stages_done:
+        if not discovery and "identity" not in stages_done:
             t0 = time.monotonic()
             consolidation = consolidate_identity_after_run(store, vocab)
             _atomic_text(run_dir / IDENTITY_FILE, json.dumps(consolidation, sort_keys=True,
@@ -1073,8 +1128,11 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         _count_backfill(report, run_dir)
         _note_holds(report, run_dir)
         _finalise_status(report, enumeration_complete)
-        # Codex f2 #10: incremental state advances ONLY for a run that verified
-        state = load_state(source_id)
+        if discovery:
+            _seal_discovery(report, run_dir, found, plan)
+        # Codex f2 #10: incremental state advances ONLY for a run that verified (a discovery
+        # built nothing, so it never advances it)
+        state = {} if discovery else load_state(source_id)
         promoted = _promote_state(state, run_dir, verified=bool(report.verify.get("ok")))
         if promoted["promoted"]:
             save_state(source_id, state, run_id=run_id)
@@ -1090,14 +1148,19 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         report.timings = {**report.timings,
                           **timings.as_dict(meter.as_dict() if meter is not None else None)}
         _write_report(report, run_dir)                  # durable first, then the event (f2 #13)
-        emit_event("run_failed", source_id=source_id, run_id=run_id,
-                   attrs={**extra_attrs, "error": report.message})
+        if not discovery:
+            emit_event("run_failed", source_id=source_id, run_id=run_id,
+                       attrs={**extra_attrs, "error": report.message})
         if nested:
             _TABULAR.report = report
         raise
     # Codex f2 #13: report.json is durable BEFORE the completion event; f2 #9: inside the tabular
     # recipe the event waits until the recipe's own outcome is known (`_run_with_tabular`)
     _write_report(report, run_dir)
+    if discovery:
+        # a discovery is no sync: no run event (nothing downstream may act on it as new data)
+        progress("report", status=report.status, message=report.message)
+        return report
     final = ("run_completed" if report.status in ("ok", "empty") else "run_failed",
              {**extra_attrs, "status": report.status, "message": report.message,
               **{k: report.counts.get(k) for k in ("inventory", "captured", "built")}})
@@ -1736,6 +1799,7 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
     """Documents: prepare (chunk + screen) → extract on a pool of `workers` → apply in order,
     one transaction per document. Items whose screen decision is not `allow` never reach this
     loop's model calls. Tables: the approved mapping, deterministically (no model per row)."""
+    assert_may_build("the build stage")
     from .mapping import ensure_mapping
 
     timings = timings or Timings()
@@ -2077,6 +2141,181 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
     return built
 
 
+# --- capture-only discovery (FEAT8, Codex R-027 AAX f1 #1, #5, #8) -------------------------------
+#: `binding.json` mode of a discovery run (a build run's binding carries no mode)
+DISCOVERY_MODE = "discover"
+#: the discovery's manifest, written by the run itself
+DISCOVERY_FILE = "discovery.json"
+#: the report status of a discovery that captured something and verified. Deliberately NOT `ok`:
+#: a discovery is no sync, so nothing that reads `ok` as a successful sync or as freshness
+#: evidence can mistake one for it.
+DISCOVERED = "discovered"
+#: the `build_skipped` reason of an allowed item a discovery captured and screened but never built
+DISCOVERY_ONLY = "discovery_capture_only"
+
+
+def plan_digest(plan) -> str:
+    """The digest a run binds its plan by (`binding.json` `plan`): what a discovery is tied to."""
+    return _digest(plan.model_dump(mode="json"))
+
+
+def _table_ref(snapshot: dict) -> str:
+    return (f"{snapshot.get('schema')}.{snapshot.get('table')}" if snapshot.get("schema")
+            else str(snapshot.get("table")))
+
+
+def _discover(conn, vocab, harness, captured: list[dict], decisions: dict, ledgers: dict,
+              run_dir: Path, sources_root, report: RunReport) -> dict:
+    """The discovery stage: every captured item is accounted for (an allowed one is recorded
+    `discovery_capture_only` in `build_skipped`, so verification still balances), and the table
+    mapping is PROPOSED from the captured snapshots the screen did not block - the same
+    `ensure_mapping` (never approving) and link proposals a build's first run makes. Returns what
+    `discovery.json` records: per table its capture digest, screen decision and the digest of the
+    mapping entry proposed from it; per document its capture digest and decision. Writes nothing
+    to a graph.
+
+    Codex R-027 AAX f2 #3: only material the screen ALLOWED (or an earlier sync built) reaches the
+    mapper with its rows and a model. A table the screen holds for REVIEW is proposed from its
+    SCHEMA alone (`schema_only`: names, types and keys, no row) and with no model at all; link
+    proposals, which measure values, read allowed tables only."""
+    from .mapping import ensure_mapping, mapping_digest
+
+    held = held_items(run_dir)
+    unchanged = {r["item_id"] for r in read_jsonl(run_dir / "unchanged.jsonl")
+                 if r.get("item_id") and not r.get("decided")}
+    tables: dict[str, dict] = {}
+    snaps: dict[str, dict] = {}
+    held_snaps: dict[str, dict] = {}
+    docs: dict = {"captured": 0, "allowed": 0, "items": []}
+    for rec in captured:
+        iid, sha = rec.get("item_id"), rec.get("sha256")
+        if not iid or not sha:
+            continue
+        decision = (decisions.get(iid) or {}).get("decision")
+        if decision is None and iid in unchanged:
+            decision = "unchanged"                     # built and verified by an earlier sync
+        if decision == "allow":
+            ledgers["build_skipped"].write({
+                "item_id": iid, "uri": rec.get("uri"), "reason": DISCOVERY_ONLY,
+                "detail": "captured and screened by a capture-only discovery; nothing is built "
+                          "until a person approves the mapping and hands the source off",
+                "reverse": "hand the source off (or run it from Sources) to build it"})
+        if rec.get("kind") != "table":
+            docs["captured"] += 1
+            docs["allowed"] += decision == "allow"
+            docs["items"].append({"item_id": iid, "sha256": sha, "decision": decision,
+                                  "held": iid in held, "uri": rec.get("uri")})
+            continue
+        try:
+            snapshot = json.loads(capture.get_bytes(sha))
+        except Exception as exc:                                     # noqa: BLE001
+            report.notes.append(f"discovery: capture {sha[:12]} unreadable ({_plain_error(exc)})")
+            continue
+        ref = _table_ref(snapshot)
+        tables[ref] = {"item_id": iid, "sha256": sha, "decision": decision,
+                       "held": iid in held, "rows": len(snapshot.get("rows") or [])}
+        if iid in held:
+            continue
+        if decision in ("allow", "unchanged"):
+            snaps[ref] = snapshot
+        elif decision == "review":
+            # held for review: its mapping is metadata a person decides, so it is still proposed
+            # - from the schema only, never its rows, and never by a model (f2 #3)
+            held_snaps[ref] = schema_only(snapshot)
+    mapping = None
+    if snaps:
+        mapping = ensure_mapping(conn.id, snaps, vocab, harness=harness, auto_approve=False,
+                                 root=sources_root)
+        try:
+            from .mapping import refresh_link_proposals
+
+            refresh_link_proposals(conn.id, snaps, vocab, root=sources_root)
+        except Exception as exc:                                     # noqa: BLE001
+            report.notes.append(f"links: proposal skipped ({_plain_error(exc)})")
+    if held_snaps:
+        mapping = ensure_mapping(conn.id, held_snaps, vocab, harness=None, auto_approve=False,
+                                 root=sources_root)
+    for ref in (*snaps, *held_snaps):
+        tm = mapping.tables.get(ref) if mapping is not None else None
+        if tm is not None:
+            tables[ref]["mapping_digest"] = mapping_digest(tm)
+            tables[ref]["mapping_status"] = tm.status
+    return {"tables": tables, "documents": docs}
+
+
+#: the keys of a table snapshot that carry no row value (`schema_only`)
+_SCHEMA_KEYS = ("schema", "table", "columns", "primary_key", "foreign_keys")
+
+
+def schema_only(snapshot: dict) -> dict:
+    """A table snapshot with every row value removed: names, types and declared keys only. What
+    the mapper may see of material the screen has not allowed (Codex R-027 AAX f2 #3)."""
+    out = {k: snapshot.get(k) for k in _SCHEMA_KEYS if k in snapshot}
+    out["columns"] = [{"name": c.get("name"), "type": c.get("type")}
+                      for c in snapshot.get("columns") or [] if isinstance(c, dict)]
+    out["rows"] = []
+    return out
+
+
+def _seal_discovery(report: RunReport, run_dir: Path, found: dict, plan) -> None:
+    """Turn the finalised status into a discovery's (`ok` -> `discovered`; anything else stands)
+    and write `discovery.json`. The report written after it is the authority on the status."""
+    if report.status == "ok":
+        report.status = DISCOVERED
+    report.message = ("DISCOVERY (capture only, nothing built): " + (report.message or ""))[:2000]
+    report.plan = {**report.plan, "mode": DISCOVERY_MODE}
+    report.notes.append("discovery: capture-only - collect, extract, screen and mapping proposal; "
+                        "no graph store was opened, nothing was built or indexed, the source's "
+                        "state was not advanced and no run event was emitted")
+    try:
+        started_ns = json.loads((run_dir / DISCOVERY_FILE).read_text(encoding="utf-8")
+                                ).get("started_ns")
+    except (OSError, ValueError):
+        started_ns = None
+    manifest = {"mode": DISCOVERY_MODE, "source_id": report.source_id, "run_id": report.run_id,
+                "started_ns": started_ns,
+                "plan_digest": plan_digest(plan), "status": report.status,
+                "tables": found.get("tables") or {}, "documents": found.get("documents") or {},
+                "built": 0, "at": now_iso()}
+    _atomic_text(run_dir / DISCOVERY_FILE, json.dumps(manifest, sort_keys=True, indent=1,
+                                                      default=str))
+
+
+def latest_discovery(source_id: str) -> Optional[dict]:
+    """The NEWEST capture-only discovery of the source, or None. Its `status` is read from the
+    run's own `report.json` (the authority; `incomplete` without one), never from the manifest
+    alone, and a manifest naming another run or source is reported `invalid`. A gate accepts it
+    only when `status == DISCOVERED` and its `plan_digest` is the current plan's."""
+    base = source_dir(source_id)
+    if not base.is_dir():
+        return None
+    found: list[tuple[int, str, Path, Optional[dict]]] = []
+    for d in (x for x in base.iterdir() if x.is_dir()):
+        man_path = d / DISCOVERY_FILE
+        if not man_path.is_file():
+            continue
+        try:
+            man = json.loads(man_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            man = None
+        # newest first by the moment the run started (run ids of one second do not sort)
+        found.append((int((man or {}).get("started_ns") or 0), d.name, d, man))
+    for _, _, d, man in sorted(found, key=lambda x: (x[0], x[1]), reverse=True):
+        if man is None:
+            return {"run_id": d.name, "status": "invalid", "tables": {},
+                    "message": "discovery.json is unreadable"}
+        try:
+            rep = json.loads((d / "report.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            rep = {}
+        status = rep.get("status") or "incomplete"
+        if man.get("run_id") != d.name or man.get("source_id") != source_id or                 man.get("mode") != DISCOVERY_MODE or rep.get("run_id") not in (None, d.name):
+            status = "invalid"
+        return {**man, "run_id": d.name, "status": status,
+                "message": rep.get("message", ""), "finished_at": rep.get("finished_at")}
+    return None
+
+
 COMPLETENESS_LEDGER = "completeness.jsonl"
 #: FIN-04: what the post-run identity consolidation did (`build.consolidate_identity_after_run`)
 IDENTITY_FILE = "identity_consolidation.json"
@@ -2171,6 +2410,7 @@ def _emit_item_events(source_id: str, run_id: str, built: list[dict], prev_state
     """§5.3 events. `prev_state_live` has already been updated for built items, so the previous
     hash is recovered from the build's own record of what it replaced. A removed item's graph
     footprint is CLOSED (not deleted) before its event is emitted — see `close_removed_item`."""
+    assert_may_build("item events and removals")
     prior = {r["item_id"]: r for r in read_jsonl(run_dir / "unchanged.jsonl")}
     counts = {"item_added": 0, "item_changed": 0, "item_removed": 0}
     closed_total = {"nodes": 0, "edges": 0}
@@ -2356,6 +2596,7 @@ def _index_passages(source_id: str, run_dir: Path, enabled: bool, harness, timin
     E2E run-2 N-01: documents built by EARLIER runs that the index does not hold at their current
     digest are back-filled in the same session (bounded per run, `WALNUT_INGEST_BACKFILL_MAX`).
     Writes `index.json` either way — with the reason when it did nothing."""
+    assert_may_build("passage indexing")
     out: dict = {"enabled": enabled, "indexed": 0, "unchanged": 0, "removed": 0,
                  "other": {}, "status": "skipped", "reason": "", "at": now_iso(),
                  "backfill": {"candidates": 0, "indexed": 0, "unchanged": 0, "other": {},
@@ -2836,6 +3077,8 @@ def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
 
 
 __all__ = ["run_ingest", "verify_run", "list_runs", "RunReport", "PlanNotApproved",
+           "latest_discovery", "plan_digest", "schema_only", "source_run_lock", "DISCOVERED", "DISCOVERY_MODE", "DISCOVERY_FILE",
+           "DISCOVERY_ONLY",
            "NotAnIngestConnection", "RunInProgress", "ResumeRefused", "run_dir_for",
            "close_removed_item", "Timings", "DEFAULT_CONCURRENCY",
            "load_state", "state_path", "source_dir", "LEDGERS", "CHECKPOINT_ITEMS",

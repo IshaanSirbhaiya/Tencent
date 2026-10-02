@@ -7,6 +7,11 @@ import { GATEWAY, authHeaders, api } from "./api";
 export interface Refusal {
   code: string;
   message: string;
+  /** R-028: the former specific code when `code` is a standard one (STALE_REVISION under
+   * DECISION_STALE). */
+  reason_code?: string;
+  /** R-028: a failure's reference in the gateway's log; the exception's text is never sent. */
+  error_ref?: string;
   nearest_alternative?: string | null;
   missing?: string[];
   job_id?: string;
@@ -178,6 +183,8 @@ export interface MaterialiseJob {
   events: JobEvent[];
   progress: JobEvent | null;
   error: string | null;
+  /** R-028: a failed or refused job's reference in the gateway's log. */
+  error_ref?: string | null;
   result: RunSummary | null;
   refusal?: Refusal;
   request?: string | null;
@@ -219,12 +226,126 @@ async function ask<T>(path: string, init?: RequestInit): Promise<Answer<T>> {
   return { ok: false, status: res.status, refusal: { code: `HTTP_${res.status}`, message: detail || `${path} answered ${res.status}` } };
 }
 
+/** A refusal as one line: the code (and the former specific code), the gateway's message, and a
+ * failure's reference (R-028). */
+export function refusalText(r: Refusal): string {
+  const code = r.reason_code && r.reason_code !== r.code ? `${r.code} (${r.reason_code})` : r.code;
+  return `${code}: ${r.message}${r.error_ref ? ` (reference ${r.error_ref})` : ""}`;
+}
+
 /** Throws the refusal as an Error — for react-query. */
 async function must<T>(p: Promise<Answer<T>>): Promise<T> {
   const a = await p;
   if (a.ok) return a.body;
-  throw new Error(`${a.refusal.code}: ${a.refusal.message}`);
+  throw new Error(refusalText(a.refusal));
 }
+
+// ---------------------------------------------------------------------------------------------
+// DSD — RAW datasets built through delegation (`/materialise/designs`, `delegated.py`)
+// ---------------------------------------------------------------------------------------------
+export interface DesignSource {
+  adapter_agent: string;
+  connection: string;
+  entity: string;
+}
+
+export interface DesignColumn {
+  name: string;
+  meaning: string;
+  role: "key" | "feature" | "label" | "time";
+  via: string | null;
+  field: string;
+  aggregate: "count" | "sum" | "avg" | "min" | "max" | null;
+  /** WHEN the value became known, as the sources say (computed server-side), or "unknown…". */
+  when_known: string;
+}
+
+export interface DesignLink {
+  id: string;
+  kind: "lookup" | "aggregate" | "documents";
+  from_field: string;
+  target: DesignSource;
+  to_field: string | null;
+  entity_kind: string | null;
+  doc_kinds: string[];
+  edge_kinds: string[];
+  text_contains: string | null;
+  /** A person-kind far end: never merged; its cells are withheld as candidates. */
+  candidate: boolean;
+  evidence: string;
+  approved_by: string | null;
+}
+
+export interface TableDesign {
+  request: string;
+  grain: DesignSource;
+  grain_key: string;
+  grain_text: string;
+  columns: DesignColumn[];
+  links: DesignLink[];
+  filters: { field: string; op: string; value: unknown }[];
+  label: { column: string; definition: string } | null;
+  questions: string[];
+  assumptions: string[];
+}
+
+export interface DesignDoc {
+  id: string;
+  owner: string;
+  /** The immutable revision this view is of; an edit names it (compare-and-set). */
+  rev: number;
+  status: "proposed" | "edited" | "approved" | "integrity_failed";
+  /** "verified", or why the sealed log / revisions did not verify (then nothing is honoured). */
+  integrity: string;
+  design: TableDesign | null;
+  /** Open questions with their ids; each stays open until an edit answers it. */
+  question_items: { id: string; text: string }[];
+  digest: string;
+  approval: { principal_id: string; authenticated_by: string; dev_only?: boolean; at: string; digest: string } | null;
+  produced_by: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  history: { at: string; by: string; action: string; digest: string }[];
+  builds?: { at: string; by: string; build: string; digest: string }[];
+}
+
+/** An edit: each key present replaces the design's own (the server re-validates it). */
+export type DesignEdit = Partial<Pick<TableDesign, "grain" | "grain_text" | "columns" | "links" | "filters" | "label">> & {
+  /** The revision the edit was made on; a superseded revision is refused (STALE_REVISION). */
+  rev: number;
+  /** Answers to open questions, `{question id: text}`. */
+  answers?: Record<string, string>;
+};
+
+/** The build's result: `summary_from_doc` plus the raw mode's own keys. */
+export type RawRunSummary = Omit<RunSummary, "rows"> & {
+  mode: "raw_delegated" | "labelled";
+  statement: string | null;
+  design_id: string | null;
+  design_digest: string | null;
+  rows: { emitted: number; base_rows_read: number; dropped: string[]; note: string } | null;
+};
+
+export interface DesignJob extends Omit<MaterialiseJob, "result"> {
+  result: RawRunSummary | null;
+}
+
+export const designApi = {
+  propose: (request: string) =>
+    ask<DesignDoc>("/materialise/designs", { method: "POST", body: JSON.stringify({ request }) }),
+  list: () => ask<{ designs: DesignDoc[] }>("/materialise/designs"),
+  get: (id: string) => ask<DesignDoc>(`/materialise/designs/${encodeURIComponent(id)}`),
+  edit: (id: string, edit: DesignEdit) =>
+    ask<DesignDoc>(`/materialise/designs/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(edit) }),
+  approve: (id: string, digest: string) =>
+    ask<DesignDoc>(`/materialise/designs/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify({ digest }) }),
+  build: (id: string, digest: string) =>
+    ask<{ job_id: string; status: string; poll: string }>(`/materialise/designs/${encodeURIComponent(id)}/build`, {
+      method: "POST",
+      body: JSON.stringify({ digest }),
+    }),
+  job: (jobId: string) => ask<DesignJob>(`/materialise/designs/jobs/${encodeURIComponent(jobId)}`),
+};
 
 export const dataApi = {
   plans: () => must(ask<PlansResponse>("/materialise/plans")),
@@ -248,7 +369,7 @@ export async function fetchRunFile(planHash: string, name: string): Promise<Blob
   );
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { refusal?: Refusal };
-    throw new Error(body.refusal ? `${body.refusal.code}: ${body.refusal.message}` : `download answered ${res.status}`);
+    throw new Error(body.refusal ? refusalText(body.refusal) : `download answered ${res.status}`);
   }
   return res.blob();
 }

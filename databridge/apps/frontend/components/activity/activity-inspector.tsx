@@ -10,10 +10,14 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
 import {
+  DECISION_KINDS,
+  INTEGRITY_TEXT,
   KIND_LABEL,
   actorText,
+  envelopeText,
+  isEnvelope,
+  valueText,
   decisionRefusalText,
-  deciderText,
   decisionText,
   fetchActivityRun,
   formatCost,
@@ -71,12 +75,11 @@ export function ActivityInspector({
             <KV label="action"><Maybe value={item.name ?? item.action_id} /></KV>
             <KV label="tool"><Maybe value={item.tool} /></KV>
             <KV label="mode"><Maybe value={item.automation_mode} /></KV>
-            <KV label="decided by"><Maybe value={item.decided_by ? deciderText(item.decided_by, item.decided_by_dev_only) : item.decided_by} /></KV>
+            <KV label="decided by"><Maybe value={item.decided_by ? actorText(item.actor) : item.decided_by} /></KV>
             <KV label="outcome"><Maybe value={item.outcome} /></KV>
             {item.refusal ? (
               <KV label="refused">
                 <span className="text-band-review" data-testid="activity-refusal">{decisionRefusalText(item.refusal)}</span>
-                {item.refusal.detail ? <span className="text-subtle"> — {item.refusal.detail}</span> : null}
               </KV>
             ) : null}
             {item.refusals && item.refusals.length && !item.refusal ? (
@@ -105,7 +108,18 @@ export function ActivityInspector({
             ) : null}
           </>
         ) : null}
-        {item.reason ? <KV label="reason"><Maybe value={item.reason} mono={false} /></KV> : null}
+        {DECISION_KIND_SET.has(item.kind) || item.kind === "one_time_task" || item.kind === "adapter_setup" ? (
+          <DecisionFields item={item} />
+        ) : null}
+        {item.reason ? (
+          <KV label="reason">
+            {isEnvelope(item.reason) ? (
+              <span className="italic text-subtle/80" data-testid="activity-withheld">{envelopeText(item.reason)}</span>
+            ) : (
+              <Maybe value={item.reason} mono={false} />
+            )}
+          </KV>
+        ) : null}
       </dl>
 
       {item.drifts && item.drifts.length ? (
@@ -144,6 +158,55 @@ export function ActivityInspector({
   );
 }
 
+const DECISION_KIND_SET: ReadonlySet<string> = new Set(DECISION_KINDS);
+
+/** The fields of a decision row (R-028 #8): what was decided, on what, and what was verified about
+ *  the record. Every value is the row's own; an unrecorded one says so. */
+function DecisionFields({ item }: { item: ActivityItem }) {
+  const rows: [string, unknown][] = [
+    ["decision", item.decision],
+    ["source", item.source_id],
+    ["table", item.table],
+    ["link", item.column ? `${item.column} → ${item.target ?? "?"}` : undefined],
+    ["design", item.design_id],
+    ["revision", item.rev],
+    ["build", item.build_id],
+    ["draft", item.draft_id],
+    ["playbook", item.playbook_id],
+    ["recipient from", item.recipient_origin],
+    ["agent", item.adapter_agent],
+    ["step", item.step],
+    ["task", item.task_id],
+    ["error ref", item.error_ref],
+  ];
+  return (
+    <>
+      {rows
+        .filter(([, v]) => v !== undefined && v !== null)
+        .map(([k, v]) => (
+          <KV key={k} label={k}>
+            <Maybe value={valueText(v)} />
+          </KV>
+        ))}
+      {item.actor?.delegation ? (
+        <KV label="delegation"><Maybe value={valueText(item.actor.delegation)} /></KV>
+      ) : null}
+      {item.integrity ? (
+        <KV label="integrity">
+          <span className={item.integrity === "failed" ? "text-band-review" : "text-fg"} data-testid="activity-integrity">
+            {INTEGRITY_TEXT[item.integrity] ?? item.integrity}
+          </span>
+        </KV>
+      ) : null}
+      {item.kind === "decision_log" && item.refusal ? (
+        <KV label="refused">
+          <span className="text-band-review" data-testid="activity-refusal">{decisionRefusalText(item.refusal)}</span>
+        </KV>
+      ) : null}
+    </>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
@@ -165,8 +228,9 @@ function History({ events }: { events: HistoryEvent[] }) {
           ) : null}
           <span className="text-subtle">{when(e.at ?? e.recorded_at)}</span>
           {e.reason || e.error_type || e.note ? (
-            <span className="text-subtle">— {e.reason ?? e.error_type ?? e.note}</span>
+            <span className="text-subtle">— {valueText(e.reason ?? e.error_type ?? e.note)}</span>
           ) : null}
+          {isEnvelope(e.error) ? <span className="italic text-subtle/80">({envelopeText(e.error)})</span> : null}
         </li>
       ))}
     </ol>
@@ -238,7 +302,7 @@ function RunDetail({
                 <button type="button" className="text-left hover:underline" onClick={() => onSelect?.(a)}>
                   <span className="font-mono text-fg">{a.name ?? a.action_id}</span> —{" "}
                   <span className={a.outcome === "execution_failed" || a.outcome === "refused" ? "text-band-review" : ""}>{a.outcome}</span>
-                  {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${deciderText(a.decided_by, a.decided_by_dev_only)}` : " (no decision recorded)"}
+                  {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${actorText(a.actor)}` : " (no decision recorded)"}
                 </button>
               </li>
             ))}

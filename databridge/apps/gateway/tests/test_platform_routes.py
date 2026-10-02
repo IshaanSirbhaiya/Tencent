@@ -30,6 +30,7 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from conftest import AUTH_HEADERS, auth_headers
+from databridge_gateway.public_errors import STANDARD_FOR  # noqa: E402  (R-028 #11)
 
 from databridge_gateway import adapter_agents_routes, automation_routes, sources_routes
 from databridge_gateway import agents_routes
@@ -166,9 +167,13 @@ class FakeIngest(IngestFacade):
         self.report_status = "ok"
         self.progress_events = [{"stage": "collect", "done": 1}, {"stage": "build", "done": 1}]
 
-    def propose_plan(self, source_id, *, harness=None):
-        self.load_connection(source_id)
-        plan = FakePlan(source_id=source_id, steps=["documents"], tools_seen=list(self.tools))
+    def propose_plan(self, source_id, *, harness=None, bind_notes=None, expected_revision=None,
+                     revision_of=None):
+        conn = self.load_connection(source_id)
+        if expected_revision is not None and revision_of(conn) != expected_revision:
+            raise RuntimeError("the connection changed")
+        plan = FakePlan(source_id=source_id, steps=["documents"], tools_seen=list(self.tools),
+                        notes=list(bind_notes or []))
         self.plans[source_id] = plan
         return plan
 
@@ -177,14 +182,18 @@ class FakeIngest(IngestFacade):
             raise LookupError(f"no plan for {source_id!r}")
         return self.plans[source_id]
 
-    def approve_plan(self, source_id, *, principal, vouch_read_tools=None):
+    def approve_plan(self, source_id, *, principal, vouch_read_tools=None, bind_notes=None,
+                     expected_plan_digest=None, expected_revision=None, revision_of=None):
         # The gateway must hand over the principal OBJECT; the package's own gate decides, so a
         # string (or a look-alike) is refused here exactly as `plans.approve_plan` refuses it.
+        # `bind_notes` are written by the same approval, as the package does (R-027 r1 #3).
         from databridge_mcp_ingest.plans import require_authenticated_approver
         who = require_authenticated_approver(principal)
         self.approvals.append((source_id, who["principal_id"]))
-        plan = self.load_plan(source_id).model_copy(update={"status": "approved",
-                                                            "approved_by": who["principal_id"]})
+        current = self.load_plan(source_id)
+        plan = current.model_copy(update={"status": "approved",
+                                          "approved_by": who["principal_id"],
+                                          "notes": [*current.notes, *(bind_notes or [])]})
         self.plans[source_id] = plan
         return plan
 
@@ -202,6 +211,24 @@ class FakeIngest(IngestFacade):
                   "counts": {"inventory": len(self.progress_events)}}
         (run_dir / "report.json").write_text(json.dumps(report), encoding="utf-8")
         return report
+
+
+def bound_notes(source_id):
+    """The binding a gateway proposal carries: the revision of the connection as it is now. A plan
+    a test writes directly carries it too, or it is (rightly) stale (R-027 r2 #5)."""
+    from databridge_gateway.platform_runtime import PLAN_REVISION_NOTE
+    from databridge_gateway.sources_routes import connection_revision
+    from databridge_mcp_ingest.connections import load_connection
+    return [f"{PLAN_REVISION_NOTE}{connection_revision(load_connection(source_id))}"]
+
+
+def approve(c, source_id, **body):
+    """Approve ``source_id``'s plan as a person does: with the `plan_digest` of the plan the
+    page shows (`GET /sources/{id}`), which every approval must name (R-027 r1 #2)."""
+    shown = c.get(f"/sources/{source_id}")
+    digest = shown.json().get("plan_digest") if shown.status_code == 200 else None
+    return c.post(f"/sources/{source_id}/plan/approve",
+                  json={"plan_digest": digest or "none-shown", **body})
 
 
 class FakeService:
@@ -336,7 +363,7 @@ def test_register_plan_approve_run_and_reload(env):
         assert detail["tools"] == rt.ingest.tools
 
         # approval is the PRINCIPAL's, whatever the body claims
-        r = c.post("/sources/test-files/plan/approve", json={"approved_by": "mallory"})
+        r = approve(c, "test-files", approved_by="mallory")
         assert r.status_code == 200, r.text
         assert r.json()["plan"]["approved_by"] == "analyst-7"
         assert rt.ingest.approvals == [("test-files", "analyst-7")]
@@ -363,13 +390,14 @@ def test_a_failed_run_still_reloads_and_is_reported(env):
     with TestClient(app, headers=AUTH_HEADERS) as c:
         c.post("/sources", json={"mode": "command", "id": "flaky", "command": "npx"})
         c.post("/sources/flaky/plan")
-        c.post("/sources/flaky/plan/approve")
+        approve(c, "flaky")
         rt.ingest.fail = RuntimeError("server went away")
         run_id = c.post("/sources/flaky/runs").json()["run_id"]
         assert reloads == [1]
         got = c.get(f"/sources/flaky/runs/{run_id}").json()
         assert got["status"] == "failed"
-        assert "server went away" in got["error"]
+        # R-028 #6 (ROUTES): a fixed sentence and a reference, never the exception text
+        assert "server went away" not in got["error"] and "reference ERR-" in got["error"]
 
 
 def test_bad_ids_are_refused_before_touching_disk(env):
@@ -655,7 +683,7 @@ def test_replacing_a_connection_revokes_its_plan_approval(env):
         base = {"mode": "command", "id": "swap", "command": "npx", "args": ["-y", "reviewed"]}
         assert c.post("/sources", json=base).status_code == 200
         c.post("/sources/swap/plan")
-        assert c.post("/sources/swap/plan/approve").status_code == 200
+        assert approve(c, "swap").status_code == 200
 
         same = c.post("/sources", json={**base, "replace": True})
         assert same.status_code == 200 and same.json()["plan_approval_revoked"] == []
@@ -683,7 +711,7 @@ def test_an_ingest_job_is_completed_only_for_a_successful_run_status(env, status
     with TestClient(app, headers=AUTH_HEADERS) as c:
         c.post("/sources", json={"mode": "command", "id": "st", "command": "npx"})
         c.post("/sources/st/plan")
-        c.post("/sources/st/plan/approve")
+        approve(c, "st")
         c.post("/sources/st/runs")
     job = rt.jobs.list("ingest", "st")[-1]
     assert job["status"] == job_status_for_run(status) != "completed"
@@ -795,12 +823,12 @@ def test_round2_a_plan_proposed_for_a_replaced_connection_cannot_be_approved(env
         assert r.status_code == 200, r.text
         assert r.json()["plan_approval_revoked"] == []                 # nothing was approved...
         assert plan_binding(rt.ingest.load_plan("bind"), PLAN_REVISION_NOTE) == PLAN_SUPERSEDED
-        bad = c.post("/sources/bind/plan/approve")                     # ...and it is still stale
-        assert bad.status_code == 409 and bad.json()["refusal"]["code"] == "PLAN_STALE"
+        bad = approve(c, "bind")                     # ...and it is still stale
+        assert bad.status_code == 409 and (bad.json()["refusal"]["code"], bad.json()["refusal"].get("reason_code")) == (STANDARD_FOR["PLAN_STALE"], "PLAN_STALE")
         assert rt.ingest.load_plan("bind").status == "proposed"
         assert rt.ingest.approvals == []
         c.post("/sources/bind/plan")                                   # proposed for B
-        assert c.post("/sources/bind/plan/approve").status_code == 200
+        assert approve(c, "bind").status_code == 200
         assert c.post("/sources/bind/runs").status_code == 202
 
 
@@ -830,7 +858,7 @@ def test_round2_a_queued_run_refuses_a_connection_changed_after_admission(env, m
     with TestClient(app, headers=AUTH_HEADERS) as c:
         _cmd(c, "pin")
         c.post("/sources/pin/plan")
-        c.post("/sources/pin/plan/approve")
+        approve(c, "pin")
     pinned = connection_revision(rt.ingest.load_connection("pin"))
     # control first: admitted for the current revision, the job runs
     job0 = rt.jobs.start("ingest", "pin", run_id="r0")
@@ -876,6 +904,85 @@ def test_round2_replacing_a_connection_revokes_its_mapping_approval(env):
     assert m.approved_by is None
     assert all(any("revoked by 'analyst-7'" in n for n in m.tables[t].rationale)
                for t in approved)
+
+
+def _revocation_actors(lines: list) -> list[dict]:
+    from databridge_gateway.platform_runtime import REVOKED_ACTOR_TAG
+    return [json.loads(n.split(REVOKED_ACTOR_TAG, 1)[1]) for n in lines if REVOKED_ACTOR_TAG in n]
+
+
+def test_tidy_a_revocation_records_the_common_actor_object(env):
+    """R-028 TIDY #5: a revocation is a decision, so it records the common actor object
+    (`decision_ledger.actor_of`), not a bare id - on the plan and on every revoked table."""
+    from databridge_core import decision_ledger as dl
+    from databridge_mcp_ingest.mapping import SourceMapping, TableMapping, load_mapping, save_mapping
+
+    app, rt, _ = _mount(env)
+    with TestClient(app, headers=auth_headers("analyst-7")) as c:
+        assert _cmd(c, "rv").status_code == 200
+        c.post("/sources/rv/plan")
+        assert approve(c, "rv").status_code == 200
+        save_mapping(SourceMapping(source_id="rv", approved_by="analyst-7",
+                                   tables={"orders": TableMapping(status="approved")}))
+        assert _cmd(c, "rv", replace=True, args=["-y", "other"]).status_code == 200
+    plan_actors = _revocation_actors(rt.ingest.load_plan("rv").notes)
+    table_actors = _revocation_actors(load_mapping("rv").tables["orders"].rationale)
+    assert plan_actors and table_actors                                 # non-vacuous
+    for a in plan_actors + table_actors:
+        assert a == dl.actor_of(a) and set(a) >= set(dl.ACTOR_FIELDS)
+        assert a["principal_id"] == "analyst-7"
+
+
+def test_tidy_a_revocation_by_a_bare_name_is_refused_and_writes_nothing(env):
+    """R-028 TIDY #5: `by` must be the actor object; a typed name is not one."""
+    from databridge_mcp_ingest.mapping import SourceMapping, TableMapping, load_mapping, save_mapping
+
+    app, rt, _ = _mount(env)
+    save_mapping(SourceMapping(source_id="nm", approved_by="analyst-7",
+                               tables={"orders": TableMapping(status="approved")}))
+    with pytest.raises(Exception):
+        rt.ingest.revoke_mapping_approval("nm", by="analyst-7", reason="r")
+    assert load_mapping("nm").tables["orders"].status == "approved"
+    with pytest.raises(Exception):
+        rt.ingest.revoke_plan_approval("nm", by="analyst-7", reason="r")
+
+
+def test_tidy_a_mapping_revocation_loads_and_saves_under_the_mapping_lock(env, monkeypatch):
+    """R-028 TIDY #2: load -> modify -> save of the mapping runs inside `mapping.mapping_lock`
+    (the one every mapping writer takes), so a concurrent approval cannot be overwritten."""
+    import contextlib
+
+    from databridge_core import decision_ledger as dl
+    from databridge_mcp_ingest import mapping as mapping_mod
+    from databridge_mcp_ingest.mapping import SourceMapping, TableMapping, save_mapping
+
+    app, rt, _ = _mount(env)
+    save_mapping(SourceMapping(source_id="lk", approved_by="analyst-7",
+                               tables={"orders": TableMapping(status="approved")}))
+    held: list[str] = []
+    seen: list[tuple[str, bool]] = []
+    real_lock, real_load, real_save = (mapping_mod.mapping_lock, rt.ingest.load_mapping,
+                                       rt.ingest._save_mapping)
+
+    @contextlib.contextmanager
+    def spy_lock(source_id, *a, **k):
+        with real_lock(source_id, *a, **k):
+            held.append(source_id)
+            try:
+                yield
+            finally:
+                held.pop()
+
+    monkeypatch.setattr(mapping_mod, "mapping_lock", spy_lock)
+    monkeypatch.setattr(rt.ingest, "load_mapping",
+                        lambda sid: (seen.append(("load", sid in held)), real_load(sid))[1])
+    monkeypatch.setattr(rt.ingest, "_save_mapping",
+                        lambda m: (seen.append(("save", m.source_id in held)), real_save(m))[1])
+    actor = dl.actor_of({"principal_id": "analyst-7", "authenticated_by": "bearer:test",
+                         "principal_type": "Principal", "dev_only": False})
+    assert rt.ingest.revoke_mapping_approval("lk", by=actor, reason="r") == ["orders"]
+    assert [k for k, _ in seen] == ["load", "save"]                     # non-vacuous
+    assert all(locked for _, locked in seen)
 
 
 def test_round2_package_runners_need_the_operators_explicit_risk_acceptance(env, monkeypatch):
@@ -1054,7 +1161,7 @@ def test_round2_an_empty_successful_ingest_counts_as_synced(env):
     with TestClient(app, headers=AUTH_HEADERS) as c:
         _cmd(c, "quiet")
         c.post("/sources/quiet/plan")
-        c.post("/sources/quiet/plan/approve")
+        approve(c, "quiet")
         c.post("/sources/quiet/runs")
         h = c.get("/sources/quiet/health").json()
     assert h["overall"] == "healthy" and h["last_success"]["status"] == "empty"
@@ -1103,7 +1210,9 @@ def test_ef3_a_failed_advert_is_reported_not_fatal(env):
             "transport": {"type": "stdio", "command": "npx"}}})
     assert r.status_code == 200, r.text
     got = r.json()["tool_advert"]["crm-write2"]
-    assert got["written"] is False and "server did not start" in got["error"]
+    # R-028 #6 (ROUTES): reported with a reference, never the exception text
+    assert got["written"] is False and "server did not start" not in got["error"]
+    assert "reference ERR-" in got["error"]
 
 
 class _RealApproveIngest(FakeIngest):
@@ -1133,7 +1242,8 @@ def _plan_with_tool(source_id, tool, cls, monkeypatch=None):
     save_plan(CrawlPlan(source_id=source_id, status="proposed",
                         steps=[StepSpec(id="walk", strategy="documents",
                                         list=ListSpec(tool=tool), read=ReadSpec(text_tool=tool))],
-                        tool_classes={tool: cls}, tools_digest=plans.tools_digest(tools)))
+                        tool_classes={tool: cls}, tools_digest=plans.tools_digest(tools),
+                        notes=bound_notes(source_id)))
 
 
 def test_ef3_plan_approval_passes_the_principals_read_vouches_through(env, monkeypatch):
@@ -1144,11 +1254,10 @@ def test_ef3_plan_approval_passes_the_principals_read_vouches_through(env, monke
     with TestClient(app, headers=auth_headers("analyst-7")) as c:
         _cmd(c, "kg")
         _plan_with_tool("kg", "open_nodes", "unclassified:unknown (no annotation)", monkeypatch)
-        r = c.post("/sources/kg/plan/approve")
+        r = approve(c, "kg")
         assert r.status_code == 409 and r.json()["refusal"]["code"] == "PLAN_NOT_APPROVABLE"
         assert "vouch_read_tools" in r.json()["refusal"]["message"]
-        r = c.post("/sources/kg/plan/approve",
-                   json={"vouch_read_tools": ["open_nodes"], "approved_by": "mallory"})
+        r = approve(c, "kg", vouch_read_tools=["open_nodes"], approved_by="mallory")
         assert r.status_code == 200, r.text
         plan = r.json()["plan"]
         assert plan["status"] == "approved" and plan["approved_by"] == "analyst-7"
@@ -1156,7 +1265,7 @@ def test_ef3_plan_approval_passes_the_principals_read_vouches_through(env, monke
 
         _cmd(c, "wr")
         _plan_with_tool("wr", "write_file", "write:name", monkeypatch)
-        r = c.post("/sources/wr/plan/approve", json={"vouch_read_tools": ["write_file"]})
+        r = approve(c, "wr", vouch_read_tools=["write_file"])
         assert r.status_code == 409 and r.json()["refusal"]["code"] == "PLAN_NOT_APPROVABLE"
         assert rt.ingest.load_plan("wr").status == "proposed"
 

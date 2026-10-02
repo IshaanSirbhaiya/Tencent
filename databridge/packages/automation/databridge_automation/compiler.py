@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import secrets
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -540,8 +541,13 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
                     default_timezone: Optional[str] = None,
                     task_class: str = TASK_CLASS,
                     purposes: Any = None, repo_root: Optional[Path] = None,
-                    packs_dir: Optional[Path] = None) -> DraftResult:
+                    packs_dir: Optional[Path] = None, run_once: bool = False) -> DraftResult:
     """Compile the user's English into a draft. See the module docstring for the pipeline.
+
+    ``run_once`` (FEAT8) compiles a ONE-TIME task: the same pipeline, catalogue, grants, purpose,
+    golden set and questions, with no trigger (words naming a schedule or event become the
+    ``one_time_trigger`` question), every action ``human_required`` (`_one_time_writes`), and a
+    ``once_…`` id. Nothing here persists it; the caller runs it once.
 
     ``harness`` is a `databridge_harness.Harness` (or None: rules only, fully offline).
     ``answers`` maps a question id from a previous result to the user's answer, e.g.
@@ -565,6 +571,8 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
     pp = prepass(text, catalogue, default_tz=tz, answers=answers, tz_source=tz_source)
     result = DraftResult(kind=pp.kind, created_from=created_from, understood="",
                          assumptions=list(pp.assumptions))
+    if run_once:
+        _one_time_writes(pp, result)
     derivations: list[dict] = [dict(d) for d in pp.derivations]
 
     def derive(field_name: str, value: Any, by: str, *, evidence: str = "",
@@ -677,7 +685,7 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
             steps = [re.sub(r"^\d+[.)]\s*", "", s).strip() for s in proposal.instructions
                      if s.strip()]
             derive("instructions", steps, "model", meta=meta)
-        if not pp.schedule and not pp.event and proposal.trigger_type != "manual":
+        if not run_once and not pp.schedule and not pp.event                 and proposal.trigger_type != "manual":
             questions.append(Question(
                 "trigger", "I didn't find a schedule or an event in your words, but this reads "
                            "like an automation. When should it run? (e.g. 'every weekday at 9am', "
@@ -741,7 +749,11 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
             derive(f"actions[{name}].tool", tool, "model+answer", evidence=f"{qid} = yes",
                    meta=meta)
             answer = answers.get(f"mode:{name}")
-            if answer in _MODES:
+            if run_once:
+                af.automation_mode = "human_required"
+                derive(f"actions[{name}].automation_mode", "human_required", "rule",
+                       evidence=ONE_TIME_EVIDENCE)
+            elif answer in _MODES:
                 af.automation_mode = answer
                 derive(f"actions[{name}].automation_mode", answer, "answer",
                        evidence=f"mode:{name} = {answer}")
@@ -827,9 +839,16 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
         derive("instructions", steps, "rule", evidence="the request's own sentences, numbered")
     model_id = bool(proposal and proposal.agent_id.strip())
     base_id = slug(proposal.agent_id if model_id else title)
-    spec_id = _unique_id(base_id, existing)
-    derive("id", spec_id, "model" if model_id else "rule", meta=meta if model_id else None,
-           evidence="slug, unique among existing ids")
+    if run_once:
+        # a one-time task is never an agent: its own prefix, and a fresh suffix so two compiles of
+        # the same words are two tasks (each one's spec is kept as its run's record)
+        spec_id = _unique_id(f"{ONE_TIME_PREFIX}{slug(title, max_len=32)}_"
+                             f"{secrets.token_hex(4)}", existing)
+        derive("id", spec_id, "rule", evidence="a one-time task's id: once_<title slug>_<random>")
+    else:
+        spec_id = _unique_id(base_id, existing)
+        derive("id", spec_id, "model" if model_id else "rule", meta=meta if model_id else None,
+               evidence="slug, unique among existing ids")
 
     if pp.schedule:
         trigger: dict = {"type": "schedule", "schedule": {"cron": pp.schedule.cron,
@@ -909,6 +928,36 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
         result.understood += "\nI assumed: " + "; ".join(result.assumptions) + "."
     result.derivations = derivations
     return result
+
+
+#: FEAT8: a one-time task's id prefix, and the evidence recorded for every write it declares.
+ONE_TIME_PREFIX = "once_"
+ONE_TIME_EVIDENCE = ("a one-time task: every write waits for a person's approval, whatever the "
+                     "words say (it is never automatic)")
+
+
+def _one_time_writes(pp: PrePass, result: DraftResult) -> None:
+    """FEAT8: shape the rule findings for a one-time task. Every action becomes `human_required`
+    (a stated "tell me after" / "just do it" is noted, never applied), so the mode and reversal
+    questions are not asked. Words naming a schedule or an event are a question, not a trigger."""
+    names = {a.name for a in pp.actions}
+    for a in pp.actions:
+        if a.automation_mode and a.automation_mode != "human_required":
+            result.notes.append(f"a one-time task never writes without approval: "
+                                f"'{a.clause}' was asked to be {a.automation_mode}; it will wait "
+                                f"for you (human_required)")
+        a.automation_mode = "human_required"
+        pp.derive(f"actions[{a.name}].automation_mode", "human_required", "rule",
+                  evidence=ONE_TIME_EVIDENCE)
+    pp.questions = [q for q in pp.questions
+                    if not (q.id.split(":", 1)[0] in ("mode", "reversal") and ":" in q.id
+                            and q.id.split(":", 1)[1] in names)]
+    if pp.schedule or pp.event:
+        what = "a schedule" if pp.schedule else "an event"
+        pp.ask("one_time_trigger",
+               f"A one-time task runs once, now, but your words name {what}. A job that runs on "
+               f"its own is an agent: build it in the Builder, or remove the timing words to run "
+               f"it once here.")
 
 
 #: The step a request that names a subject kind (a person) always carries: identity is never
@@ -1087,4 +1136,4 @@ def save_draft(result: DraftResult, *, activate: bool = False,
 
 __all__ = ["compile_english", "DraftResult", "ModelProposal", "ProposedAction", "save_draft",
            "ActivationRefused", "TASK_CLASS", "PROMPT_VERSION", "federated_question_id",
-           "FED_PREFIX"]
+           "FED_PREFIX", "ONE_TIME_PREFIX", "ONE_TIME_EVIDENCE"]

@@ -11,6 +11,7 @@
 import { GATEWAY, authHeaders } from "./api";
 import type { ActionCard, BlockedProposal } from "./outbox-api";
 import type { Refusal, SourcePointer } from "./types";
+import { describeValueState, isValueState, type ValueState } from "./value-state";
 
 /** A count and the population it was counted over, plus the ids behind it. Never one without
  *  the others — `members` is what lets a reader walk from the number to the traversal. */
@@ -189,18 +190,18 @@ export interface SubgraphResponse {
 
 /** One value the agent reported, already RENDERED by the backend.
  *
- *  `text`, not `value`: what this page prints is what the backend's renderer produced. An
- *  instruction-shaped value arrives as a fixed redaction line with `redacted: true` and its
- *  citation intact — so a withheld line still walks to its evidence, and must be styled as
- *  deliberate rather than as a hole. */
+ *  `text`, not `value`: what this page prints is what the backend's renderer produced. A value the
+ *  renderer would not print (instruction-shaped) arrives as the standard withheld envelope
+ *  `{status, reason, pointers}` in `text`'s place (R-028 TIDY #7) with its citation intact — so a
+ *  withheld line still walks to its evidence, and must be styled as deliberate rather than as a
+ *  hole. Read it through `answerValueText`. */
 export interface AnswerValue {
   key: string;
   tool: string;
   row: number;
   field: string;
   scope: string;
-  text: string;
-  redacted: boolean;
+  text: string | ValueState;
   citation: string;
   source: SourcePointer;
 }
@@ -279,6 +280,15 @@ export const intelligenceApi = {
  *  `source_id` — which is what makes a citation walkable to `/intelligence/subgraph/{id}`. Any
  *  other shape is not linked rather than linked hopefully: a citation that 404s is worse than a
  *  citation rendered as plain text. */
+/** What the page prints for one value: the rendered text, or — for the withheld envelope — the
+ *  shared sentence (`lib/value-state.ts`). Anything that is not a string and not the strict
+ *  envelope is treated as withheld and never printed (fail closed). */
+export function answerValueText(value: AnswerValue): { text: string; withheld: boolean } {
+  if (typeof value.text === "string") return { text: value.text, withheld: false };
+  if (isValueState(value.text)) return { text: describeValueState(value.text), withheld: true };
+  return { text: "Withheld: this value is not shown.", withheld: true };
+}
+
 export function citedEntity(value: AnswerValue): string | null {
   const id = value.source?.source_id;
   if (value.source?.kind !== "derived" || typeof id !== "string") return null;
@@ -346,9 +356,9 @@ export interface ConsoleRequest {
   /** Which registration this concerns. Named by a PERSON — the agent may not choose. */
   intake_id?: string | null;
   /** Door (b) of the recipient rule: an address a member of staff typed. Read only by a policy
-   *  rule that declares that door; a rule declaring `committed_ledger` refuses one outright. */
+   *  rule that declares that door; a rule declaring `committed_ledger` refuses one outright.
+   *  Who typed it is the signed-in principal; there is no `typed_by` (R-027 ONE). */
   typed_address?: string | null;
-  typed_by?: string | null;
 }
 
 export const consoleApi = {

@@ -12,9 +12,10 @@
   table nobody has ever looked at. "Was approved" is read from the append-only approvals log, not
   from wording.
 
-Nothing here names a domain, a table or a kind. A link into a PERSON kind (`is_person_kind`, the
-pack's subject kinds) is never offered for approval and shows no sample keys: those would be
-person-record keys (hard constraint 1).
+Nothing here names a domain, a table or a kind. A link into a SUBJECT kind (`is_subject_kind`,
+R-028 standard 7; persons are a subset of subjects) is never offered for approval and shows no
+sample keys: those would be subject-record keys (hard constraint 1). `is_person_kind` is used only
+to SAY which subjects are people.
 """
 from __future__ import annotations
 
@@ -52,15 +53,15 @@ def _snapshots_of(source_id: str, cache: dict) -> dict:
 def link_evidence(source_id: str, table: str, link: dict, vocab, cache: dict) -> dict:
     """The proposal's own counts, plus what the captured rows show: how many DISTINCT values
     matched, how many keys the target has, and up to `SAMPLE_KEYS` matched keys. Never sample keys
-    for a link into a person kind."""
-    from databridge_mcp_ingest.mapping import _key_values, is_person_kind  # noqa: PLC0415
+    for a link into a subject kind (R-028 TIDY #3)."""
+    from databridge_mcp_ingest.mapping import _key_values, is_subject_kind  # noqa: PLC0415
 
     out: dict[str, Any] = {"matched": link.get("matched"), "with_value": link.get("with_value"),
                            "distinct_matched": None, "target_keys": None, "samples": None,
                            "samples_note": None}
-    if is_person_kind(vocab, link.get("target_kind")):
-        out["samples_note"] = ("not shown: the target kind stands for people, so its keys are "
-                               "person-record keys")
+    if is_subject_kind(vocab, link.get("target_kind")):
+        out["samples_note"] = ("not shown: the target kind is a protected subject, so its keys "
+                               "are subject-record keys")
         return out
     mine = _snapshots_of(source_id, cache).get(table)
     theirs = _snapshots_of(str(link.get("source")), cache).get(str(link.get("table")))
@@ -227,8 +228,8 @@ def review(source_id: str, vocab=None) -> dict:
     """GET /sources/{id}/mapping/review — every link proposal (with evidence), every table that
     needs a person's approval again, and every table's per-row kind split (FIN-04 / ID7) with the
     rows each value moves."""
-    from databridge_mcp_ingest.mapping import (is_person_kind, load_mapping,  # noqa: PLC0415
-                                               logged_approvals)
+    from databridge_mcp_ingest.mapping import (is_person_kind,  # noqa: PLC0415
+                                               is_subject_kind, load_mapping, logged_approvals)
 
     vocab = vocab if vocab is not None else _vocab()
     m = load_mapping(source_id)
@@ -245,7 +246,8 @@ def review(source_id: str, vocab=None) -> dict:
         if sp:
             splits[table] = sp
         for lk in tm.links or []:
-            person = is_person_kind(vocab, lk.get("target_kind"))
+            subject = is_subject_kind(vocab, lk.get("target_kind"))     # decides (TIDY #3)
+            person = is_person_kind(vocab, lk.get("target_kind"))       # display only
             edge = lk.get("edge") or {}
             links.append({
                 "table": table, "column": lk.get("column"), "target": link_target(lk),
@@ -255,7 +257,8 @@ def review(source_id: str, vocab=None) -> dict:
                 "why": lk.get("why"), "basis": lk.get("basis"),
                 "alternatives": lk.get("alternatives") or [],
                 "person_target": person,
-                "approvable": lk.get("status") == "proposed" and bool(edge) and not person,
+                "subject_target": subject,
+                "approvable": lk.get("status") == "proposed" and bool(edge) and not subject,
                 "decided_by": lk.get("approved_by") or lk.get("rejected_by"),
                 "decided_at": lk.get("at"),
                 "decided_dev_only": lk.get("decided_dev_only"),
@@ -273,16 +276,16 @@ def _find(tm: Any, column: str, target: Optional[str]) -> list[dict]:
 
 def person_target_refusal(source_id: str, table: str, column: str, target: Optional[str],
                           vocab) -> Optional[str]:
-    """The refusal for a link into a person kind, checked BEFORE the engine is asked (the engine
-    refuses it as well)."""
-    from databridge_mcp_ingest.mapping import is_person_kind, load_mapping  # noqa: PLC0415
+    """The refusal for a link into a SUBJECT kind (persons included; R-028 TIDY #3), checked
+    BEFORE the engine is asked (the engine refuses it as well)."""
+    from databridge_mcp_ingest.mapping import is_subject_kind, load_mapping  # noqa: PLC0415
 
     tm = load_mapping(source_id).tables.get(table)
     if tm is None:
         return None
     for lk in _find(tm, column, target):
-        if is_person_kind(vocab, lk.get("target_kind")):
+        if is_subject_kind(vocab, lk.get("target_kind")):
             return (f"{table}.{column} -> {link_target(lk)} points at {lk.get('target_kind')!r}, a "
-                    f"kind that stands for people: an inferred link never points at a person "
-                    f"record (hard constraint 1)")
+                    f"protected subject kind: an inferred link never points at a subject record "
+                    f"(hard constraint 1)")
     return None

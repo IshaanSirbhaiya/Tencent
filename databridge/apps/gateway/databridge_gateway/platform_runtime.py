@@ -61,6 +61,25 @@ def now_iso() -> str:
 #: has since been replaced" — such a plan is never approvable or runnable; it is proposed again.
 PLAN_REVISION_NOTE = "gateway:proposed-for-connection-revision="
 PLAN_APPROVED_NOTE = "gateway:approved-for-connection-revision="
+#: R-028 TIDY #5: a revocation note ends with this tag and the common actor object (canonical
+#: JSON, `decision_ledger.actor_of`) of the person whose action revoked the approval.
+REVOKED_ACTOR_TAG = " | actor="
+
+
+def revocation_actor(by: Any) -> dict:
+    """The common actor object for a revocation (`decision_ledger.actor_of`). A bare string or a
+    decorated id is refused (`DecisionRefused`, APPROVER_NOT_AUTHENTICATED): a revocation is a
+    decision and records who made it the way every other decision does."""
+    from databridge_core.decision_ledger import actor_of               # noqa: PLC0415
+    if not isinstance(by, dict):
+        return actor_of({})                                            # refuses: not an actor
+    return actor_of(by)
+
+
+def _revocation_note(approved_by: Any, actor: dict, reason: str) -> str:
+    import json                                                        # noqa: PLC0415
+    return (f"{now_iso()}: approval by {approved_by!r} revoked by {actor['principal_id']!r}: "
+            f"{reason}{REVOKED_ACTOR_TAG}{json.dumps(actor, sort_keys=True, separators=(',', ':'))}")
 PLAN_SUPERSEDED = "superseded"
 
 
@@ -117,21 +136,39 @@ class IngestFacade:
         return list(fn() or []) if callable(fn) else []
 
     # plans + mappings
-    def propose_plan(self, source_id: str, *, harness: Any = None):
-        return self._mi.propose_plan(source_id, harness=harness)
+    def propose_plan(self, source_id: str, *, harness: Any = None,
+                     bind_notes: Optional[list[str]] = None,
+                     expected_revision: Optional[str] = None, revision_of: Any = None):
+        """The package's `propose_plan`. ``bind_notes`` (the revision binding) are written by the
+        SAME save as the proposal (R-027 r2 #5)."""
+        return self._mi.propose_plan(source_id, harness=harness,
+                                     bind_notes=list(bind_notes or []) or None,
+                                     expected_revision=expected_revision,
+                                     revision_of=revision_of)
 
     def load_plan(self, source_id: str):
         return self._mi.load_plan(source_id)
 
     def approve_plan(self, source_id: str, *, principal: Any,
-                     vouch_read_tools: Optional[list[str]] = None):
+                     vouch_read_tools: Optional[list[str]] = None,
+                     bind_notes: Optional[list[str]] = None,
+                     expected_plan_digest: Optional[str] = None,
+                     expected_revision: Optional[str] = None, revision_of: Any = None):
         """The package's `approve_plan`. ``principal`` is the AUTHENTICATED principal OBJECT the
         auth layer issued (INT3): mcp_ingest refuses a bare id string, so the object is forwarded,
         never ``principal.principal_id``. ``vouch_read_tools`` (EF3 / Codex b) is the approving
         principal's explicit per-tool confirmation that an UNCLASSIFIED tool is a read; the
-        package accepts it only for unknowns and never for a write."""
+        package accepts it only for unknowns and never for a write. ``bind_notes`` (the gateway's
+        revision binding, R-027 r1 #3) are written by the SAME approval: one save carries the
+        status, the binding and the approval record, and the chained log line records them.
+        ``expected_plan_digest`` / ``expected_revision`` (R-027 r2 #2) are compared by the package
+        with the plan and connection IT loads, under the plan lock."""
         return self._mi.approve_plan(source_id, principal=principal,
-                                     vouch_read_tools=list(vouch_read_tools or []) or None)
+                                     vouch_read_tools=list(vouch_read_tools or []) or None,
+                                     bind_notes=list(bind_notes or []) or None,
+                                     expected_plan_digest=expected_plan_digest,
+                                     expected_revision=expected_revision,
+                                     revision_of=revision_of)
 
     def write_tool_advert(self, source_id: str) -> Path:
         """Record the connection's LIVE tool list where the automation catalogue reads it
@@ -139,7 +176,7 @@ class IngestFacade:
         from databridge_mcp_ingest.plans import write_tool_advert     # noqa: PLC0415
         return write_tool_advert(source_id)
 
-    def revoke_plan_approval(self, source_id: str, *, by: str, reason: str,
+    def revoke_plan_approval(self, source_id: str, *, by: dict, reason: str,
                              supersede: bool = True) -> bool:
         """Return an APPROVED plan to ``proposed`` (R-019 platform #2): the connection it was
         approved for has been replaced. The plan file is rewritten with the revocation recorded
@@ -148,7 +185,18 @@ class IngestFacade:
 
         ``supersede`` (R-019 round 2, platform #1) also binds the plan to "a connection that no
         longer exists": a plan proposed for the OLD connection — approved or merely proposed —
-        can then not be approved for the new one; it has to be proposed again (`plan_binding`)."""
+        can then not be approved for the new one; it has to be proposed again (`plan_binding`).
+        Load and save run under the package's plan lock (R-027 r2 #2). ``by`` is the common
+        actor object (R-028 TIDY #5); a bare name is refused before anything is read."""
+        actor = revocation_actor(by)
+        with self._plan_lock(source_id):
+            return self._revoke_locked(source_id, by=actor, reason=reason, supersede=supersede)
+
+    def _plan_lock(self, source_id: str):
+        from databridge_mcp_ingest.plans import plan_lock             # noqa: PLC0415
+        return plan_lock(source_id)
+
+    def _revoke_locked(self, source_id: str, *, by: dict, reason: str, supersede: bool) -> bool:
         try:
             plan = self.load_plan(source_id)
         except Exception:                                             # noqa: BLE001
@@ -156,8 +204,7 @@ class IngestFacade:
         was_approved = getattr(plan, "status", None) == "approved"
         notes = list(getattr(plan, "notes", []) or [])
         if was_approved:
-            notes.append(f"{now_iso()}: approval by {plan.approved_by!r} revoked by {by!r}: "
-                         f"{reason}")
+            notes.append(_revocation_note(plan.approved_by, by, reason))
         if supersede:
             notes.append(f"{PLAN_REVISION_NOTE}{PLAN_SUPERSEDED}")
         if not was_approved and not supersede:
@@ -170,10 +217,13 @@ class IngestFacade:
 
     def stamp_plan(self, source_id: str, prefix: str, value: str):
         """Append one binding note (``<prefix><value>``) to the plan on disk and return it. The
-        binding lives in the plan's own ``notes`` so it is as durable as the approval it binds."""
-        plan = self.load_plan(source_id)
-        stamped = plan.model_copy(update={"notes": [*(plan.notes or []), f"{prefix}{value}"]})
-        self._save_plan(stamped)
+        binding lives in the plan's own ``notes`` so it is as durable as the approval it binds.
+        Under the plan lock (R-027 r2 #2); the routes no longer stamp a proposal or an approval —
+        the package writes those bindings in the same save."""
+        with self._plan_lock(source_id):
+            plan = self.load_plan(source_id)
+            stamped = plan.model_copy(update={"notes": [*(plan.notes or []), f"{prefix}{value}"]})
+            self._save_plan(stamped)
         return stamped
 
     def _save_plan(self, plan: Any) -> None:
@@ -183,26 +233,37 @@ class IngestFacade:
     def load_mapping(self, source_id: str):
         return self._mi.load_mapping(source_id)
 
-    def revoke_mapping_approval(self, source_id: str, *, by: str, reason: str) -> list[str]:
+    def revoke_mapping_approval(self, source_id: str, *, by: dict, reason: str) -> list[str]:
         """Every APPROVED table mapping of ``source_id`` back to ``proposed`` (R-019 round 2,
         platform #2): a mapping approval covers the connection whose tables a person reviewed,
         not whatever is registered under the id later. The revocation is recorded in each
-        table's ``rationale`` (who, when, why) and nothing is deleted. Returns the tables."""
-        try:
-            mapping = self.load_mapping(source_id)
-        except Exception:                                             # noqa: BLE001
-            return []
-        tables = dict(getattr(mapping, "tables", {}) or {})
-        revoked = sorted(t for t, tm in tables.items() if getattr(tm, "status", None) == "approved")
-        if not revoked:
-            return []
-        note = (f"{now_iso()}: approval by {mapping.approved_by!r} revoked by {by!r}: {reason}")
-        for t in revoked:
-            tm = tables[t]
-            tables[t] = tm.model_copy(update={"status": "proposed",
-                                              "rationale": [*(tm.rationale or []), note]})
-        self._save_mapping(mapping.model_copy(update={"tables": tables, "approved_by": None}))
-        return revoked
+        table's ``rationale`` (who, when, why) and nothing is deleted. Returns the tables.
+
+        R-028 TIDY #2/#5: ``by`` is the common actor object, and load -> modify -> save runs under
+        `mapping.mapping_lock` (the lock every mapping writer takes; `save_mapping` writes
+        atomically under the same re-entrant lock)."""
+        actor = revocation_actor(by)
+        with self._mapping_lock(source_id):
+            try:
+                mapping = self.load_mapping(source_id)
+            except Exception:                                         # noqa: BLE001
+                return []
+            tables = dict(getattr(mapping, "tables", {}) or {})
+            revoked = sorted(t for t, tm in tables.items()
+                             if getattr(tm, "status", None) == "approved")
+            if not revoked:
+                return []
+            note = _revocation_note(mapping.approved_by, actor, reason)
+            for t in revoked:
+                tm = tables[t]
+                tables[t] = tm.model_copy(update={"status": "proposed",
+                                                  "rationale": [*(tm.rationale or []), note]})
+            self._save_mapping(mapping.model_copy(update={"tables": tables, "approved_by": None}))
+            return revoked
+
+    def _mapping_lock(self, source_id: str):
+        from databridge_mcp_ingest import mapping as _mapping          # noqa: PLC0415
+        return _mapping.mapping_lock(source_id)
 
     def _save_mapping(self, mapping: Any) -> None:
         from databridge_mcp_ingest.mapping import save_mapping        # noqa: PLC0415

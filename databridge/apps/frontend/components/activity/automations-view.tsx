@@ -9,10 +9,11 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Inbox } from "lucide-react";
 import {
+  actorText,
   decisionRefusalText,
-  deciderText,
   fetchAutomations,
   formatDuration,
+  isPerson,
   itemTone,
   type ActivityItem,
   type AutomationFiring,
@@ -141,8 +142,8 @@ function FiringRow({
         <StatusPill status={f.status} tone={tone} />
         <span className="text-2xs text-subtle">{when(f.at)}</span>
         <span className="font-mono text-2xs text-fg">{f.idempotency_key}</span>
-        {f.started_by?.type === "person" ? (
-          <span className="text-2xs text-subtle">fired by {f.started_by.id}</span>
+        {f.started_by && isPerson(f.started_by) ? (
+          <span className="text-2xs text-subtle">fired by {actorText(f.started_by)}</span>
         ) : null}
       </button>
       <div className="mt-1 flex flex-col gap-1 pl-4 text-2xs">
@@ -169,7 +170,7 @@ function FiringRow({
           >
             approval <span className="font-mono text-fg">{a.name ?? a.action_id}</span> —{" "}
             <span className={a.outcome === "execution_failed" || a.outcome === "refused" ? "text-band-review" : "text-fg"}>{a.outcome}</span>
-            {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${deciderText(a.decided_by, a.decided_by_dev_only)}` : " · no decision recorded"}
+            {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${actorText(a.actor)}` : " · no decision recorded"}
           </button>
         ))}
       </div>

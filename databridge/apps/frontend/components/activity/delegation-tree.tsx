@@ -9,7 +9,9 @@ import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import {
   coverageWarning,
+  envelopeText,
   formatDuration,
+  isEnvelope,
   subtaskTone,
   type DelegationTree as Tree,
   type SubtaskNode,
@@ -197,7 +199,11 @@ function Subtask({ t }: { t: SubtaskNode }) {
         <KV label="pushed down">
           {t.pushed_down === null ? <Maybe value={null} /> : t.pushed_down ? "yes" : "no"}
         </KV>
-        {t.query ? <KV label="query"><Verbatim text={t.query} max={2000} /></KV> : null}
+        {typeof t.query === "string" && t.query ? (
+          <KV label="query"><Verbatim text={t.query} max={2000} /></KV>
+        ) : isEnvelope(t.query) ? (
+          <KV label="query"><span className="italic text-subtle/80">{envelopeText(t.query)}</span></KV>
+        ) : null}
         <KV label="rows read">
           <Maybe value={t.rows_returned} /> <span className="text-subtle/70">({t.rows_basis})</span>
         </KV>
@@ -217,8 +223,10 @@ function Subtask({ t }: { t: SubtaskNode }) {
             </ul>
           </KV>
         ) : null}
-        {t.delegate_note && !t.query ? (
+        {typeof t.delegate_note === "string" && t.delegate_note && typeof t.query !== "string" ? (
           <KV label="note"><Verbatim text={t.delegate_note} max={1500} /></KV>
+        ) : isEnvelope(t.delegate_note) ? (
+          <KV label="note"><span className="italic text-subtle/80">{envelopeText(t.delegate_note)}</span></KV>
         ) : null}
       </dl>
     </div>

@@ -29,6 +29,7 @@ import datetime as dt
 import inspect
 import json
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -47,6 +48,41 @@ MIN_CHUNK = 120
 
 class BuildError(RuntimeError):
     pass
+
+
+# --- capture-only discovery (FEAT8, Codex R-027 AAX f1 #1) ----------------------------------------
+class CaptureOnlyViolation(BuildError):
+    """A graph write was attempted while a capture-only discovery run is in progress on this
+    thread. Discovery captures, screens and profiles; it NEVER builds."""
+
+
+_CAPTURE_ONLY = threading.local()
+
+
+@contextmanager
+def capture_only():
+    """Mark this thread as running a capture-only discovery: every graph-writing entry point of
+    this module (`store_batch`, `ProseBuilder.apply`, `build_tables`,
+    `consolidate_identity_after_run`) refuses with `CaptureOnlyViolation` until the block ends.
+    Thread-local, so another source's ordinary build on another thread is unaffected."""
+    before = getattr(_CAPTURE_ONLY, "depth", 0)
+    _CAPTURE_ONLY.depth = before + 1
+    try:
+        yield
+    finally:
+        _CAPTURE_ONLY.depth = before
+
+
+def in_capture_only() -> bool:
+    return getattr(_CAPTURE_ONLY, "depth", 0) > 0
+
+
+def assert_may_build(what: str) -> None:
+    """Refuse a graph write inside a capture-only discovery (enforced by ingest, not the UI)."""
+    if in_capture_only():
+        raise CaptureOnlyViolation(f"{what} refused: this is a capture-only discovery run - it "
+                                   f"captures, screens and profiles, and builds nothing until a "
+                                   f"person approves the mapping and hands the source off")
 
 
 # --- chunking ------------------------------------------------------------------------------------
@@ -219,6 +255,7 @@ def store_batch(store):
     holds the store's own lock for the block (single writer) and defers `commit()` on its
     connection. Anything that is not a sqlite-backed `GraphStore` is written through unbatched.
     A failure rolls back the whole document — never a half-written one."""
+    assert_may_build("store_batch")
     native = getattr(store, "batch", None)
     if callable(native):
         with native():
@@ -551,6 +588,7 @@ class ProseBuilder:
     def apply(self, plan: DocPlan, results: list) -> DocBuild:
         """Write the document: `results[i]` is `(GraphExtractionResult, ms)` for `plan.jobs[i]`
         (bridges last). One transaction per document."""
+        assert_may_build("ProseBuilder.apply")
         from databridge_graph.kinds import EdgeKind
         from databridge_graph.merge import upsert_edge, upsert_node
         from databridge_graph.schema import GraphEdge
@@ -1284,6 +1322,7 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
     kind; the row it names may have been built as another kind of the split, and is met there —
     only when the edge's declaration admits that kind (else the edge is not built, and counted
     `kind_not_admitted`)."""
+    assert_may_build("build_tables")
     from databridge_graph import estate_seed as es
     from databridge_graph.merge import upsert_edge, upsert_node
 
@@ -1471,6 +1510,7 @@ def consolidate_identity_after_run(store, vocab) -> dict:
     merged and the record says so. A SUBJECT kind is never touched — the graph has no rule for one.
     An unreadable approval state REFUSES (fail closed): nothing merges, the run carries on, and
     the record names the error. Returns {status, merged, refused, kinds, absorbed}."""
+    assert_may_build("consolidate_identity_after_run")
     try:
         from databridge_graph.merge import consolidate_identity
     except ImportError as exc:                                       # pragma: no cover
@@ -1792,4 +1832,5 @@ __all__ = ["chunk_spans", "span_pointer", "cell_pointer", "derived_pointer", "Pr
            "listing_capture", "LISTING_TABLE", "CHUNK_CHARS", "reference_index",
            "resolve_reference", "finish_completeness", "unbuilt_completeness",
            "reference_completeness", "consolidate_identity_after_run", "KIND_KEY",
-           "CHUNK_OVERLAP", "ROW_KEY", "FK_PREFIX", "CANON_KEY", "BuildError", "source_ref"]
+           "CHUNK_OVERLAP", "ROW_KEY", "FK_PREFIX", "CANON_KEY", "BuildError", "source_ref",
+           "CaptureOnlyViolation", "capture_only", "in_capture_only", "assert_may_build"]

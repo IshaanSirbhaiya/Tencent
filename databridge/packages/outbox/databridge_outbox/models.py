@@ -333,6 +333,10 @@ class OutboxEntry(BaseModel):
     sent_at: Optional[str] = None
     message_id: Optional[str] = None
     supersedes: Optional[int] = None
+    #: The structured actor object of the decider (R-028 #7): ``{principal_id, authenticated_by,
+    #: principal_type, dev_only, delegation?}``. ``None`` on a row decided before it was recorded.
+    approved_actor: Optional[dict] = None
+    rejected_actor: Optional[dict] = None
 
     @property
     def is_dispatchable(self) -> bool:

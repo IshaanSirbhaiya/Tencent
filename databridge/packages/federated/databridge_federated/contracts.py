@@ -28,6 +28,10 @@ DATE_FIELD = "date"            # a document node's GROUNDED `date` attribute (do
                                # never its valid_from: an undated node has an unknown date
 #: `EntityRef.via` of a documents row's OWN node (the row IS that entity; E2E N-02).
 SELF_VIA = "self"
+#: A tabular row's RECORD TIME (DSD): the instant the facts copy it was read from was extracted —
+#: when the platform's copy of the row became valid. A metadata column, cited like any other cell
+#: (a `query_cell` of the same statement); asked for with ``SubTask.record_time``.
+RECORD_TIME_FIELD = "_record_as_of"
 #: A symbolic filter value: the injected clock's date, resolved deterministically before any read
 #: (`resolve_symbols`). The model never writes a date; "due before today" is ``due_on lt @today``.
 TODAY_TOKEN = "@today"
@@ -181,6 +185,10 @@ class SubTask(_Frozen):
     #: documents only: which graph edges from a document node count as "mentions an entity"
     #: (empty ⇒ every edge kind the vocabulary declares from that node kind).
     link_edges: tuple[str, ...] = ()
+    #: tabular rows only (DSD): also return each row's RECORD TIME (`RECORD_TIME_FIELD`), read in
+    #: the same statement from the facts store's own extraction record. Time as a column, never a
+    #: filter.
+    record_time: bool = False
 
     @model_validator(mode="after")
     def _shape(self) -> "SubTask":
@@ -405,7 +413,7 @@ def resolve_symbols(plan: "DelegationPlan", today: dt.date) -> "DelegationPlan":
     return plan.model_copy(update={"subtasks": subtasks, "combine": combine})
 
 
-__all__ = ["FIELD_RE", "TEXT_FIELD", "DATE_FIELD", "SELF_VIA", "TODAY_TOKEN", "resolve_value",
+__all__ = ["FIELD_RE", "RECORD_TIME_FIELD", "TEXT_FIELD", "DATE_FIELD", "SELF_VIA", "TODAY_TOKEN", "resolve_value",
            "resolve_symbols", "PERIODS", "resolve_period", "Filter",
            "TimeWindow", "Aggregate", "SubTask", "EntityRef", "ResultRow", "SkippedRead",
            "DelegateCoverage", "SubResult", "LinkSpec", "CompareSpec", "CombineSpec",

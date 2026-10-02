@@ -1160,7 +1160,9 @@ class PlatformReader:
         if pointer.kind == "query_cell":
             ans = self._rerun(pointer.query_hash or "")
             if ans is None:
-                return None
+                # DSD: a delegate's read (bound parameters) is re-run from the query artefact the
+                # facts store kept for it, once per statement
+                return self._resolve_query_artefact(pointer)
             if pointer.snapshot is not None and ans.facts_sha256 != pointer.snapshot.content_hash:
                 return None
             try:
@@ -1171,6 +1173,10 @@ class PlatformReader:
             if self._record_store(pointer) is not None:
                 return self._resolve_record(pointer)
             return self._resolve_captured_cell(pointer)
+        if pointer.kind == "derived" and _dsd_kind(pointer) is not None:
+            from .delegated import resolve_dsd
+            return resolve_dsd(pointer, facts_dir=self._roots()[0], resolve_leaf=self.resolve,
+                               graph_store=self._store)
         if pointer.kind == "derived" and pointer.predicate is not None:
             return self._rerun_aggregate(pointer)
         if pointer.kind == "derived" and pointer.derived_from:
@@ -1304,6 +1310,50 @@ class PlatformReader:
             return None
         return len(ids)
 
+    def _resolve_query_artefact(self, pointer: SourcePointer) -> Optional[Any]:
+        """A `query_cell` of a read this reader did not make (a delegate's, with bound
+        parameters): its statement and parameters come from the query ARTEFACT the facts store
+        kept, it is re-run read-only against the file the pointer captured, and its identity is
+        recomputed (`count.resolve_query_cell`'s rule) — once per statement, then reused."""
+        from databridge_mcp_ingest.tabular import count as cq
+        from databridge_mcp_ingest.tabular.facts import facts_path, sha256_file
+
+        qhash = pointer.query_hash or ""
+        key = ("artefact", pointer.source_id, qhash)
+        if key not in self._reruns:
+            got = None
+            try:
+                root = self._roots()[0]
+                path = facts_path(pointer.source_id, root)
+                art = cq.queries_dir(pointer.source_id, root) / f"{qhash}.json"
+                if path.is_file() and art.is_file() and                         sha256_file(path) == pointer.capture_digest:
+                    body = json.loads(art.read_text(encoding="utf-8"))
+                    if body.get("params_kind") == "named":
+                        params: Any = {k: cq._param_restore(v)
+                                       for k, v in (body.get("params") or {}).items()}
+                    else:
+                        params = tuple(cq._param_restore(v) for v in body.get("params") or [])
+                    max_rows = int(body.get("max_rows") or cq.MAX_ROWS)
+                    _schema, ordered, cols, fetched = cq._run(path, body["sql"], params,
+                                                              max_rows)
+                    rows = [list(r) for r in fetched[:max_rows]]
+                    rsha = cq.result_digest(cols, [[str(v) if isinstance(v, bytes) else v
+                                                    for v in r] for r in rows])
+                    if cq.query_identity(body["sql"], cq.params_digest(params), rsha,
+                                         ordered=ordered, rows=len(rows)) == qhash:
+                        got = (cols, rows)
+            except Exception:                                    # noqa: BLE001 - unresolved
+                got = None
+            self._reruns[key] = got
+        got = self._reruns[key]
+        if got is None:
+            return None
+        cols, rows = got
+        try:
+            return rows[pointer.row_ordinal][cols.index(pointer.column)]
+        except (IndexError, ValueError, TypeError):
+            return None
+
     def _rerun(self, query_hash: str):
         """Re-execute a facts read by its query hash — once per build, then reused. A re-run, not
         the cached answer from the read itself: resolving against the read's own rows would be a
@@ -1370,12 +1420,18 @@ class PlatformReader:
         got = self.resolve(cell.pointer)
         if got is None:
             return (False, False)
-        if cell.pointer.kind in ("query_cell", "table_cell"):
+        if cell.pointer.kind in ("query_cell", "table_cell") or _dsd_kind(cell.pointer):
             return (True, got == cell.value)
         if isinstance(cell.value, str) and got == cell.value:
             return (True, True)
         needle = str(cell.value).casefold()
         return (True, needle in str(got).casefold())
+
+
+def _dsd_kind(pointer: SourcePointer) -> Optional[str]:
+    """The DSD pointer family (`delegated.dsd_kind`), imported lazily."""
+    from .delegated import dsd_kind
+    return dsd_kind(pointer)
 
 
 def _claimant(e: PlatformEntity) -> str:

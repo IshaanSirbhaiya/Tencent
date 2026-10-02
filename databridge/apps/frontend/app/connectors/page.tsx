@@ -8,6 +8,10 @@
  * connected (`/sources/*` on the gateway): the sources list, "Add source", the plan approval, the
  * live run and each source's run history. The route keeps its name so existing links land here.
  *
+ * Above the list: "Propose plans for all", "Approve all pending plans" (one review dialog, then one
+ * batch through the per-plan approval) and "Run all approved sources" (`components/sources/
+ * batch-actions.tsx`, FEAT8).
+ *
  * URL state: `?source=<id>` selects a source, `&run=<run_id>` opens a run, `?add=1` opens the form.
  */
 import * as React from "react";
@@ -22,6 +26,7 @@ import { FailureNotice, Section } from "@/components/sources/common";
 import { SourcesList } from "@/components/sources/sources-list";
 import { AddSourceForm } from "@/components/sources/add-source-form";
 import { SourceDetailView } from "@/components/sources/source-detail";
+import { BatchActions } from "@/components/sources/batch-actions";
 
 function SourcesPage() {
   const router = useRouter();
@@ -79,6 +84,10 @@ function SourcesPage() {
             <Plus className="h-4 w-4" /> Add source
           </Button>
         </div>
+
+        {/* Every source at once (FEAT8). Approving all opens one review first; each source's own
+            approval and run stay on its page below, unchanged. */}
+        {sources.length > 0 && <BatchActions />}
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <Section

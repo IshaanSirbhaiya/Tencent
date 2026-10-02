@@ -26,12 +26,33 @@ import { GATEWAY, authHeaders } from "./api";
 export class AgentsApiError extends Error {
   code: string;
   status: number;
-  constructor(status: number, code: string, message: string) {
+  /** R-028: the former specific code when `code` is a standard one (as the other clients carry it). */
+  reason_code?: string;
+  /** R-028: the server-log reference a failure carries instead of its exception text. */
+  error_ref?: string;
+  constructor(status: number, code: string, message: string, extra?: { reason_code?: string; error_ref?: string }) {
     super(message);
     this.name = "AgentsApiError";
     this.status = status;
     this.code = code;
+    if (extra?.reason_code) this.reason_code = extra.reason_code;
+    if (extra?.error_ref) this.error_ref = extra.error_ref;
   }
+}
+
+/** The common refusal envelope (R-028): standard `code`, optional `reason_code` and `error_ref`. */
+export interface RefusalEnvelope {
+  code: string;
+  message: string;
+  reason_code?: string;
+  error_ref?: string;
+}
+
+/** The ONE way a client turns `{refusal: {...}}` into an `AgentsApiError` (R-028 TIDY #6): the
+ *  gateway's message verbatim, with the reference a failure carries so it can be quoted. */
+export function agentsApiErrorFrom(status: number, r: RefusalEnvelope): AgentsApiError {
+  const message = r.error_ref ? `${r.message} (reference ${r.error_ref})` : r.message;
+  return new AgentsApiError(status, r.code, message, { reason_code: r.reason_code, error_ref: r.error_ref });
 }
 
 async function call<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
@@ -48,8 +69,7 @@ async function call<T>(path: string, init?: RequestInit, signal?: AbortSignal): 
   }
   const body: unknown = await res.json().catch(() => ({}));
   if (body && typeof body === "object" && "refusal" in body) {
-    const r = (body as { refusal: { code: string; message: string } }).refusal;
-    throw new AgentsApiError(res.status, r.code, r.message);
+    throw agentsApiErrorFrom(res.status, (body as { refusal: RefusalEnvelope }).refusal);
   }
   if (!res.ok) {
     const detail =

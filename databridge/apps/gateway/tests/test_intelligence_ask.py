@@ -44,7 +44,8 @@ BUSINESS_QUESTION = ("which issuers sent the most documents this week, and what 
 #: offline answer is never presented as a model's reading.
 RESPONSE_KEYS = {"question", "answer", "refused", "refusal_code", "requires_human_selection",
                  "values", "unresolved", "notes", "reads", "model_calls", "planner"}
-VALUE_KEYS = {"key", "tool", "row", "field", "scope", "text", "redacted", "citation", "source"}
+# R-028 TIDY #7: no `redacted` flag; a withheld value is the standard envelope in `text`'s place
+VALUE_KEYS = {"key", "tool", "row", "field", "scope", "text", "citation", "source"}
 READ_KEYS = {"tool", "status"}
 NOTE_KEYS = {"key", "text"}
 
@@ -154,7 +155,7 @@ def test_the_answer_is_rendered_text_and_not_a_property_that_vanished(answered):
     stored field — that difference is the whole reason the second type exists."""
     assert answered["answer"].strip()
     for value in answered["values"]:
-        assert value["text"] in answered["answer"] or value["redacted"]
+        assert (isinstance(value["text"], dict) and value["text"]["status"] == "withheld") or             value["text"] in answered["answer"]
 
 
 # --- 3. the business question, and citations that resolve ----------------------------

@@ -36,11 +36,15 @@ than merely following it.
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import json
 import sqlite3
 import threading
-from typing import Iterable, Optional, Protocol, runtime_checkable
+import time
+import uuid
+from dataclasses import dataclass
+from typing import Callable, Iterable, Iterator, Optional, Protocol, runtime_checkable
 
 from databridge_core import SourcePointer
 
@@ -117,6 +121,31 @@ BEGIN
 END;
 """
 
+#: The dispatch lease (R-028 OUTX, Codex #3 CRITICAL). NOT history: a lease says "this process is
+#: sending this row right now", and it is deleted when the send is recorded or the sweep ends. It
+#: is what makes selection -> claim -> send one database-backed decision across processes: a row is
+#: claimed inside a ``BEGIN IMMEDIATE`` transaction (SQLite's cross-process write lock), only a
+#: process holding the row's live lease may send it, and ``record_sent`` refuses any other.
+LEASE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS dispatch_lease (
+    draft_id    TEXT PRIMARY KEY,
+    claim_id    TEXT NOT NULL,
+    claimed_by  TEXT NOT NULL,
+    claimed_at  REAL NOT NULL,
+    expires_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_dispatch_lease_claim ON dispatch_lease(claim_id);
+"""
+
+#: A lease outlives a slow SMTP round trip and expires after a dispatcher that died mid-sweep.
+DISPATCH_LEASE_SECONDS = 300.0
+#: How long a connection waits for another process's write lock before failing (never unlocked).
+BUSY_TIMEOUT_SECONDS = 30.0
+
+#: Structured actor columns (R-028 #7), added to an existing file by ``ALTER TABLE ... ADD COLUMN``
+#: (a schema change, not a rewrite of any row). The name columns stay the undecorated principal id.
+_ACTOR_COLUMNS = ("approved_actor_json", "rejected_actor_json")
+
 #: The state machine, written once. ``rejected`` and ``sent`` are terminal: a rejected draft is not
 #: un-rejected, it is superseded by a NEW draft somebody looked at, and a sent message is not
 #: unsent by anything a database can do.
@@ -137,7 +166,7 @@ _PAYLOAD_COLUMNS = (
 
 _ALL_COLUMNS = (*_PAYLOAD_COLUMNS, "status", "recorded_at", "recorded_by", "approved_by",
                 "approved_at", "rejected_by", "rejected_at", "reason", "sent_at", "message_id",
-                "supersedes")
+                "supersedes", *_ACTOR_COLUMNS)
 
 
 class UnknownDraft(OutboxError):
@@ -152,8 +181,40 @@ class IllegalTransition(OutboxError):
     """A state change the outbox's state machine does not permit."""
 
 
+class ClaimLost(OutboxError):
+    """This process does not hold the row's live dispatch lease, so it may not send or record it."""
+
+
+@dataclass(frozen=True)
+class DispatchClaim:
+    """What one claim selected: exactly these rows, leased to ``claim_id`` until sent or released."""
+
+    claim_id: str
+    claimed_by: str
+    draft_ids: tuple[str, ...]
+
+
 def _now(at: Optional[dt.datetime] = None) -> str:
     return (at or dt.datetime.now(dt.timezone.utc)).isoformat()
+
+
+def _actor_json(actor: Optional[dict], who: str, *, what: str) -> Optional[str]:
+    """The structured actor of a decision, serialised canonically, or ``None`` when not given.
+    Its ``principal_id`` must be the (undecorated) name the row records."""
+    if actor is None:
+        return None
+    if not isinstance(actor, dict) or str(actor.get("principal_id") or "").strip() != who:
+        raise NotApproved(f"{what} REFUSED: the actor object does not name the decider recorded "
+                          f"on the row")
+    return json.dumps(actor, sort_keys=True, separators=(",", ":"))
+
+
+def _actor_of(row: sqlite3.Row, column: str) -> Optional[dict]:
+    try:
+        raw = row[column]
+    except (IndexError, KeyError):
+        return None
+    return json.loads(raw) if raw else None
 
 
 @runtime_checkable
@@ -183,14 +244,47 @@ class OutboxStore:
         # an in-memory store at all. That is not a limitation to work around; it is the deployment
         # telling you the truth about the process split.
         self._lock = threading.RLock()
-        self.conn = sqlite3.connect(path, check_same_thread=False)
+        self.conn = sqlite3.connect(path, check_same_thread=False, timeout=BUSY_TIMEOUT_SECONDS)
         self.conn.row_factory = sqlite3.Row
-        self.conn.executescript(SCHEMA)
+        self.conn.executescript(SCHEMA + LEASE_SCHEMA)
+        self._add_actor_columns()
         self.conn.commit()
         # `None` by default: every existing caller (the dispatcher, the gateway route) keeps
         # working unchanged. Wired in, every filed draft becomes discoverable through the reverse
         # index's `impact_of` — see `record_draft` below.
         self._emission_sink = emission_sink
+
+    def _add_actor_columns(self) -> None:
+        have = {r[1] for r in self.conn.execute("PRAGMA table_info(outbox)")}
+        for col in _ACTOR_COLUMNS:
+            if col in have:
+                continue
+            try:
+                self.conn.execute(f"ALTER TABLE outbox ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError as exc:      # another process added it first
+                if "duplicate column" not in str(exc).lower():
+                    raise
+
+    @contextlib.contextmanager
+    def _immediate(self) -> Iterator[None]:
+        """One write transaction that holds SQLite's RESERVED lock from its FIRST statement.
+
+        ``BEGIN IMMEDIATE`` is the cross-process part: a read-check-insert inside it cannot
+        interleave with another connection's (another process's) write. Python's implicit
+        transactions begin only at the first INSERT, after the read they were meant to protect.
+        Re-entrant within one connection: a nested call joins the outer transaction.
+        """
+        with self._lock:
+            if self.conn.in_transaction:
+                yield
+                return
+            self.conn.execute("BEGIN IMMEDIATE")
+            try:
+                yield
+            except BaseException:
+                self.conn.rollback()
+                raise
+            self.conn.commit()
 
     # -- reads --------------------------------------------------------------------
     def _rows(self, draft_id: Optional[str] = None) -> list[sqlite3.Row]:
@@ -233,7 +327,9 @@ class OutboxStore:
             reason=row["reason"],
             sent_at=row["sent_at"],
             message_id=row["message_id"],
-            supersedes=row["supersedes"])
+            supersedes=row["supersedes"],
+            approved_actor=_actor_of(row, "approved_actor_json"),
+            rejected_actor=_actor_of(row, "rejected_actor_json"))
 
     def history(self, draft_id: str) -> list[OutboxEntry]:
         """Every row about this draft, oldest first. Nothing is ever removed from it."""
@@ -289,7 +385,7 @@ class OutboxStore:
         store that quietly returned the existing row would let a *changed* body land under an
         already-approved id.
         """
-        with self._lock, self.conn:
+        with self._immediate():
             if self._rows(draft.draft_id):
                 raise DuplicateDraft(
                     f"draft {draft.draft_id!r} is already filed. The id is a digest of the "
@@ -348,7 +444,7 @@ class OutboxStore:
         to guess its way out of. (``ix_outbox_supersedes_once`` also rejects the second insert; the
         transaction is what makes the rejection a clean failure rather than a race.)
         """
-        with self._lock, self.conn:
+        with self._immediate():
             live = self.current(draft_id)
             if live is None:
                 raise UnknownDraft(f"no draft {draft_id!r} in the outbox")
@@ -365,6 +461,7 @@ class OutboxStore:
                 "approved_by": row["approved_by"], "approved_at": row["approved_at"],
                 "rejected_by": row["rejected_by"], "rejected_at": row["rejected_at"],
                 "reason": row["reason"],
+                **{c: row[c] for c in _ACTOR_COLUMNS},
                 "status": to, "recorded_at": _now(), "recorded_by": by,
                 "supersedes": live.rowid,
             })
@@ -374,38 +471,49 @@ class OutboxStore:
         assert entry is not None
         return entry
 
-    def approve(self, draft_id: str, *, approved_by: str,
+    def approve(self, draft_id: str, *, approved_by: str, actor: Optional[dict] = None,
                 at: Optional[dt.datetime] = None) -> OutboxEntry:
         """A named human agrees this may go out. **The gate.**
 
         ``approved_by`` has no default and may not be a process name. There is no code path that
         approves a draft without one, which is the outbound half of CLAUDE.md §Hard constraints 4.
+        ``actor`` is the structured actor object of the authenticated principal (R-028 #7); when
+        given, its ``principal_id`` must BE ``approved_by`` (the name is never decorated).
         """
         who = refuse_machine_actor(approved_by, what="approve(approved_by=...)")
+        actor_json = _actor_json(actor, who, what="approve")
         when = _now(at)
         return self._transition(draft_id, to=APPROVED, by=who,
-                                extra={"approved_by": who, "approved_at": when})
+                                extra={"approved_by": who, "approved_at": when,
+                                       "approved_actor_json": actor_json})
 
     def reject(self, draft_id: str, *, rejected_by: str, reason: str,
-               at: Optional[dt.datetime] = None) -> OutboxEntry:
+               actor: Optional[dict] = None, at: Optional[dt.datetime] = None) -> OutboxEntry:
         """A named human says no, and says why. The draft stays in the record; nothing is deleted."""
         who = refuse_machine_actor(rejected_by, what="reject(rejected_by=...)")
+        actor_json = _actor_json(actor, who, what="reject")
         if not (reason or "").strip():
             raise OutboxError(
                 "reject REFUSED: a rejection with no reason teaches the next draft nothing")
         return self._transition(draft_id, to=REJECTED, by=who,
                                 extra={"rejected_by": who, "rejected_at": _now(at),
-                                       "reason": reason.strip()})
+                                       "reason": reason.strip(),
+                                       "rejected_actor_json": actor_json})
 
     def record_sent(self, draft_id: str, *, message_id: str, by: str = "dispatcher",
+                    claim_id: Optional[str] = None,
                     at: Optional[dt.datetime] = None) -> OutboxEntry:
         """Record that this draft left the building, and under which transport message id.
 
         Refuses anything that is not ``approved`` **with a named approver**. The dispatcher checks
         the same thing before it calls a transport; this is the check that survives somebody
         writing a second dispatcher.
+
+        **The lease** (R-028 #3): while a live dispatch lease exists for this row, only its holder
+        (``claim_id``) may record the send; another process's record is ``ClaimLost``. Recording
+        under the claim releases the lease in the same transaction.
         """
-        with self._lock:
+        with self._immediate():
             live = self.current(draft_id)
             if live is None:
                 raise UnknownDraft(f"no draft {draft_id!r} in the outbox")
@@ -418,9 +526,83 @@ class OutboxStore:
                 raise OutboxError(
                     "record_sent REFUSED: no transport message id. A send that cannot be looked "
                     "up in the mail log is a send nobody can prove or trace")
-            return self._transition(draft_id, to=SENT, by=by,
-                                    extra={"sent_at": _now(at),
-                                           "message_id": message_id.strip()})
+            holder = self._live_holder(draft_id, time.time())
+            if holder != claim_id and not (claim_id is None and holder is None):
+                raise ClaimLost(
+                    f"record_sent REFUSED: draft {draft_id!r} is not leased to this dispatch; "
+                    f"only the process holding its lease may record its send")
+            entry = self._transition(draft_id, to=SENT, by=by,
+                                     extra={"sent_at": _now(at),
+                                            "message_id": message_id.strip()})
+            self.conn.execute("DELETE FROM dispatch_lease WHERE draft_id = ?", (draft_id,))
+        return entry
+
+    # -- the dispatch lease (R-028 #3) ---------------------------------------------------
+    def _live_holder(self, draft_id: str, now: float) -> Optional[str]:
+        row = self.conn.execute(
+            "SELECT claim_id FROM dispatch_lease WHERE draft_id = ? AND expires_at > ?",
+            (draft_id, now)).fetchone()
+        return row[0] if row else None
+
+    def claim_for_dispatch(self, *, claimed_by: str, draft_ids: Optional[Iterable[str]] = None,
+                           may_claim: Optional[Callable[[OutboxEntry], bool]] = None,
+                           lease_seconds: float = DISPATCH_LEASE_SECONDS,
+                           now: Optional[float] = None) -> DispatchClaim:
+        """Select AND lease the rows a dispatch may send, as one cross-process transaction.
+
+        Selected: rows in :meth:`awaiting_dispatch` (approved, with a named approver), restricted
+        to ``draft_ids`` when given (the single-draft mode), with no live lease held by anyone,
+        and for which ``may_claim(entry)`` holds (the caller's access rule, evaluated INSIDE the
+        transaction, so the rows it accepted are the rows leased). A row approved by another
+        process after this commits is not in this claim, whoever's it is.
+        """
+        claim_id = f"claim-{uuid.uuid4().hex}"
+        t = time.time() if now is None else float(now)
+        wanted = None if draft_ids is None else list(dict.fromkeys(draft_ids))
+        got: list[str] = []
+        with self._immediate():
+            self.conn.execute("DELETE FROM dispatch_lease WHERE expires_at <= ?", (t,))
+            if wanted is None:
+                candidates = self.awaiting_dispatch()
+            else:
+                candidates = [e for e in (self.current(d) for d in wanted)
+                              if e is not None and e.is_dispatchable]
+            for entry in candidates:
+                if self._live_holder(entry.draft_id, t) is not None:
+                    continue
+                if may_claim is not None and not may_claim(entry):
+                    continue
+                self.conn.execute(
+                    "INSERT INTO dispatch_lease (draft_id, claim_id, claimed_by, claimed_at, "
+                    "expires_at) VALUES (?, ?, ?, ?, ?)",
+                    (entry.draft_id, claim_id, claimed_by, t, t + float(lease_seconds)))
+                got.append(entry.draft_id)
+        return DispatchClaim(claim_id=claim_id, claimed_by=claimed_by, draft_ids=tuple(got))
+
+    def holds_claim(self, draft_id: str, claim_id: str, *, now: Optional[float] = None) -> bool:
+        with self._lock:
+            return self._live_holder(draft_id, time.time() if now is None else now) == claim_id
+
+    def claimed(self, claim_id: str, *, now: Optional[float] = None) -> list[OutboxEntry]:
+        """The rows this claim still holds a live lease on and that are still dispatchable."""
+        t = time.time() if now is None else now
+        with self._lock:
+            ids = [r[0] for r in self.conn.execute(
+                "SELECT draft_id FROM dispatch_lease WHERE claim_id = ? AND expires_at > ? "
+                "ORDER BY draft_id", (claim_id, t))]
+            out = [self.current(d) for d in ids]
+        return [e for e in out if e is not None and e.is_dispatchable]
+
+    def release_claim(self, claim_id: str, draft_ids: Optional[Iterable[str]] = None) -> None:
+        """Give back this claim's leases (all, or the named rows). Never touches another claim's."""
+        with self._immediate():
+            if draft_ids is None:
+                self.conn.execute("DELETE FROM dispatch_lease WHERE claim_id = ?", (claim_id,))
+            else:
+                for d in draft_ids:
+                    self.conn.execute(
+                        "DELETE FROM dispatch_lease WHERE claim_id = ? AND draft_id = ?",
+                        (claim_id, d))
 
     # -- provenance ---------------------------------------------------------------
     def pointers_of(self, entry: OutboxEntry) -> Iterable[SourcePointer]:
@@ -430,6 +612,9 @@ class OutboxStore:
 
 __all__ = [
     "ALLOWED_NEXT",
+    "ClaimLost",
+    "DISPATCH_LEASE_SECONDS",
+    "DispatchClaim",
     "DuplicateDraft",
     "IllegalTransition",
     "OutboxStore",

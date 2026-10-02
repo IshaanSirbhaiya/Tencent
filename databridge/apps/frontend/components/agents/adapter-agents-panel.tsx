@@ -26,6 +26,7 @@ import {
   type Job,
 } from "@/lib/agents-api";
 import { Composer } from "./composer";
+import { SourceSetupPanel, SourcesToSetUp } from "./source-setup";
 import { AdaptPolicyInWords } from "./draft-card";
 import { Collapsible, ErrorLine, Row, Section, StatusPill, TriggerInWords, fmtTime } from "./shared";
 
@@ -718,9 +719,14 @@ function AdapterList({
 export function AdapterAgentsPanel({
   adapterId,
   select,
+  setupId = null,
+  selectSetup,
 }: {
   adapterId: string | null;
   select: (id: string | null) => void;
+  /** FEAT8: the source being set up through its adapter agent (`?setup=`). */
+  setupId?: string | null;
+  selectSetup?: (sourceId: string | null) => void;
 }) {
   const [showDeleted, setShowDeleted] = React.useState(false);
   const list = useQuery({ queryKey: ["adapter-agents"], queryFn: ({ signal }) => agentsApi.adapterAgents(signal) });
@@ -729,6 +735,7 @@ export function AdapterAgentsPanel({
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <div className="flex flex-col gap-4">
+        {selectSetup && <SourcesToSetUp selected={setupId} onSelect={(sid) => selectSetup(sid)} />}
         <Section
           title="Describe an adapter agent"
           testId="adapter-composer-section"
@@ -774,7 +781,9 @@ export function AdapterAgentsPanel({
         {!adapterId && <Proposals agentId={null} />}
       </div>
       <div>
-        {adapterId ? (
+        {setupId && selectSetup ? (
+          <SourceSetupPanel id={setupId} openAgent={(aid) => select(aid)} />
+        ) : adapterId ? (
           <AdapterDetail id={adapterId} />
         ) : (
           <div className="rounded border border-dashed border-border p-6 text-center text-xs text-subtle">

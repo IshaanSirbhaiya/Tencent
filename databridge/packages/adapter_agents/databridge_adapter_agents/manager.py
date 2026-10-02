@@ -58,6 +58,19 @@ FUTURE_SKEW = dt.timedelta(minutes=5)
 _PROCESS_LOCKS: dict[str, threading.Lock] = {}
 _PROCESS_LOCKS_GUARD = threading.Lock()
 
+#: Codex R-027 AAX f1 #6: a crawl plan is approved FOR a revision of its connection (the gateway's
+#: binding notes). This check says why `(service, connection)`'s approved plan may not run against
+#: the connection as it is now, or None. The gateway installs its shared check
+#: (`sources_routes.plan_stale_reason`) with `set_plan_stale_check`; a manager may carry its own
+#: (`plan_stale_check=`). Applied at activate, resume and EVERY sync (`_plan_approved`).
+_PLAN_STALE_CHECK: Optional[Callable[[Any, str], Optional[str]]] = None
+
+
+def set_plan_stale_check(fn: Optional[Callable[[Any, str], Optional[str]]]) -> None:
+    """Install (or, with None, remove) the process-wide plan staleness check."""
+    global _PLAN_STALE_CHECK
+    _PLAN_STALE_CHECK = fn
+
 
 @dataclasses.dataclass
 class ConnectionResult:
@@ -161,8 +174,10 @@ class AdapterAgentManager:
                  vocabulary: Optional[VocabularyView] = None,
                  clock: Optional[Callable[[], dt.datetime]] = None,
                  progress_cb: Optional[Callable[[dict], None]] = None,
-                 adaptation: Optional[AdaptationEngine] = None) -> None:
+                 adaptation: Optional[AdaptationEngine] = None,
+                 plan_stale_check: Optional[Callable[[Any, str], Optional[str]]] = None) -> None:
         self.service = service
+        self.plan_stale_check = plan_stale_check
         self.registry = registry or AdapterAgentRegistry()
         self._store = store
         self._store_factory = store_factory
@@ -335,23 +350,99 @@ class AdapterAgentManager:
         name, _ = self._actor(by, "pause adapter agent")
         return self.registry.pause(agent_id, by=name)
 
+    def _person_or_refuse(self, spec: AdapterAgentSpec, by: Any, what: str
+                          ) -> tuple[str, Optional[dict[str, Any]]]:
+        """Codex R-027 AAX f2 #2 - an INVARIANT of activation and resumption: a machine actor
+        (an agent, a workflow, the system; by name or by principal) never activates or resumes an
+        agent, and a SETUP-owned agent is activated or resumed only by an authenticated person."""
+        from .adapt import _MACHINE
+
+        name, who = self._actor(by, what)
+        if str(name or "").strip().lower().startswith(_MACHINE):
+            raise RegistryError(f"{what} REFUSED: {name!r} is a machine actor; only a person "
+                                f"activates or resumes an adapter agent")
+        if who is None and self._setup_source(spec) is not None:
+            raise RegistryError(f"{what} REFUSED: {spec.id!r} was set up for a source; only an "
+                                f"authenticated person (not a typed name) activates it")
+        return name, who
+
+    def _setup_source(self, spec: AdapterAgentSpec) -> Optional[str]:
+        try:
+            from .setup import setup_source_of
+
+            return setup_source_of(self.registry.root, spec.id)
+        except Exception:                                             # noqa: BLE001
+            return "\x00unreadable-setup-mark"
+
+    def _setup_problems(self, spec: AdapterAgentSpec, *, activating: bool) -> list[str]:
+        """Codex R-027 AAX f2 #1: a SETUP-owned agent is activated only under a person's hand-off
+        authorisation that covers the setup exactly as it is now, and runs (resume, every sync)
+        only with that authorisation on record - and, once active, only with an in-force sealed
+        delegation (#2). Enforced here, so the generic routes cannot bypass Set up."""
+        src = self._setup_source(spec)
+        if src is None:
+            return []
+        try:
+            from .setup import authorization_problems
+
+            stale = None
+            check = getattr(self, "plan_stale_check", None) or _PLAN_STALE_CHECK
+            if check is not None and activating:
+                stale = check(self.service, src)
+            out = authorization_problems(self.registry.root, src, spec.id, plan_stale=stale,
+                                         activating=activating)
+        except Exception as exc:                                      # noqa: BLE001
+            return [f"the setup hand-off of {spec.id!r} could not be verified "
+                    f"({type(exc).__name__}: {exc})"]
+        if not out and not activating and spec.status == "active":
+            seal, why = self.delegation_status(spec)
+            if seal is None:
+                out.append(f"{spec.id!r} was set up for {src!r} and runs only under a sealed "
+                           f"delegation in force: {why}")
+        return [f"setup hand-off: {p}" for p in out]
+
+    def authorize_setup_handoff(self, agent_id: str, *, by: Any, binding: dict) -> dict:
+        """Record a PERSON's authorisation to hand `agent_id` (set up for a source) off to the
+        build, bound to `binding` (`setup.gate_binding`). The authenticated principal is required
+        and a machine is refused; `activate` then verifies it against the setup as it is."""
+        from .adapt import _MACHINE, principal_of
+        from .setup import record_authorization
+
+        spec = self.registry.get(agent_id)
+        src = self._setup_source(spec)
+        if src is None:
+            raise RegistryError(f"{agent_id!r} was not set up for a source")
+        try:
+            who = principal_of(by, "authorise a setup hand-off")
+        except AdaptationRefused as exc:
+            raise RegistryError(str(exc)) from None
+        if who["principal_id"].lower().startswith(_MACHINE):
+            raise RegistryError(f"authorise a setup hand-off REFUSED: {who['principal_id']!r} is "
+                                f"a machine actor")
+        # R-028 TIDY #1: the FULL actor object - a dev-token principal stays marked `dev_only`
+        # (the same field `plans.require_authenticated_approver` adds); `record_authorization`
+        # runs it through `decision_ledger.require_person`.
+        who["dev_only"] = bool(getattr(by, "dev_only", False))
+        return record_authorization(self.registry.root, src, agent_id, who=who, binding=binding)
+
     def activate(self, agent_id: str, *, by: Any = ""):
         """A DRAFT becomes active only when every connection's crawl plan is approved (the spec's
-        record AND the plan on disk, P5). Refused with the reasons otherwise."""
+        record AND the plan on disk, P5), by a PERSON (f2 #2), and - for an agent set up for a
+        source - under that person's hand-off authorisation (f2 #1). Refused otherwise."""
         spec = self.registry.get(agent_id)
         if spec.status != "draft":
             raise RegistryError(f"adapter agent {agent_id!r} is {spec.status!r}; only a draft is "
                                 f"activated")
-        blocked = self.agent_gate(spec)
+        name, who = self._person_or_refuse(spec, by, "activate adapter agent")
+        blocked = self.agent_gate(spec, activating=True)
         if blocked:
             raise RegistryError(f"adapter agent {agent_id!r} cannot be activated: "
                                 + "; ".join(blocked))
-        name, who = self._actor(by, "activate adapter agent")
         spec = self.registry.activate(agent_id, by=name)
         self._seal(spec, who)
         return spec
 
-    def agent_gate(self, spec: AdapterAgentSpec) -> list[str]:
+    def agent_gate(self, spec: AdapterAgentSpec, *, activating: bool = False) -> list[str]:
         """Why this agent may NOT run at all (empty: it may). EVERY crawl plan it references must
         be human-approved — the spec's record and the plan on disk (P5) — and its `adapt` policy
         must be one the engine knows. Enforced here, not only in the UI (a UI gate is bypassable):
@@ -361,6 +452,7 @@ class AdapterAgentManager:
         why = self.screen_pack_refusal(spec)
         if why:
             reasons.append(why)
+        reasons.extend(self._setup_problems(spec, activating=activating))
         try:
             pol = Policy.of(spec)
             if pol.policy not in ("auto_additive", "ask_all", "off"):
@@ -432,11 +524,11 @@ class AdapterAgentManager:
         """PAUSED -> active. By an authenticated principal under `auto_additive`, this is the
         re-activation that seals a fresh delegation (AA3)."""
         spec = self.registry.get(agent_id)
+        name, who = self._person_or_refuse(spec, by, "resume adapter agent")
         blocked = self.agent_gate(spec)
         if blocked:
             raise RegistryError(f"adapter agent {agent_id!r} cannot be resumed: "
                                 + "; ".join(blocked))
-        name, who = self._actor(by, "resume adapter agent")
         spec = self.registry.resume(agent_id, by=name)
         self._seal(spec, who)
         return spec
@@ -497,6 +589,17 @@ class AdapterAgentManager:
         if on_disk != "approved":
             return False, (f"skipped {connection!r}: its crawl plan is {on_disk!r}, not approved "
                            f"— approve it before it can run (P5)")
+        check = getattr(self, "plan_stale_check", None) or _PLAN_STALE_CHECK
+        if check is not None:
+            # Codex R-027 AAX f1 #6: approved, but for THIS revision of the connection? Fail closed
+            try:
+                stale = check(self.service, connection)
+            except Exception as exc:                                  # noqa: BLE001
+                return False, (f"skipped {connection!r}: whether its approved crawl plan still "
+                               f"covers the connection as it is now could not be checked "
+                               f"({type(exc).__name__}: {exc})")
+            if stale:
+                return False, f"skipped {connection!r}: {stale} (P5)"
         return True, None
 
     def refresh_plans(self, agent_id: str, *, by: str = "") -> AdapterAgentSpec:
@@ -894,9 +997,13 @@ class AdapterAgentManager:
         out = []
         for p in d.glob("*.json"):
             try:
-                out.append(json.loads(p.read_text(encoding="utf-8")))
+                rec = json.loads(p.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
+            # FEAT8: a Set up step's Activity record lives beside the syncs; it is not a sync
+            if isinstance(rec, dict) and rec.get("kind", RUN_KIND) != RUN_KIND:
+                continue
+            out.append(rec)
         out.sort(key=lambda r: (r.get("started") or "", r.get("run_id") or ""))
         return out
 

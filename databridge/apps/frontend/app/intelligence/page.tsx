@@ -43,6 +43,7 @@ import { useMutation } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
 import { Topbar } from "@/components/topbar";
 import { ConsolePanel } from "@/components/intelligence/console-panel";
+import { OneTimePanel } from "@/components/intelligence/one-time-panel";
 import { Figures } from "@/components/intelligence/figures";
 import { SubgraphPanel } from "@/components/intelligence/subgraph-panel";
 import { intelligenceApi, type IntelligenceResponse } from "@/lib/intelligence-api";
@@ -123,6 +124,9 @@ export default function IntelligencePage() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div className="flex flex-col gap-5">
             <ConsolePanel asOf={asOf} onCite={onSelect} onFigures={setFigures} />
+
+            {/* FEAT8: a job described once and run once, through the agent compiler and runtime. */}
+            <OneTimePanel />
 
             <section className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">

@@ -27,7 +27,8 @@ from fastapi.testclient import TestClient
 from databridge_gateway import auth
 
 from conftest import auth_headers
-from test_platform_routes import _RealApproveIngest, _cmd, _mount, env  # noqa: F401  (fixture)
+from test_platform_routes import (_RealApproveIngest, _cmd, _mount, approve, bound_notes,  # noqa: F401
+                                  env)
 
 ROOT = Path(__file__).resolve().parents[3]                          # databridge/
 
@@ -71,7 +72,7 @@ def _sql_plan(source_id: str, tool: str, monkeypatch, *, cls: str | None = None)
     classes = plans.classify_plan_tools(steps, tools, [])
     save_plan(CrawlPlan(source_id=source_id, status="proposed", steps=steps,
                         tool_classes=cls and {tool: cls} or classes,
-                        tools_digest=plans.tools_digest(tools)))
+                        tools_digest=plans.tools_digest(tools), notes=bound_notes(source_id)))
     return classes[tool]
 
 
@@ -102,11 +103,10 @@ def test_a_database_plan_is_approvable_only_with_the_principals_vouch(env, monke
     with TestClient(app, headers=auth_headers("analyst-7")) as c:
         assert _cmd(c, source).status_code == 200
         _sql_plan(source, EXECUTOR, monkeypatch)
-        refused = c.post(f"/sources/{source}/plan/approve")
+        refused = approve(c, source)
         assert refused.status_code == 409
         assert "vouch_read_tools" in refused.json()["refusal"]["message"]
-        ok = c.post(f"/sources/{source}/plan/approve",
-                    json={"vouch_read_tools": [EXECUTOR], "approved_by": "mallory"})
+        ok = approve(c, source, vouch_read_tools=[EXECUTOR], approved_by="mallory")
         assert ok.status_code == 200, ok.text
         plan = ok.json()["plan"]
     assert plan["approved_by"] == "analyst-7"                 # the principal, never the body
@@ -123,7 +123,7 @@ def test_a_write_is_never_vouchable_and_an_unauthenticated_vouch_is_refused(env,
     with TestClient(app, headers=auth_headers("analyst-7")) as c:
         assert _cmd(c, source).status_code == 200
         _sql_plan(source, "write_rows", monkeypatch)
-        r = c.post(f"/sources/{source}/plan/approve", json={"vouch_read_tools": ["write_rows"]})
+        r = approve(c, source, vouch_read_tools=["write_rows"])
         assert r.status_code == 409
     with TestClient(app) as anon:
         r = anon.post(f"/sources/{source}/plan/approve", json={"vouch_read_tools": [EXECUTOR]})
@@ -148,7 +148,7 @@ def test_an_approval_with_the_dev_token_is_recorded_dev_only(env, monkeypatch, d
     with TestClient(app, headers=dev_auth) as c:
         assert _cmd(c, source).status_code == 200
         _sql_plan(source, EXECUTOR, monkeypatch)
-        r = c.post(f"/sources/{source}/plan/approve", json={"vouch_read_tools": [EXECUTOR]})
+        r = approve(c, source, vouch_read_tools=[EXECUTOR])
         assert r.status_code == 200, r.text
         rec = r.json()["plan"]["approval"]
         me = c.get("/auth/whoami").json()
@@ -175,8 +175,7 @@ def test_an_approval_with_a_real_token_is_not_marked(env, monkeypatch, dev_auth,
     with TestClient(app, headers=auth_headers("analyst-7")) as c:
         assert _cmd(c, source).status_code == 200
         _sql_plan(source, EXECUTOR, monkeypatch)
-        rec = c.post(f"/sources/{source}/plan/approve",
-                     json={"vouch_read_tools": [EXECUTOR]}).json()["plan"]["approval"]
+        rec = approve(c, source, vouch_read_tools=[EXECUTOR]).json()["plan"]["approval"]
         me = c.get("/auth/whoami").json()
     assert rec["dev_only"] is False and rec["authenticated_by"] == auth.GATEWAY_MECHANISM
     assert me["dev_only"] is False and me["principal_id"] == "analyst-7"
@@ -248,9 +247,9 @@ def test_activity_marks_a_decision_made_with_the_dev_token(dev):
     [row] = approval_items("run-1", "agent-x", events, {"actions": []})
     assert row["decided_by"] == "analyst-7"
     assert row["decided_by_dev_only"] is dev
-    # the actor keeps its usual {type, id} shape for a real sign-in; marked only when dev
-    assert row["actor"].get("dev_only", False) is dev
-    assert ("dev_only" in row["actor"]) is dev
+    # R-028 CONS #7: the common actor object — `dev_only` true OR false as the event recorded it,
+    # the principal id never decorated
+    assert row["actor"]["dev_only"] is dev and row["actor"]["principal_id"] == "analyst-7"
     assert row["decided_by_authenticated_by"] == (GATEWAY_DEV_MECHANISM if dev
                                                   else GATEWAY_MECHANISM)
 

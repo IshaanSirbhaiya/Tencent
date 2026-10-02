@@ -625,10 +625,10 @@ def test_c3_a_link_into_a_person_kind_is_refused_by_validation(estate):
                               "dst": f"{person}:{{walnut_fk_c}}", "evidence": ["c"],
                               "ref": {"source": "s", "table": "t", "key": "k"}}])
     probs = validate_table_mapping("t", tm, vocab)
-    assert any("link to person kind" in p for p in probs), probs
+    assert any("link to subject kind" in p for p in probs), probs
     # the same link into a kind that is not a person: no such problem (non-vacuous)
     ok = tm.model_copy(update={"edges": [{**tm.edges[0], "dst": f"{other}:{{walnut_fk_c}}"}]})
-    assert not any("link to person kind" in p for p in validate_table_mapping("t", ok, vocab))
+    assert not any("link to subject kind" in p for p in validate_table_mapping("t", ok, vocab))
 
 
 # === FIN-14: one directory per run; run history labels honestly ======================================

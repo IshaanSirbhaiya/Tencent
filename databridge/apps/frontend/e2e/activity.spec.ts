@@ -1,7 +1,17 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import {
   ACTIVITY_KINDS,
+  DECISION_KINDS,
+  INTEGRITY_TEXT,
+  KIND_LABEL,
+  RUNLESS_KINDS,
   NOT_RECORDED,
+  decisionRefusalText,
+  envelopeText,
+  isEnvelope,
+  isPerson,
+  valueText,
+  type Actor,
   DEV_TOKEN_NOTE,
   actorText,
   deciderText,
@@ -117,10 +127,21 @@ test.describe("activity (live)", () => {
 // =============================================================================================
 // @unit — pure helpers (no gateway, no page)
 // =============================================================================================
+const absent = (reason = "not_recorded_by_producer") => ({ status: "absent" as const, reason });
+/** The common actor object (R-028 #7) exactly as the gateway serves it. */
+const machine = (id: string, type: string): Actor => ({
+  principal_id: id, principal_type: type,
+  authenticated_by: absent("machine_actor"), dev_only: absent("machine_actor"),
+});
+const person = (id: string, devOnly: boolean | null, auth: string | null = "gateway:auth"): Actor => ({
+  principal_id: id, principal_type: "Approver",
+  authenticated_by: auth ?? absent(), dev_only: devOnly === null ? absent() : devOnly,
+});
+
 const item = (over: Partial<ActivityItem>): ActivityItem =>
   ({
     id: "agent_run:r", kind: "agent_run", at: null, sort_key: "", cursor: "", title: "t", status: null,
-    actor: { type: "agent", id: "a" }, produced_by: null, models_used: null, tokens: null,
+    actor: machine("a", "agent"), produced_by: null, models_used: null, tokens: null,
     duration_ms: null, loud: false, ...over,
   }) as ActivityItem;
 
@@ -136,8 +157,52 @@ test.describe("@unit activity helpers", () => {
     expect(deciderText("analyst-7", true)).toContain(DEV_TOKEN_NOTE);
     expect(deciderText("analyst-7", false)).toBe("analyst-7");
     expect(deciderText(null, true)).toBe(NOT_RECORDED);
-    expect(actorText({ type: "person", id: "analyst-7", dev_only: true })).toContain(DEV_TOKEN_NOTE);
-    expect(actorText({ type: "person", id: "analyst-7" })).not.toContain(DEV_TOKEN_NOTE);
+    expect(actorText(person("analyst-7", true))).toContain(DEV_TOKEN_NOTE);
+    expect(actorText(person("analyst-7", false))).toBe("person analyst-7");
+  });
+
+  test("R-028 #7 the actor is read from the structured object, never from a decorated id", () => {
+    // a sign-in the producer did not record is said as such — never shown as a real sign-in
+    const unrecorded = actorText(person("analyst-7", null, null));
+    expect(unrecorded).toContain("analyst-7");
+    expect(unrecorded).toContain("not recorded");
+    expect(unrecorded).not.toContain(DEV_TOKEN_NOTE);
+    // machines are named as machines; authentication does not apply to them
+    expect(actorText(machine("keeper-crm", "adapter_agent"))).toBe("adapter agent keeper-crm");
+    expect(actorText(machine("schedule", "automation"))).toBe("automation (schedule)");
+    expect(isPerson(machine("x", "agent"))).toBe(false);
+    expect(isPerson(person("x", false))).toBe(true);
+    // a delegated decision says so
+    expect(actorText({ ...person("lead-2", false), delegation: { agent_id: "keeper" } })).toContain("delegation");
+    // an id the producer did not record is "not recorded", never an empty name
+    expect(actorText({ ...person("x", false), principal_id: absent() })).toContain(NOT_RECORDED);
+  });
+
+  test("R-028 #12 a withheld or absent value is the envelope, said in words", () => {
+    const w = { status: "withheld" as const, reason: "free_text" };
+    expect(isEnvelope(w)).toBe(true);
+    expect(isEnvelope({ status: "approved" })).toBe(false);
+    expect(isEnvelope(null)).toBe(false);
+    expect(envelopeText(w)).toMatch(/^withheld/);
+    expect(envelopeText(absent())).toBe(NOT_RECORDED);
+    expect(valueText(w)).toBe(envelopeText(w));
+    expect(valueText(null)).toBe(NOT_RECORDED);
+    expect(valueText("open")).toBe("open");
+    // an unknown reason code is still said, never dropped
+    expect(envelopeText({ status: "withheld", reason: "some_new_code" })).toContain("some_new_code");
+    // the check is the shared strict one: an object that merely has a status is not an envelope
+    expect(isEnvelope({ status: "withheld", reason: "x", extra: 1 })).toBe(false);
+  });
+
+  test("R-028 #8 every kind has its own label; decision rows say what was verified", () => {
+    const labels = ACTIVITY_KINDS.map((k) => KIND_LABEL[k]);
+    expect(labels.every(Boolean)).toBe(true);
+    expect(new Set(labels).size).toBe(ACTIVITY_KINDS.length);
+    expect(KIND_LABEL.adapter_setup).not.toBe(KIND_LABEL.adapter_sync);
+    expect(KIND_LABEL.one_time_task).not.toBe(KIND_LABEL.agent_run);
+    for (const k of DECISION_KINDS) expect(ACTIVITY_KINDS).toContain(k);
+    expect(INTEGRITY_TEXT.failed).toContain("does not verify");
+    expect(decisionRefusalText({ code: "LEDGER_INTEGRITY_FAILED", message: "m" })).toBe("LEDGER_INTEGRITY_FAILED: m");
   });
 
   test("a missing measurement is 'not recorded', never zero", () => {
@@ -190,11 +255,13 @@ test.describe("@unit activity helpers", () => {
     expect(merged.map((i) => i.id)).toEqual(["x:1", "x:2", "x:3"]);
   });
 
-  test("an ontology proposal opens no run; every other kind opens the run it names", () => {
+  test("an ontology proposal or a decision opens no run; every other kind opens the run it names", () => {
     for (const k of ACTIVITY_KINDS) {
       const got = runIdOf(item({ kind: k, run_id: "r1" }));
-      expect(got).toBe(k === "ontology_proposal" ? null : "r1");
+      expect(got).toBe(RUNLESS_KINDS.includes(k) ? null : "r1");
     }
+    expect(RUNLESS_KINDS).toContain("plan_approval");
+    expect(RUNLESS_KINDS).not.toContain("one_time_task");      // a one-time task's run opens
   });
 
   test("an unknown or missing view falls back to the per-request view", () => {

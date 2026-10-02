@@ -16,7 +16,8 @@
  * Both lists render the gateway's own records; nothing here computes a status or a count. The tab
  * and the selection live in the URL (`?tab=`, `?agent=`, `?run=`, `?adapter=`) so any of them is
  * linkable. Connecting a NEW source is not done here: that is Sources (`/connectors`), linked from the
- * Adapter agents tab.
+ * Adapter agents tab. Every source added there is listed in the Adapter agents tab, ready to set up
+ * through its adapter agent (`?setup=<source>`, FEAT8).
  */
 import * as React from "react";
 import { Suspense } from "react";
@@ -53,6 +54,7 @@ function BuilderInner() {
   const agent = params.get("agent");
   const run = params.get("run");
   const adapter = params.get("adapter");
+  const setup = params.get("setup");
 
   function go(next: Record<string, string | null>) {
     const q = new URLSearchParams();
@@ -94,7 +96,12 @@ function BuilderInner() {
         {tab === "agents" ? (
           <AgentsPanel agentId={agent} runId={run} select={(a, r) => go({ tab: null, agent: a, run: r })} />
         ) : (
-          <AdapterAgentsPanel adapterId={adapter} select={(id) => go({ tab: "adapter", adapter: id })} />
+          <AdapterAgentsPanel
+            adapterId={adapter}
+            select={(id) => go({ tab: "adapter", adapter: id })}
+            setupId={setup}
+            selectSetup={(sid) => go({ tab: "adapter", setup: sid })}
+          />
         )}
       </div>
     </>

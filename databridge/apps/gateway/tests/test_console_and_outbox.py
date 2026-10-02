@@ -32,6 +32,7 @@ exercises the deterministic planner and never a hosted model.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import pathlib
 import threading
 
@@ -42,7 +43,13 @@ from fastapi.testclient import TestClient
 from databridge_gateway.intelligence_routes import _register_intelligence_routes
 from databridge_gateway.outbox_routes import register_outbox_routes
 
-from conftest import AUTH_HEADERS
+from conftest import AUTH_HEADERS, TEST_TOKENS, auth_headers
+
+#: The principal `AUTH_HEADERS` authenticates as, read off the test token table rather than
+#: restated: an approval now records the SIGNED-IN principal (R-027 ONE, Codex round 1 #1).
+SIGNED_IN = TEST_TOKENS[AUTH_HEADERS["Authorization"].split(" ", 1)[1]]
+#: Another authenticated principal, and one an operator test names in WALNUT_OPERATORS.
+OTHER, OPERATOR = sorted(p for p in TEST_TOKENS.values() if p != SIGNED_IN)[:2]
 
 #: A chit that orders a test its own package does not include AND prints a package code — so the
 #: `coverage_conflict_on_file` rule both fires and can be filled from grounded values alone.
@@ -59,9 +66,10 @@ IDENTITY_REQUEST = "is this the same person as the one on the chit?"
 CONSOLE_KEYS = {"request", "intent", "answer", "proposed", "blocked", "analytics", "notes",
                 "refusal"}
 CARD_KEYS = {"draft_id", "status", "channel", "playbook_id", "title", "when", "escalate_to",
-             "intake_id", "recipient", "subject", "body", "redacted", "because",
+             "intake_id", "recipient", "subject", "body", "because",
              "requires_human_approval", "created_at", "approved_by", "approved_at",
-             "rejected_by", "rejected_at", "reason", "sent_at", "message_id"}
+             "approved_actor", "rejected_by", "rejected_at", "rejected_actor", "reason",
+             "sent_at", "message_id"}
 RECIPIENT_KEYS = {"origin", "chosen_by", "masked", "handle", "established", "pointer"}
 CITATION_KEYS = {"kind", "source", "repo_config", "table", "column", "row", "document",
                  "char_start", "char_end", "derived_from"}
@@ -157,11 +165,11 @@ def app(tmp_path, intake, ledger, chit_text, transport):
     a.state.intake_lock = threading.RLock()
     a.state.outbox_db_path = str(tmp_path / "outbox.sqlite")
 
-    def executor(db_path: str) -> int:
+    def executor(db_path: str, claim_id: str) -> int:
         from dispatcher import Dispatcher
         from databridge_outbox.store import OutboxStore
 
-        Dispatcher(OutboxStore(db_path), transport).run_once()
+        Dispatcher(OutboxStore(db_path), transport).run_once(claim_id=claim_id)
         return 0
 
     a.state.outbox_executor = executor
@@ -364,20 +372,28 @@ def test_an_unapproved_draft_cannot_execute_through_the_route(proposed, client, 
     assert client.get(f"/outbox/{draft_id}").json()["status"] == "drafted"
 
 
-@pytest.mark.parametrize("who", ["", "   ", "system", "agent", "dispatcher", "walnut"])
-def test_approval_requires_a_name(proposed, client, who):
-    """A process name in `approved_by` makes the audit trail claim something that never happened."""
+@pytest.mark.parametrize("who", ["", "   ", "system", "agent", NURSE, SIGNED_IN])
+@pytest.mark.parametrize("decision", ["approve", "reject"])
+def test_a_caller_supplied_approver_is_refused_whatever_it_says(proposed, client, who, decision):
+    """R-027 ONE (Codex round 1, CRITICAL): the approver used to be whatever string the body
+    carried, so any caller could approve "as" anybody. Who decides is the signed-in principal; a
+    body that names someone (even the caller's own id) is refused, and the row is untouched."""
     draft_id = proposed["proposed"][0]["draft_id"]
-    r = client.post(f"/outbox/{draft_id}/approve", json={"approved_by": who})
+    field = {"approve": "approved_by", "reject": "rejected_by"}[decision]
+    body = {field: who, **({"reason": "x"} if decision == "reject" else {})}
+    r = client.post(f"/outbox/{draft_id}/{decision}", json=body)
     assert r.status_code == 422, r.text
-    assert r.json()["refusal"]["code"] == "APPROVER_REQUIRED"
-    assert client.get(f"/outbox/{draft_id}").json()["approved_by"] is None
+    # R-028 #11: the standard code. A name in the body is a claim, not an authentication.
+    assert r.json()["refusal"]["code"] == "APPROVER_NOT_AUTHENTICATED"
+    row = client.get(f"/outbox/{draft_id}").json()
+    assert row["status"] == "drafted"
+    assert row["approved_by"] is None and row["rejected_by"] is None
 
 
 def test_a_rejection_without_a_reason_is_refused(proposed, client):
     draft_id = proposed["proposed"][0]["draft_id"]
     r = client.post(f"/outbox/{draft_id}/reject",
-                    json={"rejected_by": NURSE, "reason": "  "})
+                    json={"reason": "  "})
     assert r.status_code == 422
     assert r.json()["refusal"]["code"] == "REASON_REQUIRED"
 
@@ -385,13 +401,14 @@ def test_a_rejection_without_a_reason_is_refused(proposed, client):
 def test_a_rejected_draft_is_terminal_and_cannot_be_executed(proposed, client, transport):
     draft_id = proposed["proposed"][0]["draft_id"]
     rejected = client.post(f"/outbox/{draft_id}/reject",
-                           json={"rejected_by": NURSE, "reason": "the patient was told at the counter"})
+                           json={"reason": "the patient was told at the counter"})
     assert rejected.status_code == 200, rejected.text
     assert rejected.json()["status"] == "rejected"
-    assert rejected.json()["rejected_by"] == NURSE
+    assert rejected.json()["rejected_by"] == SIGNED_IN
 
-    assert client.post(f"/outbox/{draft_id}/approve",
-                       json={"approved_by": NURSE}).status_code == 422
+    again = client.post(f"/outbox/{draft_id}/approve", json={})
+    assert again.status_code == 409                               # R-028 #11: standard code
+    assert again.json()["refusal"]["code"] == "DECISION_ALREADY_FINAL"
     assert client.post(f"/outbox/{draft_id}/execute").status_code == 422
     assert transport.sent == []
 
@@ -400,7 +417,7 @@ def test_an_unknown_draft_is_a_404_not_a_new_row(client):
     for path in ("", "/approve", "/reject", "/execute"):
         method = client.get if not path else client.post
         r = method(f"/outbox/draft_nothing{path}", **({} if not path else {"json": {
-            "approved_by": NURSE, "rejected_by": NURSE, "reason": "x"}}))
+            "reason": "x"}}))
         assert r.status_code in (404, 422), (path, r.text)
     assert client.get("/outbox").json()["drafts"] == []
 
@@ -410,10 +427,10 @@ def test_after_approval_and_execute_the_outbox_shows_a_sent_row_and_the_result_i
         proposed, client, transport):
     draft_id = proposed["proposed"][0]["draft_id"]
 
-    approved = client.post(f"/outbox/{draft_id}/approve", json={"approved_by": NURSE})
+    approved = client.post(f"/outbox/{draft_id}/approve", json={})
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "approved"
-    assert approved.json()["approved_by"] == NURSE
+    assert approved.json()["approved_by"] == SIGNED_IN
     assert approved.json()["approved_at"]
     assert transport.sent == [], "approving is not sending"
 
@@ -424,7 +441,7 @@ def test_after_approval_and_execute_the_outbox_shows_a_sent_row_and_the_result_i
     assert result["status"] == "sent"
     assert result["message_id"], "a send that cannot be looked up in the mail log is not traceable"
     assert result["sent_at"]
-    assert result["approved_by"] == NURSE
+    assert result["approved_by"] == SIGNED_IN
     assert "dispatcher" in result["executed_by"]
 
     assert len(transport.sent) == 1, "exactly one message left the building"
@@ -434,7 +451,7 @@ def test_after_approval_and_execute_the_outbox_shows_a_sent_row_and_the_result_i
     row = client.get(f"/outbox/{draft_id}").json()
     assert row["status"] == "sent"
     assert row["message_id"] == result["message_id"]
-    assert row["approved_by"] == NURSE
+    assert row["approved_by"] == SIGNED_IN
 
     # Idempotent: a second click is not a second send.
     again = client.post(f"/outbox/{draft_id}/execute")
@@ -448,7 +465,7 @@ def test_the_history_of_a_draft_survives_every_transition(proposed, client, app)
     from databridge_gateway.outbox_routes import get_store
 
     draft_id = proposed["proposed"][0]["draft_id"]
-    client.post(f"/outbox/{draft_id}/approve", json={"approved_by": NURSE})
+    client.post(f"/outbox/{draft_id}/approve", json={})
     client.post(f"/outbox/{draft_id}/execute")
     history = get_store(app).history(draft_id)
     assert [e.status for e in history] == ["drafted", "approved", "sent"]
@@ -519,9 +536,14 @@ def test_the_gateway_process_can_start_one_named_process_and_that_is_the_cost(ap
     """
     from databridge_gateway.outbox_routes import dispatch_argv
 
-    argv = dispatch_argv("/tmp/whatever.sqlite")
-    assert len(argv) == 5
-    assert argv[2:] == ["--once", "--db", "/tmp/whatever.sqlite"]
+    claim = "claim-" + "0" * 32
+    argv = dispatch_argv("/tmp/whatever.sqlite", claim)
+    assert len(argv) == 7
+    assert argv[2:] == ["--once", "--db", "/tmp/whatever.sqlite", "--claim", claim]
+    # the claim is the store's own opaque id; anything else is refused, never interpolated
+    for bad in ("", "claim-x; rm -rf /", "--db", "claim-" + "0" * 31 + "Z"):
+        with pytest.raises(ValueError):
+            dispatch_argv("/tmp/whatever.sqlite", bad)
 
 
 def test_execute_starts_the_dispatcher_in_its_own_process(app):
@@ -530,7 +552,7 @@ def test_execute_starts_the_dispatcher_in_its_own_process(app):
 
     from databridge_gateway.outbox_routes import dispatch_argv, dispatcher_script, outbox_db_path
 
-    argv = dispatch_argv(outbox_db_path(app))
+    argv = dispatch_argv(outbox_db_path(app), "claim-" + "a" * 32)
     assert argv[0] == sys.executable
     assert argv[1].endswith(str(pathlib.Path("apps") / "dispatcher" / "dispatcher.py"))
     assert "--once" in argv and "--db" in argv
@@ -560,8 +582,8 @@ def test_a_dispatcher_that_does_nothing_is_a_refusal_not_a_silent_success(
         proposed, client, app, transport):
     """A route that reported "sent" because a process exited 0 would be the worst bug here."""
     draft_id = proposed["proposed"][0]["draft_id"]
-    client.post(f"/outbox/{draft_id}/approve", json={"approved_by": NURSE})
-    app.state.outbox_executor = lambda db_path: 0          # exits cleanly, sends nothing
+    client.post(f"/outbox/{draft_id}/approve", json={})
+    app.state.outbox_executor = lambda db_path, claim_id: 0   # exits cleanly, sends nothing
     r = client.post(f"/outbox/{draft_id}/execute")
     assert r.status_code == 503, r.text
     assert r.json()["refusal"]["code"] == "DISPATCH_FAILED"
@@ -571,9 +593,9 @@ def test_a_dispatcher_that_does_nothing_is_a_refusal_not_a_silent_success(
 
 def test_a_dispatcher_that_cannot_start_leaves_the_draft_untouched(proposed, client, app):
     draft_id = proposed["proposed"][0]["draft_id"]
-    client.post(f"/outbox/{draft_id}/approve", json={"approved_by": NURSE})
+    client.post(f"/outbox/{draft_id}/approve", json={})
 
-    def explode(db_path):
+    def explode(db_path, claim_id):
         raise OSError("no python here")
 
     app.state.outbox_executor = explode
@@ -668,3 +690,327 @@ def test_a_request_to_contact_someone_reaches_the_propose_path(client, intake):
     body = r.json()
     assert body["intent"] == "propose", body
     assert body["answer"] is None
+
+
+# --- 8. who decides is the SIGNED-IN principal (R-027 ONE, Codex round 1 #1) ---------------
+def test_the_approver_is_minted_from_the_signed_in_principal(proposed, client, transport):
+    draft_id = proposed["proposed"][0]["draft_id"]
+    approved = client.post(f"/outbox/{draft_id}/approve")
+    assert approved.status_code == 200, approved.text
+    assert approved.json()["approved_by"] == SIGNED_IN
+    executed = client.post(f"/outbox/{draft_id}/execute")
+    assert executed.status_code == 200, executed.text
+    assert executed.json()["result"]["approved_by"] == SIGNED_IN
+    assert len(transport.sent) == 1
+
+
+def _routes(draft_id: str) -> list:
+    return [("get", f"/outbox/{draft_id}", {}),
+            ("post", f"/outbox/{draft_id}/approve", {"json": {}}),
+            ("post", f"/outbox/{draft_id}/reject", {"json": {"reason": "not mine to decide"}}),
+            ("post", f"/outbox/{draft_id}/execute", {})]
+
+
+def test_another_principal_gets_the_same_404_as_a_missing_draft(proposed, client, transport,
+                                                                monkeypatch):
+    """Owner-or-operator, and the refusal for someone else's draft is BYTE-identical to the
+    refusal for a draft that does not exist, so the id is not an existence oracle. "Does not
+    exist" is also asked by an OPERATOR, whose request reaches the store and gets the store's own
+    UNKNOWN_DRAFT, so the access refusal cannot drift from the real one."""
+    draft_id = proposed["proposed"][0]["draft_id"]
+    other = auth_headers(OTHER)
+    pairs = zip(_routes(draft_id), _routes("draft_nothing"))
+    for (method, path, kw), (_, missing_path, _) in pairs:
+        foreign = getattr(client, method)(path, headers=other, **kw)
+        missing = getattr(client, method)(missing_path, headers=other, **kw)
+        monkeypatch.setenv("WALNUT_OPERATORS", json.dumps([OPERATOR]))
+        truly_missing = getattr(client, method)(missing_path, headers=auth_headers(OPERATOR), **kw)
+        monkeypatch.delenv("WALNUT_OPERATORS")
+        assert foreign.status_code == missing.status_code == truly_missing.status_code == 404,             (path, foreign.text)
+        assert foreign.content == missing.content == truly_missing.content, path
+    # Nothing moved: the approve/reject/execute above were all refused.
+    row = client.get(f"/outbox/{draft_id}").json()
+    assert row["status"] == "drafted" and row["approved_by"] is None
+    assert transport.sent == []
+    # The listing is scoped the same way: the other principal does not see the row at all.
+    assert [d["draft_id"] for d in client.get("/outbox", headers=other).json()["drafts"]] == []
+    assert draft_id in [d["draft_id"] for d in client.get("/outbox").json()["drafts"]]
+
+
+def test_an_approved_draft_cannot_be_executed_by_another_principal(proposed, client, transport):
+    draft_id = proposed["proposed"][0]["draft_id"]
+    assert client.post(f"/outbox/{draft_id}/approve").status_code == 200
+    r = client.post(f"/outbox/{draft_id}/execute", headers=auth_headers(OTHER))
+    assert r.status_code == 404
+    assert transport.sent == []
+
+
+def test_an_operator_may_decide_and_is_recorded_as_themselves(proposed, client, monkeypatch):
+    monkeypatch.setenv("WALNUT_OPERATORS", json.dumps([OPERATOR]))
+    draft_id = proposed["proposed"][0]["draft_id"]
+    r = client.post(f"/outbox/{draft_id}/approve", headers=auth_headers(OPERATOR))
+    assert r.status_code == 200, r.text
+    assert r.json()["approved_by"] == OPERATOR
+    listed = client.get("/outbox", headers=auth_headers(OPERATOR)).json()["drafts"]
+    assert draft_id in [d["draft_id"] for d in listed]
+
+
+def test_a_draft_with_no_recorded_owner_is_operator_only(proposed, client, app, monkeypatch):
+    """A draft filed before owners were recorded: nobody becomes its owner by deciding."""
+    from databridge_gateway.outbox_routes import draft_owners
+
+    draft_id = proposed["proposed"][0]["draft_id"]
+    draft_owners(app).forget_for_tests(draft_id)
+    assert client.post(f"/outbox/{draft_id}/approve").status_code == 404
+    monkeypatch.setenv("WALNUT_OPERATORS", json.dumps([OPERATOR]))
+    assert client.post(f"/outbox/{draft_id}/approve",
+                       headers=auth_headers(OPERATOR)).status_code == 200
+
+
+def test_the_owner_is_the_first_proposer_and_a_second_proposal_does_not_take_it(
+        proposed, client, intake):
+    draft_id = proposed["proposed"][0]["draft_id"]
+    again = client.post("/intelligence/console", headers=auth_headers(OTHER),
+                        json={"request": ACTION_REQUEST, "intake_id": intake.intake_id})
+    assert again.status_code == 200
+    assert client.post(f"/outbox/{draft_id}/approve",
+                       headers=auth_headers(OTHER)).status_code == 404
+    assert client.post(f"/outbox/{draft_id}/approve").status_code == 200
+
+
+@pytest.mark.parametrize("route", ["/outbox/propose", "/intelligence/console"])
+def test_typed_by_is_the_signed_in_principal_never_the_body(client, intake, monkeypatch, route):
+    """Door (b) records WHO typed an address. That is an identity claim, so it is minted from the
+    signed-in principal; a `typed_by` in the body is ignored."""
+    import databridge_gateway.intelligence_routes as ir
+    import databridge_gateway.outbox_routes as orr
+
+    seen: dict = {}
+
+    def recorder(app, intake_id, **kw):
+        seen.update(kw)
+        return [], []
+
+    monkeypatch.setattr(orr, "propose_actions", recorder)
+    monkeypatch.setattr(ir, "propose_actions", recorder)
+    body = {"intake_id": intake.intake_id, "typed_address": "someone@example.org",
+            "typed_by": NURSE}
+    if route.endswith("console"):
+        body["request"] = ACTION_REQUEST
+    r = client.post(route, json=body)
+    assert r.status_code == 200, r.text
+    assert seen["typed_by"] == SIGNED_IN
+    assert seen["principal"].principal_id == SIGNED_IN
+
+
+# --- 9. Codex round 2 (R-027 ONE) ----------------------------------------------------------
+def test_a_duplicate_proposal_does_not_disclose_another_principals_draft(proposed, client, intake):
+    """#2: principal B asking for the same draft A already filed gets NOTHING of A's draft: no id,
+    no text, no status, no approver. It gets a fixed, content-free blocked reason instead."""
+    cards = proposed["proposed"]
+    assert cards
+    for card in cards:
+        assert client.post(f"/outbox/{card['draft_id']}/approve").status_code == 200
+    r = client.post("/intelligence/console", headers=auth_headers(OTHER),
+                    json={"request": ACTION_REQUEST, "intake_id": intake.intake_id})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["proposed"] == []
+    codes = [b["code"] for b in body["blocked"]]
+    assert codes and set(codes) == {"DRAFTED_BY_SOMEONE_ELSE"}, codes
+    for card in cards:
+        for leak in (card["draft_id"], card["subject"], card["recipient"]["handle"]):
+            assert leak not in r.text, leak
+    assert '"approved_by"' not in r.text and '"recipient"' not in r.text
+    # the same through /outbox/propose
+    r2 = client.post("/outbox/propose", headers=auth_headers(OTHER),
+                     json={"intake_id": intake.intake_id})
+    assert r2.status_code == 200 and r2.json()["proposed"] == []
+    assert all(c["draft_id"] not in r2.text for c in cards)
+
+
+def test_only_the_creator_of_a_draft_can_ever_own_it(client, intake, app, monkeypatch):
+    """#2 race: a duplicate proposal never records an owner, so a second caller cannot win the
+    owner row even while the creator's own owner write has not landed yet."""
+    from databridge_gateway.outbox_routes import DraftOwners
+
+    real = DraftOwners.record
+    monkeypatch.setattr(DraftOwners, "record", lambda self, d, o: None)   # creator still in flight
+    first = client.post("/intelligence/console",
+                        json={"request": ACTION_REQUEST, "intake_id": intake.intake_id}).json()
+    monkeypatch.setattr(DraftOwners, "record", real)
+    client.post("/intelligence/console", headers=auth_headers(OTHER),
+                json={"request": ACTION_REQUEST, "intake_id": intake.intake_id})
+    # Even an OPERATOR (who may see the ownerless row) does not become its owner by proposing it.
+    monkeypatch.setenv("WALNUT_OPERATORS", json.dumps([OPERATOR]))
+    client.post("/intelligence/console", headers=auth_headers(OPERATOR),
+                json={"request": ACTION_REQUEST, "intake_id": intake.intake_id})
+    monkeypatch.delenv("WALNUT_OPERATORS")
+    from databridge_gateway.outbox_routes import draft_owners
+    for card in first["proposed"]:
+        assert draft_owners(app).owner_of(card["draft_id"]) is None
+        assert client.post(f"/outbox/{card['draft_id']}/approve",
+                           headers=auth_headers(OTHER)).status_code == 404
+
+
+def test_executing_my_draft_never_sends_another_principals(proposed, client, app, transport,
+                                                           monkeypatch):
+    """#3 (R-028, CRITICAL): execution is SINGLE-DRAFT and claimed in the database. Executing my
+    draft sends mine and only mine, whatever else is approved in the queue; theirs stays approved
+    until its own owner (or an operator) executes it."""
+    from databridge_gateway.outbox_routes import draft_owners, get_store
+
+    mine, theirs = (c["draft_id"] for c in proposed["proposed"][:2])
+    owners = draft_owners(app)
+    owners.forget_for_tests(theirs)
+    owners.record(theirs, OTHER)
+    assert client.post(f"/outbox/{theirs}/approve", headers=auth_headers(OTHER)).status_code == 200
+    assert client.post(f"/outbox/{mine}/approve").status_code == 200
+
+    r = client.post(f"/outbox/{mine}/execute")
+    assert r.status_code == 200, r.text
+    assert theirs not in r.text
+    assert len(transport.sent) == 1, "another principal's approved draft left with mine"
+    assert get_store(app).current(mine).status == "sent"
+    assert client.get(f"/outbox/{theirs}", headers=auth_headers(OTHER)).json()["status"] == "approved"
+
+    # an operator executing a draft sends THAT draft: still one at a time
+    monkeypatch.setenv("WALNUT_OPERATORS", json.dumps([OPERATOR]))
+    ok = client.post(f"/outbox/{theirs}/execute", headers=auth_headers(OPERATOR))
+    assert ok.status_code == 200, ok.text
+    assert len(transport.sent) == 2
+    assert ok.json()["result"]["approved_by"] == OTHER
+
+
+def test_a_draft_approved_by_another_process_during_my_dispatch_is_not_sent(
+        proposed, client, app, transport):
+    """The finding's interleaving, across processes: worker A claims Alice's draft; worker B (a
+    separate connection to the same file) approves Bob's draft BEFORE the dispatcher process
+    sweeps. The old in-process lock could not see B; the database lease does."""
+    from databridge_outbox.store import OutboxStore
+    from dispatcher import Dispatcher
+
+    from databridge_gateway.outbox_routes import draft_owners, outbox_db_path
+
+    mine, theirs = (c["draft_id"] for c in proposed["proposed"][:2])
+    owners = draft_owners(app)
+    owners.forget_for_tests(theirs)
+    owners.record(theirs, OTHER)
+    assert client.post(f"/outbox/{mine}/approve").status_code == 200
+
+    def interleaved(db_path: str, claim_id: str) -> int:
+        OutboxStore(db_path).approve(theirs, approved_by=OTHER)       # worker B, another process
+        Dispatcher(OutboxStore(db_path), transport).run_once(claim_id=claim_id)
+        return 0
+
+    app.state.outbox_executor = interleaved
+    r = client.post(f"/outbox/{mine}/execute")
+    assert r.status_code == 200, r.text
+    assert len(transport.sent) == 1
+    assert OutboxStore(outbox_db_path(app)).current(theirs).status == "approved"
+
+
+def test_a_draft_already_being_dispatched_is_refused_not_sent_twice(proposed, client, app,
+                                                                    transport):
+    from databridge_gateway.outbox_routes import get_store
+
+    draft_id = proposed["proposed"][0]["draft_id"]
+    assert client.post(f"/outbox/{draft_id}/approve").status_code == 200
+    held = get_store(app).claim_for_dispatch(claimed_by="another worker", draft_ids=[draft_id])
+    assert held.draft_ids == (draft_id,)
+    r = client.post(f"/outbox/{draft_id}/execute")
+    assert r.status_code == 409, r.text
+    assert r.json()["refusal"]["code"] == "DISPATCH_IN_PROGRESS"
+    assert transport.sent == []
+    get_store(app).release_claim(held.claim_id)
+    assert client.post(f"/outbox/{draft_id}/execute").status_code == 200
+    assert len(transport.sent) == 1
+
+
+# --- R-028 #7, #11, #12 ---------------------------------------------------------------------
+def test_a_decision_records_the_common_actor_object_and_an_undecorated_id(proposed, client,
+                                                                         monkeypatch):
+    """#7: the dev token is recorded as STRUCTURED fields on the actor, never as a "(dev token)"
+    suffix on the id; a production token records the same id with dev_only false."""
+    from databridge_gateway import auth
+
+    draft_id, second = (c["draft_id"] for c in proposed["proposed"][:2])
+    real = client.post(f"/outbox/{draft_id}/approve")
+    assert real.status_code == 200, real.text
+    assert real.json()["approved_by"] == SIGNED_IN
+    assert real.json()["approved_actor"] == {
+        "principal_id": SIGNED_IN, "authenticated_by": auth.GATEWAY_MECHANISM,
+        "principal_type": "AuthenticatedPrincipal", "dev_only": False}
+
+    monkeypatch.setenv("WALNUT_DEV_AUTH", "1")
+    auth.reset_auth_state_for_tests()
+    monkeypatch.setenv("WALNUT_OPERATORS", json.dumps([auth.DEV_PRINCIPAL_ID]))
+    try:
+        dev = client.post(f"/outbox/{second}/reject", json={"reason": "phone instead"},
+                          headers={"Authorization": f"Bearer {auth.DEV_TOKEN}"})
+    finally:
+        monkeypatch.delenv("WALNUT_DEV_AUTH")
+        auth.reset_auth_state_for_tests()
+    assert dev.status_code == 200, dev.text
+    body = dev.json()
+    assert body["rejected_by"] == auth.DEV_PRINCIPAL_ID
+    assert "(dev token)" not in dev.text
+    assert body["rejected_actor"] == {
+        "principal_id": auth.DEV_PRINCIPAL_ID, "authenticated_by": auth.DEV_MECHANISM,
+        "principal_type": "AuthenticatedPrincipal", "dev_only": True}
+
+
+@pytest.mark.parametrize("kind", ["name", "prefix"])
+@pytest.mark.parametrize("decision", ["approve", "reject"])
+def test_a_machine_principal_is_refused_with_the_standard_code(proposed, client, app, kind,
+                                                               decision):
+    """Both machine rules: the shared `decision_ledger.require_person` (machine id prefixes) and
+    the outbox's own `refuse_machine_actor` (process names). Either is MACHINE_ACTOR."""
+    from databridge_core.decision_ledger import MACHINE_PREFIXES
+    from databridge_gateway.auth import AuthenticatedPrincipal, require_principal
+    from databridge_outbox.models import NOT_A_HUMAN
+
+    draft_id = proposed["proposed"][0]["draft_id"]
+    machine = (sorted(n for n in NOT_A_HUMAN if n)[0] if kind == "name"
+               else sorted(MACHINE_PREFIXES)[0] + "x")
+    app.dependency_overrides[require_principal] = lambda: AuthenticatedPrincipal(machine)
+    import os
+    os.environ["WALNUT_OPERATORS"] = json.dumps([machine])        # past the access rule
+    try:
+        r = client.post(f"/outbox/{draft_id}/{decision}", json={"reason": "no"}
+                        if decision == "reject" else {})
+    finally:
+        os.environ.pop("WALNUT_OPERATORS", None)
+        app.dependency_overrides.clear()
+    assert r.status_code == 422, r.text
+    assert r.json()["refusal"]["code"] == "MACHINE_ACTOR"
+    assert client.get(f"/outbox/{draft_id}").json()["status"] == "drafted"
+
+
+@pytest.mark.parametrize("second", ["approve", "reject"])
+def test_deciding_a_final_draft_is_the_standard_already_final_code(proposed, client, second):
+    draft_id = proposed["proposed"][0]["draft_id"]
+    assert client.post(f"/outbox/{draft_id}/reject", json={"reason": "no"}).status_code == 200
+    r = client.post(f"/outbox/{draft_id}/{second}",
+                    json={"reason": "again"} if second == "reject" else {})
+    assert r.status_code == 409, r.text
+    assert r.json()["refusal"]["code"] == "DECISION_ALREADY_FINAL"
+
+
+def test_instruction_shaped_draft_text_is_a_withheld_envelope_not_a_redacted_string(
+        proposed, client, monkeypatch):
+    """#12: the card's subject/body, when withheld, are the standard {status, reason, pointers}
+    envelope: no redaction line in their place and no separate `redacted` flag."""
+    import databridge_agent.guardrails as guardrails
+    from databridge_agent.render import REDACTED_VALUE
+
+    draft_id = proposed["proposed"][0]["draft_id"]
+    monkeypatch.setattr(guardrails, "looks_like_injection", lambda text: True)
+    card = client.get(f"/outbox/{draft_id}").json()
+    for field in ("subject", "body"):
+        value = card[field]
+        assert isinstance(value, dict), value
+        assert value["status"] == "withheld" and value["reason"] == "instruction_shaped"
+        assert value["pointers"] == card["because"], "a withheld value still walks to its sources"
+    assert "redacted" not in card
+    assert REDACTED_VALUE not in json.dumps(card)

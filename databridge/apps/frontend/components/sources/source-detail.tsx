@@ -194,9 +194,12 @@ export function SourceDetailView({
   // only. Reset whenever the plan changes (a re-proposal is a different set of tools) so a vouch
   // never carries over to a plan the person has not looked at.
   const [vouched, setVouched] = React.useState<string[]>([]);
-  const planKey = detailQ.data?.plan ? `${detailQ.data.plan.tools_digest}|${detailQ.data.plan.created_at}` : "";
+  const planKey = detailQ.data?.plan ? `${detailQ.data.plan.tools_digest}|${detailQ.data.plan.created_at}|${detailQ.data.plan_digest ?? ""}` : "";
   React.useEffect(() => setVouched([]), [planKey, sourceId]);
-  const approve = useAction(() => sourcesApi.approvePlan(sourceId, vouched), () => {
+  // The approval names the plan ON SCREEN (its digest): if it changed since, the gateway refuses
+  // with PLAN_CHANGED and the page shows that, rather than approving a plan nobody saw.
+  const shownDigest = detailQ.data?.plan_digest ?? "";
+  const approve = useAction(() => sourcesApi.approvePlan(sourceId, shownDigest, vouched), () => {
     setVouched([]);
     refresh();
   });

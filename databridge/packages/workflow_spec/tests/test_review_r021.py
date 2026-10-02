@@ -199,6 +199,10 @@ def test_a_yaml_approved_plan_does_not_make_a_connection_runnable(tmp_path):
 
     m = manager.AdapterAgentManager.__new__(manager.AdapterAgentManager)
     m.service = _NoOnDiskApproval()
+    # A real manager always has a registry; with none, the R-027 setup gate fails closed and adds
+    # its own reason. Give this bare manager an empty registry so only the plan gate is measured.
+    from types import SimpleNamespace
+    m.registry = SimpleNamespace(root=tmp_path)
     reasons = m.agent_gate(spec)
     assert len(reasons) == len(spec.connections) and all("approve" in r for r in reasons)
 

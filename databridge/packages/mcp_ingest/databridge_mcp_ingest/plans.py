@@ -20,17 +20,29 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import logging
+import contextlib
+import os
 import re
+import threading
+import time
 from pathlib import Path
 from typing import Any, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from databridge_core import decision_ledger as _dl
+from databridge_core.decision_ledger import (APPROVER_NOT_AUTHENTICATED, DECISION_STALE,
+                                             LEDGER_INTEGRITY_FAILED, MACHINE_ACTOR,
+                                             DecisionLedger, DecisionRefused)
+
 from . import paths
 from .client import ToolInfo
 from .connections import SourceConnection, connection_path
 from .parse import template_fields
+
+_log = logging.getLogger(__name__)
 
 #: The routed task class for model-proposed plans. `rule_proposal` is the existing class for
 #: "propose a mapping for a human to approve" (config/models.yaml); a dedicated `plan` class is a
@@ -100,6 +112,70 @@ def is_generic_executor(tool: Any) -> bool:
     props = ((getattr(tool, "input_schema", None) or {}).get("properties") or {}) \
         if not isinstance(tool, str) else {}
     return any(str(k).lower() in _EXECUTOR_SCHEMA_ARGS for k in props)
+
+
+# --- dual-use tools (R-027 r2 #1) ----------------------------------------------------------------
+def _closed_values(schema: Any) -> list[str]:
+    """The string values an argument schema allows when it is a CLOSED set: ``enum``, ``const``,
+    ``oneOf`` / ``anyOf`` of those, or an array whose ``items`` is one. Empty when the set is open."""
+    if not isinstance(schema, dict):
+        return []
+    vals: list[Any] = []
+    if "const" in schema:
+        vals.append(schema["const"])
+    if isinstance(schema.get("enum"), list):
+        vals.extend(schema["enum"])
+    for key in ("oneOf", "anyOf"):
+        for sub in schema.get(key) or []:
+            vals.extend(_closed_values(sub))
+    if isinstance(schema.get("items"), dict):
+        vals.extend(_closed_values(schema["items"]))
+    return [v for v in vals if isinstance(v, str)]
+
+
+def dual_use_selectors(tool: Any) -> dict[str, list[str]]:
+    """``{argument: [its write values]}`` for every argument of ``tool`` whose schema is a closed
+    set of values at least one of which the shared write rule (`writes_by_name`) calls a write —
+    a MODE selector (``files(action: list|delete)``). Read STRUCTURALLY from the input schema: the
+    argument's name plays no part, and a closed set with no write value (a sort order) is not one.
+    Such a tool is never vouchable (`classify_plan_tools`); a step must fix each selector to a
+    read value (`validate_steps`), and every crawl call is held to it (`client.ReadOnlyClient`)."""
+    props = ((getattr(tool, "input_schema", None) or {}).get("properties") or {}) \
+        if not isinstance(tool, str) else {}
+    out: dict[str, list[str]] = {}
+    for name, schema in props.items():
+        bad = sorted({v for v in _closed_values(schema) if writes_by_name(v)})
+        if bad:
+            out[str(name)] = bad
+    return out
+
+
+def dual_use_refusal(tool: Any, args: Optional[dict]) -> Optional[str]:
+    """Why a call of ``tool`` with ``args`` may select a write mode, or None. Fail closed: each
+    selector must be given, as a fixed literal (no ``{template}``), and be one of the schema's own
+    values that is not a write."""
+    sel = dual_use_selectors(tool)
+    if not sel:
+        return None
+    name = tool if isinstance(tool, str) else getattr(tool, "name", "?")
+    args = dict(args or {})
+    props = (getattr(tool, "input_schema", None) or {}).get("properties") or {}
+    for arg, bad in sel.items():
+        allowed = {v for v in _closed_values(props.get(arg)) if not writes_by_name(v)}
+        if arg not in args:
+            return (f"tool {name!r} chooses what it does by its {arg!r} argument (it can select "
+                    f"{bad}), and the call does not fix it to a read value")
+        value = args[arg]
+        for v in (value if isinstance(value, list) else [value]):
+            if not isinstance(v, str) or "{" in v:
+                return (f"tool {name!r}: its mode argument {arg!r} must be a fixed read value, "
+                        f"not {v!r}")
+            if writes_by_name(v) or v in bad:
+                return f"tool {name!r}: {arg}={v!r} selects a write mode; a crawl only reads"
+            if v not in allowed:
+                return (f"tool {name!r}: {arg}={v!r} is not one of its read values "
+                        f"{sorted(allowed)}")
+    return None
 
 
 #: The CLOSED grammar a crawl's SQL must fit. A statement is ONE `SELECT` / `WITH … SELECT` /
@@ -238,7 +314,26 @@ class PlanError(ValueError):
 
 class ApprovalRefused(PlanError):
     """An approval offered by something that is not an authenticated principal (a bare name, a
-    dict, an edited YAML field, a hand-built `Approver`). Plain words; never echoes a secret."""
+    dict, an edited YAML field, a hand-built `Approver`). Plain words; never echoes a secret.
+    ``code`` is the R-028 standard refusal code (`APPROVER_NOT_AUTHENTICATED` unless said)."""
+
+    code = APPROVER_NOT_AUTHENTICATED
+
+    def __init__(self, message: str = "", code: Optional[str] = None) -> None:
+        super().__init__(message)
+        if code:
+            self.code = code
+
+
+class LedgerRefused(ApprovalRefused):
+    """A decision log that does not verify (R-028 `LEDGER_INTEGRITY_FAILED`), or a deployment
+    that cannot seal (`APPROVAL_KEY_UNAVAILABLE`). No decision in it is trusted."""
+
+    code = LEDGER_INTEGRITY_FAILED
+
+
+def ledger_refused(exc: DecisionRefused) -> LedgerRefused:
+    return LedgerRefused(exc.message, code=exc.code)
 
 
 def require_authenticated_approver(obj: Any, *, what: str = "approval") -> dict:
@@ -261,6 +356,9 @@ def require_authenticated_approver(obj: Any, *, what: str = "approval") -> dict:
         raise ApprovalRefused(
             f"{what} REFUSED: a {type(obj).__name__} is not an authenticated principal; pass the "
             f"principal the application's authentication layer issued (hard constraint 4)")
+    if _dl.is_machine_principal(getattr(obj, "principal_id", "")):
+        raise ApprovalRefused(f"{what} REFUSED: {getattr(obj, 'principal_id', '')!r} is a machine "
+                              f"actor; a person decides", code=MACHINE_ACTOR)
     try:
         from databridge_adapter_agents.adapt import (AdaptationRefused,  # noqa: PLC0415
                                                      principal_of)
@@ -288,7 +386,15 @@ def require_authenticated_approver(obj: Any, *, what: str = "approval") -> dict:
         got = {"principal_id": pid, "authenticated_by": str(obj.authenticated_by),
                "principal_type": type(obj).__name__}
     got["dev_only"] = bool(getattr(obj, "dev_only", False))
-    return got
+    # R-028 #7: the ONE actor object (`databridge_core.decision_ledger.actor_of`) - a decorated id
+    # ("alice (dev token)") or a missing field is refused; a machine actor never decides
+    if _dl.is_machine_principal(got.get("principal_id")):
+        raise ApprovalRefused(f"{what} REFUSED: {got.get('principal_id')!r} is a machine actor; a "
+                              f"person decides", code=MACHINE_ACTOR)
+    try:
+        return _dl.actor_of(got)
+    except DecisionRefused as exc:
+        raise ApprovalRefused(f"{what} REFUSED: {exc.message}", code=exc.code) from None
 
 
 def require_delegated_approver(obj: Any, *, what: str = "delegated approval") -> dict:
@@ -636,6 +742,9 @@ def validate_steps(steps: list[StepSpec], tools: list[ToolInfo], *,
             if info is None:
                 continue
             problems.extend(_arg_problems(step.id, tool, args, info, available))
+            dual = dual_use_refusal(info, args)
+            if dual:
+                problems.append(f"step {step.id!r}: {dual} (refused)")
         if step.strategy == "documents":
             if step.list is None or step.read is None or not (step.read.text_tool
                                                                or step.read.binary_tool
@@ -883,10 +992,68 @@ def plan_path(source_id: str, root: Optional[Path] = None) -> Path:
     return connection_path(source_id, root).with_name(f"{source_id}.plan.yaml")
 
 
+def _lock_timeout() -> float:
+    try:
+        return float(os.environ.get("WALNUT_PLAN_LOCK_TIMEOUT_S") or 30.0)
+    except ValueError:
+        return 30.0
+
+
+def file_lock(lock_path: Path, *, timeout: Optional[float] = None):
+    """An exclusive lock across PROCESSES (an OS lock on ``lock_path``) and threads, re-entrant
+    within a thread (R-027 r2 #2/#3). It times out CLOSED: a writer that cannot get it raises
+    `PlanError` and writes nothing. R-028: the ONE implementation is
+    `databridge_core.decision_ledger.file_lock` (shared re-entrancy, so a plan lock and a ledger
+    lock taken by the same thread never deadlock each other)."""
+    wait = _lock_timeout() if timeout is None else timeout
+    return _dl.file_lock(Path(lock_path), timeout=wait, on_timeout=PlanError)
+
+
+def plan_lock(source_id: str, root: Optional[Path] = None, *, timeout: Optional[float] = None):
+    """THE lock every writer of ``source_id``'s plan takes — `save_plan` (so every CLI, package and
+    gateway writer), `propose_plan`, and `approve_plan` from its load to its save (R-027 r2 #2)."""
+    p = plan_path(source_id, root)
+    return file_lock(p.with_name(f"{p.name}.lock"), timeout=timeout)
+
+
+def plan_review_digest(plan: Any) -> str:
+    """What a person reviewed: the digest of the WHOLE stored plan (the gateway's `plan_digest`
+    is the same formula). An approval names it; `approve_plan(expected_plan_digest=...)` compares
+    it with the plan it loads under the plan lock."""
+    data = plan.model_dump(mode="json") if hasattr(plan, "model_dump") else plan
+    blob = json.dumps(data, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+class PlanChanged(PlanError):
+    """The plan on disk is not the plan the person reviewed."""
+    code = "PLAN_CHANGED"
+    standard_code = DECISION_STALE                   # R-028: the standard code it maps to
+
+
+class PlanStale(PlanError):
+    """The connection is not the revision the approval or proposal was made for."""
+    code = "PLAN_STALE"
+    standard_code = DECISION_STALE
+
+
 def save_plan(plan: CrawlPlan, root: Optional[Path] = None) -> Path:
+    """Write the plan whole or not at all (a temp file replaced into place): a reader never sees
+    half a plan, and a failed write leaves the previous plan as it was (R-027 r1 #3)."""
     p = plan_path(plan.source_id, root)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(yaml.safe_dump(plan.model_dump(mode="json"), sort_keys=False), encoding="utf-8")
+    text = yaml.safe_dump(plan.model_dump(mode="json"), sort_keys=False)
+    with plan_lock(plan.source_id, root):            # every plan writer, every process (r2 #2)
+        tmp = p.with_name(f".{p.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, p)
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
     return p
 
 
@@ -971,7 +1138,12 @@ def classify_plan_tools(steps: list[StepSpec], tools: list[ToolInfo],
                 continue
             c = classify(name, read_only=(False if info.read_only is False else None),
                          destructive=info.destructive, denied=name in denied)
-            if c.writes and c.basis == "unknown":
+            dual = dual_use_selectors(info)
+            if c.writes and c.basis == "unknown" and dual:
+                # R-027 r2 #1: its arguments can select a write, so nobody can vouch for it
+                out[name] = "write:dual_use (" + "; ".join(
+                    f"{a} can select {v}" for a, v in sorted(dual.items())) + ")"
+            elif c.writes and c.basis == "unknown":
                 claim = ("; the server claims readOnlyHint=true, which is not a grant"
                          if info.read_only is True else "")
                 out[name] = f"unclassified:unknown ({origin} classifier{claim})"
@@ -1189,17 +1361,26 @@ def probe_plan(client, plan: CrawlPlan, conn: SourceConnection, *,
 
 
 def propose_plan(source_id: str, *, harness=None, client=None, root: Optional[Path] = None,
-                 profiles: Optional[list[Profile]] = None, probe: Optional[bool] = None
-                 ) -> CrawlPlan:
+                 profiles: Optional[list[Profile]] = None, probe: Optional[bool] = None,
+                 bind_notes: Optional[list[str]] = None, expected_revision: Optional[str] = None,
+                 revision_of: Any = None) -> CrawlPlan:
     """Connect, list tools/resources, propose a plan, save it (status `proposed`, always).
 
     A plan no server-specific profile vouches for (model-proposed, or a generic fallback profile)
     is also PROBED through the same session (`probe_plan`) before it can be approved;
-    `probe=True/False` forces it on/off."""
+    `probe=True/False` forces it on/off.
+
+    ``bind_notes`` (R-027 r2 #5) are written into the plan by the SAME save — e.g. the revision of
+    the connection it was proposed for — so a proposal is never saved unbound. With
+    ``expected_revision``, ``revision_of(conn)`` of the connection loaded here must equal it."""
     from .client import open_client
     from .connections import load_connection
 
     conn = load_connection(source_id, root)
+    if expected_revision is not None and (revision_of is None
+                                          or revision_of(conn) != expected_revision):
+        raise PlanStale(f"connection {source_id!r} is not the revision the proposal was asked "
+                        f"for; nothing was proposed")
     if getattr(conn, "purpose", "ingest") != "ingest":
         raise PlanError(f"connection {source_id!r} is declared purpose={conn.purpose!r}: a "
                         f"write-capable connection is never crawled, so it gets no crawl plan. "
@@ -1238,7 +1419,10 @@ def propose_plan(source_id: str, *, harness=None, client=None, root: Optional[Pa
         plan = plan.model_copy(update={"notes": [*plan.notes, (
             "auto_approve on the connection was ignored: a plan is approved only by a named, "
             "authenticated person (approve_plan)")]})
-    save_plan(plan, root)
+    bindings = [str(n) for n in (bind_notes or []) if str(n or "").strip()]
+    if bindings:
+        plan = plan.model_copy(update={"notes": [*plan.notes, *bindings]})
+    save_plan(plan, root)                       # one save: the proposal AND its binding (r2 #5)
     return plan
 
 
@@ -1361,8 +1545,8 @@ def plan_approval_digest(plan: CrawlPlan) -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()
 
 
-# --- the approval log: append-only AND hash-chained (FXJ3, Codex f2 #6) -------------------------
-#: Fields of a log line that are the chain's, not the approval's.
+# --- the approval log: the R-028 decision ledger -----------------------------------------------
+#: A legacy UNSEALED chained log (FXJ3) uses these; the plan approvals no longer do.
 _CHAIN_FIELDS = ("prev", "hash")
 GENESIS = "genesis"
 
@@ -1372,49 +1556,81 @@ def _canon(rec: dict) -> bytes:
 
 
 def _line_hash(rec: dict) -> str:
-    """The hash a chained line carries: sha256 over its canonical content WITHOUT `hash`."""
+    """The hash a legacy chained line carries: sha256 over its canonical content WITHOUT `hash`."""
     return hashlib.sha256(_canon({k: v for k, v in rec.items() if k != "hash"})).hexdigest()
+
+
+def _is_sealed_log(path: Path) -> bool:
+    """Was ``path`` written by the R-028 decision ledger (its records carry a ``seal``)?"""
+    try:
+        with open(path, "rb") as fh:
+            for raw in fh:
+                if raw.strip():
+                    try:
+                        rec = json.loads(raw)
+                    except ValueError:
+                        return False
+                    return isinstance(rec, dict) and "seal" in rec
+    except OSError:
+        return False
+    return False
 
 
 def append_chained(path: Path, rec: dict) -> dict:
     """Append ONE record to a hash-chained, append-only JSONL log and return it as written.
 
-    Each line carries `prev` (the previous line's `hash`, or the sha256 of the previous line's raw
-    bytes for a legacy unchained line, or `genesis`) and `hash` (`_line_hash`). Opened in append
-    mode, flushed and fsynced; never rewritten. Without a signing key this is tamper-EVIDENT, not
-    tamper-proof: an edit, deletion or insertion anywhere but the tail breaks the chain
-    (`read_chained` refuses the whole log); a writer who rewrites every line from the edited one
-    to the end is not detected — that needs a key (founder decision, R-022)."""
-    import os
-
+    A log the R-028 decision ledger wrote (sealed records) is appended through it
+    (`DecisionLedger.append`: sealed, chained, anchored, verified first). Otherwise this is the
+    legacy UNSEALED chain (still used by the adapter-agent delegation log): each line carries
+    `prev` (the previous line's `hash`, or the sha256 of the previous line's raw bytes for a legacy
+    unchained line, or `genesis`) and `hash` (`_line_hash`), appended, flushed and fsynced, never
+    rewritten - tamper-EVIDENT, not tamper-proof. Either way the WHOLE existing chain is verified
+    under one interprocess lock before a line is added, and a broken log raises `PlanError`."""
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    prev = GENESIS
-    if path.is_file():
-        lines = [ln for ln in path.read_bytes().splitlines() if ln.strip()]
-        if lines:
-            try:
-                last = json.loads(lines[-1])
-            except json.JSONDecodeError:
-                last = None
-            prev = (last.get("hash") if isinstance(last, dict) and last.get("hash")
-                    else hashlib.sha256(lines[-1]).hexdigest())
-    out = {k: v for k, v in rec.items() if k not in _CHAIN_FIELDS}
-    out["prev"] = prev
-    out["hash"] = _line_hash(out)
-    with open(path, "ab") as fh:
-        fh.write(_canon(out) + b"\n")
-        fh.flush()
-        os.fsync(fh.fileno())
+    if _is_sealed_log(path):
+        try:
+            return DecisionLedger(path).append(rec)
+        except DecisionRefused as exc:
+            raise ledger_refused(exc) from None
+    # R-027 r2 #3: under one interprocess lock, the WHOLE existing chain is verified before a line
+    # is added - a broken log raises `PlanError` and is never extended (nothing is written).
+    with file_lock(path.with_name(f"{path.name}.lock")):
+        read_chained(path)
+        prev = GENESIS
+        if path.is_file():
+            lines = [ln for ln in path.read_bytes().splitlines() if ln.strip()]
+            if lines:
+                try:
+                    last = json.loads(lines[-1])
+                except json.JSONDecodeError:
+                    last = None
+                prev = (last.get("hash") if isinstance(last, dict) and last.get("hash")
+                        else hashlib.sha256(lines[-1]).hexdigest())
+        out = {k: v for k, v in rec.items() if k not in _CHAIN_FIELDS}
+        out["prev"] = prev
+        out["hash"] = _line_hash(out)
+        with open(path, "ab") as fh:
+            fh.write(_canon(out) + b"\n")
+            fh.flush()
+            os.fsync(fh.fileno())
     return out
 
 
 def read_chained(path: Path, *, what: str = "approval log") -> list[dict]:
-    """Every CHAINED record of `path`, after verifying the whole chain. A line that does not
-    parse, a `hash` that does not recompute or a `prev` that is not the previous line's hash raises
-    `PlanError` — no record of a broken log is trusted. Legacy lines written before the chain
-    existed (no `hash`) are skipped: they are never evidence."""
+    """Every record of `path`, after verifying the whole chain. A log the R-028 decision ledger
+    wrote is verified by it (seal, chain AND anchor); a legacy unsealed log by its hash chain: a
+    line that does not parse, a `hash` that does not recompute or a `prev` that is not the
+    previous line's hash raises `PlanError` - no record of a broken log is trusted. Legacy lines
+    written before the chain existed (no `hash`) are skipped: they are never evidence."""
+    path = Path(path)
     if not path.is_file():
         return []
+    if _is_sealed_log(path):
+        try:
+            return DecisionLedger(path, what=what).read()
+        except DecisionRefused as exc:
+            raise ledger_refused(exc) from None
     out: list[dict] = []
     prev_expected = GENESIS
     for n, raw in enumerate([ln for ln in path.read_bytes().splitlines() if ln.strip()], 1):
@@ -1442,17 +1658,31 @@ def plan_approvals_path(source_id: str, root: Optional[Path] = None) -> Path:
     return connection_path(source_id, root).with_name(f"{source_id}.plan.approvals.jsonl")
 
 
+def plan_ledger(source_id: str, root: Optional[Path] = None) -> DecisionLedger:
+    """The plan approval log as an R-028 decision ledger: sealed under the deployment approval
+    key, hash-chained, anchored in ``<sources>/decision.anchors.jsonl`` (or
+    ``WALNUT_DECISION_ANCHORS``), verified before every append and read. A log written before
+    R-028 (unsealed) is refused on read and superseded by the next approval."""
+    return DecisionLedger(plan_approvals_path(source_id, root), what="plan approval log")
+
+
 def _append_approval(source_id: str, rec: dict, root: Optional[Path]) -> dict:
-    """Append-only AND hash-chained (`append_chained`). Returns the line as written."""
-    return append_chained(plan_approvals_path(source_id, root), rec)
+    """Append through the decision ledger. Returns the record as written."""
+    try:
+        return plan_ledger(source_id, root).append(rec)
+    except DecisionRefused as exc:
+        raise ledger_refused(exc) from None
 
 
 def _approval_log(source_id: str, root: Optional[Path]) -> list[dict]:
-    return read_chained(plan_approvals_path(source_id, root), what="plan approval log")
+    try:
+        return plan_ledger(source_id, root).read()
+    except DecisionRefused as exc:
+        raise ledger_refused(exc) from None
 
 
 #: Log-line fields that are not part of the approval record itself.
-_LOG_ONLY = ("event", "source_id", "prev", "hash")
+_LOG_ONLY = ("event", "source_id", "seq", "prev", "hash", "seal")
 
 
 def verify_plan_approval(plan: CrawlPlan, *, root: Optional[Path] = None) -> dict:
@@ -1535,7 +1765,9 @@ def _live_state(conn: SourceConnection, client, plan: CrawlPlan
 
 def approve_plan(source_id: str, *, principal: Any = None, approved_by: Any = None,
                  root: Optional[Path] = None, vouch_read_tools: Optional[list[str]] = None,
-                 client: Any = None) -> CrawlPlan:
+                 client: Any = None, bind_notes: Optional[list[str]] = None,
+                 expected_plan_digest: Optional[str] = None,
+                 expected_revision: Optional[str] = None, revision_of: Any = None) -> CrawlPlan:
     """Approve the plan on disk — ONLY for an authenticated principal (FXI3, Codex f1 #1).
 
     `principal` is the principal the application's authentication layer issued (a sealed
@@ -1552,9 +1784,23 @@ def approve_plan(source_id: str, *, principal: Any = None, approved_by: Any = No
     step's sql tool, whose every statement `ReadOnlyClient` holds to the read-only grammar (Codex
     f2 #1). A plan that reads RESOURCES is validated against the resources listed NOW through the
     same session (Codex f2 #12). The approval is stored on the plan (`approval`) and appended to
-    the hash-chained `<id>.plan.approvals.jsonl`, bound to `plan_approval_digest`."""
-    from .connections import load_connection
+    the hash-chained `<id>.plan.approvals.jsonl`, bound to `plan_approval_digest`.
 
+    ``bind_notes`` (R-027 r1 #3) are the caller's binding notes — e.g. which revision of the
+    connection this approval covers. They are appended to the plan's ``notes`` and recorded in the
+    approval record (``bind_notes``) by THIS operation: the status, the bindings, the approval
+    record and the chained log line are written together, and the plan is saved whole or not at
+    all. A failure handing re-planned steps to the adapter agents AFTER the approval is saved does
+    not undo or misreport it; those holds stand and are decided where they live.
+
+    R-027 r2: everything from LOADING the plan to SAVING it runs under `plan_lock` — the lock every
+    plan writer takes — so the plan verified is the plan saved (#2). ``expected_plan_digest`` (the
+    `plan_review_digest` the person reviewed) and ``expected_revision`` (``revision_of(conn)`` of
+    the connection the caller checked) are compared with the EXACT objects loaded here: a plan or
+    connection changed in between is refused (`PlanChanged` / `PlanStale`). The approval log is
+    appended BEFORE the plan is saved, and `append_chained` verifies its whole chain under its lock
+    first: a broken log refuses the approval and the plan is never touched (#3). A vouch is accepted only for an
+    unclassified tool of THIS plan, and only the vouches applied are recorded (#4)."""
     subject = principal if principal is not None else approved_by
     who = require_authenticated_approver(subject, what=f"approval of the crawl plan for "
                                                        f"{source_id!r}")
@@ -1563,8 +1809,34 @@ def approve_plan(source_id: str, *, principal: Any = None, approved_by: Any = No
         raise ApprovalRefused(f"approval of the crawl plan for {source_id!r} REFUSED: the name "
                               f"given ({approved_by.strip()!r}) is not the authenticated "
                               f"principal ({who['principal_id']!r})")
+    with plan_lock(source_id, root):
+        plan = _approve_locked(source_id, who=who, root=root, vouch_read_tools=vouch_read_tools,
+                               client=client, bind_notes=bind_notes,
+                               expected_plan_digest=expected_plan_digest,
+                               expected_revision=expected_revision, revision_of=revision_of)
+    try:
+        resolve_step_holds(plan, principal=subject, root=root)
+    except Exception as exc:                                         # noqa: BLE001
+        _log.warning("plan for %s approved; handing its re-planned steps to the adapter agents "
+                     "failed (%s: %s) - their holds stand", source_id, type(exc).__name__, exc)
+    return plan
+
+
+def _approve_locked(source_id: str, *, who: dict, root: Optional[Path], vouch_read_tools: Any,
+                    client: Any, bind_notes: Any, expected_plan_digest: Optional[str],
+                    expected_revision: Optional[str], revision_of: Any) -> CrawlPlan:
+    """`approve_plan`'s load -> verify -> log -> save, run while the caller holds `plan_lock`."""
+    from .connections import load_connection
+
     plan = load_plan(source_id, root)
     conn = load_connection(source_id, root)
+    if expected_plan_digest is not None and plan_review_digest(plan) != expected_plan_digest:
+        raise PlanChanged(f"plan for {source_id!r} changed after it was reviewed; review it "
+                          f"again. Nothing was approved")
+    if expected_revision is not None and (revision_of is None
+                                          or revision_of(conn) != expected_revision):
+        raise PlanStale(f"connection {source_id!r} changed after the plan was reviewed; propose "
+                        f"and review the plan again. Nothing was approved")
     if getattr(conn, "purpose", "ingest") != "ingest":
         raise PlanError(f"connection {source_id!r} is purpose={conn.purpose!r}; it is never "
                         f"crawled, so no crawl plan can be approved for it")
@@ -1592,6 +1864,17 @@ def approve_plan(source_id: str, *, principal: Any = None, approved_by: Any = No
                                    "deny_tools": deny,
                                    "step_tool_digests": step_tool_digests(plan.steps, tools)})
     vouched = {str(t) for t in (vouch_read_tools or []) if t}
+    # r2 #4: only an UNCLASSIFIED tool of THIS plan, as classified live just now, can be vouched
+    eligible = {t for s in plan.steps for t in s.tools()
+                if str(plan.tool_classes.get(t, "")).startswith("unclassified:unknown")}
+    stray = sorted(vouched - eligible)
+    if stray:
+        named = ", ".join(f"{t} ({plan.tool_classes.get(t) or 'not a step tool of this plan'})"
+                          for t in stray)
+        raise PlanError(f"plan for {source_id!r} cannot be approved: a vouch was sent for "
+                        f"{named}, which {'is' if len(stray) == 1 else 'are'} not an "
+                        f"unclassified tool of this plan; nothing but an unclassified tool can be "
+                        f"vouched for (eligible: {sorted(eligible) or 'none'})")
     executors = {t.name for t in tools if is_generic_executor(t)}
     refused = plan_tool_refusals(plan, vouched, executors)
     if refused:
@@ -1609,17 +1892,33 @@ def approve_plan(source_id: str, *, principal: Any = None, approved_by: Any = No
             guarded = "sql_guarded:" if (t in executors or is_generic_executor(t)) else ""
             classes[t] = f"read:{guarded}vouched_by:{who['principal_id']}"
     at = _now()
+    bindings = [str(n) for n in (bind_notes or []) if str(n or "").strip()]
     plan = plan.model_copy(update={"tool_classes": classes, "status": "approved",
-                                   "approved_at": at, "approved_by": who["principal_id"]})
+                                   "approved_at": at, "approved_by": who["principal_id"],
+                                   "notes": [*(plan.notes or []), *bindings]})
     rec = {**who, "at": at, "plan_digest": plan_approval_digest(plan),
            "tools_digest": live_digest, "vouched_read_tools": sorted(vouched)}
+    if bindings:
+        rec["bind_notes"] = bindings
     if resources is not None:
         rec["resources"] = {"supports": supports, "count": len(resources)}
     written = _append_approval(source_id, {"event": "plan_approved", "source_id": source_id,
                                            **rec}, root)
     plan = plan.model_copy(update={"approval": {**rec, "log_hash": written["hash"]}})
-    save_plan(plan, root)
-    resolve_step_holds(plan, principal=subject, root=root)
+    try:
+        save_plan(plan, root)
+    except Exception as exc:
+        # The plan on disk is unchanged (save_plan is whole-or-nothing), so nothing is approved;
+        # the log says so after its approval line (append-only: nothing is removed).
+        try:
+            _append_approval(source_id, {"event": "plan_approval_not_saved",
+                                         "source_id": source_id, "at": _now(),
+                                         "approval_hash": written["hash"],
+                                         "error": type(exc).__name__}, root)
+        except Exception:                                            # noqa: BLE001
+            pass
+        raise PlanError(f"plan for {source_id!r} was not approved: the approved plan could not "
+                        f"be saved ({type(exc).__name__}); nothing was approved") from None
     return plan
 
 
@@ -1732,4 +2031,6 @@ __all__ = ["CrawlPlan", "StepSpec", "CallSpec", "ListSpec", "PageSpec", "ReadSpe
            "plan_approvals_path", "planner_catalogue", "advertise_write_tools",
            "is_generic_executor", "read_only_sql_refusal", "READ_ONLY_SQL_FUNCTIONS",
            "EXECUTOR_ARGS", "tool_digest", "step_tool_digests", "append_chained",
-           "read_chained"]
+           "read_chained", "dual_use_selectors", "dual_use_refusal", "plan_lock", "file_lock",
+           "plan_review_digest", "PlanChanged", "PlanStale", "plan_ledger", "LedgerRefused",
+           "ledger_refused"]

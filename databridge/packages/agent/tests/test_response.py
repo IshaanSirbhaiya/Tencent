@@ -102,8 +102,9 @@ def test_the_response_serializes_exactly_these_keys():
 
 def test_a_value_serializes_exactly_these_keys():
     value = _poisoned_answer().public().values[0]
+    # R-028 TIDY #7: no `redacted` flag; a withheld value is the envelope IN `text`'s place
     assert set(value.model_dump()) == {
-        "key", "tool", "row", "field", "scope", "text", "redacted", "citation", "source"}
+        "key", "tool", "row", "field", "scope", "text", "citation", "source"}
 
 
 def test_a_read_record_serializes_exactly_these_keys():
@@ -168,10 +169,19 @@ def test_a_tool_name_that_is_a_persons_name_does_not_reach_the_page():
 
 
 def test_the_value_text_is_the_rendered_text_not_the_raw_value():
+    """R-028 TIDY #7 (CONS_BRIEF standard 5): an instruction-shaped value is the standard withheld
+    envelope `{status, reason, pointers}` in the value's place - never a "redacted" string or a
+    flag beside a placeholder. Its pointer is the value's own source, so it still walks to it."""
     value = _poisoned_answer().public().values[0]
-    assert value.redacted is True
-    assert value.text == REDACTED_VALUE
+    assert value.withheld is True
+    dumped = value.model_dump(mode="json")
+    assert dumped["text"] == {"status": "withheld", "reason": "instruction_shaped",
+                              "pointers": [DOC_POINTER.model_dump(mode="json")]}
+    assert "redacted" not in dumped and REDACTED_VALUE not in json.dumps(dumped)
     assert value.citation and value.source == DOC_POINTER
+    plain = AnswerValue(key="k", tool="t", row=0, field="f", scope="", text="x",
+                        citation="c", source=DOC_POINTER)
+    assert plain.withheld is False and plain.model_dump()["text"] == "x"      # non-vacuous
 
 
 # --- candidates and refusals through the same door --------------------------------
@@ -237,5 +247,5 @@ def test_the_response_types_forbid_extra_fields():
     with pytest.raises(ValidationError):
         ReadRecord(tool="t", status="ok", arguments={"patient_id": "2"})
     with pytest.raises(ValidationError):
-        AnswerValue(key="k", tool="t", row=0, field="f", scope="", text="x", redacted=False,
+        AnswerValue(key="k", tool="t", row=0, field="f", scope="", text="x",
                     citation="c", source=DOC_POINTER, value="the raw one")

@@ -40,6 +40,7 @@ from databridge_agent_runtime import sql_is_read_only
 from .catalogue import Catalogue, ConnectionEntry, FactsTable, key_proof_sql
 from .contracts import (
     DATE_FIELD,
+    RECORD_TIME_FIELD,
     SELF_VIA,
     TEXT_FIELD,
     Aggregate,
@@ -413,8 +414,17 @@ def _run_tabular(task: SubTask, entry: ConnectionEntry, *, facts: Any, today: dt
         if KEY_PROOF_COL in table.columns:
             raise DelegateError(f"{table.name} has a column named {KEY_PROOF_COL!r}, which this "
                                 f"reader reserves for its key proof")
+        record = ""
+        if task.record_time:
+            if RECORD_TIME_FIELD in table.columns:
+                raise DelegateError(f"{table.name} has a column named {RECORD_TIME_FIELD!r}, "
+                                    f"which this reader reserves for the record time")
+            # DSD: the row's record time, from the store's own extraction record, in the SAME
+            # statement — so it is a cited cell of that statement, not a value written down here
+            record = (f"(SELECT value FROM \"_facts_meta\" WHERE key = 'extracted_at') AS "
+                      f"{_q(RECORD_TIME_FIELD)}, ")
         # the SAME statement re-proves the key over the whole table (R-021 r2 #10)
-        sql = (f"SELECT {', '.join(_q(c) for c in wanted)}, "
+        sql = (f"SELECT {', '.join(_q(c) for c in wanted)}, {record}"
                f"{key_proof_sql(table.name, table.key)} AS {KEY_PROOF_COL} "
                f"FROM {_q(table.name)}{where} ORDER BY {_q(table.key)} LIMIT ?")
         _check(sql)

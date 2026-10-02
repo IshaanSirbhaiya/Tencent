@@ -21,6 +21,7 @@ from conftest import auth_headers
 from test_activity_routes import OWNER, OTHER, _agent_run, env, fx, world  # noqa: F401
 
 from databridge_gateway.activity_routes import REQUEST_SCHEMA, delegation_tree
+from databridge_gateway.activity_actor import NOT_IN_ALLOW_LIST, withheld
 
 SENTINEL = "zz-secret-hint-7781"
 AGENT = "followup"           # the fixture's agent owned by OWNER
@@ -97,7 +98,8 @@ def _expected_request(step: dict) -> dict:
     sub = step["args"]["subtask"]
     out = {k: copy.deepcopy(sub[k]) for k in REQUEST_SCHEMA if k in sub}
     for f in out.get("filters", []):
-        f.pop("hint", None)                          # not in the allow-list: never served
+        if "hint" in f:                              # not in the allow-list: its VALUE is never
+            f["hint"] = withheld(NOT_IN_ALLOW_LIST)  # served; the envelope stands in (R-028 #12)
     return out
 
 

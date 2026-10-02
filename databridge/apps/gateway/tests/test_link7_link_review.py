@@ -231,7 +231,7 @@ def test_a_link_into_a_person_kind_is_refused_and_shows_no_keys(estate, monkeypa
     # the ENGINE refuses it as well (defence in depth: the route's pre-check is not the only gate)
     from databridge_mcp_ingest.mapping import MappingApprovalRefused, approve_link
     from databridge_gateway.auth import AuthenticatedPrincipal
-    with pytest.raises(MappingApprovalRefused, match="person kind"):
+    with pytest.raises(MappingApprovalRefused, match="subject kind"):   # R-028 #9 wording
         approve_link(LEFT, t, fk["column"], vocab=vocab,
                      principal=AuthenticatedPrincipal(principal_id="analyst-7"))
 

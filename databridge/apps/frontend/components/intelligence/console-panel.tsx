@@ -4,12 +4,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CornerDownLeft, EyeOff, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { intakeApi } from "@/lib/intake-api";
-import { useStaffSession } from "@/lib/staff-session";
 import {
   citedEntity,
   consoleApi,
   type AgentAsk,
   type AnswerValue,
+  answerValueText,
   type ConsoleResponse,
 } from "@/lib/intelligence-api";
 import type { ActionCard as ActionCardData, ExecutionResult } from "@/lib/outbox-api";
@@ -59,7 +59,6 @@ export function ConsolePanel({
   /** Hand the figures back up, so the page renders them in the same place the button does. */
   onFigures: (analytics: ConsoleResponse["analytics"]) => void;
 }) {
-  const { staff } = useStaffSession();
   const nouns = useNouns();
   const trials = usePackTrials("intelligence");
   const [request, setRequest] = React.useState("");
@@ -82,10 +81,9 @@ export function ConsolePanel({
         request: text,
         as_of: asOf || null,
         intake_id: intakeId.trim() || null,
+        // Door (b) of the recipient rule: who typed it is the SIGNED-IN principal, recorded by the
+        // gateway. No name is sent (R-027 ONE): a client string is never an identity.
         typed_address: typedAddress.trim() || null,
-        // Door (b) of the recipient rule needs a NAME, not just an address: an arbitrary address
-        // is fine as long as a person owns having entered it, and the record then says who did.
-        typed_by: staff ? `${staff.name} (${staff.staffId})` : null,
       }),
     onSuccess: (result) => {
       setCards(result.proposed ?? []);
@@ -326,20 +324,23 @@ function Answer({
               </div>
             )}
             <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-0.5">
-              {group.values.map((value) => (
-                <React.Fragment key={value.key}>
-                  <dt className="font-mono text-2xs text-subtle">{value.field}</dt>
-                  <dd
-                    className={cn(
-                      "tnum text-xs",
-                      value.redacted ? "flex items-start gap-1 italic text-band-spot" : "text-fg",
-                    )}
-                  >
-                    {value.redacted && <EyeOff className="mt-0.5 h-3 w-3 shrink-0" />}
-                    {value.text}
-                  </dd>
-                </React.Fragment>
-              ))}
+              {group.values.map((value) => {
+                const shown = answerValueText(value);
+                return (
+                  <React.Fragment key={value.key}>
+                    <dt className="font-mono text-2xs text-subtle">{value.field}</dt>
+                    <dd
+                      className={cn(
+                        "tnum text-xs",
+                        shown.withheld ? "flex items-start gap-1 italic text-band-spot" : "text-fg",
+                      )}
+                    >
+                      {shown.withheld && <EyeOff className="mt-0.5 h-3 w-3 shrink-0" />}
+                      {shown.text}
+                    </dd>
+                  </React.Fragment>
+                );
+              })}
             </dl>
             <Citations values={group.values} onCite={onCite} />
           </li>

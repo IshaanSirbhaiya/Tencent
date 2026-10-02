@@ -44,6 +44,9 @@ from typing import Any, Literal, Optional
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from databridge_core.decision_ledger import (DecisionLedger, DecisionRefused, actor_of,
+                                             atomic_write_text)
+
 from .build import FK_PREFIX, KIND_KEY, ROW_KEY, _admits
 from .connections import connection_path
 
@@ -912,12 +915,31 @@ def load_mapping(source_id: str, root: Optional[Path] = None) -> SourceMapping:
     return SourceMapping.model_validate(yaml.safe_load(p.read_text(encoding="utf-8")) or {})
 
 
+def mapping_lock(source_id: str, root: Optional[Path] = None, *,
+                 timeout: Optional[float] = None):
+    """THE lock every writer of ``source_id``'s mapping takes (R-028 #5): cross-process and
+    re-entrant within a thread (`plans.file_lock`, the ONE implementation in
+    `databridge_core.decision_ledger`). Every read -> verify -> log -> save of a mapping runs under
+    it, so two approvals or a proposal refresh can never overwrite one another, and the approval
+    log never disagrees with the mapping it approved.
+
+    Global lock order (R-028 standard 8): source -> ingest run -> plan -> MAPPING -> design ->
+    ledger append. Never take the plan lock while holding this one."""
+    from .plans import file_lock
+
+    p = mapping_path(source_id, root)
+    return file_lock(p.with_name(f"{p.name}.lock"), timeout=timeout)
+
+
 def save_mapping(m: SourceMapping, root: Optional[Path] = None) -> Path:
+    """Write the mapping whole or not at all (a same-directory temporary file, fsynced, then
+    `os.replace`), under `mapping_lock`: a reader never sees half a mapping (R-028 #5)."""
     p = mapping_path(m.source_id, root)
-    p.parent.mkdir(parents=True, exist_ok=True)
     m = m.model_copy(update={"updated_at": dt.datetime.now(dt.timezone.utc)
                              .isoformat(timespec="seconds")})
-    p.write_text(yaml.safe_dump(m.model_dump(mode="json"), sort_keys=False), encoding="utf-8")
+    text = yaml.safe_dump(m.model_dump(mode="json"), sort_keys=False)
+    with mapping_lock(m.source_id, root):
+        atomic_write_text(p, text)
     return p
 
 
@@ -944,6 +966,13 @@ def ensure_mapping(source_id: str, snapshots: dict[str, dict], vocab, *, harness
 
 def _ensure_mapping(source_id: str, snapshots: dict[str, dict], vocab, *, harness=None,
                     auto_approve: bool = False, root: Optional[Path] = None) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _ensure_mapping_locked(source_id, snapshots, vocab, harness=harness,
+                                      auto_approve=auto_approve, root=root)
+
+
+def _ensure_mapping_locked(source_id: str, snapshots: dict[str, dict], vocab, *, harness=None,
+                           auto_approve: bool = False, root: Optional[Path] = None) -> SourceMapping:
     m = load_mapping(source_id, root)
     # R-022 f2 #9: an entry proposed before mappings carried a schema snapshot gets the table's
     # CURRENT columns, so its references can be checked at approval. Never an approved entry (its
@@ -1153,7 +1182,12 @@ def _fallback_proposals(snapshots: dict[str, dict], unmapped: dict[str, TableMap
 
 # --- validation + approval (R-022 f1 #1, #5) -------------------------------------------------------
 class MappingApprovalRefused(ValueError):
-    """An approval without an authenticated principal, or of a mapping that does not validate."""
+    """An approval without an authenticated principal, or of a mapping that does not validate.
+    ``code`` is the R-028 standard refusal code when one applies (else ``None``)."""
+
+    def __init__(self, message: str = "", code: Optional[str] = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 _ENDPOINT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\{([A-Za-z_][A-Za-z0-9_]*)\}$")
@@ -1298,9 +1332,10 @@ def validate_table_mapping(table: str, tm: TableMapping, vocab, *,
                                 f"or whose evidence names no column")
             other = e.dst if e.src == own else e.src
             okind = other.split(":", 1)[0]
-            if is_person_kind(vocab, okind):
-                problems.append(f"{table}: edge {i} is a link to person kind {okind!r}; an "
-                                f"inferred link never points at a person (hard constraint 1)")
+            if is_subject_kind(vocab, okind):
+                problems.append(f"{table}: edge {i} is a link to subject kind {okind!r}; an "
+                                f"inferred link never points at a subject or a person (hard "
+                                f"constraint 1)")
         try:
             decl = vocab.edge(e.kind)
         except Exception:                                            # noqa: BLE001
@@ -1417,16 +1452,26 @@ def _record_digest(rec: dict) -> str:
 
 
 #: Fields of a mapping approval-log line that are the LOG's, not the approval record's.
-_LOG_ONLY = ("action", "source_id", "table", "record_digest", "prev", "hash")
+_LOG_ONLY = ("action", "source_id", "table", "record_digest", "seq", "prev", "hash", "seal")
 
 
-def _append_approval(source_id: str, rec: dict, root: Optional[Path]) -> None:
-    """Append-only AND hash-chained: the SAME log `plans.py` keeps (`plans.append_chained`, FXJ3;
-    INT5 for R-022 sources cross-track 3). Each line also keeps its own `record_digest`."""
-    from .plans import append_chained
+def mapping_ledger(source_id: str, root: Optional[Path] = None) -> DecisionLedger:
+    """The mapping approval log as an R-028 decision ledger (`databridge_core.decision_ledger`):
+    sealed under the deployment approval key, hash-chained, anchored, verified before every
+    append and read. A log written before R-028 (unsealed) honours nothing and is superseded by
+    the next approval."""
+    return DecisionLedger(approval_log_path(source_id, root), what="mapping approval log")
 
+
+def _append_approval(source_id: str, rec: dict, root: Optional[Path]) -> dict:
+    """Append one decision through the decision ledger. Each line also keeps its own
+    `record_digest`. A log that does not verify refuses (`MappingApprovalRefused`,
+    `LEDGER_INTEGRITY_FAILED`) and nothing is written."""
     rec = {**rec, "record_digest": _record_digest(rec)}
-    append_chained(approval_log_path(source_id, root), rec)
+    try:
+        return mapping_ledger(source_id, root).append(rec)
+    except DecisionRefused as exc:
+        raise MappingApprovalRefused(exc.message, code=exc.code) from None
 
 
 def _canon_record(rec: dict) -> str:
@@ -1440,15 +1485,15 @@ def logged_approvals(source_id: str, root: Optional[Path] = None) -> dict[str, d
     existed is never evidence; a line whose own digest, source or principal does not verify is
     skipped. Membership (`digest in out[table]`) is what it always was; the records let a caller
     compare the WHOLE approval, not only its digest."""
-    from .plans import PlanError, read_chained
-
     out: dict[str, dict[str, list]] = {}
     try:
-        lines = read_chained(approval_log_path(source_id, root), what="mapping approval log")
-    except PlanError:
+        lines = mapping_ledger(source_id, root).read()
+    except DecisionRefused:
         return out
     for rec in lines:
-        body = {k: v for k, v in rec.items() if k not in ("prev", "hash")}
+        if rec.get("action") != "approve":
+            continue                                   # a link decision is not a table approval
+        body = {k: v for k, v in rec.items() if k not in ("seq", "prev", "hash", "seal")}
         if body.get("record_digest") != _record_digest(body):
             continue
         if rec.get("source_id") != source_id or not str(rec.get("principal_id") or "").strip() \
@@ -1529,6 +1574,14 @@ def effective_mapping(m: SourceMapping, vocab, root: Optional[Path] = None,
 def approve_mapping(source_id: str, *, approved_by: Any = None, principal: Any = None,
                     tables: Optional[list[str]] = None, vocab=None,
                     root: Optional[Path] = None) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _approve_mapping_locked(source_id, approved_by=approved_by, principal=principal,
+                                       tables=tables, vocab=vocab, root=root)
+
+
+def _approve_mapping_locked(source_id: str, *, approved_by: Any = None, principal: Any = None,
+                            tables: Optional[list[str]] = None, vocab=None,
+                            root: Optional[Path] = None) -> SourceMapping:
     """An AUTHENTICATED principal approves proposed tables (R-022 f1 #1).
 
     `principal` (or, for compatibility, a principal OBJECT passed as `approved_by`) must pass
@@ -1543,7 +1596,7 @@ def approve_mapping(source_id: str, *, approved_by: Any = None, principal: Any =
     try:
         who = require_authenticated_approver(who_obj, what="mapping approval")
     except ApprovalRefused as exc:
-        raise MappingApprovalRefused(str(exc)) from None
+        raise MappingApprovalRefused(str(exc), code=exc.code) from None
     if vocab is None:
         from databridge_graph.packs import active_vocabulary
 
@@ -1710,6 +1763,13 @@ def additive_problems(source_id: str, table: str, new: TableMapping, vocab, *,
 
 def approve_delegated_additive(source_id: str, table: str, entry: dict, *, delegation: Any,
                                vocab=None, root: Optional[Path] = None) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _approve_delegated_additive_locked(source_id, table, entry, delegation=delegation,
+                                                  vocab=vocab, root=root)
+
+
+def _approve_delegated_additive_locked(source_id: str, table: str, entry: dict, *, delegation: Any,
+                                       vocab=None, root: Optional[Path] = None) -> SourceMapping:
     """Write AND approve one table's mapping under a DELEGATED approval (INT3): an adapter agent's
     ``auto_additive`` policy, delegated by the principal who activated the agent.
 
@@ -1730,7 +1790,7 @@ def approve_delegated_additive(source_id: str, table: str, entry: dict, *, deleg
         who = require_delegated_approver(delegation, what=f"delegated mapping approval of "
                                                          f"{table!r}")
     except ApprovalRefused as exc:
-        raise MappingApprovalRefused(str(exc)) from None
+        raise MappingApprovalRefused(str(exc), code=exc.code) from None
     if vocab is None:
         from databridge_graph.packs import active_vocabulary
 
@@ -1751,7 +1811,7 @@ def approve_delegated_additive(source_id: str, table: str, entry: dict, *, deleg
         raise MappingApprovalRefused(f"delegated approval of {source_id!r}/{table} REFUSED (a "
                                      f"person must approve it): {'; '.join(problems)}")
     at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-    record = {**who, "at": at, "digest": mapping_digest(new)}
+    record = {**who, **actor_of(who), "at": at, "digest": mapping_digest(new)}
     _append_approval(source_id, {"action": "approve", "source_id": source_id, "table": table,
                                  **record}, root)
     tables = {**m.tables, table: new.model_copy(update={"status": "approved",
@@ -1765,6 +1825,15 @@ def set_table_mapping(source_id: str, table: str, *, edited_by: str, node: Optio
                       edges: Optional[list[dict]] = None, vocab=None,
                       root: Optional[Path] = None,
                       split: Any = ...) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _set_table_mapping_locked(source_id, table, edited_by=edited_by, node=node,
+                                         edges=edges, vocab=vocab, root=root, split=split)
+
+
+def _set_table_mapping_locked(source_id: str, table: str, *, edited_by: str, node: Optional[dict] = None,
+                              edges: Optional[list[dict]] = None, vocab=None,
+                              root: Optional[Path] = None,
+                              split: Any = ...) -> SourceMapping:
     """A human edit of one table's mapping (origin `manual`, status `proposed` until approved).
     The node kind and every edge kind are validated against the vocabulary — an edit cannot
     smuggle an off-ontology kind past the closed vocabulary. `split` (FIN-04) replaces the
@@ -1800,11 +1869,27 @@ def set_table_mapping(source_id: str, table: str, *, edited_by: str, node: Optio
 
 
 # --- C-3: proposed links where no foreign key is declared --------------------------------------------
+def is_subject_kind(vocab, kind: Optional[str]) -> bool:
+    """THE subject predicate for linking, matching and withholding (R-028 standard 7):
+    `vocab.is_subject(kind)`. Persons are a subset of subjects. An inferred link never points at a
+    subject record, and no subject is ever matched except as a per-record, human-selected
+    candidate. A vocabulary that cannot tell fails CLOSED (a subject)."""
+    if not kind:
+        return False
+    try:
+        return bool(vocab.is_subject(str(kind)))
+    except Exception:                                                # noqa: BLE001
+        return True                                                  # cannot tell: fail closed
+
+
 def is_person_kind(vocab, kind: Optional[str]) -> bool:
     """A kind whose records stand for PEOPLE: never the target of an inferred link and never merged
     (hard constraint 1). The pack says which: a vocabulary exposing `is_person(kind)` (the
     organisation/person split, FIN-04) is asked; otherwise EVERY subject kind counts as one —
-    the conservative reading until the pack draws the line."""
+    the conservative reading until the pack draws the line.
+
+    R-028: this is for DISPLAY (which subjects are people). Linking, matching and withholding use
+    `is_subject_kind`, of which persons are a subset."""
     if not kind:
         return False
     probe = getattr(vocab, "is_person", None)
@@ -1845,8 +1930,8 @@ def propose_links(source_id: str, snapshots: dict[str, dict], tables: dict[str, 
     A proposal names the column, the table and key it points into, how many of the column's
     values matched (`matched` of `with_value`), and the declared edge kind it would become
     (`_fk_edge`, the same ranking a declared key gets) — or why none can. It is a PROPOSAL: it
-    changes nothing until a person approves it (`approve_link`). It never points at a PERSON
-    kind (`is_person_kind`) and it never merges anything: two rows describing one organisation
+    changes nothing until a person approves it (`approve_link`). It never points at a SUBJECT
+    kind (`is_subject_kind`, R-028; persons are subjects) and it never merges anything: two rows describing one organisation
     stay two nodes joined by an edge (a merge on a declared business key is a person's merge
     rule). Thresholds are policy (`link_proposals`). No table, column or kind is named here."""
     policy = policy if policy is not None else _policy()
@@ -1905,11 +1990,11 @@ def propose_links(source_id: str, snapshots: dict[str, dict], tables: dict[str, 
             tied = [f"{h[2]}:{h[3]}" for h in hits[1:] if (h[0], h[1]) == (ratio, matched)]
             if tied:
                 link["alternatives"] = tied
-            if is_person_kind(vocab, tkind):
+            if is_subject_kind(vocab, tkind):
                 link.update(status="not_proposed", why=(
-                    f"the target kind {tkind!r} stands for people: an inferred link never "
-                    f"points at a person record (hard constraint 1); a person who knows the "
-                    f"match records it through the subject's verified channel"))
+                    f"the target kind {tkind!r} is a subject: an inferred link never points at "
+                    f"a subject or a person record (hard constraint 1); a person who knows the "
+                    f"match records it per record through the subject's verified channel"))
                 found.append(link)
                 continue
             roots = fk_hint_roots(col, kind, tkind, ttab)
@@ -1985,7 +2070,7 @@ def captured_tables(source_id: str) -> dict[str, dict]:
 def link_context(source_id: str, root: Optional[Path] = None, vocab=None
                  ) -> dict[str, dict[str, tuple[dict, str]]]:
     """{other source: {table: (snapshot, kind)}} for every OTHER ingest source whose mapping maps
-    a table to a kind that is not a person kind — what a cross-source link may point into."""
+    a table to a kind that is not a subject kind — what a cross-source link may point into."""
     from .connections import list_connections
 
     out: dict[str, dict[str, tuple[dict, str]]] = {}
@@ -1998,7 +2083,7 @@ def link_context(source_id: str, root: Optional[Path] = None, vocab=None
             continue
         kinds = {t: (tm.node or {}).get("kind") for t, tm in m.tables.items()
                  if tm.status != "unmapped" and tm.node}
-        kinds = {t: k for t, k in kinds.items() if k and not is_person_kind(vocab, k)}
+        kinds = {t: k for t, k in kinds.items() if k and not is_subject_kind(vocab, k)}
         if not kinds:
             continue
         snaps = captured_tables(conn.id)
@@ -2011,6 +2096,14 @@ def link_context(source_id: str, root: Optional[Path] = None, vocab=None
 def refresh_link_proposals(source_id: str, snapshots: dict[str, dict], vocab, *,
                            root: Optional[Path] = None,
                            others: Optional[dict] = None) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _refresh_link_proposals_locked(source_id, snapshots, vocab, root=root,
+                                              others=others)
+
+
+def _refresh_link_proposals_locked(source_id: str, snapshots: dict[str, dict], vocab, *,
+                                   root: Optional[Path] = None,
+                                   others: Optional[dict] = None) -> SourceMapping:
     """Propose (C-3) links for the source's tables and save them in the mapping. `others`
     defaults to every other ingest source's captured, mapped tables (`link_context`)."""
     m = load_mapping(source_id, root)
@@ -2028,6 +2121,14 @@ def refresh_link_proposals(source_id: str, snapshots: dict[str, dict], vocab, *,
 def approve_link(source_id: str, table: str, column: str, *, principal: Any,
                  target: Optional[str] = None, vocab=None,
                  root: Optional[Path] = None) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _approve_link_locked(source_id, table, column, principal=principal, target=target,
+                                    vocab=vocab, root=root)
+
+
+def _approve_link_locked(source_id: str, table: str, column: str, *, principal: Any,
+                         target: Optional[str] = None, vocab=None,
+                         root: Optional[Path] = None) -> SourceMapping:
     """A named, AUTHENTICATED person approves one proposed link (C-3): it becomes an edge of the
     table's mapping carrying its `ref` ({source, table, key}), so the build renders the
     referenced row's identity in THAT source. Refused when the link is not a proposal with an
@@ -2043,7 +2144,7 @@ def approve_link(source_id: str, table: str, column: str, *, principal: Any,
     try:
         who = require_authenticated_approver(principal, what="link approval")
     except ApprovalRefused as exc:
-        raise MappingApprovalRefused(str(exc)) from None
+        raise MappingApprovalRefused(str(exc), code=exc.code) from None
     if vocab is None:
         from databridge_graph.packs import active_vocabulary
 
@@ -2062,8 +2163,8 @@ def approve_link(source_id: str, table: str, column: str, *, principal: Any,
         raise MappingApprovalRefused(f"{table}.{column}: the link is {link.get('status')!r}"
                                      f"{'' if link.get('edge') else ' with no edge kind'}; "
                                      f"only a proposal with an edge can be approved")
-    if is_person_kind(vocab, link.get("target_kind")):
-        raise MappingApprovalRefused(f"{table}.{column}: the link points at a person kind "
+    if is_subject_kind(vocab, link.get("target_kind")):
+        raise MappingApprovalRefused(f"{table}.{column}: the link points at subject kind "
                                      f"{link.get('target_kind')!r}; refused (hard constraint 1)")
     e = link["edge"]
     edge = {"kind": e["kind"], "src": e["src"], "dst": e["dst"], "evidence": [column],
@@ -2091,6 +2192,7 @@ def approve_link(source_id: str, table: str, column: str, *, principal: Any,
     if problems:
         raise MappingApprovalRefused(f"{table}: the link cannot be approved: "
                                      f"{'; '.join(problems)}")
+    _log_link_decision(source_id, table, link, "approve", who, at, root)
     if was_approved:
         record = {**who, "at": at, "digest": mapping_digest(new)}
         _append_approval(source_id, {"action": "approve", "source_id": source_id,
@@ -2103,12 +2205,31 @@ def approve_link(source_id: str, table: str, column: str, *, principal: Any,
 
 def _decider(who: dict) -> dict:
     return {"decided_dev_only": bool(who.get("dev_only")),
-            "decided_authenticated_by": who.get("authenticated_by")}
+            "decided_authenticated_by": who.get("authenticated_by"), "actor": actor_of(who)}
+
+
+def _log_link_decision(source_id: str, table: str, link: dict, decision: str, who: dict,
+                       at: str, root: Optional[Path]) -> dict:
+    """A link decision is a decision: it is appended to the mapping's decision ledger with the
+    actor object (R-028 #2/#7). It is not a table approval (`logged_approvals` reads only
+    ``action: approve``)."""
+    return _append_approval(source_id, {
+        "action": f"link_{decision}", "source_id": source_id, "table": table,
+        "link": {k: link.get(k) for k in ("column", "source", "table", "key", "target_kind")},
+        **actor_of(who), "at": at}, root)
 
 
 def reject_link(source_id: str, table: str, column: str, *, principal: Any,
                 target: Optional[str] = None, reason: str = "",
                 root: Optional[Path] = None) -> SourceMapping:
+    with mapping_lock(source_id, root):
+        return _reject_link_locked(source_id, table, column, principal=principal, target=target,
+                                   reason=reason, root=root)
+
+
+def _reject_link_locked(source_id: str, table: str, column: str, *, principal: Any,
+                        target: Optional[str] = None, reason: str = "",
+                        root: Optional[Path] = None) -> SourceMapping:
     """A named, AUTHENTICATED person rejects one PROPOSED link (C-3; LINK7 cross-track 1, moved
     here from the gateway). The decision is kept on the link — who, how they signed in (the dev
     token is marked), when, why — and `merge_link_proposals` keeps a decided link, so the next
@@ -2119,7 +2240,7 @@ def reject_link(source_id: str, table: str, column: str, *, principal: Any,
     try:
         who = require_authenticated_approver(principal, what="link rejection")
     except ApprovalRefused as exc:
-        raise MappingApprovalRefused(str(exc)) from None
+        raise MappingApprovalRefused(str(exc), code=exc.code) from None
     m = load_mapping(source_id, root)
     tm = m.tables.get(table)
     if tm is None:
@@ -2134,6 +2255,7 @@ def reject_link(source_id: str, table: str, column: str, *, principal: Any,
         raise MappingApprovalRefused(f"{table}.{column}: the link is {link.get('status')!r}; "
                                      f"only a proposal can be rejected")
     at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    _log_link_decision(source_id, table, link, "reject", who, at, root)
     links = [({**lk, "status": "rejected", "rejected_by": who["principal_id"], "at": at,
                **_decider(who), "reject_reason": reason.strip() or None}
               if lk is link else lk) for lk in tm.links]
@@ -2153,6 +2275,7 @@ __all__ = ["SourceMapping", "TableMapping", "propose_rules", "propose_model", "e
            "kind_for_table", "resolve_kind", "MAPPING_TASK_CLASS", "fk_edges", "fk_hint_roots",
            "resolve_pending_fks", "propose_links", "merge_link_proposals", "refresh_link_proposals",
            "approve_link", "reject_link", "link_context", "captured_tables", "is_person_kind",
+           "is_subject_kind", "mapping_lock", "mapping_ledger",
            "FK_NO_KIND",
            "is_association", "association_mapping", "propose_split", "split_value",
            "split_candidates", "split_problems", "split_kinds", "resolve_pending_splits",

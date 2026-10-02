@@ -42,10 +42,21 @@ from fed_testkit import (  # noqa: E402
 from databridge_gateway import activity_routes as act  # noqa: E402
 from databridge_gateway.activity_routes import (  # noqa: E402
     ACTIVITY_KINDS,
+    RUN_FEED_KINDS,
     ActivitySources,
     delegation_tree,
     register_activity_routes,
     sort_key,
+)
+from databridge_gateway.activity_actor import (  # noqa: E402
+    FREE_TEXT,
+    MACHINE_ACTOR,
+    NOT_IN_ALLOW_LIST,
+    SENSITIVE_FIELD,
+    SQL_WITH_LITERALS,
+    absent,
+    make_actor,
+    withheld,
 )
 from databridge_gateway.trace_recorder import recorder_for  # noqa: E402
 
@@ -130,7 +141,9 @@ def fx(world, monkeypatch):                             # noqa: F811 - pytest fi
     runs = world.runs_dir
     aa_dir = world.root / "aa_registry"
     firings_path = world.root / "automation" / "firings.jsonl"
-    written: dict[str, list[dict]] = {k: [] for k in ACTIVITY_KINDS}
+    # this fixture names only the run stores (`ActivitySources` without the decision roots), so
+    # it covers the run-feed kinds; the decision kinds are covered in test_activity_consistency
+    written: dict[str, list[dict]] = {k: [] for k in RUN_FEED_KINDS}
 
     # -- ownership: OWNER saved the workflow agent `followup` (BRAIN's owner record) and created
     #    the adapter agent `owned_aa`. `legacy` and `orphan_aa` have no recorded owner. ----------
@@ -185,6 +198,27 @@ def fx(world, monkeypatch):                             # noqa: F811 - pytest fi
             "proposals": {"filed": [{"evidence": [{"text": "secret excerpt"}]}]}}),
             encoding="utf-8")
         _w(written, "adapter_sync", f"{agent}/{run_id}", _iso(minute), *viewers)
+
+    # -- R-028 CONS #8: Set-up steps (written by `setup.record_step` beside the syncs) are their
+    #    OWN kind, never `adapter_sync`: a step OWNER decided on the owned agent, and a step the
+    #    orphan agent proposed (no recorded creator: operator-only) ------------------------------
+    from databridge_adapter_agents.setup import record_step
+    for agent, actor, viewers in (("owned_aa", "person", (OWNER,)), ("orphan_aa", "agent", ())):
+        spec = AdapterAgentSpec.model_validate({
+            "id": agent, "title": agent, "created_from": "set up crm", "connections": [CRM],
+            "extract": {"pack": "workspace"}, "status": "draft"})
+        rec = record_step(runs, spec, step="approve_plan" if actor == "person" else "propose",
+                          status="completed", by=OWNER, reason="the crawl plan", actor=actor)
+        _w(written, "adapter_setup", f"{agent}/{rec['run_id']}", rec["started"], *viewers)
+
+    # -- R-028 CONS #8: one-time task runs (`trigger.type: one_time`) are their own kind: OWNER's
+    #    task, and a task whose runner was not recorded (operator-only) -------------------------
+    _agent_run(runs, "once_owned", "run-once-owned", started=56, ended=57, by=OWNER,
+               trig_type="one_time", answer_by=None)
+    _w(written, "one_time_task", "once_owned/run-once-owned", _iso(56), OWNER)
+    _agent_run(runs, "once_orphan", "run-once-orphan", started=58, ended=59, by=None,
+               trig_type="one_time", answer_by=None)
+    _w(written, "one_time_task", "once_orphan/run-once-orphan", _iso(58))
 
     # -- automation firings: a manual one by OWNER that produced run-owner, a scheduled skip of
     #    OWNER's adapter agent, and a scheduled firing of the ownerless agent ---------------------
@@ -349,10 +383,10 @@ def test_there_is_no_write_route(fx):
 def test_feed_merges_every_record_kind_the_viewer_may_see(fx):
     app, written, _r = fx
     expected = _visible_to(written, OWNER)
-    assert all(expected[k] for k in ACTIVITY_KINDS), "every kind must have a fixture"
+    assert all(expected[k] for k in RUN_FEED_KINDS), "every kind must have a fixture"
     with TestClient(app, headers=auth_headers(OWNER)) as c:
         items = _all(c)
-    got: dict[str, set[str]] = {k: set() for k in ACTIVITY_KINDS}
+    got: dict[str, set[str]] = {k: set() for k in RUN_FEED_KINDS}
     for it in items:
         got[it["kind"]].add(_key(it))
     assert got == expected
@@ -389,7 +423,8 @@ def test_limit_is_bounded_and_kinds_filter_and_unknown_kind_refused(fx):
 # ------------------------------------------------------------------------------------------------
 # ownership: fail closed (Codex f1 #2)
 # ------------------------------------------------------------------------------------------------
-_RUN_KINDS = {"agent_run": "agent", "federated_run": "federated", "adapter_sync": "adapter_agent"}
+_RUN_KINDS = {"agent_run": "agent", "federated_run": "federated", "adapter_sync": "adapter_agent",
+              "adapter_setup": "adapter_agent", "one_time_task": "agent"}
 
 
 @pytest.mark.parametrize("who", [OWNER, OTHER, OPERATOR, "staff"])
@@ -417,7 +452,7 @@ def test_ownerless_and_ambiguous_records_are_hidden_from_everyone_but_an_operato
     app, written, runs = fx
     ownerless = {(k, w["id"]) for k, rows in written.items() for w in rows if not w["viewers"]}
     # non-vacuous: every kind that CAN be ownerless has one here, and one record is ambiguous
-    assert {k for k, _i in ownerless} == set(ACTIVITY_KINDS) - {"approval"}
+    assert {k for k, _i in ownerless} == set(RUN_FEED_KINDS) - {"approval"}
     assert ("federated_run", f"{OWNER}/{runs['ambiguous']}") in ownerless
     for who in (OWNER, OTHER):
         with TestClient(app, headers=auth_headers(who)) as c:
@@ -503,7 +538,9 @@ def test_missing_fields_stay_null_never_zero(fx):
     sched = items["agent_run:followup/run-scheduled"]
     assert sched["ended"] is None and sched["duration_ms"] is None
     assert sched["produced_by"] is None and sched["tokens"] is None
-    assert sched["started_by"] == {"type": "automation", "id": "schedule"}
+    assert sched["started_by"] == make_actor("schedule", "automation")
+    # R-028 CONS #7: the common actor object, never decorated; a machine is never authenticated
+    assert sched["started_by"]["authenticated_by"] == absent(MACHINE_ACTOR)
     # tokens appear only on a run whose OWN record measured some, or whose trace did
     measured = set()
     for it in items.values():
@@ -651,7 +688,10 @@ def test_approval_names_the_principal_and_outcome_and_links_the_run(fx):
         detail = c.get("/activity/runs/run-owner").json()
     [ap] = body["items"]
     assert ap["decided_by"] == want["decided_by"] and ap["outcome"] == want["outcome"]
-    assert ap["run_id"] == "run-owner" and ap["actor"] == {"type": "person", "id": OWNER}
+    # the fixture's decision event records no authentication: the actor says so (absent),
+    # rather than presenting the decider as signed in
+    assert ap["run_id"] == "run-owner" and ap["actor"] == make_actor(OWNER, "person")
+    assert ap["actor"]["authenticated_by"] == absent()
     assert (ap["run_kind"], ap["run_owner"]) == ("agent", "followup")
     assert [h["event"] for h in ap["history"]] == ["proposed", "approved", "executed"]
     assert detail["approvals"][0]["outcome"] == want["outcome"]
@@ -773,10 +813,14 @@ def test_unknown_fields_are_masked_recursively_and_listed(fx):
                                   "excerpt": s[4], "cell_text": s[5]}],
                    "unsupported_claims": [{"text": "c", "evidence": s[6]}]}})
     assert not any(x in json.dumps(tree) for x in s)
+    # R-028 CONS #12: what is not served is withheld IN PLACE (status + reason), never dropped
     assert tree["answer"]["citations"] == [{"source_id": "crm", "kind": "query_cell",
-                                            "row_ordinal": 1}]
+                                            "row_ordinal": 1,
+                                            "excerpt": withheld(SENSITIVE_FIELD),
+                                            "cell_text": withheld(NOT_IN_ALLOW_LIST)}]
     assert tree["subtasks"][0]["request"]["filters"] == [{"field": "status", "op": "eq",
-                                                          "value": "open"}]
+                                                          "value": "open",
+                                                          "hint": withheld(NOT_IN_ALLOW_LIST)}]
     assert {"answer.citations[].excerpt", "answer.citations[].cell_text",
             "combine.spec.secret_join", "combine.steps[].rows",
             "subtasks[0].request.filters[].hint"} <= set(tree["masked_fields"])
@@ -914,7 +958,7 @@ def test_automations_link_firings_to_runs_and_approvals(fx):
     specs = {s["spec_id"]: s for s in body["automations"]}
     [manual] = specs["followup"]["firings"]
     assert manual["idempotency_key"] == written["firing"][0]["id"].rsplit("/", 1)[1]
-    assert manual["status"] == "succeeded" and manual["started_by"]["id"] == OWNER
+    assert manual["status"] == "succeeded" and manual["started_by"]["principal_id"] == OWNER
     assert [e["status"] for e in manual["events"]] == ["pending", "succeeded"]
     assert manual["run"]["run_id"] == "run-owner"
     assert (manual["run_kind"], manual["run_owner"]) == ("agent", "followup")
@@ -1242,7 +1286,9 @@ def test_f2_09_free_text_is_not_served_codes_are(fx):
     assert drift["drifts"] == [{"kind": "renamed", "unit": "t", "subject_touching": None}]
     assert drift["problem_count"] == 1
     tree = detail.json()["delegation_tree"]
-    assert [t["query"] for t in tree["subtasks"]] == [None, None]
+    # SQL with a literal is withheld in place; a delegate that recorded no SQL has none
+    assert [t["query"] for t in tree["subtasks"]] == [withheld(SQL_WITH_LITERALS), None]
+    assert [t["delegate_note"] for t in tree["subtasks"]] == [withheld(FREE_TEXT)] * 2
     assert {"subtasks[0].query", "subtasks[0].delegate_note", "subtasks[1].delegate_note",
             "plan.questions_text"} <= set(tree["masked_fields"])
     assert "steps[].policy_decision.detail" in detail.json()["record"]["masked_fields"]
@@ -1252,7 +1298,8 @@ def test_f2_09_free_text_is_not_served_codes_are(fx):
                                                      "policy_decision": {"detail": json.dumps([
                                                          {"step": "filter", "rows_in": 3,
                                                           "note_text": s[0]}])}}]})
-    assert ops["combine"]["steps"] == [{"step": "filter", "rows_in": 3}]
+    assert ops["combine"]["steps"] == [{"step": "filter", "rows_in": 3,
+                                        "note_text": withheld(NOT_IN_ALLOW_LIST)}]
     assert "combine.steps[].note_text" in ops["masked_fields"]
 
 

@@ -21,6 +21,7 @@ own first line as the reason, and a request for it refuses by name.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -48,6 +49,23 @@ DEFAULT_PURPOSE = "dataset_materialisation"
 DEFAULT_LAWFUL_BASIS = "legitimate_interests"
 
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+_log = logging.getLogger("databridge.materialise")
+
+
+def _error_ref(context: str, exc: BaseException) -> str:
+    """R-028 TIDY #4 (CONS_BRIEF standard 4): an opaque reference for a failure whose text is
+    never shown. The exception goes to the server log under the reference; the public surface
+    carries a FIXED message and the reference."""
+    ref = f"ERR-{uuid.uuid4().hex[:10]}"
+    _log.warning("[%s] %s", ref, context, exc_info=(type(exc), exc, exc.__traceback__))
+    return ref
+
+
+def _model_failed_note(exc: BaseException) -> str:
+    ref = _error_ref("the model could not author a plan", exc)
+    return (f"the model could not author a plan (reference {ref}); the offline gold planner "
+            f"authored it instead")
 _FILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,255}$")
 
 #: The chunk corpus's own coordinate columns (`shapes/chunked.CHUNK_COLUMNS` minus the text).
@@ -105,10 +123,13 @@ class RunRefused(Exception):
     """A run refused before or during compilation/execution, with a machine-readable code."""
 
     def __init__(self, code: str, message: str, *,
-                 question_items: Optional[list[dict]] = None) -> None:
+                 question_items: Optional[list[dict]] = None,
+                 error_ref: Optional[str] = None) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
+        #: R-028 TIDY #4: set when the cause was a failure whose text is only in the server log.
+        self.error_ref = error_ref
         #: E2E run 3, P-10: the planner's questions as ``[{id, text}]``. Answer them by posting
         #: the SAME request with ``answers: {id: text}``.
         self.question_items = list(question_items or [])
@@ -117,6 +138,8 @@ class RunRefused(Exception):
         """The machine-readable refusal: code, message and — when the planner asked — the
         questions with their ids."""
         out: dict = {"code": self.code, "message": self.message}
+        if self.error_ref:
+            out["error_ref"] = self.error_ref
         if self.question_items:
             out["question_items"] = self.question_items
             out["answer_with"] = {"answers": {q["id"]: "" for q in self.question_items},
@@ -263,8 +286,10 @@ class PlatformMaterialiser:
                 lawful_basis=plan.policy.lawful_basis,
                 grant_id=plan.policy.principal.grant_id, plan_hash=plan.plan_hash)
         except Exception as exc:                                 # noqa: BLE001
+            ref = _error_ref("identifier-disclosure approver failed", exc)
             raise RunRefused("IDENTIFIER_DISCLOSURE_NOT_AUTHORISED",
-                             f"{why}; the approver could not be asked ({exc})") from exc
+                             f"{why}; the approver could not be asked (reference {ref})",
+                             error_ref=ref) from exc
         if not approver or str(approver) == by:
             raise RunRefused("IDENTIFIER_DISCLOSURE_NOT_AUTHORISED",
                              f"{why}; the approver returned "
@@ -306,7 +331,10 @@ class PlatformMaterialiser:
         try:
             plan = MaterialisationPlan.model_validate(plan_body)
         except Exception as exc:                                 # noqa: BLE001
-            raise RunRefused("PLAN_INVALID", f"not a MaterialisationPlan: {exc}") from exc
+            ref = _error_ref("submitted plan failed validation", exc)
+            raise RunRefused("PLAN_INVALID", f"the submitted plan is not a valid "
+                                             f"MaterialisationPlan (reference {ref})",
+                             error_ref=ref) from exc
         if plan.policy.principal.actor != by:
             # A plan names the principal its reads run as. Running it as somebody else would put
             # one person's name on another person's disclosure decisions.
@@ -326,7 +354,9 @@ class PlatformMaterialiser:
         try:
             required = reader.sources_for(plan_entities(plan))
         except KeyError as exc:
-            raise RunRefused("PLAN_INVALID", str(exc.args[0] if exc.args else exc)) from exc
+            ref = _error_ref("plan names an entity the platform cannot read", exc)
+            raise RunRefused("PLAN_INVALID", f"the plan reads an entity this platform does not "
+                                             f"hold (reference {ref})", error_ref=ref) from exc
         check_pins(plan.temporal.source_snapshots, pinned, required=required)
         emit({"stage": "materialising", "shape": plan.shape.kind, "plan_hash": plan.plan_hash,
               "at": _now()})
@@ -378,20 +408,20 @@ class PlatformMaterialiser:
             raise _asked(exc) from exc
         except Exception as exc:                                 # noqa: BLE001
             if planner != "model":
-                raise RunRefused("PLAN_NOT_AUTHORED", f"the planner produced no usable draft: "
-                                                      f"{exc}") from exc
+                ref = _error_ref("the offline planner produced no usable draft", exc)
+                raise RunRefused("PLAN_NOT_AUTHORED", f"the planner produced no usable draft "
+                                                      f"(reference {ref})",
+                                 error_ref=ref) from exc
             # The model could not be asked (or answered off-schema). Say so and let the offline
             # planner author instead — the compiler gates its plan exactly as it gates a model's.
-            notes.append(f"the model could not author a plan ({type(exc).__name__}: {exc}); the "
-                         f"offline gold planner authored it instead")
+            notes.append(_model_failed_note(exc))
             harness, planner = gold_harness(), "offline gold planner"
             agent = DataAgent(harness, catalogue, build_time=build_time, snapshots=snapshots,
                               backend=PLATFORM_BACKEND)
             try:
                 authored = agent.author(request, answers=answers)
             except (PlanNeedsInput, ShapeNotImplemented) as asked:
-                raise _asked(asked, f"{asked} (the model could not author a plan: "
-                                    f"{type(exc).__name__})") from asked
+                raise _asked(asked, f"{asked} (the model could not author a plan)") from asked
         # The agent's plan carries the catalogue's reader policy, which is always `suppress`; a
         # model asking for `retain` meets the same gate a submitted plan does (Finding 2).
         approved_by = self._authorise_identifiers(authored.plan, by)
@@ -550,6 +580,11 @@ class PlatformMaterialiser:
                 and list(pr.get("shaping_directives") or ()) == list(
                     new_r.get("shaping_directives") or ())
                 and pp.get("run_by") == new_p.get("run_by"))
+        if new_p.get("mode") == RAW_MODE:
+            # R-027 f2 #5: a raw run is reused only when its POINTERS are the same too
+            same = same and (pp.get("pointer_file") or {}).get("sha256") == (
+                new_p.get("pointer_file") or {}).get("sha256") and pp.get(
+                "sources_pinned") == new_p.get("sources_pinned")
         if same:
             return False
         raise RunRefused(
@@ -575,8 +610,9 @@ class PlatformMaterialiser:
                                  ledger_bound=False, emitted_at=receipt.executed_at)
             record = {"registered": True, "at": _now()}
         except Exception as exc:                                 # noqa: BLE001
-            record = {"registered": False, "error": f"{type(exc).__name__}: {exc}",
-                      "at": _now()}
+            ref = _error_ref("reverse-index registration failed", exc)
+            record = {"registered": False, "error": "the reverse index refused the registration",
+                      "error_ref": ref, "at": _now()}
         # Every attempt, success or failure, is recorded beside the run (round 2, Finding 10), so
         # "never registered" (no record: the process died after publication), "failed" and
         # "recovered" are all visible on the receipt listing — the receipt itself is untouched.
@@ -674,6 +710,10 @@ class PlatformMaterialiser:
             return "the run has no pointer check on record"
         if not (check.get("all_resolved") is True and check.get("all_match") is True):
             return "the run's pointer check did not pass"
+        if (doc.get("platform") or {}).get("mode") == RAW_MODE:
+            # DSD: a RAW extract says plainly it is not leakage-filtered (its receipt's
+            # `statement`); leakage decisions are the engineer's, so there is no leak gate here
+            return None
         return leak_check_problem((doc.get("receipt") or {}).get("missingness_leak_check"))
 
     def file_path(self, plan_hash: str, name: str) -> Optional[Path]:
@@ -685,6 +725,206 @@ class PlatformMaterialiser:
         if self.file_withheld(plan_hash, name) is not None:
             return None
         return self.out_root / plan_hash / name
+
+    # --- DSD: table designs and RAW builds through delegation -----------------------------
+    def design_store(self):
+        from .delegated import DesignStore
+        return DesignStore(self.out_root)
+
+    def design_catalogue(self, service: Any, *, allowed: Optional[set] = None):
+        """What a design may name: the federated service's measured catalogue, the facts stores,
+        the APPROVED mappings and the pack ontology — only the ``allowed`` connections (the
+        caller's grant; ``None`` = every registered one)."""
+        from .delegated import build_design_catalogue
+        return build_design_catalogue(service, vocab=self._vocabulary, facts_dir=self._facts_root,
+                                      allowed=allowed)
+
+    def propose_design(self, request: str, *, by: str, service: Any,
+                       answers: Optional[dict] = None, allowed: Optional[set] = None) -> dict:
+        """English in, a stored PROPOSED table design out (the model through the harness when one
+        is configured, else rules), validated against the measured catalogue."""
+        from .delegated import propose_design
+        if not isinstance(request, str) or not request.strip():
+            raise RunRefused("BAD_REQUEST", "describe the dataset you need")
+        cat = self.design_catalogue(service, allowed=allowed)
+        if not cat.tables:
+            raise RunRefused("EMPTY_CATALOGUE", "no adapter agent holds a readable table yet; "
+                                                "a design needs at least one")
+        design, produced = propose_design(request.strip(), cat, harness=self._harness,
+                                          answers=answers)
+        return self.design_store().create(design, owner=by, produced_by=produced)
+
+    def designs(self, *, by: str) -> list[dict]:
+        return self.design_store().list(owner=by)
+
+    def design(self, design_id: str, *, by: str) -> Optional[dict]:
+        doc = self.design_store().get(design_id)
+        return doc if doc is not None and doc.get("owner") == by else None
+
+    def edit_design(self, design_id: str, edit: dict, *, by: str, service: Any,
+                    rev: int, allowed: Optional[set] = None) -> dict:
+        """A person's edit of revision ``rev``, re-validated; it becomes a NEW immutable revision
+        (compare-and-set: an edit of a superseded revision is refused) and clears the approval."""
+        from .delegated import DesignRefused, apply_edit, design_of
+        store = self.design_store()
+        if not isinstance(edit, dict):
+            raise DesignRefused("BAD_REQUEST", "an edit is an object", 422)
+        _events, doc = store._current(design_id, by)
+        if doc["rev"] != rev:
+            raise DesignRefused("STALE_REVISION", f"the design is at revision {doc['rev']}, this "
+                                                  f"edit was made on {rev}; reload it", 409)
+        design = apply_edit(design_of(doc), edit,
+                            self.design_catalogue(service, allowed=allowed))
+        return store.replace(design_id, design, by=by, expected_rev=rev)
+
+    def approve_design(self, design_id: str, *, digest: str, principal: Any, by: str,
+                       rev: Optional[int] = None) -> dict:
+        """``principal`` is the AUTHENTICATED principal object (never a name)."""
+        from .delegated import approve
+        return approve(self.design_store(), design_id, principal=principal, digest=digest,
+                       owner=by, rev=rev)
+
+    def build_design(self, design_id: str, *, digest: str, by: str, service: Any,
+                     admission: Any, progress: Optional[Callable[[dict], None]] = None,
+                     allowed: Optional[set] = None) -> dict:
+        """Build the APPROVED design at exactly ``digest`` by delegation; publish the raw table,
+        its receipt and the per-cell pointer sidecar after a full live pointer check."""
+        import hashlib
+        from types import SimpleNamespace
+
+        from .delegated import (MODE, RAW_STATEMENT, DesignDraft, DesignRefused,
+                                approved_design, build_raw, validate_design)
+        emit = progress or (lambda _e: None)
+        store = self.design_store()
+        doc, design = approved_design(store, design_id, digest=digest, owner=by)
+        approval = dict(doc["approval"])
+
+        def still_holds() -> Any:
+            """The EXACT approval (same sealed event, revision, digest) is still the latest, and
+            the catalogue — links, approvals, columns — still validates the design unchanged."""
+            now, _d = approved_design(store, design_id, digest=digest, owner=by)
+            if now["rev"] != doc["rev"] or (now.get("approval") or {}).get("record_digest") != \
+                    approval.get("record_digest"):
+                raise DesignRefused("DESIGN_NOT_APPROVED", "the design changed or was re-approved "
+                                                           "while it was being built; nothing was "
+                                                           "published")
+            c = self.design_catalogue(service, allowed=allowed)
+            body = design.model_dump(mode="json")
+            body["label"] = design.label.model_dump() if design.label else None
+            if validate_design(DesignDraft(**body), c, request=design.request).digest != \
+                    design.digest:
+                raise DesignRefused("DESIGN_STALE", "the catalogue no longer supports the "
+                                                    "approved design exactly (a link, column or "
+                                                    "approval changed); open it, review and "
+                                                    "approve again")
+            return c
+        cat = still_holds()
+        emit({"stage": "delegating", "design": design_id, "at": _now()})
+        built = build_raw(design, cat, service, admission=admission, by=by,
+                          facts_dir=self._facts_root, emit=emit)
+        # R-027 f2 #3: the source snapshots this build READ (each facts store's content hash, as
+        # its delegate's statements were bound to it); publication re-checks them
+        pins = {r.connection: r.snapshot.content_hash
+                for r in built.results.values()
+                if r is not None and r.snapshot is not None and r.connection}
+
+        def check_pointers() -> dict:
+            got = pointer_check(built.dataset, self.reader(principal=by))
+            if not (got["all_resolved"] and got["all_match"]):
+                raise RunRefused(
+                    "POINTER_CHECK_FAILED",
+                    f"of {got['grounded_cells']} grounded cell(s), "
+                    f"{got['grounded_cells'] - got['pointers_resolved']} did not re-read and "
+                    f"{got['grounded_cells'] - got['values_match']} did not match; nothing was "
+                    f"published. First failures: {got['failures'][:5]}")
+            return got
+
+        def check_pins() -> None:
+            from databridge_mcp_ingest.tabular.facts import facts_path, sha256_file
+            moved = sorted(c for c, h in pins.items()
+                           if not facts_path(c, self._facts_root).is_file()
+                           or sha256_file(facts_path(c, self._facts_root)) != h)
+            if moved:
+                raise RunRefused("SOURCE_MOVED", f"source(s) {moved} changed while the build ran; "
+                                                 f"its pointers would name content that no "
+                                                 f"longer exists, so nothing was published")
+        emit({"stage": "checking_pointers", "at": _now()})
+        check = check_pointers()
+        stem = re.sub(r"[^A-Za-z0-9_]", "_", f"raw_{design.grain.entity}")[:60]
+        staging = self._staging()
+        try:
+            csv_name, pq_name = f"{stem}.csv", f"{stem}.parquet"
+            write_raw_csv(built.dataset, staging / csv_name)
+            outputs = [csv_name]
+            pq_note = write_raw_parquet(built.dataset, staging / pq_name)
+            if pq_note is None:
+                outputs.append(pq_name)
+            shim = SimpleNamespace(output_stem=stem, determinism=SimpleNamespace(
+                row_order=(design.columns[0].name,)))
+            pointer_file = write_pointer_sidecar(built.dataset, shim, staging)
+            (staging / "design.json").write_text(json.dumps(
+                {"design_id": design_id, "digest": design.digest,
+                 "approval": doc.get("approval"), "design": design.model_dump(mode="json")},
+                indent=2, sort_keys=True, default=str), encoding="utf-8")
+            # R-027 f2 #5: the build's identity covers its POINTER provenance — the sidecar's
+            # digest and the source snapshots — not only its values
+            content = built.receipt["content_hash"]
+            build_id = hashlib.sha256(json.dumps(
+                {"design": design.digest, "content": content, "by": by,
+                 "pointers": pointer_file["sha256"], "sources": pins},
+                sort_keys=True).encode()).hexdigest()
+            final = self.out_root / build_id
+            # R-027 f2 #2/#3: ONE transaction under the design's cross-process lock — the exact
+            # approval re-checked, the sources' pins and EVERY pointer re-read against the staged
+            # files, the publication and its `built` event. An edit waits for it.
+            with store.transaction(design_id):
+                still_holds()
+                check_pins()
+                check = check_pointers()
+                check_pins()
+                executed = _now()
+                receipt = {**built.receipt, "plan_hash": build_id, "shaped_by": "design",
+                           "executed_at": executed, "output_uri": csv_name,
+                           "output_files": outputs,
+                           "pointer_manifest": {"uri": pointer_file["name"],
+                                                "sha256": pointer_file["sha256"],
+                                                "pointers": check["grounded_cells"]},
+                           "sources_pinned": pins,
+                           "notes": [RAW_STATEMENT, *([pq_note] if pq_note else [])],
+                           "design_id": design_id, "design_rev": doc["rev"],
+                           "approved_by": (doc.get("approval") or {}).get("principal_id")}
+                cells = built.receipt["cells"]
+                honest = (f"RAW extract ({RAW_STATEMENT}): {built.dataset.n_rows} row(s), one "
+                          f"per {design.grain.entity} row; every grounded cell re-read live at "
+                          f"publication ({check['values_match']}/{check['grounded_cells']}); "
+                          f"{cells.get('policy_suppressed', 0)} withheld, "
+                          f"{cells.get('unresolved', 0)} absent")
+                platform = {"mode": MODE, "shape": "raw_table", "entity": design.grain.entity,
+                            "request": design.request, "run_by": by, "design_id": design_id,
+                            "design_digest": design.digest,
+                            "produced_by": {"agent": "main_agent", "by": "rules",
+                                            "method": "delegation", "model": None,
+                                            "design_produced_by": doc.get("produced_by"),
+                                            "at": executed},
+                            "reproducible": False, "honest_summary": honest,
+                            "pointer_check": check, "pointer_file": pointer_file,
+                            "sources_pinned": pins,
+                            "columns": list(built.dataset.columns),
+                            "unresolved": {"cells": cells.get("unresolved", 0)}}
+                out = {"receipt": receipt, "platform": platform}
+                (staging / "receipt.json").write_text(json.dumps(
+                    out, indent=2, sort_keys=True, default=str), encoding="utf-8")
+                published = self._publish(staging, final, out)
+                store.record_build(design_id, by=by, build_id=build_id, rev=doc["rev"],
+                                   digest=digest)
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+        index = self._register_emission(built.dataset, SimpleNamespace(
+            plan_hash=build_id, executed_at=executed), final)
+        emit({"stage": "done", "plan_hash": build_id, "at": _now()})
+        prior = self.receipt(build_id) or out
+        return {**summary_from_doc(prior, files=self.files(build_id)), "design_id": design_id,
+                "reused_prior_run": not published, "index_registered": index}
 
     def plan_verification(self, plan_hash: str) -> Optional[dict]:
         """Server-side check that a run's ``plan.yaml`` IS the plan with this ``plan_hash``
@@ -703,8 +943,10 @@ class PlatformMaterialiser:
             body.pop("id", None)
             recomputed = MaterialisationPlan.model_validate(body).plan_hash
         except Exception as exc:                                 # noqa: BLE001
+            ref = _error_ref("published plan.yaml could not be re-read", exc)
             return {"plan_hash": plan_hash, "recomputed": None, "matches": False,
-                    "error": f"{type(exc).__name__}: {exc}"}
+                    "error": "the published plan could not be read back as a plan",
+                    "error_ref": ref}
         out = {"plan_hash": plan_hash, "recomputed": recomputed,
                "matches": recomputed == plan_hash and declared in (None, plan_hash)}
         if declared not in (None, plan_hash):
@@ -844,14 +1086,15 @@ def file_roles(doc: dict, files: list[str]) -> dict[str, str]:
     ``metadata`` (the Croissant file, the index-registration record) or ``other``."""
     r = doc.get("receipt") or {}
     dataset = Path(r["output_uri"]).name if r.get("output_uri") else None
+    datasets = {Path(str(x)).name for x in r.get("output_files") or []} | {dataset}
     croissant = Path(r["croissant_uri"]).name if r.get("croissant_uri") else None
     manifest = r.get("pointer_manifest") or {}
     pointers = Path(manifest["uri"]).name if manifest.get("uri") else None
     roles = {}
     for name in files:
         roles[name] = ("receipt" if name == "receipt.json" else
-                       "plan" if name == "plan.yaml" else
-                       "dataset" if name == dataset else
+                       "plan" if name in ("plan.yaml", "design.json") else
+                       "dataset" if name and name in datasets else
                        "pointers" if name == pointers else
                        "metadata" if name in (croissant, "index_registration.json") else
                        "other")
@@ -977,6 +1220,10 @@ def summary_from_doc(doc: dict, *, files: list[str]) -> dict:
         "produced_by": p.get("produced_by"), "honest_summary": p.get("honest_summary"),
         "notes": r.get("notes"), "files": files,
         "label_diagnosis": r.get("label_diagnosis"),
+        # DSD (additive): the raw delegated mode says what it is
+        "mode": p.get("mode") or "labelled",
+        "statement": r.get("statement"),
+        "design_id": p.get("design_id"), "design_digest": p.get("design_digest"),
         # Additive (R-021 Data-page #1): what each file IS, so a client gates downloads on the
         # server's word rather than on a file-name guess.
         "file_roles": file_roles(doc, files),
@@ -987,8 +1234,66 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+#: The raw delegated mode's name (`delegated.MODE`), here so the download gate needs no import.
+RAW_MODE = "raw_delegated"
+
+
+def _raw_text(value: Any) -> str:
+    """A raw cell as CSV text: the stored value, unrounded (a Decimal is written as computed)."""
+    from decimal import Decimal
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        return repr(value)
+    if isinstance(value, Decimal):
+        return format(value, "f")
+    return str(value)
+
+
+def write_raw_csv(dataset, path: Path) -> int:
+    """The raw table as CSV: values only, in column order; a cell with no value is empty (its
+    state and reason are in the pointer sidecar)."""
+    import csv
+
+    from databridge_core import GroundedValue
+    with Path(path).open("w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(list(dataset.columns))
+        for row in dataset.rows:
+            w.writerow([_raw_text(c.value) if isinstance(c, GroundedValue) else "" for c in row])
+    return dataset.n_rows
+
+
+def write_raw_parquet(dataset, path: Path) -> Optional[str]:
+    """The raw table as Parquet (int64 when every value is an int, float64 when every value is a
+    plain int/float, text otherwise), or the reason it was not written."""
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ImportError:
+        return "Parquet was not written: pyarrow is not installed (the CSV is the dataset)"
+    from databridge_core import GroundedValue
+    cols = {}
+    for i, name in enumerate(dataset.columns):
+        vals = [r[i].value if isinstance(r[i], GroundedValue) else None for r in dataset.rows]
+        present = [v for v in vals if v is not None]
+        if present and all(isinstance(v, int) and not isinstance(v, bool) for v in present):
+            cols[name] = pa.array(vals, type=pa.int64())
+        elif present and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                             for v in present):
+            cols[name] = pa.array([None if v is None else float(v) for v in vals],
+                                  type=pa.float64())
+        else:
+            cols[name] = pa.array([None if v is None else _raw_text(v) for v in vals],
+                                  type=pa.string())
+    pq.write_table(pa.table(cols), str(path))
+    return None
+
+
 __all__ = ["PlatformMaterialiser", "RunRefused", "build_catalogue", "shape_status",
            "check_pins", "check_unchanged", "file_roles", "leak_check_problem",
            "plan_entities",
            "pointer_check", "materialise_root", "PLATFORM_BACKEND", "POINTER_SIDECAR_SUFFIX",
-           "write_pointer_sidecar"]
+           "write_pointer_sidecar", "write_raw_csv", "write_raw_parquet", "RAW_MODE"]

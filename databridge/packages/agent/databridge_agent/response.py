@@ -30,7 +30,7 @@ publish.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -47,12 +47,32 @@ READ_STATUSES = ("ok", "unknown_tool", "repeated", "schema_violation", "unground
                  "error", "not_read")
 
 
+class WithheldValue(BaseModel):
+    """The standard withheld envelope (R-028 #12 / TIDY #7; the public form of the core
+    ``Withheld``): ``{status, reason, pointers}`` IN the value's place. Never a placeholder string
+    with a ``redacted`` flag beside it, so every surface tells "withheld, and why" from a value
+    the same way."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    status: Literal["withheld"] = "withheld"
+    #: A closed reason. ``instruction_shaped``: the value is text addressed to an automated reader.
+    reason: str
+    #: Where the value would have come from (the value's own source pointer, serialised).
+    pointers: tuple[dict, ...] = ()
+
+
+#: The renderer refused to print the value: it is addressed to an automated reader.
+INSTRUCTION_SHAPED = "instruction_shaped"
+
+
 class AnswerValue(BaseModel):
     """One value in the answer, rendered for display and carrying its own pointer.
 
     ``text`` rather than ``value``: what a page prints must be what the renderer produced, not the
-    raw value with the rendering left as an exercise. ``redacted`` says which of the two happened,
-    so a UI can style it as a withheld value rather than as data.
+    raw value with the rendering left as an exercise. A value the renderer would not print is the
+    standard `WithheldValue` envelope in ``text``'s place (R-028 TIDY #7), with its citation and
+    source intact, so a withheld line still walks to its evidence.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -62,10 +82,13 @@ class AnswerValue(BaseModel):
     row: int
     field: str
     scope: str
-    text: str
-    redacted: bool
+    text: Union[str, WithheldValue]
     citation: str
     source: SourcePointer
+
+    @property
+    def withheld(self) -> bool:
+        return isinstance(self.text, WithheldValue)
 
 
 class ReadRecord(BaseModel):
@@ -139,9 +162,13 @@ def to_response(answer: "AgentAnswer") -> AgentResponse:
     values = []
     for field in answer.fields:
         text, redacted = render.present(field.value)
+        shown: Union[str, WithheldValue] = (
+            WithheldValue(reason=INSTRUCTION_SHAPED,
+                          pointers=(field.source.model_dump(mode="json"),))
+            if redacted else text)
         values.append(AnswerValue(
             key=field.key, tool=field.tool, row=field.row, field=field.field,
-            scope=field.scope, text=text, redacted=redacted,
+            scope=field.scope, text=shown,
             citation=render.cite(field.source), source=field.source))
     return AgentResponse(
         question=question,

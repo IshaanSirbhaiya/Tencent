@@ -1,8 +1,9 @@
 "use client";
 /**
- * The Activity timeline: every agent run, delegated question, adapter-agent sync, automation
- * firing, approval decision and adapter-agent proposal the signed-in principal may see, newest
- * first, straight from `GET /activity`. "Load older" follows the gateway's cursor; nothing polls.
+ * The Activity timeline: every agent run, delegated question, adapter-agent sync and set-up step,
+ * one-time task, automation firing, approval decision, adapter-agent proposal and human decision
+ * (plan, mapping, link, documents, hand-off, design, outbox) the signed-in principal may see,
+ * newest first, straight from `GET /activity`. "Load older" follows the gateway's cursor; nothing polls.
  */
 import * as React from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import {
   KIND_LABEL,
   actorText,
   fetchActivity,
+  isPerson,
   formatDuration,
   formatTokens,
   itemTone,
@@ -115,7 +117,8 @@ export function ActivityTimeline({
           <div className="text-sm font-semibold text-fg">No activity you can see yet</div>
           <p className="max-w-md text-xs text-subtle">
             A row appears when an agent runs, a question is delegated, an automation fires, an
-            action is decided or an adapter agent files a proposal. {head?.visibility}
+            action or a plan, mapping, design or outbound draft is decided, or an adapter agent
+            files a proposal. {head?.visibility}
           </p>
         </div>
       ) : null}
@@ -186,8 +189,8 @@ function TimelineRow({
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-2xs text-subtle">
           <span>
             by <span className="text-fg">{actorText(item.actor)}</span>
-            {item.started_by && item.started_by.type === "person" && item.actor.type !== "person" ? (
-              <> · started by <span className="text-fg">{item.started_by.id}</span></>
+            {item.started_by && isPerson(item.started_by) && !isPerson(item.actor) ? (
+              <> · started by <span className="text-fg">{actorText(item.started_by)}</span></>
             ) : null}
           </span>
           <span>

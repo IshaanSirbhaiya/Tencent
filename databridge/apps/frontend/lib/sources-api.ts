@@ -222,6 +222,8 @@ export interface LinkReview {
   basis: string | null;
   alternatives: string[];
   person_target: boolean;
+  /** R-028: the target kind is a protected subject (persons are a subset). Decides; `person_target` only describes. */
+  subject_target?: boolean;
   approvable: boolean;
   decided_by: string | null;
   decided_at: string | null;
@@ -346,9 +348,18 @@ export function linksForReview(links: readonly LinkReview[]): {
 }
 
 /** Whether the page may offer Approve for a link. Fails closed: the gateway's own `approvable`
- *  AND a proposal with an edge kind AND never a person-kind target. The gateway refuses the same. */
-export function linkApprovable(l: Pick<LinkReview, "approvable" | "status" | "edge_kind" | "person_target">): boolean {
-  return l.approvable === true && l.status === "proposed" && !!l.edge_kind && l.person_target !== true;
+ *  AND a proposal with an edge kind AND never a subject-kind (persons included) target. The
+ *  gateway refuses the same. */
+export function linkApprovable(
+  l: Pick<LinkReview, "approvable" | "status" | "edge_kind" | "person_target" | "subject_target">,
+): boolean {
+  return (
+    l.approvable === true &&
+    l.status === "proposed" &&
+    !!l.edge_kind &&
+    l.person_target !== true &&
+    l.subject_target !== true
+  );
 }
 
 /** What approving one identity rule would merge NOW: the engine's own consolidation, run on a copy
@@ -392,6 +403,9 @@ export interface SourceDetail {
   tools: string[];
   tools_note: string | null;
   plan: CrawlPlan | null;
+  /** Digest of the plan as shown. An approval must send it back: the gateway refuses to approve
+   *  a plan that changed after it was shown (Codex R-027 r1 #2). */
+  plan_digest: string | null;
   mapping: SourceMapping | null;
   last_run: RunListEntry | null;
   runs: number;
@@ -819,6 +833,12 @@ export interface SourcesFailure {
   message: string;
   /** What it means for the operator, in plain English. */
   plain: string;
+  /** R-028: the former, more specific code when `code` is a standard one (e.g. PLAN_CHANGED under
+   * DECISION_STALE). */
+  reason_code?: string;
+  /** R-028: a failure's reference in the gateway's log. The gateway never sends the exception's
+   * text; this is what an operator quotes to find it. */
+  error_ref?: string;
 }
 
 export type SourcesResult<T> = { ok: true; status: number; data: T } | SourcesFailure;
@@ -829,6 +849,17 @@ export function plainMessage(status: number, code: string, message: string): str
     return `The gateway at ${GATEWAY} could not be reached. Check that it is running.`;
   }
   switch (code) {
+    // the platform's standard refusal codes (R-028)
+    case "DECISION_STALE":
+      return "What you decided on changed after it was shown to you. Reload it, review it again and decide again.";
+    case "DECISION_ALREADY_FINAL":
+      return "This has already been decided. Nothing was changed.";
+    case "APPROVER_NOT_AUTHENTICATED":
+      return "This decision needs a signed-in person, and the signed-in principal could not be established, so nothing was decided.";
+    case "MACHINE_ACTOR":
+      return "An agent, a workflow or a delegation cannot make this decision. A signed-in person decides.";
+    case "LEDGER_INTEGRITY_FAILED":
+      return "The decision log did not verify, so nothing was decided. An operator must look at it.";
     case "PLAN_NOT_APPROVED":
       return "This source cannot run yet: its crawl plan has not been approved. Review the plan and approve it first.";
     case "RUN_IN_PROGRESS":
@@ -908,10 +939,29 @@ async function request<T>(path: string, method = "GET", payload?: unknown): Prom
   }
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (res.ok) return { ok: true, status: res.status, data: body as T };
-  const refusal = body.refusal as { code?: string; message?: string } | undefined;
-  const code = refusal?.code ?? (res.status === 401 ? "UNAUTHENTICATED" : `HTTP_${res.status}`);
-  const message = refusal?.message ?? (describeDetail(body.detail) || `${path} → ${res.status}`);
-  return { ok: false, status: res.status, code, message, plain: plainMessage(res.status, code, message) };
+  return failureFrom(res.status, body, path);
+}
+
+/** A refusal (or any non-2xx answer) as a `SourcesFailure`: the gateway's code and message
+ * verbatim, its `reason_code` and `error_ref` when it sent them (R-028), and the plain sentence —
+ * which names the reference, so the operator can quote it. */
+export function failureFrom(status: number, body: Record<string, unknown>, path: string): SourcesFailure {
+  const refusal = body.refusal as
+    | { code?: string; message?: string; reason_code?: string; error_ref?: string }
+    | undefined;
+  const code = refusal?.code ?? (status === 401 ? "UNAUTHENTICATED" : `HTTP_${status}`);
+  const message = refusal?.message ?? (describeDetail(body.detail) || `${path} → ${status}`);
+  const plain = plainMessage(status, code, message);
+  const out: SourcesFailure = {
+    ok: false,
+    status,
+    code,
+    message,
+    plain: refusal?.error_ref ? `${plain} (Reference ${refusal.error_ref}.)` : plain,
+  };
+  if (refusal?.reason_code) out.reason_code = refusal.reason_code;
+  if (refusal?.error_ref) out.error_ref = refusal.error_ref;
+  return out;
 }
 
 const enc = encodeURIComponent;
@@ -923,15 +973,13 @@ export const sourcesApi = {
   register: (body: RegisterBody) =>
     request<{ registered: Connection[]; by: string }>("/sources", "POST", body),
   proposePlan: (id: string) =>
-    request<{ plan: CrawlPlan; proposed_by: string }>(`/sources/${enc(id)}/plan`, "POST"),
-  /** `vouchReadTools` is the signed-in person's explicit, per-tool statement that an UNCLASSIFIED
-   *  tool only reads (FIN-02). Sent only when non-empty; the backend accepts it for unknowns only. */
-  approvePlan: (id: string, vouchReadTools: readonly string[] = []) =>
-    request<{ plan: CrawlPlan }>(
-      `/sources/${enc(id)}/plan/approve`,
-      "POST",
-      vouchReadTools.length ? { vouch_read_tools: [...vouchReadTools] } : undefined,
-    ),
+    request<{ plan: CrawlPlan; plan_digest: string; proposed_by: string }>(`/sources/${enc(id)}/plan`, "POST"),
+  /** Approve the plan the person REVIEWED: `planDigest` is the `plan_digest` shown with it, and the
+   *  gateway refuses (PLAN_CHANGED) when the plan on disk is no longer that plan. `vouchReadTools`
+   *  is the signed-in person's explicit, per-tool statement that an UNCLASSIFIED tool only reads
+   *  (FIN-02); the backend accepts it for unknowns only. */
+  approvePlan: (id: string, planDigest: string, vouchReadTools: readonly string[] = []) =>
+    request<{ plan: CrawlPlan }>(`/sources/${enc(id)}/plan/approve`, "POST", approvePlanBody(planDigest, vouchReadTools)),
   approveMapping: (id: string, tables?: string[]) =>
     request<{ mapping: SourceMapping }>(`/sources/${enc(id)}/mapping/approve`, "POST", tables ? { tables } : {}),
   /** Proposed links with their evidence, and the tables that need approval again (LINK7). */
@@ -964,10 +1012,148 @@ export const sourcesApi = {
   catalogue: () => request<{ connections: CatalogueConnection[] }>("/platform/catalogue"),
   /** Who this page is signed in as, and whether that is the public development token (FIN-16). */
   whoami: () => request<WhoAmI>("/auth/whoami"),
+  /** The review every pending plan needs before "Approve all" (FEAT8). */
+  batchReview: () => request<BatchReview>("/source-batch/plans"),
+  /** Propose a plan for every ingest source without an approved one. */
+  batchPropose: () => request<{ results: BatchResultRow[]; proposed_by: string }>("/source-batch/plans/propose", "POST"),
+  /** Approve the REVIEWED plans, each through the per-plan approval, as the signed-in principal. */
+  batchApprove: (items: BatchApproveItem[]) =>
+    request<BatchApproveResult>("/source-batch/plans/approve", "POST", { items }),
+  /** Start a run on every ingest source whose plan is approved (never a write connection). */
+  batchRuns: () => request<{ results: BatchResultRow[]; started_by: string }>("/source-batch/runs", "POST"),
   /** Per-run exclusion reasons (rule + count), read from the run ledgers. */
   ledgerRuns: (id: string) =>
     request<{ source: string; runs: EvidenceRunSummary[] }>(`/evidence/sources/${enc(id)}`),
 };
+
+// ---------------------------------------------------------------------------------------------
+// every source at once (FEAT8): `/source-batch/*`
+// ---------------------------------------------------------------------------------------------
+
+/** One tool call a pending plan's step makes, with the plan's own class for that tool and the
+ *  COMPLETE fixed arguments the plan passes (R-027 r2 #1). A SQL call also carries its whole SQL
+ *  configuration (statement argument, dialect, parse, extra arguments). */
+export interface BatchCall {
+  role: string;
+  tool: string;
+  class: string | null;
+  args: Record<string, unknown>;
+  sql?: Record<string, unknown>;
+}
+
+/** Every fixed argument of a call as `name=value` lines, in a stable order, values as JSON. The
+ *  review shows ALL of them: a mode argument (`action="delete"`) must never hide behind a tool name. */
+export function callArgLines(call: Pick<BatchCall, "args" | "sql">): string[] {
+  const line = (k: string, v: unknown) => `${k}=${JSON.stringify(v)}`;
+  const out = Object.keys(call.args ?? {}).sort().map((k) => line(k, call.args[k]));
+  if (call.sql) {
+    for (const k of Object.keys(call.sql).sort()) {
+      if (k === "tool" || k === "extra_args") continue;
+      out.push(line(`sql.${k}`, call.sql[k]));
+    }
+  }
+  return out;
+}
+
+/** A tool the person may vouch for in the batch (unclassified), with the backend's reason. */
+export interface BatchVouchable {
+  tool: string;
+  class: string | null;
+  reason: string;
+}
+
+/** One pending plan in the batch review. `blocked` is what keeps it out of ANY batch (a write
+ *  tool, a problem, a stale plan); it must be reviewed on its own page. */
+export interface BatchPendingPlan {
+  source_id: string;
+  title: string;
+  plan_status: string | null;
+  plan_digest: string;
+  origin: string | null;
+  steps: { step: string; strategy: string | null; calls: BatchCall[] }[];
+  tools: { tool: string; class: string | null }[];
+  vouchable: BatchVouchable[];
+  blocked: string[];
+  batch_approvable: boolean;
+}
+
+export interface BatchReview {
+  pending: BatchPendingPlan[];
+  approved: { source_id: string; approved_by: string | null }[];
+  no_plan: { source_id: string }[];
+  not_crawled: { source_id: string; purpose: string | null; reason: string }[];
+}
+
+export interface BatchApproveItem {
+  source_id: string;
+  plan_digest: string;
+  vouch_read_tools: string[];
+}
+
+export interface BatchResultRow {
+  source_id: string;
+  outcome: "approved" | "needs_individual_review" | "refused" | "proposed" | "failed" | "skipped" | "started" | string;
+  code?: string;
+  /** R-028: the former specific code when `code` is a standard one. */
+  reason_code?: string;
+  /** R-028: a failure's reference in the gateway's log (never the exception's text). */
+  error_ref?: string;
+  reason?: string;
+  approval?: ApprovalRecord;
+  run_id?: string;
+}
+
+/** R-028: who decided, as the platform's common actor object (the id is never decorated). */
+export interface DecisionActor {
+  principal_id: string;
+  authenticated_by: string;
+  principal_type: string;
+  dev_only: boolean;
+  delegation?: Record<string, unknown>;
+}
+
+export interface BatchApproveResult {
+  results: BatchResultRow[];
+  counts: Record<string, number>;
+  by: string;
+  dev_only: boolean;
+  actor?: DecisionActor;
+}
+
+/** The body "Approve all pending plans" sends: ONLY the plans the person reviewed, each with ONLY
+ *  the tools ticked for THAT plan. A tool is sent only when the plan offers a vouch for it, and a
+ *  plan the review blocks is still sent, so the backend reports it as needing individual review
+ *  rather than the page silently leaving it out. */
+export function batchApproveItems(
+  pending: readonly Pick<BatchPendingPlan, "source_id" | "plan_digest" | "vouchable">[],
+  ticked: Readonly<Record<string, readonly string[]>>,
+): BatchApproveItem[] {
+  return pending.map((p) => {
+    const offered = new Set(p.vouchable.map((v) => v.tool));
+    return {
+      source_id: p.source_id,
+      plan_digest: p.plan_digest,
+      vouch_read_tools: (ticked[p.source_id] ?? []).filter((t) => offered.has(t)),
+    };
+  });
+}
+
+/** The body of ONE plan approval: always the digest of the plan the person reviewed, and the
+ *  vouches only when there are some. */
+export function approvePlanBody(planDigest: string, vouchReadTools: readonly string[] = []): ApprovePlanBody {
+  return vouchReadTools.length ? { plan_digest: planDigest, vouch_read_tools: [...vouchReadTools] } : { plan_digest: planDigest };
+}
+
+export interface ApprovePlanBody {
+  plan_digest: string;
+  vouch_read_tools?: string[];
+}
+
+/** Which tools of a plan are still unticked (the batch will not approve the plan until they are). */
+export function unvouched(p: Pick<BatchPendingPlan, "source_id" | "vouchable">, ticked: Readonly<Record<string, readonly string[]>>): string[] {
+  const mine = new Set(ticked[p.source_id] ?? []);
+  return p.vouchable.map((v) => v.tool).filter((t) => !mine.has(t));
+}
 
 /** Unwrap for react-query: a failure is thrown as an Error carrying the failure. */
 export class SourcesError extends Error {

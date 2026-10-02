@@ -33,6 +33,13 @@ Mailpit the honest thing is to say so here rather than to imply an at-most-once 
 not exist. Nothing about it can cause an *unapproved* message to go out, which is the property that
 actually matters.
 
+**Every send is under a lease** (R-028 OUTX, Codex #3). A row is sent only by the process holding
+its live dispatch lease (``OutboxStore.claim_for_dispatch``), claimed inside one cross-process
+SQLite transaction; ``record_sent`` refuses any other. ``run_once()`` claims what is unleased and
+sends that; ``run_once(claim_id=...)`` / ``--claim`` sends ONLY the rows a caller already claimed
+(the gateway's single-draft mode), so a row approved by another process meanwhile is not swept
+along with it.
+
 Run it against a file-backed outbox — the default in-memory store belongs to whichever process
 created it, and that is the process split telling you the truth:
 
@@ -48,7 +55,7 @@ from dataclasses import dataclass
 from typing import Optional, Protocol, Sequence, runtime_checkable
 
 from databridge_outbox.models import NotApproved, OutboxEntry
-from databridge_outbox.store import OutboxStore
+from databridge_outbox.store import ClaimLost, OutboxStore
 
 OUTBOX_DB_ENV = "DATABRIDGE_OUTBOX_DB"
 POLL_SECONDS_ENV = "DATABRIDGE_DISPATCH_POLL_SECONDS"
@@ -119,24 +126,49 @@ class Dispatcher:
                 f"outbound messages (CLAUDE.md §Hard constraints 4).")
 
     # -- the work ------------------------------------------------------------------
-    def dispatch(self, draft_id: str) -> SendReceipt:
-        """Send one draft, if and only if a named human approved it."""
+    @property
+    def actor(self) -> str:
+        return f"dispatcher:{self.transport.name}"
+
+    def dispatch(self, draft_id: str, *, claim_id: Optional[str] = None) -> SendReceipt:
+        """Send one draft, if and only if a named human approved it AND this process holds its
+        lease. With no ``claim_id`` the row is claimed here first (and released after)."""
         entry = self.store.current(draft_id)
         if entry is None:
             raise NotApproved(f"dispatch REFUSED: no draft {draft_id!r} in the outbox")
         self.refuse_unless_approved(entry)
-        message_id = self.transport.send(to=entry.recipient_address,
-                                         subject=entry.subject,
-                                         body=entry.body)
-        sent = self.store.record_sent(draft_id, message_id=message_id,
-                                      by=f"dispatcher:{self.transport.name}")
+        own = claim_id is None
+        if own:
+            claim = self.store.claim_for_dispatch(claimed_by=self.actor, draft_ids=[draft_id])
+            if draft_id not in claim.draft_ids:
+                raise ClaimLost(f"dispatch REFUSED: draft {draft_id!r} is leased to another "
+                                f"dispatch")
+            claim_id = claim.claim_id
+        try:
+            if not self.store.holds_claim(draft_id, claim_id):
+                raise ClaimLost(f"dispatch REFUSED: this dispatch does not hold the lease on "
+                                f"draft {draft_id!r}")
+            entry = self.store.current(draft_id)
+            if entry is None:
+                raise NotApproved(f"dispatch REFUSED: no draft {draft_id!r} in the outbox")
+            self.refuse_unless_approved(entry)
+            message_id = self.transport.send(to=entry.recipient_address,
+                                             subject=entry.subject,
+                                             body=entry.body)
+            sent = self.store.record_sent(draft_id, message_id=message_id, by=self.actor,
+                                          claim_id=claim_id)
+        finally:
+            if own:
+                self.store.release_claim(claim_id, [draft_id])
         return SendReceipt(draft_id=draft_id, to=sent.recipient_address, message_id=message_id,
                            transport=self.transport.name,
                            sent_at=dt.datetime.fromisoformat(sent.sent_at or ""),
                            approved_by=sent.approved_by or "")
 
-    def run_once(self) -> list[SendReceipt]:
-        """Send everything currently approved. Returns a receipt per message that left.
+    def run_once(self, *, claim_id: Optional[str] = None) -> list[SendReceipt]:
+        """Send everything currently approved and unleased (claimed here), or with ``claim_id``
+        ONLY the rows that claim holds. Returns a receipt per message that left. The claim's
+        remaining leases are released at the end, so a failed row is retried next time.
 
         A failure on one row does not stop the rest: the failed row stays ``approved`` and is
         retried next time, which is the correct behaviour for a mail server that was briefly down
@@ -146,11 +178,19 @@ class Dispatcher:
         """
         receipts: list[SendReceipt] = []
         failures: list[tuple[str, Exception]] = []
-        for entry in self.store.awaiting_dispatch():
-            try:
-                receipts.append(self.dispatch(entry.draft_id))
-            except Exception as exc:                       # noqa: BLE001 — reported, not swallowed
-                failures.append((entry.draft_id, exc))
+        if claim_id is None:
+            claim = self.store.claim_for_dispatch(claimed_by=self.actor)
+            claim_id, draft_ids = claim.claim_id, list(claim.draft_ids)
+        else:
+            draft_ids = [e.draft_id for e in self.store.claimed(claim_id)]
+        try:
+            for draft_id in draft_ids:
+                try:
+                    receipts.append(self.dispatch(draft_id, claim_id=claim_id))
+                except Exception as exc:                   # noqa: BLE001 — reported, not swallowed
+                    failures.append((draft_id, exc))
+        finally:
+            self.store.release_claim(claim_id)
         if failures and not receipts:
             draft_id, exc = failures[0]
             raise DispatchFailed(
@@ -195,15 +235,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:  # pragma: no cover (entr
     parser.add_argument("--once", action="store_true",
                         help="send what is approved now, then exit")
     parser.add_argument("--db", default=None, help=f"outbox database (or ${OUTBOX_DB_ENV})")
+    parser.add_argument("--claim", default=None,
+                        help="send ONLY the rows this dispatch claim holds (with --once)")
     args = parser.parse_args(argv)
 
     dispatcher = build_dispatcher(db_path=args.db)
     print(f"dispatcher: outbox={args.db or os.environ.get(OUTBOX_DB_ENV)} "
           f"transport={dispatcher.transport.name}")
     if args.once:
-        for receipt in dispatcher.run_once():
+        for receipt in dispatcher.run_once(claim_id=args.claim):
             print(receipt.describe())
         return 0
+    if args.claim:
+        parser.error("--claim is a one-sweep mode; use it with --once")
     dispatcher.run_forever()
     return 0
 

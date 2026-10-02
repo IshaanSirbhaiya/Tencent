@@ -389,8 +389,9 @@ class ConsoleRequest(BaseModel):
     acted on for the registration a person named, and there is no path by which the model, or a
     document the model read, selects one.
 
-    ``typed_address``/``typed_by`` are door (b) of the recipient rule, passed straight through to
-    ``recipients.recipient_typed_by_human``. They are read only by a clinic rule that declares that
+    ``typed_address`` is door (b) of the recipient rule, passed to
+    ``recipients.recipient_typed_by_human`` with the SIGNED-IN principal as who typed it;
+    ``typed_by`` in the body is ignored (R-027 ONE). It is read only by a clinic rule that declares that
     door; a rule declaring ``committed_ledger`` refuses a typed address outright
     (``build_outbound_draft``), so supplying one cannot redirect a message.
     """
@@ -723,10 +724,10 @@ def _record_agent_read(tr, response, as_of, *, wall_ms: int) -> None:
             tr.pointer(origin="graph", pointer_id=pid, source_id="graph",
                        kind=str(getattr(pointer, "kind", "") or "") or None, trust=trust,
                        as_of=when)
-        if getattr(value, "redacted", False):
-            # A redacted value is WITHHELD, not grounded: the renderer refused to print it and
-            # said why. Counting it as a citation would put a value the reader never saw into the
-            # citation count.
+        if getattr(value, "withheld", False):
+            # A withheld value (the standard envelope in `text`'s place, R-028 TIDY #7) is
+            # WITHHELD, not grounded: the renderer refused to print it and said why. Counting it
+            # as a citation would put a value the reader never saw into the citation count.
             tr.cell(state="withheld", field_path=path, trust=trust,
                     reason_code="instruction_shaped_value", policy_id="databridge_agent.render",
                     source_id="graph")
@@ -755,8 +756,12 @@ def _record_agent_read(tr, response, as_of, *, wall_ms: int) -> None:
 
 
 def _register_intelligence_routes(app: FastAPI) -> None:
-    """Attach the BI surface. Read-only: nothing here writes to the graph or the ledger."""
+    """Attach the BI surface. The figures and ``/ask`` are read-only: nothing they do writes to
+    the graph or the ledger. The page's one-time tasks (FEAT8, `one_time_routes`) are mounted
+    here too: they run through the agent runtime, and any write they propose waits for a person."""
     install_auth_handler(app)
+    from .one_time_routes import register_one_time_routes             # noqa: PLC0415
+    register_one_time_routes(app)
 
     @app.get("/intelligence")
     def intelligence(as_of: Optional[str] = None,
@@ -1048,9 +1053,12 @@ def _register_intelligence_routes(app: FastAPI) -> None:
                 return ConsoleResponse(request=echoed, intent="propose", analytics=analytics,
                                        notes=tuple(notes))
             try:
-                proposed, blocked = propose_actions(app, intake_id,
-                                                    typed_address=payload.typed_address,
-                                                    typed_by=payload.typed_by)
+                from .outbox_routes import actor_id
+
+                proposed, blocked = propose_actions(
+                    app, intake_id, principal=principal,
+                    typed_address=payload.typed_address,
+                    typed_by=actor_id(principal) if payload.typed_address else None)
             except Exception:                                        # noqa: BLE001
                 log.exception("could not propose actions for %r", intake_id)
                 return _refusal("PROPOSAL_UNAVAILABLE",

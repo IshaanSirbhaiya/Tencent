@@ -18,7 +18,7 @@ survive only as a directory layout.
 So ``POST /outbox/{id}/execute`` **spawns the dispatcher as a subprocess** and reads the result
 back out of the shared, file-backed outbox. Concretely:
 
-    python apps/dispatcher/dispatcher.py --once --db <DATABRIDGE_OUTBOX_DB>
+    python apps/dispatcher/dispatcher.py --once --db <DATABRIDGE_OUTBOX_DB> --claim <claim id>
 
 Nothing in this module imports a transport (``tests/test_outbox_routes.py`` asserts that against
 this file's source, the same device ``test_outbox_cannot_send.py`` uses on the package), and the
@@ -30,9 +30,8 @@ service that polls ``awaiting_dispatch()``; approval alone is the trigger and no
 
 * the gateway can start a process, and the argv it starts is code in this file — a smaller
   privilege than holding SMTP credentials, but not zero;
-* a sweep sends **every** approved row, not only the one named in the URL, because a dispatcher is
-  a queue worker and there is no per-row flag to give it. The route reports the state of the row
-  you asked about and says so in ``note``;
+* the sweep it starts is **single-draft**: the route claims the named row in the database first
+  (a dispatch lease, below) and the dispatcher sends only what that claim holds;
 * ``send`` then ``record_sent`` is still not atomic (``dispatcher.py`` says so at length); a crash
   between them leaves a delivered message on an ``approved`` row.
 
@@ -68,6 +67,46 @@ mailbox**, which is a stronger identifier than a name, so:
 
 The cost is the same trade ``intelligence_surface`` documents: an approver on this page cannot read
 the mailbox. That is deliberate, and it is why ``/frontdesk`` exists.
+
+## Who decides (R-027 ONE, Codex round 1, CRITICAL)
+
+Every decision and the execution are made by the **authenticated principal** of the request, never by
+a name in its body. ``approved_by`` / ``rejected_by`` are minted from the principal
+(:func:`actor_for`); a body that names an approver is refused with ``APPROVER_FROM_SIGN_IN``, so a
+forged name fails loudly rather than being silently replaced. ``typed_by`` (door (b) of the
+recipient rule) is an identity claim of the same kind and is minted the same way.
+
+A draft's **owner** is the principal whose request filed it, recorded beside the outbox
+(:class:`DraftOwners`) from the authenticated principal. Only the owner or an operator
+(``agent_ownership.is_operator``, fail closed) may read, approve, reject or execute a draft; anyone
+else gets the byte-identical 404 a missing draft gets. A draft with no recorded owner (filed before
+owners were recorded) is operator-only: nobody becomes its owner by deciding it.
+
+**Ownership is bound by creation, not by asking** (Codex round 2). Only the request whose
+``record_draft`` actually filed the row records an owner; a duplicate proposal (same digest, so the
+same draft) records nothing and, unless its caller may act on the existing draft, gets a fixed,
+content-free ``DRAFTED_BY_SOMEONE_ELSE`` reason and no card. So a second principal can neither read
+another's draft through ``propose`` nor win its owner row in a race.
+
+**Execution is one draft, claimed in the database** (R-028 OUTX, Codex #3 CRITICAL). The old
+design checked "is every queued row yours?" under an in-process ``RLock`` and then swept the whole
+queue; the queue is a SQLite file shared by several processes, so another worker could approve a
+draft between the check and the sweep and it left with yours. Now ``execute`` calls
+``OutboxStore.claim_for_dispatch(draft_ids=[draft_id], may_claim=<owner-or-operator>)``: selection,
+the access predicate and the lease are ONE ``BEGIN IMMEDIATE`` transaction, the dispatcher is
+started with ``--claim`` and sends only the rows that claim holds, and ``record_sent`` refuses any
+process that does not hold the row's lease. A row already leased to another dispatch is
+``DISPATCH_IN_PROGRESS``. Nobody, operator or owner, starts a whole-queue sweep from here.
+
+**Who decided is the common actor object** (R-028 #7): ``approved_by`` / ``rejected_by`` are the
+undecorated ``principal_id``, and the structured ``{principal_id, authenticated_by, principal_type,
+dev_only}`` is recorded on the row (``approved_actor`` / ``rejected_actor``). A dev-token decision
+is marked by ``dev_only``, never by changing the id. Refusals use the standard codes
+(``APPROVER_NOT_AUTHENTICATED``, ``MACHINE_ACTOR``, ``DECISION_ALREADY_FINAL``), and withheld draft
+text is the standard ``{status: withheld, reason, pointers}`` envelope, not a redaction string.
+
+This does not touch the intake's human gate: identity is still attested in person on
+``/intake/{id}/confirm``, and the ``committed_ledger`` door still reads only that committed row.
 """
 from __future__ import annotations
 
@@ -75,14 +114,18 @@ import hashlib
 import logging
 import os
 import pathlib
+import re
+import sqlite3
 import subprocess
 import sys
-from typing import Any, Literal, Optional
+import threading
+from typing import Any, Literal, Optional, Union
 
-from fastapi import Depends, FastAPI
+from fastapi import Body, Depends, FastAPI
 from fastapi.responses import JSONResponse
 
-from .auth import install_auth_handler, require_principal
+from .agent_ownership import is_operator
+from .auth import AuthenticatedPrincipal, install_auth_handler, require_principal
 from pydantic import BaseModel, ConfigDict, Field
 
 log = logging.getLogger("databridge.gateway.outbox")
@@ -141,10 +184,22 @@ REFUSALS: dict[str, str] = {
         "Approving is the gate: the outbox refuses the state change, the dispatcher refuses the "
         "send, and this route refuses to start the dispatcher. Three layers, none of them "
         "removable from here."),
-    "APPROVER_REQUIRED": (
+    # R-028 #11: the standard approval refusal codes (`APPROVER_REQUIRED`, `APPROVER_FROM_SIGN_IN`
+    # and `ILLEGAL_TRANSITION` on a decision are retired in their favour).
+    "MACHINE_ACTOR": (
         "an approval names a person. A process name, a blank, or 'system' would make the audit "
         "trail claim something that never happened — the record has to be able to say who let "
         "this message out."),
+    "APPROVER_NOT_AUTHENTICATED": (
+        "who approves or rejects is the signed-in principal of this request, never a name in its "
+        "body. Send the decision without `approved_by` / `rejected_by`; the record names you."),
+    "DECISION_ALREADY_FINAL": (
+        "this draft has already been decided. The outbox is append-only and its state machine is "
+        "one-way: a rejected draft is not un-rejected, an approved one is not re-decided, and a "
+        "sent message is not unsent by anything a database can do."),
+    "DISPATCH_IN_PROGRESS": (
+        "another dispatch already holds this draft. Nothing was started; its state will show "
+        "the outcome of that dispatch."),
     "REASON_REQUIRED": (
         "a rejection says why. A refusal with no reason teaches the next draft nothing."),
     "ILLEGAL_TRANSITION": (
@@ -184,7 +239,7 @@ class SurfaceRefusal(BaseModel):
     refusal: RefusalBody
 
 
-REFUSAL_RESPONSES = {status: {"model": SurfaceRefusal} for status in (404, 422, 503)}
+REFUSAL_RESPONSES = {status: {"model": SurfaceRefusal} for status in (404, 409, 422, 503)}
 
 
 def _refusal(code: str, status: int = 422, *, message: Optional[str] = None) -> JSONResponse:
@@ -249,6 +304,102 @@ def get_store(app: FastAPI):
     store = OutboxStore(str(path))
     app.state.outbox = store
     return store
+
+
+# --- who owns a draft, and who is deciding -----------------------------------------------
+def actor_for(principal: AuthenticatedPrincipal) -> dict:
+    """The common actor object of the AUTHENTICATED principal (R-028 #7):
+    ``{principal_id, authenticated_by, principal_type, dev_only}``.
+
+    ``principal_id`` is never decorated: a dev-token decision is marked by ``dev_only`` and
+    ``authenticated_by``, so the id correlates across every log. ``approved_by`` / ``rejected_by``
+    / ``typed_by`` are this object's ``principal_id``; the object itself is recorded on the row.
+    """
+    from databridge_core.decision_ledger import actor_of               # noqa: PLC0415
+
+    return actor_of({"principal_id": principal.principal_id,
+                     "authenticated_by": principal.authenticated_by,
+                     "principal_type": type(principal).__name__,
+                     "dev_only": bool(principal.dev_only)})
+
+
+def person_actor(principal: AuthenticatedPrincipal) -> tuple[Optional[dict], Optional[str]]:
+    """``(actor, None)`` for a person, else ``(None, standard refusal code)``: the common
+    ``decision_ledger.require_person`` gate (a machine principal or a delegation is
+    ``MACHINE_ACTOR``). The store's own ``refuse_machine_actor`` still checks the name after it."""
+    from databridge_core.decision_ledger import DecisionRefused, require_person  # noqa: PLC0415
+
+    try:
+        return require_person(actor_for(principal), what="an outbound-message decision"), None
+    except DecisionRefused as exc:
+        return None, exc.code
+
+
+def actor_id(principal: AuthenticatedPrincipal) -> str:
+    """The undecorated name a row records for this principal (``actor_for(...)["principal_id"]``)."""
+    return actor_for(principal)["principal_id"]
+
+
+class DraftOwners:
+    """Who filed each draft, keyed by ``draft_id``. A sidecar SQLite file beside the outbox.
+
+    Kept OUT of the outbox's own file and schema: ``packages/outbox`` is the send gate and the
+    dispatcher reads it; ownership is the gateway's access rule and neither of them needs it.
+    ``INSERT OR IGNORE``: the first principal to file a draft owns it, and a later identical
+    proposal (same digest, so the same draft) does not take it.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._lock = threading.RLock()
+        self.conn = sqlite3.connect(path, check_same_thread=False)
+        self.conn.execute("CREATE TABLE IF NOT EXISTS draft_owner (draft_id TEXT PRIMARY KEY, "
+                          "owner TEXT NOT NULL, recorded_at TEXT NOT NULL)")
+        self.conn.commit()
+
+    def record(self, draft_id: str, owner: str) -> None:
+        import datetime as _dt
+
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO draft_owner (draft_id, owner, recorded_at) VALUES (?, ?, ?)",
+                (draft_id, owner, _dt.datetime.now(_dt.timezone.utc).isoformat()))
+            self.conn.commit()
+
+    def owner_of(self, draft_id: str) -> Optional[str]:
+        with self._lock:
+            row = self.conn.execute("SELECT owner FROM draft_owner WHERE draft_id = ?",
+                                    (draft_id,)).fetchone()
+        return row[0] if row and row[0] else None
+
+    def forget_for_tests(self, draft_id: str) -> None:
+        """Simulate a draft filed before owners were recorded. Tests only."""
+        with self._lock:
+            self.conn.execute("DELETE FROM draft_owner WHERE draft_id = ?", (draft_id,))
+            self.conn.commit()
+
+
+def owners_db_path(app: Optional[FastAPI] = None) -> str:
+    db = pathlib.Path(outbox_db_path(app))
+    return str(db.with_name(db.stem + ".owners.sqlite"))
+
+
+def draft_owners(app: FastAPI) -> DraftOwners:
+    owners = getattr(app.state, "outbox_owners", None)
+    if isinstance(owners, DraftOwners):
+        return owners
+    path = pathlib.Path(owners_db_path(app))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    owners = DraftOwners(str(path))
+    app.state.outbox_owners = owners
+    return owners
+
+
+def may_act_on(app: FastAPI, principal: AuthenticatedPrincipal, draft_id: str) -> bool:
+    """Owner or operator. An ownerless draft is operator-only (fail closed)."""
+    if is_operator(principal):
+        return True
+    owner = draft_owners(app).owner_of(draft_id)
+    return owner is not None and owner == principal.principal_id
 
 
 # --- what this surface may print ----------------------------------------------------------
@@ -341,8 +492,26 @@ def project_pointer(pointer: Any) -> Citation:
     return Citation(kind=pointer.kind, source=source, repo_config=repo_config)
 
 
+class ValueState(BaseModel):
+    """The standard withheld/absent envelope (R-028 #12): ``{status, reason, pointers}``.
+
+    In place of a value this surface will not print. Never a bare ``null``, a dropped field or a
+    redaction string: a client can tell "withheld, and why" from "absent" from a value.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    status: Literal["withheld", "absent"]
+    reason: str
+    pointers: tuple["Citation", ...] = ()
+
+
+#: Why draft text is withheld: it was instruction-shaped (an instruction inside a document).
+WITHHELD_INSTRUCTION_SHAPED = "instruction_shaped"
+
+
 def _present(value: str, limit: int) -> tuple[str, bool]:
-    """Render draft text for staff. ``(text, was_redacted)``.
+    """Render draft text for staff. ``(text, withheld)``.
 
     Draft bodies are rendered from repo templates interpolated with values read out of a document,
     so the interpolated half is attacker-controlled text about to be shown in the clinic's own UI.
@@ -397,19 +566,21 @@ class ActionCard(BaseModel):
     escalate_to: Optional[str] = None
     intake_id: Optional[str] = None
     recipient: RecipientView
-    subject: str
-    body: str
-    #: True when the subject or body was instruction-shaped and has been replaced. A card in this
-    #: state is still approvable — that is the reviewer's call, and hiding the button would hide
-    #: the finding — but it renders as withheld rather than as text somebody read.
-    redacted: bool = False
+    #: The text, or the standard withheld envelope when it was instruction-shaped (R-028 #12). A
+    #: card in that state is still approvable — that is the reviewer's call, and hiding the button
+    #: would hide the finding — but it renders as withheld rather than as text somebody read.
+    subject: Union[str, ValueState]
+    body: Union[str, ValueState]
     because: tuple[Citation, ...] = ()
     requires_human_approval: Literal[True] = True
     created_at: str
     approved_by: Optional[str] = None
     approved_at: Optional[str] = None
+    #: The common actor object of the approver / rejecter (R-028 #7); null on an older row.
+    approved_actor: Optional[dict] = None
     rejected_by: Optional[str] = None
     rejected_at: Optional[str] = None
+    rejected_actor: Optional[dict] = None
     reason: Optional[str] = None
     sent_at: Optional[str] = None
     message_id: Optional[str] = None
@@ -444,15 +615,22 @@ class OutboxListing(BaseModel):
 
 
 class ApproveRequest(BaseModel):
+    """The body of an approval. **Names nobody**: the approver is the signed-in principal.
+
+    ``approved_by`` is accepted only so that a body carrying one is REFUSED with a code
+    (``APPROVER_FROM_SIGN_IN``) rather than silently replaced; any value, even the caller's own id,
+    is refused."""
+
     model_config = ConfigDict(extra="forbid")
 
-    approved_by: str = ""
+    approved_by: Optional[str] = None
 
 
 class RejectRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    rejected_by: str = ""
+    #: Refused when present, like ``ApproveRequest.approved_by``.
+    rejected_by: Optional[str] = None
     reason: str = ""
 
 
@@ -464,8 +642,8 @@ LISTING_NOTE = (
 
 EXECUTION_NOTE = (
     "Performed by apps/dispatcher, in its own process, with no model in it and no way back into "
-    "this one. A sweep sends every row that is approved, not only this one, because a dispatcher "
-    "is a queue worker; the state reported here is this row's.")
+    "this one. It sent this draft only: the draft was claimed for this dispatch in the outbox "
+    "database first, and the dispatcher sends nothing its claim does not hold.")
 
 
 def _monitor_row(playbook_id: str):
@@ -486,8 +664,10 @@ def _monitor_row(playbook_id: str):
 def action_card(entry: Any) -> ActionCard:
     """One ``OutboxEntry`` → the card a browser gets."""
     monitor = _monitor_row(entry.playbook_id)
-    subject, subject_redacted = _present(entry.subject, MAX_SUBJECT_CHARS)
-    body, body_redacted = _present(entry.body, MAX_BODY_CHARS)
+    because = tuple(project_pointer(p) for p in entry.because)
+    subject, subject_withheld = _present(entry.subject, MAX_SUBJECT_CHARS)
+    body, body_withheld = _present(entry.body, MAX_BODY_CHARS)
+    withheld = ValueState(status="withheld", reason=WITHHELD_INSTRUCTION_SHAPED, pointers=because)
     return ActionCard(
         draft_id=entry.draft_id,
         status=entry.status,
@@ -507,15 +687,16 @@ def action_card(entry: Any) -> ActionCard:
                 "This address came through a door this surface does not recognise, so nothing is "
                 "claimed about how it was established."),
             pointer=project_pointer(entry.recipient_pointer)),
-        subject=subject,
-        body=body,
-        redacted=subject_redacted or body_redacted,
-        because=tuple(project_pointer(p) for p in entry.because),
+        subject=withheld if subject_withheld else subject,
+        body=withheld if body_withheld else body,
+        because=because,
         created_at=entry.created_at,
         approved_by=entry.approved_by,
         approved_at=entry.approved_at,
+        approved_actor=entry.approved_actor,
         rejected_by=entry.rejected_by,
         rejected_at=entry.rejected_at,
+        rejected_actor=entry.rejected_actor,
         reason=entry.reason,
         sent_at=entry.sent_at,
         message_id=entry.message_id)
@@ -526,13 +707,21 @@ def dispatcher_script() -> pathlib.Path:
     return repo_root() / "apps" / "dispatcher" / "dispatcher.py"
 
 
-def dispatch_argv(db_path: str) -> list[str]:
-    """The exact command this route runs. A function so a test can assert it without running it."""
-    return [sys.executable, str(dispatcher_script()), "--once", "--db", db_path]
+#: The shape of a claim id the outbox store mints. Nothing else reaches the argv.
+_CLAIM_ID = re.compile(r"^claim-[0-9a-f]{32}$")
 
 
-def run_dispatcher_once(db_path: str, *, timeout: Optional[float] = None) -> int:
-    """Start ``apps/dispatcher`` for one sweep and wait for it. Returns its exit code.
+def dispatch_argv(db_path: str, claim_id: str) -> list[str]:
+    """The exact command this route runs. A function so a test can assert it without running it.
+    ``claim_id`` must be the store's own opaque id (checked), so nothing else is interpolated."""
+    if not isinstance(claim_id, str) or not _CLAIM_ID.match(claim_id):
+        raise ValueError("dispatch_argv: not a dispatch claim id")
+    return [sys.executable, str(dispatcher_script()), "--once", "--db", db_path,
+            "--claim", claim_id]
+
+
+def run_dispatcher_once(db_path: str, claim_id: str, *, timeout: Optional[float] = None) -> int:
+    """Start ``apps/dispatcher`` for one sweep OF ONE CLAIM and wait for it. Returns its exit code.
 
     **Nothing about the send happens in this process.** No transport is imported here, no SMTP
     credential is read here, and the only thing crossing back is an exit code — the receipts the
@@ -547,7 +736,7 @@ def run_dispatcher_once(db_path: str, *, timeout: Optional[float] = None) -> int
         paths.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = os.pathsep.join(paths)
     env[OUTBOX_DB_ENV] = db_path
-    proc = subprocess.run(dispatch_argv(db_path), capture_output=True, text=True,
+    proc = subprocess.run(dispatch_argv(db_path, claim_id), capture_output=True, text=True,
                           timeout=timeout, env=env, cwd=str(repo_root()), check=False)
     # Logged, never returned. A receipt names the mailbox it went to.
     log.info("dispatcher exited %s\n%s\n%s", proc.returncode,
@@ -560,8 +749,9 @@ def _executor(app: FastAPI):
 
     A test that really shelled out would need a mail server, and a test that mocked ``smtplib``
     would be asserting against a mock of the one thing that matters. The override takes the same
-    argument the real one does — a database path — so a fake runs the *actual* ``Dispatcher`` over
-    the *actual* file with a recording transport, which is the closest a test gets to the truth.
+    arguments the real one does — a database path and a claim id — so a fake runs the *actual*
+    ``Dispatcher`` over the *actual* file with a recording transport, which is the closest a test
+    gets to the truth.
     """
     return getattr(app.state, "outbox_executor", None) or run_dispatcher_once
 
@@ -609,6 +799,9 @@ PROPOSAL_BLOCKED: dict[str, str] = {
     "RECIPIENT_REFUSED": (
         "the address for this rule could not be established through either of the two permitted "
         "doors. Nothing is drafted; see server logs."),
+    "DRAFTED_BY_SOMEONE_ELSE": (
+        "this rule's message for this registration has already been drafted by another member of "
+        "staff, and it is theirs to review. It is not shown here; an operator can see it."),
 }
 
 #: The two config sources a proposal's facts may cite, as pointers. Same file id ``claim.py`` and
@@ -735,8 +928,8 @@ def _recipient_for(monitor: Any, intake_id: str, app: FastAPI, *,
         return None, "RECIPIENT_REFUSED"
 
 
-def propose_actions(app: FastAPI, intake_id: str, *, typed_address: Optional[str] = None,
-                    typed_by: Optional[str] = None
+def propose_actions(app: FastAPI, intake_id: str, *, principal: AuthenticatedPrincipal,
+                    typed_address: Optional[str] = None, typed_by: Optional[str] = None
                     ) -> tuple[list[ActionCard], list[BlockedProposal]]:
     """Every draft the clinic's rules call for on one registration. **Drafts only.**
 
@@ -745,6 +938,11 @@ def propose_actions(app: FastAPI, intake_id: str, *, typed_address: Optional[str
     may be said to, and this function is only the wiring between them — which is why it has no
     parameter through which a recipient could be chosen except the typed-address door, whose whole
     point is that a human is the one choosing.
+
+    ``principal`` is the authenticated principal of the request that asked (keyword-only and
+    required). It becomes the owner of every draft THIS call files; a draft that already existed
+    keeps its creator, and is shown only if ``principal`` may act on it. ``typed_by`` must be
+    minted from that same principal by the caller (:func:`actor_id`), never taken from a body.
     """
     from databridge_outbox import clinic_monitors
     from databridge_outbox.drafting import build_outbound_draft
@@ -763,6 +961,7 @@ def propose_actions(app: FastAPI, intake_id: str, *, typed_address: Optional[str
                                     message=PROPOSAL_BLOCKED["NOTHING_DUE"])]
 
     store = get_store(app)
+    owners = draft_owners(app)
     cards: list[ActionCard] = []
     blocked: list[BlockedProposal] = []
     for monitor in due:
@@ -782,11 +981,18 @@ def propose_actions(app: FastAPI, intake_id: str, *, typed_address: Optional[str
         except DuplicateDraft:
             # The id is a digest of the monitor, the intake, the address and the text, so an
             # identical draft IS the same draft. Re-asking shows the row that already exists —
-            # including one a human already approved — rather than filing a second one to reject.
+            # including one a human already approved — but ONLY to someone who may act on it.
+            # Nothing is recorded: ownership belongs to the request that filed the row.
+            if not may_act_on(app, principal, draft.draft_id):
+                blocked.append(_blocked(monitor.id, "DRAFTED_BY_SOMEONE_ELSE", monitor))
+                continue
             entry = store.current(draft.draft_id)
             if entry is None:                                        # pragma: no cover - tripwire
                 blocked.append(_blocked(monitor.id, "NOT_GROUNDED", monitor))
                 continue
+        else:
+            # This call filed the row (the store refuses a second filing), so it owns it.
+            owners.record(entry.draft_id, principal.principal_id)
         cards.append(action_card(entry))
     return cards, blocked
 
@@ -805,6 +1011,8 @@ class ProposeRequest(BaseModel):
     intake_id: str = ""
     #: Door (b). Only read by a rule that declares ``recipient_from: typed_by_human``.
     typed_address: Optional[str] = None
+    #: IGNORED. Who typed the address is the signed-in principal (R-027 ONE); kept so an older
+    #: client's body still parses.
     typed_by: Optional[str] = None
 
 
@@ -834,12 +1042,14 @@ def register_outbox_routes(app: FastAPI) -> None:
     def _store():
         return get_store(app)
 
-    @app.get("/outbox", dependencies=_AUTH, response_model=OutboxListing, response_model_exclude_none=False)
-    def outbox_list():
-        """Every draft the clinic holds, newest state first, with the evidence behind each field."""
+    @app.get("/outbox", response_model=OutboxListing, response_model_exclude_none=False)
+    def outbox_list(principal: AuthenticatedPrincipal = Depends(require_principal)):
+        """Every draft THIS principal may act on (its own; all of them for an operator), newest
+        state first, with the evidence behind each field."""
         try:
             entries = [e for e in (_store().current(d) for d in
-                                   sorted({r.draft_id for r in _store().entries()}))
+                                   sorted({r.draft_id for r in _store().entries()})
+                                   if may_act_on(app, principal, d))
                        if e is not None]
         except Exception:                                            # noqa: BLE001
             log.exception("could not read the outbox")
@@ -851,8 +1061,9 @@ def register_outbox_routes(app: FastAPI) -> None:
         return OutboxListing(drafts=tuple(cards), counts=counts,
                              database=outbox_db_path(app), note=LISTING_NOTE)
 
-    @app.post("/outbox/propose", dependencies=_AUTH, response_model=ProposalResponse, responses=REFUSAL_RESPONSES)
-    def outbox_propose(payload: ProposeRequest):
+    @app.post("/outbox/propose", response_model=ProposalResponse, responses=REFUSAL_RESPONSES)
+    def outbox_propose(payload: ProposeRequest,
+                       principal: AuthenticatedPrincipal = Depends(require_principal)):
         """Ask the clinic's own rules what is worth saying about one registration. **Drafts only.**
 
         This route cannot send and has no path to anything that can: it writes rows into the
@@ -865,18 +1076,22 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("UNKNOWN_INTAKE", status=404,
                             message=PROPOSAL_BLOCKED["UNKNOWN_INTAKE"])
         try:
-            cards, blocked = propose_actions(app, intake_id,
-                                             typed_address=payload.typed_address,
-                                             typed_by=payload.typed_by)
+            cards, blocked = propose_actions(
+                app, intake_id, principal=principal,
+                typed_address=payload.typed_address,
+                typed_by=actor_id(principal) if payload.typed_address else None)
         except Exception:                                            # noqa: BLE001
             log.exception("could not propose actions for %r", intake_id)
             return _refusal("OUTBOX_UNAVAILABLE", status=503)
         return ProposalResponse(intake_id=intake_id, proposed=tuple(cards),
                                 blocked=tuple(blocked))
 
-    @app.get("/outbox/{draft_id}", dependencies=_AUTH, response_model=ActionCard, responses=REFUSAL_RESPONSES)
-    def outbox_draft(draft_id: str):
+    @app.get("/outbox/{draft_id}", response_model=ActionCard, responses=REFUSAL_RESPONSES)
+    def outbox_draft(draft_id: str,
+                     principal: AuthenticatedPrincipal = Depends(require_principal)):
         """One draft: what it would do, to whom, why, and what stands behind each field."""
+        if not may_act_on(app, principal, draft_id):
+            return _refusal("UNKNOWN_DRAFT", status=404)
         try:
             entry = _store().current(draft_id)
         except Exception:                                            # noqa: BLE001
@@ -886,51 +1101,65 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("UNKNOWN_DRAFT", status=404)
         return action_card(entry)
 
-    @app.post("/outbox/{draft_id}/approve", dependencies=_AUTH, response_model=ActionCard,
+    @app.post("/outbox/{draft_id}/approve", response_model=ActionCard,
               responses=REFUSAL_RESPONSES)
-    def outbox_approve(draft_id: str, payload: ApproveRequest):
-        """A named member of staff agrees this may go out. **The gate.**
+    def outbox_approve(draft_id: str, payload: Optional[ApproveRequest] = Body(None),
+                       principal: AuthenticatedPrincipal = Depends(require_principal)):
+        """The signed-in principal agrees this may go out. **The gate.**
 
-        The name is checked by ``OutboxStore.approve`` → ``refuse_machine_actor``, not here: one
-        definition of "is that a person", in the module that writes the row. This route only maps
-        its refusal onto a code.
-
-        There is no authentication behind the name — the sign-in screen says so and so does the
-        UI copy on this page. An approval records *who says they did this*; it does not prove one.
+        The approver is minted from the authenticated principal (:func:`actor_for`); a body that
+        names one is refused. Owner-or-operator: anyone else gets the 404 a missing draft gets,
+        checked BEFORE the body, so not even the refusal code varies with whether the id exists.
+        ``OutboxStore.approve`` → ``refuse_machine_actor`` still checks the name is a person's.
         """
         from databridge_outbox.models import NotApproved
         from databridge_outbox.store import IllegalTransition, UnknownDraft
 
+        if not may_act_on(app, principal, draft_id):
+            return _refusal("UNKNOWN_DRAFT", status=404)
+        if payload is not None and payload.approved_by is not None:
+            return _refusal("APPROVER_NOT_AUTHENTICATED")
+        actor, refused = person_actor(principal)
+        if refused is not None:
+            return _refusal(refused)
         try:
-            entry = _store().approve(draft_id, approved_by=payload.approved_by)
+            entry = _store().approve(draft_id, approved_by=actor["principal_id"], actor=actor)
         except NotApproved:
-            return _refusal("APPROVER_REQUIRED")
+            return _refusal("MACHINE_ACTOR")
         except UnknownDraft:
             return _refusal("UNKNOWN_DRAFT", status=404)
         except IllegalTransition:
-            return _refusal("ILLEGAL_TRANSITION")
+            return _refusal("DECISION_ALREADY_FINAL", status=409)
         except Exception:                                            # noqa: BLE001
             log.exception("approve failed for %r", draft_id)
             return _refusal("OUTBOX_UNAVAILABLE", status=503)
         return action_card(entry)
 
-    @app.post("/outbox/{draft_id}/reject", dependencies=_AUTH, response_model=ActionCard, responses=REFUSAL_RESPONSES)
-    def outbox_reject(draft_id: str, payload: RejectRequest):
-        """A named member of staff says no, and says why. The draft stays in the record."""
+    @app.post("/outbox/{draft_id}/reject", response_model=ActionCard, responses=REFUSAL_RESPONSES)
+    def outbox_reject(draft_id: str, payload: RejectRequest,
+                      principal: AuthenticatedPrincipal = Depends(require_principal)):
+        """The signed-in principal says no, and says why. The draft stays in the record."""
         from databridge_outbox.models import NotApproved, OutboxError
         from databridge_outbox.store import IllegalTransition, UnknownDraft
 
+        if not may_act_on(app, principal, draft_id):
+            return _refusal("UNKNOWN_DRAFT", status=404)
+        if payload.rejected_by is not None:
+            return _refusal("APPROVER_NOT_AUTHENTICATED")
         if not (payload.reason or "").strip():
             return _refusal("REASON_REQUIRED")
+        actor, refused = person_actor(principal)
+        if refused is not None:
+            return _refusal(refused)
         try:
-            entry = _store().reject(draft_id, rejected_by=payload.rejected_by,
-                                    reason=payload.reason)
+            entry = _store().reject(draft_id, rejected_by=actor["principal_id"],
+                                    reason=payload.reason, actor=actor)
         except NotApproved:
-            return _refusal("APPROVER_REQUIRED")
+            return _refusal("MACHINE_ACTOR")
         except UnknownDraft:
             return _refusal("UNKNOWN_DRAFT", status=404)
         except IllegalTransition:
-            return _refusal("ILLEGAL_TRANSITION")
+            return _refusal("DECISION_ALREADY_FINAL", status=409)
         except OutboxError:
             return _refusal("REASON_REQUIRED")
         except Exception:                                            # noqa: BLE001
@@ -938,8 +1167,9 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("OUTBOX_UNAVAILABLE", status=503)
         return action_card(entry)
 
-    @app.post("/outbox/{draft_id}/execute", dependencies=_AUTH, responses=REFUSAL_RESPONSES)
-    def outbox_execute(draft_id: str):
+    @app.post("/outbox/{draft_id}/execute", responses=REFUSAL_RESPONSES)
+    def outbox_execute(draft_id: str,
+                       principal: AuthenticatedPrincipal = Depends(require_principal)):
         """Trigger the dispatcher, then report what actually happened.
 
         Refuses an unapproved row **before** starting anything, so the failure is a clean 422
@@ -947,7 +1177,11 @@ def register_outbox_routes(app: FastAPI) -> None:
         — ``Dispatcher.refuse_unless_approved`` and ``OutboxStore.record_sent`` both make it
         again, in the process that would do the damage and in the store that would record it — it
         is the one that makes the refusal legible here.
+
+        Owner-or-operator, like the decisions: another principal gets the missing-draft 404.
         """
+        if not may_act_on(app, principal, draft_id):
+            return _refusal("UNKNOWN_DRAFT", status=404)
         try:
             entry = _store().current(draft_id)
         except Exception:                                            # noqa: BLE001
@@ -964,11 +1198,39 @@ def register_outbox_routes(app: FastAPI) -> None:
             return _refusal("NOT_APPROVED")
 
         db_path = outbox_db_path(app)
+        # ONE draft, claimed in the database: the selection, the owner-or-operator predicate and
+        # the lease are a single cross-process transaction, and the dispatcher started below
+        # sends only what this claim holds (R-028 #3). A row another process approves meanwhile
+        # is not in it, whoever's it is.
         try:
-            code = _executor(app)(db_path)
+            claim = _store().claim_for_dispatch(
+                claimed_by=actor_id(principal), draft_ids=[draft_id],
+                may_claim=lambda e: may_act_on(app, principal, e.draft_id))
+        except Exception:                                            # noqa: BLE001
+            log.exception("could not claim draft %r for dispatch", draft_id)
+            return _refusal("OUTBOX_UNAVAILABLE", status=503)
+        if draft_id not in claim.draft_ids:
+            try:
+                now = _store().current(draft_id)
+            except Exception:                                        # noqa: BLE001
+                log.exception("could not read draft %r", draft_id)
+                return _refusal("OUTBOX_UNAVAILABLE", status=503)
+            if now is not None and now.status == "sent":
+                return {"draft": action_card(now).model_dump(mode="json"),
+                        "result": _result(now).model_dump(mode="json")}
+            if now is None or not now.is_dispatchable:
+                return _refusal("NOT_APPROVED")
+            return _refusal("DISPATCH_IN_PROGRESS", status=409)
+        try:
+            code = _executor(app)(db_path, claim.claim_id)
         except Exception:                                            # noqa: BLE001
             log.exception("could not run the dispatcher for %r", draft_id)
             return _refusal("DISPATCH_UNAVAILABLE", status=503)
+        finally:
+            try:
+                _store().release_claim(claim.claim_id)
+            except Exception:                                        # noqa: BLE001
+                log.exception("could not release dispatch claim for %r", draft_id)
 
         try:
             after = _store().current(draft_id)
@@ -1011,7 +1273,12 @@ __all__ = [
     "RecipientView",
     "RejectRequest",
     "action_card",
+    "actor_for",
+    "actor_id",
+    "ValueState",
     "address_handle",
+    "draft_owners",
+    "may_act_on",
     "default_outbox_db",
     "dispatch_argv",
     "dispatcher_script",

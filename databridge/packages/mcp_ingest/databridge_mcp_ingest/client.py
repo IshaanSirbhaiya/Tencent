@@ -1479,6 +1479,14 @@ class ReadOnlyClient:
         if why:
             raise ToolChanged(why)
         live = (self._live or {}).get(name)
+        if live is not None:
+            # R-027 r2 #1: a tool whose arguments select what it does (a closed mode set holding
+            # a write) is held, on EVERY call, to a fixed read value — whatever the plan says.
+            from .plans import dual_use_refusal
+
+            dual = dual_use_refusal(live, arguments)
+            if dual:
+                raise McpClientError(f"refused: {dual}")
         if name in self._sql_args or is_generic_executor(live if live is not None else name):
             why = self._executor_refusal(name, arguments)
             if why:

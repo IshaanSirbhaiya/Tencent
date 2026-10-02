@@ -158,8 +158,11 @@ def _proposals(manager: Any) -> list[dict]:
     return list(rows.values())
 
 
-def _sync_job(app: FastAPI, agent_id: str, job_id: str, by: str) -> None:
+def _sync_job(app: FastAPI, agent_id: str, job_id: str, by: str) -> dict:
+    """Run one sync as a job. Returns the sync's summary, or ``{"status": "failed", "error": ...}``
+    when it raised - so a caller (the setup hand-off) can record the TERMINAL outcome."""
     rt = platform_of(app)
+    data: dict = {}
     try:
         summary = rt.manager.sync(agent_id, trigger={"type": "manual", "by": by})
         data = summary.as_dict()
@@ -167,9 +170,11 @@ def _sync_job(app: FastAPI, agent_id: str, job_id: str, by: str) -> None:
                                        else "completed"), result=data)
     except Exception as exc:                                          # noqa: BLE001
         log.exception("adapter agent %s sync failed", agent_id)
-        rt.jobs.finish(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+        data = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
+        rt.jobs.finish(job_id, status="failed", error=data["error"])
     finally:
         rt.jobs.update(job_id, graph_counts=reload_graph(app))
+    return data
 
 
 def filing_agent_of(row: dict) -> Optional[str]:
@@ -229,6 +234,20 @@ def _log_forwarded(rt: Any, proposal_id: str, by: Optional[str], result: dict, *
 
 def register_adapter_agents_routes(app: FastAPI) -> None:
     install_auth_handler(app)
+    # FEAT8: Set up a source through its adapter agent (`/adapter-setup/*`). Its own module; it
+    # calls the Sources routes' handlers and this module's sync job, never a parallel pipeline.
+    from .adapter_setup_routes import (gateway_plan_stale,  # noqa: PLC0415
+                                       register_adapter_setup_routes)
+
+    register_adapter_setup_routes(app)
+    # Codex R-027 AAX f1 #6: every adapter agent's activation, resume and sync re-checks that its
+    # approved crawl plan still covers the connection AS IT IS NOW - the Sources routes' own check
+    try:
+        from databridge_adapter_agents.manager import set_plan_stale_check  # noqa: PLC0415
+
+        set_plan_stale_check(gateway_plan_stale)
+    except ImportError as exc:                                        # pragma: no cover
+        log.warning("adapter agents: plan staleness check not installed: %s", exc)
     # One forward at a time per app: the check "not yet forwarded" and the append "forwarded" must
     # not interleave, or two concurrent forwards both file an ontology proposal (R-019 #6).
     forward_lock = threading.Lock()
@@ -504,6 +523,12 @@ def register_adapter_agents_routes(app: FastAPI) -> None:
                             f"adapter agent {agent_id!r} is {status!r}; only an active agent "
                             f"syncs — activate it first (POST /adapter-agents/{agent_id}/activate)",
                             status=409)
+        # Codex R-027 AAX f2 #1/#2: the manager's own gate (a setup-owned agent needs its
+        # hand-off authorisation and an in-force sealed delegation), said up front; the manager
+        # refuses again at execution time
+        blocked = rt.manager.agent_gate(spec)
+        if blocked:
+            return _refusal("ADAPTER_AGENT_GATED", "; ".join(blocked), status=409)
         try:
             job = rt.jobs.start("adapter_sync", agent_id, by=principal.principal_id)
         except JobBusy as busy:

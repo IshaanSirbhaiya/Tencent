@@ -117,7 +117,13 @@ function LinkRow({
           link never points at a person record.
         </p>
       )}
-      {!link.person_target && link.status === "not_proposed" && link.why && (
+      {!link.person_target && link.subject_target && (
+        <p className="mt-1 text-2xs text-band-spot" data-testid={`link-subject-${link.table}-${link.column}`}>
+          Not offered: <span className="font-mono">{link.target_kind}</span> is a protected subject kind, and an
+          inferred link never points at a subject record.
+        </p>
+      )}
+      {!link.person_target && !link.subject_target && link.status === "not_proposed" && link.why && (
         <p className="mt-1 text-2xs text-subtle">Not offered: {link.why}</p>
       )}
       {(link.status === "approved" || link.status === "rejected") && (

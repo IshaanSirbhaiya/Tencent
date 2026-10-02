@@ -66,8 +66,20 @@ presented as the total. The directory LISTING is still one ``stat`` per file; no
 for it.
 
 **Nothing is passed through** (Codex f1 #5). The run record is projected through a per-kind
-allow-list (`RECORD_SCHEMAS`); a key the projection does not name — at ANY depth — is not served,
-and its path is listed in ``masked_fields``. Evidence, examples, documents, candidates, withheld
+allow-list (`RECORD_SCHEMAS`); a key the projection does not name — at ANY depth — is not served:
+its value is the withheld envelope ``{"status": "withheld", "reason": <code>}`` IN PLACE (R-028
+CONS #12 — never a dropped key or a sibling "…_withheld" string), and its path is listed in
+``masked_fields``.
+
+**One timeline, one actor** (R-028 CONS #7/#8). Every producer family has its own kind (see
+`ACTIVITY_KINDS`: a Set-up step is ``adapter_setup``, never ``adapter_sync``; a one-time task is
+``one_time_task``; every human-decision family — plan, mapping and link approvals, set-up documents
+decisions and hand-offs, dataset design approvals and builds, outbox decisions — is projected by
+`activity_decisions`), and every row names who acted with the common actor object
+``{principal_id, authenticated_by, principal_type, dev_only, delegation?}`` (`activity_actor`): a
+dev-token decision is ``dev_only: true`` with an undecorated id; a field its producer did not
+record is the absent envelope. Access is the platform rule everywhere: owner OR operator
+(`agent_ownership.is_operator`), with identical 404 bodies. Evidence, examples, documents, candidates, withheld
 values and raw payloads are additionally dropped wherever they appear (`MASKED_KEYS`). Timeline
 rows are built from named fields with scalar values only.
 
@@ -102,14 +114,49 @@ from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
 
 from . import agent_ownership
+from .activity_actor import (
+    ERROR_TEXT,
+    FREE_TEXT,
+    NOT_IN_ALLOW_LIST,
+    SENSITIVE_FIELD,
+    SQL_WITH_LITERALS,
+    TOO_DEEP,
+    UNEXPECTED_SHAPE,
+    actor_from_record,
+    make_actor,
+    withheld,
+)
 from .auth import AuthenticatedPrincipal, install_auth_handler, require_principal
 from .trace_routes import has_audit_role
 
 log = logging.getLogger("databridge.gateway.activity")
 
-#: The closed kind vocabulary of the feed.
-ACTIVITY_KINDS = ("agent_run", "federated_run", "adapter_sync", "firing", "approval",
-                  "drift_proposal", "ontology_proposal")
+#: The closed kind vocabulary of the feed (R-028 CONS #8: one explicit kind per producer family —
+#: a setup step is never an ``adapter_sync``, a one-time task never a plain ``agent_run``).
+#:
+#:   agent_run · federated_run · adapter_sync · firing · approval · drift_proposal ·
+#:   ontology_proposal                                      (the run and proposal producers)
+#:   adapter_setup        a Set-up step of an adapter agent (`adapter_agents.setup.record_step`)
+#:   one_time_task        a one-time task run, or a task that failed before its run was recorded
+#:   plan_approval        a crawl plan approved for a source (the plan approval log)
+#:   mapping_approval     a table mapping approved (the mapping approval log)
+#:   link_decision        a proposed link approved or rejected (kept on the mapping)
+#:   setup_documents      a person's decision on the documents a discovery captured
+#:   setup_handoff        a person's hand-off authorisation of a setup agent
+#:   design_approval      a dataset design approved (the design's sealed log)
+#:   design_build         a dataset design built (the design's sealed log)
+#:   outbox_decision      an outbound draft approved, rejected or sent
+#:   decision_log         a decision log that did not verify (LEDGER_INTEGRITY_FAILED)
+RUN_FEED_KINDS = ("agent_run", "federated_run", "adapter_sync", "adapter_setup", "one_time_task",
+                  "firing", "approval", "drift_proposal", "ontology_proposal")
+DECISION_KINDS = ("plan_approval", "mapping_approval", "link_decision", "setup_documents",
+                  "setup_handoff", "design_approval", "design_build", "outbox_decision",
+                  "decision_log")
+ACTIVITY_KINDS = RUN_FEED_KINDS + DECISION_KINDS
+#: The trigger type a one-time task's run record carries (`one_time_routes.TRIGGER_TYPE`).
+ONE_TIME_TRIGGER = "one_time"
+#: The kind a Set-up step's record carries (`adapter_agents.setup.SETUP_KIND`).
+SETUP_RECORD_KIND = "adapter_setup"
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 #: Firings shown per trigger on `/activity/automations`.
@@ -189,9 +236,9 @@ _LOUD_RUN = {"failed", "refused", "partial", "busy", "unverified", "stopped"}
 _LOUD_FIRING = {"failed", "dead_lettered"}
 
 #: run directory kind -> the feed kinds read from it
-_RUN_DIR_KINDS = {"agent": {"agent_run", "approval"}, "federated": {"federated_run"},
-                  "adapter_agent": {"adapter_sync"}}
-_ITEM_KIND = {"agent": "agent_run", "federated": "federated_run", "adapter_agent": "adapter_sync"}
+_RUN_DIR_KINDS = {"agent": {"agent_run", "approval", "one_time_task"},
+                  "federated": {"federated_run"},
+                  "adapter_agent": {"adapter_sync", "adapter_setup"}}
 
 
 def _refusal(code: str, message: str, status: int = 404, alternative: Any = None) -> JSONResponse:
@@ -213,6 +260,19 @@ class ActivitySources:
     runs_dir: Path
     firings_path: Path
     adapter_agents_dir: Path
+    #: R-028 CONS #8 — the decision producers. ``None``: that family is not read (a test app
+    #: that names only the run stores; production resolves every one in `resolve_sources`).
+    #: The registered sources (plan + mapping approval logs, mappings with their link decisions).
+    sources_dir: Optional[Path] = None
+    #: The materialise root (``designs/<id>/events.jsonl``: dataset design approvals and builds).
+    materialise_root: Optional[Path] = None
+    #: The one-time task root (``<task_id>/task.json``).
+    one_time_root: Optional[Path] = None
+    #: The outbox SQLite file (read-only; never created here) — its owner sidecar beside it.
+    outbox_db: Optional[Path] = None
+    #: Setup decisions (``_setup/<source>/decisions.jsonl``, ``handoffs.jsonl``) live under the
+    #: adapter-agent registry root; True reads them.
+    setup_decisions: bool = False
 
 
 def resolve_sources(app: Any) -> ActivitySources:
@@ -249,7 +309,44 @@ def resolve_sources(app: Any) -> ActivitySources:
             aa_dir = adapter_agents_dir()
         except Exception:                                                 # noqa: BLE001
             aa_dir = runs.parent / "adapter_agents"
-    return ActivitySources(Path(runs), Path(firings), Path(aa_dir))
+    return ActivitySources(Path(runs), Path(firings), Path(aa_dir),
+                           **_decision_roots(app))
+
+
+def _decision_roots(app: Any) -> dict:
+    """Where the decision producers write (R-028 CONS #8). Each is the producer's OWN resolver;
+    one that cannot be resolved is left unset (that family is then not read, and never guessed).
+    Nothing here creates a file or a directory."""
+    out: dict[str, Any] = {"setup_decisions": True}
+    try:
+        from databridge_mcp_ingest import paths as mi_paths               # noqa: PLC0415
+        out["sources_dir"] = Path(mi_paths.sources_dir())
+    except Exception:                                                     # noqa: BLE001
+        pass
+    impl = getattr(app.state, "materialiser", None)
+    try:
+        root = getattr(impl, "out_root", None)
+    except Exception:                                                     # noqa: BLE001
+        root = None
+    if not isinstance(root, (str, Path)):
+        try:
+            from databridge_materialise.platform import materialise_root  # noqa: PLC0415
+            root = materialise_root()
+        except Exception:                                                 # noqa: BLE001
+            root = None
+    if root is not None:
+        out["materialise_root"] = Path(root)
+    try:
+        from .one_time_routes import one_time_root                        # noqa: PLC0415
+        out["one_time_root"] = Path(one_time_root())
+    except Exception:                                                     # noqa: BLE001
+        pass
+    try:
+        from .outbox_routes import outbox_db_path                         # noqa: PLC0415
+        out["outbox_db"] = Path(outbox_db_path(app))
+    except Exception:                                                     # noqa: BLE001
+        pass
+    return out
 
 
 # ================================================================================================
@@ -702,21 +799,22 @@ def _base(kind: str, key: str, at: Any, **rest: Any) -> dict:
 
 
 def _started_by(trig: dict) -> Optional[dict]:
-    """A person (``trigger.by``), an automation (a recorded trigger ``type`` other than manual and
-    no person), or ``None`` — NOT RECORDED — when the record names neither (a missing trigger is
-    not evidence that an automation started it)."""
+    """The actor object (R-028 CONS #7) of a person (``trigger.by``), an automation (a recorded
+    trigger ``type`` other than manual and no person), or ``None`` — NOT RECORDED — when the record
+    names neither (a missing trigger is not evidence that an automation started it). How the
+    person authenticated is served only when the trigger recorded it; otherwise it is absent."""
     by = trig.get("by") if isinstance(trig.get("by"), str) and trig.get("by") else None
     if by:
-        return {"type": "person", "id": by}
+        return actor_from_record(trig, pid_key="by", default_type="person")
     t = trig.get("type")
     if isinstance(t, str) and t and t != "manual":
-        return {"type": "automation", "id": t}
+        return make_actor(t, "automation")
     return None
 
 
 def _trigger_view(trig: dict) -> dict:
     return {k: _scalar(trig.get(k)) for k in ("type", "by", "scheduled_for", "event_id",
-                                              "fired_at") if k in trig}
+                                              "fired_at", "task_id") if k in trig}
 
 
 def _action_counts(record: dict) -> Optional[dict]:
@@ -782,17 +880,44 @@ def run_item(kind: str, owner_dir: str, record: dict,
     steps_recorded = isinstance(record.get("steps"), list)
     steps = record["steps"] if steps_recorded else []
     reduced = _coverage_reduced(record)
-    if kind == "agent":
-        item_kind, actor = "agent_run", {"type": "agent", "id": owner_dir}
+    extra: dict[str, Any] = {}
+    if kind == "agent" and trig.get("type") == ONE_TIME_TRIGGER:
+        # R-028 CONS #8: a one-time task's run is its own kind, not an agent run. Its "agent" is
+        # the task's compiled pair (the directory is the task id), and the person who ran it is
+        # its owner (`trigger.by`).
+        item_kind, actor = "one_time_task", make_actor(owner_dir, "agent")
+        title = _scalar(trig.get("question")) or f"one-time task {owner_dir}"
+        pb = _produced_by(answer.get("produced_by")) if answer else None
+        extra["task_id"] = _scalar(trig.get("task_id")) or owner_dir
+    elif kind == "agent":
+        item_kind, actor = "agent_run", make_actor(owner_dir, "agent")
         title = _scalar(trig.get("question")) or f"{owner_dir} run"
         pb = _produced_by(answer.get("produced_by")) if answer else None
     elif kind == "federated":
-        item_kind, actor = "federated_run", {"type": "agent", "id": "federated"}
+        item_kind, actor = "federated_run", make_actor("federated", "agent")
         title = _scalar(trig.get("question")) or "federated question"
         pb = _produced_by(answer.get("produced_by")) if answer else None
+    elif record.get("kind") == SETUP_RECORD_KIND:
+        # R-028 CONS #8: a Set-up step (`setup.record_step`) is NOT a sync. A step a person
+        # decided is that person's (the structured actor when the record carries one, else the
+        # recorded principal with its authentication absent); a step the agent proposed or did is
+        # the agent's, started by the person who asked.
+        agent_id = _scalar(record.get("agent_id")) or owner_dir
+        step0 = next((s for s in (record.get("steps") or []) if isinstance(s, dict)), {})
+        pd = step0.get("policy_decision") if isinstance(step0.get("policy_decision"), dict) else {}
+        decided = pd.get("reason_code") == "person_decided"
+        person = (actor_from_record(record) or actor_from_record(step0)
+                  or actor_from_record(trig, pid_key="by", default_type="person"))
+        item_kind = "adapter_setup"
+        actor = person if decided and person else make_actor(agent_id, "adapter_agent")
+        extra.update(step=_scalar(step0.get("tool")), decided_by_person=decided,
+                     adapter_agent=agent_id)
+        title = f"{'decided' if decided else 'proposed'}: {_scalar(step0.get('tool')) or 'setup'}"\
+                f" for {agent_id}"
+        pb = _produced_by(record.get("produced_by"))
     else:
         agent_id = _scalar(record.get("agent_id")) or owner_dir
-        item_kind, actor = "adapter_sync", {"type": "adapter_agent", "id": agent_id}
+        item_kind, actor = "adapter_sync", make_actor(agent_id, "adapter_agent")
         title = f"sync of {agent_id}"
         pb = _produced_by(record.get("produced_by"))
     delegations = [s for s in steps if isinstance(s, dict)
@@ -814,7 +939,7 @@ def run_item(kind: str, owner_dir: str, record: dict,
         coverage_reduced=reduced,
         reason=_scalar(record.get("reason")) if kind == "adapter_agent" else None,
         **run_usage(record, joined), trace_request_id=joined.get("request_id"),
-        loud=loud)
+        loud=loud, **extra)
 
 
 #: A firing's fields that never change across its lines. A line that contradicts one is NOT
@@ -876,13 +1001,15 @@ def fold_firings(records: Iterable[dict]) -> list[dict]:
             f["result"] = rec.get("result")
         event = {k: _scalar(rec.get(k)) for k in _FIRING_EVENT_KEYS
                  if _scalar(rec.get(k)) is not None}
+        # R-028 CONS #12: a value not served is the withheld envelope IN ITS PLACE, never a
+        # sibling "…_withheld" string beside a dropped key
         if _code(rec.get("reason")):
             event["reason"] = rec["reason"]
         elif rec.get("reason") is not None:
-            event["reason_withheld"] = "free text; not served"
+            event["reason"] = withheld(FREE_TEXT)
         if rec.get("error") is not None:
             event["error_type"] = _error_type(rec.get("error"))
-            event["error_withheld"] = "error text; not served"
+            event["error"] = withheld(ERROR_TEXT)
         f["events"].append(event)
     out = []
     for f in by_key.values():
@@ -912,9 +1039,9 @@ def firing_item(f: dict) -> dict:
         spec_id=f.get("spec_id"), spec_kind=f.get("spec_kind"), trigger_type=f.get("trigger"),
         scheduled_for=f.get("scheduled_for"), event_id=f.get("event_id"),
         status=f.get("status"),
-        actor={"type": "automation", "id": f.get("spec_id")},
-        started_by=({"type": "person", "id": f["by"]} if f.get("by")
-                    else {"type": "automation", "id": f.get("trigger")} if f.get("trigger")
+        actor=make_actor(f.get("spec_id"), "automation"),
+        started_by=(make_actor(f["by"], "person") if f.get("by")
+                    else make_actor(f.get("trigger"), "automation") if f.get("trigger")
                     else None),
         title=f"{f.get('trigger') or 'firing'} of {_nr(f.get('spec_id'))}",
         run_id=run_id, run_kind=run_kind, run_owner=run_owner,
@@ -1011,12 +1138,16 @@ def approval_items(run_id: str, agent: str, events: list[dict], record: dict) ->
             automation_mode=_scalar(proposal.get("automation_mode")
                                     or entry.get("automation_mode")),
             status=outcome, outcome=outcome,
-            # `dev_only` is added to the actor ONLY when true: a real sign-in keeps the actor's
-            # shape every other row kind uses ({type, id}); the row's `decided_by_dev_only` says
-            # true/false explicitly either way.
-            actor=(({"type": "person", "id": decider,
-                     **({"dev_only": True} if decider_dev_only else {})})
-                   if decider else {"type": "agent", "id": agent}),
+            # R-028 CONS #7: the decider is the common actor object, read from the decision
+            # event ITSELF — `dev_only` true or false as recorded (absent when not recorded),
+            # never folded into the id
+            # (the runtime writes `dev_only` only when true, beside `authenticated_by`: with the
+            # mechanism recorded, a missing flag IS false)
+            actor=((actor_from_record({**decider_ev, "dev_only": decider_dev_only}
+                                      if decider_auth else decider_ev,
+                                      pid_key="by", default_type="person")
+                    or make_actor(decider, "person"))
+                   if decider else make_actor(agent, "agent")),
             decided_by=decider, decided_by_dev_only=decider_dev_only if decider else None,
             decided_by_authenticated_by=decider_auth, proposed_at=_scalar(proposal.get("at")),
             proposed_by=_produced_by(proposal.get("produced_by")),
@@ -1053,7 +1184,7 @@ def drift_items(agent: str, records: dict[str, dict]) -> list[dict]:
             status=status, stage=_scalar(rec.get("stage")), action=_scalar(rec.get("action")),
             drifts=drifts, asked=asked, run_id=_scalar(rec.get("agent_run_id")),
             run_kind="adapter_agent", run_owner=agent,
-            actor={"type": "adapter_agent", "id": agent},
+            actor=make_actor(agent, "adapter_agent"),
             produced_by=_produced_by(rec.get("produced_by")),
             title=(f"{agent}: {len(drifts)} drift(s) on {_nr(connection)}" if drifts is not None
                    else f"{agent}: drift on {_nr(connection)} (drifts not recorded)"),
@@ -1094,7 +1225,7 @@ def ontology_proposal_items(rows: list[dict]) -> list[dict]:
             requires_human_approval=_scalar(rec.get("requires_human_approval")),
             forwarded=({k: _scalar(fw.get(k)) for k in ("at", "by", "ontology_proposal_id",
                                                         "ontology_status")} if fw else None),
-            actor={"type": "adapter_agent", "id": agent},
+            actor=make_actor(agent, "adapter_agent"),
             produced_by=_produced_by(rec.get("produced_by")),
             title=(f"{_nr(agent)} proposes {_nr(rec.get('axis'))} kind "
                    f"{_nr(rec.get('name'))}"),
@@ -1279,6 +1410,13 @@ def collect(app: Any, viewer: Viewer, kinds: Optional[set[str]] = None, *,
             if isinstance(agent, str) and viewer.adapter_agent_visible(agent):
                 items.append(it)
 
+    # R-028 CONS #8: every human-decision family, through the same actor object and owner-or-
+    # operator rule (`activity_decisions`); plus one-time tasks that never recorded a run
+    decision_want = want & (set(DECISION_KINDS) | {"one_time_task"})
+    if decision_want:
+        from .activity_decisions import decision_items                    # noqa: PLC0415
+        items.extend(decision_items(viewer, decision_want, problems, incomplete))
+
     items = [scrub(it) for it in items]
     items.sort(key=lambda i: (i["sort_key"], i["id"]), reverse=True)
     return Collected(items, firings, problems, incomplete, more, frontier)
@@ -1331,7 +1469,10 @@ S, SLIST, SVAL, SMAP, SMAP_LISTS, PB, PD, COUNT, PTR, OPS, SKIP = (
     "s", "slist", "sval", "smap", "smap_lists", "pb", "pd", "count", "ptr", "ops", "skip")
 
 TRIGGER = {k: S for k in ("type", "by", "question", "scheduled_for", "event_id", "fired_at",
-                          "firing_id", "idempotency_key")}
+                          "firing_id", "idempotency_key", "task_id")}
+#: The common actor object (R-028 CONS standard 1), when a record carries one.
+ACTOR_SCHEMA = {"principal_id": S, "authenticated_by": S, "principal_type": S, "dev_only": S,
+                "delegation": SMAP}
 SKIP_ENTRY = {k: S for k in ("tool", "adapter_agent", "connection", "channel", "reason",
                              "reason_code", "recovered", "action", "source")}
 POINTER_KEYS = ("source_id", "kind", "trust", "capture_digest", "table", "column", "row_id",
@@ -1381,10 +1522,11 @@ RECORD_SCHEMAS: dict[str, dict] = {
     "adapter_agent": {
         "run_id": S, "kind": S, "agent_id": S, "spec_digest": S, "status": S, "reason": S,
         "started": S, "ended": S, "models_used": SLIST, "trigger": TRIGGER, "produced_by": PB,
+        "recorded_at": S, "actor": ACTOR_SCHEMA,
         "steps": [{"tool": S, "ms": S, "status": S, "reason": S, "ingest_run_id": S,
                    "report_status": S, "started": S, "ended": S, "event_id": S,
                    "policy_decision": PD, "produced_by": PB, "result_pointers": COUNT,
-                   "counts": SMAP}],
+                   "counts": SMAP, "actor": ACTOR_SCHEMA}],
         "actions": COUNT, "answer": S,
         "coverage": {"searched": SLIST, "skipped": [SKIP], "reasons": SMAP},
         "totals": SMAP, "warnings": SLIST,
@@ -1395,27 +1537,40 @@ RECORD_SCHEMAS: dict[str, dict] = {
 
 
 class _Masked:
-    pass
+    """A value `_project` does not serve, and why (a closed reason code). Its parent puts the
+    withheld envelope in its place (R-028 CONS #12): the key stays, its value does not."""
+
+    __slots__ = ("reason",)
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
 
 
-_MASK = _Masked()
+def _mask(reason: str) -> _Masked:
+    return _Masked(reason)
+
+
+def _served(got: Any) -> Any:
+    """A projected value as served: itself, or the withheld envelope standing in for it."""
+    return withheld(got.reason) if isinstance(got, _Masked) else got
 
 
 def scrub(value: Any, _depth: int = 0) -> Any:
-    """Schema-independent guard: scalars kept (strings cut), dicts and lists walked, any key in
-    `MASKED_KEYS` dropped at ANY depth, anything deeper than `MAX_DEPTH` dropped."""
+    """Schema-independent guard: scalars kept (strings cut), dicts and lists walked. A key in
+    `MASKED_KEYS` at ANY depth, and anything deeper than `MAX_DEPTH`, is replaced by the withheld
+    envelope (R-028 CONS #12) — its value is never served, and its absence is never silent."""
     if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, str):
         return value[:MAX_STR]
     if _depth >= MAX_DEPTH:
-        return None
+        return withheld(TOO_DEEP)
     if isinstance(value, dict):
-        return {str(k): scrub(v, _depth + 1) for k, v in value.items()
-                if str(k).lower() not in MASKED_KEYS}
+        return {str(k): (withheld(SENSITIVE_FIELD) if str(k).lower() in MASKED_KEYS
+                         else scrub(v, _depth + 1)) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [scrub(v, _depth + 1) for v in value]
-    return None
+    return withheld(UNEXPECTED_SHAPE)
 
 
 def _is_scalar(v: Any) -> bool:
@@ -1423,11 +1578,11 @@ def _is_scalar(v: Any) -> bool:
 
 
 def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 0) -> Any:
-    """`value` through `schema`; every path not served goes in `masked`. Returns `_MASK` for a
-    value that is not served at all."""
+    """`value` through `schema`; every path not served goes in `masked`, and its value is a
+    `_Masked` that the parent serves as the withheld envelope (R-028 CONS #12)."""
     if depth > MAX_DEPTH:
         masked.add(path)
-        return _MASK
+        return _mask(TOO_DEEP)
     if schema == PB:
         return _produced_by(value)
     if schema == COUNT:
@@ -1436,14 +1591,14 @@ def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 
         if value is None:
             return None
         masked.add(path)
-        return _MASK
+        return _mask(UNEXPECTED_SHAPE)
     if schema == S:
         if _is_scalar(value):
             if isinstance(value, str) and len(value) > MAX_STR:
                 masked.add(f"{path} (truncated)")
             return _scalar(value)
         masked.add(path)
-        return _MASK
+        return _mask(UNEXPECTED_SHAPE)
     if schema in (SLIST, SVAL):
         if schema == SVAL and _is_scalar(value):
             return _scalar(value)
@@ -1452,7 +1607,7 @@ def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 
         if isinstance(value, list) and all(_is_scalar(x) for x in value):
             return [_scalar(x) for x in value]
         masked.add(path)
-        return _MASK
+        return _mask(UNEXPECTED_SHAPE)
     if schema == SMAP:
         if value is None:
             return None
@@ -1461,13 +1616,17 @@ def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 
         if isinstance(value, dict):
             out = {}
             for k, v in value.items():
-                if str(k).lower() in MASKED_KEYS or not _is_scalar(v):
+                if str(k).lower() in MASKED_KEYS:
                     masked.add(f"{path}.{k}")
-                    continue
-                out[str(k)] = _scalar(v)
+                    out[str(k)] = withheld(SENSITIVE_FIELD)
+                elif not _is_scalar(v):
+                    masked.add(f"{path}.{k}")
+                    out[str(k)] = withheld(UNEXPECTED_SHAPE)
+                else:
+                    out[str(k)] = _scalar(v)
             return out
         masked.add(path)
-        return _MASK
+        return _mask(UNEXPECTED_SHAPE)
     if schema == PD:                    # a dict on §5.7 steps, a sentence on adapter syncs
         # Codex f2 #9: the decision and its code are served; the sentence (``detail`` on §5.7
         # steps, the whole value on adapter syncs) is free text a delegate wrote and is NOT — it
@@ -1477,7 +1636,7 @@ def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 
             return None
         if isinstance(value, str):
             masked.add(path)
-            return _MASK
+            return _mask(FREE_TEXT)
         return _project(value, {"decision": S, "reason_code": S}, path, masked, depth)
     if schema == SKIP:                  # a dict on §5.7 records, a connection name on syncs
         if _is_scalar(value):
@@ -1486,7 +1645,7 @@ def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 
     if schema == PTR:
         if not isinstance(value, dict):
             masked.add(path)
-            return _MASK
+            return _mask(UNEXPECTED_SHAPE)
         out = {}
         for k, v in value.items():
             sub = f"{path}.{k}"
@@ -1494,82 +1653,92 @@ def _project(value: Any, schema: Any, path: str, masked: set[str], depth: int = 
                 got = _project(v, PTR, sub, masked, depth + 1)
             elif k in ("facts", "derived_from"):
                 got = _project(v, [PTR], sub, masked, depth + 1)
-            elif k in POINTER_KEYS and str(k).lower() not in MASKED_KEYS and _is_scalar(v):
+            elif str(k).lower() in MASKED_KEYS:
+                masked.add(sub)
+                got = _mask(SENSITIVE_FIELD)
+            elif k in POINTER_KEYS and _is_scalar(v):
                 got = _scalar(v)
             else:
                 masked.add(sub)
-                continue
-            if got is not _MASK:
-                out[k] = got
+                got = _mask(NOT_IN_ALLOW_LIST)
+            out[k] = _served(got)
         return out
     if schema == OPS:                   # a rules operation log: scalar data, two levels at most
         if not isinstance(value, list):
-            return None if value is None else _MASK
+            return None if value is None else _mask(UNEXPECTED_SHAPE)
         out_ops = []
         for v in value:
             if not isinstance(v, dict):
                 masked.add(f"{path}[]")
+                out_ops.append(withheld(UNEXPECTED_SHAPE))
                 continue
             op = {}
             for k, x in v.items():
                 sub = f"{path}[].{k}"
                 # Codex f2 #9: the keys `databridge_federated.combine` writes, and no others
-                if str(k).lower() in MASKED_KEYS or k not in OPS_KEYS:
+                if str(k).lower() in MASKED_KEYS:
                     masked.add(sub)
+                    op[str(k)] = withheld(SENSITIVE_FIELD)
+                elif k not in OPS_KEYS:
+                    masked.add(sub)
+                    op[str(k)] = withheld(NOT_IN_ALLOW_LIST)
                 elif _is_scalar(x):
                     op[str(k)] = _scalar(x)
                 elif isinstance(x, list) and all(_is_scalar(y) for y in x):
                     op[str(k)] = [_scalar(y) for y in x]
                 elif isinstance(x, dict):
-                    got = _project(x, SMAP_LISTS, sub, masked, depth + 1)
-                    if got is not _MASK:
-                        op[str(k)] = got
+                    op[str(k)] = _served(_project(x, SMAP_LISTS, sub, masked, depth + 1))
                 else:
                     masked.add(sub)
+                    op[str(k)] = withheld(UNEXPECTED_SHAPE)
             out_ops.append(op)
         return out_ops
     if schema == SMAP_LISTS:            # {name: scalar | [scalars]}
         if not isinstance(value, dict):
             masked.add(path)
-            return _MASK
+            return _mask(UNEXPECTED_SHAPE)
         out = {}
         for k, x in value.items():
             if str(k).lower() in MASKED_KEYS:
                 masked.add(f"{path}.{k}")
+                out[str(k)] = withheld(SENSITIVE_FIELD)
             elif _is_scalar(x):
                 out[str(k)] = _scalar(x)
             elif isinstance(x, list) and all(_is_scalar(y) for y in x):
                 out[str(k)] = [_scalar(y) for y in x]
             else:
                 masked.add(f"{path}.{k}")
+                out[str(k)] = withheld(UNEXPECTED_SHAPE)
         return out
     if isinstance(schema, list):
         if value is None:
             return None
         if not isinstance(value, list):
             masked.add(path)
-            return _MASK
-        got = [_project(v, schema[0], f"{path}[]", masked, depth + 1) for v in value]
-        return [g for g in got if g is not _MASK]
+            return _mask(UNEXPECTED_SHAPE)
+        return [_served(_project(v, schema[0], f"{path}[]", masked, depth + 1)) for v in value]
     if isinstance(schema, dict):
         if value is None:
             return None
         if not isinstance(value, dict):
             masked.add(path)
-            return _MASK
+            return _mask(UNEXPECTED_SHAPE)
         out = {}
         for k, v in value.items():
             sub = f"{path}.{k}" if path else str(k)
-            # unknown => masked, by default; a deny-listed key is served only as a COUNT
-            if k not in schema or (str(k).lower() in MASKED_KEYS and schema[k] != COUNT):
+            # unknown => withheld, by default; a deny-listed key is served only as a COUNT
+            if str(k).lower() in MASKED_KEYS and schema.get(k) != COUNT:
                 masked.add(sub)
+                out[k] = withheld(SENSITIVE_FIELD)
                 continue
-            got = _project(v, schema[k], sub, masked, depth + 1)
-            if got is not _MASK:
-                out[k] = got
+            if k not in schema:
+                masked.add(sub)
+                out[k] = withheld(NOT_IN_ALLOW_LIST)
+                continue
+            out[k] = _served(_project(v, schema[k], sub, masked, depth + 1))
         return out
     masked.add(path)
-    return _MASK
+    return _mask(UNEXPECTED_SHAPE)
 
 
 def public_record(kind: str, record: dict) -> dict:
@@ -1670,8 +1839,7 @@ def delegation_tree(record: dict) -> Optional[dict]:
     masked: set[str] = set()
 
     def proj(value: Any, schema: Any, path: str) -> Any:
-        got = _project(value, schema, path, masked)
-        return None if got is _MASK else got
+        return _served(_project(value, schema, path, masked))
 
     steps = [s for s in (record.get("steps") or []) if isinstance(s, dict)] \
         if isinstance(record.get("steps"), list) else []
@@ -1714,10 +1882,14 @@ def delegation_tree(record: dict) -> Optional[dict]:
                      if "questions" in pargs else None)
         if pd.get("detail") and questions is None:
             masked.add("plan.questions_text")       # the planner's sentence: free text (f2 #9)
+        # a list that did not project (not a list of strings) is withheld in place, not joined
+        q_list = questions if isinstance(questions, list) else None
         plan = {"method": _scalar(pd.get("reason_code")) or None,
                 "questions": questions,
-                "questions_text": ("; ".join(str(q) for q in questions) or None
-                                   if questions is not None else None),
+                "questions_text": ("; ".join(str(q) for q in q_list) or None
+                                   if q_list is not None else
+                                   withheld(FREE_TEXT) if pd.get("detail") and questions is None
+                                   else questions if questions is not None else None),
                 "questions_note": ("no question was asked" if questions == [] else
                                    None if questions else
                                    "not recorded: this run record keeps no plan questions"),
@@ -1773,9 +1945,12 @@ def delegation_tree(record: dict) -> Optional[dict]:
                              f"subtasks[{i}].request") if args_recorded else None),
             "decision": _scalar(pd.get("decision")), "method": method,
             "pushed_down": (method == "facts_sql_pushdown") if method else None,
-            "query": query,
-            # the delegate's own sentence is free text and is not served (Codex f2 #9)
-            "delegate_note": None,
+            # SQL holding a literal is withheld IN PLACE (R-028 CONS #12); no SQL recorded: None
+            "query": (query if query is not None else
+                      withheld(SQL_WITH_LITERALS) if sql else None),
+            # the delegate's own sentence is free text and is not served (Codex f2 #9): withheld
+            # when one was recorded, None when there was none
+            "delegate_note": withheld(FREE_TEXT) if detail else None,
             "rows_returned": rows, "rows_basis": rows_basis,
             "pointers_recorded": len(ptrs) if ptrs_recorded else None,
             "skipped": ([proj({k: v for k, v in sk.items() if k != "tool"}, SKIP_ENTRY,
@@ -1940,8 +2115,11 @@ def register_activity_routes(app: FastAPI) -> None:
                 "kinds": list(ACTIVITY_KINDS), "viewer": principal.principal_id,
                 "problems": got.problems.out(),
                 "visibility": "runs of agents you own or that you started; adapter agents you "
-                              "created; federated questions you asked. A record whose owner is "
-                              "not recorded, or is ambiguous, is shown only to an operator"
+                              "created; federated questions you asked; decisions you made, and "
+                              "the decisions on sources whose keeper agent you created; designs, "
+                              "outbound drafts and one-time tasks that are yours. A record whose "
+                              "owner is not recorded, or is ambiguous, is shown only to an "
+                              "operator"
                               + (" (you are one, so you see every record)." if viewer.operator
                                  else ".")}
 
@@ -2087,7 +2265,8 @@ def register_activity_routes(app: FastAPI) -> None:
                 "viewer": principal.principal_id, "problems": problems.out()}
 
 
-__all__ = ["register_activity_routes", "ACTIVITY_KINDS", "ActivitySources", "Viewer",
+__all__ = ["register_activity_routes", "ACTIVITY_KINDS", "RUN_FEED_KINDS", "DECISION_KINDS",
+           "ActivitySources", "Viewer",
            "collect", "delegation_tree", "fold_firings", "approval_items", "run_item",
            "paginate", "resolve_sources", "trace_index", "MAX_LIMIT", "public_record",
            "public_history", "scrub", "Problems", "MASKED_KEYS", "RECORD_SCHEMAS",

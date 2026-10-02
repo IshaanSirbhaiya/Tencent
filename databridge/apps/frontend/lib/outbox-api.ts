@@ -9,12 +9,16 @@
 //     contract is that it never names one;
 //   * no derivation strings. `Citation` is a projection onto a closed shape, so a field added to
 //     `SourcePointer` later cannot travel through it;
-//   * no send. There is no method below that causes a message to leave: `approve` records a named
-//     human's decision, and `execute` starts a separate, model-free process that reads the outbox.
+//   * no send. There is no method below that causes a message to leave: `approve` records the
+//     signed-in principal's decision, and `execute` starts a separate, model-free process that
+//     reads the outbox;
+//   * no approver. No method takes a name: who decides is the authenticated principal of the
+//     request, minted by the gateway (R-027 ONE, Codex round 1).
 //
 // Nothing in this file computes. Every string it renders was produced server-side.
 import { GATEWAY, authHeaders } from "./api";
 import type { Refusal } from "./types";
+import type { ValueState } from "./value-state";
 
 /** One pointer behind a draft field, in the closed shape the gateway publishes.
  *
@@ -61,22 +65,34 @@ export interface ActionCard {
   escalate_to: string | null;
   intake_id: string | null;
   recipient: RecipientView;
-  subject: string;
-  body: string;
-  /** The draft's own text was instruction-shaped and has been replaced. Still approvable — that
-   *  is the reviewer's call — but it must render as withheld, not as text somebody read. */
-  redacted: boolean;
+  /** The text, or the standard withheld envelope (R-028 #12) when it was instruction-shaped. Still
+   *  approvable — that is the reviewer's call — but it renders as withheld, not as text. */
+  subject: string | ValueState;
+  body: string | ValueState;
   because: Citation[];
   /** Always true. There is no value of this field that means "send without asking". */
   requires_human_approval: true;
   created_at: string;
   approved_by: string | null;
   approved_at: string | null;
+  /** The common actor object of the approver (R-028 #7); null on an older row. */
+  approved_actor: Actor | null;
   rejected_by: string | null;
   rejected_at: string | null;
+  rejected_actor: Actor | null;
   reason: string | null;
   sent_at: string | null;
   message_id: string | null;
+}
+
+/** Who decided, as the gateway authenticated them. The id is never decorated; a dev-token
+ *  decision is marked by `dev_only`. */
+export interface Actor {
+  principal_id: string;
+  authenticated_by: string;
+  principal_type: string;
+  dev_only: boolean;
+  delegation?: Record<string, unknown> | null;
 }
 
 /** A monitor rule that applies but produced no draft, and the code-authored reason.
@@ -136,17 +152,19 @@ export const outboxApi = {
   list: () => call<OutboxListing>("/outbox"),
   draft: (draftId: string) =>
     call<ActionCard & { refusal?: Refusal }>(`/outbox/${encodeURIComponent(draftId)}`),
-  /** Records a named human's agreement. There is no authentication behind the name — the page
-   *  says so, because pretending otherwise would be the one dishonest thing on this screen. */
-  approve: (draftId: string, approvedBy: string) =>
+  /** Records the SIGNED-IN principal's agreement. The body names nobody: the gateway mints the
+   *  approver from the authenticated request and refuses a body that names one
+   *  (`APPROVER_NOT_AUTHENTICATED`, R-027 ONE / R-028). Only the draft's owner or an operator may decide. */
+  approve: (draftId: string) =>
     call<ActionCard & { refusal?: Refusal }>(`/outbox/${encodeURIComponent(draftId)}/approve`, {
       method: "POST",
-      body: JSON.stringify({ approved_by: approvedBy }),
+      body: JSON.stringify({}),
     }),
-  reject: (draftId: string, rejectedBy: string, reason: string) =>
+  /** A rejection carries its reason and nothing else; who rejected is the signed-in principal. */
+  reject: (draftId: string, reason: string) =>
     call<ActionCard & { refusal?: Refusal }>(`/outbox/${encodeURIComponent(draftId)}/reject`, {
       method: "POST",
-      body: JSON.stringify({ rejected_by: rejectedBy, reason }),
+      body: JSON.stringify({ reason }),
     }),
   /** Triggers the dispatcher — a separate process — and reports the row afterwards. */
   execute: (draftId: string) =>

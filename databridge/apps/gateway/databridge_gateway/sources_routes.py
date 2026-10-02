@@ -23,6 +23,15 @@
     POST /sources/{id}/runs/{run_id}/verify    re-run reconciliation for one run
     GET  /sources/{id}/health                  plan / last run / failure streak / age
 
+    GET  /source-batch/plans                   review of every pending plan (calls, classes,
+                                               tools that need a vouch, what blocks a batch)
+    POST /source-batch/plans/propose           propose a plan for every ingest source without
+                                               an approved one
+    POST /source-batch/plans/approve           approve the REVIEWED plans, each through the same
+                                               per-plan approval; per-source results
+    POST /source-batch/runs                    start a run on every approved ingest source
+                                               (never a write connection)
+
 Every route requires `auth.require_principal` (these disclose what a deployment is connected to).
 Approval is attributed to the principal, never to a name in the body. After a run finishes —
 success or failure — `app.state.reload_graph()` is called so every surface sees the new rows.
@@ -65,6 +74,7 @@ import os
 import re
 import shutil
 import socket
+import threading
 from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -77,6 +87,8 @@ from .auth import (AuthenticatedPrincipal, install_auth_handler, register_auth_r
                    require_principal)
 from .platform_runtime import (PLAN_APPROVED_NOTE, PLAN_REVISION_NOTE, PLAN_SUPERSEDED, JobBusy,
                                now_iso, plan_binding, platform_of, reload_graph)
+from .public_errors import (actor_of, error_ref, from_exception, refusal, refusal_body,
+                            standard_code)
 
 log = logging.getLogger("databridge.gateway.sources")
 
@@ -308,6 +320,11 @@ def plan_stale_reason(plan: Any, revision: str, *, for_run: bool) -> Optional[st
     """Why ``plan`` may not be approved (``for_run=False``) or run (``True``) against the
     connection at ``revision`` — or None. Computed from the plan's own binding notes."""
     proposed_for = plan_binding(plan, PLAN_REVISION_NOTE)
+    if proposed_for is None:
+        # R-027 r2 #5: a proposal that does not say which connection it was proposed for (an
+        # interrupted or out-of-band proposal) is never approved or run; it is proposed again.
+        return ("the plan does not record which revision of this connection it was proposed "
+                "for; propose it again")
     if proposed_for == PLAN_SUPERSEDED:
         return ("the plan was proposed for a connection that has since been replaced; propose "
                 "a new plan for the current connection")
@@ -316,15 +333,52 @@ def plan_stale_reason(plan: Any, revision: str, *, for_run: bool) -> Optional[st
                 "again")
     if for_run:
         approved_for = plan_binding(plan, PLAN_APPROVED_NOTE)
+        if approved_for is None and getattr(plan, "status", None) == "approved":
+            # Fail closed (Codex R-027 r1 #3): an approval that does not say which revision of
+            # the connection it covers covers none of them.
+            return ("the plan's approval does not record which revision of this connection it "
+                    "was approved for; approve it again")
         if approved_for is not None and approved_for != revision:
             return ("the plan was approved for a different revision of this connection; it "
                     "must be proposed and approved again")
     return None
 
 
-def _refusal(code: str, message: str, status: int = 422) -> JSONResponse:
-    return JSONResponse(status_code=status, content={"refusal": {
-        "code": code, "message": message, "nearest_alternative": None}})
+def plan_digest(plan: Any) -> str:
+    """What a person reviewed, as a digest of the whole stored plan (steps, classes, notes,
+    status). An approval names it, and is refused when the plan on disk is no longer it."""
+    blob = json.dumps(_dump(plan), sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _refusal(code: str, message: str, status: int = 422, **extra: Any) -> JSONResponse:
+    """The common refusal envelope (`public_errors.refusal`): ``message`` is route-authored text,
+    never an exception's (R-028 #6); a specific code with a standard equivalent answers as the
+    standard code, the specific one kept as ``reason_code`` (R-028 #11)."""
+    return refusal(code, message, status, **extra)
+
+
+def _exc_refusal(exc: BaseException, default_code: str, status: int, context: str,
+                 principal: Any = None, **detail: Any) -> JSONResponse:
+    """A refusal for a caught exception: the package's own refusal sentence when it is safe to
+    show (`public_errors.public_sentence`), else a fixed sentence; the exception's text is logged
+    under the ``error_ref`` the body carries (R-028 #6)."""
+    code, message, reason, ref = from_exception(log, exc, default_code=default_code,
+                                                context=context, principal=principal, **detail)
+    return JSONResponse(status_code=status,
+                        content=refusal_body(code, message, reason_code=reason, ref=ref))
+
+
+def _ingest_unavailable(rt: Any) -> JSONResponse:
+    """The ingest package is not importable. Its import errors go to the server log under the
+    reference, never into the answer (R-028 #6)."""
+    ref = error_ref(log, "ingest unavailable", None, problems=list(getattr(rt, "problems", [])))
+    return refusal("INGEST_UNAVAILABLE", "databridge_mcp_ingest is not importable in this "
+                   "gateway", 503, ref=ref)
+
+
+class _SpecRefused(ValueError):
+    """A registration body this module refuses, in this module's own fixed words."""
 
 
 def _dump(obj: Any) -> Any:
@@ -377,6 +431,10 @@ class ApprovePlan(BaseModel):
     it for unknown tools only, and never for a write."""
     model_config = ConfigDict(extra="ignore")
     vouch_read_tools: list[str] = Field(default_factory=list)
+    #: `plan_digest` of the plan the person reviewed (`GET /sources/{id}`): REQUIRED - an approval
+    #: of a plan that changed since it was shown is refused (Codex R-027 r1 #2). Optional here
+    #: only so a missing digest is a refusal with a reason rather than a bare validation error.
+    plan_digest: Optional[str] = None
 
 
 class ApproveMapping(BaseModel):
@@ -409,20 +467,20 @@ class OverrideAction(BaseModel):
 def _connection_spec(req: RegisterSource) -> dict:
     if req.mode == "connection":
         if not req.connection:
-            raise ValueError("mode 'connection' needs a 'connection' declaration")
+            raise _SpecRefused("mode 'connection' needs a 'connection' declaration")
         return dict(req.connection)
     if not req.id:
-        raise ValueError(f"mode {req.mode!r} needs an 'id'")
+        raise _SpecRefused(f"mode {req.mode!r} needs an 'id'")
     base: dict = {"id": req.id, "title": req.title or req.id, "scope": dict(req.scope),
                   "auto_approve": req.auto_approve}
     if req.mode == "command":
         if not req.command:
-            raise ValueError("mode 'command' needs a 'command'")
+            raise _SpecRefused("mode 'command' needs a 'command'")
         base["transport"] = {"type": "stdio", "command": req.command, "args": list(req.args),
                              "env": dict(req.env), "env_from": dict(req.env_from)}
     elif req.mode == "url":
         if not req.url:
-            raise ValueError("mode 'url' needs a 'url'")
+            raise _SpecRefused("mode 'url' needs a 'url'")
         base["transport"] = {"type": "http", "url": req.url,
                              "headers_from": dict(req.headers_from)}
     else:                                                             # mcpjungle
@@ -538,7 +596,9 @@ def admission_refusal_at_start(rt: Any, source_id: str, pinned: Optional[str]) -
             conn = rt.ingest.load_connection(source_id)
             plan = rt.ingest.load_plan(source_id)
         except Exception as exc:                                      # noqa: BLE001
-            return f"the connection or its plan could not be re-read: {exc}"
+            ref = error_ref(log, "run admission: the connection or its plan could not be re-read",
+                            exc, source_id=source_id)
+            return f"the connection or its plan could not be re-read (reference {ref})"
         rev = connection_revision(conn)
         if pinned is not None and rev != pinned:
             return ("the connection changed after this run was admitted; it runs only against "
@@ -566,10 +626,203 @@ def _ingest_job(app: FastAPI, source_id: str, run_id: str, job_id: str,
         status = data.get("status") if isinstance(data, dict) else None
         rt.jobs.finish(job_id, status=job_status_for_run(status), result=data, run_status=status)
     except Exception as exc:                                          # noqa: BLE001
-        log.exception("ingest %s/%s failed", source_id, run_id)
-        rt.jobs.finish(job_id, status="failed", error=f"{type(exc).__name__}: {exc}")
+        # R-028 #6: a visible job record carries a fixed sentence and the reference, never the
+        # exception's text (a connector error can name a path, a host or a credential)
+        ref = error_ref(log, "ingest run failed", exc, source_id=source_id, run_id=run_id)
+        rt.jobs.finish(job_id, status="failed", error=f"the run failed (reference {ref})",
+                       error_ref=ref)
     finally:
         rt.jobs.update(job_id, graph_counts=reload_graph(app))
+
+
+class SourceRefused(Exception):
+    """A per-source refusal: the single routes turn it into their usual refusal response; the
+    batch routes (`sources_batch_routes`) report it on that source's result row.
+
+    ``message`` is route-authored, never an exception's text (R-028 #6; a failure carries an
+    ``error_ref`` instead). A specific code with a standard equivalent is held as the standard
+    code with the specific one as ``reason_code`` (R-028 #11), on the route and the batch row
+    alike."""
+
+    def __init__(self, code: str, message: str, status: int = 422, *,
+                 error_ref: Optional[str] = None, reason_code: Optional[str] = None) -> None:
+        super().__init__(message)
+        std = standard_code(code)
+        if std is not None and std != code:
+            reason_code, code = reason_code or code, std
+        self.code, self.message, self.status = code, message, status
+        self.reason_code, self.error_ref = reason_code, error_ref
+
+    def response(self) -> JSONResponse:
+        return JSONResponse(status_code=self.status, content=refusal_body(
+            self.code, self.message, reason_code=self.reason_code, ref=self.error_ref))
+
+    def row(self) -> dict:
+        """The fields a batch result row carries for this refusal."""
+        out: dict = {"code": self.code, "reason": self.message}
+        if self.reason_code:
+            out["reason_code"] = self.reason_code
+        if self.error_ref:
+            out["error_ref"] = self.error_ref
+        return out
+
+    @classmethod
+    def from_exc(cls, exc: BaseException, default_code: str, status: int, context: str,
+                 principal: Any = None, **detail: Any) -> "SourceRefused":
+        code, message, reason, ref = from_exception(log, exc, default_code=default_code,
+                                                    context=context, principal=principal,
+                                                    **detail)
+        return cls(code, message, status, error_ref=ref, reason_code=reason)
+
+
+def connection_or_refuse(rt: Any, source_id: str) -> Any:
+    if not _ID_RE.match(source_id or ""):
+        raise SourceRefused("BAD_SOURCE_ID", f"{source_id!r} is not a source id", status=400)
+    try:
+        return rt.ingest.load_connection(source_id)
+    except Exception as exc:                                          # noqa: BLE001
+        # the package's text names the declaration's path; the id was validated above
+        log.info("source %r could not be loaded: %s", source_id, exc)
+        raise SourceRefused("UNKNOWN_SOURCE", f"no registered source {source_id!r}",
+                            status=404) from None
+
+
+#: The only purpose that is crawled. Anything else is never proposed, approved or run (fail
+#: closed: a purpose this code has never seen is not crawled either).
+CRAWLED_PURPOSE = "ingest"
+
+
+def refuse_unless_crawled(conn: Any) -> None:
+    """Called UNDER the source lock by every shared helper, on the connection as it is now (Codex
+    R-027 r1 #1): a batch's earlier listing is only a report, never the gate."""
+    purpose = getattr(conn, "purpose", None)
+    if purpose != CRAWLED_PURPOSE:
+        raise SourceRefused("NOT_CRAWLED",
+                            f"{getattr(conn, 'id', '?')!r} is purpose={purpose!r}; it is never "
+                            f"crawled, so no crawl plan is proposed, approved or run for it",
+                            status=409)
+
+
+def propose_plan_for(rt: Any, source_id: str) -> Any:
+    """Propose a crawl plan for ONE source and bind it to the connection revision it was proposed
+    for. The single route and "propose plans for all" both go through here."""
+    with rt.source_lock(source_id):
+        conn = connection_or_refuse(rt, source_id)
+        refuse_unless_crawled(conn)
+        rev = connection_revision(conn)
+        try:
+            # Bound to the connection revision it was proposed FOR (R-019 round 2, #1) — in the
+            # package's own save, never stamped afterwards (R-027 r2 #5).
+            return rt.ingest.propose_plan(source_id, harness=rt.harness,
+                                          bind_notes=[f"{PLAN_REVISION_NOTE}{rev}"],
+                                          expected_revision=rev,
+                                          revision_of=connection_revision)
+        except Exception as exc:                                      # noqa: BLE001
+            raise SourceRefused.from_exc(exc, "PLAN_FAILED", 502, "plan proposal failed",
+                                         source_id=source_id) from None
+
+
+def approve_plan_for(rt: Any, source_id: str, principal: AuthenticatedPrincipal,
+                     vouch_read_tools: list[str], reviewed_digest: str, *,
+                     refuse_approved: bool = False, precheck: Any = None) -> Any:
+    """Approve ONE source's crawl plan as ``principal`` — the single route and the batch route
+    both go through here, so a batch approval is exactly a single approval (the package's
+    `approve_plan`: authenticated principal, live re-classification, hash-chained log).
+
+    Under the source lock, in order: the connection is a crawled one (r1 #1); a plan exists;
+    (batch) it is not already approved; it is the plan the person reviewed — ``reviewed_digest``
+    is its `plan_digest` (r1 #2); ``precheck(conn, plan)`` (the batch's extra gate) passes; it was
+    proposed for this connection revision. The approval is ONE package operation that writes the
+    status, the revision binding, the approval record and the chained log line together (r1 #3),
+    so what is reported is what is on disk."""
+    with rt.source_lock(source_id):
+        conn = connection_or_refuse(rt, source_id)
+        refuse_unless_crawled(conn)
+        rev = connection_revision(conn)
+        current = _plan_or_none(rt.ingest, source_id)
+        if current is None:
+            raise SourceRefused("NO_PLAN", "no crawl plan has been proposed", status=409)
+        if refuse_approved and getattr(current, "status", None) == "approved":
+            raise SourceRefused("ALREADY_APPROVED", "the plan is already approved; nothing was "
+                                "done", status=409)
+        if not reviewed_digest or plan_digest(current) != reviewed_digest:
+            raise SourceRefused("PLAN_CHANGED", "the plan changed after it was reviewed; review "
+                                "it again", status=409)
+        if precheck is not None:
+            precheck(conn, current)
+        stale = plan_stale_reason(current, rev, for_run=False)
+        if stale:
+            raise SourceRefused("PLAN_STALE", stale, status=409)
+        try:
+            # The principal OBJECT, never its id: mcp_ingest refuses a string (INT3). The binding
+            # to THIS revision is written by the same approval, never stamped afterwards.
+            # The package re-checks the reviewed digest and the revision against the plan and
+            # connection IT loads, under the plan lock every writer takes (R-027 r2 #2).
+            return rt.ingest.approve_plan(source_id, principal=principal,
+                                          vouch_read_tools=list(vouch_read_tools),
+                                          bind_notes=[f"{PLAN_APPROVED_NOTE}{rev}"],
+                                          expected_plan_digest=reviewed_digest,
+                                          expected_revision=rev,
+                                          revision_of=connection_revision)
+        except Exception as exc:                                      # noqa: BLE001
+            # the package's code when it names one (PLAN_CHANGED, PLAN_STALE, a ledger or approver
+            # code), mapped to the standard code; its sentence only when it is a safe refusal
+            raise SourceRefused.from_exc(exc, "PLAN_NOT_APPROVABLE", 409, "plan approval refused",
+                                         principal=principal, source_id=source_id) from None
+
+
+def dispatch_run(app: FastAPI, source_id: str, run_id: str, job_id: str,
+                 revision: Optional[str]) -> threading.Thread:
+    """Start ONE admitted run on its own worker thread and return it once it is running (Codex
+    R-027 r1 #4): runs of different sources execute side by side, so one slow source never holds
+    up the next. Each source stays single-flight through its job (`JobBusy`)."""
+    worker = threading.Thread(target=_ingest_job, args=(app, source_id, run_id, job_id, revision),
+                              name=f"ingest-{source_id}-{run_id}", daemon=True)
+    worker.start()
+    return worker
+
+
+def start_run_for(app: FastAPI, rt: Any, source_id: str, principal: AuthenticatedPrincipal,
+                  background: BackgroundTasks) -> dict:
+    """Admit and start ONE ingest run — the single route and "run all approved" both go through
+    here: the connection is a crawled one and the plan is approved for it as it is now, both read
+    under the source lock. The run executes on its own worker (`dispatch_run`) and is reported
+    started only once that worker is running. ``background`` only waits for the worker after the
+    response, so the request's lifetime still covers its run (and a test client sees it end)."""
+    with rt.source_lock(source_id):
+        conn = connection_or_refuse(rt, source_id)
+        refuse_unless_crawled(conn)
+        plan = _plan_or_none(rt.ingest, source_id)
+        if plan is None or getattr(plan, "status", None) != "approved":
+            raise SourceRefused("PLAN_NOT_APPROVED",
+                                f"the crawl plan for {source_id!r} is "
+                                f"{getattr(plan, 'status', 'missing')!r}; propose and approve it "
+                                f"before running (P5)", status=409)
+        rev = connection_revision(conn)
+        stale = plan_stale_reason(plan, rev, for_run=True)
+        if stale:
+            raise SourceRefused("PLAN_STALE", stale, status=409)
+        run_id = rt.ingest.new_run_id()
+        try:
+            # Admitted and marked busy under the source lock, so a replacement cannot slip
+            # in between: `sources_register` refuses to replace a connection while it runs.
+            job = rt.jobs.start("ingest", source_id, by=principal.principal_id,
+                                run_id=run_id, source_id=source_id,
+                                connection_revision=rev)
+        except JobBusy:
+            raise SourceRefused("RUN_IN_PROGRESS", f"an ingest of {source_id!r} is already "
+                                f"running", status=409) from None
+    try:
+        worker = dispatch_run(app, source_id, run_id, job["job_id"], rev)
+    except Exception as exc:                                          # noqa: BLE001
+        ref = error_ref(log, "the run could not be started", exc, source_id=source_id)
+        rt.jobs.finish(job["job_id"], status="failed",
+                       error=f"the run could not be started (reference {ref})", error_ref=ref)
+        raise SourceRefused("RUN_NOT_STARTED", "the run could not be started", status=503,
+                            error_ref=ref) from None
+    background.add_task(worker.join)
+    return {"run_id": run_id, "job_id": job["job_id"], "status": "running",
+            "started_by": principal.principal_id}
 
 
 def register_sources_routes(app: FastAPI) -> None:
@@ -587,9 +840,7 @@ def register_sources_routes(app: FastAPI) -> None:
     def _need_ingest():
         rt = platform_of(app)
         if rt.ingest is None:
-            return None, _refusal("INGEST_UNAVAILABLE",
-                                  "databridge_mcp_ingest is not importable in this gateway: "
-                                  + "; ".join(rt.problems), status=503)
+            return None, _ingest_unavailable(rt)
         return rt, None
 
     def _need_connection(rt, source_id: str):
@@ -599,7 +850,9 @@ def register_sources_routes(app: FastAPI) -> None:
         try:
             return rt.ingest.load_connection(source_id), None
         except Exception as exc:                                      # noqa: BLE001
-            return None, _refusal("UNKNOWN_SOURCE", str(exc), status=404)
+            log.info("source %r could not be loaded: %s", source_id, exc)
+            return None, _refusal("UNKNOWN_SOURCE", f"no registered source {source_id!r}",
+                                  status=404)
 
     @app.get("/sources")
     def sources_list(_p: AuthenticatedPrincipal = Depends(require_principal)):
@@ -610,12 +863,14 @@ def register_sources_routes(app: FastAPI) -> None:
         try:
             conns = rt.ingest.list_connections()
         except Exception as exc:                                      # noqa: BLE001
-            return _refusal("SOURCES_UNREADABLE", str(exc), status=500)
+            return _exc_refusal(exc, "SOURCES_UNREADABLE", 500, "sources could not be listed")
         for c in conns:
             try:
                 out.append(_summary(app, c))
             except Exception as exc:                                  # noqa: BLE001
-                problems.append(f"{getattr(c, 'id', '?')}: {exc}")
+                ref = error_ref(log, "source summary failed", exc, source_id=getattr(c, "id", "?"))
+                problems.append(f"{getattr(c, 'id', '?')}: its summary could not be read "
+                                f"(reference {ref})")
         # A stored connection the package REFUSED to load (a defaulted credential, a literal
         # secret, a malformed field) is never listed; it is shown here as invalid, with its
         # reason and never its value (E2E run 2 N-10; R-022 sources cross-track 6).
@@ -623,7 +878,9 @@ def register_sources_routes(app: FastAPI) -> None:
         try:
             refused = list(report() or []) if callable(report) else []
         except Exception as exc:                                      # noqa: BLE001
-            refused = [{"id": "?", "error": f"the refused-connection report failed: {exc}"}]
+            ref = error_ref(log, "the refused-connection report failed", exc)
+            refused = [{"id": "?", "error": f"the refused-connection report failed (reference "
+                                            f"{ref})"}]
         problems.extend(f"{p.get('id', '?')}: refused at load: {p.get('error', '')}"
                         for p in refused)
         return {"sources": out, "problems": problems}
@@ -637,8 +894,10 @@ def register_sources_routes(app: FastAPI) -> None:
         revoked: list[str] = []
         try:
             spec = None if body.mode == "import" else _connection_spec(body)
+        except _SpecRefused as exc:
+            return _refusal("BAD_CONNECTION", exc.args[0])            # this module's own words
         except ValueError as exc:
-            return _refusal("BAD_CONNECTION", str(exc))
+            return _exc_refusal(exc, "BAD_CONNECTION", 422, "registration body refused")
         refused = registration_refusal(body, spec)
         if refused:
             log.warning("sources: %s registration refused: %s", principal.principal_id,
@@ -673,17 +932,21 @@ def register_sources_routes(app: FastAPI) -> None:
                                "transport/scope")
                         # The plan is superseded whether it was approved or only proposed: a plan
                         # proposed for the old connection is not approvable for the new one.
-                        if rt.ingest.revoke_plan_approval(conns[0].id, by=principal.principal_id,
-                                                          reason=why):
+                        by = actor_of(principal)          # R-028 TIDY #5: the actor object
+                        if rt.ingest.revoke_plan_approval(conns[0].id, by=by, reason=why):
                             revoked.append(conns[0].id)
                         # ...and so is every approved table mapping (R-019 round 2, platform #2).
                         tables = rt.ingest.revoke_mapping_approval(
-                            conns[0].id, by=principal.principal_id, reason=why)
+                            conns[0].id, by=by, reason=why)
                         if tables:
                             mapping_revoked[conns[0].id] = tables
         except Exception as exc:                                      # noqa: BLE001
-            code = "SOURCE_EXISTS" if "already exists" in str(exc) else "BAD_CONNECTION"
-            return _refusal(code, str(exc), status=409 if code == "SOURCE_EXISTS" else 422)
+            if "already exists" in str(exc):          # classification only; never shown
+                log.info("sources: registration refused, exists: %s", exc)
+                return _refusal("SOURCE_EXISTS", "a source with that id already exists; send "
+                                "replace: true to replace it", status=409)
+            return _exc_refusal(exc, "BAD_CONNECTION", 422, "registration refused",
+                                principal=principal)
         log.info("sources: %s registered %s", principal.principal_id,
                  [c.id for c in conns])
         # A write connection is never crawled, so no plan proposal ever lists its tools: its
@@ -698,8 +961,9 @@ def register_sources_routes(app: FastAPI) -> None:
                 path = rt.ingest.write_tool_advert(conn.id)
                 adverts[conn.id] = {"written": True, "path": str(path)}
             except Exception as exc:                                  # noqa: BLE001
-                log.warning("sources: tool advert for %s failed: %s", conn.id, exc)
-                adverts[conn.id] = {"written": False, "error": f"{type(exc).__name__}: {exc}"}
+                ref = error_ref(log, "tool advert failed", exc, source_id=conn.id)
+                adverts[conn.id] = {"written": False, "error_ref": ref,
+                                    "error": f"the tool advert was not written (reference {ref})"}
         return {"registered": [_dump(c) for c in conns], "by": principal.principal_id,
                 "plan_approval_revoked": revoked, "mapping_approval_revoked": mapping_revoked,
                 "tool_advert": adverts}
@@ -718,7 +982,8 @@ def register_sources_routes(app: FastAPI) -> None:
                 "tools": list(getattr(plan, "tools_seen", []) or []),
                 "tools_note": (None if plan is not None else
                                "tools are listed when a crawl plan is proposed"),
-                "plan": _dump(plan), "mapping": _dump(_mapping_or_none(rt.ingest, source_id)),
+                "plan": _dump(plan), "plan_digest": plan_digest(plan) if plan is not None else None,
+                "mapping": _dump(_mapping_or_none(rt.ingest, source_id)),
                 "last_run": runs[-1] if runs else None, "runs": len(runs),
                 "running": rt.jobs.busy("ingest", source_id)}
 
@@ -728,18 +993,12 @@ def register_sources_routes(app: FastAPI) -> None:
         rt, err = _need_ingest()
         if err:
             return err
-        with rt.source_lock(source_id):
-            conn, err = _need_connection(rt, source_id)
-            if err:
-                return err
-            try:
-                rt.ingest.propose_plan(source_id, harness=rt.harness)
-                # Bound to the connection revision it was proposed FOR (R-019 round 2, #1).
-                plan = rt.ingest.stamp_plan(source_id, PLAN_REVISION_NOTE,
-                                            connection_revision(conn))
-            except Exception as exc:                                  # noqa: BLE001
-                return _refusal("PLAN_FAILED", f"{type(exc).__name__}: {exc}", status=502)
-        return {"plan": _dump(plan), "proposed_by": principal.principal_id}
+        try:
+            plan = propose_plan_for(rt, source_id)
+        except SourceRefused as refused:
+            return refused.response()
+        return {"plan": _dump(plan), "plan_digest": plan_digest(plan),
+                "proposed_by": principal.principal_id}
 
     @app.post("/sources/{source_id}/plan/approve")
     def sources_plan_approve(source_id: str, body: Optional[ApprovePlan] = Body(None),
@@ -747,23 +1006,15 @@ def register_sources_routes(app: FastAPI) -> None:
         rt, err = _need_ingest()
         if err:
             return err
-        with rt.source_lock(source_id):
-            conn, err = _need_connection(rt, source_id)
-            if err:
-                return err
-            rev = connection_revision(conn)
-            current = _plan_or_none(rt.ingest, source_id)
-            stale = plan_stale_reason(current, rev, for_run=False) if current is not None else None
-            if stale:
-                return _refusal("PLAN_STALE", stale, status=409)
-            try:
-                # The principal OBJECT, never its id: mcp_ingest refuses a string (INT3).
-                rt.ingest.approve_plan(source_id, principal=principal,
-                                       vouch_read_tools=(body.vouch_read_tools if body else []))
-                # The approval covers THIS revision of the connection, and only it (#1).
-                plan = rt.ingest.stamp_plan(source_id, PLAN_APPROVED_NOTE, rev)
-            except Exception as exc:                                  # noqa: BLE001
-                return _refusal("PLAN_NOT_APPROVABLE", str(exc), status=409)
+        if body is None or not (body.plan_digest or "").strip():
+            return _refusal("PLAN_DIGEST_REQUIRED",
+                            "send the plan_digest of the plan you reviewed (GET /sources/{id}); "
+                            "an approval is bound to the plan that was shown", status=422)
+        try:
+            plan = approve_plan_for(rt, source_id, principal, body.vouch_read_tools,
+                                    body.plan_digest.strip())
+        except SourceRefused as refused:
+            return refused.response()
         return {"plan": _dump(plan)}
 
     @app.post("/sources/{source_id}/mapping/approve")
@@ -776,7 +1027,8 @@ def register_sources_routes(app: FastAPI) -> None:
             mapping = rt.ingest.approve_mapping(source_id, principal=principal,
                                                 tables=(body.tables if body else None))
         except Exception as exc:                                      # noqa: BLE001
-            return _refusal("MAPPING_NOT_APPROVABLE", str(exc), status=409)
+            return _exc_refusal(exc, "MAPPING_NOT_APPROVABLE", 409, "mapping approval refused",
+                                principal=principal, source_id=source_id)
         return {"mapping": _dump(mapping)}
 
     @app.get("/sources/{source_id}/mapping/review")
@@ -795,7 +1047,8 @@ def register_sources_routes(app: FastAPI) -> None:
         try:
             return mapping_review.review(source_id)
         except Exception as exc:                                      # noqa: BLE001
-            return _refusal("MAPPING_UNREADABLE", f"{type(exc).__name__}: {exc}", status=500)
+            return _exc_refusal(exc, "MAPPING_UNREADABLE", 500, "mapping review failed",
+                                source_id=source_id)
 
     @app.post("/sources/{source_id}/links/approve")
     def sources_link_approve(source_id: str, body: LinkDecision,
@@ -825,7 +1078,8 @@ def register_sources_routes(app: FastAPI) -> None:
                 mapping = approve_link(source_id, body.table, body.column, principal=principal,
                                        target=body.target, vocab=vocab)
             except Exception as exc:                                  # noqa: BLE001
-                return _refusal("LINK_NOT_APPROVABLE", str(exc), status=409)
+                return _exc_refusal(exc, "LINK_NOT_APPROVABLE", 409, "link approval refused",
+                                    principal=principal, source_id=source_id)
         return {"mapping": _dump(mapping), "table": body.table, "column": body.column,
                 "approved_by": principal.principal_id}
 
@@ -849,7 +1103,8 @@ def register_sources_routes(app: FastAPI) -> None:
                                       principal=principal, target=body.target,
                                       reason=body.reason)
             except Exception as exc:                                  # noqa: BLE001
-                return _refusal("LINK_NOT_REJECTABLE", str(exc), status=409)
+                return _exc_refusal(exc, "LINK_NOT_REJECTABLE", 409, "link rejection refused",
+                                    principal=principal, source_id=source_id)
         return {"mapping": _dump(mapping), "table": body.table, "column": body.column,
                 "rejected_by": principal.principal_id}
 
@@ -869,7 +1124,8 @@ def register_sources_routes(app: FastAPI) -> None:
         try:
             return screen_holds.holds(rt.ingest, source_id)
         except Exception as exc:                                      # noqa: BLE001
-            return _refusal("HOLDS_UNREADABLE", f"{type(exc).__name__}: {exc}", status=500)
+            return _exc_refusal(exc, "HOLDS_UNREADABLE", 500, "holds could not be read",
+                                source_id=source_id)
 
     @app.post("/sources/{source_id}/overrides")
     def sources_override(source_id: str, body: OverrideAction,
@@ -888,7 +1144,8 @@ def register_sources_routes(app: FastAPI) -> None:
             rec = act(source_id, body.item_id, digest=body.digest, principal=principal,
                       reason=body.reason)
         except Exception as exc:                                      # noqa: BLE001
-            return _refusal("OVERRIDE_REFUSED", str(exc), status=409)
+            return _exc_refusal(exc, "OVERRIDE_REFUSED", 409, "screen override refused",
+                                principal=principal, source_id=source_id)
         return {"override": rec}
 
     @app.post("/sources/{source_id}/runs", status_code=202)
@@ -897,32 +1154,10 @@ def register_sources_routes(app: FastAPI) -> None:
         rt, err = _need_ingest()
         if err:
             return err
-        with rt.source_lock(source_id):
-            conn, err = _need_connection(rt, source_id)
-            if err:
-                return err
-            plan = _plan_or_none(rt.ingest, source_id)
-            if plan is None or getattr(plan, "status", None) != "approved":
-                return _refusal("PLAN_NOT_APPROVED",
-                                f"the crawl plan for {source_id!r} is "
-                                f"{getattr(plan, 'status', 'missing')!r}; propose and approve it "
-                                f"before running (P5)", status=409)
-            rev = connection_revision(conn)
-            stale = plan_stale_reason(plan, rev, for_run=True)
-            if stale:
-                return _refusal("PLAN_STALE", stale, status=409)
-            run_id = rt.ingest.new_run_id()
-            try:
-                # Admitted and marked busy under the source lock, so a replacement cannot slip
-                # in between: `sources_register` refuses to replace a connection while it runs.
-                job = rt.jobs.start("ingest", source_id, by=principal.principal_id,
-                                    run_id=run_id, source_id=source_id,
-                                    connection_revision=rev)
-            except JobBusy as busy:
-                return _refusal("RUN_IN_PROGRESS", str(busy), status=409)
-        background.add_task(_ingest_job, app, source_id, run_id, job["job_id"], rev)
-        return {"run_id": run_id, "job_id": job["job_id"], "status": "running",
-                "started_by": principal.principal_id}
+        try:
+            return start_run_for(app, rt, source_id, principal, background)
+        except SourceRefused as refused:
+            return refused.response()
 
     @app.get("/sources/{source_id}/runs")
     def sources_runs(source_id: str, _p: AuthenticatedPrincipal = Depends(require_principal)):
@@ -984,7 +1219,8 @@ def register_sources_routes(app: FastAPI) -> None:
             return rt.ingest.verify_run(source_id, run_id,
                                         store=getattr(app.state, "graph_store", None))
         except Exception as exc:                                      # noqa: BLE001
-            return _refusal("VERIFY_FAILED", f"{type(exc).__name__}: {exc}", status=500)
+            return _exc_refusal(exc, "VERIFY_FAILED", 500, "run verification failed",
+                                source_id=source_id, run_id=run_id)
 
     @app.get("/sources/{source_id}/health")
     def sources_health(source_id: str, _p: AuthenticatedPrincipal = Depends(require_principal)):
@@ -996,8 +1232,15 @@ def register_sources_routes(app: FastAPI) -> None:
             return err
         return _health(app, source_id)
 
+    # Every source at once (FEAT8): propose all, approve all after one review, run all approved.
+    # Each goes through the per-source helpers above, so nothing about one source differs.
+    from .sources_batch_routes import register_sources_batch_routes  # noqa: PLC0415
+
+    register_sources_batch_routes(app)
+
 
 __all__ = ["register_sources_routes", "RegisterSource", "COMMAND_SOURCES_ENV",
            "SECRET_HOSTS_ENV", "ALLOWED_HOSTS_ENV", "RUNNER_RISK_ENV", "command_policy_refusal",
            "secret_host_refusal", "destination_refusal", "registration_refusal",
-           "job_status_for_run", "connection_revision", "plan_stale_reason"]
+           "job_status_for_run", "connection_revision", "plan_stale_reason", "SourceRefused",
+           "connection_or_refuse", "propose_plan_for", "approve_plan_for", "start_run_for"]

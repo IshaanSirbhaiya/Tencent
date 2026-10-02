@@ -532,6 +532,14 @@ test.describe("@unit sources helpers (LINK7)", () => {
     }
   });
 
+  test("TIDY R-028 a subject target is never approvable, whether or not it is a person", () => {
+    // the subject predicate decides (CONS_BRIEF standard 7); persons are a subset of subjects
+    for (const person_target of [false, true]) {
+      expect(linkApprovable(link({ subject_target: true, person_target })), String(person_target)).toBe(false);
+    }
+    expect(linkApprovable(link({ subject_target: false }))).toBe(true); // non-vacuous
+  });
+
   test("LINK7 proposals come first, then decisions, then links never offered", () => {
     const all = [
       link({ column: "a", status: "approved" }),
@@ -615,4 +623,99 @@ test.describe("@unit sources helpers (UI8)", () => {
       expect(holdLiftable(h, "note read", "the override log fails verification"), item_id).toBe(false);
     }
   });
+});
+
+// FEAT8: "Approve all pending plans" opens ONE review before anything is approved. Non-mutating:
+// the dialog is opened, compared with the review the gateway returned, and cancelled.
+test("approve-all opens a review of exactly the pending plans, with every vouch unticked", async ({ page }) => {
+  const body = await openSources(page);
+  if (body.sources.length === 0) return;
+  const reviewP = page.waitForResponse(isGet(/^\/source-batch\/plans$/));
+  await page.getByTestId("batch-approve").click();
+  const review = (await (await reviewP).json()) as {
+    pending: { source_id: string; batch_approvable: boolean; vouchable: { tool: string }[] }[];
+  };
+  const dialog = page.getByTestId("batch-approve-dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-testid^="batch-plan-"][data-approvable]')).toHaveCount(review.pending.length);
+  for (const p of review.pending) {
+    await expect(page.getByTestId(`batch-plan-${p.source_id}`)).toHaveAttribute("data-approvable", String(p.batch_approvable));
+    for (const v of p.vouchable) {
+      await expect(page.getByTestId(`batch-vouch-box-${p.source_id}-${v.tool}`)).not.toBeChecked();
+    }
+  }
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+});
+
+// =============================================================================================
+// @unit — FEAT8: the body "Approve all pending plans" sends.
+// =============================================================================================
+import { approvePlanBody, batchApproveItems, callArgLines, unvouched, type BatchPendingPlan } from "../lib/sources-api";
+
+test.describe("@unit sources batch approval (FEAT8)", () => {
+  // Two estates' shapes, as `GET /source-batch/plans` returns them: each has a database source whose
+  // executor is unclassified, and a source with two unclassified tools.
+  const plan = (source_id: string, tools: string[]): Pick<BatchPendingPlan, "source_id" | "plan_digest" | "vouchable"> => ({
+    source_id,
+    plan_digest: `digest-${source_id}`,
+    vouchable: tools.map((tool) => ({ tool, class: "unclassified:unknown (shared classifier)", reason: "nothing classifies it" })),
+  });
+  const estates = [
+    { name: "finance", pending: [plan("core-banking", ["execute_sql"]), plan("docs", ["open_nodes", "fetch_blob"]), plan("files", [])] },
+    { name: "workspace", pending: [plan("larkspur-db", ["execute_sql"]), plan("kg", ["open_nodes", "fetch_blob"]), plan("drive", [])] },
+  ];
+
+  for (const e of estates) {
+    test(`${e.name}: every reviewed plan is sent, each with only the tools ticked for it`, () => {
+      const [db, pair, plain] = e.pending;
+      const ticked = { [db.source_id]: [db.vouchable[0].tool], [pair.source_id]: [pair.vouchable[0].tool] };
+      const items = batchApproveItems(e.pending, ticked);
+      expect(items.map((i) => i.source_id)).toEqual(e.pending.map((p) => p.source_id));
+      expect(items.map((i) => i.plan_digest)).toEqual(e.pending.map((p) => p.plan_digest));
+      expect(items.find((i) => i.source_id === db.source_id)!.vouch_read_tools).toEqual(ticked[db.source_id]);
+      expect(items.find((i) => i.source_id === pair.source_id)!.vouch_read_tools).toEqual(ticked[pair.source_id]);
+      expect(items.find((i) => i.source_id === plain.source_id)!.vouch_read_tools).toEqual([]);
+      // the pair's second tool was not ticked, so the plan still needs it
+      expect(unvouched(pair, ticked)).toEqual([pair.vouchable[1].tool]);
+      expect(unvouched(db, ticked)).toEqual([]);
+    });
+
+    test(`${e.name}: a tick never crosses to another source or to a tool the plan does not offer`, () => {
+      const [db, pair, plain] = e.pending;
+      const exec = db.vouchable[0].tool;
+      // ticked on the database source only; a stray tick for a tool `plain` does not offer
+      const items = batchApproveItems(e.pending, { [db.source_id]: [exec], [plain.source_id]: [exec] });
+      expect(items.find((i) => i.source_id === plain.source_id)!.vouch_read_tools).toEqual([]);
+      expect(items.find((i) => i.source_id === pair.source_id)!.vouch_read_tools).toEqual([]);
+      expect(items.every((i) => i.vouch_read_tools.every((t) => e.pending.find((p) => p.source_id === i.source_id)!.vouchable.some((v) => v.tool === t)))).toBe(true);
+      // a second source calling the SAME tool is not vouched by the first source's tick
+      const twin = plan(`${db.source_id}-twin`, [exec]);
+      expect(unvouched(twin, { [db.source_id]: [exec] })).toEqual([exec]);
+    });
+
+    test(`${e.name}: the review shows every fixed argument and the whole SQL configuration`, () => {
+      // Codex R-027 r2 #1: a mode argument is on screen, never hidden behind the tool name.
+      const [db, pair] = e.pending;
+      const listCall = { args: { action: "delete", path: "/" } };
+      expect(callArgLines(listCall)).toEqual(Object.keys(listCall.args).sort().map((k) => `${k}=${JSON.stringify((listCall.args as Record<string, unknown>)[k])}`));
+      expect(callArgLines(listCall).some((l) => l.includes("delete"))).toBe(true);
+      const sql = { tool: db.vouchable[0].tool, arg: "sql", dialect: "postgres", parse: { mode: "json_rows" }, extra_args: { db: pair.source_id } };
+      const lines = callArgLines({ args: sql.extra_args, sql });
+      for (const k of ["arg", "dialect", "parse"]) expect(lines).toContain(`sql.${k}=${JSON.stringify((sql as Record<string, unknown>)[k])}`);
+      expect(lines).toContain(`db=${JSON.stringify(pair.source_id)}`);
+      expect(callArgLines({ args: {} })).toEqual([]);
+    });
+
+    test(`${e.name}: a single approval always names the plan that was reviewed`, () => {
+      // Codex R-027 r1 #2: the individual approval carries the reviewed digest, with or without vouches.
+      for (const p of e.pending) {
+        const ticks = p.vouchable.map((v) => v.tool);
+        const body = approvePlanBody(p.plan_digest, ticks);
+        expect(body.plan_digest).toBe(p.plan_digest);
+        expect(body.vouch_read_tools ?? []).toEqual(ticks);
+        expect(approvePlanBody(p.plan_digest)).toEqual({ plan_digest: p.plan_digest });
+      }
+    });
+  }
 });
