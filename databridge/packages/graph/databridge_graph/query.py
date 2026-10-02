@@ -502,7 +502,7 @@ def nl_query(store: GraphStore, question: str) -> GroundedAnswer:
         for doc in claiming:
             cite(doc)
             sentences.append(f"{doc.label} names this {_words(primary.kind)}.")
-        sentences.append(identity_caveat(claimed=bool(claiming)))
+        sentences.append(identity_caveat(claimed=bool(claiming), kind=primary.kind))
     else:
         groups: dict[tuple[str, bool], list[GraphNode]] = {}
         for e in sub.edges:

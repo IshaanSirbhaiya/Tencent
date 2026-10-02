@@ -414,6 +414,10 @@ def extract_graph(doc, harness: Harness, *, store: Optional[GraphStore] = None,
         char_offset = max(0, int(meta.get("char_offset") or 0))
     except (TypeError, ValueError):
         char_offset = 0
+    # FIN-07: the source item's own identity — its id, its uri and the digest of the bytes read.
+    item_scope = hashlib.sha256("\x1f".join(
+        (str(doc.document_id), str(meta.get("uri") or ""), str(digest or ""))).encode("utf-8")
+    ).hexdigest()[:24]
     out = GraphExtractionResult(node_kinds_offered=ev.node_kinds,
                                 edge_kinds_offered=ev.edge_kinds)
     if not ev.node_kinds:
@@ -491,6 +495,15 @@ def extract_graph(doc, harness: Harness, *, store: Optional[GraphStore] = None,
                 attrs, attr_sources = {"extracted_identifier": cid}, {"extracted_identifier": cid_ptr}
             node = GraphNode(id=nid, kind=kind, label=name, attrs=attrs,
                              attr_sources=attr_sources, sources=[pointer(gs, ge)],
+                             valid_from=vf, system_from=sf)
+        elif cid is None and bound.is_document_kind(ent.kind):
+            # FIN-07: a DOCUMENT mention without a grounded identifier of its own is scoped to the
+            # SOURCE ITEM it was read from (item id + uri + content digest). Its title alone is not
+            # its identity: 95 filings from different companies titled "Annual Report for the
+            # financial year ended 31 December 2023" were five nodes, each joining unrelated
+            # companies. Two mentions are one document only when they come from the same item.
+            nid = node_id(kind, f"{name.lower()}@{item_scope}")
+            node = GraphNode(id=nid, kind=kind, label=name, sources=[pointer(gs, ge)],
                              valid_from=vf, system_from=sf)
         else:
             node = GraphNode(id=node_id(kind, (cid or name).lower()), kind=kind, label=name,

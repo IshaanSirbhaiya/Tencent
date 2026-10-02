@@ -92,7 +92,13 @@ def test_agent_delegates_a_counted_subquery_and_cites_it(world, compile_inputs):
     assert step.tool == "delegate.ask:crm_sources"
     assert step.policy_decision["decision"] == "permit"
     assert step.policy_decision["capability"] == "delegate.crm_sources"
-    assert len(world.facts.calls) == 1                          # pushed down: one statement
+    # pushed down: ONE statement reads the data. FIN-12 adds one read-only spelling probe per text
+    # `eq` filter (which stored spellings share the value), never a row read — derived from the
+    # sub-task's own filters
+    probes = [c for c in world.facts.calls if c[0].startswith("SELECT DISTINCT CAST(")]
+    text_eq = [f for f in COUNT_OVERDUE["filters"] if f["op"] == "eq"]
+    assert text_eq and len(probes) == len(text_eq)
+    assert len(world.facts.calls) - len(probes) == 1
     assert CRM in rec.coverage.searched
 
 

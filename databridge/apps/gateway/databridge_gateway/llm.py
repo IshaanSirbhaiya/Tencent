@@ -15,6 +15,8 @@ import os
 import re
 from typing import Optional
 
+from databridge_core.value_forms import value_spans
+
 #: The system prompt for a deployment whose enabled packs ship NO assistant config (E2E-2026-10-01
 #: F-04). Pack-agnostic by construction: it is written in the meta-model's words only, and
 #: `test_the_generic_prompt_names_no_pack_vocabulary` checks it against every pack on disk. The
@@ -42,7 +44,7 @@ def _enabled_packs_ship_an_assistant() -> bool:
     """True when some enabled pack ships ``config/assistant.yaml``. The deployment binding itself
     failing to resolve (no binding at all) is re-raised — that is misconfiguration, not a pack
     that simply has no assistant."""
-    from databridge_intake.pack import enabled_packs, packs_root
+    from databridge_core.pack_binding import enabled_packs, packs_root
 
     root = packs_root()
     return any((root / p / "config" / "assistant.yaml").is_file() for p in enabled_packs(root))
@@ -882,6 +884,18 @@ def _fact_lines(context: str) -> list[tuple[list[str], str]]:
     return out
 
 
+def _fact_matches(span, text: str) -> bool:
+    """Whether one fact line (lowercased) holds the value ``span`` names — by the value's KIND
+    (``databridge_core.value_forms``, FIN-08): an identifier as a whole token with dashes folded, a
+    number by Decimal value, anything else as a whole token, as before."""
+    from databridge_core.value_forms import fold_dashes, value_spans
+
+    if span.kind == "num":
+        return span.key in {s.key for s in value_spans(text) if s.kind == "num"}
+    needle = re.compile(r"(?<![a-z0-9])" + re.escape(span.key) + r"(?![a-z0-9])")
+    return bool(needle.search(fold_dashes(text)))
+
+
 def ground_narration(answer: str, context: str) -> dict:
     """Bind every value the narration states to the tagged fact lines that contain it.
 
@@ -890,21 +904,26 @@ def ground_narration(answer: str, context: str) -> dict:
     A value the model took from the question alone is therefore unbound: it is the user's claim,
     and repeating it back is not evidence for it. The model's own ``[C<n>]`` tags are ignored for
     the match; the binding is recomputed, never trusted.
+
+    FIN-08: values are read whole and by kind (``databridge_core.value_forms``). ``33,600,000.00``
+    is one number bound by a line holding ``33600000.00``; ``CM-2026-0029`` is one identifier. A
+    number of a different value binds to nothing.
     """
+    from databridge_core.value_forms import value_spans
+
     facts = _fact_lines(context)
     bound, unbound, seen = [], [], set()
-    for tok in _VALUE_TOKEN.findall(_FACT_TAG.sub(" ", answer or "")):
-        norm = tok.strip(_STRIP).lower()
-        if not norm or not any(ch.isdigit() for ch in norm) or norm in seen:
+    for span in value_spans(_FACT_TAG.sub(" ", answer or "")):
+        ident = (span.kind, span.key)
+        if ident in seen:
             continue
-        seen.add(norm)
-        needle = re.compile(r"(?<![a-z0-9])" + re.escape(norm) + r"(?![a-z0-9])")
-        tags = sorted({t for ts, text in facts if needle.search(text) for t in ts},
+        seen.add(ident)
+        tags = sorted({t for ts, text in facts if _fact_matches(span, text) for t in ts},
                       key=lambda t: int(t[1:]))
         if tags:
-            bound.append({"token": tok.strip(_STRIP), "tags": tags})
+            bound.append({"token": span.raw, "tags": tags})
         else:
-            unbound.append(tok.strip(_STRIP))
+            unbound.append(span.raw)
     return {"bound": bound, "unbound": unbound}
 
 
@@ -912,19 +931,19 @@ def _annotate(answer: str, bound: list[dict]) -> str:
     """The narration with each bound value followed by the tags that ground it — unless the model
     already placed a tag right after it. So every value in the served answer names a citation in
     the response's ``citations`` (by ``fact_tag``), and through it a pointer."""
+    from databridge_core.value_forms import value_spans
+
     by_norm = {b["token"].lower(): b["tags"] for b in bound}
     out, pos = [], 0
-    for m in _VALUE_TOKEN.finditer(answer):
-        tok = m.group(0).rstrip(_STRIP)
-        tags = by_norm.get(tok.strip(_STRIP).lower())
-        if not tags:
+    for span in value_spans(answer):
+        tags = by_norm.get(span.raw.lower())
+        if not tags or span.start < pos:
             continue
-        end = m.start() + len(tok)
-        if re.match(r"\s*\[C\d+\]", answer[end:]):
+        if re.match(r"\s*\[C\d+\]", answer[span.end:]):
             continue
-        out.append(answer[pos:end])
+        out.append(answer[pos:span.end])
         out.append(" " + "".join(f"[{t}]" for t in tags))
-        pos = end
+        pos = span.end
     out.append(answer[pos:])
     return "".join(out)
 
@@ -1065,7 +1084,7 @@ def bind_sentences(answer: str, context: str, bound: list[dict]) -> tuple[str, l
             kept.append(sentence + sep)
             continue
         low = _FACT_TAG.sub(" ", s).lower()
-        values = {t.strip(_STRIP).lower() for t in _VALUE_TOKEN.findall(low)}
+        values = {sp.raw.lower() for sp in value_spans(_FACT_TAG.sub(" ", s))}
         words = set(_CONTENT_WORD.findall(low)) - _FUNCTION_WORDS
         if (values & bound_tokens) or (words & fact_words):
             kept.append(sentence + sep)

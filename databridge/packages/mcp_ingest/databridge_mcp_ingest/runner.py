@@ -57,7 +57,9 @@ from typing import Any, Callable, Optional
 import yaml
 
 from . import capture, paths
-from .build import (ProseBuilder, anchor_id_for, build_tables, document_kind, store_batch)
+from .build import (ProseBuilder, anchor_id_for, build_tables, consolidate_identity_after_run,
+                    document_kind, store_batch,
+                    unbuilt_completeness)
 from .client import McpClientError, ReadOnlyClient, ToolChanged, open_client
 from .connections import SourceConnection, load_connection
 from .crawl import (CrawlError, Decision, Item, decide, enumerate_documents, enumerate_resources,
@@ -66,7 +68,7 @@ from .extract import ExtractionFailed, extract_text_cached, extractor_for, text_
 from .ledger import emit_event, item_event_id, now_iso, read_jsonl, scrub, typed_ledger
 from .plans import CrawlPlan, PlanError, load_plan
 from .records import DRIFT_PENDING_APPROVAL, DriftHolds, RunReportRecord, load_holds
-from .screen import load_overrides, load_screen, screen_text
+from .screen import load_overrides, load_screen, screen_policy, screen_text
 
 #: The runner reads `<sources>/<id>.holds.yaml` (written by adapter agents) and holds exactly the
 #: table, path or plan step a pending shape drift affects — the rest of the source keeps syncing.
@@ -556,6 +558,8 @@ class RunReport:
     finished_at: str = ""
     plan: dict = field(default_factory=dict)
     timings: dict = field(default_factory=dict)
+    #: FIN-03: the screen policy this run ran under (`screen.screen_policy`)
+    screen_policy: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -566,7 +570,7 @@ class RunReport:
                 "status": self.status, "message": self.message, "counts": self.counts,
                 "durations_s": self.durations, "verify": self.verify, "notes": self.notes,
                 "started_at": self.started_at, "finished_at": self.finished_at,
-                "plan": self.plan, "timings": self.timings}
+                "plan": self.plan, "timings": self.timings, "screen_policy": self.screen_policy}
 
 
 # --- locations -----------------------------------------------------------------------------------
@@ -611,8 +615,10 @@ def screen_fingerprint(cfg) -> str:
         "source": getattr(cfg, "source", ""),
         "thresholds": [cfg.block_threshold, cfg.review_threshold, cfg.min_signals_to_block],
         "rules": [[k, r.id, r.pattern.pattern, r.weight, r.min_count, r.validate]
-                  for k in ("decisive", "signals", "redactions")
-                  for r in getattr(cfg, k)]}, sort_keys=True, default=str)
+                  # FIN-17: the prompt-injection hold is part of the rule set a decision was made
+                  # under — a change to it re-screens, never carries
+                  for k in ("decisive", "signals", "redactions", "quarantine")
+                  for r in getattr(cfg, k, ())]}, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
@@ -626,17 +632,58 @@ def save_state(source_id: str, state: dict, *, run_id: Optional[str] = None) -> 
 
 
 def list_runs(source_id: str) -> list[dict]:
+    """Every run of the source, oldest first, labelled by what is ON DISK (FIN-14):
+
+    * a directory with `report.json` — that report's status;
+    * no report, and the source's run lock is held in this process — `running` (the newest such
+      directory only: a run in flight, not an `incomplete` one);
+    * no report and no core-run ledgers, only the tabular recipe's own artefacts (profile,
+      facts manifest, cards, stage log) — NOT a run: it is the recipe's side directory left by
+      the run-id bug FIN-14 fixed, and it is not listed;
+    * otherwise `incomplete` (a run that stopped without a report)."""
     base = source_dir(source_id)
     if not base.is_dir():
         return []
+    dirs = sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name)
+    running = _run_in_progress(base)
+    newest_open = next((d.name for d in reversed(dirs) if not (d / "report.json").is_file()
+                        and _is_core_run_dir(d)), None)
     out = []
-    for d in sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name):
+    for d in dirs:
         rep = d / "report.json"
-        data = json.loads(rep.read_text(encoding="utf-8")) if rep.is_file() else {}
-        out.append({"run_id": d.name, "run_dir": str(d), "status": data.get("status", "incomplete"),
+        if not rep.is_file() and not _is_core_run_dir(d):
+            continue
+        try:
+            data = json.loads(rep.read_text(encoding="utf-8")) if rep.is_file() else {}
+        except (OSError, ValueError):
+            data = {}
+        status = data.get("status") or ("running" if running and d.name == newest_open
+                                         else "incomplete")
+        out.append({"run_id": d.name, "run_dir": str(d), "status": status,
                     "message": data.get("message", ""), "counts": data.get("counts", {}),
                     "finished_at": data.get("finished_at")})
     return out
+
+
+#: Files only the CORE run writes (`_run_core`): a directory holding none of them and no report is
+#: not a run.
+_CORE_RUN_MARKERS = ("binding.json", "stages.json", "checkpoint.json", "inventory.jsonl",
+                     "captured.jsonl", "plan.snapshot.yaml")
+
+
+def _is_core_run_dir(d: Path) -> bool:
+    return any((d / f).exists() for f in _CORE_RUN_MARKERS)
+
+
+def _run_in_progress(base: Path) -> bool:
+    """Is a run of this source in flight IN THIS PROCESS (the gateway runs syncs in-process)? Read
+    from the run-lock registry; never takes the lock itself, so it cannot race a starting run."""
+    try:
+        key = os.path.normcase(str(base.resolve()))
+    except OSError:
+        return False
+    with _LOCAL_RUNS_GUARD:
+        return key in _LOCAL_RUNS
 
 
 def _new_run_id() -> str:
@@ -777,7 +824,11 @@ def run_ingest(source_id: str, store=None, harness=None,
     nested = outer is not None and outer.get("source_id") == source_id
     if nested:
         # called back by `ingest_database` for the sync that started it: keep that sync's options
-        run_id, concurrency, passages = outer["run_id"], outer["concurrency"], outer["passages"]
+        # FIN-14: the run id the recipe ALLOCATED (and passes here) wins over the sync's option
+        # (None for a fresh sync) — otherwise the core run took a second id and the recipe's
+        # directory was left beside it as a phantom "incomplete" run
+        run_id = run_id if run_id is not None else outer["run_id"]
+        concurrency, passages = outer["concurrency"], outer["passages"]
         cache, bridges, verbose = outer["cache"], outer["bridges"], outer["verbose"]
         event_attrs = event_attrs if event_attrs is not None else outer.get("event_attrs")
     elif tabular is not False and _has_tabular_step(plan) and not _inside_tabular_recipe():
@@ -820,7 +871,9 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
 
         vocab = active_vocabulary()
 
-    resuming = run_id is not None and run_dir_for(source_id, run_id).is_dir()
+    # a directory the tabular recipe created for THIS sync (its profile and stage log only) is
+    # not a run to resume: a resume needs a core run's own records (FIN-14)
+    resuming = run_id is not None and _is_core_run_dir(run_dir_for(source_id, run_id))
     run_id = run_id or _new_run_id()
     run_dir = run_dir_for(source_id, run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -903,6 +956,7 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
     state = load_state(source_id)
     report.notes.extend(screen_cfg.notes)
     report.notes.append(f"screen rules: {screen_cfg.source}")
+    report.screen_policy = screen_policy(screen_cfg)
     enumeration_complete = True
     try:
         # ---------------------------------------------------------------- collect
@@ -991,6 +1045,18 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
                             report)
             mark("index", time.monotonic() - t0)
 
+        # ---------------------------------------------------------------- identity (FIN-04)
+        # the pack's APPROVED identity rules recognise as one the organisations this run wrote
+        # and the records already in the graph; inert until a named human approves a rule, never
+        # touching a subject kind. Before verify, so verification checks the consolidated graph.
+        if "identity" not in stages_done:
+            t0 = time.monotonic()
+            consolidation = consolidate_identity_after_run(store, vocab)
+            _atomic_text(run_dir / IDENTITY_FILE, json.dumps(consolidation, sort_keys=True,
+                                                             default=str, indent=1))
+            report.notes.append(_identity_note(consolidation))
+            mark("identity", time.monotonic() - t0)
+
         for led in ledgers.values():
             led.close()
 
@@ -1074,7 +1140,7 @@ def _run_with_tabular(source_id: str, store, harness, progress_cb, *, client, so
             out = ingest_database(source_id, store, harness, client=client, vocab=vocab,
                                   sources_root=sources_root,
                                   index=_passages_enabled(options["passages"]),
-                                  progress_cb=progress_cb)
+                                  progress_cb=progress_cb, run_id=options.get("run_id"))
         except Exception as exc:                                     # noqa: BLE001
             report = getattr(_TABULAR, "report", None)
             _TABULAR.kwargs = _TABULAR.report = None
@@ -1232,6 +1298,13 @@ def _finalise_status(report: RunReport, enumeration_complete: bool) -> None:
         report.status = "ok"
         report.message = (f"{c.get('inventory')} seen, {c.get('captured')} captured, "
                           f"{c.get('built', 0)} built, {c.get('unchanged', 0)} unchanged")
+        if c.get("extract_failed"):
+            # FIN-01: honest partial coverage - the source synced, these items did not
+            allowed = (c.get("governance") or {}).get("allow", 0)
+            report.message = (f"PARTIAL COVERAGE: {c['extract_failed']} of {allowed} allowed "
+                              f"item(s) failed model extraction and are not in the graph (see "
+                              f"build_skipped.jsonl, reason {EXTRACT_FAILED}; they are retried "
+                              f"next sync). " + report.message)
     if not enumeration_complete:
         report.notes.append("listing did not complete (see failed.jsonl); removals were not "
                             "inferred from this run")
@@ -1373,7 +1446,8 @@ def _fetch_one(client, step, item: Item, conn: SourceConnection, ledgers: dict, 
     t0 = time.perf_counter()
     try:
         if item.kind == "table":
-            data, snapshot = fetch_table(client, step, item, limit=conn.scope.max_rows_per_table)
+            data, snapshot = fetch_table(client, step, item, limit=conn.scope.max_rows_per_table,
+                                         page_rows=conn.scope.table_page_rows)
             mime = "application/json"
         else:
             data, mime = fetch_document(client, step, item)
@@ -1404,11 +1478,19 @@ def _fetch_one(client, step, item: Item, conn: SourceConnection, ledgers: dict, 
         except capture.TextConflict:
             pass        # write-once (f2 #5): the stored rendering is kept; extract records ITS digest
         total, limit = snapshot.get("row_count_total"), snapshot.get("limit")
-        if total is not None and total > len(snapshot.get("rows") or []):
+        read = len(snapshot.get("rows") or [])
+        if total is not None and total > read:
+            # C-2: never silently short — "N of M rows", and why
+            capped = limit is not None and read >= int(limit)
             ledgers["coverage"].write({
-                "item_id": item.item_id, "uri": item.uri, "rule": "row_cap",
-                "rows_total": total, "rows_read": len(snapshot.get("rows") or []),
-                "reverse": f"raise scope.max_rows_per_table above {limit}"})
+                "item_id": item.item_id, "uri": item.uri,
+                "rule": "row_cap" if capped else "rows_short",
+                "rows_total": total, "rows_read": read,
+                "detail": f"{read} of {total} rows read",
+                "reverse": (f"raise or remove scope.max_rows_per_table ({limit}) on the "
+                            f"connection" if capped else
+                            "the table changed while it was read, or the dialect cannot page "
+                            "(no select_page); re-run the source")})
     t_cap = time.perf_counter() - t1
     timings.add("collect.capture_write", t_cap)
     timings.item(item.item_id, "collect", t_read + t_cap, read_ms=round(t_read * 1000, 2),
@@ -1489,7 +1571,7 @@ def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
             else:
                 got = extract_text(data, name=name, mime=rec.get("mime"), source_id=iid)
         except ExtractionFailed as exc:
-            timings.add(f"extract.{'docling' if kind != 'text' else 'text'}_failed",
+            timings.add(f"extract.{'docling' if kind not in ('text', 'email') else kind}_failed",
                         time.perf_counter() - t0)
             reason = ("extractor_unavailable" if "extractor_unavailable" in str(exc)
                       else "extract_failed")
@@ -1497,7 +1579,7 @@ def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
                                               "reason": reason, "detail": _plain_error(exc)})
             continue
         took = time.perf_counter() - t0
-        bucket = "text" if kind == "text" else ("convert_cache_hit" if hit else "docling")
+        bucket = kind if kind in ("text", "email") else ("convert_cache_hit" if hit else "docling")
         timings.add(f"extract.{bucket}", took)
         timings.item(iid, "extract", took, extractor=got.extractor, cache_hit=hit)
         if not got.text.strip():
@@ -1570,7 +1652,11 @@ def _screen(extracted: list[dict], cfg, overrides: set[str], ledgers: dict, prog
         # f2 #5: screened = extracted; a text that changed since raises (the stage fails loudly)
         text = capture.get_text(rec["sha256"], expect_text_digest=rec.get("text_sha256")) or ""
         override = _override_allows(overrides, rec["item_id"], rec["sha256"])
-        result = screen_text(text, cfg, override_allow=override)
+        # an email's extracted text is its DECODED preferred body: the injection hold also reads
+        # the captured MIME source (an HTML-only hidden span or comment is not in that body)
+        also = ([capture.get_bytes(rec["sha256"]).decode("utf-8", errors="replace")]
+                if rec.get("extractor") == "email" else [])
+        result = screen_text(text, cfg, override_allow=override, also=also)
         masked: dict = {}
         if rec.get("kind") != "table":
             # Codex f1 #8: the masked view is keyed by (content, rule set) and written once; its
@@ -1588,13 +1674,38 @@ def _screen(extracted: list[dict], cfg, overrides: set[str], ledgers: dict, prog
 
 
 class _Now:
-    """A completed future, for the serial path."""
+    """A completed future, for the serial path. Like a pool future, a failure is held and raised
+    by `result()` (FIN-01: where the item's failure is isolated), never at submission."""
 
     def __init__(self, fn, *args) -> None:
-        self._value = fn(*args)
+        self._error: Optional[BaseException] = None
+        self._value = None
+        try:
+            self._value = fn(*args)
+        except Exception as exc:                                     # noqa: BLE001
+            self._error = exc
 
     def result(self):
+        if self._error is not None:
+            raise self._error
         return self._value
+
+
+#: FIN-01: an item whose model extraction fails is recorded and skipped; this many items failing
+#: IN A ROW means the model (not one document) is the problem, and the run stops.
+EXTRACT_FAILED = "extract_failed"
+MAX_CONSECUTIVE_FAILURES = 5
+
+
+def _max_consecutive_failures() -> int:
+    try:
+        return max(1, int(os.environ.get("WALNUT_EXTRACT_MAX_CONSECUTIVE_FAILURES", "")))
+    except ValueError:
+        return MAX_CONSECUTIVE_FAILURES
+
+
+class ExtractionStalled(RuntimeError):
+    """Every one of the last N items failed model extraction: the run stops, saying so."""
 
 
 def _masked_for_build(rec: dict, raw: str, decision: dict, screen_cfg,
@@ -1653,6 +1764,7 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
             if isinstance(box.get("state"), dict):
                 state[r["item_id"]] = _provisional(box["state"])
     tables: list[tuple[dict, str, dict, dict]] = []
+    not_built: list[tuple[dict, str]] = []          # captured tables the screen kept out
     retrieved = retrieved_at or dt.datetime.now(dt.timezone.utc)
     pool = (ThreadPoolExecutor(max_workers=workers, thread_name_prefix="extract")
             if workers > 1 and harness is not None else None)
@@ -1661,14 +1773,43 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
         return pool.submit(builder.extract, plan, job) if pool else _Now(builder.extract, plan,
                                                                           job)
 
+    streak = {"failed": 0, "last": ""}
+    max_streak = _max_consecutive_failures()
+
     def finish(i: int, rec: dict, meta: dict, plan, futures: list, t_prep: float) -> None:
         iid = rec["item_id"]
         t_wait = time.perf_counter()
-        results = [f.result() for f in futures]
-        more = builder.bridge_jobs(plan, results)
-        if more:
-            plan.jobs.extend(more)
-            results += [f.result() for f in [submit(plan, j) for j in more]]
+        try:
+            results = [f.result() for f in futures]
+            more = builder.bridge_jobs(plan, results)
+            if more:
+                plan.jobs.extend(more)
+                results += [f.result() for f in [submit(plan, j) for j in more]]
+        except Exception as exc:                                     # noqa: BLE001
+            # FIN-01: ONE document the model cannot read (it returned nothing, or output that
+            # failed validation after the harness's bounded retries) never fails the source.
+            # The item is recorded with its reason, nothing of it is written to the graph, and
+            # its state is NOT advanced, so the next sync tries it again. Retries stay the
+            # harness's own ladder - no item-level loop on top of it.
+            timings.add("build.model_wait", time.perf_counter() - t_wait)
+            why = _plain_error(exc, limit=500)
+            ledgers["build_skipped"].write({
+                "item_id": iid, "uri": rec["uri"], "reason": EXTRACT_FAILED,
+                "stage": "entity_extraction", "detail": why, "model_jobs": len(plan.jobs),
+                "reverse": ("re-run the source (the item is retried; its state was not "
+                            "advanced); if it keeps failing, inspect the item - its content "
+                            "may be adversarial or unreadable to the model")})
+            streak["failed"] += 1
+            streak["last"] = why
+            if streak["failed"] >= max_streak:
+                raise ExtractionStalled(
+                    f"{streak['failed']} consecutive item(s) failed model extraction - the model, "
+                    f"not one document, looks unavailable; stopping the run. Last error: "
+                    f"{why}") from exc
+            if i % CHECKPOINT_ITEMS == 0:
+                progress("build", done=i, total=len(extracted))
+            return
+        streak["failed"] = 0
         timings.add("build.model_wait", time.perf_counter() - t_wait)
         out = builder.apply(plan, results)
         timings.add("build.graph_write", out.write_ms / 1000.0)
@@ -1730,11 +1871,16 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                 continue
             decision = decisions.get(iid, {}).get("decision")
             if decision != "allow":
+                if rec.get("kind") == "table":
+                    # counted in completeness: its rows are not in the graph (never silent)
+                    not_built.append((rec, f"screen_{decision or 'undecided'}"))
                 continue                          # excluded by the screen; governance says why
             if iid in held:
                 # captured, NOT built: a pending shape drift holds it. The state is not advanced,
                 # so once the hold is released the next sync builds it (never "unchanged").
                 h = held[iid]
+                if rec.get("kind") == "table":
+                    not_built.append((rec, DRIFT_PENDING_APPROVAL))
                 ledgers["build_skipped"].write({
                     "item_id": iid, "uri": rec["uri"], "reason": DRIFT_PENDING_APPROVAL,
                     "detail": (f"held by adaptation {h.get('adaptation_id')}: the source's shape "
@@ -1791,6 +1937,20 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
         # built only under an authenticated principal's digest-bound approval (mapping.py)
         mapping = ensure_mapping(conn.id, snaps, vocab, harness=harness, auto_approve=False,
                                  root=sources_root)
+        # C-3: links no foreign key declares, measured against this source's and the other
+        # sources' captured keys — PROPOSED in the mapping for a person; nothing is built from a
+        # proposal. Never fatal: a failure is noted and the build goes on.
+        try:
+            from .mapping import refresh_link_proposals
+
+            proposed_links = refresh_link_proposals(conn.id, snaps, vocab, root=sources_root)
+            n_links = sum(1 for tm in proposed_links.tables.values() for lk in tm.links or []
+                          if lk.get("status") == "proposed")
+            if n_links:
+                report.notes.append(f"links: {n_links} proposed link(s) where no foreign key is "
+                                    f"declared, awaiting a person (mapping links)")
+        except Exception as exc:                                     # noqa: BLE001
+            report.notes.append(f"links: proposal skipped ({_plain_error(exc)})")
         # Codex f2 #3: the run is BOUND to the approved mapping it first built tables under. The
         # binding is written BEFORE any table row is written; a later attempt of the same run
         # under a different approved mapping is refused, never mixed. The snapshot is written once.
@@ -1800,11 +1960,14 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
             _atomic_text(snap_path, yaml.safe_dump(mapping.model_dump(mode="json"),
                                                    sort_keys=False))
         ready = []
+        # every captured table of this run (and of each source an approved link names): what a
+        # reference may point into, and what completeness counts a reference against
+        context = _reference_context(conn.id, run_dir, caps, mapping)
         for snapshot, sha, rec, _ in tables:
             tref = (f"{snapshot.get('schema')}.{snapshot.get('table')}"
                     if snapshot.get("schema") else str(snapshot.get("table")))
             tm = mapping.tables.get(tref)
-            if tm is None or tm.status != "approved" or not tm.node:
+            if tm is None or tm.status != "approved" or not (tm.node or tm.association):
                 reason = ("unmapped" if tm is not None and tm.status == "unmapped"
                           else "mapping_not_approved")
                 skipped_line = ({
@@ -1832,14 +1995,26 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                 state[rec["item_id"]] = new_state
                 skipped_line["outbox"] = {"event": event, "state": new_state}
                 ledgers["build_skipped"].write(skipped_line)
+                _write_completeness(run_dir, unbuilt_completeness(
+                    snapshot, source_id=conn.id, snaps=context, reason=reason,
+                    node_kind=(tm.node or {}).get("kind") if tm is not None else None))
                 continue
             ready.append((snapshot, sha, tm.model_dump(), rec))
         if ready:
+            from .mapping import split_kinds
+
             result = build_tables(store, vocab, source_id=conn.id,
                                   tables=[(s, sha, tm) for s, sha, tm, _ in ready],
                                   retrieved_at=retrieved, mask_cfg=screen_cfg,
                                   screen_cfg=screen_cfg, overrides=overrides,
-                                  item_ids={sha: rec["item_id"] for _, sha, _, rec in ready})
+                                  item_ids={sha: rec["item_id"] for _, sha, _, rec in ready},
+                                  context=context,
+                                  # FIN-04: a reference into a split table meets the row under
+                                  # the kind the approved split built it as
+                                  kind_splits={t: tm.split for t, tm in mapping.tables.items()
+                                               if tm.status == "approved" and tm.split})
+            for rec_c in result.get("completeness") or []:
+                _write_completeness(run_dir, rec_c)
             for p in result["pointers"]:
                 ledgers["pointers"].write(p)
             for b in result["blocked_rows"]:
@@ -1868,8 +2043,10 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
             for snapshot, sha, tm, rec in ready:
                 entry = {"item_id": rec["item_id"], "uri": rec["uri"], "sha256": sha,
                          "kind": "table", "rows": len(snapshot.get("rows") or []),
-                         "node_kind": tm["node"]["kind"],
-                         "nodes_of_kind_this_run": per_table_nodes.get(tm["node"]["kind"], 0),
+                         "node_kind": (tm.get("node") or {}).get("kind"),
+                         "nodes_of_kind_this_run": sum(per_table_nodes.get(k, 0)
+                                                       for k in split_kinds(tm)),
+                         **({"node_kinds": split_kinds(tm)} if tm.get("split") else {}),
                          **({"meta_digest": rec["meta_digest"]} if rec.get("meta_digest")
                             else {}),
                          "graph_ids": sorted(table_ids.get(rec["item_id"], ()))}
@@ -1885,8 +2062,93 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                 built.append(event)
                 state[rec["item_id"]] = _provisional(new_state)
         timings.add("build.tables", time.perf_counter() - t_tab)
+    if not_built:
+        from .mapping import load_mapping
+
+        ctx = _reference_context(conn.id, run_dir, caps, load_mapping(conn.id, sources_root))
+        for rec, reason in not_built:
+            try:
+                snapshot = json.loads(capture.get_bytes(rec["sha256"]))
+            except Exception:                                        # noqa: BLE001
+                continue
+            _write_completeness(run_dir, unbuilt_completeness(
+                snapshot, source_id=conn.id, snaps=ctx, reason=reason))
     progress("build", done=len(extracted), total=len(extracted))
     return built
+
+
+COMPLETENESS_LEDGER = "completeness.jsonl"
+#: FIN-04: what the post-run identity consolidation did (`build.consolidate_identity_after_run`)
+IDENTITY_FILE = "identity_consolidation.json"
+
+
+def _identity_note(rec: dict) -> str:
+    status = rec.get("status")
+    if status == "ran":
+        approved = {k: v for k, v in (rec.get("kinds") or {}).items() if v}
+        if not approved:
+            return ("identity: no identity rule is approved for this deployment; nothing was "
+                    "merged (a named human approves a rule on the ontology)")
+        return (f"identity: approved rules {approved} merged {rec.get('absorbed', 0)} record(s) "
+                f"into {len(rec.get('merged') or [])} node(s); {len(rec.get('refused') or [])} "
+                f"group(s) refused (listed in {IDENTITY_FILE})")
+    if status == "no_rules":
+        return "identity: the bound packs declare no identity rules; nothing to consolidate"
+    return f"identity: consolidation {status} ({rec.get('error', '')}); nothing was merged"
+
+
+def identity_summary(run_dir: Path) -> Optional[dict]:
+    """The run's identity consolidation in brief (FIN-04), for `report.json → counts`."""
+    p = Path(run_dir) / IDENTITY_FILE
+    if not p.is_file():
+        return None
+    try:
+        rec = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:                                                # noqa: BLE001
+        return {"status": "unreadable"}
+    return {"status": rec.get("status"), "kinds": rec.get("kinds") or {},
+            "merged": len(rec.get("merged") or []), "absorbed": rec.get("absorbed", 0),
+            "refused": len(rec.get("refused") or []),
+            "merges": [{"kind": m.get("kind"), "survivor": m.get("survivor"),
+                        "absorbed": m.get("absorbed"), "rules": m.get("rules")}
+                       for m in rec.get("merged") or []],
+            **({"error": rec["error"]} if rec.get("error") else {})}
+
+
+def _write_completeness(run_dir: Path, rec: dict) -> None:
+    """One table's completeness line (the 2026-10-02 dry run's lesson): rows at the source vs read vs
+    built vs nodes, declared FKs vs edges, unresolved references. `verify_run` totals them into
+    the run report (`counts.completeness`), so an E2E can assert on them."""
+    with open(run_dir / COMPLETENESS_LEDGER, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
+
+
+def _reference_context(source_id: str, run_dir: Path, caps: dict, mapping) -> dict:
+    """{(source, table): snapshot}: every table THIS run captured from the source, and the captured
+    tables of each other source an approved link names (read-only, from their last verified
+    state). What a reference is resolved and counted against."""
+    out: dict = {}
+    for cap in caps.values():
+        if cap.get("kind") != "table" or not cap.get("sha256"):
+            continue
+        try:
+            snap = json.loads(capture.get_bytes(cap["sha256"]))
+        except Exception:                                            # noqa: BLE001
+            continue
+        if isinstance(snap, dict) and snap.get("table"):
+            ref = (f"{snap.get('schema')}.{snap.get('table')}" if snap.get("schema")
+                   else str(snap.get("table")))
+            out[(source_id, ref)] = snap
+    others = {(e.get("ref") or {}).get("source") for tm in mapping.tables.values()
+              if tm.status == "approved" for e in tm.edges or []
+              if (e.get("ref") or {}).get("source")}
+    if others - {source_id}:
+        from .mapping import captured_tables
+
+        for other in sorted(others - {source_id}):
+            for ref, snap in captured_tables(other).items():
+                out[(other, ref)] = snap
+    return out
 
 
 def _graph_ids(out) -> list[str]:
@@ -2282,6 +2544,12 @@ def _verify_graph_ids(store, build_records: list[dict], shas: list[str],
             out["ids"] += 1
             try:
                 ptrs = [_pointer_record(p) for p in store.sources_for(gid)]
+                if not ptrs:
+                    # FIN-04: a record an approved identity rule absorbed is closed; its pointers
+                    # live on the ONE open node that lists it in `merged_record_ids`
+                    survivor = _absorbing_node(store, gid)
+                    if survivor is not None:
+                        ptrs = [_pointer_record(p) for p in store.sources_for(survivor)]
             except Exception:                                        # noqa: BLE001
                 ptrs = []
             if not any(names_run_capture(p) and resolver.resolves(p) for p in ptrs):
@@ -2289,6 +2557,26 @@ def _verify_graph_ids(store, build_records: list[dict], shas: list[str],
                 if len(out["examples"]) < 5:
                     out["examples"].append(f"{r.get('item_id', '')[:12]}:{gid}")
     return out
+
+
+def _absorbing_node(store, gid: str) -> Optional[str]:
+    """The ONE open node whose `merged_record_ids` lists `gid` (an identity-rule merge, FIN-04),
+    else None — none, or two (ambiguous, never chosen by order)."""
+    try:
+        from databridge_graph.merge import MERGED_IDS_ATTR
+    except ImportError:                                              # pragma: no cover
+        return None
+    hits = []
+    for r in store.fetchall("SELECT id, attrs_json FROM nodes WHERE system_to IS NULL AND "
+                            "valid_to IS NULL AND instr(attrs_json, ?) > 0 AND "
+                            "instr(attrs_json, ?) > 0", (MERGED_IDS_ATTR, json.dumps(gid))):
+        try:
+            merged = json.loads(r["attrs_json"] or "{}").get(MERGED_IDS_ATTR) or []
+        except ValueError:
+            continue
+        if gid in merged and r["id"] not in hits:
+            hits.append(r["id"])
+    return hits[0] if len(hits) == 1 else None
 
 
 def _verify_store_provenance(store, shas: list[str], resolver: "_PointerResolver") -> dict:
@@ -2334,6 +2622,31 @@ def _verify_store_provenance(store, shas: list[str], resolver: "_PointerResolver
                 if len(out["examples"]) < 5:
                     out["examples"].append(f"{eid} {rec.get('kind')}")
     return out
+
+
+def completeness_summary(lines: list[dict]) -> dict:
+    """`counts.completeness` of a run report: one record per table (the LAST line per table wins,
+    so a resumed build is not counted twice) and the totals an E2E asserts on — rows at the source
+    vs captured vs built vs nodes (`graph_rows`: nodes, or a join table's edges), declared FKs vs
+    those with an edge, edges expected vs built (`edges_missing`), and unresolved references —
+    the field names of the independent audit (`scripts/e2e/completeness.py`)."""
+    by_table: dict[str, dict] = {}
+    for r in lines or []:
+        if isinstance(r, dict) and r.get("table"):
+            by_table[str(r["table"])] = r
+    tables = [by_table[t] for t in sorted(by_table)]
+
+    def total(k: str) -> int:
+        return sum(int(t.get(k) or 0) for t in tables)
+
+    return {"tables": tables, "totals": {
+        "tables": len(tables), "tables_built": sum(1 for t in tables if t.get("built")),
+        **{k: total(k) for k in ("source_rows", "captured_rows", "rows_not_read",
+                                 "rows_withheld", "rows_built", "nodes", "graph_rows",
+                                 "declared_fks", "fks_with_edge", "edges_expected",
+                                 "edges_built", "edges_missing", "unresolved_references")},
+        "capped_tables": sorted(t["table"] for t in tables if t.get("capped")),
+        "tables_not_built": sorted(t["table"] for t in tables if not t.get("built"))}}
 
 
 def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
@@ -2499,14 +2812,21 @@ def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
         "extract_skipped": len(skipped), "extract_skipped_by_reason": by_reason,
         "governance": gov_counts, "built": len(build_ids),
         "build_skipped": len(bskip), "zero_graph_output": len(zero),
+        # FIN-01: allowed items whose model extraction failed - recorded, not built, retried
+        "extract_failed": len({r["item_id"] for r in ledgers.get("build_skipped", [])
+                               if r.get("reason") == EXTRACT_FAILED and r.get("item_id")}),
         "entities": sum(r.get("entities", 0) for r in ledgers.get("build", [])),
         "relations": sum(r.get("relations", 0) for r in ledgers.get("build", [])),
         "refused": len(ledgers.get("refused", [])), "pointers": total_ptrs,
         "pointers_resolved": resolved, "failed_retried": len(retried),
         "store_provenance": store_check,
         "partial_coverage": len(ledgers.get("coverage", [])),
+        "completeness": completeness_summary(ledgers.get("completeness", [])),
         "ledgers_found": sorted(ledgers),
     }
+    ident = identity_summary(run_dir)
+    if ident is not None:
+        counts["identity_consolidation"] = ident
     if store is not None:
         try:
             counts["store_totals"] = store.counts()
@@ -2519,4 +2839,5 @@ __all__ = ["run_ingest", "verify_run", "list_runs", "RunReport", "PlanNotApprove
            "NotAnIngestConnection", "RunInProgress", "ResumeRefused", "run_dir_for",
            "close_removed_item", "Timings", "DEFAULT_CONCURRENCY",
            "load_state", "state_path", "source_dir", "LEDGERS", "CHECKPOINT_ITEMS",
+           "completeness_summary", "COMPLETENESS_LEDGER",
            "CHECKPOINT_SECONDS"]

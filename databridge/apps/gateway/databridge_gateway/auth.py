@@ -84,7 +84,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 log = logging.getLogger("databridge.gateway.auth")
@@ -118,6 +118,31 @@ class AuthenticatedPrincipal:
 
     principal_id: str
     dev_mode: bool = False
+
+    # FIN-16 (finance dry run): the approval gates (`mcp_ingest.require_authenticated_approver`,
+    # `adapter_agents.principal_of`) record ``dev_only`` and ``authenticated_by`` by reading these
+    # two attribute names off the principal. This type only carried ``dev_mode``, so an approval
+    # made with the public dev token was logged as ``dev_only: false, authenticated_by: "gateway"``
+    # — indistinguishable from a real signed-in person. Both are DERIVED from ``dev_mode`` (which
+    # only `_AuthState.resolve` sets, and only for the dev token), never stored separately, so the
+    # two cannot disagree.
+    @property
+    def dev_only(self) -> bool:
+        return bool(self.dev_mode)
+
+    @property
+    def authenticated_by(self) -> str:
+        return DEV_MECHANISM if self.dev_mode else GATEWAY_MECHANISM
+
+    def describe(self) -> dict:
+        """What the page may show about who is signed in: the name and how it was established."""
+        return {"principal_id": self.principal_id, "dev_only": self.dev_only,
+                "authenticated_by": self.authenticated_by}
+
+
+#: How a principal was established, as recorded on every approval it makes.
+GATEWAY_MECHANISM = "gateway"
+DEV_MECHANISM = "gateway:dev-token"
 
 
 def _load_token_directory() -> dict[str, str]:
@@ -322,3 +347,62 @@ def install_auth_handler(app: FastAPI) -> None:
     than once on the same `app` (FastAPI simply keeps the last registration for the same
     exception type), which is what happens when `main.create_app()` composes all of them."""
     app.add_exception_handler(AuthRequired, _auth_exception_handler)
+
+
+# ---------------------------------------------------------------------------------------------
+# Who am I — the page's sign-in chip (FIN-16)
+# ---------------------------------------------------------------------------------------------
+def register_auth_routes(app: FastAPI) -> None:
+    """``GET /auth/whoami`` — the principal THIS request authenticated as, and how.
+
+    It exists so a page can say plainly when it is acting under the public dev token: an approval
+    made from such a page is recorded ``dev_only: true`` and the page should not look like a real
+    sign-in. Gated like every other route (no credential → 401), it names only the caller itself.
+    Idempotent: composing several route modules that each call it registers it once."""
+    install_auth_handler(app)
+    if getattr(app.state, "_auth_routes_registered", False):
+        return
+    app.state._auth_routes_registered = True
+
+    @app.get("/auth/whoami")
+    def auth_whoami(principal: AuthenticatedPrincipal = Depends(require_principal)) -> dict:
+        return principal.describe()
+
+
+# ---------------------------------------------------------------------------------------------
+# Allowed browser origins (FIN-19)
+# ---------------------------------------------------------------------------------------------
+#: The origins a browser may call this gateway from when nothing is configured: the one local
+#: frontend (D-FE-6). A second deployment (another port, another host) names its own.
+DEFAULT_CORS_ORIGINS = ("http://localhost:3000", "http://127.0.0.1:3000")
+CORS_ORIGINS_ENV = "WALNUT_CORS_ORIGINS"
+
+
+def cors_allowed_origins(raw: Optional[str] = None) -> list[str]:
+    """The CORS allow-list, from ``WALNUT_CORS_ORIGINS`` (comma- or whitespace-separated), else
+    `DEFAULT_CORS_ORIGINS`.
+
+    Fails closed on anything that is not an exact ``scheme://host[:port]`` origin: a wildcard
+    (``*``), a path, a query or a non-http(s) scheme is DROPPED and logged — never widened to
+    "every origin". If nothing valid is left the default is used, so a typo cannot open the
+    gateway to every site, nor silently close it to the one frontend that was working."""
+    from urllib.parse import urlsplit
+
+    text = os.environ.get(CORS_ORIGINS_ENV, "") if raw is None else raw
+    out: list[str] = []
+    for token in text.replace(",", " ").split():
+        origin = token.strip().rstrip("/")
+        try:
+            parts = urlsplit(origin)
+            port_ok = parts.port is None or 0 < parts.port < 65536
+        except ValueError:
+            parts, port_ok = None, False
+        if (parts is None or not port_ok or parts.scheme not in ("http", "https")
+                or not parts.hostname or "*" in origin or parts.path or parts.query
+                or parts.fragment or parts.username or parts.password):
+            log.error("%s: %r is not an exact http(s) origin; ignored (a wildcard or a path is "
+                      "never accepted)", CORS_ORIGINS_ENV, token)
+            continue
+        if origin not in out:
+            out.append(origin)
+    return out or list(DEFAULT_CORS_ORIGINS)

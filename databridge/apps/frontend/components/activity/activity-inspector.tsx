@@ -13,6 +13,7 @@ import {
   KIND_LABEL,
   actorText,
   decisionRefusalText,
+  deciderText,
   decisionText,
   fetchActivityRun,
   formatCost,
@@ -70,7 +71,7 @@ export function ActivityInspector({
             <KV label="action"><Maybe value={item.name ?? item.action_id} /></KV>
             <KV label="tool"><Maybe value={item.tool} /></KV>
             <KV label="mode"><Maybe value={item.automation_mode} /></KV>
-            <KV label="decided by"><Maybe value={item.decided_by} /></KV>
+            <KV label="decided by"><Maybe value={item.decided_by ? deciderText(item.decided_by, item.decided_by_dev_only) : item.decided_by} /></KV>
             <KV label="outcome"><Maybe value={item.outcome} /></KV>
             {item.refusal ? (
               <KV label="refused">
@@ -237,7 +238,7 @@ function RunDetail({
                 <button type="button" className="text-left hover:underline" onClick={() => onSelect?.(a)}>
                   <span className="font-mono text-fg">{a.name ?? a.action_id}</span> —{" "}
                   <span className={a.outcome === "execution_failed" || a.outcome === "refused" ? "text-band-review" : ""}>{a.outcome}</span>
-                  {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${a.decided_by}` : " (no decision recorded)"}
+                  {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${deciderText(a.decided_by, a.decided_by_dev_only)}` : " (no decision recorded)"}
                 </button>
               </li>
             ))}

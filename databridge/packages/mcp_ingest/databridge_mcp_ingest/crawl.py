@@ -478,9 +478,15 @@ def _q(name: str, dialect: Optional[dict] = None) -> str:
     return dialect_quote(dialect, name)
 
 
-def fetch_table(client, step: StepSpec, item: Item, *, limit: int) -> tuple[bytes, dict]:
-    """Describe, key, count and read a bounded, ORDERED page of one table. Returns canonical JSON
-    bytes (what is captured) and the parsed snapshot."""
+def fetch_table(client, step: StepSpec, item: Item, *, limit: Optional[int] = None,
+                page_rows: int = 1000) -> tuple[bytes, dict]:
+    """Describe, key, count and read one table — the WHOLE table by default (C-2 / FIN-18), page
+    by page in key order through the dialect's `select_page`, `page_rows` rows per call. `limit`
+    is an explicit cap (the connection's `scope.max_rows_per_table`, None = none): a capped table
+    is recorded as such (`snapshot["limit"]`) and the run reports "N of M rows" (`coverage`).
+    A dialect without `select_page` reads one bounded statement (the cap, else the counted total)
+    — still never silently short: the snapshot says what was read and what was counted.
+    Returns canonical JSON bytes (what is captured) and the parsed snapshot."""
     dialect = sql_dialect(step.sql.dialect)
     ctx = dict(item.ctx)
     columns = [{"name": r.get("column_name"), "type": r.get("data_type")}
@@ -498,12 +504,41 @@ def fetch_table(client, step: StepSpec, item: Item, *, limit: int) -> tuple[byte
                 total = int(next(iter(counted[0].values())))
             except (TypeError, ValueError, StopIteration):
                 total = None
-    order_by = ", ".join(_q(c, dialect) for c in pk) if pk else "1"
-    rows = _sql(client, step, dialect["select"], {**ctx, "order_by": order_by, "limit": limit},
-                dialect)
+    cap = int(limit) if limit else None
+    page_rows = max(1, int(page_rows or 1000))
+    key_order = ", ".join(_q(c, dialect) for c in pk) if pk else "1"
+    rows: list[dict] = []
+    if total is not None and total <= page_rows:
+        # the whole table fits one statement (the counted total): one read, as always
+        rows = _sql(client, step, dialect["select"],
+                    {**ctx, "order_by": key_order,
+                     "limit": cap if cap is not None and cap < page_rows else page_rows}, dialect)
+    elif dialect.get("select_page"):
+        # a keyless table is ordered by EVERY column, so OFFSET pages do not shift under ties
+        order_by = key_order if pk else (", ".join(str(i + 1) for i in range(len(columns)))
+                                         or "1")
+        prev_page: Optional[list] = None
+        while True:
+            want = page_rows if cap is None else min(page_rows, cap - len(rows))
+            if want <= 0:
+                break
+            got = _sql(client, step, dialect["select_page"],
+                       {**ctx, "order_by": order_by, "limit": want, "offset": len(rows)}, dialect)
+            if got and len(got) == want and got == prev_page:
+                raise CrawlError(f"{item.uri}: the server returned the same page twice (OFFSET "
+                                 f"ignored?); the table cannot be read whole by paging")
+            prev_page = got
+            rows.extend(got)
+            if len(got) < want:
+                break
+    else:
+        bound = cap if cap is not None else (total if total is not None else page_rows)
+        rows = _sql(client, step, dialect["select"],
+                    {**ctx, "order_by": key_order, "limit": max(bound, 1)}, dialect)
     snapshot = {"schema": ctx.get("schema"), "table": ctx.get("table"), "columns": columns,
                 "primary_key": pk, "foreign_keys": fks, "row_count_total": total,
-                "limit": limit, "rows": rows}
+                # the capture is content-addressed: HOW it was paged is not part of it
+                "limit": cap, "rows": rows}
     data = json.dumps(snapshot, sort_keys=True, default=str, ensure_ascii=False).encode("utf-8")
     return data, json.loads(data)
 

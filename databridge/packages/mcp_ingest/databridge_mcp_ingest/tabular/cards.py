@@ -116,6 +116,11 @@ def card_text(source_id: str, profile: dict, facts_entry: Optional[dict], *,
         else:
             lines.append(f"Graph: all {n} rows as `{node['kind']}` nodes"
                          f"{' (once the mapping is approved)' if m.get('status') != 'approved' else ''}.")
+    elif m.get("association") and m.get("edges"):
+        e = (m.get("edges") or [{}])[0]
+        lines.append(f"Graph: a join table — each row is a `{e.get('kind')}` EDGE between the "
+                     f"rows it references ({e.get('fk')}), not a node"
+                     f"{' (once the mapping is approved)' if m.get('status') != 'approved' else ''}.")
     else:
         lines.append("Graph: this table is not mapped to an ontology kind, so its rows are NOT "
                      "graph nodes (they are in the facts store).")

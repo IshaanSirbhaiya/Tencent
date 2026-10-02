@@ -12,6 +12,16 @@ written down here (CLAUDE.md rule 6). Findings: wiki/40-reviews/E2E-2026-10-01.m
 wiki/40-reviews/E2E-2026-10-01-run2.md (run 2: + delegation D, materialise M, adaptation A,
 security S). The run-2 tests read the artefacts `scripts/e2e/run2_phase*.py` saved under
 <run>/artefacts; a run-2 artefact that is absent skips its test (a run-1 dir has none).
+
+**Either estate** (2026-10-02): ``WALNUT_E2E_ESTATE=finance`` asserts over a finance run directory
+(``var/finance``), ``workspace`` (the default) over the runs 1-4 directories. Tests that read the
+workspace corpus's own expected outcomes skip on another estate.
+
+**Completeness** (``test_c_*``, after the finance dry run): four live runs proved that every value
+the graph holds re-verifies, and none asked whether the graph holds what the source has. The
+``test_c_*`` assertions compare the source's own counts (rows, declared FKs) with the graph's, with
+thresholds derived from the estate — ``scripts/e2e/completeness.py``, and
+``wiki/40-reviews/LESSON-2026-10-02-completeness.md`` for why.
 """
 from __future__ import annotations
 
@@ -32,10 +42,16 @@ RUN = os.environ.get("WALNUT_E2E_DIR")
 if not RUN:
     pytest.skip("WALNUT_E2E_DIR not set: no completed e2e run to assert over", allow_module_level=True)
 E = (ROOT / RUN).resolve() if not Path(RUN).is_absolute() else Path(RUN)
-if not (E / "graph" / "workspace.db").is_file():
-    pytest.skip(f"{E} holds no e2e graph", allow_module_level=True)
 sys.path.insert(0, str(ROOT / "scripts" / "e2e"))
+from e2e_env import ESTATES, estate_name, graph_db  # noqa: E402
+
+ESTATE = estate_name()
+GRAPH = graph_db(E, ESTATE)
+if not GRAPH.is_file():
+    pytest.skip(f"{E} holds no {ESTATE} e2e graph ({GRAPH.name})", allow_module_level=True)
 os.environ["WALNUT_E2E_DIR"] = str(E)
+workspace_only = pytest.mark.skipif(
+    ESTATE != "workspace", reason="reads the workspace corpus's own expected outcomes / sources")
 
 
 def _jsonl(p: Path) -> list[dict]:
@@ -50,6 +66,7 @@ def _first_full_files_run() -> Path:
     return full[0]
 
 
+@workspace_only
 def test_screen_decisions_match_expected_outcomes():
     expected = yaml.safe_load((ROOT / "fixtures/workspace_demo/expected_outcomes.yaml")
                               .read_text(encoding="utf-8"))["files"]
@@ -65,6 +82,7 @@ def test_screen_decisions_match_expected_outcomes():
     assert collections.Counter(got[k]["decision"] for k in expected) == want
 
 
+@workspace_only
 def test_blocked_and_review_items_never_built():
     run = _first_full_files_run()
     decisions = {r["item_id"]: r["decision"] for r in _jsonl(run / "governance.jsonl")}
@@ -82,13 +100,14 @@ def test_every_pointer_reverifies():
 
 def test_graph_has_no_dangling_edges_and_spans_both_sources():
     import graph_audit
-    out = graph_audit.audit(E / "graph" / "workspace.db")
+    out = graph_audit.audit(GRAPH)
     assert out["nodes"] > 0
     assert out["dangling_count"] == 0, out["dangling_edges"][:5]
     assert out["components_spanning_both_sources"] >= 1
     assert out["cross_source_entities_own_pointers"]
 
 
+@workspace_only
 def test_briefing_cites_two_sources():
     recs = [json.loads(Path(p).read_text(encoding="utf-8"))
             for p in glob.glob(str(E / "runs" / "agent" / "account_briefing" / "*.json"))]
@@ -104,6 +123,69 @@ def test_every_model_step_names_its_model():
     steps = [s for r in recs if r.get("status") == "completed" for s in r.get("steps") or []]
     assert steps, "vacuous: no steps"
     assert all((s.get("produced_by") or {}).get("model") for s in steps)
+
+
+# ============================================================== completeness (finance dry run)
+_COMPLETENESS: dict = {}
+
+
+def _completeness() -> dict:
+    """The completeness audit of this run, computed once (read-only over graph, capture, ingest)."""
+    if not _COMPLETENESS:
+        import completeness
+
+        answers = next((d for d in (E / "dryrun" / "http", E / "artefacts" / "http")
+                        if d.is_dir()), None)
+        _COMPLETENESS.update(completeness.audit(
+            GRAPH, E / "ingest", E / "capture", answers_dir=answers,
+            bound_packs=ESTATES[ESTATE]["packs"].split(","), packs_dir=ROOT / "packs"))
+    return _COMPLETENESS
+
+
+def test_c_every_source_row_reaches_the_graph():
+    """Per captured table: the source's own row count == rows captured == rows the graph cites.
+    A short capture is a row cap; a short graph is a build that dropped rows."""
+    out = _completeness()
+    assert out["tables"], "vacuous: no captured table in this run"
+    check = out["checks"]["rows_complete"]
+    assert check["passed"], check
+
+
+def test_c_every_declared_foreign_key_becomes_an_edge():
+    out = _completeness()
+    assert out["foreign_keys"] or any(t["association"] for t in out["tables"]),         "vacuous: the run declares no foreign key"
+    assert sum(f["edges_expected"] for f in out["foreign_keys"]) > 0
+    check = out["checks"]["declared_fks_built"]
+    assert check["passed"], check
+
+
+def test_c_isolated_nodes_are_no_more_than_the_declared_keys_predict():
+    """The threshold is DERIVED: a table-row node is predicted isolated only when it neither
+    references nor is referenced by a captured row through a declared key."""
+    out = _completeness()
+    iso = out["isolation"]
+    assert iso["table_nodes"] > 0, "vacuous: no table-row nodes"
+    assert iso["isolated"] <= iso["predicted_isolated"], iso
+
+
+def test_c_every_foreign_key_value_resolves_to_a_captured_row():
+    check = _completeness()["checks"]["references_resolved"]
+    assert check["passed"], check
+
+
+def test_c_values_shared_across_sources_are_linked():
+    """A column whose values are another source's keys (by the data, not by name) must be an edge
+    — or the platform must have proposed one. Today there is no proposal path, so: an edge."""
+    check = _completeness()["checks"]["cross_source_links"]
+    assert check["passed"], check
+
+
+def test_c_no_answer_uses_another_packs_subject_vocabulary():
+    out = _completeness()
+    if "foreign_vocabulary" not in out:
+        pytest.skip("this run captured no HTTP responses to scan")
+    assert out["foreign_vocabulary"]["terms"], "vacuous: no unbound pack declares a subject"
+    assert out["checks"]["no_foreign_vocabulary"]["passed"], out["foreign_vocabulary"]["hits"][:5]
 
 
 # ===================================================================================== run 2 (E2E2)

@@ -128,8 +128,9 @@ def compile_declaration(decl: Union[dict, str], catalogue: CatalogueLike, *,
             "not_compiled",
             reason=(f"no purpose is configured for pack {data.get('pack')!r}. A purpose is the "
                     f"lawful basis for every read and must be declared in "
-                    f"packs/{data.get('pack')}/purposes.yaml (set WALNUT_AGENT_PURPOSE when the "
-                    f"pack declares several)."))
+                    f"packs/{data.get('pack')}/purposes.yaml. When the pack declares several, "
+                    f"mark the one agents compiled from English run under with "
+                    f"`default_for_compiled_agents: true`, or set WALNUT_AGENT_PURPOSE."))
     try:
         # the runtime's parser: same strict YAML and the same digest `load_agent` will compute
         parsed = parse_declaration_text(text, declared_in=f"var/agents/{data.get('agent')}"

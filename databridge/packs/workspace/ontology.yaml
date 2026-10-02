@@ -154,3 +154,5 @@ subject_kinds:
     # the match against the system of record, which is what `verified_channel` means.
     attestation: verified_channel
     grant_type: PersonReadGrant
+    attested_by: a named member of staff
+    held_by: the organisation

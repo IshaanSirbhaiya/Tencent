@@ -147,6 +147,9 @@ export interface IntelligenceResponse {
   graph_unavailable: string | null;
   queue: QueueSummary | null;
   queue_unavailable: string | null;
+  /** False when this deployment mounts no intake queue at all (C-5): the card is left out. Absent
+   *  on an older gateway, where the card is shown only if a queue or a failure reason came back. */
+  queue_mounted?: boolean;
   /** Coverage and exclusions per ingestion source, from the run ledgers. Absent from older
    *  gateways, so optional. */
   ingestion?: IngestionSummary | null;

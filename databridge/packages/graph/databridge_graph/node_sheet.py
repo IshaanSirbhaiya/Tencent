@@ -96,23 +96,55 @@ def _is_subject_kind(kind) -> bool:
     return active_vocabulary().is_subject(str(kind))
 
 
+#: FIN-09: both caveats are worded from the subject KIND (its noun), the attestation mode its pack
+#: declares, and the pack's optional `attested_by` / `held_by` wording (`subject_kinds`). Under the
+#: healthcare binding they render byte-identically to the fixed strings they replaced.
+_HOW_ATTESTED = {"in_person": "checked in person",
+                 "verified_channel": "confirmed against the system of record"}
+NEUTRAL_ATTESTED_BY = "a named human"
+NEUTRAL_HELD_BY = "this system"
+
+
+def _wording(kind) -> tuple[str, str, str, str]:
+    """(noun, how, attested_by, held_by) for a subject kind (None: the neutral wording)."""
+    from .identity import _bound_subject, attestation_mode, subject_noun
+
+    k = _bound_subject(kind)
+    attested_by, held_by = (active_vocabulary().subject_wording(k) if k else (None, None))
+    return (subject_noun(k), _HOW_ATTESTED.get(attestation_mode(k) or "", "confirmed"),
+            attested_by or NEUTRAL_ATTESTED_BY, held_by or NEUTRAL_HELD_BY)
+
+
+def identity_claim_caveat(kind=None) -> str:
+    """The caveat at the head of a subject's claims block."""
+    noun, how, by, _ = _wording(kind)
+    return ("**CLAIMED ON THE DOCUMENT — NOT VERIFIED.** These link a document to registry "
+            f"candidates. Identity is {how} by {by}; the system never confirms it, and nothing "
+            f"below may be read as a determination of who this {noun} is.")
+
+
+def registry_row_caveat(kind=None) -> str:
+    """Emitted on EVERY subject sheet, claims or none. The claims block used to be the only place
+    a sheet said "not verified", so a subject merely held on file rendered a name, a date of birth
+    and a nationality with no caveat at all. Registry presence is not identification, and the
+    sheet is read by the MODEL as well as by a person (CLAUDE.md constraint 1)."""
+    _, how, by, held = _wording(kind)
+    return ("**A REGISTRY ROW IS NOT AN IDENTIFICATION.** This sheet describes a row "
+            f"{held} holds on file. It does not establish who any person at the counter is; "
+            f"identity is {how} by {by}, and the system never confirms it. Names are not unique "
+            "in the registry — several people on file share one.")
+
+
+#: The NEUTRAL renderings, kept under their old names for importers (no pack's subject named).
 IDENTITY_CAVEAT = (
     "**CLAIMED ON THE DOCUMENT — NOT VERIFIED.** These link a document to registry candidates. "
-    "Identity is checked in person by clinic staff; the system never confirms it, and nothing "
-    "below may be read as a determination of who this patient is."
-)
-
-#: Emitted on EVERY patient sheet, claims or none. The claims block above used to be the only
-#: place this document said "not verified", so a patient the clinic merely holds on file — 289 of
-#: the 300 once `clinic_seed` seeded the whole registry — rendered a name, a date of birth and a
-#: nationality with no caveat at all. Registry presence is not identification, and the sheet is
-#: read by the MODEL as well as by a person (CLAUDE.md constraint 1).
+    f"Identity is confirmed by {NEUTRAL_ATTESTED_BY}; the system never confirms it, and nothing "
+    "below may be read as a determination of who this subject is.")
 PATIENT_CAVEAT = (
-    "**A REGISTRY ROW IS NOT AN IDENTIFICATION.** This sheet describes a row the clinic holds on "
-    "file. It does not establish who any person at the counter is; identity is checked in person "
-    "by clinic staff, and the system never confirms it. Names are not unique in the registry — "
-    "several people on file share one."
-)
+    f"**A REGISTRY ROW IS NOT AN IDENTIFICATION.** This sheet describes a row {NEUTRAL_HELD_BY} "
+    f"holds on file. It does not establish who any person at the counter is; identity is "
+    f"confirmed by {NEUTRAL_ATTESTED_BY}, and the system never confirms it. Names are not unique "
+    "in the registry — several people on file share one.")
 
 # Longest untrusted string reproduced verbatim. A label is a name, a code or a short phrase; a
 # 40KB one is an attempt to push the caveat out of the model's attention, and truncating is the
@@ -360,7 +392,7 @@ def node_markdown(store,
         # Keyed on the KIND, never on whether a claim edge happens to exist. It is emitted here —
         # early, on its own line, before any attribute value — for the same reason the claims
         # caveat is: no supplied label, attribute or id can sit inside it or comment it out.
-        lines += ["", f"> {PATIENT_CAVEAT}"]
+        lines += ["", f"> {registry_row_caveat(node.kind)}"]
     if as_of is not None:
         lines.append(f"**Shown as of:** {_fmt_time(as_of)} (valid time; belief as held today)")
     if superseded:
@@ -389,6 +421,7 @@ def node_markdown(store,
         ]
 
     claims: list[str] = []
+    claimed_kinds: set[str] = set()
     relations: list[str] = []
     claim_kinds = claimed_identity_edges()
     for edge_row in store.edges_touching(node.id):
@@ -413,22 +446,36 @@ def node_markdown(store,
         else:
             label = other.label
         line = _relation_line(edge, label, other_id, outgoing)
+        if edge.kind in claim_kinds:
+            if other is not None and _is_subject_kind(other.kind):
+                claimed_kinds.add(str(getattr(other.kind, "value", other.kind)))
+            else:
+                # the endpoint is absent at this instant: the subject kinds the edge kind admits
+                decl = active_vocabulary().edge_kinds.get(str(getattr(edge.kind, "value",
+                                                                      edge.kind)))
+                ends = (decl.dst if outgoing else decl.src) if decl is not None else ()
+                claimed_kinds.update(k for k in ends if _is_subject_kind(k))
         (claims if edge.kind in claim_kinds else relations).append(
             line + (f"\n  - {_candidate_phrase(edge)}"
                     if edge.kind in claim_kinds else ""))
 
+    # the subject kind the claims are about: the sheet's own kind when it IS a subject, else the
+    # one subject kind its claim edges reach (several, or none: the neutral wording)
+    claim_subject = (node.kind if _is_subject_kind(node.kind)
+                     else (next(iter(claimed_kinds)) if len(claimed_kinds) == 1 else None))
     if claims:
         # A SEPARATE, TRUSTED BLOCK. The caveat is emitted before any untrusted text and is not
         # part of any line that contains some, so no supplied label, attribute or id can sit
         # inside it, precede it, or comment it out.
-        lines += ["", "## Claimed identity — NOT VERIFIED", "", f"> {IDENTITY_CAVEAT}", ""]
+        lines += ["", "## Claimed identity — NOT VERIFIED", "",
+                  f"> {identity_claim_caveat(claim_subject)}", ""]
         lines += claims
     elif _is_subject_kind(node.kind):
         # An empty section rather than none: "no document names this person" is an ANSWER, and
         # the absence of a heading reads as the question never having been asked.
         lines += ["", "## Claimed identity — NOT VERIFIED", "",
-                  "_No document on file names this patient. Being on file is not being "
-                  "identified._"]
+                  f"_No document on file names this {_wording(node.kind)[0]}. Being on file is "
+                  "not being identified._"]
 
     lines += ["", "## Relationships"]
     lines += relations or ["_No relationships recorded at this point in time._"]

@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+import unicodedata
+from dataclasses import dataclass, field
 from datetime import timedelta
 from difflib import SequenceMatcher
 from typing import Optional
@@ -26,7 +27,7 @@ from collections.abc import Sequence
 
 from databridge_core import SourcePointer
 
-from .packs import Vocabulary, active_vocabulary
+from .packs import IdentityRule, Vocabulary, active_vocabulary
 from .schema import IDENTITY_BEARING_FIELDS, GraphEdge, GraphNode
 from .store import GraphStore, row_to_edge, row_to_node
 
@@ -183,6 +184,14 @@ def resolve_existing(store: GraphStore, incoming: GraphNode,
     same = store.open_node_row(incoming.id)
     if same is not None:
         return same, "id"
+    # FIN-04: a record an approved identity rule ALREADY merged into another (`consolidate_identity`)
+    # re-sights the survivor, not a fresh copy of itself. `identity_rule_for` is None for every
+    # subject kind, so no subject can reach this branch.
+    rule = v.identity_rule_for(str(incoming.kind))
+    if rule is not None:
+        survivor = _absorbed_into(store, incoming)
+        if survivor is not None:
+            return survivor, "absorbed"
     if id_only:
         # The caller minted `incoming.id` as a MENTION id (the extractor's subject path, review
         # R-019 t06 C1): only a re-sighting of that exact mention may match. No canonical and no
@@ -205,6 +214,21 @@ def resolve_existing(store: GraphStore, incoming: GraphNode,
         row = store.find_by_canonical(incoming.kind, incoming.canonical_id)
         if row is not None:
             return row, "canonical"
+    # FIN-04: a kind whose pack declares identity rules merges on the rules a named human has
+    # APPROVED for this deployment (a business key, an exact normalised name), and on the default
+    # name-similarity step only when the pack says `similarity_merge: true`.
+    if rule is not None:
+        row, how = _rule_match(store, incoming, rule, approved_rule_types(rule, v))
+        if row is not None:
+            return row, how
+        if not rule.similarity_merge:
+            return None, ""
+    # FIN-07: a DOCUMENT is never one with another because their titles look alike. Two filings
+    # titled "Annual Report for the financial year ended 31 December 2023" from two companies are
+    # two documents; a document is identified by its source item (an id the extractor scopes to
+    # the item) or by a declared, grounded identifier (the canonical step above), never by name.
+    if v.is_document_kind(str(incoming.kind)):
+        return None, ""
     # A SUBJECT never reaches the similarity step, by TWO independent rules: the pack's
     # `never_fuzzy_merge` set, and `is_subject` itself (review R-019 t06 C1 — the pack loader forces
     # the flag True today, but a guard that holds only while one flag is set is one guard, not a
@@ -324,6 +348,294 @@ def name_prefix_join(store: GraphStore, incoming: GraphNode,
     return NameJoin(row=row, attr=attr, pointer=ptr, name=name)
 
 
+#: `matched_by` values that came from an approved identity rule (FIN-04), not from an id or key.
+RULE_MATCHES = frozenset({"business_key", "exact_name", "absorbed"})
+
+#: The attribute a survivor carries listing the record ids an identity rule merged into it. Its
+#: pointer is a derivation over the absorbed record's own pointer, so it is grounded like any value.
+MERGED_IDS_ATTR = "merged_record_ids"
+
+_NAME_WORD = re.compile(r"[^\w]+", re.UNICODE)
+
+
+def normalise_legal_name(name: object) -> str:
+    """The EXACT-name key (FIN-04): Unicode-folded, case-folded, punctuation and whitespace
+    collapsed. Nothing else: the legal form is KEPT ("… LLC" is not "… Ltd"), no token is dropped
+    or reordered, and no similarity is involved. "Pte. Ltd." and "PTE LTD" are one spelling."""
+    text = unicodedata.normalize("NFKC", str(name or "")).casefold().replace("_", " ")
+    return " ".join(_NAME_WORD.sub(" ", text).split())
+
+
+def _key_value(value: object) -> str:
+    """A business-key value as compared: exact, but blind to case and surrounding whitespace."""
+    if value is None:
+        return ""
+    return unicodedata.normalize("NFKC", str(value)).strip().casefold()
+
+
+def approved_rule_types(rule: IdentityRule, vocab: Vocabulary) -> frozenset[str]:
+    """The rule types a named human has approved for ``rule.kind`` in this deployment. Empty when
+    none is approved (the default): a declared rule merges nothing on its own. Fails CLOSED: an
+    unreadable state file raises rather than reading as 'nothing approved' or 'all approved'."""
+    from .ontology_state import approved_identity_rules                # noqa: PLC0415
+
+    approved = approved_identity_rules(vocab.packs)
+    return frozenset(t for t in rule.rule_types if (rule.kind, t) in approved)
+
+
+def _business_keys(node: GraphNode, rule: IdentityRule) -> dict[str, str]:
+    """The node's declared business keys, each grounded by its OWN pointer, normalised."""
+    out = {}
+    for key in rule.business_keys:
+        value = _key_value(node.attrs.get(key))
+        if value and key in node.attr_sources:
+            out[key] = value
+    return out
+
+
+def _keys_conflict(a: dict[str, str], b: dict[str, str]) -> bool:
+    """Two records that each carry the SAME business key with DIFFERENT values are two
+    organisations, whatever their names say (the near-name twins of a register)."""
+    return any(k in b and b[k] != v for k, v in a.items())
+
+
+def _open_of_kind(store: GraphStore, kind: str, where: str = "", params: tuple = ()):
+    return store.fetchall(
+        "SELECT * FROM nodes WHERE kind = ? AND system_to IS NULL AND valid_to IS NULL "
+        f"{where} ORDER BY rowid_pk", (kind, *params))
+
+
+def _rule_match(store: GraphStore, incoming: GraphNode, rule: IdentityRule,
+                approved: frozenset[str]):
+    """(row, how) for the ONE open record an approved rule says ``incoming`` is, else (None, "").
+    Two or more matching records is ambiguous and matches nothing."""
+    kind = str(incoming.kind)
+    mine = _business_keys(incoming, rule)
+    if "business_key" in approved:
+        for key, value in mine.items():
+            rows = [r for r in _open_of_kind(
+                        store, kind, "AND instr(lower(attrs_json), ?) > 0", (value,))
+                    if r["id"] != incoming.id]
+            hits = [r for r in rows
+                    if _business_keys(row_to_node(store, r), rule).get(key) == value]
+            if len({r["id"] for r in hits}) == 1:
+                return hits[0], "business_key"
+            if hits:
+                return None, ""
+    if "exact_name" in approved:
+        want = normalise_legal_name(incoming.label)
+        if want:
+            first = want.split()[0]
+            hits = []
+            for r in _open_of_kind(store, kind, "AND instr(lower(label), ?) > 0", (first,)):
+                if r["id"] == incoming.id or normalise_legal_name(r["label"]) != want:
+                    continue
+                if _keys_conflict(mine, _business_keys(row_to_node(store, r), rule)):
+                    continue
+                hits.append(r)
+            if len({r["id"] for r in hits}) == 1:
+                return hits[0], "exact_name"
+    return None, ""
+
+
+def _absorbed_into(store: GraphStore, incoming: GraphNode):
+    """The ONE open record of ``incoming``'s kind that lists ``incoming.id`` among the records an
+    identity rule merged into it, else None (two would be ambiguous: None)."""
+    hits = []
+    for r in _open_of_kind(store, str(incoming.kind), "AND instr(attrs_json, ?) > 0",
+                           (MERGED_IDS_ATTR,)):
+        try:
+            merged = json.loads(r["attrs_json"] or "{}").get(MERGED_IDS_ATTR) or []
+        except ValueError:
+            continue
+        if incoming.id in merged:
+            hits.append(r)
+    return hits[0] if len(hits) == 1 else None
+
+
+@dataclass
+class ConsolidationReport:
+    """What `consolidate_identity` did, per kind: every merge (survivor, absorbed records, the
+    rule types that joined them) and every group it REFUSED, with the reason."""
+    merged: list[dict] = field(default_factory=list)
+    refused: list[dict] = field(default_factory=list)
+    kinds: dict[str, list[str]] = field(default_factory=dict)
+
+    def as_record(self) -> dict:
+        return {"merged": self.merged, "refused": self.refused, "kinds": self.kinds}
+
+
+def consolidate_identity(store: GraphStore, vocab: Optional[Vocabulary] = None, *,
+                         approved: Optional[dict[str, frozenset[str]]] = None
+                         ) -> ConsolidationReport:
+    """Apply the APPROVED identity rules (FIN-04) to the records already in the store: every group
+    of open records of one rule-bearing kind that an approved rule says is one organisation
+    becomes ONE node. Run it after a rule is approved, and after an ingest run.
+
+    ``approved`` maps kind -> approved rule types; omitted, it is read from the ontology state
+    (`ontology_state.approved_identity_rules`), which is the only place approvals live.
+
+    What it will not do:
+      * touch a subject kind — `Vocabulary.identity_rule_for` has no rule for one, so a person is
+        never merged (CLAUDE.md hard constraint 1);
+      * join two records that carry the same business key with different values, however equal
+        their names (a name shared by two registered companies merges nothing in that group);
+      * re-point an attested determination edge — a record carrying one is refused, listed.
+
+    The survivor is the record with a canonical id and the most business keys (then the oldest);
+    absorbed records are CLOSED, never deleted (ADR-0003), their open edges re-pointed, their
+    attributes the survivor lacks carried over with their own pointers, and their ids listed in
+    the survivor's `merged_record_ids`, so a later sighting of one re-sights the survivor.
+    """
+    from .meta import ATTESTED_META_KINDS                               # noqa: PLC0415
+
+    v = vocab if vocab is not None else active_vocabulary()
+    report = ConsolidationReport()
+    for kind, rule in sorted(v.identity_rules.items()):
+        if v.is_subject(kind):                     # unreachable by construction; a wall anyway
+            continue
+        types = (approved or {}).get(kind) if approved is not None else approved_rule_types(rule, v)
+        types = frozenset(t for t in (types or ()) if t in rule.rule_types)
+        report.kinds[kind] = sorted(types)
+        if not types:
+            continue
+        rows = _open_of_kind(store, kind)
+        nodes = {r["id"]: row_to_node(store, r) for r in rows}
+        rowid = {r["id"]: r["rowid_pk"] for r in rows}
+        keys = {i: _business_keys(n, rule) for i, n in nodes.items()}
+        parent = {i: i for i in nodes}
+        comp_keys = {i: dict(k) for i, k in keys.items()}
+        why: dict[str, set] = {i: set() for i in nodes}
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        def union_all(ids, how):
+            roots = sorted({find(i) for i in ids}, key=lambda r: rowid[r])
+            merged_keys: dict[str, str] = {}
+            for r in roots:
+                if _keys_conflict(merged_keys, comp_keys[r]):
+                    return False
+                merged_keys.update(comp_keys[r])
+            head = roots[0]
+            for r in roots[1:]:
+                parent[r] = head
+                why[head] |= why[r]
+            comp_keys[head] = merged_keys
+            if len(roots) > 1:
+                why[head].add(how)
+            return True
+
+        if "business_key" in types:
+            for key in rule.business_keys:
+                groups: dict[str, list[str]] = {}
+                for i, k in keys.items():
+                    if key in k:
+                        groups.setdefault(k[key], []).append(i)
+                for value, ids in sorted(groups.items()):
+                    if len(ids) > 1 and not union_all(ids, "business_key"):
+                        report.refused.append({"kind": kind, "rule": "business_key",
+                                               "key": key, "records": sorted(ids),
+                                               "reason": "the records carry a different value "
+                                                         "for another business key"})
+        if "exact_name" in types:
+            groups = {}
+            for i, n in nodes.items():
+                name = normalise_legal_name(n.label)
+                if name:
+                    groups.setdefault(name, []).append(i)
+            for name, ids in sorted(groups.items()):
+                if len(ids) > 1 and not union_all(ids, "exact_name"):
+                    report.refused.append({"kind": kind, "rule": "exact_name",
+                                           "records": sorted(ids),
+                                           "reason": "the name is carried by records with "
+                                                     "different business keys: two "
+                                                     "organisations share it, so none is joined"})
+        components: dict[str, list[str]] = {}
+        for i in nodes:
+            components.setdefault(find(i), []).append(i)
+        for root, ids in sorted(components.items()):
+            if len(ids) < 2:
+                continue
+            attested = [i for i in ids for e in store.edges_touching(i)
+                        if e["system_to"] is None and _edge_is_attested(e, v, ATTESTED_META_KINDS)]
+            if attested:
+                report.refused.append({"kind": kind, "records": sorted(ids),
+                                       "reason": f"{sorted(set(attested))} carry an attested "
+                                                 f"determination edge; a rule never re-points "
+                                                 f"what a human attested"})
+                continue
+            survivor = min(ids, key=lambda i: (nodes[i].canonical_id is None,
+                                               -len(keys[i]), rowid[i]))
+            absorbed = sorted((i for i in ids if i != survivor), key=lambda i: rowid[i])
+            _absorb(store, nodes[survivor], [nodes[i] for i in absorbed], rule)
+            report.merged.append({"kind": kind, "survivor": survivor, "absorbed": absorbed,
+                                  "rules": sorted(why[root])})
+    return report
+
+
+def _edge_is_attested(row, vocab: Vocabulary, attested_metas) -> bool:
+    decl = vocab.edge_kinds.get(str(row["kind"]))
+    return decl is not None and decl.binds_to in attested_metas
+
+
+def _absorb(store: GraphStore, survivor: GraphNode, absorbed: list[GraphNode],
+            rule: IdentityRule) -> None:
+    """Close each absorbed record, re-point its open edges at the survivor, and open ONE new
+    version of the survivor carrying their pointers and the attributes it lacked."""
+    from .store import row_to_edge                                      # noqa: PLC0415
+
+    at = store.now()
+    floor = max([survivor.system_from, *(n.system_from for n in absorbed)])
+    if at <= floor:
+        at = floor + timedelta(microseconds=1)
+    attrs = dict(survivor.attrs)
+    attr_sources = dict(survivor.attr_sources)
+    sources = tuple(survivor.sources)
+    merged_ids = list(attrs.get(MERGED_IDS_ATTR) or [])
+    basis = []
+    for node in absorbed:
+        for key, value in node.attrs.items():
+            if key == MERGED_IDS_ATTR or value is None or key in attrs or attrs.get(key) is not None:
+                continue
+            if key in node.attr_sources:
+                attrs[key] = value
+                attr_sources[key] = node.attr_sources[key]
+        sources = sources + _new_pointers(sources, node.sources)
+        for mid in [node.id, *(node.attrs.get(MERGED_IDS_ATTR) or [])]:
+            if mid not in merged_ids and mid != survivor.id:
+                merged_ids.append(mid)
+        basis.append(node.sources[0])
+    prior = survivor.attr_sources.get(MERGED_IDS_ATTR)
+    if prior is not None:
+        basis.insert(0, prior)
+    attrs[MERGED_IDS_ATTR] = merged_ids
+    attr_sources[MERGED_IDS_ATTR] = SourcePointer(
+        source_id=basis[0].source_id, kind="derived", derived_from=basis,
+        derivation=(f"identity rule for {rule.kind!r} declared by pack {rule.pack!r} and "
+                    f"approved by a named human (ontology state): these records are one record"),
+        trust=basis[0].trust)
+    merged = survivor.model_copy(update={"attrs": attrs, "attr_sources": attr_sources,
+                                         "sources": sources, "system_from": at})
+    closed = store.replace_node(merged, at=at)
+    assert closed == 1, f"consolidation expected one open version of {survivor.id!r}"
+    for node in absorbed:
+        for row in store.edges_touching(node.id):
+            if row["system_to"] is not None:
+                continue
+            edge = row_to_edge(store, row)
+            src = survivor.id if edge.src_id == node.id else edge.src_id
+            dst = survivor.id if edge.dst_id == node.id else edge.dst_id
+            store.close_edge(edge.id, at=at)
+            upsert_edge(store, edge.model_copy(update={
+                "id": f"{src}|{edge.kind.value}|{dst}", "src_id": src, "dst_id": dst,
+                "system_from": at}))
+        store.close_node(node.id, at=at)
+
+
 def upsert_node(store: GraphStore, incoming: GraphNode,
                 vocab: Optional[Vocabulary] = None, *, id_only: bool = False) -> UpsertOutcome:
     """Idempotent: re-applying the same node CORROBORATES (no duplicate version).
@@ -346,6 +658,15 @@ def upsert_node(store: GraphStore, incoming: GraphNode,
                              requires_human_selection=subject)
 
     existing = row_to_node(store, row)
+    if matched_by in RULE_MATCHES:
+        # FIN-04: a record recognised by an approved identity rule is ANOTHER record of the same
+        # organisation, not a new statement of the survivor's identity. The survivor keeps its own
+        # canonical id and label (with their pointers): the incoming record's are still on file in
+        # its own pointers, which are appended below.
+        incoming = incoming.model_copy(update={
+            "canonical_id": existing.canonical_id, "label": existing.label,
+            "attr_sources": {k: p for k, p in incoming.attr_sources.items()
+                             if k not in IDENTITY_BEARING_FIELDS}})
     if not _conflicts(existing, incoming):
         # corroboration: append only NEW pointers (idempotent — same pointer twice is a no-op).
         # The existing (possibly richer) node is preserved — an extracted MENTION of a seed entity

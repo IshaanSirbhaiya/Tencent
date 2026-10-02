@@ -38,7 +38,7 @@ process memory and empties on restart, the ledger does not, and a committed row 
 **A claim edge is a CLAIM until a human settles it (R-26).** An edge binding to the ``ABOUT``
 meta-kind (``node_sheet.claimed_identity_edges``) is reported as a **relationship** only when a
 committed ledger row names the same document AND the same selected subject; otherwise it is an
-``identity_claim`` carrying the graph's own ``IDENTITY_CAVEAT``.
+``identity_claim`` carrying the graph's own ``identity_claim_caveat`` for the subject kind.
 
 **R-015.** Every route here requires ``auth.require_principal``; the release rule above is an
 additional question ("has a human confirmed this yet"), not a substitute for "may the caller ask".
@@ -56,9 +56,9 @@ from databridge_graph import GraphEdge, row_to_edge, row_to_node
 # The identity vocabulary is imported, never restated — see the note in `node_sheet`. If
 # `_candidate_phrase` is renamed this import fails loudly, which is the correct failure.
 from databridge_graph.node_sheet import (  # noqa: PLC2701
-    IDENTITY_CAVEAT,
     _candidate_phrase,
     claimed_identity_edges,
+    identity_claim_caveat,
 )
 
 from .auth import AuthenticatedPrincipal, install_auth_handler, require_principal
@@ -619,10 +619,13 @@ def _envelope(entity_id: str, entity_type: str, *,
               sources: list[dict],
               ledger_entries: list[dict],
               authorisation: dict,
-              ingestion: Optional[dict] = None) -> dict:
+              ingestion: Optional[dict] = None,
+              caveat_kind: Optional[str] = None) -> dict:
     """One response shape for every entity type, so a caller never has to guess which keys exist.
 
-    ``identity_caveat`` is populated only when something on this page IS an unsettled claim.
+    ``identity_caveat`` is populated only when something on this page IS an unsettled claim. It is
+    worded for the claimed subject's kind (``caveat_kind``, GRAPH6 FIN-09: the pack's own noun and
+    attestation), and neutrally when the kind is unknown or the claims name several kinds.
     """
     claims = identity_claims or []
     return {
@@ -632,13 +635,19 @@ def _envelope(entity_id: str, entity_type: str, *,
         "claim": claim,
         "relationships": relationships or [],
         "identity_claims": claims,
-        "identity_caveat": IDENTITY_CAVEAT if (claims or claim) else None,
+        "identity_caveat": identity_claim_caveat(caveat_kind) if (claims or claim) else None,
         "authorisation": authorisation,
         "sources": sources,
         "ledger_entries": ledger_entries,
         "ingestion": ingestion,
         "limitation": LIMITATION,
     }
+
+
+def _one_kind(kinds) -> Optional[str]:
+    """The single subject kind a caveat is about, or None (several, or none known)."""
+    found = sorted({str(k) for k in kinds if k})
+    return found[0] if len(found) == 1 else None
 
 
 def _attribute_evidence(attrs: dict, attr_sources: dict[str, SourcePointer]) -> dict:
@@ -683,6 +692,9 @@ def _node_response(app: FastAPI, store, policy: ExposurePolicy, commits: _Commit
         ledger_entries = [_ledger_row_to_dict(r) for r in commits.for_names(sorted(names))]
 
     relationships, claims = _split_incident_edges(store, policy, commits, node.id)
+    claimed_kinds = ({row["kind"]} if is_subject else
+                     {c.get("other_kind") for c in claims
+                      if c.get("other_kind") in policy.subject_kinds})
     return _envelope(
         entity_id, "node",
         node={
@@ -705,7 +717,8 @@ def _node_response(app: FastAPI, store, policy: ExposurePolicy, commits: _Commit
         sources=sources,
         ledger_entries=ledger_entries,
         authorisation=authorisation,
-        ingestion=_ingestion_block(runs, [*node.sources, *node.attr_sources.values()], sources))
+        ingestion=_ingestion_block(runs, [*node.sources, *node.attr_sources.values()], sources),
+        caveat_kind=_one_kind(claimed_kinds))
 
 
 def _edge_response(app: FastAPI, store, policy: ExposurePolicy, commits: _Commits,
@@ -756,8 +769,11 @@ def _edge_response(app: FastAPI, store, policy: ExposurePolicy, commits: _Commit
             # SUBJECT key, whatever the bound pack calls its subject kind.
             "patient_id": claimed_subject,
         })
+        _, subject_node = _claim_nodes(policy, edge.src_id, edge.dst_id)
+        subject_row = store.open_node_row(subject_node) if subject_node else None
         return _envelope(entity_id, "identity_claim", claim=claim, sources=sources,
-                         ledger_entries=[], authorisation=authorisation, ingestion=ingestion)
+                         ledger_entries=[], authorisation=authorisation, ingestion=ingestion,
+                         caveat_kind=subject_row["kind"] if subject_row is not None else None)
 
     payload = _edge_payload(edge)
     payload.update({"established": True, "established_by": [r["rowid_pk"] for r in backing],

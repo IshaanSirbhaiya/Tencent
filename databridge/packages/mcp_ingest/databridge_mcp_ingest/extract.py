@@ -4,7 +4,11 @@ a type nobody can read without fetching it, and extraction can record a skip wit
 
   text      .txt .md .csv .tsv .json .yaml .log .xml .html …   decoded UTF-8 (BOM-aware; cp1252
                                                                 fallback, recorded)
-  pdf       .pdf and images                                     packages/convert docling_extract
+  email     .eml, message/rfc822                                MIME DECODED (stdlib `email`,
+                                                                policy.default): headers, the
+                                                                text/plain body (else the HTML's
+                                                                text), text attachments
+  pdf      .pdf and images                                     packages/convert docling_extract
                                                                 (text layer + OCR, page-ordered)
   office    .docx .pptx .xlsx                                   docling DocumentConverter → Markdown
 
@@ -23,7 +27,8 @@ from typing import Optional
 
 TEXT_EXT = frozenset({".txt", ".md", ".markdown", ".csv", ".tsv", ".json", ".jsonl", ".yaml",
                       ".yml", ".log", ".xml", ".html", ".htm", ".rst", ".ini", ".cfg", ".toml",
-                      ".sql", ".eml"})
+                      ".sql"})
+EMAIL_EXT = frozenset({".eml"})
 PDF_EXT = frozenset({".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"})
 OFFICE_EXT = frozenset({".docx", ".pptx", ".xlsx"})
 
@@ -34,6 +39,7 @@ _MIME_TO_EXT = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
     "application/json": ".json", "text/csv": ".csv", "text/markdown": ".md",
     "text/plain": ".txt", "text/html": ".html", "image/png": ".png", "image/jpeg": ".jpg",
+    "message/rfc822": ".eml",
 }
 
 
@@ -90,8 +96,10 @@ def docling_available() -> bool:
 
 
 def extractor_for(name_or_path: str, mime: Optional[str] = None) -> Optional[str]:
-    """`text` | `pdf` | `office`, or None when no extractor exists for this type."""
+    """`text` | `email` | `pdf` | `office`, or None when no extractor exists for this type."""
     def by_ext(ext: str) -> Optional[str]:
+        if ext in EMAIL_EXT:
+            return "email"
         if ext in TEXT_EXT:
             return "text"
         if ext in PDF_EXT:
@@ -123,6 +131,8 @@ def extract_text(data: bytes, *, name: str, mime: Optional[str] = None,
     kind = extractor_for(name, mime)
     if kind is None:
         raise ExtractionFailed(f"no extractor for {name!r} ({mime})")
+    if kind == "email":
+        return extract_email(data)
     if kind == "text":
         text, warnings = _decode(data)
         # R-022 #13: judged on the DECODED text — a BOM-marked UTF-16 file is full of zero bytes
@@ -158,6 +168,69 @@ def extract_text(data: bytes, *, name: str, mime: Optional[str] = None,
     except Exception as exc:                                         # noqa: BLE001
         raise ExtractionFailed(f"docling could not read this file: {exc}") from exc
     return Extracted(text=text, extractor="docling:office")
+
+
+#: Text attachments of an email rendered into its extracted text (by the sniffed format).
+_EMAIL_TEXT_ATTACHMENTS = frozenset({"txt", "markdown", "csv", "tsv", "json", "jsonl", "xml",
+                                     "yaml", "html"})
+_EMAIL_HEADERS = (("from", "From"), ("to", "To"), ("cc", "Cc"), ("date", "Date"),
+                  ("subject", "Subject"))
+_MAX_EMAIL_ATTACHMENT_CHARS = 2_000_000
+
+
+def extract_email(data: bytes) -> Extracted:
+    """An .eml as the text a mail client SHOWS. Read raw (as it used to be), the model saw base64
+    and quoted-printable transport encoding: msg_00119's body was one base64 block, and the model
+    returned nothing (FIN-01's trigger).
+
+    Parsed with the stdlib `email` package (policy.default) through the convert package's email
+    source adapter (`databridge_convert.adapters.source.email.parse` — reused, not rebuilt): the
+    typed headers, the body (text/plain preferred over text/html; HTML reduced to its text), then
+    each TEXT attachment, decoded, under a `--- attachment: <name> (<type>) ---` line. Binary
+    attachments are named, not rendered.
+
+    **Locator.** The capture keeps the ORIGINAL bytes; this rendering is the capture's extracted
+    text (`<sha>.txt`, digest `text_sha256`, extractor `email`). A `doc_span` pointer's
+    `char_start`/`char_end` index THIS decoded text — as a PDF's pointers index its docling text —
+    never raw-byte offsets into the MIME source, and the grounding wall checks every value against
+    it. A message that does not parse keeps its raw text, with a warning (never dropped)."""
+    try:
+        from databridge_convert.adapters.source import email as s_email
+
+        parsed = s_email.parse(data)
+    except Exception as exc:                                         # noqa: BLE001
+        text, warnings = _decode(data)
+        if "\x00" in text[:4096]:
+            raise ExtractionFailed("binary content in an email-typed item") from exc
+        return Extracted(text=text, extractor="email",
+                         warnings=(*warnings, f"email did not parse ({type(exc).__name__}); "
+                                              f"raw MIME text kept"))
+    lines: list[str] = []
+    for key, label in _EMAIL_HEADERS:
+        v = parsed.headers.get(key)
+        if v:
+            lines.append(f"{label}: {', '.join(v) if isinstance(v, list) else v}")
+    body = "\n".join(b.text for b in parsed.doc.blocks if b.text)
+    parts = ["\n".join(lines), body]
+    warnings: list[str] = list((parsed.doc.source_meta or {}).get("loss_report") or [])
+    for a in parsed.attachments:
+        head = f"--- attachment: {a.filename} ({a.content_type}) ---"
+        if a.format_guess in _EMAIL_TEXT_ATTACHMENTS and b"\x00" not in a.data[:4096]:
+            att, w = _decode(a.data)
+            if a.format_guess == "html":
+                import re
+
+                att = html.unescape(re.sub(r"<[^>]+>", " ", att))
+            if len(att) > _MAX_EMAIL_ATTACHMENT_CHARS:
+                att = att[:_MAX_EMAIL_ATTACHMENT_CHARS]
+                warnings.append(f"attachment {a.filename}: truncated to "
+                                f"{_MAX_EMAIL_ATTACHMENT_CHARS} characters")
+            warnings.extend(w)
+            parts.append(f"{head}\n{att.strip()}")
+        else:
+            parts.append(f"{head}\n[binary attachment, {len(a.data)} bytes, not rendered]")
+    text = "\n\n".join(p for p in parts if p.strip()) + "\n"
+    return Extracted(text=text, extractor="email", warnings=tuple(warnings))
 
 
 #: Bump when the conversion itself changes (e.g. the Markdown post-processing above).
@@ -239,6 +312,6 @@ def _office_converter():
     return _OFFICE
 
 
-__all__ = ["extractor_for", "extract_text", "extract_text_cached", "convert_cache_path",
+__all__ = ["extractor_for", "extract_text", "extract_email", "extract_text_cached", "convert_cache_path",
            "Extracted", "ExtractionFailed", "guess_mime", "ext_of", "ext_of_mime",
            "docling_available", "text_digest"]

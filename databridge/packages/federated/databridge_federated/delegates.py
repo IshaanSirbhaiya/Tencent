@@ -42,6 +42,7 @@ from .contracts import (
     DATE_FIELD,
     SELF_VIA,
     TEXT_FIELD,
+    Aggregate,
     DelegateCoverage,
     EntityRef,
     ResultRow,
@@ -232,11 +233,113 @@ def resolve_text_filters(task: SubTask, table: FactsTable, *, facts: Any, conn: 
             resolved, uncertain)
 
 
+def _fold_text(v: Any) -> str:
+    """A text value with letter case and spacing taken out: what two spellings of ONE stored
+    value share (``'WATCHLIST'``, ``'Watchlist'``, ``' watchlist '``)."""
+    return " ".join(str(v).casefold().split())
+
+
+def fold_case_variants(task: SubTask, table: FactsTable, *, facts: Any, conn: str,
+                       cancel: Any = None) -> tuple[Optional[SubTask], list[str], int]:
+    """FIN-12. An ``eq`` filter on a text column compares one SPELLING, and a column that stores
+    one value in several spellings (``WATCHLIST`` 25 rows, ``Watchlist`` 5, ``watchlist`` 3)
+    then answers for a fraction of the rows that hold the value. Rule, never a model:
+
+    * the column's stored values equal to the filter value once letter case and spacing are
+      taken out (`_fold_text`) are found with one read-only statement;
+    * when that finds a spelling other than the filter's own, the filter reads ALL of them
+      (``in``), and the reading is returned as a sentence naming every spelling (shown to the
+      asker as an assumption);
+    * nothing else is matched: no substring, no word overlap, no distance — ``watch`` is not
+      ``watchlist``. The row key is never folded (a key names one row, spelled exactly), and the
+      caller does not fold a sub-task that reaches a person (`service.case_foldable`).
+
+    Returns ``(task to read instead, or None; sentences; statements issued)``."""
+    filters = list(task.filters)
+    said: list[str] = []
+    changed = False
+    probes = 0
+    for i, f in enumerate(task.filters):
+        if f.op != "eq" or not isinstance(f.value, str) or to_decimal(f.value) is not None:
+            continue
+        if f.field not in table.columns or f.field == table.key or not _fold_text(f.value):
+            continue
+        c = _q(f.field)
+        # SQLite's lower() folds ASCII only, so the bound value is folded the same way; Python's
+        # casefold then decides, over this narrowed set
+        sql = (f"SELECT DISTINCT CAST({c} AS TEXT) AS v FROM {_q(table.name)} "
+               f"WHERE lower(trim(CAST({c} AS TEXT))) = ? ORDER BY v LIMIT ?")
+        _check(sql)
+        _checkpoint(cancel)
+        probe = "".join(ch.lower() if ch.isascii() else ch for ch in f.value.strip())
+        ans = facts.query(conn, sql, params=(probe, _RESOLVE_CANDIDATES + 1))
+        probes += 1
+        want = _fold_text(f.value)
+        spellings = sorted({str(r[0]) for r in (getattr(ans, "rows", []) or [])
+                            if r and r[0] is not None and _fold_text(r[0]) == want})
+        if not spellings or spellings == [f.value]:
+            continue
+        filters[i] = f.model_copy(update={"op": "in", "value": tuple(spellings)}) \
+            if len(spellings) > 1 else f.model_copy(update={"value": spellings[0]})
+        changed = True
+        shown = ", ".join(repr(s) for s in spellings)
+        said.append(f"{table.name}.{f.field} = {f.value!r} was read as every stored spelling of "
+                    f"that value that differs from it only in letter case or spacing ({shown})")
+    return (task.model_copy(update={"filters": tuple(filters)}) if changed else None), said,         probes
+
+
+def _group_spellings(result: SubResult, task: SubTask, table: Optional[FactsTable]) -> list[str]:
+    """FIN-12: groups whose keys are one value spelled differently (``SGD`` and ``sgd``). They are
+    shown as the source stores them — never merged by a guess — and said, so a total split across
+    spellings is never read as two different values."""
+    if task.aggregate is None or not task.aggregate.group_by:
+        return []
+    out: list[str] = []
+    for g in task.aggregate.group_by:
+        seen: dict[str, set[str]] = {}
+        for r in result.rows:
+            gv = r.cells.get(g)
+            if gv is not None and isinstance(gv.value, str):
+                seen.setdefault(_fold_text(gv.value), set()).add(gv.value)
+        for spellings in seen.values():
+            if len(spellings) > 1:
+                where = f"{table.name}." if table is not None else ""
+                out.append(f"{where}{g} stores one value in several spellings "
+                           f"({', '.join(repr(s) for s in sorted(spellings))}); each spelling is "
+                           f"a separate group here, so its total is split across them")
+    return out
+
+
 def run_tabular(task: SubTask, entry: ConnectionEntry, *, facts: Any, today: dt.date,
                 principal: str, run_id: Optional[str], cancel: Any = None,
-                resolve_names: bool = False) -> SubResult:
+                resolve_names: bool = False, fold_case: bool = False) -> SubResult:
     """Exact SQL on the facts store. With ``resolve_names`` an EMPTY read whose text ``eq``
-    filter names no stored value is retried once through `resolve_text_filters` (E2E3 P-01)."""
+    filter names no stored value is retried once through `resolve_text_filters` (E2E3 P-01).
+    With ``fold_case`` a text ``eq`` filter reads every spelling of its value that differs only
+    in letter case or spacing (`fold_case_variants`, FIN-12)."""
+    folded: list[str] = []
+    probes = 0
+    table0 = entry.table(task.entity_kinds[0] if task.entity_kinds else "")
+    if fold_case and table0 is not None and task.filters:
+        widened, folded, probes = fold_case_variants(task, table0, facts=facts,
+                                             conn=entry.connection, cancel=cancel)
+        if widened is not None:
+            task = widened
+    result = _run_tabular_resolving(task, entry, facts=facts, today=today, principal=principal,
+                                    run_id=run_id, cancel=cancel, resolve_names=resolve_names)
+    split = _group_spellings(result, task, table0)
+    if not folded and not split and not probes:
+        return result
+    cov = result.coverage.model_copy(update={
+        "resolved": (*folded, *result.coverage.resolved),
+        "uncertain": (*result.coverage.uncertain, *split)})
+    return result.model_copy(update={"coverage": cov,
+                                     "queries": result.queries + probes})
+
+
+def _run_tabular_resolving(task: SubTask, entry: ConnectionEntry, *, facts: Any, today: dt.date,
+                           principal: str, run_id: Optional[str], cancel: Any = None,
+                           resolve_names: bool = False) -> SubResult:
     first = _run_tabular(task, entry, facts=facts, today=today, principal=principal,
                          run_id=run_id, cancel=cancel)
     if not resolve_names or not _is_empty(first) or not task.filters:
@@ -510,6 +613,20 @@ def _pushdown_rows(task: SubTask, table: FactsTable, ans: Any, conn: str, *,
                                  snapshot=snap)
             if dp is not None:
                 cells[agg.label()] = GroundedValue(value=value, pointer=dp)
+        count_label = Aggregate(op="count").label()
+        if agg.op != "count" and count_label not in cells and n == len(keys):
+            # FIN-12: the same statement already counted the group's rows (``COUNT(*)``) and read
+            # back every row key, so "how many, and what total" is answered by ONE read: the count
+            # is stated beside the total, cited to the key cell of every row it counted. Before
+            # this the count was computed and thrown away, and the planner dropped the separate
+            # count read it had planned.
+            cp = derived_pointer(source_id=conn, derivation=f"COUNT(*) over the pushed-down group "
+                                 f"[{group_desc}]",
+                                 inputs=[_source_cell(conn, table, table.key, k, snap)
+                                         for k in keys],
+                                 row_ids=keys, predicate=predicate, snapshot=snap)
+            if cp is not None:
+                cells[count_label] = GroundedValue(value=n, pointer=cp)
         rid = f"{conn}:{table.name}:group:" + "|".join(str(rec[g]) for g in agg.group_by)
         out.append(ResultRow(row_id=rid, cells=cells))
     return out, excluded

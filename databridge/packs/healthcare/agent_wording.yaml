@@ -65,3 +65,30 @@ console_notes:
   answer_is_a_list: >-
     The answer is a list of values, not a paragraph. The model chooses which values appear and
     writes none of them: each line is printed by code beside the pointer that value itself carries.
+
+# The identity refusal and the identity nouns (C-5, finance dry run 2026-10-02). The DETECTION rule
+# is engine code (`databridge_core.identity_guardrail`); these nouns are added to its generic floor
+# — under every binding, since the engine takes the union over every pack on disk — and this
+# refusal is the text it answers with when this pack is the voice. Paragraphs are separated by a
+# blank line.
+identity:
+  refusal: |-
+    I can't confirm anyone's identity, and I can't tell you whether an NRIC, FIN, passport or
+    insurance e-card is valid, current, or belongs to the person in front of you. Identity is
+    verified in person by clinic staff, and that check is outside what I do.
+
+    What I can do: show you the registry candidates a document matches, with the score and the
+    reason each one matched, and show you the exact text on the document that each value came
+    from. You make the call.
+  document_nouns: [nric, fin, passport]
+  subject_nouns: [patient]
+  record_nouns: [questionnaire]
+
+refusals:
+  no_send: |-
+    I can't send anything — no email, no Slack message, no submission. I have no tool that reaches
+    outside this system, by design: the documents I read come from outside the clinic, so an agent
+    that could send is one crafted sentence away from mailing patient data to a stranger.
+
+    What I can do is read the clinic graph and tell you what it says, with the source of every
+    line. A human writes and sends anything that leaves the building.

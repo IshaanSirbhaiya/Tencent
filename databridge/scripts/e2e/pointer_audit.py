@@ -11,7 +11,12 @@ For each row of `sources` (every version, every entity/edge/attribute pointer):
 Categories: verified | hash_mismatch | capture_missing | text_unbound | out_of_bounds |
 value_not_in_span | cell_missing | cell_value_mismatch | other.
 
-    python scripts/e2e/pointer_audit.py [label]
+    python scripts/e2e/pointer_audit.py [label]        (WALNUT_E2E_ESTATE selects the estate)
+
+The graph and the facts stores are opened read-only (`mode=ro`); the facts store checked for a
+pointer is the one its `source_id` names (`<source>_facts.sqlite`), so the audit runs on either
+estate. This audit proves every value the graph HOLDS re-verifies. It cannot see what the graph
+does NOT hold: `completeness.py` is that check.
 """
 from __future__ import annotations
 
@@ -25,7 +30,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from e2e_env import e2e_dir  # noqa: E402
+from e2e_env import ESTATES, e2e_dir, estate_name, graph_db  # noqa: E402
 
 E = e2e_dir()
 CAP = E / "capture"
@@ -103,7 +108,7 @@ def live_cell(table: str, pk: list, row_id: str, column: str) -> str:
     sql = f"select {column}::text from {table} where {pk[0]}::text = {QUOTE}{rid}{QUOTE}"
     try:
         out = subprocess.run(["docker", "exec", "walnut_demo_pg", "psql", "-U", "walnut", "-d",
-                              "larkspur", "-At", "-c", sql], capture_output=True, text=True,
+                              ESTATES[estate_name()]["live_db"], "-At", "-c", sql], capture_output=True, text=True,
                              timeout=30)
         LIVE[key] = out.stdout.rstrip("\n") if out.returncode == 0 else "error:" + out.stderr[:100]
     except Exception as exc:                                        # noqa: BLE001
@@ -112,7 +117,7 @@ def live_cell(table: str, pk: list, row_id: str, column: str) -> str:
 
 
 def main(label: str = "") -> dict:
-    c = sqlite3.connect(str(E / "graph" / "workspace.db"))
+    c = sqlite3.connect(f"{graph_db(E).resolve().as_uri()}?mode=ro", uri=True)
     node_rows = {r[0]: r for r in c.execute(
         "select rowid_pk,id,kind,label,canonical_id,attrs_json,system_to from nodes")}
     edge_rows = {r[0]: r for r in c.execute(
@@ -122,8 +127,14 @@ def main(label: str = "") -> dict:
     latest_label: dict = {}
     for k in sorted(node_rows):
         latest_label[node_rows[k][1]] = node_rows[k][3]
-    fpath = E / "facts" / "larkspur_db_facts.sqlite"
-    facts = sqlite3.connect(str(fpath)) if fpath.is_file() else None
+    facts_by_source: dict = {}
+
+    def facts_for(source_id) -> "sqlite3.Connection | None":
+        if source_id not in facts_by_source:
+            fpath = E / "facts" / f"{source_id}_facts.sqlite"
+            facts_by_source[source_id] = (sqlite3.connect(f"{fpath.resolve().as_uri()}?mode=ro",
+                                                          uri=True) if fpath.is_file() else None)
+        return facts_by_source[source_id]
     counts = collections.Counter()
     by_kind: dict = collections.defaultdict(collections.Counter)
     fails: dict = collections.defaultdict(list)
@@ -213,6 +224,7 @@ def main(label: str = "") -> dict:
                                                       "snapshot": row[col], "live": lv})
             elif lv.startswith("error"):
                 cells["live_error"] += 1
+            facts = facts_for(p.get("source_id"))
             if facts is not None and len(pk) == 1:
                 tname = table.split(".")[-1]
                 try:

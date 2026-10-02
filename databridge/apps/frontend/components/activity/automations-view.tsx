@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Inbox } from "lucide-react";
 import {
   decisionRefusalText,
+  deciderText,
   fetchAutomations,
   formatDuration,
   itemTone,
@@ -168,7 +169,7 @@ function FiringRow({
           >
             approval <span className="font-mono text-fg">{a.name ?? a.action_id}</span> —{" "}
             <span className={a.outcome === "execution_failed" || a.outcome === "refused" ? "text-band-review" : "text-fg"}>{a.outcome}</span>
-            {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${a.decided_by}` : " · no decision recorded"}
+            {a.refusal ? ` — ${decisionRefusalText(a.refusal)}` : a.decided_by ? ` by ${deciderText(a.decided_by, a.decided_by_dev_only)}` : " · no decision recorded"}
           </button>
         ))}
       </div>

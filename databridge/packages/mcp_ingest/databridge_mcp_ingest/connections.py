@@ -140,7 +140,11 @@ class Scope(_Strict):
     max_depth: int = 12
     tables_include: list[str] = Field(default_factory=list)
     tables_exclude: list[str] = Field(default_factory=list)
-    max_rows_per_table: int = 1000
+    max_rows_per_table: Optional[int] = None
+    """An EXPLICIT row cap per table (C-2 / FIN-18). None (the default) reads every table WHOLE,
+    page by page; a cap, when set, is reported per run as "N of M rows" (`coverage`)."""
+    table_page_rows: int = 1000
+    """Rows per paged read of a table (one SQL statement each)."""
     deny_tools: list[str] = Field(default_factory=list)
     """Tools this connection must never call during ingestion, whatever their names suggest
     (enforced by `client.ReadOnlyClient` in addition to the write-verb pattern)."""
@@ -781,6 +785,11 @@ def import_declarations(path: Optional[Path] = None, *, route: str = "direct",
             scope["file_types"] = list(raw_scope["include_extensions"])
         if raw_scope.get("max_bytes"):
             scope["max_bytes"] = int(raw_scope["max_bytes"])
+        # C-2: a table row cap is set only when the operator DECLARES one (none = whole tables)
+        if raw_scope.get("max_rows_per_table"):
+            scope["max_rows_per_table"] = int(raw_scope["max_rows_per_table"])
+        if raw_scope.get("table_page_rows"):
+            scope["table_page_rows"] = int(raw_scope["table_page_rows"])
         roots = [str(r) for r in raw_scope.get("roots") or []]
         if decl.get("source_class") == "database":
             if roots:

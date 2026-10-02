@@ -59,3 +59,23 @@ console_notes:
   answer_is_a_list: >-
     The answer is a list of values, not a paragraph. The model chooses which values appear and
     writes none of them: each line is printed by code beside the pointer that value itself carries.
+
+# The identity refusal and nouns (C-5, 2026-10-02). Detection is engine code; see
+# `databridge_core.identity_guardrail`. A workspace names no national identity document.
+identity:
+  refusal: |-
+    I can't confirm anyone's identity, and I can't tell you whether an identity document,
+    credential or directory record is valid, current, or belongs to the person you are dealing
+    with. Identity is confirmed by a named member of staff, and that check is outside what I do.
+
+    What I can do: show you the registry candidates a record matches, with the reason each one
+    matched, and show you the exact source text each value came from. You make the call.
+
+refusals:
+  no_send: |-
+    I can't send anything — no email, no chat message, no submission. I have no tool that reaches
+    outside this system, by design: the documents I read come from outside the organisation, so an
+    agent that could send is one crafted sentence away from mailing private records to a stranger.
+
+    What I can do is read the knowledge graph and tell you what it says, with the source of every
+    line. A human writes and sends anything that leaves the organisation.

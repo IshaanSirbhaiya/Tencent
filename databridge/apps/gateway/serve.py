@@ -3,7 +3,7 @@
 The repo uses pytest `pythonpath` instead of editable installs; this launcher mirrors that so
 `python serve.py` works without `uv`/installs. Binds 127.0.0.1 only (D-FE-6).
 
-    python serve.py            # serves http://127.0.0.1:8000
+    python serve.py            # serves http://127.0.0.1:8000  (WALNUT_GATEWAY_PORT to change)
 """
 from __future__ import annotations
 
@@ -73,5 +73,18 @@ import uvicorn  # noqa: E402
 
 from databridge_gateway.main import create_app  # noqa: E402
 
+def gateway_port(raw: str | None = None) -> int:
+    """FIN-19: the port, from ``WALNUT_GATEWAY_PORT`` (default 8000), so a second deployment can
+    run beside the first. The browser origins it admits are `auth.cors_allowed_origins`
+    (``WALNUT_CORS_ORIGINS``). Still loopback only (D-FE-6). A value that is not a port is refused
+    loudly rather than falling back to 8000, which is the OTHER deployment's port."""
+    text = (os.environ.get("WALNUT_GATEWAY_PORT", "") if raw is None else raw).strip()
+    if not text:
+        return 8000
+    if not text.isdigit() or not 0 < int(text) < 65536:
+        raise SystemExit(f"WALNUT_GATEWAY_PORT={text!r} is not a TCP port")
+    return int(text)
+
+
 if __name__ == "__main__":
-    uvicorn.run(create_app(), host="127.0.0.1", port=8000, log_level="info")
+    uvicorn.run(create_app(), host="127.0.0.1", port=gateway_port(), log_level="info")

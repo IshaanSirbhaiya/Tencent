@@ -181,7 +181,10 @@ def test_no_graph_degrades_to_a_reason_not_a_500_and_not_a_zero():
     assert r.status_code == 200
     body = r.json()
     assert body["graph"] is None and body["graph_unavailable"]
-    assert body["queue"] is None and body["queue_unavailable"]
+    # C-5: no intake queue mounted is not a failure — no reason is printed for it; the page is
+    # told the queue is absent and leaves the card out.
+    assert body["queue"] is None and body["queue_unavailable"] is None
+    assert body["queue_mounted"] is False
 
 
 def test_a_traversal_that_raises_degrades_to_a_reason_not_a_500(app, monkeypatch):

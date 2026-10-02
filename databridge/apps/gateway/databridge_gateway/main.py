@@ -19,8 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import demo_state as ds
-from .auth import (AuthenticatedPrincipal, install_auth_handler, log_auth_state_at_boot,
-                   require_principal)
+from .auth import (AuthenticatedPrincipal, cors_allowed_origins, install_auth_handler,
+                   log_auth_state_at_boot, require_principal)
 from .builder_routes import register_builder_routes
 from .connector_routes import register_connector_routes
 from .graph_routes import register_graph_routes
@@ -176,23 +176,39 @@ def _norm_value(tok: str) -> str:
 
 
 def unsupported_value_tokens(answer: str, evidence: str) -> list[str]:
-    """Every digit-bearing token of ``answer`` not found in ``evidence`` (case-insensitive,
-    surrounding punctuation ignored). Computed, never looked up: the check is the membership of
-    the answer's own tokens in the evidence the model was given.
+    """Every digit-bearing value of ``answer`` not found in ``evidence``. Computed, never looked
+    up: the check is the membership of the answer's own values in the evidence the model was given.
+
+    Values are read by what they ARE (``databridge_core.value_forms``, FIN-08):
+
+    * an identifier (``CM-2026-0029``) must occur in the evidence as a WHOLE token — never as a
+      substring, and its digits are never read as signed numbers;
+    * a number is compared by VALUE on both sides — ``33,600,000.00`` is supported by evidence
+      holding ``33600000.00``, and a different value is not. A bare integer of at most three
+      digits (a count in prose) keeps the old leniency of appearing anywhere in the evidence;
+    * any other digit-bearing token, as before.
 
     The QUESTION is not evidence (R-019 round 2, main #1): "is the balance 9000?" does not make
     9000 a supported value. A narration that repeats a value only the question holds is dropped
     and the claim-checked deterministic answer is served instead."""
-    haystack = (evidence or "").lower()
+    from databridge_core.value_forms import fold_dashes, value_spans  # noqa: PLC0415
+
+    haystack = fold_dashes(evidence or "").lower()
     known = {_norm_value(t) for t in _VALUE_TOKEN.findall(haystack)}
+    ev = value_spans(evidence or "")
+    ev_ids = {s.key for s in ev if s.kind == "id"}
+    ev_nums = {s.key for s in ev if s.kind == "num"}
     out: list[str] = []
-    for tok in _VALUE_TOKEN.findall(answer or ""):
-        norm = _norm_value(tok)
-        if not any(ch.isdigit() for ch in norm):
-            continue
-        if norm in known or norm in haystack:
-            continue
-        out.append(tok.strip(".,;:!?)(\"'-/"))
+    for sp in value_spans(answer or ""):
+        if sp.kind == "id":
+            ok = sp.key in ev_ids or sp.key in known
+        elif sp.kind == "num":
+            bare_count = sp.raw.isdigit() and len(sp.raw) <= 3
+            ok = sp.key in ev_nums or (bare_count and sp.raw in haystack)
+        else:
+            ok = sp.key in known or sp.key in haystack
+        if not ok and sp.raw not in out:
+            out.append(sp.raw)
     return out
 
 
@@ -206,10 +222,23 @@ def narration_claim_violations(answer: str, evidence: str) -> list[str]:
     The allowed forms are computed from the EVIDENCE the model was given — every value-shaped
     form in it, never listed, and never the question (main #1). What this adds to
     `unsupported_value_tokens` is what that check cannot see because it carries no digit — a
-    spelled-out magnitude ("a hundred"), a unit-worded amount, a hedged quantity."""
+    spelled-out magnitude ("a hundred"), a unit-worded amount, a hedged quantity.
+
+    FIN-08: two forms are added to the allowed set from the ANSWER, both decided by
+    ``databridge_core.value_forms``: a number written differently from the evidence but EQUAL to
+    an evidence value (``33,600,000.00`` against ``33600000.00``), and every identifier as a whole
+    token — `check_claims` would otherwise read ``CM-2026-0029`` as the signed numbers ``-2026`` /
+    ``-0029``. Whether an identifier is supported is `unsupported_value_tokens`' job (whole-token
+    membership); a number of a different VALUE is still not allowed, and hedging is still checked
+    on the original text."""
     from databridge_convert.generate.claim_check import check_claims  # noqa: PLC0415
+    from databridge_core.value_forms import value_spans  # noqa: PLC0415
 
     allowed = set(_EVIDENCE_FORM.findall(evidence or ""))
+    ev_nums = {s.key for s in value_spans(evidence or "") if s.kind == "num"}
+    for sp in value_spans(answer or ""):
+        if sp.kind == "id" or (sp.kind == "num" and sp.key in ev_nums):
+            allowed.add(sp.raw)
     return [v.token for v in check_claims(answer or "", facts=[], allow=allowed).violations]
 
 
@@ -290,7 +319,7 @@ def narration_identity_claims(answer: str) -> list[str]:
     question screen over the answer, so a narration phrased like a forbidden question is caught
     by the same rules. Any hit drops the narration — the system presents candidates, a human
     decides who someone is (CLAUDE.md hard constraint 1)."""
-    from databridge_intake.guardrails import check_question  # noqa: PLC0415
+    from databridge_core.identity_guardrail import check_question  # noqa: PLC0415
 
     text = re.sub(r"\s+", " ", answer or "")
     hits = [m.group(0) for pat in (*_subject_patterns(), *_IDENTITY_ASSERTIONS)
@@ -437,10 +466,12 @@ def create_app() -> FastAPI:
     # it happen lazily on whichever request reaches a gated route first. See `auth.py`.
     log_auth_state_at_boot()
     app = FastAPI(title="DataBridge Gateway", version="0.1.0", lifespan=lifespan)
-    # CORS closed to the local dev origin only (D-FE-6).
+    # CORS closed to the deployment's own frontend origins (D-FE-6). FIN-19: read from
+    # `WALNUT_CORS_ORIGINS` (`auth.cors_allowed_origins`, default the local :3000 pair), so a
+    # second deployment on another port (finance on :3100) is not refused by its own browser.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=cors_allowed_origins(),
         allow_methods=["*"], allow_headers=["*"],
     )
 
@@ -733,7 +764,7 @@ def create_app() -> FastAPI:
         # THE GUARDRAIL, FIRST. Identity-verification questions are refused deterministically,
         # before any model is reached — the system prompt forbids them too, but a prompt is a
         # request and this is the guarantee (CLAUDE.md §Hard constraints 1).
-        from databridge_intake.guardrails import check_question
+        from databridge_core.identity_guardrail import check_question
 
         screened = check_question(req.question)
         if screened.refused:

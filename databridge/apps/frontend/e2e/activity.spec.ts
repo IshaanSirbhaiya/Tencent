@@ -2,7 +2,9 @@ import { test, expect, type APIRequestContext } from "@playwright/test";
 import {
   ACTIVITY_KINDS,
   NOT_RECORDED,
+  DEV_TOKEN_NOTE,
   actorText,
+  deciderText,
   coverageWarning,
   decisionText,
   formatDuration,
@@ -130,6 +132,14 @@ const sub = (status: SubtaskNode["status"], agent = "crm_agent"): SubtaskNode =>
 });
 
 test.describe("@unit activity helpers", () => {
+  test("FIN-16 a decision made with the dev token is marked, a real one is not", () => {
+    expect(deciderText("analyst-7", true)).toContain(DEV_TOKEN_NOTE);
+    expect(deciderText("analyst-7", false)).toBe("analyst-7");
+    expect(deciderText(null, true)).toBe(NOT_RECORDED);
+    expect(actorText({ type: "person", id: "analyst-7", dev_only: true })).toContain(DEV_TOKEN_NOTE);
+    expect(actorText({ type: "person", id: "analyst-7" })).not.toContain(DEV_TOKEN_NOTE);
+  });
+
   test("a missing measurement is 'not recorded', never zero", () => {
     expect(formatDuration(null)).toBe(NOT_RECORDED);
     expect(formatDuration(undefined)).toBe(NOT_RECORDED);

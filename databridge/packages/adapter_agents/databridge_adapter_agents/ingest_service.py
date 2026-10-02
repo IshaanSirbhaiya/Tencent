@@ -614,13 +614,22 @@ class McpIngestService:
     def propose_table_mappings(self, source_id: str, refs: list[str], *, vocab: Any,
                                harness: Any = None) -> dict[str, dict[str, Any]]:
         """Proposed mapping entries for new tables: measured profile → `mapping.propose_rules`,
-        then `mapping.propose_model` for what no rule mapped (constrained to the vocabulary)."""
+        then `mapping.propose_model` for what no rule mapped (constrained to the vocabulary).
+
+        The rules are told the kinds the source's mapping ALREADY gives its other tables
+        (`known_kinds`, exactly as an ingest sync tells them), so a foreign key or a join into
+        one of those tables resolves to the kind a person approved — never to a kind guessed
+        from the referenced table's name alone (R-026 LINK7 cross-track 2). A join table is
+        never offered to the model as a node, as in an ingest sync."""
         drift = self._module("databridge_mcp_ingest.drift")
         mapping = self._module("databridge_mcp_ingest.mapping")
         snaps = drift.profile_tables(source_id, list(refs), root=self.sources_root)
         current = mapping.load_mapping(source_id, self.sources_root)
-        proposed = mapping.propose_rules(snaps, vocab)
+        known_kinds = {t: (tm.node or {}).get("kind") for t, tm in current.tables.items()
+                       if tm.status != "unmapped"}
+        proposed = mapping.propose_rules(snaps, vocab, known_kinds=known_kinds)
         unmapped = [t for t, tm in proposed.items() if tm.status == "unmapped"
+                    and not tm.association
                     and not (snaps[t].get("history_snapshot") or {}).get("is")]
         proposed.update(mapping.propose_model(snaps, unmapped, {**current.tables, **proposed},
                                               vocab, harness))

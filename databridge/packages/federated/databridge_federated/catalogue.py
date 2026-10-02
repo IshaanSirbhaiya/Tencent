@@ -251,6 +251,65 @@ def registry_specs(root: Any = None) -> tuple[list[Any], dict[str, str]]:
     return specs, dict(reg.problems)
 
 
-__all__ = ["FactsTable", "ConnectionEntry", "AdapterAgentEntry", "Catalogue", "build_catalogue",
+@dataclass(frozen=True)
+class DirectFactsSpec:
+    """A declared connection no adapter agent keeps, offered to the planner through its own
+    read-only facts store (FIN-15). Shaped like an ``AdapterAgentSpec`` for `build_catalogue`; its
+    id is the connection's own id, so a plan names the source it reads."""
+
+    id: str
+    title: str
+    connections: tuple[str, ...]
+    status: str = "active"
+
+
+def declared_connections(sources_dir: Any = None) -> list[str]:
+    """Every connection the deployment declares: ``<WALNUT_SOURCES_DIR>/<id>.yaml`` (the plan,
+    mapping and tools files beside it — ``<id>.<what>.yaml`` — are not connections). Read-only;
+    an unreadable directory declares nothing."""
+    from pathlib import Path                                      # noqa: PLC0415
+
+    if sources_dir is None:
+        try:
+            from databridge_mcp_ingest import paths as _paths      # noqa: PLC0415
+            sources_dir = _paths.sources_dir()
+        except Exception:                                         # noqa: BLE001 - none declared
+            return []
+    base = Path(sources_dir)
+    if not base.is_dir():
+        return []
+    return sorted(p.stem for p in base.glob("*.yaml") if "." not in p.stem)
+
+
+def unowned_facts_specs(specs: Iterable[Any], facts: Any, connections: Optional[Iterable[str]]
+                        = None) -> tuple[list[DirectFactsSpec], list[str]]:
+    """``(specs, notes)``: one `DirectFactsSpec` per declared connection that NO adapter agent
+    (active or paused) keeps and whose facts store exists. FIN-15: counting is a read of the facts
+    store the ingest already built and a human already approved; it does not need an adapter agent
+    to exist first. A paused adapter agent's connection is NOT offered this way (the operator
+    paused it). The caller's grant still decides what is read (`CatalogueAdmission`)."""
+    if facts is None:
+        return [], []
+    kept = {c for s in specs for c in getattr(s, "connections", ())}
+    taken = {getattr(s, "id", None) for s in specs}
+    out: list[DirectFactsSpec] = []
+    for cid in (declared_connections() if connections is None else connections):
+        cid = str(cid)
+        if not cid or cid in kept or cid in taken:
+            continue
+        try:
+            if not facts.available(cid):
+                continue
+        except Exception:                                         # noqa: BLE001 - not offered
+            continue
+        out.append(DirectFactsSpec(id=cid, title=f"{cid} (its facts store, read directly; no "
+                                                 f"adapter agent keeps this source)",
+                                   connections=(cid,)))
+    notes = [f"{s.id}: no adapter agent keeps this connection; its read-only facts store is "
+             f"offered directly" for s in out]
+    return out, notes
+
+
+__all__ = ["DirectFactsSpec", "declared_connections", "unowned_facts_specs", "FactsTable", "ConnectionEntry", "AdapterAgentEntry", "Catalogue", "build_catalogue",
            "describe_facts_tables", "describe_steady", "SteadyFacts", "DESCRIBE_ATTEMPTS",
            "registry_specs", "measure_key", "key_proof_sql"]

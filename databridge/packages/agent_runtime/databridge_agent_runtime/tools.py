@@ -1353,6 +1353,17 @@ class ToolLayer:
                                   f"read-only query: {why}. A write is a declared action.")
                     return
             res = self.gateway.call_tool(conn, tool, args)
+            retry = _source_relative(args, schema) if res.is_error else None
+            if retry is not None:
+                # FIN-11: the planner addressed the source's tree from "/" ("/" or "/2026"), and
+                # the source refused it. A source's paths are relative to ITS root, so the same
+                # read is sent ONCE more with the path relative to that root — same tool, same
+                # grant, still a read; the first refusal is kept on the step either way.
+                again = self.gateway.call_tool(conn, tool, retry[0])
+                if not again.is_error:
+                    args, res = retry[0], again
+                    out.args = dict(args)
+                    self._shaped = [*self._shaped, retry[1]]
             uri = res.uri or str(args.get("path") or args.get("uri") or "") or \
                 f"mcp://{conn}/{tool}?{_short_hash(json.dumps(args, sort_keys=True, default=str))}"
         if res.is_error:
@@ -1574,6 +1585,37 @@ def _mask_value(value: Any, cfg: Any) -> Any:
         return value
     from databridge_mcp_ingest.screen import apply_masks      # noqa: PLC0415
     return apply_masks(value, cfg.redactions)[0]
+
+
+#: A path written from the top of a tree: one or more ``/`` or ``\`` and then a relative rest.
+#: A Windows drive path (``C:\…``) and a UNC / network path (``\\host``, ``//host``) are real
+#: absolute addresses and never match.
+_ROOTED = re.compile(r"^(?![\\/]{2})[\\/]+(?P<rest>[^:]*)$")
+
+
+def _source_relative(args: dict, schema: Any) -> Optional[tuple[dict, str]]:
+    """``(arguments, note)`` with the ONE string argument the tool's schema declares that is
+    written from the top of a tree (``/``, ``/2026``) made relative to the source's root (``.``,
+    ``2026``); None when there is no such argument or more than one (never guessed). Reads only
+    the schema and the value: no tool, server or domain is named here (FIN-11)."""
+    props = schema.get("properties") if isinstance(schema, dict) else None
+    if not isinstance(props, dict):
+        return None
+    hits = [(k, _ROOTED.match(v)) for k, v in args.items()
+            if isinstance(v, str) and k in props and "string" in _prop_types(props.get(k))]
+    hits = [(k, m) for k, m in hits if m is not None]
+    if len(hits) != 1:
+        return None
+    k, m = hits[0]
+    rest = m.group("rest").strip().rstrip("\\/") or "."
+    shaped = {**args, k: rest}
+    return shaped, (f"'{k}' {args[k]!r} was refused by the source; it was sent again as "
+                    f"{rest!r}, relative to the source's own root")
+
+
+def _prop_types(prop: Any) -> list[str]:
+    t = prop.get("type") if isinstance(prop, dict) else None
+    return [t] if isinstance(t, str) else [x for x in (t or []) if isinstance(x, str)]
 
 
 def _extract_text(data: bytes, *, name: str, mime: Optional[str],

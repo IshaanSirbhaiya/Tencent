@@ -1,6 +1,6 @@
 """The deterministic pass — over what the agent is ASKED, and over what the agent SAYS.
 
-``databridge_intake.guardrails.check_question`` already screens questions before any model is
+``databridge_core.identity_guardrail.check_question`` already screens questions before any model is
 called, and its docstring makes the argument this module inherits: *a prompt is a request, not a
 guarantee*. That module is imported, not copied — two divergent copies of an identity refusal is a
 worse outcome than one imperfect copy, because only one of them gets reviewed.
@@ -46,11 +46,11 @@ from __future__ import annotations
 
 import re
 
-from databridge_intake.guardrails import (
+from databridge_core.identity_guardrail import (
     REFUSAL_CODE as IDENTITY_REFUSAL_CODE,
-    REFUSAL_TEXT as IDENTITY_REFUSAL_TEXT,
     GuardrailResult,
     check_question,
+    refusal_text as identity_refusal_text,
 )
 
 __all__ = [
@@ -64,18 +64,33 @@ __all__ = [
     "screen_incoming",
     "screen_agent_output",
     "check_answer_values",
+    "identity_refusal_text",
     "looks_like_injection",
+    "no_send_text",
 ]
 
 NO_SEND_CODE = "AGENT_HAS_NO_SEND_CAPABILITY"
-NO_SEND_TEXT = (
-    "I can't send anything — no email, no Slack message, no submission. I have no tool that "
-    "reaches outside this system, by design: the documents I read come from outside the clinic, "
-    "so an agent that could send is one crafted sentence away from mailing patient data to a "
-    "stranger.\n\n"
-    "What I can do is read the clinic graph and tell you what it says, with the source of every "
-    "line. A human writes and sends anything that leaves the building."
-)
+
+
+def no_send_text() -> str:
+    """The no-send refusal in the voice pack's words (``agent_wording.yaml`` → ``refusals``).
+
+    C-5 (finance dry run, 2026-10-02): this was a literal naming one vertical's organisation and
+    records, served under every pack. The FACT it states — there is no send tool — is code
+    (``tools.py``); only the sentence is the pack's."""
+    from .wording import wording
+
+    return wording().refusals["no_send"]
+
+
+def __getattr__(name: str):
+    # The old constants, kept importable. They are resolved per access, because the voice is a
+    # property of the binding at the time of the question, not of import order.
+    if name == "NO_SEND_TEXT":
+        return no_send_text()
+    if name == "IDENTITY_REFUSAL_TEXT":
+        return identity_refusal_text()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 UNGROUNDED_VALUE_CODE = "AGENT_VALUE_NOT_IN_SOURCES"
 UNGROUNDED_VALUE_TEXT = (
@@ -209,7 +224,7 @@ def screen_incoming(question: str) -> GuardrailResult:
 
     rule = _match(text, _SEND_REQUESTS)
     if rule:
-        return GuardrailResult(refused=True, code=NO_SEND_CODE, reason=rule, answer=NO_SEND_TEXT)
+        return GuardrailResult(refused=True, code=NO_SEND_CODE, reason=rule, answer=no_send_text())
     return GuardrailResult(refused=False)
 
 
@@ -227,16 +242,16 @@ def screen_agent_output(answer: str) -> GuardrailResult:
     identity = check_question(text)          # the interrogative rules also catch several statements
     if identity.refused:
         return GuardrailResult(refused=True, code=IDENTITY_REFUSAL_CODE,
-                               reason=f"shared:{identity.reason}", answer=IDENTITY_REFUSAL_TEXT)
+                               reason=f"shared:{identity.reason}", answer=identity_refusal_text())
 
     rule = _match(text, _IDENTITY_ASSERTIONS)
     if rule:
         return GuardrailResult(refused=True, code=IDENTITY_REFUSAL_CODE, reason=rule,
-                               answer=IDENTITY_REFUSAL_TEXT)
+                               answer=identity_refusal_text())
 
     rule = _match(text, _ACTION_CLAIMS)
     if rule:
-        return GuardrailResult(refused=True, code=NO_SEND_CODE, reason=rule, answer=NO_SEND_TEXT)
+        return GuardrailResult(refused=True, code=NO_SEND_CODE, reason=rule, answer=no_send_text())
     return GuardrailResult(refused=False)
 
 

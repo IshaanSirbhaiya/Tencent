@@ -39,21 +39,91 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-#: Attached to a patient answer a document DOES name. A claim on a letter, and nothing more.
+# FIN-09 (finance dry run, 2026-10-02): the caveat used to be two fixed strings naming ONE pack's
+# subject ("this patient") and its attestation ("staff confirm identity in person"), so every
+# finance answer about a party said "names this patient". It is now worded from the subject KIND's
+# own noun and the attestation mode its pack declares (`subject_kinds[].attestation`). Under the
+# healthcare binding the output is byte-identical to the old strings, because that pack declares a
+# `patient` subject attested `in_person`. With no kind known and no single subject kind bound, the
+# neutral engine wording applies.
+
+#: The attestation clause, per declared attestation mode (`packs.ATTESTATION_MODES`).
+ATTESTATION_CLAUSE = {
+    "in_person": "staff confirm identity in person",
+    "verified_channel": "a named human confirms identity against the system of record",
+}
+#: The engine's neutral wording, for a mode it does not know or a binding it cannot single out.
+NEUTRAL_ATTESTATION_CLAUSE = "a named human confirms identity"
+NEUTRAL_SUBJECT_NOUN = "subject"
+
+
+def _bound_subject(kind=None) -> Optional[str]:
+    """The subject kind a caveat is about: ``kind`` when given, else the ONE subject kind the
+    bound vocabulary declares, else None."""
+    if kind is not None:
+        return str(getattr(kind, "value", kind))
+    try:
+        from .packs import active_vocabulary                           # noqa: PLC0415
+        subjects = sorted(active_vocabulary().subject_kinds)
+    except Exception:                                                  # noqa: BLE001
+        return None
+    return subjects[0] if len(subjects) == 1 else None
+
+
+def subject_noun(kind=None) -> str:
+    """The noun a caveat uses: the subject kind's own name, else the voice pack's first declared
+    subject noun (`agent_wording.yaml` `identity.subject_nouns`), else the neutral noun."""
+    k = _bound_subject(kind)
+    if k:
+        return k.replace("_", " ")
+    try:
+        from databridge_core.identity_guardrail import identity_wording  # noqa: PLC0415
+        nouns = identity_wording().subject_nouns
+    except Exception:                                                  # noqa: BLE001
+        nouns = ()
+    return nouns[0] if nouns else NEUTRAL_SUBJECT_NOUN
+
+
+def attestation_mode(kind=None) -> Optional[str]:
+    """The attestation mode the pack declares for the subject kind, else None."""
+    k = _bound_subject(kind)
+    if not k:
+        return None
+    try:
+        from .packs import active_vocabulary                           # noqa: PLC0415
+        return active_vocabulary().attestation_for(k)
+    except Exception:                                                  # noqa: BLE001
+        return None
+
+
+def attestation_clause(kind=None) -> str:
+    return ATTESTATION_CLAUSE.get(attestation_mode(kind) or "", NEUTRAL_ATTESTATION_CLAUSE)
+
+
+def _article(noun: str) -> str:
+    return ("an " if noun[:1].lower() in "aeiou" else "a ") + noun
+
+
+def identity_caveat(*, claimed: bool, kind=None) -> str:
+    """The caveat for a subject, whether or not any document names it. Never ``""``.
+
+    Worded for ``kind`` (a subject kind) and the attestation its pack declares; see the FIN-09
+    note above for the defaults."""
+    noun, clause = subject_noun(kind), attestation_clause(kind)
+    if claimed:
+        return (f"A document naming {_article(noun)} is a claim on the document, not a verified "
+                f"identity; {clause}.")
+    return (f"No document on file names this {noun}; this is a registry row, not a verified "
+            f"identity. Names are not unique in the registry, and {clause}.")
+
+
+#: The neutral renderings, kept under their old names for importers. They name no pack's subject.
 IDENTITY_CLAIMED_ON_DOCUMENT = (
-    "A document naming a patient is a claim on the document, not a verified identity; "
-    "staff confirm identity in person.")
-
-#: Attached to a patient the clinic merely holds on file. This is the wording the 289 unreferenced
-#: registry rows get, and the reason this module exists.
+    f"A document naming {_article(NEUTRAL_SUBJECT_NOUN)} is a claim on the document, not a "
+    f"verified identity; {NEUTRAL_ATTESTATION_CLAUSE}.")
 IDENTITY_REGISTRY_ONLY = (
-    "No document on file names this patient; this is a registry row, not a verified identity. "
-    "Names are not unique in the registry, and staff confirm identity in person.")
-
-
-def identity_caveat(*, claimed: bool) -> str:
-    """The caveat for a patient, whether or not any document names them. Never ``""``."""
-    return IDENTITY_CLAIMED_ON_DOCUMENT if claimed else IDENTITY_REGISTRY_ONLY
+    f"No document on file names this {NEUTRAL_SUBJECT_NOUN}; this is a registry row, not a "
+    f"verified identity. Names are not unique in the registry, and {NEUTRAL_ATTESTATION_CLAUSE}.")
 
 
 def same_label_node_ids(store, node_id: str) -> list[str]:
@@ -157,7 +227,9 @@ __all__ = [
     "IDENTITY_CLAIMED_ON_DOCUMENT",
     "IDENTITY_REGISTRY_ONLY",
     "ambiguous_refusal",
+    "attestation_clause",
     "identity_caveat",
     "resolve_entity",
+    "subject_noun",
     "same_label_node_ids",
 ]

@@ -156,6 +156,19 @@ class TabularStage:
             for h in self.held:
                 f.write(json.dumps(h, sort_keys=True, default=str) + "\n")
 
+    def attach(self, run_dir: Path) -> None:
+        """Start recording into `run_dir`, writing the stage outcomes recorded so far (in memory)
+        first — for a RESUMED run, whose directory is not touched until its core run has
+        accepted the resume (FIN-14: a refused resume leaves the interrupted run as it was)."""
+        self.run_dir = run_dir
+        run_dir.mkdir(parents=True, exist_ok=True)
+        with open(run_dir / "tabular.stages.jsonl", "a", encoding="utf-8") as f:
+            for rec in self.stage_log:
+                f.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
+        if any(r.get("stage") == "profile" and r.get("status") == "ok" for r in self.stage_log):
+            (run_dir / "profile.json").write_text(json.dumps(self.profiles, indent=1,
+                                                             default=str), encoding="utf-8")
+
     def run_stage(self, stage: str, fn: Callable[..., Any], *a: Any, **kw: Any) -> Any:
         """Run one stage; its outcome — or its failure — is on disk before this returns/raises."""
         try:
@@ -418,9 +431,13 @@ def run_tabular(source_id: str, *, store=None, client=None, vocab=None, harness=
 def ingest_database(source_id: str, store=None, harness=None, *, client=None, vocab=None,
                     sources_root: Optional[Path] = None, index: bool = True,
                     force_publish: Any = None,
-                    progress_cb: Optional[Callable[[dict], None]] = None) -> dict:
+                    progress_cb: Optional[Callable[[dict], None]] = None,
+                    run_id: Optional[str] = None) -> dict:
     """The whole database recipe on ONE session: profile → mapping → graph → facts → cards.
-    Returns {"run": core RunReport dict, "tabular": tabular report, "timings": per stage}."""
+    Returns {"run": core RunReport dict, "tabular": tabular report, "timings": per stage}.
+
+    `run_id`: the sync's run id (a caller that already announced one, or a resume); a new one
+    otherwise. The recipe's artefacts and the core run share THIS one directory (FIN-14)."""
     from ..runner import _new_run_id, run_dir_for, run_ingest
 
     if store is None:
@@ -434,9 +451,16 @@ def ingest_database(source_id: str, store=None, harness=None, *, client=None, vo
     stage = TabularStage(source_id, client=client, sources_root=sources_root, vocab=vocab,
                          harness=harness, progress=progress_cb)
     # R-022 f1 #11: allocate the run FIRST (the core run then uses the same id and directory)
-    run_id = _new_run_id()
-    stage.run_dir = run_dir_for(source_id, run_id)
-    stage.run_dir.mkdir(parents=True, exist_ok=True)
+    run_id = run_id or _new_run_id()
+    run_dir = run_dir_for(source_id, run_id)
+    from ..runner import _is_core_run_dir
+
+    # FIN-14: a RESUME is recorded in memory until the core run accepts it (then `attach`); a
+    # fresh sync records into its run directory from the first stage, as before
+    resume = _is_core_run_dir(run_dir)
+    stage.run_dir = None if resume else run_dir
+    if not resume:
+        run_dir.mkdir(parents=True, exist_ok=True)
     t_all = time.monotonic()
     with _session(stage.conn, client) as c:
         stage.client = c
@@ -448,6 +472,8 @@ def ingest_database(source_id: str, store=None, harness=None, *, client=None, vo
                                  run_id=run_id, client=c, sources_root=sources_root,
                                  vocab=stage._vocab())
         stage._time("graph_run", t0)
+        if stage.run_dir is None:
+            stage.attach(run_dir)
         stage.run_stage("facts", stage.facts, force=force_publish)
         stage.run_stage("cards", stage.build_cards, store, index=index)
     tab = stage.write_artefacts(Path(report.run_dir), standalone=False)

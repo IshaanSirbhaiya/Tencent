@@ -8,6 +8,16 @@ Every result is a ``Passage`` whose ``pointer`` is a ``doc_span`` over the captu
 (``document_id`` = hashed full path, ``char_start``/``char_end``, ``capture_digest`` = the
 capture sha256), labelled ``trust=UNTRUSTED`` — document text is third-party writable (spine D3).
 
+**Exact identifiers rank first** (finance dry run, FIN-10). "What does credit memo CM-2026-0029
+recommend?" returned five OTHER memos: the keyword leg ranked CM-2026-0029 first, but every memo
+reads alike to the vector leg, so memos found by BOTH legs out-fused the one found by keyword
+alone. An identifier-shaped token in the query (letters AND digits, optionally joined by ``-``,
+``_``, ``.`` or ``/``, e.g. ``CM-2026-0029``, ``CB-F-000302``) now runs an exact leg: the
+identifier is matched as one whole token in each store, and a passage that contains it carries
+``EXACT_BONUS`` per distinct identifier on top of its fused score, so an exact hit always ranks
+above a passage that merely resembles it. The vector and keyword legs, and ``mode="vector"``, are
+unchanged.
+
 Depth levels (``deep_search``): ``standard``; ``facets`` — the question is split into parts and
 each part is searched separately, so a topic that lost the overall ranking still gets evidence;
 ``rerank`` — facets, then a model judges which extracts truly answer. Splitting and judging go
@@ -50,6 +60,38 @@ _STORE_ERRORS = (sqlite3.Error, OSError, ValueError)
 MODES = ("hybrid", "vector", "keyword")
 DEPTHS = ("standard", "facets", "rerank")
 _TERM = re.compile(r"[^\s\"]+")
+#: Larger than any fused RRF score can reach (two legs at rank 1: 2 / (RRF_K + 1)), so one exact
+#: identifier hit outranks every passage that has none.
+EXACT_BONUS = 1.0
+#: An identifier: alphanumeric runs joined by single separators, containing a letter AND a digit.
+_IDENT_SHAPE = re.compile(r"[0-9A-Za-z]+(?:[-_./][0-9A-Za-z]+)*")
+_IDENT_MIN_LEN = 4
+
+
+def identifier_tokens(text: str) -> list[str]:
+    """The identifier-shaped tokens of a query, in order, de-duplicated (case-insensitively).
+
+    Shape, never vocabulary: letters and digits together (``CM-2026-0029``, ``INV-7731``,
+    ``CB-F-000302``, ``A1B2``). A bare number (``2026``) or a word is not an identifier."""
+    out: dict[str, str] = {}
+    for t in _TERM.findall(text or ""):
+        t = t.strip(".,;:!?()[]{}'<>")
+        if (len(t) >= _IDENT_MIN_LEN and _IDENT_SHAPE.fullmatch(t)
+                and re.search(r"[A-Za-z]", t) and re.search(r"[0-9]", t)):
+            out.setdefault(t.lower(), t)
+    return list(out.values())
+
+
+def _ident_pattern(ident: str) -> re.Pattern:
+    """`ident` as one WHOLE token: not inside a longer identifier (``CM-2026-00291`` and
+    ``XCM-2026-0029`` do not contain ``CM-2026-0029``)."""
+    return re.compile(r"(?<![0-9A-Za-z])(?<![0-9A-Za-z][-_./])" + re.escape(ident)
+                      + r"(?![0-9A-Za-z])(?![-_./][0-9A-Za-z])", re.IGNORECASE)
+
+
+def exact_matches(content: str, idents: Sequence[str]) -> int:
+    """How many of ``idents`` occur in ``content`` as whole tokens."""
+    return sum(1 for i in idents if _ident_pattern(i).search(content or ""))
 
 
 def fts_query(text: str) -> Optional[str]:
@@ -219,9 +261,25 @@ class Retriever:
                                                  "source_id": e.get("source_id"),
                                                  "leg": "keyword"})
 
+        # FIN-10: the exact-identifier leg. Its own FTS query names ONLY the identifiers, so a
+        # passage holding the id is a candidate even when common words fill the keyword pool.
+        idents = identifier_tokens(query) if mode in ("hybrid", "keyword") else []
+        exact_hits: list[tuple[str, str]] = []
+        if idents:
+            fq_ids = fts_query(" ".join(idents))
+            for e in entries:
+                hits, err = self._fts(root / e["file"], e["file"], fq_ids, pool, kind_set)
+                if err is not None:
+                    coverage["skipped"].append({"store": e["file"],
+                                                "source_id": e.get("source_id"),
+                                                "reason": f"exact-identifier leg failed: {err}"})
+                    notices.append(f"exact-identifier leg failed for {e['file']}: {err}")
+                    continue
+                exact_hits.extend((f, c) for _, f, c in hits)
+
         # fetch rows for every candidate (bounded by pool x stores) — needed for kinds + output
         by_file: dict[str, set[str]] = {}
-        for *_, f, cid in vec_hits + kw_hits:
+        for f, cid in [(t[-2], t[-1]) for t in vec_hits + kw_hits] + exact_hits:
             by_file.setdefault(f, set()).add(cid)
         rows: dict[tuple[str, str], sqlite3.Row] = {}
         for f, cids in by_file.items():
@@ -251,6 +309,17 @@ class Retriever:
             for key in kw_rank:
                 acc[key] = acc.get(key, 0.0) + 1.0 / (RRF_K + kw_local[key])
             fused = sorted(acc.items(), key=lambda t: (-t[1], t[0][0], t[0][1]))
+        if idents:
+            # A whole-token match is verified on the passage text itself (the FTS phrase also
+            # matches `CM 2026 0029` or a longer id that merely contains it), then ranked first.
+            scored = dict(fused)
+            for key in set(exact_hits) | set(scored):
+                if not keep(*key):
+                    continue
+                n = exact_matches(rows[key]["content"], idents)
+                if n:
+                    scored[key] = scored.get(key, 0.0) + EXACT_BONUS * n
+            fused = sorted(scored.items(), key=lambda t: (-t[1], t[0][0], t[0][1]))
         out = [self._passage(rows[key], sc) for key, sc in fused[:k]]
         if len(out) < max(1, k // 2):
             notices.append(f"thin result ({len(out)} of {k}); a deeper search "

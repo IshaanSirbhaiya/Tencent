@@ -167,8 +167,51 @@ def _number_value(token: str) -> str:
     return format(d, "f")
 
 
+#: FIN-08: a currency or unit CODE written flush against its amount (``HKD33,600,000.00``). The
+#: code is split off before numbers are read, on both sides of every comparison, so the amount is
+#: read by VALUE — before this, `_NUMBER`'s look-behind skipped the whole ``33`` group and read
+#: ``600,000.00`` (600000), which no evidence holds, and a correct amount was flagged. Two to
+#: four capitals and nothing else: ``F-000302`` (one letter, then a hyphen) is untouched.
+_GLUED_CODE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2,4})(?=\d)")
+
+#: FIN-08: the dashes a writer (or a model) uses inside an identifier that the source spells with
+#: an ASCII hyphen: ``CM‑2026‑0029`` (U+2011) is ``CM-2026-0029``. Folded wherever an identifier
+#: is compared (`_fold`, `_in_pool`); nothing else about the identifier changes.
+_DASHES = str.maketrans({c: "-" for c in "‐‑‒–—−﹣－"})
+
+
+def _unglue(text: str) -> str:
+    return _GLUED_CODE.sub(r"\1 ", str(text or ""))
+
+
 def _numbers(text: str) -> set[str]:
-    return {_number_value(m.group(0)) for m in _NUMBER.finditer(text or "")}
+    return {_number_value(m.group(0)) for m in _NUMBER.finditer(_unglue(text))}
+
+
+_MONTH = (r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|"
+          r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)")
+#: A date or a clock time as written in prose or in the run context: ``2026-10-02`` (with an
+#: optional ``T09:41``), ``09:41``, ``2 October 2026``, ``October 2, 2026``, ``2 Oct``.
+_DATE_EXPR = re.compile(
+    r"\b\d{4}-\d{1,2}-\d{1,2}(?:[T ]\d{1,2}:\d{2}(?::\d{2})?)?\b"
+    r"|\b\d{1,2}:\d{2}(?::\d{2})?\b"
+    r"|\b\d{1,2}(?:st|nd|rd|th)?\s+" + _MONTH + r"\b\.?(?:,?\s+\d{4})?"
+    r"|\b" + _MONTH + r"\.?\s+\d{1,2}(?:st|nd|rd|th)?\b(?:,?\s+\d{4})?", re.I)
+
+
+def _date_split(text: str) -> tuple[set[str], set[str]]:
+    """``(numbers inside a date or time, every other number)`` of ``text``.
+
+    The run context (today's date, the local time) grounds a number only where the claim writes
+    a DATE or a TIME (2026-10-02 found in a sources error: the ``2`` of today's ``2026-10-02``
+    grounded "the table holds 2 invoices", a count no evidence held). A date's parts still ground
+    a date written another way (``2 October 2026``)."""
+    text = _unglue(text)
+    dated: set[str] = set()
+    for m in _DATE_EXPR.finditer(text):
+        dated |= {_number_value(d) for d in re.findall(r"\d+", m.group(0))}
+    rest = _DATE_EXPR.sub(" ", text)
+    return dated, {_number_value(m.group(0)) for m in _NUMBER.finditer(rest)}
 
 
 #: Characters that carry markdown meaning in the rendered answer: a citation (``[p1]``), a flag
@@ -256,7 +299,7 @@ def _evidence_text(e: Any) -> str:
 
 
 def _fold(text: str) -> str:
-    return " ".join(str(text or "").lower().split())
+    return " ".join(str(text or "").translate(_DASHES).lower().split())
 
 
 def _value_in(value: str, text: str) -> bool:
@@ -266,7 +309,19 @@ def _value_in(value: str, text: str) -> bool:
         return False
     if _NUMBER.fullmatch(v):
         return _number_value(v) in _numbers(text)
-    return _in_pool(v, _fold(text))
+    if _in_pool(v, _fold(text)):
+        return True
+    coded = _coded_amount(v)
+    if coded is not None:                 # FIN-08: ``HKD33,600,000.00`` — the code AND the value
+        code, amount = coded
+        return _in_pool(code, _fold(text)) and _number_value(amount) in _numbers(text)
+    return False
+
+
+def _coded_amount(v: str) -> Optional[tuple[str, str]]:
+    """``("HKD", "33,600,000.00")`` for a code written flush against an amount; else None."""
+    m = re.fullmatch(r"([A-Z]{2,4})\s?(\d[\d,]*(?:\.\d+)?)", v)
+    return (m.group(1), m.group(2)) if m and _NUMBER.fullmatch(m.group(2)) else None
 
 
 @dataclass
@@ -413,11 +468,20 @@ def _check(text: str, refs: list[str], registry: PointerRegistry, *,
     # the user's own values; restating them is not a claim about the data. One rule, shared with
     # the federated narrator (`databridge_federated.scope_literals`): a BARE number in the question
     # never grounds — it could be the very answer.
-    lit_numbers = _numbers(literals) | _numbers(_question_scope(question))
+    # The run context's date and time ground only what the claim writes AS a date or time: the
+    # ``2`` of today's ``2026-10-02`` is not evidence for "2 invoices" (`_date_split`).
+    lit_dated, lit_plain = _date_split(literals)
+    lit_plain |= _numbers(_question_scope(question))
+    text_dated, text_plain = _date_split(text)
+
+    def _missing(pool: set[str]) -> list[str]:
+        return sorted((text_plain - pool - lit_plain)
+                      | (text_dated - pool - lit_plain - lit_dated))
+
     if not refs:
         if require_citation:
             return "no_citation", [], []
-        missing = sorted(_numbers(text) - lit_numbers)
+        missing = _missing(set())
         return (f"number_not_in_cited_evidence: {', '.join(missing)}" if missing else ""), [], []
     evidence = [registry.get(r) for r in refs]
     if any(e is None for e in evidence):
@@ -427,12 +491,12 @@ def _check(text: str, refs: list[str], registry: PointerRegistry, *,
                                             literals=f"{literals}\n{owner_text}", clock=clock)
     # P-12: an id in the arguments of the query that produced a cited result (``customer_id =
     # 'C-1003'`` returned no rows) is what that result is ABOUT — the claim may name it.
-    pool = set().union(*(_numbers(_evidence_text(e)) for e in evidence)) | lit_numbers
+    pool = set().union(*(_numbers(_evidence_text(e)) for e in evidence))
     for e in evidence:
         pool |= _numbers(" ".join(getattr(e, "query_ids", ()) or ()))
     for v in verified:
         pool |= _numbers(" ".join([v.value, *v.inputs, v.derivation]))
-    missing = sorted(_numbers(text) - pool)
+    missing = _missing(pool)
     why = []
     if problems:
         why.append(f"derivation_not_reproducible: {'; '.join(problems)}")
@@ -795,9 +859,10 @@ def _is_identifier(tok: str) -> bool:
 
 def _in_pool(value: str, pool_lower: str) -> bool:
     """``value`` occurs in the pool as a whole token (case-insensitive, whitespace folded)."""
-    v = " ".join(value.lower().split())
+    v = " ".join(value.translate(_DASHES).lower().split())
     if not v:
         return True
+    pool_lower = pool_lower.translate(_DASHES)
     return re.search(r"(?<![a-z0-9])" + re.escape(v) + r"(?![a-z0-9])", pool_lower) is not None
 
 
@@ -850,6 +915,12 @@ def ungrounded_values(args: Any, evidence: list, *, literals: str = "",
             numbers_of(v)
             return
         if _in_pool(v, pool_lower):
+            return
+        coded = _coded_amount(v)
+        if coded is not None:             # FIN-08: the code as a token, the amount by value
+            if not _in_pool(coded[0], pool_lower):
+                flag(coded[0])
+            numbers_of(coded[1])
             return
         if "/" in v or "\\" in v or _EXT.match(v):
             # a path segment by segment — and a bare file name like a path's last segment: its

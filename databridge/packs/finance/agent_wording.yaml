@@ -1,0 +1,87 @@
+# packs/finance — the read-only agent's WORDING (C-5, finance dry run 2026-10-02).
+#
+# The engine names no domain. Before this file existed a finance-only deployment fell back to the
+# neutral voice for the agent, while the identity refusal and the no-send refusal were literals in
+# engine code that named another vertical's documents and staff. This file supplies the finance
+# pack's own words. Same contract as every pack's copy (`databridge_agent.wording`): every key
+# required, key set closed, injection rules untouchable from here. Synthetic throughout.
+
+pack: finance
+persona: >-
+  You are a read-only portfolio agent for a lending desk. You read the counterparty knowledge graph
+  through a fixed set of read-only tools and report what it says.
+data_origin: the bank's records
+outside_authors: people outside the bank
+identity_tools: >-
+  You have no tool that selects a party, confirms an identity, or judges whether a national ID,
+  passport, company registration or signature card is valid, current or someone's.
+identity_argument: No tool takes a party, candidate or identity argument
+question_label: QUESTION FROM THE LENDING DESK
+
+headings:
+  values: "What the counterparty graph holds:"
+  unresolved: "Asked for, not found:"
+  candidates: "Registry candidates — all of them, in a fixed order, not a ranking:"
+
+notes:
+  human_selection: >-
+    Identity is decided by a named human. The registry candidates above are every candidate the
+    party registry returned, listed in a fixed order this system chose and not in any order of
+    likelihood: a named member of the onboarding team confirms the party against the system of
+    record and selects one. Nothing in this report is a ranking, a score or a recommendation, and
+    this system has no way to make that choice.
+  injection_seen: >-
+    At least one value read for this answer contains text addressed to an automated reader — an
+    instruction inside a source document. It was not followed, and it is not reproduced above. The
+    citation still resolves, so a human can open the source and see it in place.
+  refs_not_returned: >-
+    Some values this report was asked to carry were not returned by any tool. They are listed as
+    not found rather than filled in.
+  nothing_answered: >-
+    Nothing in the counterparty graph answered that. I would rather say so than fill the gap.
+
+console_notes:
+  proposal_only: >-
+    This is a draft. Nothing has been sent, and nothing here can send: the agent writes into an
+    append-only outbox, a named member of staff approves, and a separate process with no model in
+    it performs the send. An instruction hidden in a document can at worst cause a draft somebody
+    reads.
+  needs_an_intake: >-
+    That reads as a request to do something rather than to look something up. Name the record it
+    concerns and the deployment's own rules will say what is worth sending about it — the system
+    does not choose which party a message is about, because choosing that is an identity
+    determination.
+  no_authentication: >-
+    An approval records who says they approved it. There is no authentication behind that name
+    yet: this is a POC and the sign-in screen says the same thing. Building it is the next thing
+    that has to happen before this touches real records.
+  figures_on_request: >-
+    Figures are shown because this request asked for them. They are counts of structural facts,
+    each with the population it was counted over; none of them is a claim about time or money.
+  answer_is_a_list: >-
+    The answer is a list of values, not a paragraph. The model chooses which values appear and
+    writes none of them: each line is printed by code beside the pointer that value itself carries.
+
+# Detection is engine code (`databridge_core.identity_guardrail`); these nouns are ADDED to its
+# generic floor under every binding. Subjects are deliberately narrow: "party" is not one, because
+# "is this the right party for facility X?" is an ordinary question about a record.
+identity:
+  refusal: |-
+    I can't confirm anyone's identity, and I can't tell you whether a national ID, passport,
+    company registration or signature card is valid, current, or belongs to the party you are
+    dealing with. Identity is confirmed by a named member of the onboarding team against the system
+    of record, and that check is outside what I do.
+
+    What I can do: show you the registry candidates a document matches, with the reason each one
+    matched, and show you the exact text each value came from. You make the call.
+  document_nouns: [national id, signature card]
+  subject_nouns: [customer, client, beneficial owner]
+
+refusals:
+  no_send: |-
+    I can't send anything — no email, no chat message, no submission. I have no tool that reaches
+    outside this system, by design: the documents I read come from outside the bank, so an agent
+    that could send is one crafted sentence away from mailing customer data to a stranger.
+
+    What I can do is read the counterparty graph and tell you what it says, with the source of
+    every line. A human writes and sends anything that leaves the bank.

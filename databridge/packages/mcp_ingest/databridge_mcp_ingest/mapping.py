@@ -44,7 +44,7 @@ from typing import Any, Literal, Optional
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from .build import FK_PREFIX, ROW_KEY, _admits
+from .build import FK_PREFIX, KIND_KEY, ROW_KEY, _admits
 from .connections import connection_path
 
 MAPPING_TASK_CLASS = "schema_annotation"
@@ -73,6 +73,19 @@ class TableMapping(_Strict):
     #: by the approval digest, so an approval is bound to that schema.
     columns: Optional[list[str]] = None
     fk_columns: Optional[list[str]] = None
+    #: a JOIN table (`is_association`): NO node — each row is an edge between the two rows it
+    #: references (its `edges` name only foreign-key endpoints)
+    association: bool = False
+    #: C-3: PROPOSED links — a column no foreign key declares whose values are measured keys of
+    #: another table (this source or another). Outside the approval digest: a proposal changes
+    #: nothing; `approve_link` turns one into an edge (with `ref`) that the table's approval covers.
+    links: list[dict[str, Any]] = Field(default_factory=list)
+    #: FIN-04 per-row KIND SPLIT (`propose_split`): {column, kinds: {normalised value: kind},
+    #: default}. A row whose discriminator value (normalised by `split_value`) is bound in `kinds`
+    #: becomes a node of THAT kind; any other value — unrecognised, NULL, masked — becomes
+    #: `default`, which is the node kind and, when the split names a subject kind at all, a
+    #: subject (the safe side: never merged). Covered by the approval digest when present.
+    split: Optional[dict[str, Any]] = None
 
 
 class NodeSpecModel(_Strict):
@@ -96,6 +109,18 @@ class EdgeSpecModel(_Strict):
     evidence: list[str] = Field(default_factory=list)
     fk: Optional[str] = None
     reversed: bool = False
+    #: an APPROVED link (C-3): the table and key the `{walnut_fk_<column>}` endpoint names, in
+    #: `source` — a reference no foreign key declares
+    ref: Optional[dict[str, Optional[str]]] = None
+    #: a join table's edge: its other columns, as edge attributes (attribute name -> column)
+    attrs: dict[str, str] = Field(default_factory=dict)
+
+
+class SplitSpecModel(_Strict):
+    """The STRICT shape of a mapping's per-row kind split (FIN-04)."""
+    column: str
+    kinds: dict[str, str] = Field(default_factory=dict)
+    default: str
 
 
 class SourceMapping(_Strict):
@@ -174,7 +199,11 @@ def _meta_hint_kind(table: str, vocab, policy: dict) -> tuple[Optional[str], str
     last = re.split(r"[_\-\s.]+", table.lower())[-1]
     forms = set(_forms(last))
     for meta_name, words in (policy.get("meta_kind_hints") or {}).items():
-        if not forms & {w.lower() for w in words or []}:
+        hints = {w.lower() for w in words or []}
+        # FIN-04: an abbreviation of a hint word (`org` for `organisation`) is the same hint — a
+        # prefix of three or more letters, never a substring
+        if not (forms & hints or any(len(f) >= 3 and w.startswith(f)
+                                     for f in forms for w in hints)):
             continue
         try:
             meta = NodeMetaKind(meta_name)
@@ -187,9 +216,164 @@ def _meta_hint_kind(table: str, vocab, policy: dict) -> tuple[Optional[str], str
         if meta_name in bound:
             return meta_name, (f"table name {table!r} is a common name for the {meta_name!r} "
                                f"meta-kind; kind {meta_name!r} is named like it")
+        fit, why = _ontology_fit(table, bound, vocab, exclude=meta_name)
+        if fit is not None:
+            return fit, (f"table name {table!r} is a common name for the {meta_name!r} "
+                         f"meta-kind; of the {len(bound)} kinds bound to it, {why}")
         return None, (f"table name {table!r} hints meta-kind {meta_name!r} but {len(bound)} "
                       f"kinds bind to it {list(bound)} — left for the model / a human")
     return None, ""
+
+
+def _kind_words(vocab, kind: str, exclude: str = "") -> tuple[set[str], set[str]]:
+    """(strong, weak) word roots of a kind AS THE PACK DECLARES IT: its name and meta-kind
+    (strong), its description (weak). `exclude` drops a strong word every candidate shares (the
+    meta-kind they were all found through)."""
+    d = vocab.node_kinds[kind]
+    meta = getattr(getattr(d, "binds_to", None), "value", "") or ""
+    drop = _roots(exclude.replace("_", " ")) if exclude else set()
+    strong = _roots(f"{kind} {meta}".replace("_", " ")) - drop
+    weak = _roots(str(getattr(d, "description", "") or ""))
+    return strong, weak
+
+
+def _word_hit(root: str, words: set[str]) -> bool:
+    return any(w == root or (len(root) >= 3 and w.startswith(root)) for w in words)
+
+
+def _fit_score(roots: set[str], strong: set[str], weak: set[str]) -> int:
+    """How well some words fit a kind's declaration: 2 per word naming the kind or its meta-kind,
+    1 per word its description uses (a word may abbreviate: `org` fits `organisation`)."""
+    return sum(2 if _word_hit(r, strong) else 1 if _word_hit(r, weak) else 0 for r in roots)
+
+
+def _ontology_fit(text: str, kinds, vocab, *, exclude: str = ""
+                  ) -> tuple[Optional[str], str]:
+    """(the ONE kind among `kinds` whose declaration the words of `text` fit best, why) — or
+    (None, why) when no word fits or two kinds fit equally. The pack's own wording decides; no
+    word list lives here."""
+    roots = _roots(text.replace("_", " ").replace(".", " "))
+    scores = {k: _fit_score(roots, *_kind_words(vocab, k, exclude)) for k in kinds
+              if k in vocab.node_kinds}
+    best = max(scores.values(), default=0)
+    top = sorted(k for k, s in scores.items() if s == best)
+    if best <= 0:
+        return None, f"no word of {text!r} fits any of {sorted(scores)}"
+    if len(top) > 1:
+        return None, f"{top} fit {text!r} equally (score {best})"
+    return top[0], (f"{top[0]!r} fits its words best by the pack's declarations (score {best}; "
+                    f"{ {k: s for k, s in sorted(scores.items())} })")
+
+
+# --- FIN-04: a per-row kind split (one table, people AND organisations) -------------------------
+_KIND_REF = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`")
+
+
+def split_value(value: Any) -> str:
+    """A discriminator value as a split binds it: NFKC, case-folded, every run of punctuation or
+    whitespace one space (`ORGANISATION`, `organisation` and ` Organisation ` are one value)."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKC", str(value)).casefold()
+    return " ".join(re.findall(r"[^\W_]+", text))
+
+
+def split_candidates(vocab, kind: str) -> list[str]:
+    """The kinds a row of `kind` may be split into: those the pack's declarations cross-reference
+    with it (`kind`'s description names them, or theirs names `kind`) — the ontology's own
+    "use X for …" pointers. Never a list here."""
+    decl = vocab.node_kinds.get(kind)
+    if decl is None:
+        return []
+    own = set(_KIND_REF.findall(str(getattr(decl, "description", "") or "")))
+    out = []
+    for k, d in vocab.node_kinds.items():
+        if k == kind:
+            continue
+        if k in own or kind in _KIND_REF.findall(str(getattr(d, "description", "") or "")):
+            out.append(k)
+    return sorted(out)
+
+
+def _split_policy(policy: dict) -> tuple[int, int]:
+    sp = policy.get("kind_split") or {}
+    return int(sp.get("max_distinct", 12)), int(sp.get("min_rows_per_value", 2))
+
+
+def propose_split(snap: dict, kind: str, vocab, policy: Optional[dict] = None
+                  ) -> tuple[Optional[dict], list[str]]:
+    """(split, rationale): FIN-04 — a SUBJECT table whose rows are of more than one declared kind,
+    told apart by a categorical column.
+
+    Only a subject kind is split (`default` stays the subject: any value not bound — unrecognised,
+    NULL, masked — is the safe side and is never merged). For each low-cardinality text column
+    (not a key, not a foreign key), every distinct NORMALISED value (`split_value`) is fitted to
+    the subject and to the kinds the pack cross-references with it (`split_candidates`) by the
+    pack's own words (`_fit_score`): a value goes to the ONE kind it fits best; a tie that
+    includes the subject, or no fit at all, stays the subject. The column that sends the most rows
+    to another kind is proposed; two columns tying is no proposal. A PROPOSAL like any mapping: it
+    is covered by the table's approval digest and built only once a person approves it."""
+    policy = policy if policy is not None else _policy()
+    try:
+        if not vocab.is_subject(kind):
+            return None, []
+    except Exception:                                                # noqa: BLE001
+        return None, []
+    cands = [k for k in split_candidates(vocab, kind) if k in vocab.node_kinds]
+    if not cands:
+        return None, []
+    max_distinct, min_rows = _split_policy(policy)
+    pk = set(snap.get("primary_key") or [])
+    fk_cols = {f.get("column") for f in snap.get("foreign_keys") or []}
+    types = {c.get("name"): str(c.get("type") or "") for c in snap.get("columns") or []}
+    rows = snap.get("rows") or []
+    words = {k: _kind_words(vocab, k) for k in [kind, *cands]}
+    best: list[tuple[int, str, dict, dict]] = []
+    for col in _columns(snap):
+        if col in pk or col in fk_cols or _NUMERIC_TYPE.search(types.get(col, "")):
+            continue
+        counts: dict[str, int] = {}
+        for r in rows:
+            v = r.get(col)
+            if v is None or not str(v).strip():
+                continue
+            counts[split_value(v)] = counts.get(split_value(v), 0) + 1
+        if not 2 <= len(counts) <= max_distinct or sum(counts.values()) < min_rows * len(counts):
+            continue
+        bound: dict[str, str] = {}
+        basis: dict[str, str] = {}
+        for value in sorted(counts):
+            roots = _roots(value)
+            scores = {k: _fit_score(roots, *words[k]) for k in words}
+            top = max(scores.values())
+            winners = sorted(k for k, s in scores.items() if s == top)
+            if top <= 0:
+                basis[value] = f"fits no declared kind; stays {kind!r}"
+                continue
+            if len(winners) == 1:
+                bound[value] = winners[0]
+                basis[value] = f"-> {winners[0]!r} (fit {scores})"
+            elif kind in winners:
+                bound[value] = kind
+                basis[value] = f"-> {kind!r}: ties {winners}, the subject is the safe side"
+            else:
+                basis[value] = f"ties {winners}; stays {kind!r} (the safe side)"
+        moved = sum(n for v, n in counts.items() if bound.get(v, kind) != kind)
+        if moved:
+            best.append((moved, col, bound, {v: f"{counts[v]} row(s) {basis[v]}"
+                                             for v in sorted(counts)}))
+    if not best:
+        return None, []
+    best.sort(key=lambda b: (-b[0], b[1]))
+    if len(best) > 1 and best[1][0] == best[0][0]:
+        return None, [f"kind split not proposed: columns {best[0][1]!r} and {best[1][1]!r} "
+                      f"would each move {best[0][0]} row(s) to another kind; a person chooses"]
+    moved, col, bound, basis = best[0]
+    split = {"column": col, "kinds": bound, "default": kind}
+    note = (f"kind split on {col!r} (PROPOSED, FIN-04): {moved} row(s) are another declared kind "
+            f"by the pack's own words; any other value (unrecognised, NULL, masked) stays "
+            f"{kind!r}, a subject, never merged — {basis}")
+    return split, [note]
 
 
 def resolve_kind(table: str, snap: dict, vocab, policy: Optional[dict] = None
@@ -346,65 +530,126 @@ def _hint_score(hint_roots: set[str], name: str, decl) -> int:
     return sum(1 for h in hint_roots for w in words if w.startswith(h) or h.startswith(w))
 
 
-def _fk_edge(vocab, kind: str, ref_kind: str, hint: str, policy: dict
-             ) -> tuple[Optional[str], bool, str]:
+def fk_hint_roots(column: str, *names: str) -> set[str]:
+    """The word roots of a key column that can say WHICH relationship it is (FIN-05).
+
+    A key named only after what it references (`<kind>_id` → a row of that kind, `<table>_id` →
+    a row of that table) says THAT it references, never in which role: the words of the referenced
+    kind, the row's own kind and the referenced table are removed. What is left (`owner` in
+    `owner_rm_code`) is evidence for a declaration."""
+    stem = column.lower().removesuffix("_id")
+    roots = _roots(stem.replace("_", " "))
+    noise: set[str] = set()
+    for n in names:
+        if n:
+            last = str(n).rsplit(".", 1)[-1]
+            noise |= _roots(last.replace("_", " "))
+            for f in _forms(last):
+                noise |= _roots(f.replace("_", " "))
+    return {r for r in roots if not any(r.startswith(x) or x.startswith(r) for x in noise)}
+
+
+def _fk_edge(vocab, kind: str, ref_kind: str, hint: str, policy: dict, *,
+             hint_roots: Optional[set[str]] = None) -> tuple[Optional[str], bool, str]:
     """(edge_kind, reversed, why).
 
-    1. forward (row → referenced) with BOTH endpoints declared; else
-    2. the reverse (referenced → row) with both declared, when the key's own name matches that
-       declaration (`account_owner` ~ `manages` "owns"); else
-    3. forward through a wildcard endpoint (the reverse named in the rationale for review); else
-    4. the reverse with both declared.
-    Within a step, meta-kinds are tried in the policy's preference order; among candidates of
-    one meta-kind the column name's words decide (`account_owner` ~ "owns"), then the most
-    specific declaration (fewest endpoint kinds), then the name."""
+    Every candidate (every meta-kind in `fk_edge_metas`, both directions, explicit or through a
+    wildcard endpoint) is ranked in ONE list (FIN-05: returning the first meta-kind with any
+    candidate let a role edge win before the key's words or direction were looked at):
+
+    1. first, a declaration naming BOTH kinds in the key's own direction (row -> referenced), or
+       in reverse when the key's own words match it (`fk_hint_roots`: `owner` in `owner_rm_code`
+       ~ `manages` "owns"; the referenced kind's own name never counts — a key named
+       `<kind>_id` says THAT it references that kind, not in which role) — by those words, then
+       direction, then the policy's meta-kind order;
+    2. otherwise everything else — an explicit declaration read in reverse that the key does not
+       name, or one admitting the kinds through a wildcard — by the meta-kind's place in
+       `fk_edge_metas` (participation and containment before roles: a role read in reverse is
+       never assumed from a key that does not name it), explicit before wildcard;
+    then the most specific declaration (fewest endpoint kinds), then the name.
+    """
     from databridge_graph.meta import EdgeMetaKind
 
     metas = tuple(policy.get("fk_edge_metas") or ("part_of", "references"))
-    hint_roots = _roots(hint.replace("_", " "))
+    if hint_roots is None:
+        hint_roots = _roots(hint.replace("_", " "))
 
-    def best(src: str, dst: str, need_explicit: bool) -> tuple[Optional[str], str]:
-        for meta in metas:
+    ranked = []
+    for direction, (src, dst) in enumerate(((kind, ref_kind), (ref_kind, kind))):
+        for order, meta in enumerate(metas):
             try:
                 names = vocab.edges_binding_to(EdgeMetaKind(meta))
             except ValueError:
                 continue
-            cands = []
             for name in names:
                 decl = vocab.edge(name)
-                explicit = _explicit(decl, "src", src) and _explicit(decl, "dst", dst)
-                if need_explicit and not explicit:
-                    continue
                 if not (_admits(decl, "src", src) and _admits(decl, "dst", dst)):
                     continue
+                explicit = _explicit(decl, "src", src) and _explicit(decl, "dst", dst)
+                h = _hint_score(hint_roots, name, decl)
                 spec = len(tuple(decl.src or ())) + len(tuple(decl.dst or ()))
-                cands.append((-_hint_score(hint_roots, name, decl), spec, name))
-            if cands:
-                cands.sort()
-                h, _, name = cands[0]
-                why = " (column words match its declaration)" if h < 0 else ""
-                if len(cands) > 1:
-                    why += f"; other {meta} candidates: {[c[2] for c in cands[1:]]}"
-                return name, why
-        return None, ""
-
-    ek, why = best(kind, ref_kind, True)
-    if ek:
-        return ek, False, f"{ek!r} declares {kind} -> {ref_kind}{why}"
-    rev, rwhy = best(ref_kind, kind, True)
-    if rev and "column words match" in rwhy:
-        return rev, True, (f"{rev!r} declares {ref_kind} -> {kind} and the key's name matches it "
-                           f"(read in reverse: no edge declares {kind} -> {ref_kind}){rwhy}")
-    ek, why = best(kind, ref_kind, False)
-    if ek:
-        extra = (f"; {rev!r} declares the reverse {ref_kind} -> {kind} — choose it on review "
-                 f"if the key means that") if rev else ""
-        return ek, False, (f"{ek!r} admits {kind} -> {ref_kind} through a wildcard endpoint"
-                           f"{why}{extra}")
+                # tier 0: a declaration naming both kinds in the key's own direction, or in
+                # reverse when the key's words name it; tier 1: everything else, by meta order
+                first = explicit and (direction == 0 or h > 0)
+                key = ((0, -h, direction, order) if first else (1, 0, 0, order))
+                ranked.append((*key, 0 if explicit else 1, direction, spec, name, h, explicit))
+    ranked = sorted(set(ranked))
+    if not ranked:
+        return None, False, (f"no declared edge kind admits {kind} -> {ref_kind} in either "
+                             f"direction")
+    top = ranked[0]
+    order, direction, name, hscore, explicit = top[3], top[5], top[7], top[8], top[9]
+    h = -hscore
+    how = "declares" if explicit else "admits (through a wildcard endpoint)"
+    ranked = [(c[8], c[5], c[3], c[6], c[7]) for c in ranked]
+    rev = direction == 1
+    src, dst = (ref_kind, kind) if rev else (kind, ref_kind)
+    why = (" (column words match its declaration)" if h < 0 else
+           f" (no column word names a role; meta-kind {metas[order]!r} is ranked by "
+           f"fk_edge_metas)")
     if rev:
-        return rev, True, (f"{rev!r} declares {ref_kind} -> {kind} (read in reverse: nothing "
-                           f"admits {kind} -> {ref_kind}){rwhy}")
-    return None, False, f"no declared edge kind admits {kind} -> {ref_kind} in either direction"
+        why += f" (read in reverse: the key is on the {kind} row)"
+    others = [f"{c[4]}{' (reverse)' if c[1] else ''}" for c in ranked[1:]]
+    if others:
+        why += f"; other candidates: {others} — choose one on review if the key means that"
+    return name, rev, f"{name!r} {how} {src} -> {dst}{why}"
+
+
+#: The rationale prefix of a declared FK whose referenced table had no kind when it was proposed:
+#: the edge is re-resolved once every table's kind is known (`_resolve_pending_fks`, FIN-06).
+FK_NO_KIND = "referenced table has no kind"
+
+
+def fk_edges(snap: dict, kind: str, kinds: dict, vocab, policy: Optional[dict] = None
+             ) -> tuple[list[dict], list[str]]:
+    """(edges, rationale lines): one edge per DECLARED foreign key of the table, by `_fk_edge`.
+    A key whose referenced table has no kind (yet), or whose kinds no declaration admits, gets NO
+    edge and a rationale line saying so — it is counted per run (`build.completeness`), never
+    silently dropped."""
+    policy = policy if policy is not None else _policy()
+    edges: list[dict] = []
+    notes: list[str] = []
+    for fk in snap.get("foreign_keys") or []:
+        col = fk.get("column")
+        if not col:
+            continue
+        ref = _table_ref(fk.get("ref_schema"), fk.get("ref_table") or "")
+        ref_kind = kinds.get(ref) or kind_for_table(fk.get("ref_table") or "", vocab)
+        if ref_kind is None:
+            notes.append(f"FK {col} -> {ref}: {FK_NO_KIND}; no edge")
+            continue
+        roots = fk_hint_roots(col, kind, ref_kind, fk.get("ref_table") or "")
+        ek, rev, ewhy = _fk_edge(vocab, kind, ref_kind, col, policy, hint_roots=roots)
+        if ek is None:
+            notes.append(f"FK {col} -> {ref}: {ewhy}; no edge")
+            continue
+        row_end = f"{kind}:{{{ROW_KEY}}}"
+        ref_end = f"{ref_kind}:{{{FK_PREFIX}{col}}}"
+        edges.append({"kind": ek, "src": ref_end if rev else row_end,
+                      "dst": row_end if rev else ref_end,
+                      "evidence": [col], "fk": f"{col} -> {ref}", "reversed": rev})
+        notes.append(f"FK {col} -> {ref}: edge {ewhy} — review")
+    return edges, notes
 
 
 def _table_mapping(tref: str, snap: dict, kind: str, kinds: dict, vocab, *, origin: str,
@@ -435,46 +680,106 @@ def _table_mapping(tref: str, snap: dict, kind: str, kinds: dict, vocab, *, orig
     if len(attrs) > MAX_ATTRS:
         rationale.append(f"{len(attrs)} attribute columns; first {MAX_ATTRS} kept")
         attrs = dict(list(attrs.items())[:MAX_ATTRS])
-    edges = []
-    for fk in fks:
-        ref = _table_ref(fk.get("ref_schema"), fk.get("ref_table") or "")
-        ref_kind = kinds.get(ref) or kind_for_table(fk.get("ref_table") or "", vocab)
-        if ref_kind is None:
-            rationale.append(f"FK {fk['column']} -> {ref}: referenced table has no kind; no edge")
-            continue
-        stem = fk["column"].lower().removesuffix("_id")
-        ek, rev, ewhy = _fk_edge(vocab, kind, ref_kind, stem, policy)
-        if ek is None:
-            rationale.append(f"FK {fk['column']} -> {ref}: {ewhy}; no edge")
-            continue
-        row_end = f"{kind}:{{{ROW_KEY}}}"
-        ref_end = f"{ref_kind}:{{{FK_PREFIX}{fk['column']}}}"
-        edges.append({"kind": ek, "src": ref_end if rev else row_end,
-                      "dst": row_end if rev else ref_end,
-                      "evidence": [fk["column"]], "fk": f"{fk['column']} -> {ref}",
-                      "reversed": rev})
-        rationale.append(f"FK {fk['column']} -> {ref}: edge {ewhy} — review")
+    # C-1 (2026-10-02 dry run): a foreign-key column is ALSO kept as an attribute, so the reference
+    # value is on the node even where no edge could be built (never silently dropped)
+    for c in columns:
+        if c in fk_cols and c not in pk and c.lower() not in _IDENTITY_FIELDS:
+            attrs[c] = c
+    edges, fk_notes = fk_edges(snap, kind, kinds, vocab, policy)
+    rationale.extend(fk_notes)
     node = {"kind": kind, "label": label, "sources": pk or [ROW_KEY], "attrs": attrs}
     if canonical:
         node["canonical_id"] = canonical
     if candidate:
         node["candidate_identifier"] = candidate
+    split, split_notes = propose_split(snap, kind, vocab, policy)
+    rationale.extend(split_notes)
     return TableMapping(status="proposed", origin=origin, node=node, edges=edges,
-                        rationale=rationale, columns=columns, fk_columns=sorted(fk_cols))
+                        rationale=rationale, columns=columns, fk_columns=sorted(fk_cols),
+                        split=split)
+
+
+def is_association(snap: dict) -> bool:
+    """A JOIN (association) table, by STRUCTURE only — never by its name: two or more declared
+    foreign keys, and a primary key made of foreign-key columns only. Its rows say "this row of A
+    is related to that row of B"; they become EDGES between the referenced rows, not nodes (the
+    same rule as the completeness audit, `scripts/e2e/completeness.py`)."""
+    fk_cols = {f.get("column") for f in snap.get("foreign_keys") or []
+               if f.get("column") and f.get("ref_table")}
+    pk = set(snap.get("primary_key") or [])
+    return len(fk_cols) >= 2 and bool(pk) and pk <= fk_cols
+
+
+def association_mapping(tref: str, snap: dict, kinds: dict, vocab, *, origin: str = "rules",
+                        policy: Optional[dict] = None) -> TableMapping:
+    """A join table's mapping (MAT6 / FIN completeness): NO node; one edge per row between the two
+    rows it references — the key's foreign keys, in key order — of the declared edge kind
+    `_fk_edge` ranks first for the two kinds (the table's own name words as the hint; never the
+    kinds' names). Every other column of the row becomes an attribute of the edge, and the edge's
+    evidence is the join row's own two key cells. Unmapped, with the reason, when a referenced
+    table has no kind yet or no declaration admits the pair."""
+    policy = policy if policy is not None else _policy()
+    columns = _columns(snap)
+    pk = list(snap.get("primary_key") or [])
+    fks = {f["column"]: f for f in snap.get("foreign_keys") or []
+           if f.get("column") and f.get("ref_table")}
+    pair = [fks[c] for c in pk if c in fks][:2]
+    if len(pair) < 2:
+        pair = [fks[c] for c in columns if c in fks][:2]
+    rationale = [f"association (join) table: its key {pk} is made of foreign keys only, so each "
+                 f"row is an EDGE between the rows it references, not a node"]
+    ends = []
+    for fk in pair:
+        ref = _table_ref(fk.get("ref_schema"), fk.get("ref_table") or "")
+        k = kinds.get(ref) or kind_for_table(fk.get("ref_table") or "", vocab)
+        if k is None:
+            return TableMapping(status="unmapped", origin=origin, rationale=[
+                *rationale, f"FK {fk['column']} -> {ref}: {FK_NO_KIND}; the join waits for it"],
+                columns=columns, fk_columns=sorted(fks), association=True)
+        ends.append((fk["column"], ref, k))
+    (ca, ra, ka), (cb, rb, kb) = ends
+    table = str(snap.get("table") or tref)
+    roots = fk_hint_roots(table, ka, kb, ra, rb)
+    ek, rev, why = _fk_edge(vocab, ka, kb, table, policy, hint_roots=roots)
+    if ek is None:
+        return TableMapping(status="unmapped", origin=origin,
+                            rationale=[*rationale, f"{why}; no edge"], columns=columns,
+                            fk_columns=sorted(fks), association=True)
+    a_end, b_end = f"{ka}:{{{FK_PREFIX}{ca}}}", f"{kb}:{{{FK_PREFIX}{cb}}}"
+    attrs = {c: c for c in columns if c not in (ca, cb) and c.lower() not in _IDENTITY_FIELDS}
+    edge = {"kind": ek, "src": b_end if rev else a_end, "dst": a_end if rev else b_end,
+            "evidence": [ca, cb], "fk": f"{ca} -> {ra}; {cb} -> {rb}", "reversed": rev}
+    if attrs:
+        edge["attrs"] = attrs
+    rationale.append(f"each row: edge {why} — review")
+    return TableMapping(status="proposed", origin=origin, node=None, edges=[edge],
+                        rationale=rationale, columns=columns, fk_columns=sorted(fks),
+                        association=True)
 
 
 def propose_rules(snapshots: dict[str, dict], vocab,
-                  context: Optional[dict[str, dict]] = None) -> dict[str, TableMapping]:
+                  context: Optional[dict[str, dict]] = None,
+                  known_kinds: Optional[dict[str, Optional[str]]] = None
+                  ) -> dict[str, TableMapping]:
     """`context`: every table captured from the source (default: `snapshots`), so a table first
-    seen on a later sync still knows the other tables' keys."""
+    seen on a later sync still knows the other tables' keys. `known_kinds`: the kinds the
+    mapping already gives OTHER tables, so a foreign key (or a join) into one of them resolves.
+
+    A JOIN table (`is_association`, by structure) is mapped to edges between the rows it
+    references (`association_mapping`), never to a node of its own."""
     policy = _policy()
     ctx = context if context is not None else snapshots
+    assoc = {t for t, s in snapshots.items() if is_association(s)}
     resolved = {tref: resolve_kind(s.get("table") or tref, s, vocab, policy)
-                for tref, s in snapshots.items()}
-    kinds = {tref: (None if (snapshots[tref].get("history_snapshot") or {}).get("is") else k)
-             for tref, (k, _) in resolved.items()}
+                for tref, s in snapshots.items() if tref not in assoc}
+    kinds = {**{t: k for t, k in (known_kinds or {}).items() if k},
+             **{tref: (None if (snapshots[tref].get("history_snapshot") or {}).get("is") else k)
+                for tref, (k, _) in resolved.items()}}
     out: dict[str, TableMapping] = {}
     for tref, snap in snapshots.items():
+        if tref in assoc:
+            out[tref] = association_mapping(tref, snap, kinds, vocab, policy=policy)
+            continue
         kind, why = resolved[tref]
         hist = snap.get("history_snapshot") or {}
         if hist.get("is"):
@@ -670,6 +975,7 @@ def _ensure_mapping(source_id: str, snapshots: dict[str, dict], vocab, *, harnes
     if backfill:
         m = m.model_copy(update={"tables": {**m.tables, **backfill}})
         save_mapping(m, root)
+    m = _with_pending_fks(m, snapshots, vocab, root)
     new = {t: s for t, s in snapshots.items() if t not in m.tables}
     retry = {t: s for t, s in snapshots.items()
              if t in m.tables and m.tables[t].status == "unmapped"
@@ -678,20 +984,27 @@ def _ensure_mapping(source_id: str, snapshots: dict[str, dict], vocab, *, harnes
     if not new and not retry:
         return m
     proposed: dict[str, TableMapping] = {}
+    known_kinds = {t: (tm.node or {}).get("kind") for t, tm in m.tables.items()
+                   if tm.status != "unmapped"}
     if new:
-        proposed = propose_rules(new, vocab, context=snapshots)
-        unmapped = [t for t, tm in proposed.items() if tm.status == "unmapped"]
+        proposed = propose_rules(new, vocab, context=snapshots, known_kinds=known_kinds)
+        # a join table is never offered to the model as a node: it waits for its targets' kinds
+        unmapped = [t for t, tm in proposed.items() if tm.status == "unmapped"
+                    and not tm.association]
         proposed.update(propose_model(new, unmapped, {**m.tables, **proposed}, vocab, harness,
                                       context=snapshots))
     if retry:
-        again = propose_rules(retry, vocab, context=snapshots)
+        again = propose_rules(retry, vocab, context=snapshots, known_kinds=known_kinds)
         proposed.update({t: tm for t, tm in again.items() if tm.status == "proposed"})
         still = {t: m.tables[t] for t in retry if t not in proposed}
     else:
         still = {}
     known = {**m.tables, **proposed}
     fallback = _fallback_proposals(snapshots, {**{t: tm for t, tm in proposed.items()
-                                                  if tm.status == "unmapped"}, **still},
+                                                  if tm.status == "unmapped"
+                                                  and not tm.association},
+                                               **{t: tm for t, tm in still.items()
+                                                  if not is_association(snapshots[t])}},
                                    known, vocab)
     proposed.update(fallback)
     if auto_approve:
@@ -703,7 +1016,108 @@ def _ensure_mapping(source_id: str, snapshots: dict[str, dict], vocab, *, harnes
         return m
     m = m.model_copy(update={"tables": {**m.tables, **proposed}})
     save_mapping(m, root)
+    # FIN-06: a table proposed by the rules BEFORE the model gave the table it references a kind
+    # gets its edge now that every kind is known
+    return _with_pending_fks(m, snapshots, vocab, root)
+
+
+def _with_pending_fks(m: SourceMapping, snapshots: dict[str, dict], vocab,
+                      root: Optional[Path]) -> SourceMapping:
+    got = resolve_pending_fks(m.tables, snapshots, vocab)
+    got.update(resolve_pending_splits({**m.tables, **got}, snapshots, vocab))
+    if not got:
+        return m
+    m = m.model_copy(update={"tables": {**m.tables, **got}})
+    save_mapping(m, root)
     return m
+
+
+def resolve_pending_fks(tables: dict[str, TableMapping], snapshots: dict[str, dict], vocab,
+                        policy: Optional[dict] = None) -> dict[str, TableMapping]:
+    """FIN-06 / C-1: every DECLARED foreign key becomes an edge once the table it references has
+    a kind — whatever order the rules, the model and the fallback mapped the tables in.
+
+    For each rules/model entry (never a `manual` one: a person's edit is a decision) whose
+    declared FK has no edge, the edge is proposed again against the kinds of EVERY table now
+    mapped. A `proposed` entry simply gains the edge (and the FK attribute). An `approved` entry
+    is RE-PROPOSED with it — its approval was for the mapping without the edge, so a person
+    approves the change (the rationale says what changed); nothing is approved on anyone's
+    behalf. Returns only the entries that changed."""
+    policy = policy if policy is not None else _policy()
+    kinds = {t: (tm.node or {}).get("kind") for t, tm in tables.items()
+             if tm.status != "unmapped" and tm.node}
+    out: dict[str, TableMapping] = {}
+    for t, tm in tables.items():
+        snap = snapshots.get(t)
+        if (tm.status == "unmapped" and tm.origin != "manual" and snap is not None
+                and is_association(snap)):
+            # a join table waiting for the kinds of the rows it joins
+            got = association_mapping(t, snap, kinds, vocab, policy=policy)
+            if got.status == "proposed":
+                out[t] = got
+            continue
+        if tm.node is None or tm.status == "unmapped" or tm.origin == "manual":
+            continue
+        if snap is None:
+            continue
+        have = {c for e in tm.edges or [] for c in (e or {}).get("evidence") or []}
+        declared = [f.get("column") for f in snap.get("foreign_keys") or [] if f.get("column")]
+        missing = [c for c in declared if c not in have]
+        if not missing:
+            continue
+        found, notes = fk_edges(snap, tm.node["kind"], kinds, vocab, policy)
+        add = [e for e in found if e["evidence"][0] in missing]
+        if not add:
+            continue
+        cols = {e["evidence"][0] for e in add}
+        node = dict(tm.node)
+        attrs = dict(node.get("attrs") or {})
+        pk = set(snap.get("primary_key") or [])
+        for c in sorted(cols):
+            if c not in pk and c.lower() not in _IDENTITY_FIELDS:
+                attrs.setdefault(c, c)
+        node["attrs"] = attrs
+        kept = [r for r in tm.rationale
+                if not any(r.startswith(f"FK {c} -> ") for c in cols)]
+        added = [n for n in notes if any(n.startswith(f"FK {c} -> ") for c in cols)]
+        update: dict[str, Any] = {"node": node, "edges": [*(tm.edges or []), *add],
+                                  "rationale": [*kept, *added]}
+        if tm.status == "approved":
+            update.update(status="proposed", approval=None)
+            update["rationale"] = [*update["rationale"], (
+                f"re-proposed: declared foreign key(s) {sorted(cols)} now have an edge (the "
+                f"referenced table was given a kind after this table was mapped) — approve it "
+                f"again")]
+        out[t] = tm.model_copy(update=update)
+    return out
+
+
+def resolve_pending_splits(tables: dict[str, TableMapping], snapshots: dict[str, dict], vocab,
+                           policy: Optional[dict] = None) -> dict[str, TableMapping]:
+    """FIN-04: a rules/model entry of a SUBJECT kind, mapped before kind splits existed, whose rows
+    `propose_split` now finds to be of more than one declared kind, gains the split. A `proposed`
+    entry simply gains it; an `approved` one is RE-PROPOSED with it (its approval covered the
+    table without the split, so a person approves the change — nothing is approved on anyone's
+    behalf). A `manual` entry is a person's decision and is never touched. Returns only the
+    entries that changed."""
+    policy = policy if policy is not None else _policy()
+    out: dict[str, TableMapping] = {}
+    for t, tm in tables.items():
+        snap = snapshots.get(t)
+        if snap is None or tm.node is None or tm.split is not None or tm.status == "unmapped" \
+                or tm.origin == "manual" or tm.association:
+            continue
+        split, notes = propose_split(snap, tm.node.get("kind") or "", vocab, policy)
+        if split is None:
+            continue
+        update: dict[str, Any] = {"split": split, "rationale": [*tm.rationale, *notes]}
+        if tm.status == "approved":
+            update.update(status="proposed", approval=None)
+            update["rationale"] = [*update["rationale"], (
+                f"re-proposed: the rows of this {tm.node.get('kind')!r} table are of more than "
+                f"one declared kind (kind split on {split['column']!r}) — approve it again")]
+        out[t] = tm.model_copy(update=update)
+    return out
 
 
 def _fallback_proposals(snapshots: dict[str, dict], unmapped: dict[str, TableMapping],
@@ -753,6 +1167,10 @@ def mapping_digest(tm: TableMapping) -> str:
     if tm.columns is not None:
         data["columns"] = sorted(tm.columns)
         data["fk_columns"] = sorted(tm.fk_columns or [])
+    if tm.split is not None:
+        # FIN-04: which rows become which kind is part of what a person approves (absent, the
+        # digest is byte-identical to before, so no existing approval changes)
+        data["split"] = tm.split
     body = json.dumps(data, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
@@ -773,6 +1191,9 @@ def reference_problems(table: str, tm: TableMapping, *, columns: Optional[list[s
         return [f"{table}: the mapping carries no schema snapshot, so the columns it names cannot "
                 f"be checked; re-propose it from a profile"]
     have, fk_have = set(cols) | {ROW_KEY}, set(fks or [])
+    # an approved link (C-3) reads its column like a foreign key, through the edge's `ref`
+    fk_have |= {c for e in tm.edges or [] if (e or {}).get("ref")
+                for c in (e or {}).get("evidence") or []}
     node = tm.node or {}
     named: list[tuple[str, str]] = [("label", f) for f in _TEMPLATE_FIELD.findall(
         str(node.get("label") or ""))]
@@ -781,9 +1202,15 @@ def reference_problems(table: str, tm: TableMapping, *, columns: Optional[list[s
     for key in ("canonical_id", "candidate_identifier"):
         if node.get(key) is not None:
             named.append((key, node[key]))
+    if isinstance(tm.split, dict) and tm.split.get("column") is not None:
+        named.append(("kind split", tm.split["column"]))
     problems = [f"{table}: {where} names column {col!r}, which the table does not have"
                 for where, col in named if str(col) not in have]
     for i, e in enumerate(tm.edges or []):
+        for a, col in ((e or {}).get("attrs") or {}).items():
+            if str(col) not in have:
+                problems.append(f"{table}: edge {i} attr {a!r} names column {col!r}, which the "
+                                f"table does not have")
         for col in (e or {}).get("evidence") or []:
             if str(col) not in have:
                 problems.append(f"{table}: edge {i} evidence names column {col!r}, which the "
@@ -807,6 +1234,8 @@ def validate_table_mapping(table: str, tm: TableMapping, vocab, *,
     table's own row at one end, and — for a SUBJECT kind — that `canonical_id` (the exact-merge
     key) is one of the kind's DECLARED identifiers. Run at approval AND at run time."""
     problems: list[str] = []
+    if tm.node is None and tm.association:
+        return _validate_association(table, tm, vocab, check_references=check_references)
     if tm.node is None:
         return [f"{table}: no node to approve"]
     try:
@@ -835,6 +1264,8 @@ def validate_table_mapping(table: str, tm: TableMapping, vocab, *,
                 problems.append(f"{table}: candidate_identifier {node.candidate_identifier!r} is "
                                 f"not a declared identifier of subject kind {node.kind!r} "
                                 f"{sorted(idents)}")
+    if tm.split is not None:
+        problems += split_problems(table, tm, vocab)
     own = f"{node.kind}:{{{ROW_KEY}}}"
     for i, raw in enumerate(tm.edges or []):
         try:
@@ -861,10 +1292,111 @@ def validate_table_mapping(table: str, tm: TableMapping, vocab, *,
             ends[side] = kind
         if own not in (e.src, e.dst):
             problems.append(f"{table}: edge {i} has neither end on this table's own row ({own})")
+        if e.ref is not None:
+            if not (e.ref.get("source") and e.ref.get("table")) or not e.evidence:
+                problems.append(f"{table}: edge {i} is a link whose ref names no source/table "
+                                f"or whose evidence names no column")
+            other = e.dst if e.src == own else e.src
+            okind = other.split(":", 1)[0]
+            if is_person_kind(vocab, okind):
+                problems.append(f"{table}: edge {i} is a link to person kind {okind!r}; an "
+                                f"inferred link never points at a person (hard constraint 1)")
         try:
             decl = vocab.edge(e.kind)
         except Exception:                                            # noqa: BLE001
             decl = None
+        if decl is not None and len(ends) == 2 and not (
+                _admits(decl, "src", ends["src"]) and _admits(decl, "dst", ends["dst"])):
+            problems.append(f"{table}: edge kind {e.kind!r} does not admit "
+                            f"{ends['src']} -> {ends['dst']}")
+    if check_references:
+        problems += reference_problems(table, tm)
+    return problems
+
+
+def split_problems(table: str, tm: TableMapping, vocab) -> list[str]:
+    """A kind split's problems (FIN-04): its shape; `default` is the node kind; every bound kind
+    is in the vocabulary; every bound value is in normalised form (`split_value`), so a hand edit
+    cannot bind a spelling no row is ever looked up by; and — HARD CONSTRAINT 1 — when the split
+    names a subject kind anywhere, the default (every unrecognised, NULL or masked value) is a
+    subject: a row nobody recognised is never put on the side that merges."""
+    if tm.association or tm.node is None:
+        return [f"{table}: a kind split needs a node (a join table has none)"]
+    try:
+        sp = SplitSpecModel.model_validate(tm.split)
+    except Exception as exc:                                         # noqa: BLE001
+        return [f"{table}: kind split is malformed ({str(exc).splitlines()[0][:200]})"]
+    problems: list[str] = []
+    kind = (tm.node or {}).get("kind")
+    if sp.default != kind:
+        problems.append(f"{table}: kind split default {sp.default!r} is not the node kind "
+                        f"{kind!r}")
+    for value, k in sorted(sp.kinds.items()):
+        if k not in vocab.node_kinds:
+            problems.append(f"{table}: kind split binds {value!r} to {k!r}, which is not in the "
+                            f"active vocabulary")
+        if split_value(value) != value:
+            problems.append(f"{table}: kind split value {value!r} is not normalised "
+                            f"({split_value(value)!r})")
+
+    def subject(k: str) -> bool:
+        try:
+            return bool(vocab.is_subject(k))
+        except Exception:                                            # noqa: BLE001
+            return True                                              # cannot tell: fail closed
+
+    if any(subject(k) for k in {sp.default, *sp.kinds.values()}) and not subject(sp.default):
+        problems.append(f"{table}: kind split names a subject kind but its default "
+                        f"{sp.default!r} is not one: an unrecognised row would leave the "
+                        f"protected side (hard constraint 1)")
+    return problems
+
+
+def split_kinds(tm) -> list[str]:
+    """Every kind a mapping's rows may become: the node kind, plus each kind its split binds."""
+    node = (tm.get("node") if isinstance(tm, dict) else tm.node) or {}
+    split = (tm.get("split") if isinstance(tm, dict) else tm.split) or {}
+    base = node.get("kind")
+    out = [base] if base else []
+    for k in sorted(set((split.get("kinds") or {}).values())):
+        if k not in out:
+            out.append(k)
+    return out
+
+
+def _validate_association(table: str, tm: TableMapping, vocab, *,
+                          check_references: bool = False) -> list[str]:
+    """A join table's mapping: no node, at least one edge, and every edge a declared kind whose
+    BOTH endpoints are foreign-key columns of the table, admitted by its declaration."""
+    problems: list[str] = []
+    if not tm.edges:
+        problems.append(f"{table}: an association mapping with no edge")
+    if tm.split is not None:
+        problems.append(f"{table}: a join table has no node, so it cannot carry a kind split")
+    for i, raw in enumerate(tm.edges or []):
+        try:
+            e = EdgeSpecModel.model_validate(raw)
+        except Exception as exc:                                     # noqa: BLE001
+            problems.append(f"{table}: edge {i} is malformed ({str(exc).splitlines()[0][:200]})")
+            continue
+        if e.kind not in vocab.edge_kinds:
+            problems.append(f"{table}: edge kind {e.kind!r} is not in the active vocabulary")
+            continue
+        ends: dict[str, str] = {}
+        for side, text in (("src", e.src), ("dst", e.dst)):
+            m = _ENDPOINT.match(text)
+            if m is None or not m.group(2).startswith(FK_PREFIX):
+                problems.append(f"{table}: edge {i} {side} {text!r} is not "
+                                f"'<kind>:{{{FK_PREFIX}<column>}}' (a join row's edge joins the "
+                                f"rows it references)")
+                continue
+            if m.group(1) not in vocab.node_kinds:
+                problems.append(f"{table}: edge {i} {side} kind {m.group(1)!r} is not in the "
+                                f"vocabulary")
+            ends[side] = m.group(1)
+        if e.ref is not None:
+            problems.append(f"{table}: edge {i}: a join table's edge cannot be a link")
+        decl = vocab.edge(e.kind) if e.kind in vocab.edge_kinds else None
         if decl is not None and len(ends) == 2 and not (
                 _admits(decl, "src", ends["src"]) and _admits(decl, "dst", ends["dst"])):
             problems.append(f"{table}: edge kind {e.kind!r} does not admit "
@@ -1132,6 +1664,10 @@ def additive_problems(source_id: str, table: str, new: TableMapping, vocab, *,
                         f"approved by a person, never by delegation")
     if node.get("candidate_identifier") is not None:
         problems.append(f"{table}: names a subject identifier; approved by a person only")
+    if new.split != (current.split if current is not None else None):
+        # FIN-04: which rows leave (or join) a subject kind is a person's decision
+        problems.append(f"{table}: adds, changes or removes a kind split; approved by a person "
+                        f"only")
     if current is None or current.status == "unmapped" or current.node is None:
         # R-022 f2 #2: a NEW table may add only its OWN rows. An exact-merge key would fold its
         # rows onto records already in the graph — that re-reads existing nodes, so it is not
@@ -1227,10 +1763,12 @@ def approve_delegated_additive(source_id: str, table: str, entry: dict, *, deleg
 
 def set_table_mapping(source_id: str, table: str, *, edited_by: str, node: Optional[dict] = None,
                       edges: Optional[list[dict]] = None, vocab=None,
-                      root: Optional[Path] = None) -> SourceMapping:
+                      root: Optional[Path] = None,
+                      split: Any = ...) -> SourceMapping:
     """A human edit of one table's mapping (origin `manual`, status `proposed` until approved).
     The node kind and every edge kind are validated against the vocabulary — an edit cannot
-    smuggle an off-ontology kind past the closed vocabulary."""
+    smuggle an off-ontology kind past the closed vocabulary. `split` (FIN-04) replaces the
+    per-row kind split (None removes it; omitted, it is kept) and is validated like the rest."""
     if not edited_by or not edited_by.strip():
         raise ValueError("an edit needs a name (edited_by)")
     if vocab is None:
@@ -1246,11 +1784,361 @@ def set_table_mapping(source_id: str, table: str, *, edited_by: str, node: Optio
     for e in new_edges or []:
         if e.get("kind") not in vocab.edge_kinds:
             raise ValueError(f"edge kind {e.get('kind')!r} is not in the active vocabulary")
+    new_split = cur.split if split is ... else split
     tm = TableMapping(status="proposed" if new_node else "unmapped", origin="manual",
                       node=new_node, edges=list(new_edges or []),
                       rationale=[*cur.rationale, f"edited by {edited_by.strip()}"],
-                      columns=cur.columns, fk_columns=cur.fk_columns)
+                      columns=cur.columns, fk_columns=cur.fk_columns, links=list(cur.links),
+                      split=new_split if new_node else None)
+    if tm.split is not None:
+        bad = split_problems(table, tm, vocab)
+        if bad:
+            raise ValueError("; ".join(bad))
     m = m.model_copy(update={"tables": {**m.tables, table: tm}})
+    save_mapping(m, root)
+    return m
+
+
+# --- C-3: proposed links where no foreign key is declared --------------------------------------------
+def is_person_kind(vocab, kind: Optional[str]) -> bool:
+    """A kind whose records stand for PEOPLE: never the target of an inferred link and never merged
+    (hard constraint 1). The pack says which: a vocabulary exposing `is_person(kind)` (the
+    organisation/person split, FIN-04) is asked; otherwise EVERY subject kind counts as one —
+    the conservative reading until the pack draws the line."""
+    if not kind:
+        return False
+    probe = getattr(vocab, "is_person", None)
+    try:
+        if callable(probe):
+            return bool(probe(str(kind)))
+        return bool(vocab.is_subject(str(kind)))
+    except Exception:                                                # noqa: BLE001
+        return True                                                  # cannot tell: fail closed
+
+
+_NUMERIC_TYPE = re.compile(r"int|serial|numeric|decimal|real|double|float|number|money", re.I)
+
+
+def _key_values(snap: dict) -> Optional[tuple[str, set[str]]]:
+    """(key column, its values) of a table a link may point INTO: a single primary key, not
+    numeric (a surrogate 1, 2, 3 overlaps every other surrogate by accident), whose values read
+    are not all digits. None otherwise."""
+    pk = list(snap.get("primary_key") or [])
+    if len(pk) != 1:
+        return None
+    types = {c.get("name"): str(c.get("type") or "") for c in snap.get("columns") or []}
+    if _NUMERIC_TYPE.search(types.get(pk[0], "")):
+        return None
+    vals = {str(r.get(pk[0])) for r in snap.get("rows") or [] if r.get(pk[0]) is not None}
+    if not vals or all(v.strip().isdigit() for v in vals):
+        return None
+    return pk[0], vals
+
+
+def propose_links(source_id: str, snapshots: dict[str, dict], tables: dict[str, TableMapping],
+                  vocab, *, others: Optional[dict[str, dict[str, tuple[dict, str]]]] = None,
+                  policy: Optional[dict] = None) -> dict[str, list[dict]]:
+    """{table: [link proposal, ...]} — C-3: a column no foreign key declares whose values are,
+    by MEASUREMENT, keys of another table (in this source, or — `others` {source: {table:
+    (snapshot, kind)}} — in another source): a reference column holding the other system's key.
+
+    A proposal names the column, the table and key it points into, how many of the column's
+    values matched (`matched` of `with_value`), and the declared edge kind it would become
+    (`_fk_edge`, the same ranking a declared key gets) — or why none can. It is a PROPOSAL: it
+    changes nothing until a person approves it (`approve_link`). It never points at a PERSON
+    kind (`is_person_kind`) and it never merges anything: two rows describing one organisation
+    stay two nodes joined by an edge (a merge on a declared business key is a person's merge
+    rule). Thresholds are policy (`link_proposals`). No table, column or kind is named here."""
+    policy = policy if policy is not None else _policy()
+    lp = policy.get("link_proposals") or {}
+    min_matched = int(lp.get("min_matched", 3))
+    min_ratio = float(lp.get("min_ratio", 0.8))
+    targets: list[tuple[str, str, str, set[str], str]] = []   # (source, table, key, keys, kind)
+    for t, snap in snapshots.items():
+        tm = tables.get(t)
+        kind = (tm.node or {}).get("kind") if tm is not None and tm.status != "unmapped" \
+            else None
+        kv = _key_values(snap)
+        if kind and kv:
+            targets.append((source_id, t, kv[0], kv[1], kind))
+    for other, tabs in sorted((others or {}).items()):
+        if other == source_id:
+            continue
+        for t, (snap, kind) in sorted(tabs.items()):
+            kv = _key_values(snap)
+            if kind and kv:
+                targets.append((other, t, kv[0], kv[1], kind))
+    out: dict[str, list[dict]] = {}
+    for t, snap in sorted(snapshots.items()):
+        tm = tables.get(t)
+        if tm is None or tm.status == "unmapped" or not tm.node:
+            continue
+        kind = tm.node["kind"]
+        pk = set(snap.get("primary_key") or [])
+        declared = {f.get("column") for f in snap.get("foreign_keys") or []}
+        have = {c for e in tm.edges or [] for c in (e or {}).get("evidence") or []}
+        types = {c.get("name"): str(c.get("type") or "") for c in snap.get("columns") or []}
+        rows = snap.get("rows") or []
+        found: list[dict] = []
+        for col in _columns(snap):
+            if col in pk or col in declared or col in have or _NUMERIC_TYPE.search(
+                    types.get(col, "")):
+                continue
+            vals = [str(r.get(col)) for r in rows if r.get(col) is not None]
+            if len(vals) < min_matched:
+                continue
+            hits = []
+            for (tsrc, ttab, tkey, keys, tkind) in targets:
+                if tsrc == source_id and ttab == t and tkey == col:
+                    continue
+                matched = sum(1 for v in vals if v in keys)
+                if matched >= min_matched and matched / len(vals) >= min_ratio:
+                    hits.append((matched / len(vals), matched, tsrc, ttab, tkey, tkind))
+            if not hits:
+                continue
+            hits.sort(key=lambda h: (-h[0], -h[1], h[2], h[3]))
+            ratio, matched, tsrc, ttab, tkey, tkind = hits[0]
+            link = {"column": col, "source": tsrc, "table": ttab, "key": tkey,
+                    "target_kind": tkind, "matched": matched, "with_value": len(vals),
+                    "basis": "value overlap with the target's key (measured on the rows read)",
+                    "status": "proposed", "edge": None}
+            tied = [f"{h[2]}:{h[3]}" for h in hits[1:] if (h[0], h[1]) == (ratio, matched)]
+            if tied:
+                link["alternatives"] = tied
+            if is_person_kind(vocab, tkind):
+                link.update(status="not_proposed", why=(
+                    f"the target kind {tkind!r} stands for people: an inferred link never "
+                    f"points at a person record (hard constraint 1); a person who knows the "
+                    f"match records it through the subject's verified channel"))
+                found.append(link)
+                continue
+            roots = fk_hint_roots(col, kind, tkind, ttab)
+            ek, rev, ewhy = _fk_edge(vocab, kind, tkind, col, policy, hint_roots=roots)
+            if ek is None:
+                same = (" — the rows may describe the same thing; folding them together is a "
+                        "merge rule on a declared business key, which a person decides"
+                        if tkind == kind else "")
+                link.update(status="not_proposed", why=f"{ewhy}{same}")
+            else:
+                row_end = f"{kind}:{{{ROW_KEY}}}"
+                ref_end = f"{tkind}:{{{FK_PREFIX}{col}}}"
+                link["edge"] = {"kind": ek, "src": ref_end if rev else row_end,
+                                "dst": row_end if rev else ref_end, "reversed": rev}
+                link["why"] = (f"{matched} of {len(vals)} values of {col!r} are keys of "
+                               f"{tsrc}:{ttab}.{tkey}; edge {ewhy}")
+            found.append(link)
+        if found:
+            out[t] = found
+    return out
+
+
+def _link_id(link: dict) -> tuple:
+    return (link.get("column"), link.get("source"), link.get("table"), link.get("key"))
+
+
+def merge_link_proposals(tables: dict[str, TableMapping], proposals: dict[str, list[dict]]
+                         ) -> dict[str, TableMapping]:
+    """The tables whose `links` change: new proposals are added, a decided link (approved or
+    rejected by a person) keeps its decision, and a proposal the data no longer supports is
+    dropped unless decided. Links are outside the approval digest: proposing one never touches
+    an approval."""
+    out: dict[str, TableMapping] = {}
+    for t, tm in tables.items():
+        current = list(tm.links or [])
+        decided = {_link_id(lk): lk for lk in current
+                   if lk.get("status") in ("approved", "rejected")}
+        fresh = [lk for lk in proposals.get(t, []) if _link_id(lk) not in decided]
+        merged = [*decided.values(), *fresh]
+        key = lambda lk: (str(lk.get("column")), str(lk.get("source")), str(lk.get("table")))
+        merged.sort(key=key)
+        if json.dumps(merged, sort_keys=True, default=str) != json.dumps(
+                sorted(current, key=key), sort_keys=True, default=str):
+            out[t] = tm.model_copy(update={"links": merged})
+    return out
+
+
+def captured_tables(source_id: str) -> dict[str, dict]:
+    """{table: snapshot} of every table the source's LAST verified state holds (its captures),
+    read-only — the other side of a cross-source link proposal."""
+    from . import capture
+    from .runner import load_state
+
+    out: dict[str, dict] = {}
+    try:
+        state = load_state(source_id)
+    except Exception:                                                # noqa: BLE001
+        return out
+    for entry in state.values():
+        sha = (entry or {}).get("content_hash")
+        if not sha or (entry or {}).get("graph") is False:
+            continue
+        try:
+            data = json.loads(capture.get_bytes(sha))
+        except Exception:                                            # noqa: BLE001
+            continue
+        if isinstance(data, dict) and data.get("table") and isinstance(data.get("rows"), list):
+            ref = _table_ref(data.get("schema"), data["table"])
+            out[ref] = data
+    return out
+
+
+def link_context(source_id: str, root: Optional[Path] = None, vocab=None
+                 ) -> dict[str, dict[str, tuple[dict, str]]]:
+    """{other source: {table: (snapshot, kind)}} for every OTHER ingest source whose mapping maps
+    a table to a kind that is not a person kind — what a cross-source link may point into."""
+    from .connections import list_connections
+
+    out: dict[str, dict[str, tuple[dict, str]]] = {}
+    for conn in list_connections(root):
+        if conn.id == source_id or getattr(conn, "purpose", "ingest") != "ingest":
+            continue
+        try:
+            m = load_mapping(conn.id, root)
+        except Exception:                                            # noqa: BLE001
+            continue
+        kinds = {t: (tm.node or {}).get("kind") for t, tm in m.tables.items()
+                 if tm.status != "unmapped" and tm.node}
+        kinds = {t: k for t, k in kinds.items() if k and not is_person_kind(vocab, k)}
+        if not kinds:
+            continue
+        snaps = captured_tables(conn.id)
+        got = {t: (snaps[t], k) for t, k in kinds.items() if t in snaps}
+        if got:
+            out[conn.id] = got
+    return out
+
+
+def refresh_link_proposals(source_id: str, snapshots: dict[str, dict], vocab, *,
+                           root: Optional[Path] = None,
+                           others: Optional[dict] = None) -> SourceMapping:
+    """Propose (C-3) links for the source's tables and save them in the mapping. `others`
+    defaults to every other ingest source's captured, mapped tables (`link_context`)."""
+    m = load_mapping(source_id, root)
+    if others is None:
+        others = link_context(source_id, root, vocab)
+    props = propose_links(source_id, snapshots, m.tables, vocab, others=others)
+    changed = merge_link_proposals({t: m.tables[t] for t in snapshots if t in m.tables}, props)
+    if not changed:
+        return m
+    m = m.model_copy(update={"tables": {**m.tables, **changed}})
+    save_mapping(m, root)
+    return m
+
+
+def approve_link(source_id: str, table: str, column: str, *, principal: Any,
+                 target: Optional[str] = None, vocab=None,
+                 root: Optional[Path] = None) -> SourceMapping:
+    """A named, AUTHENTICATED person approves one proposed link (C-3): it becomes an edge of the
+    table's mapping carrying its `ref` ({source, table, key}), so the build renders the
+    referenced row's identity in THAT source. Refused when the link is not a proposal with an
+    edge, or when its target is a person kind (re-checked against the active vocabulary).
+
+    The table's mapping changes, so its approval must cover the change: a table whose approval
+    VERIFIES is re-approved by this same person (logged like any approval, digest over the new
+    edges); a table not yet approved keeps `proposed` with the edge in it, for the usual
+    approval. Nothing is approved on anyone else's behalf. `target` ("source:table") picks one
+    link when a column has several."""
+    from .plans import ApprovalRefused, require_authenticated_approver
+
+    try:
+        who = require_authenticated_approver(principal, what="link approval")
+    except ApprovalRefused as exc:
+        raise MappingApprovalRefused(str(exc)) from None
+    if vocab is None:
+        from databridge_graph.packs import active_vocabulary
+
+        vocab = active_vocabulary()
+    m = load_mapping(source_id, root)
+    tm = m.tables.get(table)
+    if tm is None or not tm.node:
+        raise MappingApprovalRefused(f"{table}: no mapped table to link from")
+    cands = [lk for lk in tm.links or [] if lk.get("column") == column and (
+        target is None or f"{lk.get('source')}:{lk.get('table')}" == target)]
+    if len(cands) != 1:
+        raise MappingApprovalRefused(f"{table}.{column}: {len(cands)} link(s) match; name one "
+                                     f"with target='source:table'")
+    link = cands[0]
+    if link.get("status") != "proposed" or not link.get("edge"):
+        raise MappingApprovalRefused(f"{table}.{column}: the link is {link.get('status')!r}"
+                                     f"{'' if link.get('edge') else ' with no edge kind'}; "
+                                     f"only a proposal with an edge can be approved")
+    if is_person_kind(vocab, link.get("target_kind")):
+        raise MappingApprovalRefused(f"{table}.{column}: the link points at a person kind "
+                                     f"{link.get('target_kind')!r}; refused (hard constraint 1)")
+    e = link["edge"]
+    edge = {"kind": e["kind"], "src": e["src"], "dst": e["dst"], "evidence": [column],
+            "fk": f"{column} -> {link['source']}:{link['table']} (approved link)",
+            "reversed": bool(e.get("reversed")),
+            "ref": {"source": link["source"], "table": link["table"], "key": link.get("key")}}
+    logged = logged_approvals(source_id, root)
+    was_approved = tm.status == "approved" and approval_problem(
+        source_id, table, tm, vocab, logged=logged, root=root) is None
+    node = dict(tm.node)
+    attrs = dict(node.get("attrs") or {})
+    attrs.setdefault(column, column)
+    node["attrs"] = attrs
+    at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    # LINK7 cross-track 1: HOW the approver signed in is kept on the link (links sit outside the
+    # approval digest, so this changes no approval)
+    links = [({**lk, "status": "approved", "approved_by": who["principal_id"], "at": at,
+               **_decider(who)} if lk is link else lk) for lk in tm.links]
+    new = tm.model_copy(update={"node": node, "edges": [*(tm.edges or []), edge],
+                                "links": links, "status": "proposed", "approval": None,
+                                "rationale": [*tm.rationale, (
+                                    f"link {column} -> {link['source']}:{link['table']} "
+                                    f"approved by {who['principal_id']}")]})
+    problems = validate_table_mapping(table, new, vocab, check_references=True)
+    if problems:
+        raise MappingApprovalRefused(f"{table}: the link cannot be approved: "
+                                     f"{'; '.join(problems)}")
+    if was_approved:
+        record = {**who, "at": at, "digest": mapping_digest(new)}
+        _append_approval(source_id, {"action": "approve", "source_id": source_id,
+                                     "table": table, **record}, root)
+        new = new.model_copy(update={"status": "approved", "approval": record})
+    m = m.model_copy(update={"tables": {**m.tables, table: new}})
+    save_mapping(m, root)
+    return m
+
+
+def _decider(who: dict) -> dict:
+    return {"decided_dev_only": bool(who.get("dev_only")),
+            "decided_authenticated_by": who.get("authenticated_by")}
+
+
+def reject_link(source_id: str, table: str, column: str, *, principal: Any,
+                target: Optional[str] = None, reason: str = "",
+                root: Optional[Path] = None) -> SourceMapping:
+    """A named, AUTHENTICATED person rejects one PROPOSED link (C-3; LINK7 cross-track 1, moved
+    here from the gateway). The decision is kept on the link — who, how they signed in (the dev
+    token is marked), when, why — and `merge_link_proposals` keeps a decided link, so the next
+    sync never proposes it again. Nothing else in the mapping changes; no approval is touched.
+    `target` ("source:table") picks one link when a column has several."""
+    from .plans import ApprovalRefused, require_authenticated_approver
+
+    try:
+        who = require_authenticated_approver(principal, what="link rejection")
+    except ApprovalRefused as exc:
+        raise MappingApprovalRefused(str(exc)) from None
+    m = load_mapping(source_id, root)
+    tm = m.tables.get(table)
+    if tm is None:
+        raise MappingApprovalRefused(f"{table}: not in the mapping")
+    cands = [lk for lk in tm.links or [] if lk.get("column") == column and (
+        target is None or f"{lk.get('source')}:{lk.get('table')}" == target)]
+    if len(cands) != 1:
+        raise MappingApprovalRefused(f"{table}.{column}: {len(cands)} link(s) match; name one "
+                                     f"with target='source:table'")
+    link = cands[0]
+    if link.get("status") != "proposed":
+        raise MappingApprovalRefused(f"{table}.{column}: the link is {link.get('status')!r}; "
+                                     f"only a proposal can be rejected")
+    at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    links = [({**lk, "status": "rejected", "rejected_by": who["principal_id"], "at": at,
+               **_decider(who), "reject_reason": reason.strip() or None}
+              if lk is link else lk) for lk in tm.links]
+    m = m.model_copy(update={"tables": {**m.tables, table: tm.model_copy(update={
+        "links": links})}})
     save_mapping(m, root)
     return m
 
@@ -1262,4 +2150,10 @@ __all__ = ["SourceMapping", "TableMapping", "propose_rules", "propose_model", "e
            "set_table_mapping", "load_mapping", "save_mapping", "mapping_path",
            "reference_problems", "additive_problems", "approve_delegated_additive",
            "delegation_scope_problems", "DELEGATION_SCOPE",
-           "kind_for_table", "resolve_kind", "MAPPING_TASK_CLASS"]
+           "kind_for_table", "resolve_kind", "MAPPING_TASK_CLASS", "fk_edges", "fk_hint_roots",
+           "resolve_pending_fks", "propose_links", "merge_link_proposals", "refresh_link_proposals",
+           "approve_link", "reject_link", "link_context", "captured_tables", "is_person_kind",
+           "FK_NO_KIND",
+           "is_association", "association_mapping", "propose_split", "split_value",
+           "split_candidates", "split_problems", "split_kinds", "resolve_pending_splits",
+           "KIND_KEY", "SplitSpecModel"]

@@ -209,14 +209,15 @@ export function Figures({
         unavailable={data.ingestion_unavailable ?? null}
       />
 
-      {(queue || queue_unavailable) && (
-        <section>
-          <h2 className="mb-1 text-sm font-semibold">Waiting on a human</h2>
+      {data.queue_mounted !== false && (queue || queue_unavailable) && (
+        <section data-testid="queue-card">
+          <h2 className="mb-1 text-sm font-semibold">Waiting on a person</h2>
           <p className="mb-2 text-2xs text-subtle">
-            Read from the confirm gate itself, not re-derived. Identity is verified in person and is
-            never automated — an intake sitting here is the system working, not failing.
+            Read from the confirm gate itself, not re-derived. The {nouns.identifier} is checked by
+            a person and is never automated, so a {nouns.document} waiting in the {nouns.queue} is
+            the system working, not failing.
           </p>
-          {queue_unavailable && <Unavailable what="The intake queue" reason={queue_unavailable} />}
+          {queue_unavailable && <Unavailable what={`The ${nouns.queue}`} reason={queue_unavailable} />}
           {queue && <BlockedQueue queue={queue} />}
         </section>
       )}

@@ -37,6 +37,18 @@ purposes:
     subject_scoped: true
     lawful_basis: legal obligation - AML/CFT sanctions screening
 
+  - id: finance.agent_run
+    description: >
+      A user-defined agent answering a question or running an automation over the finance sources
+      the user connected. Reads are scoped to the agent's declared sources; identity is never
+      resolved by the agent (a party it finds is a candidate a person confirms).
+    subject_scoped: false
+    lawful_basis: legitimate interests - internal operations on the institution's own records
+    # The purpose agents compiled from English bind when WALNUT_AGENT_PURPOSE names none
+    # (`databridge_automation.catalogue.default_agent_purpose`). Their golden set is
+    # packs/finance/evals/agent_contract.jsonl.
+    default_for_compiled_agents: true
+
   - id: finance.graph_build
     description: Scheduled build-time crawl staging evidence into the graph. Not subject-scoped.
     subject_scoped: false

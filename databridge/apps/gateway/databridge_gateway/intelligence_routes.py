@@ -63,8 +63,10 @@ on. So every degraded path here is a refusal with a code (`_refusal`), never a t
    model route. An identity question is refused with `model_calls == 0` and the refusal is a 200
    carrying the fixed staff-facing text. Screening after the configuration checks meant an unloaded
    graph answered "the clinic graph is not loaded" to "is this the same person?".
-6. **Bounds refuse rather than truncate.** Every figure here is a count, so a count over part of a
-   graph is a wrong number, not a short one (`intelligence_surface.check_graph_bounds`).
+6. **Counts are never truncated.** Every figure is exact at any graph size (C-4,
+   `intelligence_counts`): past the detail envelope only the member LISTS are left out, and each
+   figure says so. The agent and the drill-down still refuse past their bounds rather than walk part
+   of a graph (`intelligence_surface.check_graph_bounds`).
 
 **R-015.** All four routes below used to be reachable by anyone, unauthenticated
 (`phase5-gw-intelligence.md` #1) — this surface's own comments even documented "there is no
@@ -197,37 +199,59 @@ def _store(app: FastAPI):
 
 def _graph_analytics(app: FastAPI, as_of: Optional[dt.datetime]) -> tuple[Optional[dict],
                                                                          Optional[str]]:
-    """(payload, unavailable_reason). Never raises — see the module docstring."""
+    """(payload, unavailable_reason). Never raises — see the module docstring.
+
+    C-4 (finance dry run): every figure is EXACT at any graph size. The page used to withhold all
+    of them past 5,000 nodes / 20,000 relationships. Now:
+
+    * within `MAX_GRAPH_NODES` / `MAX_GRAPH_EDGES` (the DETAIL envelope, measured on the requested
+      snapshot) the figures come from `analytics.compute`, with the member ids each one counted;
+    * past it, the OPEN graph is counted in the store (`intelligence_counts.store_figures`, SQL
+      aggregates) and a rewound one by `compute`; either way the numbers are exact, and only the
+      member LISTS are left out, each figure saying so (`MEMBERS_NOT_LISTED`).
+
+    "Unavailable" is now reserved for a real failure: no graph, a history the reader cannot
+    rewind, or a read that raised."""
     store = _store(app)
     if store is None:
         return None, "the graph is not loaded"
     try:
         from databridge_graph.analytics import SnapshotIncomplete, compute
 
+        from .intelligence_counts import store_figures, supports_sql, unlist_members
         from .intelligence_surface import (
+            COUNT_FIGURES,
             SurfaceNames,
-            SurfaceTooLarge,
-            check_graph_bounds,
             sanitise_analytics,
             snapshot_view,
+            within_detail_envelope,
         )
 
         try:
-            # ONE snapshot of the requested instant, read once (R-019 t08b #5/#9): the bound, the
-            # naming policy and every figure are computed over the SAME rows, so the bound is the
-            # size of what is counted — not of today's graph — and nothing reads between them.
+            # ONE snapshot of the requested instant, read once (R-019 t08b #5/#9): the envelope,
+            # the naming policy and every in-memory figure are computed over the SAME rows.
             view = snapshot_view(store, as_of)
-            # Bounded BEFORE any figure is computed. On a snapshot past this surface's envelope
-            # the honest answer is "these figures are withheld", never a number cut down to fit.
-            check_graph_bounds(view)
         except SnapshotIncomplete as exc:
             return None, exc.message
-        except SurfaceTooLarge as exc:
-            return None, exc.message
         names = SurfaceNames(view)
+        if within_detail_envelope(view):
+            raw = compute(store, snapshot=view.snapshot).to_dict()
+            listed = True
+        elif as_of is None and supports_sql(store):
+            raw = store_figures(store)
+            listed = False
+        else:
+            # A rewound snapshot past the envelope: the store's SQL counts the OPEN graph only,
+            # so the rewind is counted in memory — exactly — and its member lists dropped below.
+            raw = compute(store, snapshot=view.snapshot).to_dict()
+            listed = False
         # Sanitised on the way out, always: a figure counting SUBJECT rows has subject ids as its
         # members, and the entity table would otherwise carry their names.
-        payload = sanitise_analytics(compute(store, snapshot=view.snapshot).to_dict(), names)
+        payload = sanitise_analytics(raw, names)
+        if not listed:
+            payload = unlist_members(payload, COUNT_FIGURES)
+        else:
+            payload["members_listed"] = True
         # Which kinds are withheld and why — kind names only. The claim EDGE names are left out:
         # this page never walks a claim, so it has no reason to name one.
         payload["withholding"] = names.policy.describe(include_edges=False)
@@ -268,7 +292,11 @@ def _queue_summary(app: FastAPI) -> tuple[Optional[dict], Optional[str]]:
     """
     intakes = getattr(app.state, "intakes", None)
     if intakes is None:
-        return None, "no intake queue is mounted in this deployment"
+        # C-5: a deployment that mounts no intake queue has nothing to summarise. That is not a
+        # failure, so it is not reported as one (no `queue_unavailable` reason for the page to
+        # print under a heading about a queue that does not exist); `queue_mounted: false` says
+        # so instead, and the page leaves the card out.
+        return None, None
     try:
         from databridge_intake.ledger import attestation_subject_matches
         from databridge_intake.models import ConfirmationState
@@ -733,7 +761,8 @@ def _register_intelligence_routes(app: FastAPI) -> None:
     @app.get("/intelligence")
     def intelligence(as_of: Optional[str] = None,
                      _principal: AuthenticatedPrincipal = Depends(require_principal)):
-        """Structural counts over the clinic graph, plus what the counter is waiting on.
+        """Structural counts over the shared graph, plus — when this deployment mounts an intake
+        queue — what that queue is waiting on.
 
         `?as_of=2026-08-01` rewinds the graph figures to what was true on that date. The queue is
         the live queue and is not rewound — `app.state.intakes` is not bi-temporal, and pretending
@@ -746,6 +775,7 @@ def _register_intelligence_routes(app: FastAPI) -> None:
             return _refusal("BAD_AS_OF", BAD_AS_OF_MESSAGE)
         graph, graph_unavailable = _graph_analytics(app, parsed)
         queue, queue_unavailable = _queue_summary(app)
+        queue_mounted = getattr(app.state, "intakes", None) is not None
         ingestion, ingestion_unavailable = _ingestion_summary()
         return {
             "as_of": parsed.isoformat() if parsed else None,
@@ -753,6 +783,9 @@ def _register_intelligence_routes(app: FastAPI) -> None:
             "graph_unavailable": graph_unavailable,
             "queue": queue,
             "queue_unavailable": queue_unavailable,
+            # Whether this deployment mounts an intake queue at all. False is not a failure: the
+            # page shows no queue card, rather than a card about a queue the pack never declared.
+            "queue_mounted": queue_mounted,
             "ingestion": ingestion,
             "ingestion_unavailable": ingestion_unavailable,
             # Said in the payload, not only in the UI copy, so an agent reading this over MCP in

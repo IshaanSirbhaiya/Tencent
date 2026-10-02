@@ -10,6 +10,13 @@ instance: WALNUT_ROOT points at <run>/root, a deployment root whose `packages` i
 real code and whose `fixtures/workspace_demo/files` is the run's private corpus copy. When
 <run>/root does not exist (run 1) WALNUT_ROOT stays the repo.
 Keys are loaded from databridge/.env with python-dotenv and are never printed.
+
+**Either estate** (2026-10-02, after the finance dry run — see
+`wiki/40-reviews/LESSON-2026-10-02-completeness.md`): `WALNUT_E2E_ESTATE` (or `setup_env(estate=)`)
+selects `workspace` (the default, runs 1-4) or `finance`. The preset names the packs, the graph
+file, the agent purpose, the golden set and the operator declarations — the same values the
+estate's own launcher sets (`start-walnut-finance.ps1`). Four runs on one small estate missed
+everything that only shows at the second estate's size and shape.
 """
 from __future__ import annotations
 
@@ -27,6 +34,34 @@ PACKAGES = ("packages/core", "packages/harness", "packages/ingest", "packages/se
             "apps/gateway", "apps/mcp_server", "apps/dispatcher")
 
 
+#: Per-estate deployment settings: what the estate's launcher sets. `mcp_servers` is relative to
+#: the run dir unless it starts with `infra/` (then relative to the repo). Harness configuration,
+#: not engine code — the engine reads none of this.
+ESTATES: dict[str, dict[str, str]] = {
+    "workspace": {"packs": "workspace", "graph": "workspace.db",
+                  "agent_purpose": "workspace.agent_run",
+                  "golden_set": "packs/workspace/evals/agent_contract.jsonl",
+                  "mcp_servers": "mcp_servers.yaml", "passages": "", "live_db": "larkspur"},
+    "finance": {"packs": "finance", "graph": "finance.db",
+                "agent_purpose": "lending.portfolio_reporting",
+                "golden_set": "packs/finance/evals/credit_memo_v3.jsonl",
+                "mcp_servers": "infra/mcp_servers.finance.yaml", "passages": "1",
+                "live_db": "finance_demo"},
+}
+
+
+def estate_name(estate: str | None = None) -> str:
+    name = estate or os.environ.get("WALNUT_E2E_ESTATE") or "workspace"
+    if name not in ESTATES:
+        raise ValueError(f"unknown e2e estate {name!r}; known: {sorted(ESTATES)}")
+    return name
+
+
+def graph_db(E: Path, estate: str | None = None) -> Path:
+    """The run's graph file for the estate."""
+    return Path(E) / "graph" / ESTATES[estate_name(estate)]["graph"]
+
+
 def e2e_dir() -> Path:
     return Path(os.environ.get("WALNUT_E2E_DIR") or (ROOT / "var" / "e2e-20261001T0356")).resolve()
 
@@ -42,8 +77,11 @@ def followups_dir(E: Path) -> Path:
     return (E / "root" / "var" / "workspace_demo" / "Follow-ups") if (E / "root").is_dir()         else E / "followups"
 
 
-def setup_env(load_keys: bool = True) -> Path:
+def setup_env(load_keys: bool = True, estate: str | None = None) -> Path:
     E = e2e_dir()
+    preset = ESTATES[estate_name(estate)]
+    servers = preset["mcp_servers"]
+    servers_path = ROOT / servers if servers.startswith("infra/") else E / servers
     deploy_root = E / "root"
     for p in PACKAGES:
         sp = str(ROOT / p)
@@ -58,11 +96,12 @@ def setup_env(load_keys: bool = True) -> Path:
     env = {
         "WALNUT_ROOT": str(deploy_root if deploy_root.is_dir() else ROOT),
         "WALNUT_PYTHON": sys.executable,
-        "DATABRIDGE_PACKS": "workspace",
+        "DATABRIDGE_PACKS": preset["packs"],
+        "WALNUT_E2E_ESTATE": estate_name(estate),
         "WALNUT_TIMEZONE": "Asia/Singapore",
-        "WALNUT_AGENT_PURPOSE": "workspace.agent_run",
-        "WALNUT_AGENT_GOLDEN_SET": str(ROOT / "packs/workspace/evals/agent_contract.jsonl"),
-        "WALNUT_GRAPH_DB_PATH": str(E / "graph" / "workspace.db"),
+        "WALNUT_AGENT_PURPOSE": preset["agent_purpose"],
+        "WALNUT_AGENT_GOLDEN_SET": str(ROOT / preset["golden_set"]),
+        "WALNUT_GRAPH_DB_PATH": str(graph_db(E, estate)),
         "WALNUT_CAPTURE_DIR": str(E / "capture"),
         "WALNUT_SOURCES_DIR": str(E / "sources"),
         "WALNUT_INGEST_DIR": str(E / "ingest"),
@@ -79,7 +118,7 @@ def setup_env(load_keys: bool = True) -> Path:
         "WALNUT_ONTOLOGY_AUDIT_PATH": str(E / "ontology" / "audit.jsonl"),
         "WALNUT_ACT_REGISTRY_PATH": str(E / "ontology" / "act_registry.json"),
         "WALNUT_MCP_STATE": str(E / "mcp_state"),
-        "WALNUT_MCP_SERVERS": str(E / "mcp_servers.yaml"),
+        "WALNUT_MCP_SERVERS": str(servers_path),
         "WALNUT_FOLLOWUPS_DIR": str(followups_dir(E)),
         "WALNUT_E2E_CORPUS": str(corpus_dir(E)),
         "WALNUT_DEMO_PG_PORT": "5433",
@@ -89,6 +128,8 @@ def setup_env(load_keys: bool = True) -> Path:
         "PYTHONUNBUFFERED": "1",
         "PYTHONIOENCODING": "utf-8",
     }
+    if preset["passages"]:
+        env["WALNUT_INGEST_PASSAGES"] = preset["passages"]
     for k, v in env.items():
         os.environ[k] = v
     for d in ("graph", "capture", "sources", "ingest", "events", "runs", "passages", "cache",

@@ -47,7 +47,9 @@ from databridge_graph.packs import active_vocabulary
 from .subject_exposure import ExposurePolicy, entity_key
 
 # --- bounds -----------------------------------------------------------------------------
-#: The envelope this surface is designed for. Beyond it the page refuses rather than truncating.
+#: The DETAIL envelope. Within it the figures list their members; beyond it the figures are still
+#: served EXACT, without member lists (C-4), while the agent and the drill-down refuse rather than
+#: walk part of a graph (`check_graph_bounds`).
 MAX_GRAPH_NODES = 5_000
 MAX_GRAPH_EDGES = 20_000
 #: One drill-down. `depth` bounds hops; these bound degree and response size, which it does not.
@@ -341,6 +343,13 @@ def check_graph_bounds(view: Any) -> None:
             f"is withheld instead.")
 
 
+def within_detail_envelope(view: Any) -> bool:
+    """Whether the figures may LIST their members for this snapshot (C-4). Past the envelope the
+    figures are still served, exact, without member lists; nothing is refused for size."""
+    return (len(view.open_nodes()) <= MAX_GRAPH_NODES
+            and len(view.open_edges()) <= MAX_GRAPH_EDGES)
+
+
 # --- the traversal ------------------------------------------------------------------------
 def _valid_at(row: Any, as_of: Optional[dt.datetime]) -> bool:
     """The same validity rule `analytics.compute` applies, so a drill-down matches its figure."""
@@ -599,6 +608,7 @@ __all__ = [
     "SnapshotView",
     "SurfaceNames",
     "SurfaceTooLarge",
+    "within_detail_envelope",
     "check_graph_bounds",
     "document_handle",
     "entity_handle",

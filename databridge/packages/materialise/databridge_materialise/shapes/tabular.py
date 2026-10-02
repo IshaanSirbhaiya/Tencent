@@ -21,7 +21,7 @@ for a missing feature.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Mapping, Optional, Sequence
 
 from databridge_adapter import assert_provenance_present, canonical_json
@@ -39,6 +39,7 @@ from ..derivations import rows_digest
 from ..errors import UngroundedCell
 from ..plan import Column, MaterialisationPlan
 from ..reader import EntityRead, EstateReader
+from ..durations import parse_duration
 from ..temporal import (
     in_force_at,
     known_at,
@@ -79,6 +80,10 @@ class TabularBuild:
     #: rows would a valid-time cut have changed" is the measurement that shows the rule earning
     #: its keep rather than being asserted.
     leak_probe: dict[str, int] = field(default_factory=dict)
+    #: FIN-13 (finance dry run): WHY rows were not labelled, computed from the label versions the
+    #: store holds, and the window / re-run instant that WOULD label rows. `None` when no row was
+    #: rejected for a label reason.
+    label_diagnosis: Optional[dict] = None
 
 
 def _needed_fields(plan: MaterialisationPlan) -> dict[str, set[str]]:
@@ -235,6 +240,8 @@ def build_tabular(compiled: CompiledPlan, reader: EstateReader) -> TabularBuild:
     row_cuts: list[set[str]] = []
     unknown_at_decision: dict[str, int] = {}
     rejected_policy = rejected_maturity = rejected_incomplete = rejected_unlabelled = 0
+    #: Per cohort row that reached the label read: (T_d, outcome, label version instants).
+    label_obs: list[tuple[datetime, str, list[datetime]]] = []
     leak_probe = {"rows": 0, "system_time_cut_has_prior": 0, "valid_time_cut_has_prior": 0,
                   "cut_disagrees": 0}
 
@@ -260,6 +267,7 @@ def build_tabular(compiled: CompiledPlan, reader: EstateReader) -> TabularBuild:
                 cohort_read.value(cohort_row, label.source.join_key), [])
             outcome, label_cell = _read_label(plan, candidates, decision_time, build_time,
                                               state=label_is_state)
+            label_obs.append((decision_time, outcome, _label_instants(plan, candidates)))
             if outcome == "immature":
                 rejected_maturity += 1
                 continue
@@ -325,6 +333,10 @@ def build_tabular(compiled: CompiledPlan, reader: EstateReader) -> TabularBuild:
             f"{rejected_unlabelled} cohort rows were excluded because their label window has "
             f"closed and no outcome was recorded inside it: not immature, and not negative "
             f"examples")
+    diagnosis = (_diagnose_label(plan, label_obs, build_time, state=label_is_state)
+                 if rejected_unlabelled or rejected_maturity else None)
+    if diagnosis is not None:
+        notes.append(diagnosis["explanation"])
     if leak_probe["cut_disagrees"]:
         notes.append(
             f"temporal contract, measured: {leak_probe['cut_disagrees']} of {leak_probe['rows']} "
@@ -338,7 +350,142 @@ def build_tabular(compiled: CompiledPlan, reader: EstateReader) -> TabularBuild:
                         unknown_at_decision=dict(sorted(unknown_at_decision.items())),
                         columns_refused=tuple(refused),
                         notes=tuple(notes), reads=tuple(reads.values()),
-                        leak_probe=leak_probe)
+                        leak_probe=leak_probe, label_diagnosis=diagnosis)
+
+
+def _label_instants(plan: MaterialisationPlan,
+                    candidates: Sequence[Mapping[str, Cell]]) -> list[datetime]:
+    """The valid-time instants of the label versions the store holds for one cohort row."""
+    label = plan.shape.label
+    out: list[datetime] = []
+    for candidate in candidates:
+        cell = candidate.get(label.source.valid_time_field)
+        instant = to_instant(cell.value if isinstance(cell, GroundedValue) else None)
+        if instant is not None:
+            out.append(instant)
+    return sorted(out)
+
+
+def _days_ceil(delta: timedelta) -> int:
+    whole = delta.days
+    return whole + (1 if delta - timedelta(days=whole) > timedelta(0) else 0)
+
+
+def _diagnose_label(plan: MaterialisationPlan,
+                    observed: Sequence[tuple[datetime, str, list[datetime]]],
+                    build_time: datetime, *, state: bool) -> Optional[dict]:
+    """FIN-13: say exactly WHY rows went unlabelled or immature, and what WOULD label rows.
+
+    Everything here is computed from the label versions the store holds and the plan's own
+    declarations (decision instants, window, lag, T_b). Nothing is recalled.
+
+    * **unlabelled** (state label): no version of the label was in force at the row's horizon
+      ``T_d + within``; the earliest version the store holds came into force later. The diagnosis
+      names that instant and the horizons, so the gap is visible.
+    * **immature**: the horizon has not arrived by ``T_b - lag``. The diagnosis names the instant
+      from which a re-run labels the first of them, and the instant by which all would be.
+    * **best window**: the whole-day ``within`` that labels the most rows against THIS store,
+      found by sweeping every row's feasible interval. For a state label a row is labelled iff its
+      earliest version ``v0`` satisfies ``v0 <= T_d + within <= T_b - lag``; for an event label
+      iff an outcome ``o`` with ``T_d < o <= T_b - lag`` falls inside the window.
+    """
+    if not observed:
+        return None
+    label = plan.shape.label
+    within = plan.temporal.label_window.within
+    lag = parse_duration(plan.temporal.label_maturity_lag)
+    cutoff = build_time - lag
+    field_name = f"{label.source.entity}.{label.source.field}"
+    versions = [v for _, _, vs in observed for v in vs]
+    unlabelled = [(td, vs) for td, outcome, vs in observed if outcome == "unlabelled"]
+    immature = [(td, vs) for td, outcome, vs in observed if outcome == "immature"]
+    labelled = sum(1 for _, outcome, _ in observed if outcome == "ok")
+
+    # --- the whole-day window that labels the most rows ----------------------------------
+    intervals: list[tuple[int, Optional[int]]] = []
+    for td, _, vs in observed:
+        if state:
+            if not vs:
+                continue
+            lo, hi = max(_days_ceil(vs[0] - td), 1), (cutoff - td).days
+            if lo <= hi:
+                intervals.append((lo, hi))
+        else:
+            after = [v for v in vs if td < v <= cutoff]
+            if after:
+                intervals.append((max(_days_ceil(after[0] - td), 1), None))
+    best_days, best_rows = None, 0
+    for lo, _ in intervals:
+        n = sum(1 for a, b in intervals if a <= lo and (b is None or lo <= b))
+        if n > best_rows or (n == best_rows and best_days is not None and lo < best_days):
+            best_days, best_rows = lo, n
+
+    per_row: dict[int, int] = {}
+    for _, _, vs in observed:
+        per_row[len(vs)] = per_row.get(len(vs), 0) + 1
+    single_version = bool(versions) and max(per_row) <= 1
+
+    diagnosis: dict[str, Any] = {
+        "label": label.path,
+        "reading": "state" if state else "event",
+        "window": within,
+        "maturity_lag": plan.temporal.label_maturity_lag,
+        "build_time": build_time.isoformat(),
+        "rows_read": len(observed),
+        "labelled": labelled,
+        "unlabelled": len(unlabelled),
+        "immature": len(immature),
+        "label_versions": len(versions),
+        "label_versions_in_force_from": min(versions).isoformat() if versions else None,
+        "label_versions_in_force_to": max(versions).isoformat() if versions else None,
+        "max_versions_per_row": max(per_row) if per_row else 0,
+        "best_window": ({"within": f"P{best_days}D", "rows": best_rows, "of": len(observed)}
+                        if best_days is not None else None),
+    }
+    parts: list[str] = [f"label diagnosis for {field_name} ({diagnosis['reading']} label, window "
+                        f"{within}, lag {plan.temporal.label_maturity_lag}):"]
+    if unlabelled:
+        horizons = [label_horizon(td, within) for td, _ in unlabelled]
+        earliest_known = [vs[0] for _, vs in unlabelled if vs]
+        diagnosis["unlabelled_horizons"] = [min(horizons).isoformat(), max(horizons).isoformat()]
+        if state and earliest_known:
+            parts.append(
+                f"{len(unlabelled)} row(s) are unlabelled because their horizons T_d+{within} "
+                f"fall between {min(horizons).isoformat()} and {max(horizons).isoformat()}, and "
+                f"the earliest version of {field_name} the store holds for any of them came into "
+                f"force at {min(earliest_known).isoformat()}, so the store does not know the "
+                f"value at those horizons.")
+        else:
+            parts.append(
+                f"{len(unlabelled)} row(s) are unlabelled because their windows (horizons "
+                f"{min(horizons).isoformat()} to {max(horizons).isoformat()}) closed with no "
+                f"version of {field_name} recorded inside them.")
+    if immature:
+        due = sorted(label_horizon(td, within) + lag for td, _ in immature)
+        diagnosis["immature_mature_from"] = due[0].isoformat()
+        diagnosis["immature_mature_by"] = due[-1].isoformat()
+        parts.append(
+            f"{len(immature)} row(s) are immature: their horizons have not arrived by T_b - lag "
+            f"({cutoff.isoformat()}). Re-running on or after {due[0].isoformat()} labels the "
+            f"first of them; on or after {due[-1].isoformat()}, all of them.")
+    if single_version:
+        lo_v, hi_v = min(versions), max(versions)
+        parts.append(
+            f"The store holds ONE version of {field_name} per row, in force from "
+            f"{lo_v.isoformat()}" + (f" to {hi_v.isoformat()}" if hi_v != lo_v else "")
+            + ": the source carries no history for it, so it answers only horizons on or after "
+              "that instant. History accrues as the source is re-read over time; a source that "
+              "records when each value took effect would answer earlier horizons.")
+    if best_days is not None:
+        parts.append(f"Suggestion: label window P{best_days}D would label {best_rows} of "
+                     f"{len(observed)} row(s) against this store.")
+    else:
+        parts.append(f"Suggestion: no whole-day label window labels any of the {len(observed)} "
+                     f"row(s) against this store"
+                     + (f"; re-run on or after {diagnosis['immature_mature_from']} instead."
+                        if immature else "."))
+    diagnosis["explanation"] = " ".join(parts)
+    return diagnosis
 
 
 def _feature_cell(plan: MaterialisationPlan, column: Column, cohort_read: EntityRead,

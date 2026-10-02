@@ -22,7 +22,7 @@ Which pack's wording
 --------------------
 Computed, never named:
 
-* a pack the process is **pinned** to (``DATABRIDGE_PACK`` / ``databridge_intake.pack.bind_pack``)
+* a pack the process is **pinned** to (``DATABRIDGE_PACK`` / ``databridge_core.pack_binding.bind_pack``)
   that ships ``agent_wording.yaml`` → that pack's;
 * otherwise, a deployment that enables **exactly one** pack, and that pack ships the file →
   that pack's;
@@ -30,7 +30,14 @@ Computed, never named:
   names no domain and is therefore the one copy the engine may ship.
 
 A deployment binding several verticals gets the neutral voice on purpose: an agent answering over
-a finance graph and a clinic graph at once is neither a clinic's agent nor a bank's.
+a finance graph and a clinic graph at once is neither a clinic's agent nor a bank's. The rule is
+``databridge_core.pack_binding.voice_pack`` — the same one the identity refusal uses, so the agent
+and the refusal can never speak in two different packs' voices (C-5, finance dry run 2026-10-02).
+
+The file also carries ``refusals`` (the no-send refusal, closed keys) and an optional ``identity``
+section, which is validated here but READ by ``databridge_core.identity_guardrail``: the identity
+refusal and the identity nouns are the engine guardrail's, and a pack declaring them badly must
+fail when its wording loads, not on the first question that trips the guardrail.
 """
 from __future__ import annotations
 
@@ -55,6 +62,17 @@ NOTE_KEYS = ("human_selection", "injection_seen", "refs_not_returned", "nothing_
 HEADING_KEYS = ("values", "unresolved", "candidates")
 CONSOLE_NOTE_KEYS = ("proposal_only", "needs_an_intake", "no_authentication",
                      "figures_on_request", "answer_is_a_list")
+#: The refusals the agent itself words (closed). The identity refusal is the engine guardrail's
+#: (``identity`` section), not a key here — one reader per sentence.
+REFUSAL_KEYS = ("no_send",)
+
+
+def _paragraphs(text: str) -> str:
+    """Fold whitespace within each paragraph; keep blank-line paragraph breaks."""
+    import re
+
+    return "\n\n".join(" ".join(p.split()) for p in re.split(r"\n\s*\n", str(text or ""))
+                       if p.strip())
 
 
 class WordingError(RuntimeError):
@@ -87,6 +105,8 @@ class AgentWording(BaseModel):
     headings: Mapping[str, str]
     notes: Mapping[str, str]
     console_notes: Mapping[str, str]
+    refusals: Mapping[str, str]
+    identity: Optional[Mapping] = None
 
     @field_validator("persona", "data_origin", "outside_authors", "identity_tools",
                      "identity_argument", "question_label", "pack")
@@ -112,6 +132,22 @@ class AgentWording(BaseModel):
     def _console(cls, v):
         return _closed(v, CONSOLE_NOTE_KEYS, "console_notes")
 
+    @field_validator("refusals")
+    @classmethod
+    def _refusals(cls, v):
+        closed = _closed(v, REFUSAL_KEYS, "refusals")          # validates presence and key set
+        return MappingProxyType({k: _paragraphs(dict(v)[k]) for k in closed})
+
+    @field_validator("identity")
+    @classmethod
+    def _identity(cls, v):
+        if v is None:
+            return None
+        from databridge_core.identity_guardrail import parse_identity_section
+
+        parse_identity_section({"identity": dict(v)}, pack=None, where="identity")
+        return MappingProxyType(dict(v))
+
 
 def load_wording(path: pathlib.Path) -> AgentWording:
     path = pathlib.Path(path)
@@ -127,27 +163,18 @@ def load_wording(path: pathlib.Path) -> AgentWording:
 
 
 def _packs_root() -> pathlib.Path:
-    from databridge_intake.pack import packs_root
+    from databridge_core.pack_binding import packs_root
 
     return packs_root()
 
 
 def wording_pack(root: Optional[pathlib.Path] = None) -> str:
     """Which pack's wording applies to this process right now. See the module docstring."""
-    from databridge_intake.pack import enabled_packs, pinned_pack
+    from databridge_core.pack_binding import voice_pack
 
     r = pathlib.Path(root) if root is not None else _packs_root()
-    ships = lambda name: (r / name / WORDING_FILENAME).is_file()         # noqa: E731
-    pinned = pinned_pack()
-    if pinned:
-        return pinned if ships(pinned) else NEUTRAL_PACK
-    try:
-        bound = list(enabled_packs(r))
-    except Exception:                                                # noqa: BLE001
-        bound = []
-    # Exactly one ENABLED pack — not "exactly one that ships wording". Counting only the packs with
-    # a file would let a three-vertical deployment speak in the one vertical that wrote one.
-    return bound[0] if len(bound) == 1 and ships(bound[0]) else NEUTRAL_PACK
+    # Exactly one ENABLED pack — not "exactly one that ships wording" (``voice_pack``).
+    return voice_pack(WORDING_FILENAME, r) or NEUTRAL_PACK
 
 
 @functools.lru_cache(maxsize=16)
@@ -167,5 +194,5 @@ def wording(root: Optional[pathlib.Path] = None) -> AgentWording:
 
 
 __all__ = ["AgentWording", "CONSOLE_NOTE_KEYS", "HEADING_KEYS", "NEUTRAL_PACK",
-           "NEUTRAL_WORDING_PATH", "NOTE_KEYS",
+           "NEUTRAL_WORDING_PATH", "NOTE_KEYS", "REFUSAL_KEYS",
            "WORDING_FILENAME", "WordingError", "load_wording", "wording", "wording_pack"]

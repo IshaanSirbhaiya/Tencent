@@ -29,6 +29,17 @@ export type ActorType = "agent" | "adapter_agent" | "automation" | "person";
 export interface Actor {
   type: ActorType;
   id: string | null;
+  /** FIN-16: a person authenticated with the public development token, not a real sign-in. */
+  dev_only?: boolean;
+}
+
+/** The plain words shown after a person who acted under the development token (FIN-16). */
+export const DEV_TOKEN_NOTE = "dev token, not a real sign-in";
+
+/** A decider's name, marked when the decision event records the development token. */
+export function deciderText(by: string | null | undefined, devOnly: boolean | null | undefined): string {
+  if (!by) return NOT_RECORDED;
+  return devOnly ? `${by} (${DEV_TOKEN_NOTE})` : by;
 }
 
 /** §5.8 — who produced a thing. Every key may be absent or null. */
@@ -134,6 +145,9 @@ export interface ActivityItem {
   automation_mode?: string | null;
   outcome?: string;
   decided_by?: string | null;
+  /** FIN-16: the decision event recorded `dev_only: true` (the development token). */
+  decided_by_dev_only?: boolean | null;
+  decided_by_authenticated_by?: string | null;
   history?: HistoryEvent[];
   /** Every refused decision on this action, oldest first. */
   refusals?: DecisionRefusal[];
@@ -427,7 +441,7 @@ export function actorText(a: Actor | null | undefined): string {
   const id = a.id ?? NOT_RECORDED;
   switch (a.type) {
     case "person":
-      return `person ${id}`;
+      return a.dev_only ? `person ${id} (${DEV_TOKEN_NOTE})` : `person ${id}`;
     case "adapter_agent":
       return `adapter agent ${id}`;
     case "automation":

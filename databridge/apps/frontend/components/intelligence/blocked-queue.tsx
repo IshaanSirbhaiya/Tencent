@@ -23,8 +23,8 @@ export function BlockedQueue({ queue }: { queue: QueueSummary }) {
   if (queue.intakes === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-xs text-subtle">
-        No intakes read yet. Read a document from <code>/intake</code> and this queue fills from it
-        — there is nothing hardcoded here to show in the meantime.
+        Nothing in the {nouns.queue} yet. Read a {nouns.document} and it fills from it; there is
+        nothing hardcoded here to show in the meantime.
       </p>
     );
   }
@@ -32,19 +32,18 @@ export function BlockedQueue({ queue }: { queue: QueueSummary }) {
     <div className="flex flex-col gap-2">
       <p className="text-2xs text-subtle">
         <span className="tnum font-medium text-fg">{queue.blocked_count}</span> of{" "}
-        <span className="tnum">{queue.intakes}</span> intake
-        {queue.intakes === 1 ? "" : "s"} cannot commit yet;{" "}
+        <span className="tnum">{queue.intakes}</span> in the {nouns.queue} cannot commit yet;{" "}
         <span className="tnum">{queue.committed}</span> committed.
       </p>
       {queue.blocked.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-2xs text-subtle">
-          Nothing is waiting on a human right now.
+          Nothing is waiting on a person right now.
         </p>
       ) : (
         <table className="w-full text-left text-xs" data-testid="blocked-queue">
           <thead className="text-2xs uppercase tracking-wide text-subtle">
             <tr className="border-b border-border">
-              <th className="py-1.5 pr-2 font-medium">Document</th>
+              <th className="py-1.5 pr-2 font-medium">{nouns.document}</th>
               <th className="px-2 py-1.5 font-medium">Waiting on</th>
               <th className="px-2 py-1.5 font-medium">Candidates in the {nouns.registry}</th>
               <th className="px-2 py-1.5 font-medium">Coverage</th>

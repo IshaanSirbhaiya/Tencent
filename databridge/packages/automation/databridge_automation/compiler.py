@@ -332,7 +332,15 @@ def _read_tools(sources: list[str], catalogue: CatalogueLike,
             has_path = True
         plain = [t for t in conn.read_tools if not t.query]
         named = [t for t in plain if _names_tool(instructions, t.name)]
-        for t in (named if (named or has_path) else plain):
+        chosen = named if (named or has_path) else plain
+        if not has_path and named:
+            # FIN-11: a document source is listed and read along its approved reading path; a
+            # step that names one tool of that path gets the rest of it (never a write, never a
+            # tool outside the path), so "find the memo with list_dir" can also read the memo.
+            path = set(conn.reading_path)
+            if path & {t.name for t in named}:
+                chosen = [t for t in plain if t in named or t.name in path]
+        for t in chosen:
             tools.append(f"source.read:{cid}:{t.name}")
     return tools
 
@@ -352,6 +360,10 @@ def _grant_basis(tool: str, catalogue: CatalogueLike, instructions: str) -> tupl
                                     f"names"}
     if p["tool"] and _names_tool(instructions, str(p["tool"])):
         return "rule", {"evidence": f"a step of the instructions uses {p['tool']}"}
+    conn = connection_of(catalogue, str(p["connection"]))
+    if conn is not None and p["tool"] in conn.reading_path:
+        return "rule", {"evidence": f"{p['tool']} is on {conn.id}'s approved reading path, a step "
+                                    f"of which the instructions use (FIN-11)"}
     return "rule", {"evidence": f"{p['connection']} has no query path and no step names a tool, "
                                 f"so it is read through its read tools"}
 

@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from databridge_gateway.evidence_routes import register_evidence_routes
 from databridge_graph import NodeKind
 from databridge_graph.clinic_seed import fresh_clinic_store
-from databridge_graph.node_sheet import IDENTITY_CAVEAT
+from databridge_graph.node_sheet import IDENTITY_CAVEAT, identity_claim_caveat
 from databridge_intake.ledger import EvidenceLedger, subject_fingerprint_for
 from databridge_intake.models import ConfirmationState
 from databridge_intake.paths import fixtures_dir
@@ -277,7 +277,9 @@ def test_the_identity_caveat_is_the_graphs_own_wording(client, app):
     confirm(app, CHIT_03, candidate_index=0)
     body = client.get(f"/evidence/trace/document:{CHIT_03}").json()
     assert body["identity_claims"]
-    assert body["identity_caveat"] == IDENTITY_CAVEAT
+    # the claimed subject's kind, in the pack's own words (GRAPH6 FIN-09), not the neutral text
+    [kind] = {c["other_kind"] for c in body["identity_claims"]}
+    assert body["identity_caveat"] == identity_claim_caveat(kind) != IDENTITY_CAVEAT
 
 
 def test_no_caveat_is_emitted_when_there_is_no_unsettled_claim(client, app):
@@ -302,7 +304,9 @@ def test_tracing_the_rejected_candidates_edge_does_not_return_an_edge(client, ap
     assert body["claim"]["established"] is False
     assert body["claim"]["patient_id"] == rejected
     assert body["ledger_entries"] == []
-    assert body["identity_caveat"] == IDENTITY_CAVEAT
+    kind = client.get(f"/evidence/trace/document:{CHIT_03}").json()["identity_claims"][0][
+        "other_kind"]
+    assert body["identity_caveat"] == identity_claim_caveat(kind) != IDENTITY_CAVEAT
     # The evidence for the claim is still there — this is a refusal to ASSERT, not a refusal to
     # show. `requires_human_verification` is the graph's own invariant, cited.
     assert body["sources"]
@@ -342,7 +346,7 @@ def test_a_patient_confirmed_on_one_document_is_only_a_claim_on_another(client, 
         pytest.skip("seed changed: this patient is no longer claimed by two documents")
     assert established == {f"document:{CHIT_10}"}
     assert claimed == {f"document:{CHIT_01}"}
-    assert body["identity_caveat"] == IDENTITY_CAVEAT
+    assert body["identity_caveat"] == identity_claim_caveat(body["node"]["kind"]) !=         IDENTITY_CAVEAT
 
 
 def test_non_identity_relationships_are_unaffected(client, app):

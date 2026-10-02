@@ -151,6 +151,28 @@ export interface CrawlPlan {
   created_at: string;
   approved_at: string | null;
   approved_by: string | null;
+  /** The backend's per-tool class, re-derived from the LIVE tool list at proposal and again at
+   *  approval: `read:…`, `write:…`, or `unclassified:unknown …` (nothing vouches for it). */
+  tool_classes?: Record<string, string>;
+  /** The recorded approval (who, how they were authenticated, what they vouched for). `{}` until
+   *  approved. */
+  approval?: ApprovalRecord | null;
+}
+
+/** How an approval was recorded by the backend's approval gate (`require_authenticated_approver`). */
+export interface ApprovalRecord {
+  principal_id?: string;
+  authenticated_by?: string;
+  principal_type?: string;
+  /** True when the approving principal came from the public development token (FIN-16). */
+  dev_only?: boolean;
+  at?: string;
+  vouched_read_tools?: string[];
+}
+
+/** Was this approval made under the development token? Read from the RECORD, never inferred. */
+export function approvedWithDevToken(rec: ApprovalRecord | null | undefined): boolean {
+  return !!rec && rec.dev_only === true;
 }
 
 export interface TableMapping {
@@ -159,6 +181,9 @@ export interface TableMapping {
   node: Record<string, unknown> | null;
   edges: Record<string, unknown>[];
   rationale: string[];
+  approval?: ApprovalRecord | null;
+  /** FIN-04 per-row kind split ({column, kinds: {value: kind}, default}); reviewed via `splits`. */
+  split?: { column: string; kinds: Record<string, string>; default: string } | null;
 }
 
 export interface SourceMapping {
@@ -166,6 +191,200 @@ export interface SourceMapping {
   tables: Record<string, TableMapping>;
   updated_at: string;
   approved_by: string | null;
+}
+
+/** What the captured rows show for one proposed link (LINK7). `samples` is null when the target
+ *  kind stands for people (never shown) or the rows are not captured on this gateway; the note
+ *  says which. */
+export interface LinkEvidence {
+  matched: number | null;
+  with_value: number | null;
+  distinct_matched: number | null;
+  target_keys: number | null;
+  samples: string[] | null;
+  samples_note: string | null;
+}
+
+/** One link proposal (C-3): a column no foreign key declares whose values are, by measurement,
+ *  the keys of another mapped table. A proposal changes nothing until a person approves it. */
+export interface LinkReview {
+  table: string;
+  column: string;
+  /** "source:table" — names the link when a column has several. */
+  target: string;
+  target_source: string;
+  target_table: string;
+  target_key: string | null;
+  target_kind: string | null;
+  status: "proposed" | "not_proposed" | "approved" | "rejected" | string;
+  edge_kind: string | null;
+  why: string | null;
+  basis: string | null;
+  alternatives: string[];
+  person_target: boolean;
+  approvable: boolean;
+  decided_by: string | null;
+  decided_at: string | null;
+  decided_dev_only: boolean | null;
+  reject_reason: string | null;
+  table_status: string;
+  evidence: LinkEvidence;
+}
+
+/** A table a person approved before that is no longer approved (re-proposed by the engine, or an
+ *  approval that no longer verifies). Read from the append-only approvals log, not from wording. */
+export interface Reapproval {
+  reasons: string[];
+  previously_approved_by: string | null;
+  previously_approved_at: string | null;
+  dev_only: boolean;
+}
+
+/** One discriminator value of a per-row kind split (FIN-04 / ID7), as the gateway measured it on the
+ *  rows the last sync captured. `rows` is null when no capture of the table is held yet. */
+export interface KindSplitValue {
+  /** The NORMALISED value (case-folded, punctuation collapsed) — the form the split binds. */
+  value: string;
+  kind: string;
+  /** Whether the split names this value; an unnamed value takes the default (the subject). */
+  bound: boolean;
+  rows: number | null;
+  stays_subject: boolean;
+}
+
+/** A table's PROPOSED (or approved) per-row kind split: which column tells the rows apart, what
+ *  each value becomes, and which rows stay the subject. Approved together with the table. */
+export interface KindSplitReview {
+  column: string;
+  /** The table's node kind — a subject; every value the split does not move stays this kind. */
+  default: string;
+  default_is_subject: boolean;
+  default_is_person: boolean;
+  kinds: { kind: string; subject: boolean; person: boolean; is_default: boolean }[];
+  values: KindSplitValue[];
+  rows_total: number | null;
+  rows_moved: number | null;
+  rows_stay: { bound_to_subject: number; unrecognised: number; null_or_blank: number; masked: number } | null;
+  counts_note: string | null;
+  status: "proposed" | "approved" | "unmapped" | string;
+  approved_with_table: boolean;
+}
+
+export interface MappingReview {
+  source_id: string;
+  links: LinkReview[];
+  reapproval: Record<string, Reapproval>;
+  /** Tables whose mapping carries a per-row kind split (absent on an older gateway). */
+  splits?: Record<string, KindSplitReview>;
+}
+
+/** The split's values in the two groups a person reads before approving: the rows that become
+ *  another kind, and the rows that stay the subject (never merged). Totals are summed only when
+ *  every count is known. */
+export function splitGroups(sp: Pick<KindSplitReview, "values" | "default">): {
+  moved: KindSplitValue[];
+  stays: KindSplitValue[];
+  movedRows: number | null;
+} {
+  // A value is shown as moving only when the gateway says it leaves the subject AND its kind is not
+  // the default: fail closed, a disagreement never shows a person row as "becomes an organisation".
+  const moved = sp.values.filter((v) => v.stays_subject === false && v.kind !== sp.default);
+  const stays = sp.values.filter((v) => !moved.includes(v));
+  const known = moved.every((v) => typeof v.rows === "number");
+  return { moved, stays, movedRows: known ? moved.reduce((a, v) => a + (v.rows ?? 0), 0) : null };
+}
+
+/** One item the latest run's screen HOLDS for a person (review band): never extracted or built
+ *  until an owner lifts the hold for exactly this content digest. */
+export interface ScreenHold {
+  item_id: string;
+  uri: string | null;
+  item_kind: string | null;
+  digest: string;
+  rules: { rule: string | null; type: string | null; count: number | null }[];
+  rationale: string | null;
+  reverse: string | null;
+  carried_forward: boolean;
+  lifted: boolean;
+  lifted_by: string | null;
+  lifted_at: string | null;
+  lifted_reason: string | null;
+  lifted_dev_only: boolean | null;
+}
+
+export interface HoldsListing {
+  source_id: string;
+  run_id: string | null;
+  holds: ScreenHold[];
+  blocked: number;
+  log_problem: string | null;
+}
+
+/** Whether the page may offer "Lift hold": not already lifted, a content digest to bind the lift
+ *  to, a non-empty reason, and an override log that verifies. The gateway checks the same. */
+export function holdLiftable(h: Pick<ScreenHold, "lifted" | "digest" | "item_id">, reason: string, logProblem: string | null): boolean {
+  return !h.lifted && /^[0-9a-f]{64}$/.test(h.digest) && !!h.item_id && reason.trim().length > 0 && !logProblem;
+}
+
+export interface LinkDecisionBody {
+  table: string;
+  column: string;
+  target?: string;
+  reason?: string;
+}
+
+/** Proposed links first (they need a decision), then decided ones, then the ones never offered. */
+export function linksForReview(links: readonly LinkReview[]): {
+  pending: LinkReview[];
+  decided: LinkReview[];
+  notOffered: LinkReview[];
+} {
+  const pending = links.filter((l) => l.status === "proposed");
+  const decided = links.filter((l) => l.status === "approved" || l.status === "rejected");
+  const notOffered = links.filter((l) => !pending.includes(l) && !decided.includes(l));
+  return { pending, decided, notOffered };
+}
+
+/** Whether the page may offer Approve for a link. Fails closed: the gateway's own `approvable`
+ *  AND a proposal with an edge kind AND never a person-kind target. The gateway refuses the same. */
+export function linkApprovable(l: Pick<LinkReview, "approvable" | "status" | "edge_kind" | "person_target">): boolean {
+  return l.approvable === true && l.status === "proposed" && !!l.edge_kind && l.person_target !== true;
+}
+
+/** What approving one identity rule would merge NOW: the engine's own consolidation, run on a copy
+ *  of the graph (it changes nothing). */
+export interface IdentityRulePreview {
+  groups: number;
+  records_absorbed: number;
+  sample_groups: { survivor: string; records: string[]; labels: string[]; rules: string[] }[];
+  refused: number;
+  refused_samples: { records: string[]; reason: string }[];
+}
+
+export interface IdentityRuleType {
+  rule: "business_key" | "exact_name" | string;
+  state: "approved" | "revoked" | "not_approved" | string;
+  decided_by: string | null;
+  decided_at: string | null;
+  dev_only: boolean | null;
+  preview: IdentityRulePreview | null;
+  preview_note: string | null;
+}
+
+/** A pack's declaration of how records of one NON-person kind may be recognised as one record
+ *  (D-004). Inert until a named person approves a rule type. */
+export interface IdentityRuleDecl {
+  pack: string;
+  kind: string;
+  business_keys: string[];
+  exact_name: boolean;
+  similarity_merge: boolean;
+  rules: IdentityRuleType[];
+}
+
+export interface IdentityRulesListing {
+  packs: string[];
+  identity_rules: IdentityRuleDecl[];
 }
 
 export interface SourceDetail {
@@ -238,6 +457,13 @@ export interface StartedRun {
   job_id: string;
   status: "running";
   started_by: string;
+}
+
+/** `GET /auth/whoami`: the principal the gateway authenticated this page's credential as. */
+export interface WhoAmI {
+  principal_id: string;
+  dev_only: boolean;
+  authenticated_by: string;
 }
 
 /** `/platform/catalogue` — the backend's own read/write classification of each tool. */
@@ -445,13 +671,48 @@ export function planToolAudit(
   };
 }
 
+/** A plan tool a PERSON may vouch for as a read (FIN-02), and why nothing else could.
+ *
+ *  Only a tool that NOTHING classifies is vouchable: the catalogue calls it a write solely because
+ *  nothing vouches for it (`basis: "unknown"`) AND the plan's own live classification says
+ *  `unclassified:unknown`. A tool whose name or annotation says it writes, a denied tool, or a
+ *  write-only connection's tool is never offered: the backend refuses those whatever is sent, and
+ *  this page does not invite the attempt. */
+export interface VouchableTool {
+  tool: string;
+  /** The plan's own class for it, verbatim (e.g. `unclassified:unknown (shared classifier)`). */
+  plan_class: string;
+  /** Plain-English reason it is unclassified. */
+  reason: string;
+}
+
+export function vouchableTools(
+  plan: Pick<CrawlPlan, "steps" | "tool_classes"> | null,
+  catalogue: Pick<CatalogueConnection, "tools"> | null,
+): VouchableTool[] {
+  if (!plan || !catalogue) return [];
+  const byName = new Map(catalogue.tools.map((t) => [t.name, t]));
+  const classes = plan.tool_classes ?? {};
+  return planToolAudit(plan, catalogue)
+    .writes.filter((t) => byName.get(t)?.basis === "unknown" && (classes[t] ?? "").startsWith("unclassified:unknown"))
+    .map((t) => ({
+      tool: t,
+      plan_class: classes[t],
+      reason:
+        "Its name carries no read verb, the server publishes no read-only annotation for it, and no approved plan " +
+        "uses it yet, so nothing establishes that it only reads. It is treated as a write until a person vouches for it.",
+    }));
+}
+
 /** Why a crawl plan cannot be approved from this page. Empty means it may be. Fails closed: a
  *  non-ingest connection, a missing catalogue, or ANY tool the catalogue does not positively
- *  classify as read-only blocks approval (R-019 round 3, S3). */
+ *  classify as read-only blocks approval (R-019 round 3, S3), UNLESS it is a `vouchableTools`
+ *  tool the signed-in person has explicitly vouched for (`vouched`, FIN-02). */
 export function planApprovalBlockers(
-  plan: Pick<CrawlPlan, "steps" | "problems"> | null,
+  plan: Pick<CrawlPlan, "steps" | "problems" | "tool_classes"> | null,
   catalogue: Pick<CatalogueConnection, "tools"> | null,
   purpose: string | null | undefined,
+  vouched: readonly string[] = [],
 ): string[] {
   const out: string[] = [];
   if (!crawlAllowed(purpose)) out.push("This connection's purpose is not \"ingest\", so its plan cannot be approved here.");
@@ -462,7 +723,15 @@ export function planApprovalBlockers(
     return out;
   }
   const audit = planToolAudit(plan, catalogue);
-  if (audit.writes.length) out.push(`The plan calls ${audit.writes.join(", ")}, which the tool catalogue classifies as writing.`);
+  const vouchable = new Set(vouchableTools(plan, catalogue).map((v) => v.tool));
+  const writes = audit.writes.filter((t) => !vouchable.has(t));
+  const unvouched = audit.writes.filter((t) => vouchable.has(t) && !vouched.includes(t));
+  if (writes.length) out.push(`The plan calls ${writes.join(", ")}, which the tool catalogue classifies as writing.`);
+  if (unvouched.length) {
+    out.push(
+      `Nothing classifies ${unvouched.join(", ")} as a read. Vouch for it below if you know it only reads; until then it is treated as writing.`,
+    );
+  }
   if (audit.unclassified.length) {
     out.push(`The tool catalogue does not classify ${audit.unclassified.join(", ")}, so it cannot be shown to only read.`);
   }
@@ -574,6 +843,18 @@ export function plainMessage(status: number, code: string, message: string): str
       return "The plan could not be approved. A plan with recorded problems, or no plan at all, cannot be approved.";
     case "MAPPING_NOT_APPROVABLE":
       return "The table mapping could not be approved.";
+    case "LINK_TARGETS_PERSON":
+      return "This link points at records of people. An inferred link never points at a person record, so it cannot be approved.";
+    case "LINK_NOT_APPROVABLE":
+      return "The link could not be approved. Only a proposed link with an edge kind can be approved.";
+    case "LINK_NOT_REJECTABLE":
+      return "The link could not be rejected. Only a proposed link can be rejected.";
+    case "IDENTITY_RULE_REFUSED":
+      return "That identity rule cannot be decided: only a rule a bound pack declares, on a kind that is not a person, can be approved.";
+    case "UNAUTHENTICATED_APPROVER":
+      return "The signed-in principal could not be established, so nothing was approved.";
+    case "MAPPING_UNREADABLE":
+      return "The table mapping could not be read for review.";
     case "INGEST_UNAVAILABLE":
       return "Source ingestion is not available in this gateway (the ingest package failed to load).";
     case "UNKNOWN_SOURCE":
@@ -643,9 +924,35 @@ export const sourcesApi = {
     request<{ registered: Connection[]; by: string }>("/sources", "POST", body),
   proposePlan: (id: string) =>
     request<{ plan: CrawlPlan; proposed_by: string }>(`/sources/${enc(id)}/plan`, "POST"),
-  approvePlan: (id: string) => request<{ plan: CrawlPlan }>(`/sources/${enc(id)}/plan/approve`, "POST"),
+  /** `vouchReadTools` is the signed-in person's explicit, per-tool statement that an UNCLASSIFIED
+   *  tool only reads (FIN-02). Sent only when non-empty; the backend accepts it for unknowns only. */
+  approvePlan: (id: string, vouchReadTools: readonly string[] = []) =>
+    request<{ plan: CrawlPlan }>(
+      `/sources/${enc(id)}/plan/approve`,
+      "POST",
+      vouchReadTools.length ? { vouch_read_tools: [...vouchReadTools] } : undefined,
+    ),
   approveMapping: (id: string, tables?: string[]) =>
     request<{ mapping: SourceMapping }>(`/sources/${enc(id)}/mapping/approve`, "POST", tables ? { tables } : {}),
+  /** Proposed links with their evidence, and the tables that need approval again (LINK7). */
+  mappingReview: (id: string) => request<MappingReview>(`/sources/${enc(id)}/mapping/review`),
+  /** Approve ONE proposed link as the signed-in principal (never into a person kind). */
+  approveLink: (id: string, body: LinkDecisionBody) =>
+    request<{ mapping: SourceMapping; approved_by: string }>(`/sources/${enc(id)}/links/approve`, "POST", body),
+  identityRules: () => request<IdentityRulesListing>("/ontology/identity-rules"),
+  decideIdentityRule: (body: { pack: string; kind: string; rule: string; decision: "approved" | "revoked" }) =>
+    request<{ decision: Record<string, unknown>; consolidation: { merged: unknown[]; refused: unknown[] } | null }>(
+      "/ontology/identity-rules/decide",
+      "POST",
+      body,
+    ),
+  rejectLink: (id: string, body: LinkDecisionBody) =>
+    request<{ mapping: SourceMapping; rejected_by: string }>(`/sources/${enc(id)}/links/reject`, "POST", body),
+  /** Items the latest run's screen holds for a person, with the rules and reason (UI8). */
+  holds: (id: string) => request<HoldsListing>(`/sources/${enc(id)}/holds`),
+  /** Lift (or revoke the lift of) ONE hold for ONE content digest, as the signed-in principal. */
+  override: (id: string, body: { action: "approve" | "revoke"; item_id: string; digest: string; reason: string }) =>
+    request<{ override: Record<string, unknown> }>(`/sources/${enc(id)}/overrides`, "POST", body),
   startRun: (id: string) => request<StartedRun>(`/sources/${enc(id)}/runs`, "POST"),
   runs: (id: string) => request<RunsList>(`/sources/${enc(id)}/runs`),
   run: (id: string, runId: string) => request<RunDetail>(`/sources/${enc(id)}/runs/${enc(runId)}`),
@@ -655,6 +962,8 @@ export const sourcesApi = {
       "POST",
     ),
   catalogue: () => request<{ connections: CatalogueConnection[] }>("/platform/catalogue"),
+  /** Who this page is signed in as, and whether that is the public development token (FIN-16). */
+  whoami: () => request<WhoAmI>("/auth/whoami"),
   /** Per-run exclusion reasons (rule + count), read from the run ledgers. */
   ledgerRuns: (id: string) =>
     request<{ source: string; runs: EvidenceRunSummary[] }>(`/evidence/sources/${enc(id)}`),

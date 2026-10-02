@@ -920,6 +920,8 @@ FK_PREFIX = "walnut_fk_"
 #: reached us UNMASKED, else the row key. A masked value ("[EMAIL]*****") is not an identity —
 #: two different addresses of one length mask alike, and merging on that would fuse two rows.
 CANON_KEY = "walnut_canonical"
+#: FIN-04: the kind a row's node is built as, under an approved kind split (`mapping.KIND_KEY`)
+KIND_KEY = "walnut_kind"
 
 
 def _render_pk(row: dict, pk: list[str]) -> Optional[str]:
@@ -934,7 +936,9 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
                canonical_col: Optional[str] = None, canonical_masked: Optional[list] = None,
                overrides=None, withheld_fks: Optional[list] = None,
                candidate_col: Optional[str] = None, candidate_values: Optional[dict] = None,
-               candidate_masked: Optional[list] = None):
+               candidate_masked: Optional[list] = None,
+               ref_index: Optional[dict] = None, links: Optional[list[dict]] = None,
+               split: Optional[dict] = None):
     """Rows of one captured table as `AdapterRow`s with our own `table_cell` pointers. Adds
     `walnut_row_key` (source-qualified row identity) and `walnut_fk_<col>` (the referenced row's
     identity) so a mapping can key nodes and join edges without colliding across tables/sources.
@@ -945,10 +949,19 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
     withheld too (R-022 #7): its identity would be built from the raw value the mask hides. Every
     withheld row is appended to `blocked_rows` with its `decision` (`block` | `review` | `held`)
     and a `row_ref` + `row_digest` an owner can approve. An FK whose value was masked yields no
-    referenced-row identity (listed in `withheld_fks`). Every present column — NULL included —
+    referenced-row identity (listed in `withheld_fks`). A foreign key that names a column of the
+    referenced table OTHER than its key is resolved to that row's key through `ref_index`
+    (`reference_index`), so the reference meets the row however the target is keyed (C-1); an
+    approved cross-table / cross-source LINK (`links`: {column, source, table}) renders the
+    referenced row identity the same way. Every present column — NULL included —
     gets a `table_cell` pointer (R-022 #10). A row of a KEYLESS table with any masked column is
     held (`KEYLESS_ROW_MASKED`: its hash identity would be computed from the raw value), and a row
-    with no columns is held (`NO_POINTER_COLUMNS`) — never silently dropped (R-022 f2 #5, #7)."""
+    with no columns is held (`NO_POINTER_COLUMNS`) — never silently dropped (R-022 f2 #5, #7).
+
+    `split` (an APPROVED mapping's FIN-04 kind split) adds `walnut_kind`: the kind THIS row's node
+    is built as — the kind the split binds the row's normalised discriminator value to, else the
+    split's default (the subject: an unrecognised, NULL or MASKED value is never moved off the
+    protected side). It is cited as derived from the discriminator cell (or the row identity)."""
     import hashlib
 
     from databridge_graph.adapter_ingest import AdapterRow
@@ -1044,21 +1057,28 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
             values[ROW_KEY] = f"{source_id}/{tref}/row-{row_hash}"
             pointers[ROW_KEY] = derived_pointer("row identity = hash of the row's values",
                                                 list(pointers.values()))
-        for fk in fks:
-            col = fk.get("column")
-            if col and row.get(col) is not None and fk.get("ref_table"):
+        refs = [(fk.get("column"), source_id, _fk_ref_table(fk), fk.get("ref_column"))
+                for fk in fks if fk.get("ref_table")]
+        refs += [(lk.get("column"), lk.get("source"), lk.get("table"), lk.get("key"))
+                 for lk in links or [] if lk.get("table") and lk.get("source")]
+        for col, ref_source, ref_table, ref_col in refs:
+            if col and row.get(col) is not None:
                 if col in masked_cols:
                     # R-022 #7: the referenced row's identity would carry the raw masked value
                     if withheld_fks is not None:
                         withheld_fks.append({"table": tref, "row_ref": ref, "column": col,
                                              "rule": "FOREIGN_KEY_MASKED"})
                     continue
-                ref_table = (f"{fk.get('ref_schema')}.{fk['ref_table']}" if fk.get("ref_schema")
-                             else str(fk["ref_table"]))
-                values[f"{FK_PREFIX}{col}"] = f"{source_id}/{ref_table}/{row.get(col)}"
+                key, how = resolve_reference(ref_index, ref_source, ref_table, ref_col,
+                                             row.get(col))
+                values[f"{FK_PREFIX}{col}"] = f"{ref_source}/{ref_table}/{key}"
                 pointers[f"{FK_PREFIX}{col}"] = derived_pointer(
-                    f"referenced row identity = '{source_id}/{ref_table}/' + {col}",
+                    f"referenced row identity = '{ref_source}/{ref_table}/' + "
+                    f"{col if how == 'the reference' else how}",
                     [pointers[col]])
+        if split:
+            values[KIND_KEY], pointers[KIND_KEY] = _row_kind(split, row, values, pointers,
+                                                             masked_cols)
         if canonical_col:
             raw = row.get(canonical_col)
             if raw is not None and canonical_col in pointers and values.get(canonical_col) == raw:
@@ -1080,6 +1100,127 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
             elif raw is not None:
                 candidate_values[values[ROW_KEY]] = str(raw)
         yield AdapterRow(values, pointers)
+
+
+def _ends_admitted(store, vocab, edge, src: str, dst: str) -> bool:
+    """Does the edge's declaration admit the kinds of the nodes its ends resolved to? Checked only
+    where an end resolved to a node of ANOTHER kind than the one it names (a split row, FIN-04)."""
+    def kind_of(node_id: str, named: str) -> str:
+        if node_id.partition(":")[0] == named.partition(":")[0]:
+            return named.partition(":")[0]
+        row = store.open_node_row(node_id)
+        return str(row["kind"]) if row is not None else node_id.partition(":")[0]
+
+    s_kind, d_kind = kind_of(src, edge.src_id), kind_of(dst, edge.dst_id)
+    if s_kind == edge.src_id.partition(":")[0] and d_kind == edge.dst_id.partition(":")[0]:
+        return True
+    try:
+        decl = vocab.edge(edge.kind.value)
+    except Exception:                                                # noqa: BLE001
+        return False
+    return _admits(decl, "src", s_kind) and _admits(decl, "dst", d_kind)
+
+
+def _row_kind(split: dict, row: dict, values: dict, pointers: dict, masked_cols: set
+              ) -> tuple[str, SourcePointer]:
+    """(kind, pointer) of one row under an approved kind split (FIN-04)."""
+    from .mapping import split_value
+
+    col, default = split.get("column"), split.get("default")
+    raw = row.get(col) if col else None
+    if raw is None or col not in pointers:
+        return default, derived_pointer(
+            f"row kind = {default!r}: the kind split's default (no value in {col!r})",
+            [pointers[ROW_KEY]])
+    if col in masked_cols:
+        return default, derived_pointer(
+            f"row kind = {default!r}: the kind split's default ({col!r} is masked; a masked "
+            f"value never moves a row off the protected side)", [pointers[ROW_KEY]])
+    norm = split_value(raw)
+    kind = (split.get("kinds") or {}).get(norm)
+    if kind is None:
+        return default, derived_pointer(
+            f"row kind = {default!r}: the kind split's default ({col!r} value is not bound by "
+            f"the approved split)", [pointers[col]])
+    return kind, derived_pointer(
+        f"row kind = {kind!r}: the approved kind split binds {col!r} value {norm!r} to it",
+        [pointers[col]])
+
+
+def _split_specs(node: dict, edges: list, split: Optional[dict]):
+    """(node specs, edge specs) of a table's mapping, ONE per kind its rows may become (FIN-04):
+    each guarded by `when: {walnut_kind: <kind>}`, each edge with the table's own row end
+    re-kinded. Without a split: the one node spec and the edges as mapped."""
+    from databridge_graph import estate_seed as es
+
+    canonical = CANON_KEY if node.get("canonical_id") else ROW_KEY
+    base = node["kind"]
+    kinds = [base, *sorted({k for k in (split or {}).get("kinds", {}).values() if k != base})]
+    own = f"{base}:{{{ROW_KEY}}}"
+    nodes, out_edges = [], []
+    for k in (kinds if split else [base]):
+        when = {KIND_KEY: k} if split else {}
+        nodes.append(es.NodeSpec(
+            kind=k, key="{" + ROW_KEY + "}", label=node.get("label") or "{" + ROW_KEY + "}",
+            sources=tuple(node.get("sources") or [ROW_KEY]),
+            # a split-off kind is keyed by its source row only; organisations are recognised
+            # as one by the pack's APPROVED identity rules (consolidation), not by a mapping key
+            canonical_id=canonical if k == base else ROW_KEY,
+            attrs=dict(node.get("attrs") or {}), when=when))
+        mine = f"{k}:{{{ROW_KEY}}}"
+        for e in edges:
+            out_edges.append(es.EdgeSpec(
+                kind=e["kind"], src=mine if e["src"] == own else e["src"],
+                dst=mine if e["dst"] == own else e["dst"],
+                evidence=tuple(e.get("evidence") or ()), attrs=dict(e.get("attrs") or {}),
+                when=when))
+    return tuple(nodes), tuple(out_edges)
+
+
+def _fk_ref_table(fk: dict) -> str:
+    return (f"{fk.get('ref_schema')}.{fk['ref_table']}" if fk.get("ref_schema")
+            else str(fk["ref_table"]))
+
+
+def _snap_ref(snapshot: dict) -> str:
+    return (f"{snapshot.get('schema')}.{snapshot.get('table')}" if snapshot.get("schema")
+            else str(snapshot.get("table")))
+
+
+def reference_index(snapshots, wanted: list[tuple[str, str, Optional[str]]]) -> dict:
+    """C-1: {(source, table, column): {value: the row's rendered primary key}} for every
+    reference that names a column of its target table OTHER than the target's key — built from
+    the target's captured rows. `snapshots`: {(source, table): snapshot}. A reference to the key
+    itself (or with no column named) needs no index: the value IS the row's key."""
+    out: dict = {}
+    for source, table, column in wanted:
+        snap = (snapshots or {}).get((source, table))
+        if snap is None or not column:
+            continue
+        pk = list(snap.get("primary_key") or [])
+        if not pk or pk == [column]:
+            continue
+        idx: dict[str, str] = {}
+        for r in snap.get("rows") or []:
+            v, k = r.get(column), _render_pk(r, pk)
+            if v is not None and k is not None:
+                idx.setdefault(str(v), k)
+        out[(source, table, column)] = idx
+    return out
+
+
+def resolve_reference(ref_index: Optional[dict], source: str, table: str,
+                      column: Optional[str], value) -> tuple[str, str]:
+    """(the referenced row's key, how it was found). Through `ref_index` when the reference names
+    a non-key column (an unknown value stays itself: the edge then dangles and is COUNTED, never
+    guessed); otherwise the value is the key."""
+    idx = (ref_index or {}).get((source, table, column)) if column else None
+    if idx is not None:
+        hit = idx.get(str(value))
+        if hit is not None:
+            return hit, f"the key of the row whose {column} = the reference"
+        return str(value), f"the reference (no row of {table} has {column} = it)"
+    return str(value), "the reference"
 
 
 def rows_to_graph(rows, **kw) -> None:
@@ -1112,7 +1253,9 @@ def reconcile_edge_validity(nodes, edges) -> list:
 def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, dict]],
                  retrieved_at: dt.datetime, mask_cfg: Optional[ScreenConfig],
                  screen_cfg: Optional[ScreenConfig] = None, overrides=None,
-                 item_ids: Optional[dict] = None) -> dict:
+                 item_ids: Optional[dict] = None,
+                 context: Optional[dict] = None,
+                 kind_splits: Optional[dict] = None) -> dict:
     """`tables`: (snapshot, sha, table_mapping) for every table with an APPROVED mapping. Builds
     all rows first (so FK edges between tables resolve), drops dangling edges (counted), then
     upserts. Returns counts + the pointers minted, for verification.
@@ -1125,7 +1268,22 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
     `pointers` ledgers EVERY pointer written (entity and attribute pointers of each node, the
     evidence of each edge): `table_cell` leaves and `derived` pointers with their `basis`, so the
     runner's verify resolves each derived pointer through its leaves. `item_ids` (capture sha →
-    item id) stamps each entry with the table item it came from."""
+    item id) stamps each entry with the table item it came from.
+
+    `context` ({(source, table): snapshot}) holds captured tables a reference may point INTO
+    beyond the ones being built (a target table unchanged this run, another source's table for an
+    approved link): a reference naming a non-key column is resolved through it (C-1).
+
+    `completeness` (the 2026-10-02 dry run's lesson) accounts for every table built, so a run report
+    can be asserted on: source rows vs rows read vs rows built vs nodes, and per declared foreign
+    key / approved link the references present, the edges built, and every reference that did
+    NOT become an edge (no edge in the mapping, masked, dangling).
+
+    `kind_splits` ({table: split}, FIN-04): the approved kind splits of the source's OTHER tables
+    (those built this run carry their own). A reference into a split table names the table's node
+    kind; the row it names may have been built as another kind of the split, and is met there —
+    only when the edge's declaration admits that kind (else the edge is not built, and counted
+    `kind_not_admitted`)."""
     from databridge_graph import estate_seed as es
     from databridge_graph.merge import upsert_edge, upsert_node
 
@@ -1139,24 +1297,48 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
     candidate_values: dict[str, str] = {}
     candidate_masked: list = []
     withheld_fks: list = []
-    fk_targets: dict[str, tuple[str, str, str]] = {}
+    fk_targets: dict[str, tuple] = {}
     seed = es.SeedMap(pack="mcp_ingest", root=Path("."), system_time=store.now(),
                       default_valid_from=retrieved_at, datasets=())
+    snaps = {(source_id, _snap_ref(s)): s for s, _, _ in tables}
+    snaps.update({k: v for k, v in (context or {}).items() if k not in snaps})
+    wanted: list[tuple] = []
+    for s, _, tmap in tables:
+        wanted += [(source_id, _fk_ref_table(f), f.get("ref_column"))
+                   for f in s.get("foreign_keys") or [] if f.get("ref_table")]
+        wanted += [(lk["source"], lk["table"], lk.get("key")) for lk in _links_of(tmap)]
+    ref_index = reference_index(snaps, wanted)
+    alternatives: dict[str, set] = {}
+    splits = [*(kind_splits or {}).values(),
+              *((tm.get("split") for _, _, tm in tables if tm.get("node")))]
+    for sp in splits:
+        if isinstance(sp, dict) and sp.get("default"):
+            others = {k for k in (sp.get("kinds") or {}).values() if k != sp["default"]}
+            if others:
+                alternatives.setdefault(sp["default"], set()).update(others)
+    not_admitted: list[dict] = []
+    #: per table: what came in, what was built, and per reference column what became an edge
+    complete: dict[str, dict] = {}
+    edge_origin: dict[str, tuple[str, str]] = {}            # edge id -> (table, column)
     for snapshot, sha, tmap in tables:
-        tref = (f"{snapshot.get('schema')}.{snapshot.get('table')}" if snapshot.get("schema")
-                else str(snapshot.get("table")))
-        node = tmap["node"]
+        tref = _snap_ref(snapshot)
+        # a JOIN table (`association`) has no node of its own: its rows are edges between the
+        # rows it references, each citing the join row's own cells
+        node = tmap.get("node") or {}
+        links = _links_of(tmap)
+        split = tmap.get("split") if node else None
+        if node:
+            node_specs, edge_specs = _split_specs(node, list(tmap.get("edges") or []), split)
+        else:
+            node_specs = ()
+            edge_specs = tuple(es.EdgeSpec(kind=e["kind"], src=e["src"], dst=e["dst"],
+                                           evidence=tuple(e.get("evidence") or ()),
+                                           attrs=dict(e.get("attrs") or {}))
+                               for e in tmap.get("edges") or [])
         dataset = es.DatasetSpec(
             id=tref, reader="adapter", table=tref, paths=(), trust=Trust.UNTRUSTED,
-            row_key="{" + ROW_KEY + "}",
-            nodes=(es.NodeSpec(kind=node["kind"], key="{" + ROW_KEY + "}",
-                               label=node.get("label") or "{" + ROW_KEY + "}",
-                               sources=tuple(node.get("sources") or [ROW_KEY]),
-                               canonical_id=CANON_KEY if node.get("canonical_id") else ROW_KEY,
-                               attrs=dict(node.get("attrs") or {})),),
-            edges=tuple(es.EdgeSpec(kind=e["kind"], src=e["src"], dst=e["dst"],
-                                    evidence=tuple(e.get("evidence") or ()))
-                        for e in tmap.get("edges") or []))
+            row_key="{" + ROW_KEY + "}", nodes=node_specs, edges=edge_specs)
+        n_blocked, n_masked = len(blocked_rows), len(withheld_fks)
         rows = list(table_rows(snapshot, source_id=source_id, sha=sha, mask_cfg=mask_cfg,
                                redactions=redactions, blocked_rows=blocked_rows,
                                screen_cfg=screen_cfg, canonical_col=node.get("canonical_id"),
@@ -1164,28 +1346,46 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                                withheld_fks=withheld_fks,
                                candidate_col=node.get("candidate_identifier"),
                                candidate_values=candidate_values,
-                               candidate_masked=candidate_masked))
+                               candidate_masked=candidate_masked,
+                               ref_index=ref_index, links=links, split=split))
+        before = set(edges)
         rows_to_graph(rows, dataset=dataset, seed=seed, source_id=source_ref(source_id),
                       vocab=vocab, nodes=nodes, raw_keys=raw_keys, edges=edges, report=report)
-        # endpoint id -> (kind, referenced table, referenced row id): how a later run finds a
-        # referenced row that merged onto another node in an earlier run (`_resolve_endpoint`)
+        for eid in set(edges) - before:
+            col = "*" if tmap.get("association") else _evidence_column(edges[eid])
+            if col is not None:
+                edge_origin[eid] = (tref, col)
+        complete[tref] = _table_completeness(snapshot, tmap, rows, links, snaps,
+                                             source_id=source_id,
+                                             withheld=blocked_rows[n_blocked:],
+                                             masked_refs=withheld_fks[n_masked:])
+        # endpoint id -> (kind, referenced table, referenced row id, source): how a later run
+        # finds a referenced row that merged onto another node in an earlier run
         for e in tmap.get("edges") or []:
             for end in (e["src"], e["dst"]):
                 kind_name, _, tmpl = end.partition(":")
                 col = tmpl.strip("{}")
                 if not col.startswith(FK_PREFIX):
                     continue
+                raw_col = col[len(FK_PREFIX):]
                 fk = next((f for f in snapshot.get("foreign_keys") or []
-                           if f.get("column") == col[len(FK_PREFIX):]), None)
-                if fk is None or not fk.get("ref_table"):
+                           if f.get("column") == raw_col and f.get("ref_table")), None)
+                lk = next((x for x in links if x.get("column") == raw_col), None)
+                if fk is not None:
+                    tgt = (source_id, _fk_ref_table(fk), fk.get("ref_column"))
+                elif lk is not None:
+                    tgt = (lk["source"], lk["table"], lk.get("key"))
+                else:
                     continue
-                ref = (f"{fk.get('ref_schema')}.{fk['ref_table']}" if fk.get("ref_schema")
-                       else str(fk["ref_table"]))
                 for r in rows:
                     key = es._render(tmpl, r) if hasattr(es, "_render") else None
-                    raw = r.get(col[len(FK_PREFIX):])
+                    raw = r.get(raw_col)
                     if key is not None and raw is not None:
-                        fk_targets[f"{kind_name}:{key}"] = (kind_name, ref, str(raw))
+                        row_id, _ = resolve_reference(ref_index, *tgt, raw)
+                        fk_targets[f"{kind_name}:{key}"] = (kind_name, tgt[1], row_id, tgt[0])
+    for tref, rec in complete.items():
+        rec["nodes"] = sum(1 for rk in raw_keys.values()
+                           if str(rk).startswith(f"{source_id}/{tref}/"))
     node_list = list(nodes.values())
     # node id -> its row's declared subject identifier (raw_keys: node id -> rendered row key)
     candidate_for = {nid: candidate_values[rk] for nid, rk in raw_keys.items()
@@ -1215,21 +1415,39 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                     pointers.append({"entity": outcome.id, **rec})
         kept, dangling_ids, ambiguous = [], [], []
         for edge in reconcile_edge_validity(node_list, list(edges.values())):
-            src = _resolve_endpoint(store, edge.src_id, id_map, fk_targets, source_id, ambiguous)
-            dst = _resolve_endpoint(store, edge.dst_id, id_map, fk_targets, source_id, ambiguous)
+            origin = edge_origin.get(edge.id)
+            src = _resolve_endpoint(store, edge.src_id, id_map, fk_targets, source_id, ambiguous,
+                                    alternatives)
+            dst = _resolve_endpoint(store, edge.dst_id, id_map, fk_targets, source_id, ambiguous,
+                                    alternatives)
+            if src is not None and dst is not None and alternatives and not _ends_admitted(
+                    store, vocab, edge, src, dst):
+                # FIN-04: the row was built as another kind of its split, which this edge's
+                # declaration does not admit — never written under a kind it was not declared for
+                not_admitted.append({"edge": edge.id, "src": src, "dst": dst,
+                                     "kind": edge.kind.value, "rule": "KIND_NOT_ADMITTED"})
+                dangling_ids.append(edge.id)
+                if origin is not None:
+                    _bump_ref(complete, origin, "dangling")
+                continue
             if src is None or dst is None:
                 dangling_ids.append(edge.id)
+                if origin is not None:
+                    _bump_ref(complete, origin, "dangling")
                 continue
             if (src, dst) != (edge.src_id, edge.dst_id):
                 edge = edge.model_copy(update={"id": f"{src}|{edge.kind.value}|{dst}",
                                                "src_id": src, "dst_id": dst})
             kept.append(edge)
+            if origin is not None:
+                _bump_ref(complete, origin, "edges_built")
         for e in kept:
             upsert_edge(store, e)
             for p in e.sources:
                 rec = _ledger_pointer(p, item_ids)
                 if rec is not None:
                     pointers.append({"entity": e.id, **rec})
+    completeness = [finish_completeness(rec) for _, rec in sorted(complete.items())]
     return {"nodes": len(node_list), "edges": len(kept), "dangling_edges": len(dangling_ids),
             "dangling_edge_ids": dangling_ids, "merged": merged,
             "candidate_links": candidate_links,
@@ -1237,9 +1455,197 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
             "rows_review": sum(1 for b in blocked_rows if b.get("decision") == "review"),
             "rows_held": sum(1 for b in blocked_rows if b.get("decision") == "held"),
             "blocked_rows": blocked_rows, "withheld_fks": withheld_fks,
-            "ambiguous_endpoints": ambiguous,
+            "ambiguous_endpoints": ambiguous, "kind_not_admitted": not_admitted,
             "canonical_masked": canonical_masked, "candidate_masked": candidate_masked,
-            "redactions": redactions, "pointers": pointers, "report": report.as_record()}
+            "redactions": redactions, "pointers": pointers, "report": report.as_record(),
+            "completeness": completeness}
+
+
+def consolidate_identity_after_run(store, vocab) -> dict:
+    """FIN-04 / D-004: after a run, apply the pack's APPROVED identity rules to the graph
+    (`databridge_graph.merge.consolidate_identity`), so organisations this run wrote are recognised
+    as one with the records already there. Table rows are written id-only and never rule-merge at
+    write time; this is where they do.
+
+    Inert unless a named human approved a rule (ontology state): with none approved, nothing is
+    merged and the record says so. A SUBJECT kind is never touched — the graph has no rule for one.
+    An unreadable approval state REFUSES (fail closed): nothing merges, the run carries on, and
+    the record names the error. Returns {status, merged, refused, kinds, absorbed}."""
+    try:
+        from databridge_graph.merge import consolidate_identity
+    except ImportError as exc:                                       # pragma: no cover
+        return {"status": "unavailable", "error": str(exc), "merged": [], "refused": [],
+                "kinds": {}, "absorbed": 0}
+    if not getattr(vocab, "identity_rules", None):
+        return {"status": "no_rules", "merged": [], "refused": [], "kinds": {}, "absorbed": 0}
+    try:
+        rep = consolidate_identity(store, vocab).as_record()
+    except Exception as exc:                                         # noqa: BLE001
+        return {"status": "refused", "error": f"{type(exc).__name__}: {str(exc)[:300]}",
+                "merged": [], "refused": [], "kinds": {}, "absorbed": 0}
+    return {"status": "ran", **rep,
+            "absorbed": sum(len(m.get("absorbed") or ()) for m in rep.get("merged") or ())}
+
+
+def _links_of(tmap: dict) -> list[dict]:
+    """The approved cross-table / cross-source LINKS of a table mapping: its edges carrying a
+    `ref` ({source, table, key}) — a reference no foreign key declares, approved by a person
+    (`mapping.approve_link`). One entry per column."""
+    out: dict[str, dict] = {}
+    for e in tmap.get("edges") or []:
+        ref = e.get("ref") or {}
+        cols = e.get("evidence") or []
+        if ref.get("source") and ref.get("table") and cols:
+            out.setdefault(cols[0], {"column": cols[0], "source": ref["source"],
+                                     "table": ref["table"], "key": ref.get("key")})
+    return list(out.values())
+
+
+def _evidence_column(edge) -> Optional[str]:
+    """The source column an edge's evidence cites (a `table_cell`, or the leaf of a `derived`
+    pointer), for per-column accounting."""
+    for p in edge.sources or ():
+        stack = [p]
+        while stack:
+            q = stack.pop()
+            if q.kind == "table_cell" and q.column:
+                return q.column
+            stack.extend(q.derived_from or ())
+    return None
+
+
+def _target_keys(snaps: dict, source: str, table: str, column: Optional[str]) -> Optional[set]:
+    """The values a reference may hold to name a CAPTURED row of `table` (its `column`, else its
+    rendered key), or None when the table was not captured (this run / the context)."""
+    snap = (snaps or {}).get((source, table))
+    if snap is None:
+        return None
+    pk = list(snap.get("primary_key") or [])
+    if column and pk != [column]:
+        return {str(r.get(column)) for r in snap.get("rows") or [] if r.get(column) is not None}
+    return {k for k in (_render_pk(r, pk) for r in snap.get("rows") or []) if k is not None}
+
+
+def reference_completeness(snapshot: dict, rows: list, links: list[dict], snaps: dict, *,
+                           source_id: str, edge_for: Optional[dict] = None,
+                           masked_refs: Optional[list] = None) -> list[dict]:
+    """Per declared FK (and approved link) of one table: the rows holding a value, how many name a
+    CAPTURED target row (`edges_expected`), how many do not (`unresolved_references`: the row was
+    not captured — a cap, out of scope, or a dangling value at the source), and the edge kind the
+    mapping gives it (None: no edge in the mapping). Field names are the completeness audit's
+    (`scripts/e2e/completeness.py`), so the two can be compared line by line."""
+    declared = [(f.get("column"), source_id, _fk_ref_table(f), f.get("ref_column"),
+                 "declared_fk") for f in snapshot.get("foreign_keys") or []
+                if f.get("column") and f.get("ref_table")]
+    declared += [(lk["column"], lk["source"], lk["table"], lk.get("key"), "approved_link")
+                 for lk in links]
+    out = []
+    for col, src, table, ref_col, origin in declared:
+        keys = _target_keys(snaps, src, table, ref_col)
+        present = [r.get(col) for r in rows if r.get(col) is not None]
+        expected = sum(1 for v in present if keys is not None and str(v) in keys)
+        e = (edge_for or {}).get(col)
+        out.append({"column": col, "origin": origin,
+                    "references": table if src == source_id else f"{src}:{table}",
+                    "edge_kind": e.get("kind") if e else None,
+                    "target_captured": keys is not None, "rows_with_value": len(present),
+                    "edges_expected": expected, "edges_built": 0, "dangling": 0,
+                    "masked": sum(1 for m in masked_refs or () if m.get("column") == col),
+                    "unresolved_references": len(present) - expected})
+    return out
+
+
+def _table_completeness(snapshot: dict, tmap: dict, rows: list, links: list[dict], snaps: dict,
+                        *, source_id: str, withheld: list, masked_refs: list) -> dict:
+    edge_for: dict[str, dict] = {}
+    for e in tmap.get("edges") or []:
+        for c in e.get("evidence") or []:
+            edge_for.setdefault(c, e)
+    assoc = bool(tmap.get("association"))
+    rec = {"table": _snap_ref(snapshot), "node_kind": (tmap.get("node") or {}).get("kind"),
+           "built": True, "association": assoc,
+           "foreign_keys": reference_completeness(snapshot, rows, links, snaps,
+                                                  source_id=source_id, edge_for=edge_for,
+                                                  masked_refs=masked_refs)}
+    rec.update(_row_counts(snapshot, rows_built=len(rows), withheld=len(withheld)))
+    if assoc:
+        # a join table's rows are EDGES between the rows it references: one is expected for a
+        # row whose every reference names a captured row
+        refs = rec["foreign_keys"]
+        cols = [c for e in tmap.get("edges") or [] for c in e.get("evidence") or []]
+        keysets = {r["column"]: _target_keys(snaps, source_id, r["references"], None)
+                   for r in refs if r["column"] in cols}
+        rec["association_edges_expected"] = sum(
+            1 for row in rows if cols and all(
+                row.get(c) is not None and keysets.get(c) is not None
+                and str(row.get(c)) in keysets[c] for c in cols))
+        rec["association_edges_built"] = 0
+    return rec
+
+
+def _row_counts(snapshot: dict, *, rows_built: int, withheld: int) -> dict:
+    read = len(snapshot.get("rows") or [])
+    total = snapshot.get("row_count_total")
+    return {"source_rows": total if total is not None else read, "captured_rows": read,
+            "capture_limit": snapshot.get("limit"),
+            "capped": isinstance(total, int) and read < total,
+            "rows_withheld": withheld, "rows_built": rows_built, "nodes": 0}
+
+
+def unbuilt_completeness(snapshot: dict, *, source_id: str, snaps: dict, reason: str,
+                         node_kind: Optional[str] = None) -> dict:
+    """A captured table NOT built (unmapped, or its mapping not approved): none of its rows is in
+    the graph and none of its references became an edge — counted, never silent."""
+    rows = snapshot.get("rows") or []
+    rec = {"table": _snap_ref(snapshot), "node_kind": node_kind, "built": False,
+           "reason": reason, "association": False,
+           "foreign_keys": reference_completeness(snapshot, rows, [], snaps,
+                                                  source_id=source_id)}
+    rec.update(_row_counts(snapshot, rows_built=0, withheld=0))
+    return finish_completeness(rec)
+
+
+def _bump_ref(complete: dict, origin: tuple[str, str], field_name: str) -> None:
+    tref, col = origin
+    rec = complete.get(tref) or {}
+    if rec.get("association"):
+        if field_name == "edges_built":
+            rec["association_edges_built"] = rec.get("association_edges_built", 0) + 1
+        for r in rec.get("foreign_keys") or []:
+            r[field_name] += 1                          # each join edge uses every reference
+        return
+    for r in rec.get("foreign_keys") or []:
+        if r["column"] == col:
+            r[field_name] += 1
+            return
+
+
+def finish_completeness(rec: dict) -> dict:
+    """Totals of one table's completeness record: declared FKs vs those with an edge, edges
+    expected (the reference names a captured row) vs built, `edges_missing` (expected and NOT
+    built — the defect the 2026-10-02 dry run found), unresolved references (no captured row to point
+    at) and the rows the run did not read (a cap). `graph_rows`: the rows the graph holds — nodes,
+    or, for a join table, the edges its rows became."""
+    refs = rec.get("foreign_keys") or []
+    for r in refs:
+        r["edges_missing"] = max(0, int(r.get("edges_expected") or 0)
+                                 - int(r.get("edges_built") or 0))
+    rec["declared_fks"] = sum(1 for r in refs if r.get("origin") == "declared_fk")
+    rec["fks_with_edge"] = sum(1 for r in refs if r.get("origin") == "declared_fk"
+                               and r.get("edge_kind"))
+    if rec.get("association"):
+        rec["edges_expected"] = int(rec.get("association_edges_expected") or 0)
+        rec["edges_built"] = int(rec.get("association_edges_built") or 0)
+        rec["graph_rows"] = rec["edges_built"]
+    else:
+        rec["edges_expected"] = sum(int(r.get("edges_expected") or 0) for r in refs)
+        rec["edges_built"] = sum(int(r.get("edges_built") or 0) for r in refs)
+        rec["graph_rows"] = int(rec.get("nodes") or 0)
+    rec["edges_missing"] = max(0, rec["edges_expected"] - rec["edges_built"])
+    rec["unresolved_references"] = sum(int(r.get("unresolved_references") or 0) for r in refs)
+    rec["rows_not_read"] = max(0, int(rec.get("source_rows") or 0)
+                               - int(rec.get("captured_rows") or 0))
+    return rec
 
 
 def _ledger_pointer(p: SourcePointer, item_ids: Optional[dict], depth: int = 0) -> Optional[dict]:
@@ -1307,7 +1713,38 @@ def _upsert_row_node(store, n, vocab, upsert_node, candidate_value: Optional[str
 
 
 def _resolve_endpoint(store, node_ref: str, id_map: dict, fk_targets: dict,
-                      source_id: str, ambiguous: Optional[list] = None) -> Optional[str]:
+                      source_id: str, ambiguous: Optional[list] = None,
+                      alternatives: Optional[dict] = None) -> Optional[str]:
+    """`_resolve_one`, then — FIN-04 — the same row under each kind an approved kind split may
+    have built it as (`alternatives`: {kind: other kinds}): a reference to a `party` row that the
+    split built as a `legal_entity` meets that node. The row identity is the same; only the kind
+    differs. Exactly one hit is used; two are ambiguous (refused, listed)."""
+    got = _resolve_one(store, node_ref, id_map, fk_targets, source_id, ambiguous)
+    if got is not None or not alternatives:
+        return got
+    kind, sep, rest = node_ref.partition(":")
+    if not sep:
+        return None
+    hits = []
+    for alt in sorted(alternatives.get(kind) or ()):
+        alt_ref = f"{alt}:{rest}"
+        tgt = fk_targets.get(node_ref)
+        alt_fk = {alt_ref: (alt, *tgt[1:])} if tgt is not None else {}
+        hit = _resolve_one(store, alt_ref, id_map, alt_fk, source_id, ambiguous)
+        if hit is not None and hit not in hits:
+            hits.append(hit)
+    if len(hits) > 1:
+        if ambiguous is not None:
+            ambiguous.append({"endpoint": node_ref, "candidates": hits,
+                              "rule": "AMBIGUOUS_SPLIT_KIND",
+                              "reverse": "the referenced row exists under more than one kind; "
+                                         "a person corrects the kind split"})
+        return None
+    return hits[0] if hits else None
+
+
+def _resolve_one(store, node_ref: str, id_map: dict, fk_targets: dict,
+                 source_id: str, ambiguous: Optional[list] = None) -> Optional[str]:
     """The id an edge endpoint names in the store NOW: this run's node (re-pointed if it merged),
     an open node of that id, or — for a reference to a row built in an EARLIER run that merged
     onto another node then — the open node whose pointers cite that row's own cells.
@@ -1325,7 +1762,9 @@ def _resolve_endpoint(store, node_ref: str, id_map: dict, fk_targets: dict,
     target = fk_targets.get(node_ref)
     if target is None:
         return None
-    kind, table, row_id = target
+    kind, table, row_id = target[:3]
+    # an approved cross-source link names ITS source; a declared FK is this source's own table
+    ref_source = target[3] if len(target) > 3 and target[3] else source_id
     rows = store.fetchall(
         "SELECT DISTINCT n.id AS id FROM sources s JOIN nodes n ON n.id = s.entity_id "
         "AND n.system_to IS NULL AND n.valid_to IS NULL, json_tree(s.source_pointer_json) t "
@@ -1334,7 +1773,7 @@ def _resolve_endpoint(store, node_ref: str, id_map: dict, fk_targets: dict,
         "AND json_extract(t.value, '$.source_id') = ? "
         "AND json_extract(t.value, '$.table') = ? "
         "AND json_extract(t.value, '$.row_id') = ? ORDER BY n.id LIMIT 3",
-        (kind, "%" + table.replace("%", "") + "%", source_ref(source_id), table, row_id))
+        (kind, "%" + table.replace("%", "") + "%", source_ref(ref_source), table, row_id))
     ids = [r["id"] for r in rows]
     if len(ids) > 1:
         if ambiguous is not None:
@@ -1350,5 +1789,7 @@ __all__ = ["chunk_spans", "span_pointer", "cell_pointer", "derived_pointer", "Pr
            "DocBuild", "DocPlan", "ChunkJob", "store_batch", "anchor_id_for", "rows_to_graph",
            "reconcile_edge_validity", "BRIDGE_MAX_GAP", "BRIDGE_MAX_SPAN", "BRIDGE_PAD",
            "build_tables", "table_rows", "document_kind", "edge_kind_for", "edge_kind_choice",
-           "listing_capture", "LISTING_TABLE", "CHUNK_CHARS",
+           "listing_capture", "LISTING_TABLE", "CHUNK_CHARS", "reference_index",
+           "resolve_reference", "finish_completeness", "unbuilt_completeness",
+           "reference_completeness", "consolidate_identity_after_run", "KIND_KEY",
            "CHUNK_OVERLAP", "ROW_KEY", "FK_PREFIX", "CANON_KEY", "BuildError", "source_ref"]

@@ -20,7 +20,7 @@ and the main agent just understands all of it." This package is that loop:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from .catalogue import (
     AdapterAgentEntry,
@@ -29,7 +29,9 @@ from .catalogue import (
     FactsTable,
     SteadyFacts,
     build_catalogue,
+    declared_connections,
     registry_specs,
+    unowned_facts_specs,
 )
 from .combine import CombinedTable, CombineError, TableRow, combine, table_from_result
 from .contracts import (
@@ -59,9 +61,15 @@ from .service import (CatalogueAdmission, FederatedAnswer, FederatedService, nam
 def build_service(*, store: Any = None, harness: Any = None, facts: Any = None,
                   retriever: Any = None, gateway_factory: Any = None,
                   adapter_agents_root: Optional[Path] = None, vocabulary: Any = None,
-                  runs_dir: Optional[Path] = None) -> FederatedService:
+                  runs_dir: Optional[Path] = None,
+                  connections: Optional[Iterable[str]] = None) -> FederatedService:
     """A service over the live registry, facts stores and vocabulary (each optional; what is
-    missing is reported by the catalogue and by coverage)."""
+    missing is reported by the catalogue and by coverage).
+
+    ``connections`` are the deployment's declared connections (default: every
+    ``WALNUT_SOURCES_DIR/<id>.yaml``). One that no adapter agent keeps but whose read-only facts
+    store exists is still in the catalogue, read directly (FIN-15: before this, /brain could not
+    count anything until someone had created an adapter agent)."""
     specs: list = []
     problems: list[str] = []
     try:
@@ -74,6 +82,9 @@ def build_service(*, store: Any = None, harness: Any = None, facts: Any = None,
         facts = default_facts()
     if facts is not None and not isinstance(facts, SteadyFacts):
         facts = SteadyFacts(facts)                           # E2E4 Q-01: contention is re-read
+    unowned, said = unowned_facts_specs(specs, facts, connections)
+    specs = [*specs, *unowned]
+    problems += said
     if vocabulary is None:
         try:
             from databridge_graph.packs import active_vocabulary  # noqa: PLC0415
@@ -97,7 +108,7 @@ def answer(question: str, *, service: Optional[FederatedService] = None,
 
 __all__ = [
     "AdapterAgentEntry", "Catalogue", "ConnectionEntry", "FactsTable", "SteadyFacts",
-    "build_catalogue",
+    "build_catalogue", "declared_connections", "unowned_facts_specs",
     "registry_specs", "CombinedTable", "CombineError", "TableRow", "combine",
     "table_from_result", "PERIODS", "Aggregate", "CombineSpec", "CompareSpec",
     "DelegateCoverage", "DelegationPlan", "EntityRef", "Filter", "LinkSpec", "ResultRow",

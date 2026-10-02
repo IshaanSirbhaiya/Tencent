@@ -273,6 +273,19 @@ def validate_state(data: Any, path: Optional[Path] = None) -> dict[str, Any]:
         ev = rec.get("evidence", [])
         _need(isinstance(ev, list) and all(isinstance(x, dict) for x in ev), path,
               f"{where}.evidence must be a list of objects")
+    _need("identity_rule_decisions" not in data
+          or isinstance(data["identity_rule_decisions"], list), path,
+          "'identity_rule_decisions' is not a list")
+    for i, rec in enumerate(data.get("identity_rule_decisions") or []):
+        where = f"identity_rule_decisions[{i}]"
+        _need(isinstance(rec, dict), path, f"{where} is not an object")
+        for f in ("pack", "kind", "principal", "at"):
+            _need(_str(rec.get(f)) and rec[f].strip() == rec[f], path,
+                  f"{where}.{f} must be a non-empty string")
+        _need(rec.get("rule") in IDENTITY_RULE_TYPES, path,
+              f"{where}.rule must be one of {sorted(IDENTITY_RULE_TYPES)}")
+        _need(rec.get("decision") in IDENTITY_RULE_DECISIONS, path,
+              f"{where}.decision must be one of {sorted(IDENTITY_RULE_DECISIONS)}")
     ops: set[str] = set()
     for i, rec in enumerate(data.get("operations") or []):
         where = f"operations[{i}]"
@@ -339,3 +352,99 @@ def currently_deprecated(packs: Iterable[str]) -> tuple[frozenset[str], frozense
     nodes = frozenset(k for (_, axis, k), r in last.items() if axis == "node" and not r.get("reactivated"))
     edges = frozenset(k for (_, axis, k), r in last.items() if axis == "edge" and not r.get("reactivated"))
     return nodes, edges
+
+
+# --- identity rules (FIN-04, wiki/20-decisions/D-004) -------------------------------------------
+#
+# A pack DECLARES which merge rules a non-subject kind may use (`packs.IdentityRule`); a named
+# human APPROVES one for this deployment. The approval is a record here, append-only like the
+# deprecations: the last decision per (pack, kind, rule) wins, and a revocation is a new record,
+# never an edit. Nothing in the engine approves a rule, and an unapproved rule merges nothing.
+#
+# The principal is whatever authenticated identity the CALLER established. This module cannot
+# authenticate anyone; it refuses a blank principal and records the one it is given. The HTTP
+# route that calls it must take the principal from the authenticated session, never from the body.
+
+#: Kept identical to `packs.IDENTITY_RULE_TYPES` (asserted by the tests) without importing packs
+#: here, so this module stays importable on its own.
+IDENTITY_RULE_TYPES = frozenset({"business_key", "exact_name"})
+IDENTITY_RULE_DECISIONS = frozenset({"approved", "revoked"})
+
+_RULE_CACHE: dict[tuple, frozenset] = {}
+_RULE_CACHE_LOCK = threading.Lock()
+
+
+def _state_identity() -> tuple:
+    path = state_path()
+    try:
+        st = path.stat()
+    except OSError:
+        return (str(path), None)
+    return (str(path), st.st_size, st.st_mtime_ns)
+
+
+def approved_identity_rules(packs: Iterable[str]) -> frozenset[tuple[str, str]]:
+    """`(kind, rule)` pairs a named human has approved, and not since revoked, in any of
+    ``packs``. Last record per (pack, kind, rule) wins.
+
+    Cached on the state file's (path, size, mtime): `merge.resolve_existing` asks this on the
+    upsert path, and must not parse JSON per row. Raises `OntologyStateError` when the state file
+    exists but cannot be read: a merge must not run on rules it cannot establish (fail closed).
+    """
+    wanted = tuple(sorted(set(packs)))
+    key = (_state_identity(), wanted)
+    with _RULE_CACHE_LOCK:
+        hit = _RULE_CACHE.get(key)
+    if hit is not None:
+        return hit
+    last: dict[tuple[str, str, str], dict] = {}
+    for rec in _read_state().get("identity_rule_decisions", []) or []:
+        if rec["pack"] in wanted:
+            last[(rec["pack"], rec["kind"], rec["rule"])] = rec
+    out = frozenset((k, r) for (_, k, r), rec in last.items() if rec["decision"] == "approved")
+    with _RULE_CACHE_LOCK:
+        if len(_RULE_CACHE) > 64:
+            _RULE_CACHE.clear()
+        _RULE_CACHE[key] = out
+    return out
+
+
+def record_identity_rule_decision(*, pack: str, kind: str, rule: str, principal: str,
+                                  decision: str = "approved", vocab=None,
+                                  at: Optional[str] = None) -> dict[str, Any]:
+    """Append one human decision on a DECLARED identity rule. Returns the record written.
+
+    Refused (`ValueError`) unless the bound vocabulary declares exactly this rule for this kind,
+    in this pack: a decision can approve what a pack declared, never invent a rule, and never
+    touch a subject kind (which can carry no rule at all). ``principal`` must be a non-blank,
+    authenticated identity supplied by the caller.
+    """
+    if not isinstance(principal, str) or not principal.strip():
+        raise ValueError("an identity rule decision needs a named, authenticated principal")
+    if decision not in IDENTITY_RULE_DECISIONS:
+        raise ValueError(f"decision must be one of {sorted(IDENTITY_RULE_DECISIONS)}")
+    if rule not in IDENTITY_RULE_TYPES:
+        raise ValueError(f"rule must be one of {sorted(IDENTITY_RULE_TYPES)}")
+    if vocab is None:
+        from .packs import active_vocabulary                           # noqa: PLC0415
+        vocab = active_vocabulary()
+    declared = vocab.identity_rule_for(kind)
+    if declared is None:
+        raise ValueError(f"no bound pack declares identity rules for {kind!r} (a subject kind "
+                         f"never has any)")
+    if declared.pack != pack or pack not in vocab.packs:
+        raise ValueError(f"the identity rule for {kind!r} is declared by pack {declared.pack!r}, "
+                         f"not {pack!r}")
+    if rule not in declared.rule_types:
+        raise ValueError(f"pack {pack!r} does not declare a {rule!r} rule for {kind!r} "
+                         f"(declared: {list(declared.rule_types)})")
+    import datetime as _dt                                             # noqa: PLC0415
+    rec = {"pack": pack, "kind": str(kind), "rule": rule, "decision": decision,
+           "principal": principal.strip(),
+           "at": at or _dt.datetime.now(_dt.timezone.utc).isoformat()}
+    with file_lock(state_lock_path()):
+        state = read_state()
+        state.setdefault("identity_rule_decisions", []).append(rec)
+        validate_state(state)
+        write_state(state)
+    return rec

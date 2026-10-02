@@ -460,17 +460,24 @@ def test_an_undeclared_kind_is_not_named_on_the_page(tmp_path, monkeypatch):
 
 def test_graph_bounds_are_checked_against_the_requested_snapshot(desk, monkeypatch):
     """t08b #9. The bound was checked against the LIVE graph: a rewind to an instant with more
-    nodes than today passed, and a small historical snapshot could be refused for today's size."""
+    nodes than today passed, and a small historical snapshot could be refused for today's size.
+
+    C-4 (finance dry run): past the envelope the figures are no longer WITHHELD — they are served
+    exact, without member lists. The envelope is still measured on the requested snapshot: today
+    fits and lists its members; the rewind (one node more) does not."""
     import databridge_gateway.intelligence_surface as surface
 
     g, client = desk
     inside, _old, _new = _rewind_topic(g)
     live = len(g.store.open_nodes())
     monkeypatch.setattr(surface, "MAX_GRAPH_NODES", live)       # today fits exactly
-    assert client.get("/intelligence").json()["graph_unavailable"] is None
+    now = client.get("/intelligence").json()
+    assert now["graph_unavailable"] is None and now["graph"]["members_listed"] is True
     then = client.get(f"/intelligence?as_of={inside}").json()
-    assert then["graph"] is None and then["graph_unavailable"], (
-        "the rewound snapshot holds one node more than the bound and must be refused")
+    assert then["graph_unavailable"] is None, "a large snapshot is counted, not refused"
+    assert then["graph"]["members_listed"] is False, (
+        "the rewound snapshot holds one node more than the envelope: no member lists")
+    assert then["graph"]["nodes"] == live + 1
 
 
 def test_a_dangling_edge_neither_crashes_the_ask_nor_hides_in_the_figures(desk):

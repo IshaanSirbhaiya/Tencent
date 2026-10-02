@@ -69,4 +69,17 @@ canonical_columns: [code, reference, ref, number, "no", sku, slug, domain, email
 
 # Foreign keys become edges. Meta-kinds tried, in preference order when two candidates score the
 # same. `about` (a claim) and `derived_from`/`supersedes` (lineage) are never inferred from a key.
-fk_edge_metas: [role_of, party_to, issued, authorises, part_of, at, references]
+# A key's own words decide first (`owner` in `owner_rm_code` names a role); this order only breaks
+# a tie the words leave. Participation and containment come BEFORE roles (FIN-05, 2026-10-02): a
+# key named only after what it references (`<kind>_id`) is the row's participant, and a ROLE
+# (an owner, a manager, an approver) must be named by the key before it is assumed.
+fk_edge_metas: [party_to, part_of, role_of, issued, authorises, at, references]
+
+# Proposed links (C-3, dry run 2026-10-02): a column NO foreign key declares whose values
+# are, by measurement on the rows read, keys of another table — in the same source or another
+# (a reference column holding the other system's key). PROPOSED only; a person approves each one
+# (mapping.approve_link). A link never points at a person kind and never merges anything. The
+# target's key must be a single, non-numeric key (surrogate integers overlap by accident).
+link_proposals:
+  min_matched: 3       # at least this many values must be keys of the target
+  min_ratio: 0.8       # ... and at least this share of the column's non-null values

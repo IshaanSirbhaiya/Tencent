@@ -733,6 +733,8 @@ subject_kinds:
     never_fuzzy_merge: true
     attestation: in_person
     grant_type: PersonReadGrant
+    attested_by: a named officer
+    held_by: the agency
 
   - kind: organisation
     identifiers: [company_registration, licence_number, registered_address]
@@ -741,15 +743,21 @@ subject_kinds:
     # document against the record, which is what `verified_channel` means here.
     attestation: verified_channel
     grant_type: OrganisationReadGrant
+    attested_by: a named officer
+    held_by: the agency
 
   - kind: applicant
     identifiers: [national_id, passport, company_registration, application_reference]
     never_fuzzy_merge: true
     attestation: verified_channel
     grant_type: ApplicantReadGrant
+    attested_by: a named officer
+    held_by: the agency
 
   - kind: claimant
     identifiers: [national_id, passport, claim_reference, benefits_reference]
     never_fuzzy_merge: true
     attestation: verified_channel
     grant_type: ClaimantReadGrant
+    attested_by: a named officer
+    held_by: the agency

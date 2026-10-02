@@ -59,9 +59,7 @@ from .agent import (
 )
 from .guardrails import (
     IDENTITY_REFUSAL_CODE,
-    IDENTITY_REFUSAL_TEXT,
     NO_SEND_CODE,
-    NO_SEND_TEXT,
     UNGROUNDED_VALUE_CODE,
     UNGROUNDED_VALUE_TEXT,
     check_answer_values,
@@ -227,4 +225,9 @@ def __getattr__(name: str):
         from .render import notes
 
         return notes()
+    # IDENTITY_REFUSAL_TEXT / NO_SEND_TEXT are the voice pack's words, resolved per access (C-5).
+    if name in ("IDENTITY_REFUSAL_TEXT", "NO_SEND_TEXT"):
+        from . import guardrails as _guardrails
+
+        return getattr(_guardrails, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

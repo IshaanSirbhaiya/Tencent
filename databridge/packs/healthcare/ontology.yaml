@@ -153,3 +153,5 @@ subject_kinds:
     never_fuzzy_merge: true
     attestation: in_person
     grant_type: PatientReadGrant
+    attested_by: clinic staff
+    held_by: the clinic

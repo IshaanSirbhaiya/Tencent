@@ -107,6 +107,11 @@ class ConnectionInfo:
     facts: Optional[bool] = None
     """Whether the connection has a read-only facts store (`facts.query:<id>`). None = derive from
     `kind` (a ``database`` has one)."""
+    reading_path: tuple[str, ...] = ()
+    """FIN-11: the tools a HUMAN-APPROVED crawl plan reads this connection with (its roots, list
+    and read steps; `plan_read_tools`), SQL aside. A document source is listed AND read along this
+    path, so an agent granted one step of it is granted the rest (`compiler._read_tools`) — a
+    folder it can list but not read is a grant that cannot answer."""
 
     @property
     def agent_write(self) -> bool:
@@ -394,6 +399,34 @@ def load_pack_purposes(pack: str, packs_root: Optional[Path] = None) -> tuple[st
                  if isinstance(p, dict) and p.get("id"))
 
 
+#: The purposes.yaml field that marks the ONE purpose agents compiled from English bind when the
+#: pack declares several and the operator names none (``WALNUT_AGENT_PURPOSE``).
+DEFAULT_PURPOSE_FIELD = "default_for_compiled_agents"
+#: A pack's answer-contract golden set: the floor every agent compiled from English is measured
+#: against when the operator names none (``WALNUT_AGENT_GOLDEN_SET``) and the agent has no own set.
+AGENT_CONTRACT_GOLDEN = "evals/agent_contract.jsonl"
+
+
+def default_agent_purpose(pack: str, packs_root: Optional[Path] = None) -> Optional[str]:
+    """The purpose a compiled agent binds when nobody names one: the pack's only purpose, else
+    the ONE it marks `DEFAULT_PURPOSE_FIELD`; None when that is not exactly one (the compiler
+    then says so, naming the file — `declaration.compile_declaration`). Read from the pack, never
+    chosen by the engine."""
+    data = _read_yaml((packs_root or paths.packs_dir()) / pack / "purposes.yaml") or {}
+    entries = [p for p in (data.get("purposes") or []) if isinstance(p, dict) and p.get("id")]         if isinstance(data, dict) else []
+    if len(entries) == 1:
+        return str(entries[0]["id"])
+    marked = [str(p["id"]) for p in entries if p.get(DEFAULT_PURPOSE_FIELD) is True]
+    return marked[0] if len(marked) == 1 else None
+
+
+def default_golden_set(pack: str, packs_root: Optional[Path] = None) -> Optional[str]:
+    """``packs/<pack>/evals/agent_contract.jsonl`` when the pack ships one, else None."""
+    root = packs_root or paths.packs_dir()
+    return f"packs/{pack}/{AGENT_CONTRACT_GOLDEN}" if (root / pack / AGENT_CONTRACT_GOLDEN
+                                                       ).is_file() else None
+
+
 def load_connection_info(path: Path, *, ingest_root: Optional[Path] = None
                          ) -> Optional[ConnectionInfo]:
     """One `WALNUT_SOURCES_DIR/<id>.yaml` (+ its `<id>.plan.yaml`, `<id>.tools.yaml` if present,
@@ -460,11 +493,15 @@ def load_connection_info(path: Path, *, ingest_root: Optional[Path] = None
     wf = data.get("writes_for")
     writes_for = tuple(str(x) for x in ([wf] if isinstance(wf, str) else (wf or []))
                        if isinstance(x, str) and x)
+    sql_steps = {str(s.get("sql", {}).get("tool")) for s in (plan or {}).get("steps") or []
+                 if isinstance(s, dict) and isinstance(s.get("sql"), dict)}
+    reading_path = tuple(sorted(t for t in vouched if t in tools and t not in sql_steps
+                                and t not in deny and not tools[t].write and not tools[t].query))
     return ConnectionInfo(id=cid, title=str(data.get("title") or ""), kind=kind,
                           tools=tuple(tools.values()), locations=tuple(locations),
                           aliases=aliases, plan_status=plan_status,
                           purpose=str(data.get("purpose") or ""), writes_for=writes_for,
-                          facts=facts)
+                          facts=facts, reading_path=reading_path)
 
 
 def writers_for(catalogue: CatalogueLike, cid: str) -> list[ConnectionInfo]:
@@ -518,10 +555,10 @@ def load_catalogue(sources_dir: Optional[Path] = None, *, pack: Optional[str] = 
                 conns.append(info)
     pk = pack or paths.bound_pack()
     kinds, subjects = load_ontology_kinds(pk, packs_root)
-    purposes = load_pack_purposes(pk, packs_root)
     gov = Governance(pack=pk, purpose=(os.environ.get("WALNUT_AGENT_PURPOSE")
-                                       or (purposes[0] if len(purposes) == 1 else None)),
-                     golden_set=os.environ.get("WALNUT_AGENT_GOLDEN_SET") or None)
+                                       or default_agent_purpose(pk, packs_root)),
+                     golden_set=(os.environ.get("WALNUT_AGENT_GOLDEN_SET")
+                                 or default_golden_set(pk, packs_root)))
     return Catalogue(connections=tuple(conns), kinds=kinds, subject_kinds=subjects,
                      internal_tools=tuple(internal_tools), governance=gov,
                      existing_ids=tuple(existing_ids),
@@ -534,4 +571,6 @@ __all__ = ["Catalogue", "CatalogueLike", "ConnectionInfo", "Governance", "ToolRe
            "QUERY_TOOL", "DEFAULT_INTERNAL_TOOLS", "classify_tool",
            "runtime_adverts", "runtime_catalogue", "to_adapter_catalogue", "load_catalogue",
            "load_connection_info", "load_ontology_kinds", "load_pack_purposes", "folder_paths",
+           "default_agent_purpose", "default_golden_set", "DEFAULT_PURPOSE_FIELD",
+           "AGENT_CONTRACT_GOLDEN",
            "connection_of", "writers_for", "EXEC_VERB"]

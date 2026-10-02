@@ -1,6 +1,10 @@
 """Scenario 2 (+3 helper): graph connectivity audit over the shared e2e graph store (read-only).
 
-    python scripts/e2e/graph_audit.py [label]   -> <e2e>/artefacts/graph_audit[_label].json
+    python scripts/e2e/graph_audit.py [label] [--estate workspace|finance] [--dir <run>]
+        -> <e2e>/artefacts/graph_audit[_label].json
+
+Connectivity only. What the graph SHOULD hold (rows, declared FKs, isolation against what the FKs
+predict, unresolved references, cross-source links) is `completeness.py`'s job.
 """
 from __future__ import annotations
 
@@ -11,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from e2e_env import e2e_dir  # noqa: E402
+from e2e_env import ESTATES, e2e_dir, estate_name, graph_db  # noqa: E402
 
 
 def _sources_of(ptr: dict) -> set[str]:
@@ -22,7 +26,8 @@ def _sources_of(ptr: dict) -> set[str]:
 
 
 def audit(db: Path) -> dict:
-    c = sqlite3.connect(str(db))
+    # read-only: a read-write open folds the WAL and changes the evidence being audited
+    c = sqlite3.connect(f"{Path(db).resolve().as_uri()}?mode=ro", uri=True)
     nodes = {r[0]: {"kind": r[1], "label": r[2], "canonical_id": r[3]} for r in c.execute(
         "select id,kind,label,canonical_id from nodes where system_to is null and valid_to is null")}
     edges = [dict(zip(("id", "src", "dst", "kind"), r)) for r in c.execute(
@@ -93,9 +98,16 @@ def audit(db: Path) -> dict:
 
 
 if __name__ == "__main__":
-    label = sys.argv[1] if len(sys.argv) > 1 else ""
-    E = e2e_dir()
-    out = audit(E / "graph" / "workspace.db")
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("label", nargs="?", default="")
+    ap.add_argument("--estate", default=None, choices=sorted(ESTATES))
+    ap.add_argument("--dir", default=None)
+    a = ap.parse_args()
+    label = a.label
+    E = Path(a.dir).resolve() if a.dir else e2e_dir()
+    out = audit(graph_db(E, estate_name(a.estate)))
     p = E / "artefacts" / f"graph_audit{'_' + label if label else ''}.json"
     p.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(json.dumps({k: v for k, v in out.items() if k != "probes"}, indent=1)[:6000])

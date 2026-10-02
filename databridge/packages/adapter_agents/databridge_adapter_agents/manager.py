@@ -104,6 +104,9 @@ class SyncSummary:
     record_path: Optional[str] = None
     warnings: list[str] = dataclasses.field(default_factory=list)
     record_error: Optional[str] = None
+    #: FIN-03: the screen policy the sync ran under (`mcp_ingest.screen.screen_policy`):
+    #: `pack` (a pack's screen.yaml) or `engine_default` (the bound pack declares none)
+    screen_policy: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     @property
     def ran(self) -> list[str]:
@@ -131,7 +134,7 @@ class SyncSummary:
                               "occurrences_total": self.proposals.get("occurrences_total"),
                               "error": self.proposals.get("error")},
                 "warnings": list(self.warnings), "record_error": self.record_error,
-                "record_path": self.record_path}
+                "record_path": self.record_path, "screen_policy": dict(self.screen_policy)}
 
 
 def _iso(t: Optional[dt.datetime]) -> Optional[str]:
@@ -373,23 +376,57 @@ class AdapterAgentManager:
         where the deployment's RESOLVED screen (`mcp_ingest.screen.load_screen`) comes from that
         pack's ``screen.yaml``. The contract has no I/O, so this is checked here, at activate,
         resume and every sync. A spec that names no pack is screened by whatever the deployment
-        resolves, as before. A screen that cannot be loaded refuses (fail closed)."""
+        resolves, as before. A screen that cannot be loaded refuses (fail closed).
+
+        FIN-03: a pack that ships NO ``screen.yaml`` is screened by the engine default policy
+        (`defaults/screen.yaml`: credential gate, prompt-injection hold, PII masks). Such a spec
+        runs where the deployment resolves that same default — the sync reports it
+        (`SyncSummary.screen_policy`). It still refuses where another pack's screen is in force,
+        and for a pack that does not exist."""
         want = (getattr(spec, "screen", None) or {}).get("pack")
         if not want:
             return None
         try:
-            from databridge_mcp_ingest.screen import load_screen, screen_pack_of  # noqa: PLC0415
+            from databridge_mcp_ingest import paths as _ipaths  # noqa: PLC0415
+            from databridge_mcp_ingest.screen import (  # noqa: PLC0415
+                is_engine_default, load_screen, pack_screen_file, screen_pack_of)
 
             cfg = load_screen()
             got = screen_pack_of(cfg)
+            declared = pack_screen_file(want)
+            # a pack is ONE plain directory name carrying an ontology (never a path)
+            exists = (isinstance(want, str) and want.replace("_", "").replace("-", "").isalnum()
+                      and (_ipaths.packs_dir() / want / "ontology.yaml").is_file())
+            engine_default = is_engine_default(cfg)
         except Exception as exc:                                      # noqa: BLE001
             return (f"spec.screen.pack is {want!r} but the deployment's screen could not be "
                     f"resolved ({type(exc).__name__}: {exc})")
+        if declared is None:
+            if not exists:
+                return (f"spec.screen.pack is {want!r} but no such pack exists; change the spec")
+            if got is None and engine_default:
+                return None                    # the pack's policy IS the engine default
+            return (f"spec.screen.pack is {want!r}, which declares no screen.yaml (it is "
+                    f"screened by the engine default policy), but this deployment screens with "
+                    f"{'packs/' + got + '/screen.yaml' if got else cfg.source}; change the spec "
+                    f"or the deployment's packs")
         if got != want:
             return (f"spec.screen.pack is {want!r} but this deployment screens with "
                     f"{got + ' (packs/' + got + '/screen.yaml)' if got else 'the bundled defaults'}"
                     f" ({cfg.source}); enable the pack, or change the spec")
         return None
+
+    @staticmethod
+    def _screen_policy() -> dict[str, Any]:
+        """FIN-03: what the sync reports about its screen — `engine_default` when no enabled pack
+        declares one. Never raises: a screen that cannot be resolved is reported as such (the
+        gate above has already refused a spec that names a pack)."""
+        try:
+            from databridge_mcp_ingest.screen import load_screen, screen_policy  # noqa: PLC0415
+
+            return screen_policy(load_screen())
+        except Exception as exc:                                      # noqa: BLE001
+            return {"policy": "unresolved", "error": f"{type(exc).__name__}: {exc}"}
 
     def resume(self, agent_id: str, *, by: Any = ""):
         """PAUSED -> active. By an authenticated principal under `auto_additive`, this is the
@@ -579,7 +616,8 @@ class AdapterAgentManager:
             reason = None if status == "completed" else ("; ".join(reasons) or None)
             summary = SyncSummary(spec.id, run_id, status, trigger, started,
                                   ev.now_iso(self._clock()), results, reason=reason,
-                                  proposals=proposals, warnings=warnings)
+                                  proposals=proposals, warnings=warnings,
+                                  screen_policy=self._screen_policy())
             self._write_record_safe(spec, summary)
             return summary
         finally:
@@ -836,6 +874,7 @@ class AdapterAgentManager:
                                "reasons": {c.connection: c.reason for c in summary.connections
                                            if c.reason}},
                   "totals": summary.totals(), "warnings": list(summary.warnings),
+                  "screen_policy": dict(summary.screen_policy),
                   "proposals": summary.as_dict()["proposals"],
                   "adaptation": {c.connection: c.adaptation for c in summary.connections
                                  if c.adaptation}}

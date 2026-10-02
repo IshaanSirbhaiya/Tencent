@@ -7,6 +7,14 @@
     POST /sources/{id}/plan                    propose a crawl plan (connects, lists tools)
     POST /sources/{id}/plan/approve            approve it — approved_by = the signed-in principal
     POST /sources/{id}/mapping/approve         approve the table mapping — same rule
+    GET  /sources/{id}/mapping/review          proposed links (with evidence) + tables that need
+                                               approval again, and why (LINK7) + each table's
+                                               per-row kind split with row counts (UI8)
+    POST /sources/{id}/links/approve           approve ONE proposed link — same rule; never into a
+                                               person kind
+    POST /sources/{id}/links/reject            reject ONE proposed link — same rule
+    GET  /sources/{id}/holds                   items the latest run's screen holds, with the
+                                               rules and reason, and whether an owner lifted them
     POST /sources/{id}/overrides               approve / revoke ONE screen override (item or row
                                                + content digest) — same rule
     POST /sources/{id}/runs                    start an ingest in the background → {run_id}
@@ -65,7 +73,8 @@ from fastapi import BackgroundTasks, Body, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from .auth import AuthenticatedPrincipal, install_auth_handler, require_principal
+from .auth import (AuthenticatedPrincipal, install_auth_handler, register_auth_routes,
+                   require_principal)
 from .platform_runtime import (PLAN_APPROVED_NOTE, PLAN_REVISION_NOTE, PLAN_SUPERSEDED, JobBusy,
                                now_iso, plan_binding, platform_of, reload_graph)
 
@@ -375,6 +384,17 @@ class ApproveMapping(BaseModel):
     tables: Optional[list[str]] = None
 
 
+class LinkDecision(BaseModel):
+    """Body of `/links/approve` and `/links/reject`: WHICH link (table, column and, when a column
+    has several, `target` = "source:table"). Who decides is always the signed-in principal; a body
+    name is ignored (``extra="ignore"``)."""
+    model_config = ConfigDict(extra="ignore")
+    table: str = Field(min_length=1)
+    column: str = Field(min_length=1)
+    target: Optional[str] = None
+    reason: str = ""
+
+
 class OverrideAction(BaseModel):
     """Body of `/sources/{id}/overrides`. An override lifts ONE item (or row ref) with ONE content
     digest out of the screen's REVIEW band — never out of a block. Who decides is always the
@@ -554,6 +574,15 @@ def _ingest_job(app: FastAPI, source_id: str, run_id: str, job_id: str,
 
 def register_sources_routes(app: FastAPI) -> None:
     install_auth_handler(app)
+    # `/auth/whoami` (FIN-16): the page that approves plans and mappings says who it acts as, and
+    # whether that is the public dev token. Registered here because this module is the one that
+    # takes approvals; `register_auth_routes` is idempotent.
+    register_auth_routes(app)
+    # LINK7 (GRAPH6 FIN-04): the identity rules a person approves sit beside the mapping decisions
+    # on the Sources page; registered here so no other module's registration changes.
+    from .identity_rules_routes import register_identity_rules_routes  # noqa: PLC0415
+
+    register_identity_rules_routes(app)
 
     def _need_ingest():
         rt = platform_of(app)
@@ -749,6 +778,98 @@ def register_sources_routes(app: FastAPI) -> None:
         except Exception as exc:                                      # noqa: BLE001
             return _refusal("MAPPING_NOT_APPROVABLE", str(exc), status=409)
         return {"mapping": _dump(mapping)}
+
+    @app.get("/sources/{source_id}/mapping/review")
+    def sources_mapping_review(source_id: str,
+                               _p: AuthenticatedPrincipal = Depends(require_principal)):
+        """Proposed links with their evidence, and the tables that need a person's approval again
+        (LINK7). Read-only."""
+        from . import mapping_review                                  # noqa: PLC0415
+
+        rt, err = _need_ingest()
+        if err:
+            return err
+        _, err = _need_connection(rt, source_id)
+        if err:
+            return err
+        try:
+            return mapping_review.review(source_id)
+        except Exception as exc:                                      # noqa: BLE001
+            return _refusal("MAPPING_UNREADABLE", f"{type(exc).__name__}: {exc}", status=500)
+
+    @app.post("/sources/{source_id}/links/approve")
+    def sources_link_approve(source_id: str, body: LinkDecision,
+                             principal: AuthenticatedPrincipal = Depends(require_principal)):
+        """A signed-in person approves ONE proposed link (C-3) through `mapping.approve_link`, which
+        re-checks the principal and refuses a person-kind target. Refused here first when the target
+        is a person kind, so the refusal names the rule."""
+        from databridge_mcp_ingest.mapping import approve_link        # noqa: PLC0415
+
+        from . import mapping_review                                  # noqa: PLC0415
+
+        rt, err = _need_ingest()
+        if err:
+            return err
+        with rt.source_lock(source_id):
+            _, err = _need_connection(rt, source_id)
+            if err:
+                return err
+            try:
+                vocab = mapping_review._vocab()
+                why = mapping_review.person_target_refusal(source_id, body.table, body.column,
+                                                           body.target, vocab)
+                if why:
+                    return _refusal("LINK_TARGETS_PERSON", why, status=409)
+                # The principal OBJECT, never its id: the package refuses a string.
+                # The engine records the decider and HOW they signed in (dev token marked).
+                mapping = approve_link(source_id, body.table, body.column, principal=principal,
+                                       target=body.target, vocab=vocab)
+            except Exception as exc:                                  # noqa: BLE001
+                return _refusal("LINK_NOT_APPROVABLE", str(exc), status=409)
+        return {"mapping": _dump(mapping), "table": body.table, "column": body.column,
+                "approved_by": principal.principal_id}
+
+    @app.post("/sources/{source_id}/links/reject")
+    def sources_link_reject(source_id: str, body: LinkDecision,
+                            principal: AuthenticatedPrincipal = Depends(require_principal)):
+        """A signed-in person rejects ONE proposed link through `mapping.reject_link`, which
+        re-checks the principal, records how they signed in (dev token marked) and keeps the
+        decision across the next sync's proposals."""
+        from databridge_mcp_ingest.mapping import reject_link         # noqa: PLC0415
+
+        rt, err = _need_ingest()
+        if err:
+            return err
+        with rt.source_lock(source_id):
+            _, err = _need_connection(rt, source_id)
+            if err:
+                return err
+            try:
+                mapping = reject_link(source_id, body.table, body.column,
+                                      principal=principal, target=body.target,
+                                      reason=body.reason)
+            except Exception as exc:                                  # noqa: BLE001
+                return _refusal("LINK_NOT_REJECTABLE", str(exc), status=409)
+        return {"mapping": _dump(mapping), "table": body.table, "column": body.column,
+                "rejected_by": principal.principal_id}
+
+    @app.get("/sources/{source_id}/holds")
+    def sources_holds(source_id: str, _p: AuthenticatedPrincipal = Depends(require_principal)):
+        """The items the latest run's screen HOLDS for a person (review band), each with the rules
+        that fired and the screen's reason, and whether an owner has lifted it (UI8). Read-only;
+        lifting is `POST /sources/{id}/overrides`."""
+        from . import screen_holds                                    # noqa: PLC0415
+
+        rt, err = _need_ingest()
+        if err:
+            return err
+        _, err = _need_connection(rt, source_id)
+        if err:
+            return err
+        try:
+            return screen_holds.holds(rt.ingest, source_id)
+        except Exception as exc:                                      # noqa: BLE001
+            return _refusal("HOLDS_UNREADABLE", f"{type(exc).__name__}: {exc}", status=500)
 
     @app.post("/sources/{source_id}/overrides")
     def sources_override(source_id: str, body: OverrideAction,

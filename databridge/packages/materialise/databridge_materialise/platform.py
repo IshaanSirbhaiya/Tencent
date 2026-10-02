@@ -497,6 +497,8 @@ class PlatformMaterialiser:
                            "features_unknown_at_decision":
                                dict(receipt.features_unknown_at_decision)},
             "columns": list(built.dataset.columns),
+            # FIN-13: why rows went unlabelled/immature, and what would label them
+            "label_diagnosis": receipt.label_diagnosis,
         }
         # Paths in the receipt are rewritten to the FINAL directory and made relative to it: the
         # staging directory is gone the moment this returns.
@@ -974,6 +976,7 @@ def summary_from_doc(doc: dict, *, files: list[str]) -> dict:
         "unresolved": p.get("unresolved"), "pointer_check": p.get("pointer_check"),
         "produced_by": p.get("produced_by"), "honest_summary": p.get("honest_summary"),
         "notes": r.get("notes"), "files": files,
+        "label_diagnosis": r.get("label_diagnosis"),
         # Additive (R-021 Data-page #1): what each file IS, so a client gates downloads on the
         # server's word rather than on a file-name guess.
         "file_roles": file_roles(doc, files),

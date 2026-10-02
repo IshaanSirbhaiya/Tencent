@@ -174,7 +174,9 @@ class FederatedService:
         if problems:
             return SubResult(subtask_id=task.id, adapter_agent=adapter_agent,
                              error="; ".join(problems))
-        return self.run_subtask(task, admission=admission, run_id=run_id)
+        return self.run_subtask(task, admission=admission, run_id=run_id,
+                                fold_case=bool(case_foldable(DelegationPlan(subtasks=(task,)),
+                                                             self.catalogue)))
 
     def refreshing_note(self) -> str:
         """E2E4 Q-01: why nothing is planned while a facts store cannot be read."""
@@ -203,7 +205,7 @@ class FederatedService:
 
     def run_subtask(self, task: SubTask, *, admission: Any, run_id: Optional[str] = None,
                     cancel: Optional[threading.Event] = None,
-                    resolve_names: bool = False) -> SubResult:
+                    resolve_names: bool = False, fold_case: bool = False) -> SubResult:
         """Run one sub-task under ``admission``. Never raises: failures are the result. A set
         ``cancel`` stops the delegate before its next read (its deadline passed).
         ``resolve_names`` lets an empty facts read retry a text filter as the ONE stored value
@@ -241,7 +243,7 @@ class FederatedService:
             if channel == "facts":
                 return run_tabular(task, entry, facts=self.facts, today=today,
                                    principal=admission.principal, run_id=run_id, cancel=cancel,
-                                   resolve_names=resolve_names)
+                                   resolve_names=resolve_names, fold_case=fold_case)
             return run_documents(task, entry, store=self.store, retriever=self.retriever,
                                  catalogue=self.catalogue, today=today,
                                  principal=admission.principal, run_id=run_id,
@@ -258,7 +260,8 @@ class FederatedService:
     # ---- parallel dispatch -----------------------------------------------------------------
     def dispatch(self, tasks: list[SubTask], *, admission: Any,
                  run_id: Optional[str] = None,
-                 resolve_names: frozenset[str] = frozenset()) -> dict[str, SubResult]:
+                 resolve_names: frozenset[str] = frozenset(),
+                 fold_case: frozenset[str] = frozenset()) -> dict[str, SubResult]:
         """Every sub-task at once (bounded pool). Each sub-task's deadline runs from when IT
         started (a queued task is not charged for its wait); a task that never started is
         cancelled once every wave could have run. At its deadline a task's ``cancel`` event is
@@ -276,7 +279,8 @@ class FederatedService:
         def run(t: SubTask) -> SubResult:
             begun[t.id] = time.monotonic()
             return self.run_subtask(t, admission=admission, run_id=run_id, cancel=cancels[t.id],
-                                    resolve_names=t.id in resolve_names)
+                                    resolve_names=t.id in resolve_names,
+                                    fold_case=t.id in fold_case)
 
         def timed_out(t: SubTask, why: str) -> SubResult:
             cancels[t.id].set()
@@ -398,7 +402,8 @@ class FederatedService:
 
         t = time.perf_counter()
         results = self.dispatch(list(the_plan.subtasks), admission=admission, run_id=run_id,
-                                resolve_names=name_resolvable(the_plan, self.catalogue))
+                                resolve_names=name_resolvable(the_plan, self.catalogue),
+                                fold_case=case_foldable(the_plan, self.catalogue))
         timings["dispatch_ms"] = int((time.perf_counter() - t) * 1000)
         timings["subtasks"] = {k: {"ms": (v.timings or {}).get("ms"), "method": v.method,
                                    "queries": v.queries, "rows": len(v.rows)}
@@ -788,6 +793,23 @@ def name_resolvable(plan: DelegationPlan, catalogue: Catalogue) -> frozenset[str
                 link.key_kind in catalogue.node_kinds:
             organised.add(link.subtask)
     return frozenset(organised - subjecty)
+
+
+def case_foldable(plan: DelegationPlan, catalogue: Catalogue) -> frozenset[str]:
+    """The sub-tasks whose text ``eq`` filters read every spelling of their value that differs only
+    in letter case or spacing (FIN-12, `delegates.fold_case_variants`). Every sub-task EXCEPT one
+    that reaches a person: a sub-task linked through a subject kind (either side of the link), or
+    one whose entity kind is a subject kind. Spelling is not identity, but a filter that widens
+    over a person's name is the kind of quiet merge hard constraint 1 keeps a human in front of."""
+    subjecty: set[str] = set()
+    c = plan.combine
+    for link in (c.links if c is not None else ()):
+        if any(catalogue.is_subject(k) for k in (link.key_kind, link.entity_kind)
+               if k is not None):
+            subjecty |= {link.subtask, c.base}
+    return frozenset(t.id for t in plan.subtasks
+                     if t.id not in subjecty
+                     and not any(catalogue.is_subject(k) for k in t.entity_kinds))
 
 
 def enforce_candidates(final: FinalAnswer, table: CombinedTable, view: list[dict]

@@ -351,8 +351,10 @@ test.describe("@unit sources helpers", () => {
 // @unit — Codex round 3 (R-019 "Round 3"), FX8b.
 // =============================================================================================
 import {
+  approvedWithDevToken,
   mappingGate,
   planApprovalBlockers,
+  vouchableTools,
   redactCommand,
   registrationProblems,
   stageOrder,
@@ -408,6 +410,60 @@ test.describe("@unit sources helpers (round 3)", () => {
     expect(planApprovalBlockers(plan, written, "ingest").join(" ")).toContain("writing");
   });
 
+  test("FIN-02 an unclassified SQL tool is approvable only after the person vouches for it", () => {
+    // Two estates' database sources, shaped as the gateway returns them: the plan's SQL step calls
+    // the server's generic executor, which the catalogue calls a write ONLY because nothing
+    // vouches for it (basis "unknown") and the plan records as unclassified.
+    for (const sourceId of ["workspace_db", "finance_core_banking"]) {
+      const plan = {
+        source_id: sourceId,
+        problems: [],
+        steps: [{ id: "db", strategy: "tabular", sql: { tool: "execute_sql" } }],
+        tool_classes: { execute_sql: "unclassified:unknown (shared classifier)" },
+      } as unknown as CrawlPlan;
+      const cat = {
+        tools: [
+          { name: "list_schemas", write: false, basis: "name" },
+          { name: "execute_sql", write: true, basis: "unknown" },
+        ],
+      } as CatalogueConnection;
+      expect(vouchableTools(plan, cat).map((v) => v.tool), sourceId).toEqual(["execute_sql"]);
+      expect(vouchableTools(plan, cat)[0].plan_class).toContain("unclassified:unknown");
+      const blocked = planApprovalBlockers(plan, cat, "ingest");
+      expect(blocked.join(" "), sourceId).toContain("execute_sql");
+      expect(blocked.join(" ")).toContain("Vouch");
+      // the vouch clears exactly that tool, and nothing else
+      expect(planApprovalBlockers(plan, cat, "ingest", ["execute_sql"]), sourceId).toEqual([]);
+      expect(planApprovalBlockers(plan, cat, "ingest", ["some_other_tool"]).length).toBeGreaterThan(0);
+      // a vouch never opens a write connection
+      expect(planApprovalBlockers(plan, cat, "agent_write", ["execute_sql"]).length).toBeGreaterThan(0);
+    }
+  });
+
+  test("FIN-02 a tool whose NAME or annotation says it writes is never offered for a vouch", () => {
+    const plan = {
+      problems: [],
+      steps: [{ id: "db", strategy: "tabular", sql: { tool: "write_rows" } }],
+      tool_classes: { write_rows: "write:name" },
+    } as unknown as CrawlPlan;
+    for (const basis of ["name", "annotation", "denied", "purpose"]) {
+      const cat = { tools: [{ name: "write_rows", write: true, basis }] } as CatalogueConnection;
+      expect(vouchableTools(plan, cat), basis).toEqual([]);
+      expect(planApprovalBlockers(plan, cat, "ingest", ["write_rows"]).join(" "), basis).toContain("writing");
+    }
+    // an unknown-basis catalogue entry whose PLAN class is not unclassified is not vouchable either
+    const stale = { ...plan, tool_classes: { write_rows: "write:annotation" } } as unknown as CrawlPlan;
+    const cat = { tools: [{ name: "write_rows", write: true, basis: "unknown" }] } as CatalogueConnection;
+    expect(vouchableTools(stale, cat)).toEqual([]);
+  });
+
+  test("FIN-16 an approval made with the dev token is recognised from its record", () => {
+    expect(approvedWithDevToken({ principal_id: "analyst-7", dev_only: true, authenticated_by: "gateway:dev-token" })).toBe(true);
+    expect(approvedWithDevToken({ principal_id: "analyst-7", dev_only: false, authenticated_by: "gateway" })).toBe(false);
+    expect(approvedWithDevToken({})).toBe(false);
+    expect(approvedWithDevToken(null)).toBe(false);
+  });
+
   test("R3-S5 embedded report verification counts win over report counts", () => {
     const run = {
       verify: null,
@@ -425,5 +481,138 @@ test.describe("@unit sources helpers (round 3)", () => {
     });
     expect(ids).toEqual(["collect", "extract", "hydrate", "embed"]);
     expect(stageOrder(known, { stages: null, events: [], progress: null })).toEqual(known);
+  });
+});
+
+// =============================================================================================
+// @unit — LINK7: proposed links and tables that need approval again.
+// =============================================================================================
+import { linkApprovable, linksForReview, type LinkReview } from "../lib/sources-api";
+
+test.describe("@unit sources helpers (LINK7)", () => {
+  // Two estates' shapes, as the gateway returns them: a CRM-style organisation reference and a
+  // workspace project → organisation reference. Field values are what the route emits.
+  const link = (over: Partial<LinkReview>): LinkReview =>
+    ({
+      table: "t",
+      column: "c",
+      target: "src:target",
+      target_source: "src",
+      target_table: "target",
+      target_key: "id",
+      target_kind: "organisation",
+      status: "proposed",
+      edge_kind: "part_of",
+      why: null,
+      basis: null,
+      alternatives: [],
+      person_target: false,
+      approvable: true,
+      decided_by: null,
+      decided_at: null,
+      decided_dev_only: null,
+      reject_reason: null,
+      table_status: "approved",
+      evidence: { matched: 3, with_value: 3, distinct_matched: 3, target_keys: 3, samples: ["a"], samples_note: null },
+      ...over,
+    }) as LinkReview;
+
+  test("LINK7 Approve is offered only for a proposal with an edge kind, never into a person kind", () => {
+    for (const estate of [
+      { table: "crm.contact", column: "org_ref", target_kind: "legal_entity" },
+      { table: "projects", column: "client_code", target_kind: "organisation" },
+    ]) {
+      expect(linkApprovable(link(estate)), estate.table).toBe(true);
+      // the gateway's flag alone is not enough: every condition must hold (fail closed)
+      expect(linkApprovable(link({ ...estate, person_target: true })), estate.table).toBe(false);
+      expect(linkApprovable(link({ ...estate, edge_kind: null })), estate.table).toBe(false);
+      expect(linkApprovable(link({ ...estate, status: "approved" })), estate.table).toBe(false);
+      expect(linkApprovable(link({ ...estate, status: "not_proposed" })), estate.table).toBe(false);
+      expect(linkApprovable(link({ ...estate, approvable: false })), estate.table).toBe(false);
+    }
+  });
+
+  test("LINK7 proposals come first, then decisions, then links never offered", () => {
+    const all = [
+      link({ column: "a", status: "approved" }),
+      link({ column: "b", status: "not_proposed", person_target: true }),
+      link({ column: "c", status: "proposed" }),
+      link({ column: "d", status: "rejected" }),
+    ];
+    const g = linksForReview(all);
+    expect(g.pending.map((l) => l.column)).toEqual(["c"]);
+    expect(g.decided.map((l) => l.column)).toEqual(["a", "d"]);
+    expect(g.notOffered.map((l) => l.column)).toEqual(["b"]);
+    expect(g.pending.length + g.decided.length + g.notOffered.length).toBe(all.length);
+  });
+});
+
+// =============================================================================================
+// @unit — UI8: the per-row kind split before approval, and the screen's holds.
+// =============================================================================================
+import { holdLiftable, splitGroups, type KindSplitReview, type KindSplitValue } from "../lib/sources-api";
+
+test.describe("@unit sources helpers (UI8)", () => {
+  // Two estates' shapes, as `GET /sources/{id}/mapping/review` returns them: finance's party table
+  // (people and companies) and the workspace directory assembled from Larkspur's own rows.
+  const estates: { name: string; split: Pick<KindSplitReview, "values" | "default"> }[] = [
+    {
+      name: "finance",
+      split: {
+        default: "party",
+        values: [
+          { value: "organisation", kind: "legal_entity", bound: true, rows: 70, stays_subject: false },
+          { value: "corp", kind: "legal_entity", bound: true, rows: 12, stays_subject: false },
+          { value: "individual", kind: "party", bound: true, rows: 90, stays_subject: true },
+          { value: "unknown", kind: "party", bound: false, rows: 3, stays_subject: true },
+        ],
+      },
+    },
+    {
+      name: "workspace",
+      split: {
+        default: "person",
+        values: [
+          { value: "org", kind: "organisation", bound: true, rows: 4, stays_subject: false },
+          { value: "organisation", kind: "organisation", bound: true, rows: 8, stays_subject: false },
+          { value: "person", kind: "person", bound: false, rows: 20, stays_subject: true },
+        ],
+      },
+    },
+  ];
+
+  test("UI8 the split's values divide into rows that change kind and rows that stay the subject", () => {
+    for (const e of estates) {
+      const g = splitGroups(e.split);
+      const want = e.split.values.filter((v) => v.kind !== e.split.default);
+      expect(g.moved, e.name).toEqual(want);
+      expect(g.stays.every((v) => v.kind === e.split.default), e.name).toBe(true);
+      expect(g.moved.length + g.stays.length, e.name).toBe(e.split.values.length);
+      expect(g.movedRows, e.name).toBe(want.reduce((a, v) => a + (v.rows ?? 0), 0));
+      expect(g.moved.length, e.name).toBeGreaterThan(0); // non-vacuous
+    }
+  });
+
+  test("UI8 a row is never shown as leaving the subject on a disagreement (fail closed)", () => {
+    for (const e of estates) {
+      // the gateway says "moves" but the kind IS the default: shown as staying
+      const odd: KindSplitValue = { value: "x", kind: e.split.default, bound: true, rows: 1, stays_subject: false };
+      expect(splitGroups({ ...e.split, values: [odd] }).moved, e.name).toEqual([]);
+      // an unknown count makes the total unknown, never 0
+      const v = { ...e.split.values.find((x) => !x.stays_subject)!, rows: null };
+      expect(splitGroups({ ...e.split, values: [v] }).movedRows, e.name).toBeNull();
+    }
+  });
+
+  test("UI8 Lift hold needs a reason, a content digest, a verified log, and a hold not yet lifted", () => {
+    const digest = "a".repeat(64);
+    for (const item_id of ["fin_sql:core_banking.party", "ws_sql:public.persons"]) {
+      const h = { item_id, digest, lifted: false };
+      expect(holdLiftable(h, "note read", null), item_id).toBe(true);
+      expect(holdLiftable(h, "   ", null), item_id).toBe(false);
+      expect(holdLiftable({ ...h, lifted: true }, "note read", null), item_id).toBe(false);
+      expect(holdLiftable({ ...h, digest: "abc" }, "note read", null), item_id).toBe(false);
+      expect(holdLiftable(h, "note read", "the override log fails verification"), item_id).toBe(false);
+    }
   });
 });

@@ -63,3 +63,15 @@ console_notes:
   answer_is_a_list: >-
     The answer is a list of values, not a paragraph. The model chooses which values appear and
     writes none of them: each line is printed by code beside the pointer that value itself carries.
+
+# The no-send refusal (C-5, 2026-10-02). Neutral: no organisation, no industry. The identity
+# refusal's neutral text is the engine's own (`databridge_core.identity_guardrail`), so this file
+# declares no `identity` section — one neutral copy, not two.
+refusals:
+  no_send: |-
+    I can't send anything — no email, no chat message, no submission. I have no tool that reaches
+    outside this system, by design: the documents I read come from outside this system, so an agent
+    that could send is one crafted sentence away from mailing private records to a stranger.
+
+    What I can do is read the knowledge graph and tell you what it says, with the source of every
+    line. A human writes and sends anything that leaves the system.

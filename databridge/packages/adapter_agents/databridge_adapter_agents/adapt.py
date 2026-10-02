@@ -1103,14 +1103,33 @@ class AdaptationEngine:
             vocab = self._vocab()
             props = self._svc("propose_table_mappings", conn, [ref], vocab=vocab,
                               harness=rh) or {}
-            e = props.get(ref) or {}
-            if e.get("status") == "unmapped" or not e.get("node"):
+            e = self._with_source_fks(ref, props.get(ref) or {}, ctx, vocab)
+            if e.get("status") == "unmapped" or not (e.get("node") or e.get("association")):
                 return Proposal(noted=(f"new table {ref!r}: no kind in the vocabulary maps it "
                                        f"({'; '.join(e.get('rationale') or [])}); its rows are "
                                        f"captured and counted, not graphed — recorded as an "
                                        f"unmapped concept"))
+            is_subject = getattr(vocab, "is_subject", None) if vocab is not None else None
+            if e.get("association"):
+                # a JOIN table (by structure): no node; each row is an edge between the two rows
+                # it references. It touches a subject when either end is a subject kind.
+                ends = sorted({str(x).split(":", 1)[0] for edge in e.get("edges") or []
+                               for x in (edge.get("src"), edge.get("dst")) if x})
+                touched = [k for k in ends if callable(is_subject) and is_subject(k)]
+                if touched:
+                    for d in drifts:
+                        d.subject_touching = True
+                        d.subject_reason = (f"new join table {ref!r} links subject kind(s) "
+                                            f"{touched}")
+                return Proposal(artifact="mapping", content={"table": ref, "entry": e},
+                                previous=None,
+                                summary=(f"map new join table {ref!r} to edge(s) "
+                                         f"{[x.get('kind') for x in e.get('edges') or []]} "
+                                         f"between {ends} ({e.get('origin')}): "
+                                         f"{'; '.join(e.get('rationale') or [])}"),
+                                hold={"level": "table", "table": ref, "new": True})
             kind = e["node"]["kind"]
-            if vocab is not None and getattr(vocab, "is_subject", lambda k: False)(kind):
+            if callable(is_subject) and is_subject(kind):
                 for d in drifts:
                     d.subject_touching = True
                     d.subject_reason = f"new table {ref!r} maps to subject kind {kind!r}"
@@ -1191,6 +1210,11 @@ class AdaptationEngine:
                     else:
                         notes.append(f"new foreign key {c!r}: no declared edge kind admits it "
                                      f"(not mapped; its value stays in the facts store)")
+                    # C-1: the reference value is kept on the node as well, as an ingest sync
+                    # keeps it, so it is never silently dropped where no edge could be built
+                    if c.lower() not in ("label", "canonical_id") and c not in attrs \
+                            and c not in attrs.values():
+                        attrs[c] = c
                     continue
                 if c.lower() in ("label", "canonical_id"):
                     notes.append(f"column {c!r} is an identity field name; not mapped")
@@ -1242,26 +1266,65 @@ class AdaptationEngine:
         e["columns"], e["fk_columns"] = cols, sorted(set(fks))
         return e
 
-    def _fk_edges(self, conn: str, ref: str, column: str, kind: Optional[str],
-                  ctx: dict[str, Any]) -> list[dict[str, Any]]:
-        """The edge the mapping RULES give a new foreign-key column — only when the rules map the
-        table to the same kind a person approved (a human decision is never replaced)."""
+    @staticmethod
+    def _snapshot(ctx: dict[str, Any], ref: str) -> Optional[dict[str, Any]]:
+        """The table as the shape probe sees it NOW, in mcp_ingest's snapshot form (no rows: the
+        foreign-key rules read the schema only)."""
         cur = ctx.get("current")
         table = cur.tables.get(ref) if cur is not None and cur.tables else None
         if table is None:
-            return []
+            return None
         schema, _, name = ref.rpartition(".")
-        snap = {"ref": ref, "schema": schema, "table": name,
+        return {"ref": ref, "schema": schema, "table": name,
                 "columns": [{"name": c.name, "type": c.type} for c in table.columns.values()],
-                "primary_key": table.primary_key, "foreign_keys": table.foreign_keys,
-                "rows": []}
+                "primary_key": list(table.primary_key or []),
+                "foreign_keys": [dict(f) for f in table.foreign_keys or []], "rows": []}
+
+    def _with_source_fks(self, ref: str, entry: dict[str, Any], ctx: dict[str, Any],
+                         vocab: Any) -> dict[str, Any]:
+        """A new table's proposed entry with its declared foreign keys (or, for a join table, its
+        two ends) resolved against the kinds the source's mapping ALREADY gives the referenced
+        tables — `mapping.resolve_pending_fks`, the rule an ingest sync uses (C-1 / FIN-06). A
+        reference into a table the model mapped, whose name no rule maps, still gets its edge.
+        The entry comes back unchanged when nothing more resolves."""
+        if not entry or vocab is None:
+            return entry
+        snap = self._snapshot(ctx, ref)
+        if snap is None:
+            return entry
+        from databridge_mcp_ingest import mapping as mi
+
         try:
-            proposed = self._svc("propose_column_mapping", conn, snap, vocab=self._vocab()) or {}
+            mine = mi.TableMapping.model_validate(entry)
+            known = {t: mi.TableMapping.model_validate(e)
+                     for t, e in ((ctx.get("mapping") or {}).get("tables") or {}).items()
+                     if t != ref and e}
+            got = mi.resolve_pending_fks({**known, ref: mine}, {ref: snap}, vocab)
+        except Exception:                                             # noqa: BLE001
+            return entry
+        return got[ref].model_dump(mode="json") if ref in got else entry
+
+    def _fk_edges(self, conn: str, ref: str, column: str, kind: Optional[str],
+                  ctx: dict[str, Any]) -> list[dict[str, Any]]:
+        """The edge a new foreign-key column gets, by the SAME rule an ingest sync uses
+        (`mapping.fk_edges`): the referenced table's kind comes from the source's mapping —
+        whoever mapped it (rules, model or a person) — and the edge kind from the joint ranking
+        (FIN-05), for the kind a person approved for this table (a human decision is never
+        replaced). A reference to a non-key column is resolved at build time from the endpoint,
+        exactly as for any declared key."""
+        snap = self._snapshot(ctx, ref)
+        if snap is None or not kind:
+            return []
+        snap["foreign_keys"] = [f for f in snap["foreign_keys"] if f.get("column") == column]
+        if not snap["foreign_keys"]:
+            return []
+        from databridge_mcp_ingest.mapping import fk_edges
+
+        try:
+            edges, _ = fk_edges(snap, kind, self._table_kinds(ctx), self._vocab())
         except Exception:                                             # noqa: BLE001
             return []
-        if ((proposed.get("node") or {}).get("kind")) != kind:
-            return []
-        return [x for x in proposed.get("edges") or [] if x.get("evidence") == [column]]
+        return [x for x in edges if x.get("evidence") == [column]]
 
     def _propose_tool(self, conn: str, prefix: str, drifts: list[Any], ctx: dict[str, Any]
                       ) -> Proposal:

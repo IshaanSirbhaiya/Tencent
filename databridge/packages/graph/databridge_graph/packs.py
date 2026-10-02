@@ -71,11 +71,18 @@ _PACK_NAME = re.compile(r"^[a-z][a-z0-9_-]*$")
 #: misspelled ``subject_kind:`` used to load a pack with NO subject protections at all and no
 #: complaint (packs finding 8) — the security-relevant typo is exactly the one that must fail.
 _PACK_TOP_LEVEL_KEYS = frozenset({
-    "pack", "title", "version", "node_kinds", "edge_kinds", "subject_kinds"})
+    "pack", "title", "version", "node_kinds", "edge_kinds", "subject_kinds", "identity_rules"})
 _NODE_KIND_KEYS = frozenset({"name", "binds_to", "description"})
 _EDGE_KIND_KEYS = frozenset({"name", "binds_to", "src", "dst", "description"})
 _SUBJECT_KIND_KEYS = frozenset({
-    "kind", "identifiers", "never_fuzzy_merge", "attestation", "grant_type"})
+    "kind", "identifiers", "never_fuzzy_merge", "attestation", "grant_type", "attested_by",
+    "held_by"})
+_IDENTITY_RULE_KEYS = frozenset({"kind", "business_keys", "exact_name", "similarity_merge"})
+
+#: The merge rules an `identity_rules` entry can declare. Closed. Each is INERT until a named
+#: human approves it for the deployment (`ontology_state.record_identity_rule_decision`): a pack
+#: declares which rules MAY be approved, never that one is.
+IDENTITY_RULE_TYPES = frozenset({"business_key", "exact_name"})
 
 
 class PackError(Exception):
@@ -198,6 +205,12 @@ class SubjectKind:
     grant_type: str
     pack: str
     sources: tuple[SourcePointer, ...] = ()
+    attested_by: Optional[str] = None
+    """WORDING only (FIN-09): who performs the attestation, as the identity caveats say it
+    (e.g. "a named member of the onboarding team"). None: the engine's neutral wording. Not a
+    security field."""
+    held_by: Optional[str] = None
+    """WORDING only (FIN-09): who holds the register a subject row sits in (e.g. "the bank")."""
 
     def security_fields(self) -> tuple:
         """The parts two packs must agree on exactly before the same subject kind may be shared.
@@ -209,6 +222,40 @@ class SubjectKind:
         """
         return (self.kind, self.identifiers, self.never_fuzzy_merge, self.attestation,
                 self.grant_type)
+
+
+@dataclass(frozen=True)
+class IdentityRule:
+    """A pack's declaration of how records of one NON-subject kind may be recognised as one
+    record (FIN-04, `wiki/20-decisions/D-004`). The counterpart of `SubjectKind`, and mutually
+    exclusive with it: the loader refuses an identity rule on any kind a bound pack declares a
+    subject, so a person can never be merged by one.
+
+    * ``business_keys`` -- attribute names whose EXACT value (grounded by its own pointer) names
+      one record: a registration number, an LEI;
+    * ``exact_name`` -- two records whose names are EXACTLY equal after normalisation (case,
+      punctuation and whitespace only; the legal form is kept) may be one;
+    * ``similarity_merge`` -- whether the engine's default name-SIMILARITY merge still applies to
+      the kind. Required and explicit.
+
+    Both merge rules are INERT until a named human approves them (`rule_types` lists what may be
+    approved); `similarity_merge: false` takes effect at once, because it only ever merges less.
+    """
+
+    kind: str
+    business_keys: tuple[str, ...]
+    exact_name: bool
+    similarity_merge: bool
+    pack: str
+    sources: tuple[SourcePointer, ...] = ()
+
+    @property
+    def rule_types(self) -> tuple[str, ...]:
+        return tuple(t for t, on in (("business_key", bool(self.business_keys)),
+                                     ("exact_name", self.exact_name)) if on)
+
+    def security_fields(self) -> tuple:
+        return (self.kind, self.business_keys, self.exact_name, self.similarity_merge)
 
 
 def _sealed(mapping: Optional[Mapping]) -> Mapping:
@@ -240,9 +287,10 @@ class Pack:
     node_kinds: Mapping[str, NodeKindDecl] = field(default_factory=dict)
     edge_kinds: Mapping[str, EdgeKindDecl] = field(default_factory=dict)
     subject_kinds: Mapping[str, SubjectKind] = field(default_factory=dict)
+    identity_rules: Mapping[str, IdentityRule] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        for f in ("node_kinds", "edge_kinds", "subject_kinds"):
+        for f in ("node_kinds", "edge_kinds", "subject_kinds", "identity_rules"):
             object.__setattr__(self, f, _sealed(getattr(self, f)))
 
 
@@ -260,6 +308,9 @@ class Vocabulary:
     edge_kinds: Mapping[str, EdgeKindDecl]
     subject_kinds: Mapping[str, SubjectKind]
     generation: int = 0
+    identity_rules: Mapping[str, IdentityRule] = field(default_factory=dict)
+    """FIN-04: the declared merge rules of NON-subject kinds (see `IdentityRule`). Never holds a
+    subject kind: `build_vocabulary` refuses the combination."""
     """The binding generation this snapshot was built under (`binding_generation()`).
 
     Packs finding 7: a resolver that captures `active_vocabulary()` at import keeps using the old
@@ -279,7 +330,7 @@ class Vocabulary:
         # cached process-wide, so one mutation of it re-opens the closed vocabulary for every
         # later caller, and deleting a subject silently disables `never_fuzzy_merge` for it.
         object.__setattr__(self, "packs", tuple(self.packs))
-        for f in ("node_kinds", "edge_kinds", "subject_kinds"):
+        for f in ("node_kinds", "edge_kinds", "subject_kinds", "identity_rules"):
             object.__setattr__(self, f, _sealed(getattr(self, f)))
 
     # --- node/edge lookup ---
@@ -316,6 +367,19 @@ class Vocabulary:
     def is_subject(self, kind: str) -> bool:
         return str(kind) in self.subject_kinds
 
+    def identity_rule_for(self, kind: str) -> Optional[IdentityRule]:
+        """The declared merge rules of a NON-subject kind, or ``None`` (FIN-04). A subject kind
+        never has one, whatever any mapping says."""
+        if self.is_subject(str(kind)):
+            return None
+        return self.identity_rules.get(str(kind))
+
+    def is_document_kind(self, kind: str) -> bool:
+        """Whether ``kind`` binds to the DOCUMENT meta-kind (FIN-07: a document's identity is its
+        source item, never its title)."""
+        d = self.node_kinds.get(str(kind))
+        return d is not None and d.binds_to is NodeMetaKind.DOCUMENT
+
     def identity_grant_for(self, kind: str) -> Optional[str]:
         """The capability minted when a human attests to a candidate of this kind, or ``None``.
 
@@ -328,6 +392,11 @@ class Vocabulary:
     def attestation_for(self, kind: str) -> Optional[str]:
         s = self.subject_kinds.get(str(kind))
         return s.attestation if s else None
+
+    def subject_wording(self, kind: str) -> tuple[Optional[str], Optional[str]]:
+        """``(attested_by, held_by)`` the pack words a subject kind's caveats with (FIN-09)."""
+        s = self.subject_kinds.get(str(kind))
+        return (s.attested_by, s.held_by) if s else (None, None)
 
     def identifiers_for(self, kind: str) -> tuple[str, ...]:
         s = self.subject_kinds.get(str(kind))
@@ -625,13 +694,59 @@ def load_pack(name: str, root: Optional[Path] = None, *, use_cache: bool = True)
                                f"subject kind {skind!r} grant_type", where)
         if skind in subject_kinds:
             raise PackError(f"{where}: subject kind {skind!r} declared twice")
+        wording = {w: (_non_blank_str(entry[w], f"subject kind {skind!r} {w}", where)
+                       if entry.get(w) is not None else None)
+                   for w in ("attested_by", "held_by")}
         subject_kinds[skind] = SubjectKind(
             kind=skind, identifiers=identifiers, never_fuzzy_merge=True,
-            attestation=attestation, grant_type=grant, pack=name,
+            attestation=attestation, grant_type=grant, pack=name, **wording,
             sources=(_decl_pointer(path, "subject_kinds", index, key="kind"),))
 
+    identity_rules: dict[str, IdentityRule] = {}
+    for index, entry in enumerate(_as_list(data.get("identity_rules"), "identity_rules", where)):
+        if not isinstance(entry, dict):
+            raise PackError(f"{where}: each identity_rules entry must be a mapping")
+        _reject_unknown_keys(entry, _IDENTITY_RULE_KEYS, "an identity_rules entry", where)
+        rkind = str(_require(entry, "kind", where))
+        if rkind not in node_kinds:
+            raise PackError(f"{where}: identity rule for {rkind!r}, which is not a node kind this "
+                            f"pack declares")
+        if rkind in subject_kinds:
+            raise PackError(
+                f"{where}: identity rule for {rkind!r}, which this pack declares a SUBJECT. A "
+                f"subject is never merged by a rule (CLAUDE.md hard constraint 1): its records "
+                f"stay candidates for a named human")
+        if node_kinds[rkind].binds_to not in SUBJECT_ELIGIBLE_META_KINDS:
+            raise PackError(
+                f"{where}: identity rule for {rkind!r}, which binds to "
+                f"{node_kinds[rkind].binds_to.value!r}; identity rules apply to kinds binding to "
+                f"{sorted(m.value for m in SUBJECT_ELIGIBLE_META_KINDS)}")
+        keys = tuple(_non_blank_str(v, f"identity rule {rkind!r} business key", where)
+                     for v in _as_list(entry.get("business_keys"), "business_keys", where))
+        if len(set(keys)) != len(keys):
+            raise PackError(f"{where}: identity rule {rkind!r} lists a business key twice")
+        flags = {}
+        for flag in ("exact_name", "similarity_merge"):
+            value = entry.get(flag, False if flag == "exact_name" else None)
+            if type(value) is not bool:
+                raise PackError(
+                    f"{where}: identity rule {rkind!r}: {flag!r} must be true or false, not "
+                    f"{value!r} (similarity_merge is required: a kind that declares merge rules "
+                    f"says explicitly whether the default name-similarity merge stays on)")
+            flags[flag] = value
+        if not keys and not flags["exact_name"]:
+            raise PackError(f"{where}: identity rule {rkind!r} declares no business key and no "
+                            f"exact_name rule: nothing a human could approve")
+        if rkind in identity_rules:
+            raise PackError(f"{where}: identity rule for {rkind!r} declared twice")
+        identity_rules[rkind] = IdentityRule(
+            kind=rkind, business_keys=keys, exact_name=flags["exact_name"],
+            similarity_merge=flags["similarity_merge"], pack=name,
+            sources=(_decl_pointer(path, "identity_rules", index, key="kind"),))
+
     pack = Pack(name=name, title=title, version=version, path=path,
-                node_kinds=node_kinds, edge_kinds=edge_kinds, subject_kinds=subject_kinds)
+                node_kinds=node_kinds, edge_kinds=edge_kinds, subject_kinds=subject_kinds,
+                identity_rules=identity_rules)
     with _LOCK:
         _PACK_CACHE[key] = pack
     return pack
@@ -694,6 +809,7 @@ def build_vocabulary(names: Sequence[str], root: Optional[Path] = None) -> Vocab
     nodes: dict[str, NodeKindDecl] = {}
     edges: dict[str, EdgeKindDecl] = {}
     subjects: dict[str, SubjectKind] = {}
+    rules: dict[str, IdentityRule] = {}
     for pname in ordered:
         pack = load_pack(pname, root)
         for k, d in pack.node_kinds.items():
@@ -752,10 +868,28 @@ def build_vocabulary(names: Sequence[str], root: Optional[Path] = None) -> Vocab
             # the agreement was checked.
             subjects[k] = replace(prior_s,
                                   sources=tuple(dict.fromkeys(prior_s.sources + s.sources)))
+        for k, r in pack.identity_rules.items():
+            prior_r = rules.get(k)
+            if prior_r is not None and prior_r.security_fields() != r.security_fields():
+                raise PackError(
+                    f"packs {prior_r.pack!r} and {r.pack!r} both declare identity rules for "
+                    f"{k!r} but disagree ({prior_r.security_fields()} vs {r.security_fields()}). "
+                    f"Which records may be merged is not decided by list order")
+            rules[k] = r if prior_r is None else replace(
+                prior_r, sources=tuple(dict.fromkeys(prior_r.sources + r.sources)))
+    # FIN-04: a kind ANY bound pack declares a subject is never merged by a rule, whichever pack
+    # declared the rule. Refused, not resolved by order.
+    clash = sorted(set(rules) & set(subjects))
+    if clash:
+        raise PackError(
+            f"identity rules for {clash} (pack(s) {sorted({rules[k].pack for k in clash})}) clash "
+            f"with subject declarations of the same kind(s) (pack(s) "
+            f"{sorted({subjects[k].pack for k in clash})}). A subject is never merged by a rule; "
+            f"enable only one, or rename the kind")
     with _LOCK:
         generation = _GENERATION
     return Vocabulary(packs=ordered, node_kinds=nodes, edge_kinds=edges, subject_kinds=subjects,
-                      generation=generation)
+                      generation=generation, identity_rules=rules)
 
 
 def active_vocabulary(root: Optional[Path] = None) -> Vocabulary:
@@ -837,7 +971,8 @@ def never_fuzzy_merge_kinds() -> frozenset[str]:
 __all__ = [
     "ANY_KIND", "ATTESTATION_MODES", "DEFAULT_PACKS_ROOT", "binding_generation",
     "check_pack_name",
-    "EdgeKindDecl", "NodeKindDecl", "Pack", "PackError", "SubjectKind", "UnknownKind",
+    "EdgeKindDecl", "IDENTITY_RULE_TYPES", "IdentityRule", "NodeKindDecl", "Pack", "PackError",
+    "SubjectKind", "UnknownKind",
     "Vocabulary", "active_vocabulary", "available_packs", "bind_deployment",
     "build_vocabulary", "clear_caches", "configured_packs", "deployment", "load_pack",
     "never_fuzzy_merge_kinds", "packs_root",

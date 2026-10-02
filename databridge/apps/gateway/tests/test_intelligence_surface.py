@@ -303,14 +303,27 @@ def test_a_malformed_as_of_on_the_drilldown_is_refused_and_not_echoed(client):
 # --- 6. bounds that refuse --------------------------------------------------------------
 def test_a_graph_past_this_pages_envelope_is_refused_not_truncated(client, monkeypatch):
     """Silent truncation is the one degrade this page must never have: every figure on it is a
-    count, and a count over part of a graph is a wrong number, not a short one."""
+    count, and a count over part of a graph is a wrong number, not a short one.
+
+    C-4 (finance dry run): the FIGURES are no longer withheld past the envelope — they are counted
+    exactly in the store and served without their member lists. The agent and the drill-down,
+    which walk the graph, still refuse rather than walk part of it."""
     from databridge_gateway import intelligence_surface
 
+    small = client.get("/intelligence").json()["graph"]          # within the envelope: listed
+    assert small["members_listed"] is True
     monkeypatch.setattr(intelligence_surface, "MAX_GRAPH_NODES", 1)
 
     summary = client.get("/intelligence").json()
-    assert summary["graph"] is None
-    assert "withheld" in summary["graph_unavailable"]
+    assert summary["graph_unavailable"] is None
+    graph = summary["graph"]
+    assert graph["members_listed"] is False
+    assert (graph["nodes"], graph["edges"]) == (small["nodes"], small["edges"])
+    for key in intelligence_surface.COUNT_FIGURES:
+        if small.get(key) is None:
+            continue
+        assert (graph[key]["n"], graph[key]["of"]) == (small[key]["n"], small[key]["of"]), key
+        assert graph[key]["members"] == []
 
     asked = client.post("/intelligence/ask", json={"question": BUSINESS_QUESTION})
     assert asked.status_code == 503

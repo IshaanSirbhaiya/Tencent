@@ -50,12 +50,14 @@ import yaml
 
 from . import paths
 
-_TOP_KEYS = frozenset({"version", "pack", "thresholds", "decisive", "signals", "redactions"})
+_TOP_KEYS = frozenset({"version", "pack", "thresholds", "decisive", "signals", "redactions",
+                       "quarantine"})
 _THRESHOLD_KEYS = frozenset({"block", "review", "min_signals_to_block"})
 _RULE_KEYS = {
     "decisive": frozenset({"id", "description", "pattern", "reverse"}),
     "signals": frozenset({"id", "description", "pattern", "weight", "min_count", "reverse"}),
     "redactions": frozenset({"id", "description", "pattern", "validate", "replacement"}),
+    "quarantine": frozenset({"id", "description", "pattern", "reverse", "min_count"}),
 }
 
 
@@ -84,6 +86,11 @@ class ScreenConfig:
     min_signals_to_block: int = 2
     source: str = "defaults"
     notes: list[str] = field(default_factory=list)
+    #: FIN-17: instruction-like content addressed to an automated reader (prompt injection). Any
+    #: match HOLDS the text in the review band — never extracted, listed for a human — whatever
+    #: the score. Matched against `detection_text` (format characters removed, NFKC), so text
+    #: split by zero-width characters is read as the words it shows.
+    quarantine: list[Rule] = field(default_factory=list)
 
 
 @dataclass
@@ -189,6 +196,7 @@ def parse_screen(data: dict, where: str) -> ScreenConfig:
         decisive=_rules(data.get("decisive"), "decisive", where),
         signals=_rules(data.get("signals"), "signals", where),
         redactions=_rules(data.get("redactions"), "redactions", where),
+        quarantine=_rules(data.get("quarantine"), "quarantine", where),
         block_threshold=float(th.get("block", 2)), review_threshold=float(th.get("review", 1)),
         min_signals_to_block=int(th.get("min_signals_to_block", 2)), source=where)
 
@@ -198,6 +206,7 @@ def _read(path: Path) -> ScreenConfig:
 
 
 _MANDATORY: Optional[tuple[Rule, ...]] = None
+_MANDATORY_QUARANTINE: Optional[tuple[Rule, ...]] = None
 
 
 def mandatory_rules() -> tuple[Rule, ...]:
@@ -209,11 +218,23 @@ def mandatory_rules() -> tuple[Rule, ...]:
     return _MANDATORY
 
 
-def _with_mandatory(decisive: list[Rule], where: str) -> tuple[list[Rule], list[str]]:
+def mandatory_quarantine_rules() -> tuple[Rule, ...]:
+    """FIN-17: the engine's prompt-injection hold — every QUARANTINE rule of
+    `defaults/screen.yaml`. Engine policy like the credential gate: structural shapes of text
+    addressed to an automated reader, not domain behaviour, so no pack can disable or narrow
+    them (a pack may add its own)."""
+    global _MANDATORY_QUARANTINE
+    if _MANDATORY_QUARANTINE is None:
+        _MANDATORY_QUARANTINE = tuple(_read(paths.default_screen_path()).quarantine)
+    return _MANDATORY_QUARANTINE
+
+
+def _with_mandatory(decisive: list[Rule], where: str, *, section: str = "decisive",
+                    mandatory_of=None) -> tuple[list[Rule], list[str]]:
     """The mandatory rules FIRST under their own ids, then the pack's. A pack rule identical to a
     mandatory one (same id, same pattern) is that rule; one that reuses a reserved id with a
     DIFFERENT pattern cannot narrow it: it is kept beside it as `<id>.pack`, and noted."""
-    mandatory = list(mandatory_rules())
+    mandatory = list((mandatory_of or mandatory_rules)())
     reserved = {r.id: r.pattern.pattern for r in mandatory}
     notes: list[str] = []
     extra: list[Rule] = []
@@ -221,7 +242,7 @@ def _with_mandatory(decisive: list[Rule], where: str) -> tuple[list[Rule], list[
         if r.id in reserved:
             if r.pattern.pattern == reserved[r.id]:
                 continue
-            notes.append(f"{where}: decisive rule {r.id!r} reuses a reserved engine credential "
+            notes.append(f"{where}: {section} rule {r.id!r} reuses a reserved engine "
                          f"rule id with a different pattern; the engine rule is always applied "
                          f"and the pack's is kept beside it as {r.id + '.pack'!r}")
             r = Rule(id=f"{r.id}.pack", pattern=r.pattern, weight=r.weight,
@@ -250,7 +271,11 @@ def load_screen(packs: Optional[list[str]] = None, *, path: Optional[Path] = Non
                 candidate = f
                 break
     if candidate is None:
-        defaults.notes.append("no enabled pack ships screen.yaml; the bundled defaults are in use")
+        # FIN-03: a pack that declares no screen is screened by the ENGINE DEFAULT policy — the
+        # credential gate, the prompt-injection hold and the PII masks of defaults/screen.yaml.
+        # Said in every run report (`screen_policy`), never silently.
+        defaults.notes.append(f"{DEFAULT_POLICY_NOTE} ({paths.default_screen_path().name}: "
+                              f"credential gate, prompt-injection hold, PII masks)")
         return defaults
     cfg = _read(candidate)
     have = {(r.id, r.pattern.pattern) for r in cfg.decisive}
@@ -259,7 +284,49 @@ def load_screen(packs: Optional[list[str]] = None, *, path: Optional[Path] = Non
     added = [r.id for r in mandatory_rules() if (r.id, r.pattern.pattern) not in have]
     if added:
         cfg.notes.append(f"default credential rules always applied: {added}")
+    have_q = {(r.id, r.pattern.pattern) for r in cfg.quarantine}
+    cfg.quarantine, notes = _with_mandatory(cfg.quarantine, str(candidate),
+                                            section="quarantine",
+                                            mandatory_of=mandatory_quarantine_rules)
+    cfg.notes.extend(notes)
+    added = [r.id for r in mandatory_quarantine_rules()
+             if (r.id, r.pattern.pattern) not in have_q]
+    if added:
+        cfg.notes.append(f"default prompt-injection hold always applied: {added}")
     return cfg
+
+
+#: The run-report wording when no enabled pack declares a screen (FIN-03).
+DEFAULT_POLICY_NOTE = ("no enabled pack ships screen.yaml; the ENGINE DEFAULT screen policy "
+                       "is in use")
+
+
+def pack_screen_file(pack: str) -> Optional[Path]:
+    """`packs/<pack>/screen.yaml` when that pack declares a screen; None when it declares none
+    (it is then screened by the engine default policy)."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", str(pack)):
+        return None                                  # a pack is a directory name, never a path
+    f = paths.packs_dir() / str(pack) / "screen.yaml"
+    return f if f.is_file() else None
+
+
+def is_engine_default(cfg: ScreenConfig) -> bool:
+    """True when `cfg` is the engine default policy (`defaults/screen.yaml`)."""
+    try:
+        return Path(str(cfg.source)).resolve() == paths.default_screen_path().resolve()
+    except (OSError, ValueError):
+        return False
+
+
+def screen_policy(cfg: ScreenConfig) -> dict:
+    """What a run reports about its screen (FIN-03): `policy` is `pack` (that pack's
+    `screen.yaml`, plus the engine's mandatory rules), `engine_default` (no enabled pack declares
+    a screen) or `file` (a file forced by path)."""
+    pack = screen_pack_of(cfg)
+    policy = "pack" if pack else ("engine_default" if is_engine_default(cfg) else "file")
+    return {"policy": policy, "pack": pack, "source": str(cfg.source),
+            "credential_rules": len(cfg.decisive), "quarantine_rules": len(cfg.quarantine),
+            "signals": len(cfg.signals), "redactions": len(cfg.redactions)}
 
 
 def screen_pack_of(cfg: ScreenConfig) -> Optional[str]:
@@ -310,15 +377,104 @@ def apply_masks(text: str, rules: list[Rule]) -> tuple[str, list[dict]]:
     return text, redactions
 
 
-def screen_text(text: str, cfg: ScreenConfig, *, override_allow: bool = False) -> ScreenResult:
+_JSON_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def detection_text(text: str) -> str:
+    """The text the prompt-injection hold reads (FIN-17): what a reader is SHOWN. Unicode
+    compatibility forms folded (NFKC: full-width and styled letters become plain ones), every
+    FORMAT character removed (category Cf: zero-width spaces and joiners, bidi controls, soft
+    hyphens — the usual way to split a phrase so a pattern misses it), and the same characters
+    removed when they arrive JSON-escaped (a table row is screened as its JSON). Never used for
+    masking or offsets — only to decide whether to hold."""
+    import unicodedata
+
+    def unescape(m: re.Match) -> str:
+        ch = chr(int(m.group(1), 16))
+        return "" if unicodedata.category(ch) == "Cf" else m.group(0)
+
+    folded = unicodedata.normalize("NFKC", _JSON_ESCAPE.sub(unescape, text))
+    return "".join(ch for ch in folded if unicodedata.category(ch) != "Cf")
+
+
+_MIME_TRANSFER = re.compile(r"(?im)^content-transfer-encoding:[ \t]*(?:base64|quoted-printable)\b")
+_MAX_MIME_PARTS = 64
+
+
+def detection_variants(text: str) -> list[str]:
+    """Every reading of `text` the injection hold checks: the text itself, and — when it is a
+    MIME message whose parts are transfer-encoded (base64, quoted-printable) — each decoded text
+    part, HTML entities unescaped. An instruction hidden in an encoded body or attachment is what
+    a mail client (or a model given the decoded part) would show, so it is read too. Binary parts
+    are skipped; a message that does not parse is read as text only."""
+    out = [detection_text(text)]
+    if not _MIME_TRANSFER.search(text):
+        return out
+    import email
+    import html as _html
+    from email import policy as _policy
+
+    try:
+        msg = email.message_from_string(text, policy=_policy.compat32)
+        for n, part in enumerate(msg.walk()):
+            if n >= _MAX_MIME_PARTS:
+                break
+            if part.is_multipart():
+                continue
+            payload = part.get_payload(decode=True)
+            if not isinstance(payload, (bytes, bytearray)) or not payload or \
+                    b"\x00" in payload[:4096]:
+                continue
+            try:
+                decoded = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+            except LookupError:
+                decoded = payload.decode("utf-8", errors="replace")
+            out.append(detection_text(_html.unescape(decoded)))
+    except Exception:                                                # noqa: BLE001
+        pass                                 # not a parseable message: the text reading stands
+    return out
+
+
+def _quarantine_fired(text: str, rules: list[Rule]) -> list[dict]:
+    if not rules:
+        return []
+    probes = detection_variants(text)
+    fired = []
+    for rule in rules:
+        n = max(sum(1 for _ in rule.pattern.finditer(p)) for p in probes)
+        if n >= rule.min_count:
+            fired.append({"rule": rule.id, "kind": "quarantine", "count": n, "weight": None})
+    return fired
+
+
+QUARANTINE_REVERSE = ("Possible prompt injection: text addressed to an automated reader. It is "
+                      "held (never extracted, never sent to a model) until a person looks. If it "
+                      "is legitimate, an authenticated owner approves this content "
+                      "(screen.approve_override: principal, reason, content digest) and the "
+                      "source is re-run; otherwise remove it at the source.")
+
+
+def screen_text(text: str, cfg: ScreenConfig, *, override_allow: bool = False,
+                also: Iterable[str] = ()) -> ScreenResult:
     """Decide on one text. `override_allow` — the caller holds a VERIFIED override approval for
-    exactly this content (`load_overrides(...).allows(item, digest)`) — lifts a REVIEW only."""
+    exactly this content (`load_overrides(...).allows(item, digest)`) — lifts a REVIEW only.
+
+    FIN-17: a QUARANTINE match (instruction-like text addressed to an automated reader) puts the
+    text in the review band whatever its score — held, listed for a human, never extracted. A
+    decisive or corroborated block still wins over it. `also`: the SOURCE the text was extracted
+    from (an email's raw MIME, whose non-preferred HTML part or hidden comment the extracted text
+    leaves out) — read by the injection hold only; the decision is about `text`."""
     fired: list[dict] = []
     decisive = list(cfg.decisive)
     pairs = {(r.id, r.pattern.pattern) for r in decisive}
     missing = [r for r in mandatory_rules() if (r.id, r.pattern.pattern) not in pairs]
     if missing:                          # a hand-built config: the credential gate still applies
         decisive = missing + decisive
+    quarantine = list(cfg.quarantine)
+    qpairs = {(r.id, r.pattern.pattern) for r in quarantine}
+    # a hand-built config: the injection hold still applies
+    quarantine = [r for r in mandatory_quarantine_rules()
+                  if (r.id, r.pattern.pattern) not in qpairs] + quarantine
     for rule in decisive:
         n = sum(1 for _ in rule.pattern.finditer(text))
         if n:
@@ -344,6 +500,19 @@ def screen_text(text: str, cfg: ScreenConfig, *, override_allow: bool = False) -
                             f"{distinct} corroborating signals {names} scored {score:g} "
                             f">= {cfg.block_threshold:g}",
                             reverse or "the owner re-marks or removes the material")
+    held = _quarantine_fired(text, quarantine)
+    for source in also:
+        seen = {h["rule"] for h in held}
+        held += [h for h in _quarantine_fired(source, quarantine) if h["rule"] not in seen]
+    if held:
+        fired.extend(held)
+        if not override_allow:
+            return ScreenResult("review", score, fired, redactions, masked,
+                                f"possible prompt injection: quarantine rule(s) "
+                                f"{[h['rule'] for h in held]} matched text addressed to an "
+                                f"automated reader (held for a human: excluded, never "
+                                f"extracted)", QUARANTINE_REVERSE)
+        names = [f["rule"] for f in fired]
     if score >= cfg.review_threshold and not override_allow:
         how = ("Override: an authenticated owner approves this content "
                "(screen.approve_override: principal, reason, content digest) and the source is "
@@ -353,7 +522,7 @@ def screen_text(text: str, cfg: ScreenConfig, *, override_allow: bool = False) -
                             f"for owner override)",
                             reverse if "approve_override" in reverse else
                             (reverse + " " if reverse else "") + how)
-    rationale = ("owner override" if score >= cfg.review_threshold else
+    rationale = ("owner override" if score >= cfg.review_threshold or held else
                  ("no rule fired" if not fired else f"signal(s) {names} below the review band"))
     return ScreenResult("allow", score, fired, redactions, masked, rationale, "")
 
@@ -630,4 +799,6 @@ __all__ = ["ScreenConfig", "ScreenResult", "ScreenError", "Rule", "load_screen",
            "screen_text", "apply_masks", "luhn_ok", "mod97_ok", "load_overrides",
            "approve_override", "revoke_override", "OverrideSet", "OverrideRefused",
            "override_log_path", "content_digest", "row_digest", "row_ref", "mandatory_rules",
-           "approval_key_path", "APPROVAL_KEY_ENV", "APPROVAL_KEY_FILE_ENV"]
+           "approval_key_path", "APPROVAL_KEY_ENV", "APPROVAL_KEY_FILE_ENV",
+           "mandatory_quarantine_rules", "detection_text", "detection_variants", "screen_policy", "pack_screen_file",
+           "is_engine_default", "screen_pack_of", "DEFAULT_POLICY_NOTE", "QUARANTINE_REVERSE"]

@@ -31,10 +31,22 @@ node_kinds:
   - name: party
     binds_to: entity
     description: >
-      The KYC subject — a borrowing entity, a guarantor or an individual, natural person or
-      company. A subject (D4b): identity is attested at onboarding by a named human, never by a
-      score. Use this for anyone the book has an exposure or a relationship to; use `institution`
-      for the lender's own side.
+      The KYC subject who is a NATURAL PERSON — an individual borrower, a personal guarantor, a
+      sole proprietor. A subject (D4b): identity is attested at onboarding by a named human, never
+      by a score, and records of a person are never merged. Use `legal_entity` for a company. A
+      table or document that mixes people and companies in one set of rows, with nothing that
+      tells them apart row by row, maps to `party`: protecting a company as if it were a person
+      costs a confirmation step, while treating a person as a company could merge two people.
+
+  - name: legal_entity
+    binds_to: organisation
+    description: >
+      A COMPANY or other legal entity the book has an exposure or a relationship to — a borrowing
+      company, a corporate guarantor, an issuer of a filing, a CRM account organisation. Not a
+      subject: records of one legal entity may be recognised as one by its business key
+      (registration number, LEI) or by its exact legal name, under a merge rule a named human
+      approves (see `identity_rules`; D-004). Use `party` for a natural person, `institution` for
+      the lender's own side.
 
   - name: counterparty
     binds_to: entity
@@ -256,21 +268,21 @@ edge_kinds:
   # --- who is party to what -----------------------------------------------------------------------
   - name: holds_account
     binds_to: party_to
-    src: [party]
+    src: [party, legal_entity]
     dst: [account]
     description: >
       Participation in the arrangement. The party the account belongs to.
 
   - name: borrower_of
     binds_to: party_to
-    src: [party]
+    src: [party, legal_entity]
     dst: [facility]
     description: The party obligated under the facility. A guarantor gets its own role edge, so
       that "who owes this?" and "who backs this?" never collapse into one answer.
 
   - name: guarantor_of
     binds_to: role_of
-    src: [party, institution]
+    src: [party, legal_entity, institution]
     dst: [facility]
     description: >
       The party that backs the exposure without owing it. Held apart from `borrower_of` so
@@ -286,14 +298,14 @@ edge_kinds:
   - name: beneficial_owner_of
     binds_to: role_of
     src: [beneficial_owner]
-    dst: [party]
+    dst: [party, legal_entity]
     description: An ownership or control link. Every link is a CLAIM with a source; a chain of
       them is a chain of claims, and its weakest link is its strength.
 
   - name: manages
     binds_to: role_of
     src: [relationship_manager]
-    dst: [party, opportunity]
+    dst: [party, legal_entity, opportunity]
     description: >
       The relationship the banker owns. An access predicate as well as an attribution, so it
       is never inferred from a name.
@@ -301,13 +313,13 @@ edge_kinds:
   - name: contact_for
     binds_to: role_of
     src: [contact]
-    dst: [party, institution]
+    dst: [party, legal_entity, institution]
     description: >
       The party or institution a named individual speaks for.
 
   - name: in_sector
     binds_to: role_of
-    src: [party]
+    src: [party, legal_entity]
     dst: [sector]
     description: >
       The classification a party sits in, for concentration questions.
@@ -323,14 +335,14 @@ edge_kinds:
 
   - name: issued_by
     binds_to: issued
-    src: [institution, party, committee]
+    src: [institution, party, legal_entity, committee]
     dst: [credit_memo, filing, watchlist_entry, spreadsheet]
     description: >
       The body that produced the artefact, acting in its own name.
 
   - name: sent_by
     binds_to: issued
-    src: [party, institution, relationship_manager, contact]
+    src: [party, legal_entity, institution, relationship_manager, contact]
     dst: [message]
     description: >
       The originator of a message. For an inbound message this is read from headers and is
@@ -414,7 +426,7 @@ edge_kinds:
   - name: rates
     binds_to: references
     src: [rating_action]
-    dst: [instrument, party, facility]
+    dst: [instrument, party, legal_entity, facility]
     description: >
       The thing a rating action was assigned to.
 
@@ -429,7 +441,7 @@ edge_kinds:
   - name: memo_about
     binds_to: about
     src: [credit_memo, filing, rating_action, screening_result]
-    dst: [party, counterparty, beneficial_owner]
+    dst: [party, legal_entity, counterparty, beneficial_owner]
     description: >
       A CLAIM that the document concerns this subject. Two candidate parties yield two edges and
       neither is a determination. The destination is a SUBJECT only: an `about` edge pointing at a
@@ -439,7 +451,7 @@ edge_kinds:
   - name: mentions
     binds_to: about
     src: [message, filing, credit_memo, spreadsheet]
-    dst: [party, counterparty, beneficial_owner, contact]
+    dst: [party, legal_entity, counterparty, beneficial_owner, contact]
     description: >
       A name recovered from free text or OCR. UNTRUSTED and weaker than `memo_about`: a hypothesis
       with a pointer, storable and citable, and never permitted to influence control flow.
@@ -479,7 +491,7 @@ edge_kinds:
   - name: sent_to
     binds_to: references
     src: [message]
-    dst: [party, contact, relationship_manager, institution]
+    dst: [party, legal_entity, contact, relationship_manager, institution]
     description: >
       A recipient of the message. Read from headers, so untrusted for routing.
 
@@ -502,7 +514,7 @@ edge_kinds:
   - name: logged_with
     binds_to: references
     src: [interaction]
-    dst: [party, contact, opportunity]
+    dst: [party, legal_entity, contact, opportunity]
 
   # --- places ------------------------------------------------------------------------------------------
     description: >
@@ -517,7 +529,7 @@ edge_kinds:
 
   - name: located_at
     binds_to: at
-    src: [party, institution, branch, collateral, counterparty]
+    src: [party, legal_entity, institution, branch, collateral, counterparty]
     dst: [address]
     description: >
       An address as some record holds it. Kept unmerged: a stale address is a matching
@@ -525,7 +537,7 @@ edge_kinds:
 
   - name: in_jurisdiction
     binds_to: at
-    src: [party, institution, instrument, facility, collateral]
+    src: [party, legal_entity, institution, instrument, facility, collateral]
     dst: [jurisdiction]
 
   # --- lineage ------------------------------------------------------------------------------------------
@@ -578,7 +590,7 @@ edge_kinds:
   - name: reads_from
     binds_to: references
     src: [adapter]
-    dst: [party, account, facility, transaction, filing, credit_memo, message, price_observation,
+    dst: [party, legal_entity, account, facility, transaction, filing, credit_memo, message, price_observation,
           payment_event, spreadsheet, watchlist_entry]
     description: >
       Which kinds an adapter is the writer for. The reverse index that answers "if this
@@ -608,15 +620,43 @@ subject_kinds:
     never_fuzzy_merge: true
     attestation: verified_channel
     grant_type: PartyReadGrant
+    attested_by: a named member of the onboarding team
+    held_by: the bank
 
   - kind: counterparty
     identifiers: [company_registration, lei, tax_id, account_number]
     never_fuzzy_merge: true
     attestation: verified_channel
     grant_type: CounterpartyReadGrant
+    attested_by: a named member of the onboarding team
+    held_by: the bank
 
   - kind: beneficial_owner
     identifiers: [national_id, passport, tax_id]
     never_fuzzy_merge: true
     attestation: in_person
     grant_type: BeneficialOwnerReadGrant
+    attested_by: a named member of the onboarding team
+    held_by: the bank
+
+identity_rules:
+  # FIN-04 (founder decision, 2026-10-02; wiki/20-decisions/D-004). Party is split: a natural
+  # person is `party` (a subject, above: never merged, candidates only) and a company is
+  # `legal_entity` (declared here: never a subject).
+  #
+  # A legal entity's records may be recognised as ONE record on
+  #   * a declared business key -- the same registration number or LEI, each value grounded by
+  #     its own pointer; or
+  #   * its exact legal name after normalisation (case, punctuation and whitespace only; the legal
+  #     form is kept, so "... LLC" is never "... Ltd").
+  # Both are INERT until a named human approves them for the deployment (ontology state). Two
+  # records carrying different values of one business key are two companies, whatever their names
+  # say -- the register's near-name twins -- and are never joined.
+  #
+  # `similarity_merge: false`: name SIMILARITY never joins two legal entities here. The estate
+  # plants near-name twins (different registration, different jurisdiction) precisely so that a
+  # fuzzy match is wrong in the case that matters.
+  - kind: legal_entity
+    business_keys: [registration_no, company_registration, lei]
+    exact_name: true
+    similarity_merge: false

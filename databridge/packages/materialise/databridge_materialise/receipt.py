@@ -136,6 +136,10 @@ class Receipt(BaseModel):
     #: been RECORDED by the row's decision instant (the system-time cut) — the source does hold
     #: it. Counted apart so "not known at T_d" is never read as "not in the source" (Q-07).
     features_unknown_at_decision: dict[str, int] = Field(default_factory=dict)
+    #: FIN-13: why rows were not labelled (unlabelled/immature), computed from the label versions
+    #: the store holds, with the window or re-run instant that WOULD label rows. `None` when no
+    #: row was rejected for a label reason.
+    label_diagnosis: Optional[dict[str, Any]] = None
 
     croissant_uri: Optional[str] = None
     output_uri: Optional[str] = None
@@ -177,9 +181,16 @@ class Receipt(BaseModel):
         else:
             claim = (f"agent-shaped: NOT reproducible. plan_hash {self.plan_hash[:12]}… names the "
                      f"request, not these bytes; re-running may produce a different dataset")
+        empty = ""
+        if self.rows.emitted == 0 and self.label_diagnosis:
+            # FIN-13: an empty labelled dataset says why on the one line an operator reads.
+            d = self.label_diagnosis
+            empty = (f" — NO row emitted: {d.get('unlabelled', 0)} unlabelled and "
+                     f"{d.get('immature', 0)} immature for label {d.get('label')}; see "
+                     f"label_diagnosis")
         return (f"{self.rows.emitted} rows, {self.cells.grounded} grounded cells, "
                 f"{self.cells.policy_suppressed} withheld, {self.cells.unresolved} absent — "
-                f"{claim}")
+                f"{claim}{empty}")
 
     def to_yaml(self) -> str:
         import yaml

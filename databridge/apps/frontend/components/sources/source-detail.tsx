@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  approvedWithDevToken,
   crawlAllowed,
   failureOf,
   humanApproved,
@@ -27,6 +28,7 @@ import {
   redactUrl,
   sourcesApi,
   unwrap,
+  vouchableTools,
   type CatalogueConnection,
   type SourceDetail,
   type SourcesFailure,
@@ -37,6 +39,10 @@ import { FailureNotice, Section, StatusBadge, Warning, ago, fmtTime, n } from ".
 import { PlanView, ToolsView } from "./plan-view";
 import { RunView } from "./run-view";
 import { routeLabel } from "./sources-list";
+import { AuthChip, DevTokenMark } from "@/components/auth-chip";
+import { KindSplitView, LinksPanel, ReapprovalNote } from "./mapping-review";
+import { ScreenHoldsSection } from "./screen-holds";
+import { IdentityRulesSection } from "./identity-rules";
 
 function useAction<T>(fn: () => Promise<SourcesResult<T>>, onOk: (data: T) => void) {
   const [failure, setFailure] = React.useState<SourcesFailure | null>(null);
@@ -160,6 +166,12 @@ export function SourceDetailView({
     queryFn: () => unwrap(sourcesApi.health(sourceId)),
     retry: false,
   });
+  // LINK7: proposed links (with evidence) and tables that need a person's approval again.
+  const reviewQ = useQuery({
+    queryKey: ["source-mapping-review", sourceId],
+    queryFn: () => unwrap(sourcesApi.mappingReview(sourceId)),
+    retry: false,
+  });
   const runsQ = useQuery({
     queryKey: ["source-runs", sourceId],
     queryFn: () => unwrap(sourcesApi.runs(sourceId)),
@@ -171,13 +183,35 @@ export function SourceDetailView({
     qc.invalidateQueries({ queryKey: ["source", sourceId] });
     qc.invalidateQueries({ queryKey: ["source-health", sourceId] });
     qc.invalidateQueries({ queryKey: ["source-runs", sourceId] });
+    qc.invalidateQueries({ queryKey: ["source-mapping-review", sourceId] });
+    qc.invalidateQueries({ queryKey: ["source-holds", sourceId] });
     qc.invalidateQueries({ queryKey: ["sources"] });
     qc.invalidateQueries({ queryKey: ["platform-catalogue"] });
   };
 
   const propose = useAction(() => sourcesApi.proposePlan(sourceId), refresh);
-  const approve = useAction(() => sourcesApi.approvePlan(sourceId), refresh);
+  // FIN-02: the tools the signed-in person has explicitly vouched for as reads, for THIS plan
+  // only. Reset whenever the plan changes (a re-proposal is a different set of tools) so a vouch
+  // never carries over to a plan the person has not looked at.
+  const [vouched, setVouched] = React.useState<string[]>([]);
+  const planKey = detailQ.data?.plan ? `${detailQ.data.plan.tools_digest}|${detailQ.data.plan.created_at}` : "";
+  React.useEffect(() => setVouched([]), [planKey, sourceId]);
+  const approve = useAction(() => sourcesApi.approvePlan(sourceId, vouched), () => {
+    setVouched([]);
+    refresh();
+  });
   const approveMapping = useAction(() => sourcesApi.approveMapping(sourceId), refresh);
+  // Approving ONE table again (a re-proposed table) — recorded against the signed-in principal.
+  const [againFailure, setAgainFailure] = React.useState<SourcesFailure | null>(null);
+  const approveAgain = useMutation({
+    mutationFn: (table: string) => sourcesApi.approveMapping(sourceId, [table]),
+    onSuccess: (r) => {
+      if (r.ok) {
+        setAgainFailure(null);
+        refresh();
+      } else setAgainFailure(r);
+    },
+  });
   const start = useAction(
     () => sourcesApi.startRun(sourceId),
     (d) => {
@@ -197,6 +231,10 @@ export function SourceDetailView({
   const running = d.running ?? health?.running ?? null;
   const mappingTables = d.mapping ? Object.entries(d.mapping.tables) : [];
   const proposedTables = mappingTables.filter(([, t]) => t.status === "proposed").length;
+  const review = reviewQ.data ?? null;
+  const reapproval = review?.reapproval ?? {};
+  const splits = review?.splits ?? {};
+  const reapprovalCount = Object.keys(reapproval).length;
   // Approved BY A PERSON. The connection's auto_approve flag records "auto_approve (connection
   // flag)" as the approver — that is not a human gate, so it never enables Run here.
   const planApproved = humanApproved(plan);
@@ -206,7 +244,8 @@ export function SourceDetailView({
   const audit = planToolAudit(plan, catalogue);
   // Approval fails closed on anything the page cannot establish: a non-ingest purpose, plan
   // problems, a missing catalogue, a writing tool, or ANY unclassified tool (R-019 round 3, S3).
-  const approveBlockers = planApprovalBlockers(plan, catalogue, d.connection.purpose);
+  const vouchable = vouchableTools(plan, catalogue);
+  const approveBlockers = planApprovalBlockers(plan, catalogue, d.connection.purpose, vouched);
   // A run builds from the table mapping: an approved mapping not approved BY A PERSON gates the run
   // until someone re-approves it (R-019 round 3, S2). The gateway must enforce the same (EF3).
   const mapGate = mappingGate(d.mapping);
@@ -304,6 +343,12 @@ export function SourceDetailView({
               {planApproved ? (
                 <p className="text-xs text-band-auto" data-testid="plan-approved">
                   Approved by <strong>{plan.approved_by}</strong> {plan.approved_at && <>on {fmtTime(plan.approved_at)}</>}.
+                  {approvedWithDevToken(plan.approval) && <DevTokenMark testId="plan-approved-dev" />}
+                  {(plan.approval?.vouched_read_tools ?? []).length > 0 && (
+                    <span className="ml-1 text-2xs text-subtle" data-testid="plan-approved-vouched">
+                      Vouched as read-only by the approver: {(plan.approval?.vouched_read_tools ?? []).join(", ")}.
+                    </span>
+                  )}
                 </p>
               ) : (
                 <>
@@ -313,6 +358,14 @@ export function SourceDetailView({
                       yourself to enable a run from this page.
                     </p>
                   )}
+                  {vouchable.length > 0 && !isWriteConn && (
+                    <VouchPanel
+                      tools={vouchable}
+                      vouched={vouched}
+                      onChange={setVouched}
+                      disabled={approve.pending}
+                    />
+                  )}
                   <Button
                     data-testid="plan-approve"
                     onClick={approve.run}
@@ -321,7 +374,10 @@ export function SourceDetailView({
                     {approve.pending ? "Approving…" : "Approve plan"}
                   </Button>
                   {approveBlockers.length === 0 ? (
-                    <span className="text-2xs text-subtle">Approval is recorded against your signed-in principal.</span>
+                    <span className="flex items-center gap-1 text-2xs text-subtle">
+                      Approval is recorded against your signed-in principal:
+                      <AuthChip compact />
+                    </span>
                   ) : (
                     <ul className="basis-full list-disc pl-5 text-2xs text-band-spot" data-testid="plan-approve-blocked">
                       {approveBlockers.map((b) => (
@@ -342,6 +398,10 @@ export function SourceDetailView({
           )}
         </div>
       </Section>
+
+      {/* UI8: items the screen holds for a person (e.g. a table with a planted note), each with
+          its reason and the owner's action to lift it. */}
+      <ScreenHoldsSection sourceId={sourceId} />
 
       {d.mapping && mappingTables.length > 0 && (
         <Section
@@ -380,12 +440,27 @@ export function SourceDetailView({
                   marked approved by {d.mapping.approved_by} — not a person
                 </span>
               ) : (
-                <span className="text-2xs text-subtle">approved by {d.mapping.approved_by}</span>
+                <span className="text-2xs text-subtle" data-testid="mapping-approved-by">
+                  approved by {d.mapping.approved_by}
+                  {mappingTables.some(([, t]) => approvedWithDevToken(t.approval)) && (
+                    <DevTokenMark testId="mapping-approved-dev" />
+                  )}
+                </span>
               )
             ) : null
           }
         >
           {approveMapping.failure && <FailureNotice failure={approveMapping.failure} testId="mapping-approve-failure" />}
+          {againFailure && <FailureNotice failure={againFailure} testId="mapping-reapprove-failure" />}
+          {reapprovalCount > 0 && (
+            <Warning testId="mapping-reapproval-summary">
+              {reapprovalCount} table(s) you or a colleague approved before need your approval again. They are not built
+              until a person approves the changed mapping; each row below says why.
+            </Warning>
+          )}
+          {reviewQ.isError && failureOf(reviewQ.error) && (
+            <FailureNotice failure={failureOf(reviewQ.error)!} testId="mapping-review-failure" />
+          )}
           <table className="w-full text-left text-xs" data-testid="mapping-table">
             <thead className="border-b border-border text-2xs uppercase tracking-wider text-subtle">
               <tr>
@@ -400,19 +475,53 @@ export function SourceDetailView({
                 <tr key={table} className="border-b border-border align-top last:border-0">
                   <td className="py-1.5 pr-3 font-mono text-2xs">{table}</td>
                   <td className="py-1.5 pr-3">
-                    <StatusBadge status={t.status} />
+                    <StatusBadge status={reapproval[table] ? "needs_reapproval" : t.status} />
                   </td>
                   <td className="py-1.5 pr-3 text-2xs">
                     {t.node && typeof t.node.kind === "string" ? <span className="font-mono">{t.node.kind}</span> : "—"}
                     {t.edges.length > 0 && <span className="text-subtle"> · {t.edges.length} relation(s)</span>}
+                    {splits[table] && <KindSplitView table={table} split={splits[table]} />}
+                    {splits[table] && t.status === "proposed" && !reapproval[table] && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="my-1"
+                        data-testid={`mapping-approve-split-${table}`}
+                        disabled={approveAgain.isPending || isWriteConn}
+                        onClick={() => approveAgain.mutate(table)}
+                      >
+                        Approve this table and its split
+                      </Button>
+                    )}
                   </td>
-                  <td className="py-1.5 text-2xs text-subtle">{t.rationale.join(" ")}</td>
+                  <td className="py-1.5 text-2xs text-subtle">
+                    {reapproval[table] && (
+                      <>
+                        <ReapprovalNote table={table} r={reapproval[table]} />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="my-1"
+                          data-testid={`mapping-approve-again-${table}`}
+                          disabled={approveAgain.isPending || isWriteConn}
+                          onClick={() => approveAgain.mutate(table)}
+                        >
+                          Approve again
+                        </Button>
+                      </>
+                    )}
+                    {t.rationale.join(" ")}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {review && <LinksPanel sourceId={sourceId} review={review} onDone={refresh} />}
         </Section>
       )}
+
+      {/* LINK7 / D-004: pack-declared identity rules, beside the mapping decisions. */}
+      <IdentityRulesSection />
 
       <Section
         testId="source-run"
@@ -504,6 +613,62 @@ export function SourceDetailView({
           </table>
         )}
       </Section>
+    </div>
+  );
+}
+
+/**
+ * FIN-02: the explicit "vouch this tool as a read" step. Shown only for tools NOTHING classifies
+ * (`vouchableTools`); each must be ticked by name. The vouch travels with the approval as
+ * `vouch_read_tools` and is recorded against the signed-in principal; the backend still refuses a
+ * write, a denied tool and an executor used anywhere but a guarded SQL step.
+ */
+function VouchPanel({
+  tools,
+  vouched,
+  onChange,
+  disabled,
+}: {
+  tools: { tool: string; plan_class: string; reason: string }[];
+  vouched: string[];
+  onChange: (next: string[]) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="basis-full rounded border border-band-spot/40 bg-muted/30 p-3" data-testid="plan-vouch">
+      <div className="mb-1 text-xs font-medium">Vouch for unclassified tools</div>
+      <p className="mb-2 text-2xs text-subtle">
+        Nothing classifies these tools as reads, so the plan cannot be approved as it stands. If you know a tool only
+        reads, vouch for it. Your vouch is recorded with the approval under your signed-in name (<AuthChip compact />).
+        A tool used as a SQL step is still held to the read-only statement grammar on every call.
+      </p>
+      <ul className="space-y-2">
+        {tools.map((t) => {
+          const checked = vouched.includes(t.tool);
+          return (
+            <li key={t.tool} className="text-2xs">
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  data-testid={`plan-vouch-${t.tool}`}
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={(e) =>
+                    onChange(e.target.checked ? [...vouched, t.tool] : vouched.filter((x) => x !== t.tool))
+                  }
+                  className="mt-0.5"
+                />
+                <span>
+                  I vouch that <code className="font-mono">{t.tool}</code> only reads.
+                  <span className="block text-subtle">
+                    Why it is unclassified: {t.reason} (recorded class: <code className="font-mono">{t.plan_class}</code>)
+                  </span>
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

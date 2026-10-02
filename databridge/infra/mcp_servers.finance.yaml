@@ -1,0 +1,163 @@
+# infra/mcp_servers.finance.yaml — the MCP servers the FINANCE live demo connects to (operator
+# manifest, version 1; same shape as infra/mcp_servers.yaml, which is the workspace demo's and is
+# NOT changed). Read by the finance gateway only: start-walnut-finance.ps1 sets
+# WALNUT_MCP_SERVERS=infra/mcp_servers.finance.yaml for that process.
+#
+# EVERYTHING HERE IS SYNTHETIC: fixtures/packs/finance is an invented lender (see its README).
+#
+# Sources (all read-only; the two DB connections use the SELECT-only role `finance_reader`):
+#   finance_core_banking   Postgres finance_demo, schema core_banking   (parties, accounts, ...)
+#   finance_crm            Postgres finance_demo, schema crm            (orgs, contacts, RMs, ...)
+#   finance_filings        fixtures/packs/finance/filings       .md/.txt annual reports
+#   finance_credit_memos   fixtures/packs/finance/credit_memos  .md underwriting memoranda
+#   finance_mailbox        fixtures/packs/finance/mailbox/messages  .eml messages
+#   finance_spreadsheets   fixtures/packs/finance/spreadsheets  .csv exports
+# Write connections (purpose: agent_write — never ingested; only for read-write agents):
+#   finance_db_writer      INSERT on ops.follow_up_task only (role finance_agent_writer)
+#   finance-followups      create-only .md/.txt files under var/finance/followups
+#
+# Route: DIRECT only (each server is launched on this machine over stdio). The finance folders are
+# NOT mounted into the MCPJungle container, and adding a mount would mean recreating the container
+# the workspace demo is using — so there is no `mcpjungle:` block here on purpose.
+#
+# Passwords are ${VAR} references, expanded at connect time and never written out; the launcher
+# sets the SYNTHETIC demo values (WALNUT_FIN_PG_READER_PASSWORD / WALNUT_FIN_PG_WRITER_PASSWORD).
+# ${WALNUT_ROOT} is databridge/ (the launcher sets it).
+
+version: 1
+
+servers:
+  - id: finance_core_banking
+    title: Finance core banking (Postgres)
+    description: >-
+      Synthetic core-banking ledger: parties, addresses, contacts, accounts, facilities,
+      transactions, monthly balances, collateral, covenants and covenant tests.
+    source_class: database
+    aliases: [core banking, ledger, the bank]
+    trust: untrusted
+    package: {registry: pypi, name: postgres-mcp, verified: "2026-10-02 - FIN1 dry run (see wiki/40-reviews/FIN-live-dry-run-2026-10-02.md)"}
+    direct:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=restricted"]
+      env:
+        DATABASE_URI: "postgresql://finance_reader:${WALNUT_FIN_PG_READER_PASSWORD}@127.0.0.1:${WALNUT_DEMO_PG_PORT:-5433}/finance_demo"
+    scope:
+      roots: ["core_banking"]
+    tools_hint:
+      enumerate: list_objects          # {"schema_name": "core_banking", "object_type": "table"}
+      describe: get_object_details
+      query: execute_sql               # read-only twice: restricted mode AND the SELECT-only role
+    notes: >
+      Whole tables are read by default, in pages (TAB6, R-026). A cap applies only when declared
+      (scope.max_rows_per_table), and the run report then says "N of M rows read" per table.
+      Connections registered before TAB6 kept a 1000-row cap; re-register them on a fresh state.
+
+  - id: finance_crm
+    title: Finance CRM (Postgres)
+    description: >-
+      Synthetic CRM: relationship managers, organisations, contacts, interactions, opportunities.
+    source_class: database
+    aliases: [crm, the CRM]
+    trust: untrusted
+    package: {registry: pypi, name: postgres-mcp, verified: "2026-10-02 - FIN1 dry run"}
+    direct:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=restricted"]
+      env:
+        DATABASE_URI: "postgresql://finance_reader:${WALNUT_FIN_PG_READER_PASSWORD}@127.0.0.1:${WALNUT_DEMO_PG_PORT:-5433}/finance_demo"
+    scope:
+      roots: ["crm"]
+    tools_hint:
+      enumerate: list_objects
+      describe: get_object_details
+      query: execute_sql
+
+  - id: finance_filings
+    title: Finance filings (annual reports)
+    description: Synthetic annual reports and financial statements (.md / .txt).
+    source_class: files
+    aliases: [filings, annual reports]
+    trust: untrusted
+    package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--root", "${WALNUT_ROOT}/fixtures/packs/finance/filings"]
+    scope: {roots: ["."], include_extensions: [".md", ".txt"], max_bytes: 26214400}
+    tools_hint: {enumerate: list_dir, read_binary: read_bytes, stat: stat_file}
+
+  - id: finance_credit_memos
+    title: Finance credit memos
+    description: Synthetic underwriting memoranda (.md).
+    source_class: files
+    aliases: [credit memos, memos]
+    trust: untrusted
+    package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--root", "${WALNUT_ROOT}/fixtures/packs/finance/credit_memos"]
+    scope: {roots: ["."], include_extensions: [".md"], max_bytes: 26214400}
+    tools_hint: {enumerate: list_dir, read_binary: read_bytes, stat: stat_file}
+
+  - id: finance_mailbox
+    title: Finance mailbox
+    description: Synthetic RFC 5322 email messages (.eml), threaded.
+    source_class: files
+    aliases: [mailbox, email, emails, mail]
+    trust: untrusted
+    package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--root", "${WALNUT_ROOT}/fixtures/packs/finance/mailbox/messages"]
+    scope: {roots: ["."], include_extensions: [".eml"], max_bytes: 26214400}
+    tools_hint: {enumerate: list_dir, read_binary: read_bytes, stat: stat_file}
+
+  - id: finance_spreadsheets
+    title: Finance spreadsheets (CSV exports)
+    description: Synthetic covenant tracker, exposure summary, limit utilisation, PD/LGD model.
+    source_class: files
+    aliases: [spreadsheets, sheets]
+    trust: untrusted
+    package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--root", "${WALNUT_ROOT}/fixtures/packs/finance/spreadsheets"]
+    scope: {roots: ["."], include_extensions: [".csv"], max_bytes: 26214400}
+    tools_hint: {enumerate: list_dir, read_binary: read_bytes, stat: stat_file}
+
+  # --- agent WRITE connections: purpose agent_write => plans and ingest runs refuse them ---------
+  - id: finance_db_writer
+    title: Finance ops - agent write (follow-up tasks only)
+    description: INSERT-only access to ops.follow_up_task for read-write agents. Never ingested.
+    source_class: database
+    purpose: agent_write
+    writes_for: [finance_core_banking]
+    trust: untrusted
+    package: {registry: pypi, name: postgres-mcp, verified: "2026-10-02 - role finance_agent_writer: INSERT on ops.follow_up_task only"}
+    direct:
+      transport: stdio
+      command: uvx
+      args: ["--with", "mcp<2", "postgres-mcp", "--access-mode=unrestricted"]
+      env:
+        DATABASE_URI: "postgresql://finance_agent_writer:${WALNUT_FIN_PG_WRITER_PASSWORD}@127.0.0.1:${WALNUT_DEMO_PG_PORT:-5433}/finance_demo"
+    scope:
+      roots: []
+    tools_hint:
+      write: execute_sql            # one INSERT INTO ops.follow_up_task (...) per approved action
+
+  - id: finance-followups
+    title: Finance follow-ups (write, create-only)
+    description: Write connection for read-write agents; create-only .md/.txt drafts.
+    source_class: files
+    purpose: agent_write
+    trust: untrusted
+    direct:
+      transport: stdio
+      command: "${WALNUT_PYTHON:-python}"
+      args: ["${WALNUT_ROOT}/packages/mcp_ingest/servers/files_blob/server.py", "--write-root", "${WALNUT_ROOT}/var/finance/followups", "--create-write-root", "--write-ext", ".md", "--write-ext", ".txt"]
+    tools_hint: {write: write_file}

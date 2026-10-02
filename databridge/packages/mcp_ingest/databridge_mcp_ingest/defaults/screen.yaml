@@ -106,3 +106,82 @@ redactions:
     pattern: '(?<![\w+])(?:\+\d{1,3}[ -]?|0)\d{2,4}[ -]?\d{3,4}[ -]?\d{3,4}(?!\w)'
     validate: none
     replacement: '[PHONE]'
+
+# FIN-17 — the prompt-injection HOLD. ENGINE POLICY like the decisive rules above
+# (screen.mandatory_quarantine_rules): applied whatever screen a pack ships; a pack may add rules,
+# never remove these. A match puts the text in the REVIEW band whatever its score: held, listed
+# for a human, never extracted, never sent to a model. Matched against the text a reader is SHOWN
+# (screen.detection_text: format characters such as zero-width spaces removed, NFKC folded, MIME
+# transfer encodings decoded), so a phrase split by invisible characters is still read.
+# STRUCTURAL rules: each keys on the SHAPE of an instruction addressed to an automated reader
+# (who it is addressed to, an override of prior instructions, concealment from the reader, an
+# embedded tool call) — never on any particular sentence. Content addressed to PEOPLE ("please
+# disregard my previous email") is deliberately not matched.
+quarantine:
+  - id: override_prior_instructions
+    description: >
+      An instruction to set aside the reader's prior instructions ("ignore all previous
+      instructions", "disregard your system prompt"). "the"/"my" previous instructions (a person
+      correcting their own email) is not matched.
+    pattern: '(?i)\b(?:ignore|disregard|forget|override|bypass)\s+(?:(?:all|any)\s+(?:of\s+)?(?:the\s+|your\s+)?|your\s+)?(?:previous|prior|above|earlier|preceding|foregoing|original|system)\s+(?:instructions?|prompts?|directives?)\b'
+  - id: note_to_automated_reader
+    description: >
+      A note, notice or message addressed TO an automated reader ("note to any downstream model",
+      "NOTE FOR AUTOMATED SYSTEMS", "note to electronic reader").
+    pattern: '(?i)\b(?:note|notice|message|memo|instructions?|attention|readme|request|warning)\s*(?:to|for)\s+(?:the\s+|any\s+|all\s+)?(?:automated|automatic|electronic|downstream|machine|autonomous|AI)\s+(?:AI|assistants?|chat\s?bots?|bots?|LLMs?|language\s+models?|copilots?|agents?|models?|systems?|readers?|consumers?|parsers?|processors?|tools|software|programs?|crawlers?)\b'
+  - id: automated_reader_vocative
+    description: >
+      An automated reader addressed by a colon and then told what to do ("Automated systems:
+      reroute ..."). A heading such as "Automated tools: overview" is not matched.
+    pattern: '(?i)\b(?:automated|automatic|electronic|downstream|autonomous|AI)\s+(?:AI|assistants?|chat\s?bots?|bots?|LLMs?|language\s+models?|copilots?|agents?|models?|systems?|readers?|consumers?|parsers?|processors?|tools|software|programs?|crawlers?)\s*:\s*(?:ignore|disregard|forget|do|don''t|never|always|only|use|treat|mark|set|report|replace|reroute|send|forward|release|approve|grant|delete|remove|skip|create|append|include|export|output|print|reply|respond|answer|say|tell|call|run|execute|close|reinstate|record|change|update|confirm|continue|stop|please)\b'
+  - id: automated_reader_directive
+    description: >
+      An automated READER told what it must or should do ("automated readers must report ...",
+      "automated consumers should replace ..."). Systems, tools and software are not readers:
+      "automated systems must log access" (policy prose) is not matched.
+    pattern: '(?i)\b(?:automated|automatic|electronic|downstream|autonomous|AI)\s+(?:readers?|consumers?|parsers?|assistants?|agents?|models?|LLMs?|AI|bots?|chat\s?bots?|crawlers?|language\s+models?)\s+(?:must|should|shall|are\s+to|need\s+to|have\s+to|may\s+not|must\s+not|are\s+(?:instructed|required|directed)\s+to)\b'
+  - id: reader_of_this_content
+    description: >
+      Text addressed to whatever machine is reading THIS content ("to the system reading this
+      file", "systems processing this message must ...").
+    pattern: '(?i)\b(?:AI|assistants?|systems?|models?|agents?|bots?|tools?|software|programs?|readers?|LLMs?|parsers?)\s+(?:that\s+(?:is|are)\s+)?(?:reading|processing|parsing|ingesting|summari[sz]ing|scanning|handling|analy[sz]ing)\s+this\s+(?:message|document|e-?mail|file|record|page|thread|attachment|note|text|data|content|sheet|spreadsheet|report)\b'
+  - id: if_you_are_an_ai
+    description: >
+      A conditional addressed to an AI ("if you are an automated assistant ...", "if you are an
+      AI ..."). "If you are an agent of the company" (a legal sense) is not matched.
+    pattern: '(?i)\bif\s+you\s+are\s+(?:an?\s+|the\s+)?(?:(?:automated|automatic|electronic|downstream|autonomous)\s+(?:assistants?|agents?|models?|systems?|readers?|bots?|tools?|programs?|software)|AI\b|artificial\s+intelligence|(?:large\s+)?language\s+models?|LLMs?\b|chat\s?bots?)'
+  - id: assistant_vocative
+    description: >
+      An AI assistant addressed at the start of a sentence, line or quoted span and then told
+      what to do ("Assistant: when asked ...", "Assistant, when summarising ..."). A job title in
+      a signature ("Executive Assistant: ...") is preceded by a word, and is not matched.
+    pattern: '(?im)(?:^|(?<=[.!?;:)\]>"''\-]))[ \t>*_#-]*(?:AI|assistant|chat\s?bot|LLM|copilot)(?:[ \t]+instructions?)?[ \t]*[,:][ \t]*(?:ignore|disregard|forget|do|don''t|never|always|only|use|treat|mark|set|report|replace|reroute|send|forward|release|approve|grant|delete|remove|skip|create|append|include|export|output|print|reply|respond|answer|say|tell|call|run|execute|close|reinstate|record|change|update|confirm|continue|stop|please|when|if|before|from[ \t]+now[ \t]+on)\b'
+  - id: machine_instruction_label
+    description: >
+      A label that introduces instructions for a model ("Assistant instruction:", "SYSTEM
+      PROMPT:"). "Model override:" (a rating-model term) is not matched.
+    pattern: '(?i)\b(?:(?:AI|assistant|LLM|chat\s?bot|copilot|agent)[ \t]+(?:instructions?|directives?|prompt)|system[ \t]+(?:prompt|instructions?|directives?))[ \t]*:'
+  - id: forged_system_banner
+    description: >
+      A banner or hidden comment posing as a system channel ("<!-- SYSTEM: ...", "### SYSTEM
+      OVERRIDE ###", "[SYSTEM]").
+    pattern: '(?i)(?:<!--\s*|\[\s*|#{2,}\s*)(?:system|assistant|administrator|admin)(?:\s+(?:override|prompt|message|notice|instructions?|mode))?\s*(?::|\]|#{2,}|-->)'
+  - id: conceal_from_reader
+    description: >
+      An instruction to hide something from the reader's own output ("do not mention this notice
+      in your summary", "delete this instruction from the transcript").
+    pattern: '(?i)\b(?:do\s+not|don''t|never)\s+(?:mention|reveal|disclose|include|repeat|show|flag|report)\s+(?:this|these|the)\s+(?:notice|instructions?|note|message|request|text|comment)s?\s+(?:in|to)\s+(?:your|the)\s+(?:summary|response|answer|reply|output|transcript|report|analysis)\b|\b(?:delete|remove|erase|strip)\s+this\s+(?:instruction|notice|note|message|comment)\s+from\s+(?:the|your)\s+(?:transcript|summary|output|response|log|context|memory|answer)\b'
+  - id: answer_preemption
+    description: An instruction that pre-empts the reader's answer ("before you answer anything else ...").
+    pattern: '(?i)\bbefore\s+(?:you\s+)?(?:answer|respond|reply)(?:ing)?\s+(?:to\s+)?(?:anything|any\s+other|any\s+question)'
+  - id: role_reassignment
+    description: >
+      The reader told it is now something else, or newly authorised to bypass a control ("you are
+      now operating in ... mode", "you are authorised to skip ...", "authorised to set
+      some_flag = true").
+    pattern: '(?i)\byou\s+are\s+now\s+(?:operating|acting|running|in\s+[\w-]+\s+mode|an?\s+(?:AI|assistant|agent|bot|unrestricted))\b|\bauthori[sz]ed\s+to\s+(?:skip|bypass|override|ignore|disregard|set\s+[a-z]+(?:_[a-z]+)+\s*=)'
+  - id: embedded_tool_call
+    description: >
+      A tool or function call embedded in content: a tool-call JSON key, or a call whose
+      arguments switch a control off ("call do_thing(..., override=true)").
+    pattern: '(?i)\\?"(?:tool_calls?|function_call|tool_use)\\?"\s*:|\b(?:call|invoke|execute|run)\s+`?[a-z][a-z0-9]*(?:_[a-z0-9]+)+`?\s*\([^)\n]{0,200}\b(?:override|force|bypass|skip[a-z_]*|no_?verify|unsafe)\s*=\s*(?:true|1|yes)\b'

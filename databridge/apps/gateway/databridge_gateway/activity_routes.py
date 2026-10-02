@@ -940,7 +940,9 @@ _REFUSAL_KEYS = ("decision", "reason_code", "by", "claimed_by", "at")
 #: payload (args, result pointers, rows) are NOT: read them where their own route masks them.
 HISTORY_KEYS = ("event", "status", "by", "at", "recorded_at", "reason", "note", "outcome",
                 "idempotency_key", "decision", "reason_code", "claimed_by", "action_id", "name",
-                "tool", "automation_mode", "stage", "action", "attempt")
+                "tool", "automation_mode", "stage", "action", "attempt",
+                # FIN-16: how a decider was authenticated (dev token or not) — scalars only.
+                "authenticated_by", "dev_only")
 
 
 def public_history(events: Optional[list]) -> list[dict]:
@@ -985,8 +987,14 @@ def approval_items(run_id: str, agent: str, events: list[dict], record: dict) ->
             outcome = "approved"
         else:
             outcome = "awaiting_decision"
-        decider = next((e.get("by") for e in reversed(decisions)
-                        if isinstance(e.get("by"), str) and e.get("by")), None)
+        decider_ev = next((e for e in reversed(decisions)
+                           if isinstance(e.get("by"), str) and e.get("by")), None)
+        decider = decider_ev.get("by") if decider_ev is not None else None
+        # FIN-16: how the decider was authenticated, from the decision event ITSELF (the runtime
+        # records `authenticated_by` and, for the dev token's mechanism, `dev_only: true`). A
+        # decision made with the public dev token is marked, never shown as a plain sign-in.
+        decider_dev_only = bool(decider_ev is not None and decider_ev.get("dev_only") is True)
+        decider_auth = _scalar(decider_ev.get("authenticated_by")) if decider_ev else None
         # the row sits at its LATEST recorded event: the outcome, else the decision, else the ask
         last = max((e for e in evs if parse_ts(e.get("at"))),
                    key=lambda e: sort_key(e.get("at")), default=proposal)
@@ -1003,9 +1011,14 @@ def approval_items(run_id: str, agent: str, events: list[dict], record: dict) ->
             automation_mode=_scalar(proposal.get("automation_mode")
                                     or entry.get("automation_mode")),
             status=outcome, outcome=outcome,
-            actor=({"type": "person", "id": decider} if decider
-                   else {"type": "agent", "id": agent}),
-            decided_by=decider, proposed_at=_scalar(proposal.get("at")),
+            # `dev_only` is added to the actor ONLY when true: a real sign-in keeps the actor's
+            # shape every other row kind uses ({type, id}); the row's `decided_by_dev_only` says
+            # true/false explicitly either way.
+            actor=(({"type": "person", "id": decider,
+                     **({"dev_only": True} if decider_dev_only else {})})
+                   if decider else {"type": "agent", "id": agent}),
+            decided_by=decider, decided_by_dev_only=decider_dev_only if decider else None,
+            decided_by_authenticated_by=decider_auth, proposed_at=_scalar(proposal.get("at")),
             proposed_by=_produced_by(proposal.get("produced_by")),
             produced_by=_produced_by(proposal.get("produced_by")),
             title=f"{_scalar(proposal.get('name')) or aid} on {_nr(run_id)}",
