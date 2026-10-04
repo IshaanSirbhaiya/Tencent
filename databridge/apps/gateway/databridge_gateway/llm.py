@@ -458,6 +458,132 @@ def _dedupe_passages(passages: list[dict]) -> list[dict]:
     return out
 
 
+#: E2E run 5, F-05: at most this many relationships are read per matched record. The context
+#: prints at most 20 relationship lines and 24 related records, so a record with thousands of
+#: edges (a currency, a jurisdiction) is cut here — by relevance to the asked words, then by age —
+#: and the context SAYS it was cut.
+MAX_NEIGHBOUR_EDGES = 200
+
+def bounded_neighbourhood(store, node_id: str, *, asked: Optional[set] = None,
+                          cap: Optional[int] = None) -> tuple[list, list, int]:
+    """``(nodes, edges, total)``: the 1-hop neighbourhood of ``node_id`` over the OPEN graph, the
+    same set `databridge_graph.neighbors(depth=1)` returns, read through the edge indexes instead
+    of materialising every open edge and node of the store (E2E run 5, F-05: 12 s of a 26 s
+    question on a 50k-node graph was that scan).
+
+    At most ``cap`` edges are converted. They are chosen from the raw rows (cheap) by how many
+    asked words their KIND carries, then oldest first; ``total`` is how many there were, so a
+    caller can say the neighbourhood was cut. Nodes are the root and every open node at the other
+    end of a returned edge."""
+    from databridge_graph.store import row_to_edge, row_to_node
+
+    from brain_server import TOUCHING_EDGES_SQL
+
+    rows = store.fetchall(TOUCHING_EDGES_SQL, (node_id, node_id, node_id))
+    total = len(rows)
+    cap = MAX_NEIGHBOUR_EDGES if cap is None else cap
+    words = asked or set()
+    if total > cap:
+        rows = sorted(rows, key=lambda r: (-_relevance(str(r["kind"]), "", words),
+                                           r["rowid_pk"]))[:cap]
+    rows = sorted(rows, key=lambda r: r["rowid_pk"])
+    edges = [row_to_edge(store, r) for r in rows]
+    nodes = []
+    seen: set = set()
+    for nid in [node_id, *(x for e in edges for x in (e.src_id, e.dst_id))]:
+        if nid in seen:
+            continue
+        seen.add(nid)
+        row = store.open_node_row(nid)
+        if row is not None:
+            nodes.append(row_to_node(store, row))
+    return nodes, edges, total
+
+
+#: E2E run 5, W-04: documents described from their extracted records, and lines per document.
+MAX_EXTRACTED_DOCS = 3
+MAX_EXTRACTED_LINES = 8
+
+
+def _same_document(node, doc_ids: set) -> bool:
+    """A record extracted FROM one of ``doc_ids``: one of its own pointers is a span of it."""
+    return any(getattr(p, "document_id", None) in doc_ids for p in (node.sources or []))
+
+
+def _extracted_from_documents(store, by_id: dict, match_ids: set, passages: list,
+                              doc_kinds: set, asked: set, *, is_subject, rel_line, cite_node,
+                              tags, seen_rel: set) -> list[str]:
+    """Lines for each DOCUMENT neighbour whose source published no passage in this context: the
+    relationships the graph extracted from it (its own edges, then the edges of the non-subject
+    records whose own pointers are spans of the same document). Read by index and bounded
+    (`MAX_EXTRACTED_DOCS` documents, `MAX_EXTRACTED_LINES` lines each). Provenance decides
+    what belongs to a document — never a kind name. Every line carries its pointers' tags; a
+    subject endpoint carries its identity caveat (`rel_line`)."""
+    quoted = {p.get("source_id") for p in passages or []}
+    docs = [n for nid, n in by_id.items()
+            if nid not in match_ids and str(getattr(n.kind, "value", n.kind)) in doc_kinds
+            and not ({p.source_id for p in n.sources} & quoted)]
+    def _edge_score(e, doc_id: str) -> int:
+        """How many asked words a relationship carries in its kind and in the label and kind of
+        what it reaches — not the document itself, and not the entities already matched (every
+        document here mentions those). A relationship already written scores nothing."""
+        if (e.src_id, e.kind.value, e.dst_id) in seen_rel:
+            return -1
+        ends = " ".join(f"{by_id[x].label} {getattr(by_id[x].kind, 'value', by_id[x].kind)}"
+                        for x in (e.src_id, e.dst_id)
+                        if x in by_id and x != doc_id and x not in match_ids)
+        return _relevance(e.kind.value, ends, asked)
+
+    scored_docs: list[tuple[int, str, list[str]]] = []
+    for doc in docs:
+        doc_ids = {p.document_id for p in doc.sources if getattr(p, "document_id", None)}
+        if not doc_ids:
+            continue
+        if not doc.sources:
+            continue
+        nodes, edges, _total = bounded_neighbourhood(store, doc.id, asked=asked,
+                                                     cap=MAX_EXTRACTED_LINES)
+        for n in nodes:
+            by_id.setdefault(n.id, n)
+        found = list(edges)
+        # the records extracted from this same document: their relationships are its contents
+        for n in nodes:
+            if n.id == doc.id or is_subject(n.kind) or not _same_document(n, doc_ids):
+                continue
+            sub_nodes, sub_edges, _t = bounded_neighbourhood(store, n.id, asked=asked,
+                                                             cap=MAX_EXTRACTED_LINES)
+            for x in sub_nodes:
+                by_id.setdefault(x.id, x)
+            found.extend(e for e in sub_edges
+                         if any(getattr(p, "document_id", None) in doc_ids for p in e.sources))
+        keep = [e for e in found if e.src_id in by_id and e.dst_id in by_id]
+        # what the question asks about first; the document's own order after that
+        ranked = sorted(enumerate(keep), key=lambda ie: (-_edge_score(ie[1], doc.id), ie[0]))
+        best = _edge_score(ranked[0][1], doc.id) if ranked else 0
+        scored_docs.append((best, doc, [e for _i, e in ranked]))
+    # documents whose extracted records the question asks about first; then the latest name
+    # first (a dated file name sorts by its date)
+    scored_docs.sort(key=lambda t: (-t[0], [-ord(c) for c in str(t[1].label)]))
+    out: list[str] = []
+    for _best, doc, edges in scored_docs[:MAX_EXTRACTED_DOCS]:
+        body: list[str] = []
+        for e in edges:
+            key = (e.src_id, e.kind.value, e.dst_id)
+            if key in seen_rel:
+                continue
+            line = rel_line(e, prefix="    ")
+            if line is None:
+                continue
+            seen_rel.add(key)
+            body.append(line)
+            if len(body) >= MAX_EXTRACTED_LINES:
+                break
+        if body:
+            out.append(f"- {tags(cite_node(doc))} {doc.label} [{doc.kind.value}]")
+            out.extend(body)
+    return out
+
+
 def build_context(brain, question: str, *, top_k: int = 8) -> dict:
     """Serialise the relevant subgraph as the LLM context block + return the cited facts.
 
@@ -486,6 +612,7 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         attestation_clause,
         identity_caveat_for,
         is_vague_question,
+        link_entities_indexed,
         passage_citation,
         passages_bound_to,
         record_id_matches,
@@ -494,7 +621,6 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         subject_selection_refusal,
         withheld_items,
     )
-    from databridge_graph import link_entities, neighbors
     from databridge_graph.identity import ambiguous_refusal, same_label_node_ids
     from databridge_graph.kinds import edge_kinds_binding_to, node_kinds_binding_to
     from databridge_graph.meta import EdgeMetaKind, NodeMetaKind
@@ -519,6 +645,13 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
     # primary entity. Decided BEFORE the no-match branch, so an id-only question never falls
     # through to "no entity matched".
     records = record_id_matches(store, question) if explicit is None else [[], []]
+    if explicit is None and not (records[0] or records[1]) and withheld_items(
+            question, getattr(brain, "ingest_root", None), named=True):
+        # E2E run 5, F-06: the question NAMES an item the ingestion screen withheld or holds
+        # for review. Records sharing a word with it would be narrated as "the context holds no
+        # such review"; the deterministic branch names the item as withheld instead, with its
+        # rule, and quotes nothing of it. No model is called.
+        return _no_context(deterministic_reason="withheld_or_needs_clarification")
     if explicit is not None:
         matches = [explicit]
     elif records[0] or records[1]:
@@ -528,7 +661,8 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         # record carrying the same identifier follows, as a SEPARATE record.
         matches = (records[0] + records[1])[:top_k]
     else:
-        matches = link_entities(store, question, top_k=top_k)
+        # F-05: the same BM25 linking, read from the raw rows by index (cached per store)
+        matches = link_entities_indexed(store, question, top_k=top_k)
         if matches:
             shared = same_label_node_ids(store, matches[0].id) or [matches[0].id]
             if is_subject(matches[0].kind):
@@ -622,15 +756,24 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
                 "candidates": [], "refusal": "", "passages": passages,
                 "passages_withheld": passages_withheld}
 
-    # collect each match + its 1-hop neighbourhood
+    # collect each match + its 1-hop neighbourhood — read through the edge indexes, never the
+    # whole graph (E2E run 5, F-05: `neighbors()` materialised all 49k open edges per question)
+    asked = _question_words(question)
     by_id: dict = {}
     edges_seen: list = []
+    neighbourhood_cut: list[tuple[str, int, int]] = []
+    edge_ids: set = set()
     for m in matches:
         by_id[m.id] = m
-        sub = neighbors(store, m.id, depth=1)
-        for n in sub.nodes:
+        sub_nodes, sub_edges, total = bounded_neighbourhood(store, m.id, asked=asked)
+        for n in sub_nodes:
             by_id.setdefault(n.id, n)
-        edges_seen.extend(sub.edges)
+        for e in sub_edges:
+            if e.id not in edge_ids:
+                edge_ids.add(e.id)
+                edges_seen.append(e)
+        if total > len(sub_edges):
+            neighbourhood_cut.append((m.label, len(sub_edges), total))
 
     def _count_of(e) -> tuple[Optional[int], Optional[str]]:
         """The claim's candidate count and its tag — only when the edge holds a pointer for it."""
@@ -717,7 +860,6 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
             out.append(line)
         return out
 
-    asked = _question_words(question)
     # Relationships the question asks about come first (their kind and the field they were read
     # from, against the asked words), so the 20-line cap below never cuts the one asked for.
     edges_seen.sort(key=lambda e: -_relevance(e.kind.value, _field_of(e) or "", asked))
@@ -728,6 +870,10 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         lines.append(f"  NOTE: the identifier names {', '.join(repr(n.label) for n in records[0])}"
                      f"; {len(records[1])} other record(s) carry the same identifier and are "
                      f"listed after it as SEPARATE records — answer about the named record.")
+    for label, shown, total in neighbourhood_cut:
+        lines.append(f"  NOTE: {label!r} has {total} relationships; the {shown} most relevant to "
+                     f"the question were read. A relationship not listed below is not shown, "
+                     f"not absent.")
     for group in same_name_groups:
         if len(group) > 1:
             labels = sorted({by_id[i].label for i in group if i in by_id})
@@ -797,25 +943,18 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         lines.append("RELATED RECORDS (one hop from the entities above; their own attributes):")
         lines.extend(rel_lines)
 
-    rels = []
-    seen_rel = set()
-    for e in edges_seen:
-        if e.src_id not in by_id or e.dst_id not in by_id:
-            continue
-        key = (e.src_id, e.kind.value, e.dst_id)
-        if key in seen_rel:
-            continue
-        if len(rels) >= 20:
-            break
+    def _rel_line(e, prefix: str = "- ") -> Optional[str]:
+        """One relationship line with the edge's tag and both endpoints' tags; ``None`` when any
+        of the three has no pointer (the line is then not written)."""
         src, dst = by_id[e.src_id], by_id[e.dst_id]
         # The relationship's own pointer and both endpoints' — a line missing any is not written.
         etag = _cite(_edge_key(e), f"{src.label} → {dst.label}", "relationship", e.sources,
                      edge_kind=e.kind.value)
         stag, dtag = _cite_node(src), _cite_node(dst)
         if not (etag and stag and dtag):
-            continue
-        seen_rel.add(key)
-        line = f"- {_tags(etag, stag, dtag)} {src.label} --[{e.kind.value.upper()}]--> {dst.label}"
+            return None
+        line = (f"{prefix}{_tags(etag, stag, dtag)} {src.label} --[{e.kind.value.upper()}]--> "
+                f"{dst.label}")
         field = _field_of(e)
         if field:
             line += f"  (read from field {field})"
@@ -829,11 +968,43 @@ def build_context(brain, question: str, *, top_k: int = 8) -> dict:
         for end in (src, dst):
             if is_subject(end.kind):
                 line += f"  [{end.label}: IDENTITY — {subject_node_caveat(end.kind)}]"
+        return line
+
+    rels = []
+    seen_rel = set()
+    for e in edges_seen:
+        if e.src_id not in by_id or e.dst_id not in by_id:
+            continue
+        key = (e.src_id, e.kind.value, e.dst_id)
+        if key in seen_rel:
+            continue
+        if len(rels) >= 20:
+            break
+        line = _rel_line(e)
+        if line is None:
+            continue
+        seen_rel.add(key)
         rels.append(line)
     if rels:
         lines.append("")
         lines.append("RELATIONSHIPS:")
         lines.extend(rels)
+
+    # E2E run 5, W-04: a DOCUMENT one hop from the entities above, none of whose text is
+    # published as passages ("what did we agree with X in our most recent meeting?" — the meeting
+    # note mentions X, but no extract of it can be quoted). The graph still holds what was
+    # extracted FROM it, each with its pointer: its own relationships, and those of the records
+    # extracted from the same document (the meeting it records, what that meeting was about, who
+    # was party to it). They are written here instead of the context saying nothing about it.
+    doc_lines = _extracted_from_documents(
+        store, by_id, match_ids, passages, doc_kinds, asked, is_subject=is_subject,
+        rel_line=_rel_line, cite_node=_cite_node, tags=_tags, seen_rel=seen_rel)
+    if doc_lines:
+        lines.append("")
+        lines.append("EXTRACTED FROM DOCUMENTS (no passage of these documents is published; "
+                     "what the graph extracted from each, with its pointer — the document's own "
+                     "wording is not available):")
+        lines.extend(doc_lines)
     if passages:
         lines.append("")
         lines.extend(_passage_block(passages))

@@ -66,10 +66,12 @@ from .connections import SourceConnection, load_connection
 from .crawl import (CrawlError, Decision, Item, decide, enumerate_documents, enumerate_resources,
                     enumerate_tables, fetch_document, fetch_table, item_identity, table_text)
 from .extract import ExtractionFailed, extract_text_cached, extractor_for, text_digest
-from .ledger import emit_event, item_event_id, now_iso, read_jsonl, scrub, typed_ledger
+from .ledger import (emit_event, item_event_id, now_iso, public_text, read_jsonl, scrub,
+                     typed_ledger)
 from .plans import CrawlPlan, PlanError, load_plan
 from .records import DRIFT_PENDING_APPROVAL, DriftHolds, RunReportRecord, load_holds
-from .screen import load_overrides, load_screen, screen_policy, screen_text
+from .screen import (ScreenResult, apply_masks, load_overrides, load_screen, screen_policy,
+                     screen_text)
 
 #: The runner reads `<sources>/<id>.holds.yaml` (written by adapter agents) and holds exactly the
 #: table, path or plan step a pending shape drift affects — the rest of the source keeps syncing.
@@ -998,6 +1000,9 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
     timings = Timings(ledgers["timings"])
     meter = None
     state = load_state(source_id)
+    # E2E run 5 F-01/F-02: the screen stage's verdict on every table row, reused by the build in
+    # this process (a resumed build has none and screens the rows itself)
+    row_verdicts: dict = {}
     report.notes.extend(screen_cfg.notes)
     report.notes.append(f"screen rules: {screen_cfg.source}")
     report.screen_policy = screen_policy(screen_cfg)
@@ -1033,15 +1038,21 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         if "extract" not in stages_done:
             t0 = time.monotonic()
             decided = load_decided(source_id)
+            # R-029 TIDY2: the anchor kind a document would be built under NOW (a connection's
+            # `document_kind` may have been named since it was last built)
+            anchor_now = document_kind(vocab, conn.document_kind)[0] if vocab is not None \
+                else None
             _extract(captured, state, ledgers, progress, timings, cache, decided=decided,
-                     fingerprint=screen_fingerprint(screen_cfg), overrides=overrides)
+                     fingerprint=screen_fingerprint(screen_cfg), overrides=overrides,
+                     source_id=source_id, sources_root=sources_root, anchor_kind=anchor_now)
             mark("extract", time.monotonic() - t0)
         extracted = read_jsonl(run_dir / "extracted.jsonl")
 
         # ---------------------------------------------------------------- screen (pre-model)
         if "screen" not in stages_done:
             t0 = time.monotonic()
-            _screen(extracted, screen_cfg, overrides, ledgers, progress, timings)
+            _screen(extracted, screen_cfg, overrides, ledgers, progress, timings,
+                    source_id=source_id, row_verdicts=row_verdicts)
             _record_decided(source_id, run_id, run_dir, screen_fingerprint(screen_cfg))
             mark("screen", time.monotonic() - t0)
         decisions = {r["item_id"]: r for r in read_jsonl(run_dir / "governance.jsonl")}
@@ -1082,7 +1093,7 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
                            decisions, state, ledgers, run_dir, progress, checkpoint,
                            sources_root, report, timings=timings, workers=workers,
                            bridges=bridges, overrides=overrides,
-                           retrieved_at=_run_started(run_dir))
+                           retrieved_at=_run_started(run_dir), row_verdicts=row_verdicts)
             t_rm = time.perf_counter()
             _emit_item_events(conn.id, run_id, built, state, run_dir, enumeration_complete,
                               report, store=store, doc_kind=doc_kind, ledger=ledgers["removed"],
@@ -1136,6 +1147,8 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         promoted = _promote_state(state, run_dir, verified=bool(report.verify.get("ok")))
         if promoted["promoted"]:
             save_state(source_id, state, run_id=run_id)
+            if any(r.get("kind") == "table" for r in read_jsonl(run_dir / "build.jsonl")):
+                _refresh_links_elsewhere(source_id, vocab, sources_root, report)
         if promoted["withheld"]:
             report.notes.append(f"state NOT advanced for {promoted['withheld']} item(s): "
                                 f"verification failed, so the next sync rebuilds and re-verifies "
@@ -1289,8 +1302,9 @@ def _write_report(report: RunReport, run_dir: Path) -> None:
     # built THROUGH the typed format its readers use (`records.RunReportRecord`)
     body = json.loads(json.dumps(report.as_dict(), default=str))
     # f1 #5: nothing a person reads back from report.json carries a credential
-    body["message"] = scrub(body.get("message") or "")
-    body["notes"] = [scrub(n) for n in body.get("notes") or []]
+    # R-029 TIDY2: ... nor a server path (a rules file, a store, a source's own directory)
+    body["message"] = public_text(scrub(body.get("message") or ""))
+    body["notes"] = [public_text(scrub(n)) for n in body.get("notes") or []]
     body["produced_by"] = _run_produced_by(report, run_dir)
     body = RunReportRecord.model_validate(body).model_dump(mode="json", exclude_unset=True)
     _atomic_text(run_dir / "report.json", json.dumps(body, sort_keys=True, indent=1,
@@ -1579,17 +1593,30 @@ def held_items(run_dir: Path) -> dict[str, dict]:
 def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
              timings: Optional[Timings] = None, cache: bool = True, *,
              decided: Optional[dict] = None, fingerprint: str = "",
-             overrides: Optional[set] = None) -> None:
+             overrides: Optional[set] = None, source_id: Optional[str] = None,
+             sources_root: Optional[Path] = None, anchor_kind: Optional[str] = None) -> None:
     from .extract import extract_text
 
     timings = timings or Timings()
     decided, overrides = decided or {}, overrides or set()
+    # E2E run 5 F-03: unchanged tables that must be rebuilt anyway (a referenced table was built,
+    # a held row was lifted) — decided over the WHOLE run's captures first, so order is moot
+    rebuild = (_rebuild_for_references(captured, state, source_id, overrides,
+                                       approved=_approved_digests(source_id, sources_root))
+               if source_id else {})
     for i, rec in enumerate(captured, 1):
         iid, sha = rec["item_id"], rec["sha256"]
         prev = state.get(iid)
+        # R-029 TIDY2: a DOCUMENT built under another anchor kind than the one it would get now
+        # (an operator named the connection's `document_kind` after it was built with none) is
+        # rebuilt, so it is anchored. A state written before the kind was recorded is not.
+        if prev and rec.get("kind") != "table" and "anchor_kind" in prev \
+                and prev.get("anchor_kind") != anchor_kind:
+            rebuild[iid] = "anchor_kind_changed"
         # an item seen but NOT built (F-23: a table awaiting its mapping) is never "unchanged":
         # it is re-read until it is built
-        if prev and prev.get("content_hash") == sha and prev.get("graph", True) is not False:
+        if prev and prev.get("content_hash") == sha and prev.get("graph", True) is not False \
+                and iid not in rebuild:
             ledgers["unchanged"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
                                         "last_run": prev.get("run_id")})
             continue
@@ -1611,6 +1638,7 @@ def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
         if rec.get("kind") == "table":
             text = capture.get_text(sha) or ""
             ledgers["extracted"].write({"item_id": iid, "uri": rec["uri"], "sha256": sha,
+                                        **({"rebuild": rebuild[iid]} if iid in rebuild else {}),
                                         "kind": "table", "chars": len(text),
                                         "extractor": "table", "text_sha256": text_digest(text),
                                         # f2 #15: tables carry the metadata anchor too
@@ -1691,7 +1719,7 @@ def _record_decided(source_id: str, run_id: str, run_dir: Path, fingerprint: str
     keep = ("decision", "score", "fired", "rationale", "reverse", "kind", "rules_source")
     for r in ledgers_fresh:
         iid = r.get("item_id")
-        if not iid or r.get("kind") == "table":
+        if not iid or r.get("kind") in ("table", TABLE_ROW):
             continue
         if r.get("decision") in ("block", "review"):
             decided[iid] = {"content_hash": r.get("sha256"), "decision": r.get("decision"),
@@ -1706,12 +1734,87 @@ def _record_decided(source_id: str, run_id: str, run_dir: Path, fingerprint: str
     os.replace(tmp, p)
 
 
+#: governance `kind` of one table ROW the screen did not allow (E2E run 5 F-01). Its `item_id` is
+#: the row's `row_ref` and its `sha256` the row's `row_digest`: what an owner's override names
+TABLE_ROW = "table_row"
+#: the screen stage reports progress through a table every this many rows (E2E run 5 F-02)
+SCREEN_PROGRESS_ROWS = 5000
+#: the verdict kept for the build on a row the screen ALLOWED (its text is not kept twice)
+_ROW_ALLOWED = ScreenResult("allow", 0.0, [], [], "", "allowed by this run's screen", "")
+
+
+def _screen_table(rec: dict, cfg, overrides, ledgers: dict, progress, *, source_id: str,
+                  verdicts: Optional[dict] = None) -> None:
+    """E2E run 5 F-01: a TABLE is screened row by row — one planted cell never holds the whole
+    table. The table's own metadata (names, types, comments, keys: everything but its rows) is
+    screened as the item: when IT is not allowed, the whole table is held, since every row is read
+    through it. Otherwise the table is `allow`ed, every row the screen does not allow is written as
+    its OWN governance decision (`kind: table_row`, `item_id` = its `row_ref`, `sha256` = its
+    `row_digest` — liftable one by one by an owner's override, never as a table), and the build
+    withholds exactly those rows. The table's decision counts them (`rows_held`), so a held row is
+    never silent. `verdicts` collects every row's verdict for the build of this same run."""
+    from .build import _render_pk
+    from .screen import row_digest, row_ref
+
+    snapshot = json.loads(capture.get_bytes(rec["sha256"]))
+    tref = (f"{snapshot.get('schema')}.{snapshot.get('table')}" if snapshot.get("schema")
+            else str(snapshot.get("table")))
+    meta = {k: v for k, v in snapshot.items() if k != "rows"}
+    result = screen_text(json.dumps(meta, sort_keys=True, default=str), cfg,
+                         override_allow=_override_allows(overrides, rec["item_id"],
+                                                         rec["sha256"]))
+    rows = snapshot.get("rows") or []
+    pk = list(snapshot.get("primary_key") or [])
+    held = {"review": 0, "block": 0}
+    for ordinal, row in enumerate(rows):
+        pk_value = _render_pk(row, pk)
+        row_id = pk_value if pk_value is not None else f"#{ordinal}"
+        ref, digest = row_ref(source_id, tref, row_id), row_digest(row)
+        verdict = screen_text(json.dumps(row, sort_keys=True, default=str), cfg,
+                              override_allow=_override_allows(overrides, ref, digest))
+        if verdicts is not None:
+            # an allowed row's verdict is only its decision (the build reads nothing else)
+            verdicts[ref] = (digest, verdict if verdict.decision != "allow" else _ROW_ALLOWED)
+        if ordinal and ordinal % SCREEN_PROGRESS_ROWS == 0:
+            progress("screen", table=tref, rows_done=ordinal, rows_total=len(rows))
+        if verdict.decision == "allow":
+            continue
+        held[verdict.decision] = held.get(verdict.decision, 0) + 1
+        # a key value the screen masks is never written out raw, not even in a ledger line
+        sensitive = any(isinstance(row.get(c), str) and apply_masks(row[c], cfg.redactions)[1]
+                        for c in pk)
+        shown = ref if sensitive else row_id
+        line = verdict.as_record()
+        if verdict.decision == "review":
+            line["reverse"] = ("an authenticated owner approves THIS row (an override naming "
+                               "its row_ref as the item and its row_digest) and the source is "
+                               "re-run; the rest of the table is built meanwhile")
+        ledgers["governance"].write({**line, "item_id": ref, "uri": f"{tref}#{shown}",
+                                     "sha256": digest, "kind": TABLE_ROW, "table": tref,
+                                     "row_id": shown, "table_item_id": rec["item_id"],
+                                     "rules_source": cfg.source, "at": now_iso()})
+    ledgers["governance"].write({"item_id": rec["item_id"], "uri": rec["uri"],
+                                 "sha256": rec["sha256"], "kind": rec.get("kind"),
+                                 "rules_source": cfg.source, "at": now_iso(),
+                                 **result.as_record(),
+                                 # what the decision covers: the metadata; the rows one by one
+                                 "screened": "metadata; rows one by one",
+                                 "rows_screened": len(rows), "rows_held": held})
+
+
 def _screen(extracted: list[dict], cfg, overrides: set[str], ledgers: dict, progress,
-            timings: Optional[Timings] = None) -> None:
+            timings: Optional[Timings] = None, *, source_id: Optional[str] = None,
+            row_verdicts: Optional[dict] = None) -> None:
     timings = timings or Timings()
     fingerprint = screen_fingerprint(cfg)
     for i, rec in enumerate(extracted, 1):
         t0 = time.perf_counter()
+        if rec.get("kind") == "table" and source_id is not None:
+            _screen_table(rec, cfg, overrides, ledgers, progress, source_id=source_id,
+                          verdicts=row_verdicts)
+            timings.add("screen.table", time.perf_counter() - t0)
+            progress("screen", done=i, total=len(extracted))
+            continue
         # f2 #5: screened = extracted; a text that changed since raises (the stage fails loudly)
         text = capture.get_text(rec["sha256"], expect_text_digest=rec.get("text_sha256")) or ""
         override = _override_allows(overrides, rec["item_id"], rec["sha256"])
@@ -1729,6 +1832,8 @@ def _screen(extracted: list[dict], cfg, overrides: set[str], ledgers: dict, prog
             capture.put_redacted(rec["sha256"], result.masked_text)   # shared §5.2 copy
             masked = {"redaction_variant": variant, "masked_sha256": digest}
         timings.add("screen.document", time.perf_counter() - t0)
+        if i % CHECKPOINT_ITEMS == 0:
+            progress("screen", done=i, total=len(extracted))
         ledgers["governance"].write({"item_id": rec["item_id"], "uri": rec["uri"],
                                      "sha256": rec["sha256"], "kind": rec.get("kind"),
                                      "rules_source": cfg.source, "at": now_iso(),
@@ -1795,7 +1900,8 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
            ledgers, run_dir, progress, checkpoint, sources_root, report, *,
            timings: Optional[Timings] = None, workers: int = 1,
            bridges: bool = True, overrides=None,
-           retrieved_at: Optional[dt.datetime] = None) -> list[dict]:
+           retrieved_at: Optional[dt.datetime] = None,
+           row_verdicts: Optional[dict] = None) -> list[dict]:
     """Documents: prepare (chunk + screen) → extract on a pool of `workers` → apply in order,
     one transaction per document. Items whose screen decision is not `allow` never reach this
     loop's model calls. Tables: the approved mapping, deterministically (no model per row)."""
@@ -1907,8 +2013,15 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                  # f2 #12: the mime THIS source captured it as, not the first sighting's
                  "mime": (caps.get(iid) or {}).get("mime") or meta.get("mime"),
                  "replaced_hash": (state.get(iid) or {}).get("content_hash")}
+        prior_kind = (state.get(iid) or {}).get("anchor_kind")
+        if prior_kind and prior_kind != doc_kind:
+            # R-029 TIDY2: rebuilt under another anchor kind - the anchor it had is closed (kept
+            # as history), never left open beside the new one
+            close_prior_anchor(store, source_id=conn.id, item_id=iid, kind=prior_kind)
         new_state = {"content_hash": rec["sha256"], "uri": rec["uri"], "rel": rels.get(iid),
-                     "run_id": run_dir.name, "built_at": now_iso()}
+                     "run_id": run_dir.name, "built_at": now_iso(),
+                     # R-029 TIDY2: the anchor kind it was built under (None: no anchor written)
+                     "anchor_kind": doc_kind}
         ledgers["build"].write({**entry, "outbox": {"event": event, "state": new_state}})
         if out.model_called and not out.entities:
             ledgers["build_skipped"].write({"item_id": iid, "uri": rec["uri"],
@@ -1999,22 +2112,17 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                   else str(s.get("table"))): s for s, _, _, _ in tables}
         # Codex f2 #2: a connection flag is never an approval - always False here; a table is
         # built only under an authenticated principal's digest-bound approval (mapping.py)
-        mapping = ensure_mapping(conn.id, snaps, vocab, harness=harness, auto_approve=False,
-                                 root=sources_root)
+        # R-029 F-01: a row the screen held never reaches the mapper
+        mapping = ensure_mapping(conn.id, {t: _without_held_rows(sn, conn.id, decisions)
+                                           for t, sn in snaps.items()},
+                                 vocab, harness=harness, auto_approve=False, root=sources_root)
         # C-3: links no foreign key declares, measured against this source's and the other
         # sources' captured keys — PROPOSED in the mapping for a person; nothing is built from a
         # proposal. Never fatal: a failure is noted and the build goes on.
-        try:
-            from .mapping import refresh_link_proposals
-
-            proposed_links = refresh_link_proposals(conn.id, snaps, vocab, root=sources_root)
-            n_links = sum(1 for tm in proposed_links.tables.values() for lk in tm.links or []
-                          if lk.get("status") == "proposed")
-            if n_links:
-                report.notes.append(f"links: {n_links} proposed link(s) where no foreign key is "
-                                    f"declared, awaiting a person (mapping links)")
-        except Exception as exc:                                     # noqa: BLE001
-            report.notes.append(f"links: proposal skipped ({_plain_error(exc)})")
+        # E2E run 5 F-11: measured over EVERY table this run captured (an unchanged one too),
+        # so a link is proposed whichever source or table was built first
+        _refresh_links(conn.id, _own_table_snapshots(conn.id, caps), vocab, sources_root,
+                       report)
         # Codex f2 #3: the run is BOUND to the approved mapping it first built tables under. The
         # binding is written BEFORE any table row is written; a later attempt of the same run
         # under a different approved mapping is refused, never mixed. The snapshot is written once.
@@ -2065,7 +2173,7 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                 continue
             ready.append((snapshot, sha, tm.model_dump(), rec))
         if ready:
-            from .mapping import split_kinds
+            from .mapping import mapping_digest, split_kinds
 
             result = build_tables(store, vocab, source_id=conn.id,
                                   tables=[(s, sha, tm) for s, sha, tm, _ in ready],
@@ -2076,7 +2184,13 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                                   # FIN-04: a reference into a split table meets the row under
                                   # the kind the approved split built it as
                                   kind_splits={t: tm.split for t, tm in mapping.tables.items()
-                                               if tm.status == "approved" and tm.split})
+                                               if tm.status == "approved" and tm.split},
+                                  row_verdicts=row_verdicts,
+                                  progress=lambda **kw: progress("build", **kw))
+            # E2E run 5 F-03: what each table still waits for — references whose target row
+            # is not in the graph yet, and rows held for a person — so the day either changes
+            # the table is rebuilt (`_rebuild_for_references`), never left "unchanged"
+            waits = _table_waits(conn.id, result, ready, state, run_dir.name)
             for rec_c in result.get("completeness") or []:
                 _write_completeness(run_dir, rec_c)
             for p in result["pointers"]:
@@ -2093,6 +2207,7 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                 f"tables: {result['nodes']} nodes, {result['edges']} edges, "
                 f"{result['dangling_edges']} dangling edges dropped (counted), "
                 f"{result['rows_blocked']} rows blocked by the screen, "
+                f"{result['rows_review']} rows held for a person (each liftable on its own), "
                 f"{len(result['redactions'])} cells masked, "
                 f"{len(result.get('canonical_masked') or [])} canonical id(s) withheld because "
                 f"the value was masked (those rows merge by row key only), "
@@ -2118,7 +2233,10 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                          "replaced_hash": (state.get(rec["item_id"]) or {}).get("content_hash")}
                 new_state = {"content_hash": sha, "uri": rec["uri"],
                              "rel": rels.get(rec["item_id"]), "run_id": run_dir.name,
-                             "built_at": now_iso()}
+                             "built_at": now_iso(), **waits.get(rec["item_id"], {}),
+                             # F-11: the approved mapping it was built under
+                             "mapping_digest": mapping_digest(mapping.tables[rec["uri"]])
+                             if rec["uri"] in mapping.tables else None}
                 ledgers["build"].write({**entry, "outbox": {"event": event, "state": new_state}})
                 if not snapshot.get("rows"):
                     ledgers["build_skipped"].write({"item_id": rec["item_id"],
@@ -2126,6 +2244,11 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                 built.append(event)
                 state[rec["item_id"]] = _provisional(new_state)
         timings.add("build.tables", time.perf_counter() - t_tab)
+    elif any(c.get("kind") == "table" for c in caps.values()):
+        # nothing to build this run: links are still measured against every captured table
+        _refresh_links(conn.id, _own_table_snapshots(conn.id, caps), vocab, sources_root,
+                       report)
+    _carry_completeness(conn.id, run_dir, caps, state)
     if not_built:
         from .mapping import load_mapping
 
@@ -2183,6 +2306,10 @@ def _discover(conn, vocab, harness, captured: list[dict], decisions: dict, ledge
     held = held_items(run_dir)
     unchanged = {r["item_id"] for r in read_jsonl(run_dir / "unchanged.jsonl")
                  if r.get("item_id") and not r.get("decided")}
+    # R-029 TIDY2: a document is NAMED in the manifest (the setup page shows it) by its path
+    # relative to the source's root, never by the server's absolute path
+    rels = {r["item_id"]: r.get("rel") for r in read_jsonl(run_dir / "inventory.jsonl")
+            if r.get("item_id")}
     tables: dict[str, dict] = {}
     snaps: dict[str, dict] = {}
     held_snaps: dict[str, dict] = {}
@@ -2204,7 +2331,8 @@ def _discover(conn, vocab, harness, captured: list[dict], decisions: dict, ledge
             docs["captured"] += 1
             docs["allowed"] += decision == "allow"
             docs["items"].append({"item_id": iid, "sha256": sha, "decision": decision,
-                                  "held": iid in held, "uri": rec.get("uri")})
+                                  "held": iid in held,
+                                  "uri": rels.get(iid) or public_text(rec.get("uri") or "")})
             continue
         try:
             snapshot = json.loads(capture.get_bytes(sha))
@@ -2217,7 +2345,9 @@ def _discover(conn, vocab, harness, captured: list[dict], decisions: dict, ledge
         if iid in held:
             continue
         if decision in ("allow", "unchanged"):
-            snaps[ref] = snapshot
+            # R-029 F-01: a row the screen held (its own decision) never reaches the mapper
+            snaps[ref] = _without_held_rows(snapshot, conn.id, decisions)
+            tables[ref]["rows_held"] = len(snapshot.get("rows") or []) - len(snaps[ref]["rows"])
         elif decision == "review":
             # held for review: its mapping is metadata a person decides, so it is still proposed
             # - from the schema only, never its rows, and never by a model (f2 #3)
@@ -2245,6 +2375,26 @@ def _discover(conn, vocab, harness, captured: list[dict], decisions: dict, ledge
 
 #: the keys of a table snapshot that carry no row value (`schema_only`)
 _SCHEMA_KEYS = ("schema", "table", "columns", "primary_key", "foreign_keys")
+
+
+def _without_held_rows(snapshot: dict, source_id: str, decisions: dict) -> dict:
+    """R-029 F-01: the snapshot without the rows this run's screen did not allow (each a
+    `table_row` decision keyed by its `row_ref`): what the mapper may read of an allowed table."""
+    from .build import _render_pk
+    from .screen import row_ref
+
+    held = {i for i, d in decisions.items()
+            if (d or {}).get("kind") == TABLE_ROW and (d or {}).get("decision") != "allow"}
+    if not held:
+        return snapshot
+    tref = _table_ref(snapshot)
+    pk = list(snapshot.get("primary_key") or [])
+    keep = []
+    for ordinal, row in enumerate(snapshot.get("rows") or []):
+        key = _render_pk(row, pk)
+        if row_ref(source_id, tref, key if key is not None else f"#{ordinal}") not in held:
+            keep.append(row)
+    return {**snapshot, "rows": keep}
 
 
 def schema_only(snapshot: dict) -> dict:
@@ -2321,7 +2471,26 @@ COMPLETENESS_LEDGER = "completeness.jsonl"
 IDENTITY_FILE = "identity_consolidation.json"
 
 
+def _reconciled_brief(rec: dict) -> Optional[dict]:
+    """IDN cross-track 2: the post-run keyless reconciliation (`consolidate_identity_after_run`'s
+    `reconciled`), in brief — a run that only reconciled still reports what it joined."""
+    r = rec.get("reconciled")
+    if not isinstance(r, dict):
+        return None
+    return {"status": r.get("status"), "merged": len(r.get("merged") or []),
+            "absorbed": r.get("absorbed", 0), "refused": len(r.get("refused") or []),
+            **({"error_ref": r["error_ref"]} if r.get("error_ref") else {})}
+
+
 def _identity_note(rec: dict) -> str:
+    r = _reconciled_brief(rec)
+    tail = (f"; keyless mentions reconciled: {r['absorbed']} absorbed into {r['merged']} "
+            f"record(s), {r['refused']} refused" if r and r.get("status") == "ran"
+            else (f"; keyless reconciliation {r['status']}" if r else ""))
+    return _identity_head(rec) + tail
+
+
+def _identity_head(rec: dict) -> str:
     status = rec.get("status")
     if status == "ran":
         approved = {k: v for k, v in (rec.get("kinds") or {}).items() if v}
@@ -2351,6 +2520,7 @@ def identity_summary(run_dir: Path) -> Optional[dict]:
             "merges": [{"kind": m.get("kind"), "survivor": m.get("survivor"),
                         "absorbed": m.get("absorbed"), "rules": m.get("rules")}
                        for m in rec.get("merged") or []],
+            **({"reconciled": _reconciled_brief(rec)} if _reconciled_brief(rec) else {}),
             **({"error": rec["error"]} if rec.get("error") else {})}
 
 
@@ -2360,6 +2530,267 @@ def _write_completeness(run_dir: Path, rec: dict) -> None:
     the run report (`counts.completeness`), so an E2E can assert on them."""
     with open(run_dir / COMPLETENESS_LEDGER, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
+
+
+def _own_table_snapshots(source_id: str, caps: dict) -> dict[str, dict]:
+    """{table: snapshot} of every table this run captured (built, unchanged or held alike)."""
+    return {ref: snap for (src, ref), snap in _captured_tables_of(source_id, caps).items()}
+
+
+def _captured_tables_of(source_id: str, caps: dict) -> dict:
+    out: dict = {}
+    for cap in caps.values():
+        if cap.get("kind") != "table" or not cap.get("sha256"):
+            continue
+        try:
+            snap = json.loads(capture.get_bytes(cap["sha256"]))
+        except Exception:                                            # noqa: BLE001
+            continue
+        if isinstance(snap, dict) and snap.get("table"):
+            ref = (f"{snap.get('schema')}.{snap.get('table')}" if snap.get("schema")
+                   else str(snap.get("table")))
+            out[(source_id, ref)] = snap
+    return out
+
+
+def _refresh_links(source_id: str, snaps: dict[str, dict], vocab, sources_root,
+                   report: "RunReport") -> None:
+    """C-3 / F-11: propose links for this source's tables (never fatal: a failure is noted)."""
+    if not snaps:
+        return
+    try:
+        from .mapping import refresh_link_proposals
+
+        m = refresh_link_proposals(source_id, snaps, vocab, root=sources_root)
+        n_links = sum(1 for tm in m.tables.values() for lk in tm.links or []
+                      if lk.get("status") == "proposed")
+        if n_links:
+            report.notes.append(f"links: {n_links} proposed link(s) where no foreign key is "
+                                f"declared, awaiting a person (mapping links)")
+    except Exception as exc:                                         # noqa: BLE001
+        report.notes.append(f"links: proposal skipped ({_plain_error(exc)})")
+
+
+def _refresh_links_elsewhere(source_id: str, vocab, sources_root, report: "RunReport") -> None:
+    """E2E run 5 F-11, order independence ACROSS sources: once this run's tables are promoted, the
+    columns of every OTHER ingest source are measured against them too — a link from a source
+    that was built FIRST is proposed now, not on that source's next sync. Each source's mapping
+    is written under its own lock, one at a time (never two mapping locks held together). Never
+    fatal: a failure is noted."""
+    from .connections import list_connections
+    from .mapping import captured_tables, load_mapping, refresh_link_proposals
+
+    try:
+        conns = list_connections(sources_root)
+    except Exception as exc:                                         # noqa: BLE001
+        report.notes.append(f"links: other sources not measured ({_plain_error(exc)})")
+        return
+    touched = []
+    for conn in conns:
+        if conn.id == source_id or getattr(conn, "purpose", "ingest") != "ingest":
+            continue
+        try:
+            before = load_mapping(conn.id, sources_root)
+            if not any(tm.node for tm in before.tables.values()):
+                continue
+            snaps = captured_tables(conn.id)
+            if not snaps:
+                continue
+            after = refresh_link_proposals(conn.id, snaps, vocab, root=sources_root)
+        except Exception as exc:                                     # noqa: BLE001
+            report.notes.append(f"links: {conn.id} not measured ({_plain_error(exc)})")
+            continue
+
+        def proposed(m) -> set:
+            return {(t, lk.get("column"), lk.get("source"), lk.get("table"))
+                    for t, tm in m.tables.items() for lk in tm.links or []
+                    if lk.get("status") == "proposed"}
+
+        new = proposed(after) - proposed(before)
+        if new:
+            touched.append(f"{conn.id} +{len(new)}")
+    if touched:
+        report.notes.append(f"links: newly proposed in other sources against this run's tables: "
+                            f"{', '.join(touched)} (awaiting a person)")
+
+
+def _table_waits(source_id: str, result: dict, ready: list, state: dict, run_id: str
+                 ) -> dict[str, dict]:
+    """E2E run 5 F-03 / F-01: {table item id: state fields} — what a built table still waits for.
+
+    * `pending_refs`: each reference (declared FK or approved link) of which at least one edge
+      DANGLED because its target row is not in the graph, with the target's state as this build
+      saw it (`seen_run`, `seen_hash`; for a target built in THIS run, this run). When the target
+      is rebuilt later — in this source or another — the table is rebuilt so the edges resolve.
+    * `held_rows`: the [row_ref, row_digest] of each row the screen held for a person; when an
+      owner lifts one, the table is rebuilt so the row (and the edges into it) reach the graph."""
+    from .build import _snap_ref
+
+    built_now = {_snap_ref(s): sha for s, sha, _, _ in ready}
+    by_uri = {e.get("uri"): e for e in state.values() if isinstance(e, dict)}
+    others: dict[str, dict] = {}
+    held: dict[str, list] = {}
+    for b in result.get("blocked_rows") or []:
+        if b.get("decision") == "review" and b.get("row_ref") and b.get("row_digest"):
+            held.setdefault(str(b.get("table")), []).append([b["row_ref"], b["row_digest"]])
+    out: dict[str, dict] = {}
+    for snapshot, _, _, rec in ready:
+        tref = _snap_ref(snapshot)
+        line = next((c for c in result.get("completeness") or [] if c.get("table") == tref), {})
+        pending = []
+        for fk in line.get("foreign_keys") or []:
+            if not fk.get("edge_kind") or not int(fk.get("dangling") or 0):
+                continue
+            ref = str(fk.get("references") or "")
+            src, _, tab = ref.partition(":") if fk.get("origin") == "approved_link" and                 ":" in ref else (source_id, "", ref)
+            if src == source_id and tab in built_now:
+                seen = {"seen_run": run_id, "seen_hash": built_now[tab]}
+            else:
+                if src == source_id:
+                    cur = by_uri.get(tab) or {}
+                else:
+                    if src not in others:
+                        others[src] = {e.get("uri"): e for e in load_state(src).values()
+                                       if isinstance(e, dict)}
+                    cur = others[src].get(tab) or {}
+                seen = {"seen_run": cur.get("run_id") if cur.get("graph", True) is not False
+                        else None, "seen_hash": cur.get("content_hash")}
+            pending.append({"source": src, "table": tab, "column": fk.get("column"),
+                            "dangling": int(fk.get("dangling") or 0), **seen})
+        waits = {}
+        if pending:
+            waits["pending_refs"] = pending
+        if held.get(tref):
+            waits["held_rows"] = held[tref]
+        if waits:
+            out[rec["item_id"]] = waits
+    return out
+
+
+def _target_built_since(cur: Optional[dict], pending: dict) -> bool:
+    """Was the referenced table BUILT (and verified) since the table holding the reference recorded it?"""
+    if not cur or cur.get("graph", True) is False or not cur.get("built_at"):
+        return False
+    return (cur.get("run_id"), cur.get("content_hash")) != (pending.get("seen_run"),
+                                                           pending.get("seen_hash"))
+
+
+def _approved_digests(source_id: str, sources_root) -> dict[str, str]:
+    """{table: digest} of the source's APPROVED table mappings now (empty when unreadable)."""
+    try:
+        from .mapping import load_mapping, mapping_digest
+
+        return {t: mapping_digest(tm) for t, tm in load_mapping(source_id, sources_root)
+                .tables.items() if tm.status == "approved"}
+    except Exception:                                                # noqa: BLE001
+        return {}
+
+
+def _rebuild_for_references(captured: list[dict], state: dict, source_id: str, overrides,
+                            approved: Optional[dict] = None) -> dict[str, str]:
+    """E2E run 5 F-03: {item id: why} — UNCHANGED tables this run re-reads and rebuilds anyway.
+
+    0. a table whose APPROVED mapping changed since it was built (`mapping_digest`: e.g. a
+       person approved a link, F-11) — the new edges are built without waiting for new rows;
+    1. a table one of whose held rows an owner has since lifted (`held_rows`, F-01);
+    2. a table with `pending_refs` whose target is rebuilt in this run (its content changed, it
+       was never built, or 1. applies to it), or was built since in any run — of this source
+       or, for an approved link, of the other source.
+    Order-independent: the whole run's captures are looked at before any item is decided, so the
+    target may be captured before or after the table that references it."""
+    tables = [r for r in captured if r.get("kind") == "table"]
+
+    def unchanged(rec: dict) -> bool:
+        prev = state.get(rec["item_id"]) or {}
+        return prev.get("content_hash") == rec["sha256"] and prev.get("graph", True) is not False
+
+    out: dict[str, str] = {}
+    for rec in tables:
+        prev = state.get(rec["item_id"]) or {}
+        now = (approved or {}).get(rec["uri"])
+        if unchanged(rec) and now and prev.get("mapping_digest") \
+                and prev["mapping_digest"] != now:
+            out[rec["item_id"]] = "its approved mapping changed since it was built"
+            continue
+        lifted = [r for r, d in prev.get("held_rows") or []
+                  if _override_allows(overrides, r, d)]
+        if unchanged(rec) and lifted:
+            out[rec["item_id"]] = f"{len(lifted)} held row(s) lifted by an owner"
+    moving = {r["uri"] for r in tables if not unchanged(r) or r["item_id"] in out}
+    by_uri = {e.get("uri"): e for e in state.values() if isinstance(e, dict)}
+    others: dict[str, dict] = {}
+    for rec in tables:
+        iid = rec["item_id"]
+        if iid in out or not unchanged(rec):
+            continue
+        for p in _pending_refs_of(source_id, state.get(iid) or {}, rec["uri"]):
+            src, tab = p.get("source") or source_id, p.get("table")
+            if src == source_id:
+                if tab in moving:
+                    out[iid] = f"references {tab}, rebuilt this run"
+                    break
+                cur = by_uri.get(tab)
+            else:
+                if src not in others:
+                    try:
+                        others[src] = {e.get("uri"): e for e in load_state(src).values()
+                                       if isinstance(e, dict)}
+                    except Exception:                                # noqa: BLE001
+                        others[src] = {}
+                cur = others[src].get(tab)
+            if _target_built_since(cur, p):
+                out[iid] = f"references {src}:{tab}, built since"
+                break
+    return out
+
+
+def _pending_refs_of(source_id: str, entry: dict, tref: str) -> list[dict]:
+    """A built table's `pending_refs`. A table built BEFORE they were recorded (no
+    `mapping_digest` in its state — e.g. the run-5 finance deployment) has them derived once from
+    its last build's completeness record: every reference with dangling edges, target state
+    unseen — so the next run that finds the target built rebuilds it (F-03, live states)."""
+    if "pending_refs" in entry or "mapping_digest" in entry or not entry.get("run_id"):
+        return list(entry.get("pending_refs") or [])
+    try:
+        lines = read_jsonl(run_dir_for(source_id, entry["run_id"]) / COMPLETENESS_LEDGER)
+    except Exception:                                                # noqa: BLE001
+        return []
+    last = next((r for r in reversed(lines) if r.get("table") == tref), None) or {}
+    out = []
+    for fk in last.get("foreign_keys") or []:
+        if not fk.get("edge_kind") or not int(fk.get("dangling") or 0):
+            continue
+        ref = str(fk.get("references") or "")
+        src, _, tab = ref.partition(":") if fk.get("origin") == "approved_link" and ":" in ref \
+            else (source_id, "", ref)
+        out.append({"source": src, "table": tab, "column": fk.get("column"),
+                    "dangling": int(fk["dangling"]), "seen_run": None, "seen_hash": None})
+    return out
+
+
+def _carry_completeness(source_id: str, run_dir: Path, caps: dict, state: dict) -> None:
+    """E2E run 5 F-03: a table this run left UNCHANGED keeps its place in the run's completeness
+    — its last build's record, marked `carried_forward` with the run it came from — so a run that
+    built nothing still reports every table, and a gap a table still has (edges missing, rows
+    held) never disappears from the report because nothing changed."""
+    done = {r.get("table") for r in read_jsonl(run_dir / COMPLETENESS_LEDGER)}
+    unchanged = {r["item_id"] for r in read_jsonl(run_dir / "unchanged.jsonl")
+                 if r.get("item_id")}
+    cache: dict[str, list[dict]] = {}
+    for iid, cap in caps.items():
+        if cap.get("kind") != "table" or iid not in unchanged:
+            continue
+        prev = state.get(iid) or {}
+        rid, tref = prev.get("run_id"), cap.get("uri")
+        if not rid or not tref or tref in done or rid == run_dir.name:
+            continue
+        if rid not in cache:
+            cache[rid] = read_jsonl(run_dir_for(source_id, rid) / COMPLETENESS_LEDGER)
+        last = next((r for r in reversed(cache[rid]) if r.get("table") == tref), None)
+        if last is None:
+            continue
+        _write_completeness(run_dir, {**last, "carried_forward": True,
+                                      "from_run": last.get("from_run") or rid})
 
 
 def _reference_context(source_id: str, run_dir: Path, caps: dict, mapping) -> dict:
@@ -2472,6 +2903,24 @@ def _emit_item_events(source_id: str, run_id: str, built: list[dict], prev_state
         report.notes.append(f"removals: {closed_total['nodes']} node(s) and "
                             f"{closed_total['edges']} edge(s) closed (system_to set; history "
                             f"kept)")
+
+
+def close_prior_anchor(store, *, source_id: str, item_id: str, kind: str) -> list[str]:
+    """Close — never delete — the item's anchor node under ``kind`` (its id is the item's own,
+    `anchor_id_for`) and every open edge touching it; returns what was closed. For a document
+    rebuilt under another anchor kind (R-029 TIDY2)."""
+    aid = anchor_id_for(kind, source_id, item_id)
+    if store.open_node_row(aid) is None:
+        return []
+    at = store.now()
+    closed = [aid]
+    with store_batch(store):
+        store.close_node(aid, at=at, _commit=False)
+        for row in store.fetchall("SELECT DISTINCT id FROM edges WHERE (src_id = ? OR "
+                                  "dst_id = ?) AND system_to IS NULL", (aid, aid)):
+            store.close_edge(row["id"], at=at, _commit=False)
+            closed.append(row["id"])
+    return closed
 
 
 def close_removed_item(store, *, source_id: str, item_id: str, content_hash: Optional[str],
@@ -2788,7 +3237,7 @@ def _verify_graph_ids(store, build_records: list[dict], shas: list[str],
                 if not ptrs:
                     # FIN-04: a record an approved identity rule absorbed is closed; its pointers
                     # live on the ONE open node that lists it in `merged_record_ids`
-                    survivor = _absorbing_node(store, gid)
+                    survivor = _absorbing_node(store, gid) or _repointed_edge(store, gid)
                     if survivor is not None:
                         ptrs = [_pointer_record(p) for p in store.sources_for(survivor)]
             except Exception:                                        # noqa: BLE001
@@ -2798,6 +3247,24 @@ def _verify_graph_ids(store, build_records: list[dict], shas: list[str],
                 if len(out["examples"]) < 5:
                     out["examples"].append(f"{r.get('item_id', '')[:12]}:{gid}")
     return out
+
+
+def _repointed_edge(store, gid: str) -> Optional[str]:
+    """R-029 (F-03 made FK edges into organisations real): an EDGE this run wrote whose endpoint
+    an approved identity rule later absorbed was closed and re-opened on the survivor
+    (`merge` re-points it as `src|kind|dst`). Its open successor, or None."""
+    parts = gid.split("|")
+    if len(parts) != 3:
+        return None
+    src, kind, dst = parts
+    if store.open_node_row(src) is None:
+        src = _absorbing_node(store, src) or src
+    if store.open_node_row(dst) is None:
+        dst = _absorbing_node(store, dst) or dst
+    if f"{src}|{kind}|{dst}" == gid:
+        return None
+    row = store.find_open_edge(src, dst, kind)
+    return row["id"] if row is not None else None
 
 
 def _absorbing_node(store, gid: str) -> Optional[str]:
@@ -2929,9 +3396,11 @@ def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
                         f"skipped ({len(skipped)}) + unchanged ({len(unchanged)})")
     # a CARRIED decision (F-31: unchanged, still blocked / in review) is not a fresh screen; it
     # must belong to an item this run recorded as unchanged-and-decided
-    gov = [r["item_id"] for r in ledgers.get("governance", [])
-           if r.get("item_id") and not r.get("carried_forward")]
-    carried = {r["item_id"] for r in ledgers.get("governance", []) if r.get("carried_forward")}
+    # E2E run 5 F-01: a held table ROW (`table_row`) is a decision inside its table's, not an item
+    row_holds = [r for r in ledgers.get("governance", []) if r.get("kind") == TABLE_ROW]
+    item_gov = [r for r in ledgers.get("governance", []) if r.get("kind") != TABLE_ROW]
+    gov = [r["item_id"] for r in item_gov if r.get("item_id") and not r.get("carried_forward")]
+    carried = {r["item_id"] for r in item_gov if r.get("carried_forward")}
     if sorted(gov) != sorted(extracted):
         problems.append(f"governance has {len(gov)} decision(s) for {len(extracted)} extracted "
                         f"item(s) — every extracted item needs exactly one")
@@ -2939,7 +3408,7 @@ def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
     if carried != decided_unchanged:
         problems.append(f"{len(carried ^ decided_unchanged)} carried decision(s) do not match "
                         f"the items recorded unchanged-and-decided")
-    decisions = {r["item_id"]: r.get("decision") for r in ledgers.get("governance", [])}
+    decisions = {r["item_id"]: r.get("decision") for r in item_gov}
     allowed = {i for i, d in decisions.items() if d == "allow"}
     build_ids, bskip = set(ids("build")), set(ids("build_skipped"))
     if not allowed <= (build_ids | bskip):
@@ -3052,6 +3521,9 @@ def verify_run(source_id: str, run_id: str, *, store=None) -> dict:
         "unchanged": len(unchanged), "extracted": len(extracted),
         "extract_skipped": len(skipped), "extract_skipped_by_reason": by_reason,
         "governance": gov_counts, "built": len(build_ids),
+        # F-01: rows the screen held inside allowed tables, by decision (each liftable alone)
+        "table_rows_held": {d: sum(1 for r in row_holds if r.get("decision") == d)
+                            for d in sorted({str(r.get("decision")) for r in row_holds})},
         "build_skipped": len(bskip), "zero_graph_output": len(zero),
         # FIN-01: allowed items whose model extraction failed - recorded, not built, retried
         "extract_failed": len({r["item_id"] for r in ledgers.get("build_skipped", [])

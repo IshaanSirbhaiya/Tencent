@@ -341,8 +341,14 @@ def test_a_link_never_points_into_a_subject_kind_even_when_it_is_not_a_person(na
                 stripped = _strip_fk(snaps, t, fk["column"])
                 got = propose_links("src", stripped, propose_rules(stripped, vocab),
                                     _PersonlessVocab(vocab)).get(t, [])
-                into_subject += [lk for lk in got if lk["column"] == fk["column"]
-                                 and lk["table"] == target]
+                mine = [lk for lk in got if lk["column"] == fk["column"]
+                        and lk["table"] == target]
+                # R-029 F-11: a split target is measured per kind; a link may name the kind its
+                # NON-subject rows are built as — never a subject kind
+                assert not [lk for lk in mine if lk["status"] == "proposed"
+                            and vocab.is_subject(lk["target_kind"])], mine
+                into_subject += [lk for lk in mine if vocab.is_subject(lk["target_kind"])]
+        assert into_subject                                             # non-vacuous
         assert all(lk["status"] == "not_proposed" and lk["edge"] is None
                    and "subject" in lk["why"] for lk in into_subject), into_subject
         # validation refuses an approved-link edge INTO a subject kind as well

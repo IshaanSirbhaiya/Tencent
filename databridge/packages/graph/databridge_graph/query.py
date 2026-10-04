@@ -20,7 +20,9 @@ what rather than implying one covers both.
 """
 from __future__ import annotations
 
+import json
 import re
+import threading
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -52,14 +54,40 @@ class Snapshot:
     edges: list[GraphEdge]
 
 
+#: The four bi-temporal columns, read first so only the LIVE versions are read whole.
+_TIMES = "rowid_pk, valid_from, valid_to, system_from, system_to"
+
+
+def _live_rows(store: GraphStore, table: str, vt: datetime, st: datetime) -> list:
+    """Every row of ``table`` live at (``vt``, ``st``), in rowid order — decided by `_live_at` (the
+    one rule) over the four time columns, then read whole BY ROWID for the live ones only. The
+    previous read materialised every column of every version (closed history included) before
+    filtering (R-029 TIDY2)."""
+    live = [r["rowid_pk"] for r in store.fetchall(f"SELECT {_TIMES} FROM {table} ORDER BY rowid_pk")
+            if _live_at(r, vt, st)]
+    out: list = []
+    for i in range(0, len(live), 500):
+        chunk = live[i:i + 500]
+        out += store.fetchall(f"SELECT * FROM {table} WHERE rowid_pk IN ("
+                              + ", ".join("?" for _ in chunk) + ") ORDER BY rowid_pk",
+                              tuple(chunk))
+    return out
+
+
 def as_of(store: GraphStore, valid_time: datetime, system_time: datetime) -> Snapshot:
     """What the graph held to be true at ``valid_time``, as believed at ``system_time``."""
     # materialise rows under the lock FIRST (store.fetchall), then build — never iterate a live
     # cursor while issuing sources_for() queries on the same shared connection.
-    node_rows = store.fetchall("SELECT * FROM nodes")
-    edge_rows = store.fetchall("SELECT * FROM edges")
-    nodes = [row_to_node(store, r) for r in node_rows if _live_at(r, valid_time, system_time)]
-    edges = [row_to_edge(store, r) for r in edge_rows if _live_at(r, valid_time, system_time)]
+    if isinstance(store, GraphStore):
+        node_rows = _live_rows(store, "nodes", valid_time, system_time)
+        edge_rows = _live_rows(store, "edges", valid_time, system_time)
+    else:
+        node_rows = [r for r in store.fetchall("SELECT * FROM nodes")
+                     if _live_at(r, valid_time, system_time)]
+        edge_rows = [r for r in store.fetchall("SELECT * FROM edges")
+                     if _live_at(r, valid_time, system_time)]
+    nodes = [row_to_node(store, r) for r in node_rows]
+    edges = [row_to_edge(store, r) for r in edge_rows]
     return Snapshot(valid_time, system_time, nodes, edges)
 
 
@@ -73,10 +101,73 @@ class Subgraph:
         return {n.id for n in self.nodes}
 
 
+#: The OPEN edges touching one node, through `ix_edges_src` / `ix_edges_dst` (a SEARCH, never a
+#: scan), in rowid order — the order `store.open_edges()` lists them in. A self-loop is returned
+#: once.
+TOUCHING_EDGES_SQL = ("SELECT * FROM edges WHERE system_to IS NULL AND src_id = ? "
+                      "UNION ALL "
+                      "SELECT * FROM edges WHERE system_to IS NULL AND dst_id = ? AND src_id <> ? "
+                      "ORDER BY rowid_pk")
+
+
+def _open_rows_by_id(store: GraphStore, ids) -> list:
+    """Every OPEN node row whose id is in ``ids``, in rowid order (as `store.open_nodes()`)."""
+    ids = list(dict.fromkeys(ids))
+    rows: list = []
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        rows += store.fetchall("SELECT * FROM nodes WHERE system_to IS NULL AND id IN ("
+                               + ", ".join("?" for _ in chunk) + ")", tuple(chunk))
+    return sorted(rows, key=lambda r: r["rowid_pk"])
+
+
+def _neighbors_indexed(store: GraphStore, node_id: str, edge_kind: Optional[EdgeKind],
+                       depth: int) -> Subgraph:
+    """`neighbors` read through the edge indexes: the same BFS, the same edge order (each node's
+    touching edges in rowid order), and only the edges and nodes reached are typed. The previous
+    read typed EVERY open edge (two pointer queries each) to keep the few touching one node —
+    ~8 s per call on a 49k-edge graph (E2E run 5 F-05; R-029 TIDY2)."""
+    typed: dict[int, GraphEdge] = {}
+
+    def touching(nid: str) -> list[GraphEdge]:
+        out = []
+        for r in store.fetchall(TOUCHING_EDGES_SQL, (nid, nid, nid)):
+            if edge_kind is not None and EdgeKind(r["kind"]) != edge_kind:
+                continue
+            e = typed.get(r["rowid_pk"])
+            if e is None:
+                e = typed[r["rowid_pk"]] = row_to_edge(store, r)
+            out.append(e)
+        return out
+
+    seen_nodes, seen_edges = {node_id}, set()
+    out_edges: list[GraphEdge] = []
+    frontier = deque([(node_id, 0)])
+    while frontier:
+        nid, d = frontier.popleft()
+        if d >= depth:
+            continue
+        for e in touching(nid):
+            if e.id not in seen_edges:
+                seen_edges.add(e.id)
+                out_edges.append(e)
+            other = e.dst_id if e.src_id == nid else e.src_id
+            if other not in seen_nodes:
+                seen_nodes.add(other)
+                frontier.append((other, d + 1))
+    nodes = [row_to_node(store, r) for r in _open_rows_by_id(store, seen_nodes)]
+    return Subgraph(nodes, out_edges)
+
+
 def neighbors(store: GraphStore, node_id: str, *, edge_kind: Optional[EdgeKind] = None,
               depth: int = 1) -> Subgraph:
     """BFS up to ``depth`` hops over the OPEN graph (edges traversed in both directions for
-    connectivity). ``edge_kind`` filters to one relationship type when set."""
+    connectivity). ``edge_kind`` filters to one relationship type when set.
+
+    On a `GraphStore` it reads by index (`_neighbors_indexed`); any other store-like object (a
+    view that narrows "the open graph") is read through its ``open_edges()``/``open_nodes()``."""
+    if isinstance(store, GraphStore):
+        return _neighbors_indexed(store, node_id, edge_kind, depth)
     open_edges = [row_to_edge(store, r) for r in store.open_edges()]
     if edge_kind is not None:
         open_edges = [e for e in open_edges if e.kind == edge_kind]
@@ -128,14 +219,22 @@ class GraphPath:
 
 def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
     """Shortest connecting path (BFS, edges undirected for connectivity). Each step carries the
-    edge's SourcePointers — the path IS a provenance chain."""
-    open_edges = [row_to_edge(store, r) for r in store.open_edges()]
-    adj: dict[str, list[GraphEdge]] = {}
-    for e in open_edges:
-        adj.setdefault(e.src_id, []).append(e)
-        adj.setdefault(e.dst_id, []).append(e)
+    edge's SourcePointers — the path IS a provenance chain.
 
-    prev: dict[str, tuple[str, GraphEdge]] = {}
+    The search runs over the open edges' ENDPOINTS only (three columns, one read); only the edges
+    and nodes ON the path are typed (R-029 TIDY2: it typed every open edge and every open node,
+    ~8 s per call on a 49k-edge graph). Same BFS, same edge order, same path."""
+    if isinstance(store, GraphStore):
+        ends = store.fetchall("SELECT rowid_pk, src_id, dst_id FROM edges "
+                              "WHERE system_to IS NULL ORDER BY rowid_pk")
+    else:
+        ends = store.open_edges()
+    adj: dict[str, list] = {}
+    for e in ends:
+        adj.setdefault(e["src_id"], []).append(e)
+        adj.setdefault(e["dst_id"], []).append(e)
+
+    prev: dict[str, tuple[str, object]] = {}
     q = deque([src_id])
     seen = {src_id}
     while q:
@@ -143,7 +242,7 @@ def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
         if nid == dst_id:
             break
         for e in adj.get(nid, []):
-            other = e.dst_id if e.src_id == nid else e.src_id
+            other = e["dst_id"] if e["src_id"] == nid else e["src_id"]
             if other not in seen:
                 seen.add(other)
                 prev[other] = (nid, e)
@@ -152,15 +251,23 @@ def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
     if dst_id not in seen:
         return GraphPath(src_id, dst_id, [], found=False)
     # reconstruct
-    chain: list[tuple[str, GraphEdge]] = []
+    chain: list[tuple[str, object]] = []
     cur = dst_id
     while cur != src_id:
         pnode, pedge = prev[cur]
         chain.append((cur, pedge))
         cur = pnode
     chain.reverse()
-    node_by_id = {r["id"]: row_to_node(store, r) for r in store.open_nodes()}
-    steps = [PathStep(edge=e, to_node=node_by_id[nid]) for nid, e in chain]
+    steps = []
+    for nid, e in chain:
+        if isinstance(store, GraphStore):
+            erow = store.fetchone("SELECT * FROM edges WHERE rowid_pk = ?", (e["rowid_pk"],))
+        else:
+            erow = e
+        nrow = store.open_node_row(nid)
+        if nrow is None:
+            raise KeyError(nid)            # as before: a path step names an open node
+        steps.append(PathStep(edge=row_to_edge(store, erow), to_node=row_to_node(store, nrow)))
     return GraphPath(src_id, dst_id, steps, found=True)
 
 
@@ -290,6 +397,8 @@ def link_entities(store: GraphStore, question: str, *, top_k: int = 3) -> list[G
     as a `document` is.
     """
     doc_kinds = _document_kinds()
+    if isinstance(store, GraphStore):
+        return _link_entities_indexed(store, question, doc_kinds, top_k)
     rows = [r for r in store.open_nodes() if r["kind"] not in doc_kinds]
     if not rows:
         return []
@@ -301,6 +410,77 @@ def link_entities(store: GraphStore, question: str, *, top_k: int = 3) -> list[G
     ])
     by_id = {n.id: n for n in nodes}
     return [by_id[s.id] for s in index.search(question, top_k=top_k)]
+
+
+# --- linking a LARGE graph by index (E2E run 5 F-05, moved from /brain by R-029 TIDY2) --------
+_LINK_LOCK = threading.Lock()
+#: id(store) -> (fingerprint, index, store): the BM25 index over the open nodes, rebuilt when the
+#: store's nodes or pointers move (any insert, close, new version or new pointer changes it).
+_LINK_CACHE: dict = {}
+_LINK_CACHE_MAX = 4
+
+
+def _link_fingerprint(store: GraphStore) -> tuple:
+    row = store.fetchone("SELECT COUNT(*) AS n, MAX(rowid_pk) AS m FROM nodes "
+                         "WHERE system_to IS NULL")
+    top = store.fetchone("SELECT MAX(rowid_pk) AS m FROM nodes")
+    src = store.fetchone("SELECT MAX(rowid) AS m, COUNT(*) AS n FROM sources")
+    return (int(row["n"] or 0), row["m"], top["m"], src["m"], src["n"])
+
+
+def _cited_fields(store: GraphStore) -> dict[int, set[str]]:
+    """``{node rowid: the attribute names that carry a pointer for THAT version}`` — the bulk form
+    of `row_to_node`'s per-version `attr_sources_for` (a version's own pointers, plus legacy
+    pointers recorded before versions were distinguished)."""
+    out: dict[int, set[str]] = {}
+    for r in store.fetchall(
+            "SELECT n.rowid_pk AS v, s.field AS field FROM nodes n JOIN sources s "
+            "ON s.entity_id = n.id AND s.field IS NOT NULL "
+            "AND (s.version_pk = n.rowid_pk OR s.version_pk IS NULL) "
+            "WHERE n.system_to IS NULL"):
+        out.setdefault(r["v"], set()).add(r["field"])
+    return out
+
+
+def _link_entities_indexed(store: GraphStore, question: str, doc_kinds: frozenset[str],
+                           top_k: int) -> list[GraphNode]:
+    """`link_entities` without typing every node: the SAME BM25 index (the same candidates in the
+    same order — every open node that is not DOCUMENT-shaped — and the same label, canonical id
+    and attribute text, an uncited attribute blanked exactly as `row_to_node` blanks it), built
+    from the raw rows, cached per store until its nodes or pointers change. Only the ``top_k``
+    returned are read back as `GraphNode`s — through `open_node_row`, the newest open version, as
+    the full read's ``by_id`` kept the last of several open versions of one id."""
+    from .store import _grounded_attrs_only
+
+    key = id(store)
+    fp = (_link_fingerprint(store), tuple(sorted(doc_kinds)))
+    with _LINK_LOCK:
+        hit = _LINK_CACHE.get(key)
+    if hit is None or hit[0] != fp or hit[2] is not store:
+        cited = _cited_fields(store)
+        cands = []
+        for r in store.fetchall("SELECT rowid_pk, id, kind, label, canonical_id, attrs_json "
+                                "FROM nodes WHERE system_to IS NULL ORDER BY rowid_pk"):
+            if r["kind"] in doc_kinds:
+                continue
+            attrs = _grounded_attrs_only(json.loads(r["attrs_json"]),
+                                         dict.fromkeys(cited.get(r["rowid_pk"], ())))
+            cands.append(Candidate(id=r["id"], label=r["label"], canonical_id=r["canonical_id"],
+                                   attr_text=" ".join(str(v) for v in attrs.values())))
+        hit = (fp, Bm25Index(cands) if cands else None, store)
+        with _LINK_LOCK:
+            if len(_LINK_CACHE) >= _LINK_CACHE_MAX and key not in _LINK_CACHE:
+                _LINK_CACHE.pop(next(iter(_LINK_CACHE)))
+            _LINK_CACHE[key] = hit
+    index = hit[1]
+    if index is None:
+        return []
+    out = []
+    for scored in index.search(question, top_k=top_k):
+        row = store.open_node_row(scored.id)
+        if row is not None:
+            out.append(row_to_node(store, row))
+    return out
 
 
 def _document_kinds() -> frozenset[str]:

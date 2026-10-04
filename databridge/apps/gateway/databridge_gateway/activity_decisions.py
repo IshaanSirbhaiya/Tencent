@@ -12,6 +12,11 @@ verified about the record — never more:
     design_approval    <materialise>/designs/<id>/events.jsonl  sealed + anchored (`DesignStore`)
     design_build       (the same sealed log)
     outbox_decision    the outbox SQLite file (read-only)       append-only rows (DB triggers)
+    screen_override    <sources>/<sid>.override_approvals.jsonl  HMAC-sealed + hash-chained (no
+                                                                external anchor); a hold lifted
+                                                                or reinstated (E2E run 5 F-12)
+    identity_rule_decision  the ontology state file + the gateway's audit beside it  plain records
+                                                                (E2E run 5 F-12)
     one_time_task      <one_time>/<task_id>/task.json           a task that failed before its run
                                                                 was recorded (a run that WAS
                                                                 recorded is read with the runs)
@@ -36,12 +41,14 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from .activity_actor import (
     FREE_TEXT,
+    PERSON,
     actor_from_record,
     actor_pid,
     make_actor,
@@ -67,11 +74,14 @@ LEDGER_INTEGRITY_FAILED = "LEDGER_INTEGRITY_FAILED"
 #: ``integrity`` — what was verified about a decision row, and nothing more.
 SEALED = "sealed_and_anchored"      # HMAC-sealed, hash-chained, anchored outside the log
 APPEND_ONLY = "append_only_store"   # rows of a store whose database refuses UPDATE/DELETE
+SEALED_CHAINED = "sealed_and_chained"  # HMAC-sealed + hash-chained, NOT anchored outside the log
+                                       # (a removed tail is not detectable): the override log
 UNVERIFIED = "unverified"           # a plain record: shown as recorded, nothing proven
 FAILED = "failed"
 
 PLAN_SUFFIX = ".plan.approvals.jsonl"
 MAPPING_LOG_SUFFIX = ".mapping.approvals.jsonl"
+OVERRIDE_SUFFIX = ".override_approvals.jsonl"
 
 
 def _no_run(**rest: Any) -> dict:
@@ -605,6 +615,172 @@ def one_time_task_items(viewer: Viewer, src: ActivitySources, problems: Problems
 
 
 # ================================================================================================
+# screen holds lifted / reinstated (E2E run 5 F-12) — the sealed, chained override log
+# ================================================================================================
+def _override_key(sources_dir: Optional[Path]) -> Optional[bytes]:
+    """The deployment approval key, READ ONLY — the rule `screen._approval_key` applies, minus its
+    first-use creation: the environment value, else an EXISTING key file outside the sources
+    directory. ``None`` when there is none (then nothing can be verified, so nothing is shown)."""
+    from databridge_mcp_ingest import screen                               # noqa: PLC0415
+
+    minimum = getattr(screen, "_MIN_KEY_CHARS", 32)
+    raw = os.environ.get(screen.APPROVAL_KEY_ENV, "")
+    if raw:
+        return raw.strip().encode("utf-8") if len(raw.strip()) >= minimum else None
+    kp = screen.approval_key_path().resolve()
+    if sources_dir is not None:
+        sources = Path(sources_dir).resolve()
+        if kp == sources or sources in kp.parents:
+            return None
+    try:
+        key = kp.read_text(encoding="utf-8").strip() if kp.is_file() else ""
+    except OSError:
+        return None
+    return key.encode("utf-8") if len(key) >= minimum else None
+
+
+def _override_records(path: Path, sid: str, sources_dir: Optional[Path]
+                      ) -> tuple[Optional[list[dict]], str]:
+    """``(verified records, integrity)`` of one override log, verified exactly as its producer
+    verifies it: through THE decision ledger once `screen` writes through it, else the screen's
+    own sealed chain (`screen._read_chain`: seal, digest, ``seq``/``prev``, well-formedness). An
+    unsealed legacy line is never a record. ``(None, FAILED)`` for a log that does not verify —
+    and when no approval key can be read, since nothing could then be verified."""
+    if _producer_on_ledger("databridge_mcp_ingest.screen"):
+        return read_ledger(path, "screen override log")
+    try:
+        from databridge_mcp_ingest.screen import _read_chain               # noqa: PLC0415
+        key = _override_key(sources_dir)
+    except Exception:                                                     # noqa: BLE001
+        return None, FAILED
+    if key is None:
+        return None, "no_key"
+    try:
+        chain = _read_chain(path, key, sid)
+    except Exception:                                                     # noqa: BLE001
+        return None, FAILED
+    if chain.broken:
+        return None, FAILED
+    return list(chain.records), SEALED_CHAINED
+
+
+def screen_override_items(viewer: Viewer, src: ActivitySources, problems: Problems,
+                          incomplete: set[str]) -> list[dict]:
+    """One row per hold a person lifted (``approve``: the item's content is admitted past the
+    screen) or reinstated (``revoke``). Seen by the decider, the source's keeper creator, and an
+    operator. The decider's reason is their own sentence: withheld in place."""
+    kind = "screen_override"
+    out: list[dict] = []
+    budget = _Budget()
+    no_key = False
+    for path in _listed(src.sources_dir, f"*{OVERRIDE_SUFFIX}", kind, incomplete):
+        sid = path.name[: -len(OVERRIDE_SUFFIX)]
+        if not safe_name(sid):
+            continue
+        keeper = keeper_owner(viewer, sid)
+        if not _admit(path, kind, budget, problems, incomplete, visible=may_see(viewer, keeper)):
+            continue
+        recs, integrity = _override_records(path, sid, src.sources_dir)
+        if integrity == "no_key":
+            no_key = True
+            continue
+        if recs is None:
+            if may_see(viewer, keeper):
+                out.append(integrity_row("screen override log", sid, None, family=kind,
+                                         source_id=sid))
+            continue
+        for r in recs:
+            if r.get("source_id") != sid or r.get("action") not in ("approve", "revoke"):
+                continue
+            actor = actor_from_record(r)
+            if actor is None or not may_see(viewer, actor_pid(actor), keeper):
+                continue
+            lifted = r.get("action") == "approve"
+            decision = "lifted" if lifted else "reinstated"
+            item = _scalar(r.get("item_id"))
+            out.append(_base(
+                kind, f"{sid}/{r.get('seq') or str(r.get('record_digest') or '')[:16]}",
+                r.get("at"), status=decision, decision=decision, source_id=sid, item_id=item,
+                digest=_scalar(r.get("digest")),
+                reason=withheld(FREE_TEXT) if r.get("reason") else None,
+                actor=actor, integrity=integrity,
+                title=(f"screen hold on {sid} lifted: the held content is admitted"
+                       if lifted else f"screen hold on {sid} reinstated"),
+                loud=False, **_no_run()))
+    if no_key:
+        # the deployment approval key is unavailable: nothing can be verified, so nothing is
+        # shown (said once, naming no source)
+        problems.add({"source": kind, "file": None,
+                      "error": "screen overrides cannot be verified: no approval key is "
+                               "readable"})
+        incomplete.add(kind)
+    return out
+
+
+# ================================================================================================
+# identity-rule decisions (E2E run 5 F-12) — the ontology state + the gateway's audit
+# ================================================================================================
+def _identity_audit(path: Optional[Path], problems: Problems, incomplete: set[str],
+                    operator: bool) -> dict[tuple, dict]:
+    """How each decider signed in, keyed exactly as the gateway joins it
+    (`identity_rules_routes._decisions`: pack, kind, rule, principal, at)."""
+    if path is None or not Path(path).is_file():
+        return {}
+    rows, lossy = _read_jsonl(Path(path), problems, "identity_rule_decision", visible=operator)
+    if lossy:
+        incomplete.add("identity_rule_decision")
+    return {(a.get("pack"), a.get("kind"), a.get("rule"), a.get("principal"), a.get("at")): a
+            for a in rows}
+
+
+def identity_rule_items(viewer: Viewer, src: ActivitySources, problems: Problems,
+                        incomplete: set[str]) -> list[dict]:
+    """One row per decision on a declared identity rule — an approval widens what the graph
+    merges. The state file is what the merge honours (who, when, what); the gateway's audit adds
+    how the decider signed in, matched on the exact decision. A deployment-wide store: the decider
+    and an operator see a decision. A state the producer itself would refuse to read
+    (`ontology_state.validate_state`) is one integrity row, for operators only."""
+    kind = "identity_rule_decision"
+    out: list[dict] = []
+    state = src.ontology_state
+    if state is None or not Path(state).is_file():
+        return out
+    state = Path(state)
+    if not _admit(state, kind, _Budget(), problems, incomplete, visible=viewer.operator):
+        return out
+    try:
+        from databridge_graph.ontology_state import validate_state         # noqa: PLC0415
+        data = validate_state(json.loads(state.read_text(encoding="utf-8")), state)
+        recs = data.get("identity_rule_decisions") or []
+    except Exception:                                                     # noqa: BLE001
+        if viewer.operator:
+            out.append(integrity_row("ontology state", "identity rules", None, family=kind))
+        return out
+    audit = _identity_audit(src.identity_rule_audit, problems, incomplete, viewer.operator)
+    for n, r in enumerate(recs):
+        pid = r.get("principal")
+        if not may_see(viewer, pid):
+            continue
+        how = audit.get((r.get("pack"), r.get("kind"), r.get("rule"), pid, r.get("at")))
+        # the gateway audits a decision only after its approval gate accepted a person
+        # (`require_authenticated_approver` refuses a machine): with the audit, a person
+        actor = actor_from_record({"principal_id": pid,
+                                   "authenticated_by": (how or {}).get("authenticated_by"),
+                                   "dev_only": (how or {}).get("dev_only")},
+                                  default_type=PERSON if how else None)
+        decision = _scalar(r.get("decision"))
+        pack, node_kind, rule = _scalar(r.get("pack")), _scalar(r.get("kind")), \
+            _scalar(r.get("rule"))
+        out.append(_base(
+            kind, f"{pack}/{node_kind}/{rule}/{n}", r.get("at"), status=decision,
+            decision=decision, pack=pack, node_kind=node_kind, rule=rule,
+            actor=actor or make_actor(None, None), integrity=UNVERIFIED,
+            title=f"identity rule {rule} for {node_kind} ({pack}) {decision}",
+            loud=actor is None, **_no_run()))
+    return out
+
+
+# ================================================================================================
 # the entry point `collect` calls
 # ================================================================================================
 def decision_items(viewer: Viewer, want: Iterable[str], problems: Problems,
@@ -626,10 +802,15 @@ def decision_items(viewer: Viewer, want: Iterable[str], problems: Problems,
         out += outbox_items(viewer, src, problems, incomplete)
     if "one_time_task" in want:
         out += one_time_task_items(viewer, src, problems, incomplete)
+    if want & {"screen_override", "decision_log"}:
+        out += screen_override_items(viewer, src, problems, incomplete)
+    if want & {"identity_rule_decision", "decision_log"}:
+        out += identity_rule_items(viewer, src, problems, incomplete)
     # a log that does not verify is shown with the family it belongs to, and on its own kind
     return [r for r in out if r["kind"] in want
             or (r["kind"] == "decision_log" and r.get("family") in want)]
 
 
-__all__ = ["decision_items", "LEDGER_INTEGRITY_FAILED", "SEALED", "APPEND_ONLY",
+__all__ = ["decision_items", "LEDGER_INTEGRITY_FAILED", "SEALED", "SEALED_CHAINED",
+           "APPEND_ONLY",
            "UNVERIFIED", "FAILED", "keeper_owner", "may_see", "integrity_row"]

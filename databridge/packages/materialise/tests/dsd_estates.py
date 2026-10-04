@@ -289,14 +289,20 @@ def _build_documents(e: Estate) -> None:
                        "label": label, "entity_ids": hits})
 
 
-def build_estate(name: str, root: Path, monkeypatch) -> Estate:
-    """Build one estate (the caller binds the pack with `deployment`)."""
+def build_estate(name: str, root: Path, monkeypatch, *, tables: Optional[list] = None,
+                 extra_sql: Optional[str] = None) -> Estate:
+    """Build one estate (the caller binds the pack with `deployment`). ``tables`` adds source
+    tables to the estate's own list (E2E5 F-10: the finance ``txn`` table, 24k rows);
+    ``extra_sql`` runs on the SOURCE database before it is crawled (more synthetic rows, so a
+    small estate is as large as the case needs — the crawl, facts store and mapping stay real)."""
     from databridge_graph.packs import active_vocabulary
     from databridge_graph.store import GraphStore
     from databridge_mcp_ingest.mapping import SourceMapping, approve_mapping, propose_rules, \
         save_mapping
 
-    cfg = ESTATES[name]
+    cfg = dict(ESTATES[name])
+    if tables:
+        cfg["tables"] = list(dict.fromkeys([*cfg["tables"], *tables]))
     for env, sub in {"WALNUT_FACTS_DIR": "facts", "WALNUT_ADAPTER_AGENTS_DIR": "adapter_agents",
                      "WALNUT_RUNS_DIR": "runs", "WALNUT_CAPTURE_DIR": "capture",
                      "WALNUT_PASSAGES_DIR": "passages", "WALNUT_SOURCES_DIR": "sources",
@@ -307,6 +313,9 @@ def build_estate(name: str, root: Path, monkeypatch) -> Estate:
     monkeypatch.setenv("WALNUT_APPROVAL_KEY", APPROVAL_KEY)
     est = _import_estates()
     db = est.build_estate(name, root / "src.sqlite")
+    if extra_sql:
+        db.executescript(extra_sql)
+        db.commit()
     client = est.engine_client(db)
     snaps = {t: est.snapshot(client, *t.split(".")) for t in cfg["tables"]}
     db.close()

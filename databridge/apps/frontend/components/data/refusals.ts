@@ -62,6 +62,20 @@ const GLOSSARY: Record<string, Explained> = {
     headline: "The planner needs more from you before it can write a plan that compiles. Nothing was read.",
     remedy: "Answer its question below — your answer is sent with the same request.",
   },
+  // E2E5 W-11: the standard codes the planner answers with now (the class name is `reason_code`)
+  PLAN_NEEDS_INPUT: {
+    headline: "The planner needs more from you before it can write a plan that compiles. Nothing was read.",
+    remedy:
+      "Answer its question below — your answer is sent with the same request. For a plain table with no label, use Raw dataset by delegation below.",
+  },
+  SHAPE_NOT_IMPLEMENTED: {
+    headline: "That output shape is not built yet. The builder refuses by name rather than produce something it cannot account for.",
+    remedy: "Pick a built shape — or, for a plain table with no label, use Raw dataset by delegation below.",
+  },
+  BASE_TOO_LARGE: {
+    headline: "The table's selection has more rows than this deployment builds in one raw table. The source counted them; nothing was read.",
+    remedy: "Add a filter to the design (a time filter keeps only those rows), or ask an operator to raise the bound.",
+  },
   ALREADY_RUNNING: { headline: "This exact request is already running. Wait for it to finish." },
   MATERIALISER_NOT_IMPLEMENTED: { headline: "No materialiser is attached to this gateway, so nothing can be built." },
   NOT_AUTHENTICATED: { headline: "The gateway did not accept this page's credential." },

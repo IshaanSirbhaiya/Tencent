@@ -78,6 +78,7 @@ servers:
     title: Finance filings (annual reports)
     description: Synthetic annual reports and financial statements (.md / .txt).
     source_class: files
+    document_kind: filing          # R-029 (F-08): one anchor node per item
     aliases: [filings, annual reports]
     trust: untrusted
     package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
@@ -92,6 +93,7 @@ servers:
     title: Finance credit memos
     description: Synthetic underwriting memoranda (.md).
     source_class: files
+    document_kind: credit_memo          # R-029 (F-08): one anchor node per item
     aliases: [credit memos, memos]
     trust: untrusted
     package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
@@ -106,6 +108,7 @@ servers:
     title: Finance mailbox
     description: Synthetic RFC 5322 email messages (.eml), threaded.
     source_class: files
+    document_kind: message          # R-029 (F-08): one anchor node per item
     aliases: [mailbox, email, emails, mail]
     trust: untrusted
     package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}
@@ -120,6 +123,7 @@ servers:
     title: Finance spreadsheets (CSV exports)
     description: Synthetic covenant tracker, exposure summary, limit utilisation, PD/LGD model.
     source_class: files
+    document_kind: spreadsheet          # R-029 (F-08): one anchor node per item
     aliases: [spreadsheets, sheets]
     trust: untrusted
     package: {registry: local, name: walnut-files-blob, verified: "2026-10-02 - FIN1 dry run"}

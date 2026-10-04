@@ -41,6 +41,9 @@ export const DECISION_KINDS = [
   "design_approval",
   "design_build",
   "outbox_decision",
+  // E2E run 5 F-12: the two decisions that WIDEN what the graph holds
+  "screen_override",
+  "identity_rule_decision",
   "decision_log",
 ] as const;
 export const ACTIVITY_KINDS = [...RUN_FEED_KINDS, ...DECISION_KINDS] as const;
@@ -278,7 +281,8 @@ export interface ActivityItem {
   // R-028 CONS #8 — decision rows (activity_decisions.py)
   /** approved | rejected | built | handed_off | sent … */
   decision?: string | null;
-  /** What was verified about the record: sealed_and_anchored · append_only_store · unverified ·
+  /** What was verified about the record: sealed_and_anchored · sealed_and_chained ·
+   *  append_only_store · unverified ·
    *  failed. Never more than what was checked. */
   integrity?: string | null;
   source_id?: string | null;
@@ -305,6 +309,13 @@ export interface ActivityItem {
   error_ref?: string | null;
   step?: string | null;
   decided_by_person?: boolean | null;
+  /** screen_override (E2E run 5 F-12): the held item and the content digest the lift covers. */
+  item_id?: string | null;
+  digest?: string | null;
+  /** identity_rule_decision (F-12): which declared rule, for which kind, in which pack. */
+  pack?: string | null;
+  node_kind?: string | null;
+  rule?: string | null;
   /** decision_log: the family whose log did not verify, and the standard refusal. */
   family?: string | null;
   log?: string | null;
@@ -313,6 +324,7 @@ export interface ActivityItem {
 /** `integrity` in words: what was verified about a decision record — and only that. */
 export const INTEGRITY_TEXT: Record<string, string> = {
   sealed_and_anchored: "sealed, chained and anchored — verified",
+  sealed_and_chained: "sealed and chained — verified (not anchored: a removed tail is not detected)",
   append_only_store: "an append-only store (no seal)",
   unverified: "recorded, not verified (a plain record)",
   failed: "does not verify — nothing in this log is trusted",
@@ -550,6 +562,8 @@ export const KIND_LABEL: Record<ActivityKind, string> = {
   design_approval: "design approval",
   design_build: "design build",
   outbox_decision: "outbox decision",
+  screen_override: "screen hold lifted",
+  identity_rule_decision: "identity rule decision",
   decision_log: "decision log integrity",
 };
 

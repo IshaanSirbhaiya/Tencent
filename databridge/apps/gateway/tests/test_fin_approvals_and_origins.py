@@ -250,8 +250,12 @@ def test_activity_marks_a_decision_made_with_the_dev_token(dev):
     # R-028 CONS #7: the common actor object — `dev_only` true OR false as the event recorded it,
     # the principal id never decorated
     assert row["actor"]["dev_only"] is dev and row["actor"]["principal_id"] == "analyst-7"
-    assert row["decided_by_authenticated_by"] == (GATEWAY_DEV_MECHANISM if dev
-                                                  else GATEWAY_MECHANISM)
+    # E2E run 5 W-09: the runtime's name for the gateway's mechanism is served under the auth
+    # layer's canonical name, on the flat field and the actor alike
+    from databridge_gateway.activity_actor import canonical_mechanism
+    recorded = GATEWAY_DEV_MECHANISM if dev else GATEWAY_MECHANISM
+    assert row["decided_by_authenticated_by"] == canonical_mechanism(recorded)
+    assert row["actor"]["authenticated_by"] == canonical_mechanism(recorded)
 
 
 # --- FIN-19: the launcher's port is configuration too ------------------------------------------

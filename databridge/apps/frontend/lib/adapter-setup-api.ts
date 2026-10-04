@@ -63,10 +63,13 @@ export interface PendingDecision {
   deferral: "defer" | "keep held";
 }
 
-/** The documents the latest discovery captured, and whether a person decided to build them. */
+/** The documents the latest discovery captured, and whether a person decided on them: `allowed` are
+ *  built at the hand-off; `kept` were already built by an earlier run and are kept as they are (W-05). */
 export interface SetupDocuments {
   captured: number;
   allowed: number;
+  /** Already built by an earlier run, bytes unchanged: the keeper keeps them, nothing is rebuilt. */
+  kept?: number;
   held: number;
   digest: string | null;
   decided: boolean;
@@ -283,6 +286,14 @@ export function allDeferred(pending: readonly Pick<PendingDecision, "key">[], de
 /** The documents decision is offered when the latest discovery captured documents nobody decided on yet. */
 export function documentsDecisionOffered(d: SetupDocuments | null | undefined): boolean {
   return !!d && !!d.digest && !!d.discovery_run_id && !d.decided;
+}
+
+/** The documents button's words: build the new ones and/or keep the already-built ones (W-05). */
+export function documentsDecisionLabel(d: Pick<SetupDocuments, "allowed" | "kept">): string {
+  const kept = d.kept ?? 0;
+  if (d.allowed > 0 && kept > 0) return `Build ${d.allowed} and keep ${kept} already-built document(s)`;
+  if (kept > 0) return `Keep these ${kept} already-built document(s)`;
+  return `Build these ${d.allowed} document(s)`;
 }
 
 /** "people" / "a protected subject" / "not people" — the person line, from the vocabulary's flags. */

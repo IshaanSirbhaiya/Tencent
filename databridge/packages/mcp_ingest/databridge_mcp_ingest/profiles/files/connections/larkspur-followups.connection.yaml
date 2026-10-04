@@ -28,4 +28,6 @@ transport:
     - ".txt"
   cwd: "${WALNUT_ROOT}"
 via: direct
+# E2E run 5 W-01: a write root is never crawled (plans, runs and batch-propose skip it)
+purpose: agent_write
 auto_approve: false

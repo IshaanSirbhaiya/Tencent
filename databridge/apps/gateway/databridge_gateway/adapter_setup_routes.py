@@ -202,13 +202,21 @@ def discovered_ok(discovery: Optional[dict], g: dict) -> bool:
     return not discovery_problems(discovery, plan_digest=g["plan_digest"])
 
 
+def _explained_by(produced_by: dict) -> str:
+    """W-06: who explained it - the model that RAN and its task class, or the mapper's rules."""
+    if produced_by.get("mode") == "model":
+        return (f"by {produced_by.get('model') or 'a model the harness did not name'} "
+                f"(task class {produced_by.get('task_class')})")
+    return "from the mapper's rules (no model)"
+
+
 def setup_state(app: FastAPI, conn: Any) -> dict:
     """Where one source's setup stands, computed from what is on disk (the plan, the discovery,
     the mapping, the explanation, the agent). Read-only."""
     from databridge_adapter_agents.setup import (approved_by_people,  # noqa: PLC0415
-                                                 discovery_problems, documents_digest,
-                                                 documents_problems, explanation_problems,
-                                                 setup_records)
+                                                 discovery_problems, document_items,
+                                                 documents_digest, documents_problems,
+                                                 explanation_problems, setup_records)
 
     rt = platform_of(app)
     sid = conn.id
@@ -236,10 +244,12 @@ def setup_state(app: FastAPI, conn: Any) -> dict:
     kept = keeper is not None and keeper.status == "active"
     disc_tables = bool((discovery or {}).get("tables"))
     doc_items = [d for d in ((discovery or {}).get("documents") or {}).get("items") or []]
-    doc_allowed = [d for d in doc_items if d.get("decision") == "allow" and not d.get("held")]
+    # W-05: documents the screen allowed now (built at the hand-off) and documents an earlier
+    # sync already built (kept by the keeper, not rebuilt) - both need a person's decision
+    doc_allowed, doc_kept = document_items(discovery)
     docs_digest = documents_digest(discovery) if discovered_ok(discovery, g) else None
     docs_problems = documents_problems(g["documents_decision"], discovery)
-    docs_only = discovered_ok(discovery, g) and not disc_tables and bool(doc_allowed)
+    docs_only = discovered_ok(discovery, g) and not disc_tables and bool(doc_allowed or doc_kept)
     if running:
         discover_status = "doing"
     elif discovered:
@@ -269,7 +279,7 @@ def setup_state(app: FastAPI, conn: Any) -> dict:
         _step("explain", "The agent explains the mapping",
               "done" if fresh or docs_only else ("todo" if discovered else "blocked"),
               "no tables: documents only" if docs_only else
-              (f"by {explanation['produced_by'].get('mode')}" if fresh else
+              (_explained_by(explanation["produced_by"]) if fresh else
                "; ".join(ex_problems[:1]) if explanation else "")),
         _step("approve_mapping", "A person approves the mapping",
               "done" if (people and not people_problems and fresh) or docs_only else
@@ -280,8 +290,8 @@ def setup_state(app: FastAPI, conn: Any) -> dict:
         _step("approve_documents", "A person decides on the documents",
               ("done" if not docs_problems else "waiting_for_person") if docs_digest else
               ("done" if discovered else "todo"),
-              (f"{len(doc_allowed)} document(s) captured" if docs_digest else
-               "no documents to build" if discovered else "")),
+              (f"{len(doc_allowed)} document(s) to build, {len(doc_kept)} already built to keep"
+               if docs_digest else "no documents to build" if discovered else "")),
         _step("handoff", "Hand off: build, then keep the source",
               "done" if kept else ("todo" if not problems else "blocked"),
               f"kept by {keeper.id}" if kept else "; ".join(problems[:3])),
@@ -293,7 +303,7 @@ def setup_state(app: FastAPI, conn: Any) -> dict:
         "transport": getattr(getattr(conn, "transport", None), "type", None),
         "phase": phase, "steps": steps, "running": running,
         "plan_status": plan_status, "plan_stale": stale,
-        "runs": len(runs), "last_run": finished[-1] if finished else None,
+        "runs": len(runs), "last_run": _public_run(finished[-1]) if finished else None,
         "discovery": ({k: discovery.get(k) for k in ("run_id", "status", "message",
                                                       "finished_at")}
                       if discovery else None),
@@ -302,6 +312,7 @@ def setup_state(app: FastAPI, conn: Any) -> dict:
         "handoff_problems": problems,
         "pending_decisions": g["pending"],
         "documents": {"captured": len(doc_items), "allowed": len(doc_allowed),
+                      "kept": len(doc_kept),
                       "held": sum(1 for d in doc_items if d.get("decision") == "review"
                                   or d.get("held")),
                       "digest": docs_digest, "decided": bool(docs_digest) and not docs_problems,
@@ -314,6 +325,19 @@ def setup_state(app: FastAPI, conn: Any) -> dict:
                      for r in (setup_records(rt.manager.runs_root, keeper.id)
                                if keeper is not None else [])],
     }
+
+
+#: W-06: what a run summary may show a person - never its server directory or free-text notes
+_PUBLIC_RUN_KEYS = ("source_id", "run_id", "status", "message", "counts", "started_at",
+                    "finished_at", "durations_s", "plan")
+
+
+def _public_run(run: Optional[dict]) -> Optional[dict]:
+    """A run summary for the setup page: its own fields, without the server-side run directory
+    and the notes (which name screen-rule files by their server path)."""
+    if not isinstance(run, dict):
+        return None
+    return {k: run[k] for k in _PUBLIC_RUN_KEYS if k in run}
 
 
 def _record(rt, spec, **kw):
@@ -329,7 +353,7 @@ def _record(rt, spec, **kw):
 
 
 def _discover_job(app: FastAPI, source_id: str, run_id: str, job_id: str, revision: str,
-                  spec: Any, by: str) -> None:
+                  spec: Any, by: str, requester: Optional[dict] = None) -> None:
     """The capture-only discovery, on its own worker. Re-checks the admission when it starts (the
     Sources run's own check), then runs ingest in its capture-only mode and records the TERMINAL
     outcome."""
@@ -342,7 +366,7 @@ def _discover_job(app: FastAPI, source_id: str, run_id: str, job_id: str, revisi
         refused = admission_refusal_at_start(rt, source_id, revision)
         if refused:
             rt.jobs.finish(job_id, status="refused", error=refused)
-            _record(rt, spec, step="discover", status="failed", by=by,
+            _record(rt, spec, step="discover", status="failed", by=by, requested_by=requester,
                     reason=f"the discovery {run_id} of {source_id} was refused when it started: "
                            f"{refused}")
             return
@@ -357,6 +381,7 @@ def _discover_job(app: FastAPI, source_id: str, run_id: str, job_id: str, revisi
         rt.jobs.finish(job_id, status="completed" if ok else "failed", result=data,
                        run_status=status)
         _record(rt, spec, step="discover", status="completed" if ok else "failed", by=by,
+                requested_by=requester,
                 reason=(f"discovered {source_id} ({run_id}): captured and screened, mapping "
                         f"proposed, nothing built" if ok else
                         f"the discovery {run_id} of {source_id} ended {status}: "
@@ -368,17 +393,18 @@ def _discover_job(app: FastAPI, source_id: str, run_id: str, job_id: str, revisi
         ref = error_ref(log, "discovery failed", exc, source_id=source_id, run_id=run_id)
         rt.jobs.finish(job_id, status="failed",
                        error=f"the discovery failed (reference {ref})", error_ref=ref)
-        _record(rt, spec, step="discover", status="failed", by=by,
+        _record(rt, spec, step="discover", status="failed", by=by, requested_by=requester,
                 reason=f"the discovery {run_id} of {source_id} failed (reference {ref})")
 
 
-def _build_job(app: FastAPI, agent_id: str, job_id: str, by: str, source_id: str) -> None:
+def _build_job(app: FastAPI, agent_id: str, job_id: str, by: str, source_id: str,
+               requester: Optional[dict] = None) -> None:
     """The hand-off's build: the agent's own sync job, then the TERMINAL Activity record from
     its outcome (Codex R-027 AAX f1 #9) - never "completed" at queue time."""
     from .adapter_agents_routes import _sync_job  # noqa: PLC0415
 
     rt = platform_of(app)
-    data = _sync_job(app, agent_id, job_id, by) or {}
+    data = _sync_job(app, agent_id, job_id, by, actor=requester) or {}
     status = data.get("status")
     try:
         spec = rt.manager.registry.get(agent_id)
@@ -387,6 +413,7 @@ def _build_job(app: FastAPI, agent_id: str, job_id: str, by: str, source_id: str
         return
     ok = status in _BUILD_OK
     _record(rt, spec, step="build", status="completed" if ok else "failed", by=by,
+            requested_by=requester,
             reason=(f"built {source_id} from the approved mapping (sync {data.get('run_id')} "
                     f"{status}); it keeps the source from now on" if ok else
                     f"the build run of {source_id} ended {status}"
@@ -488,6 +515,7 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                 return _exc_refusal(exc, "AGENT_NOT_CREATED", 409, "setup: agent not created",
                                     principal=principal, source_id=source_id)
             _record(rt, spec, step="created", status="completed", by=principal.principal_id,
+                    requested_by=actor_of(principal),
                     who=actor_of(principal),
                     actor="person", reason=f"created the draft adapter agent {spec.id} to set up "
                                            f"{source_id}")
@@ -503,10 +531,12 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                        principal=principal)
         if _refused(result):
             _record(rt, spec, step="propose_plan", status="failed", by=principal.principal_id,
+                    requested_by=actor_of(principal),
                     reason="the crawl plan could not be proposed")
             return result
         plan = result.get("plan") or {}
         _record(rt, spec, step="propose_plan", status="completed", by=principal.principal_id,
+                requested_by=actor_of(principal),
                 reason=f"proposed a crawl plan with {len(plan.get('steps') or [])} step(s) for "
                        f"{source_id}; a person approves it",
                 counts={"steps": len(plan.get("steps") or []),
@@ -536,6 +566,7 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
         except Exception as exc:                                      # noqa: BLE001
             log.warning("setup: refresh_plans %s: %s", spec.id, exc)
         _record(rt, spec, step="approve_plan", status="completed", by=principal.principal_id,
+                requested_by=actor_of(principal),
                 who=actor_of(principal),
                 actor="person", reason=(f"approved the crawl plan for {source_id}"
                                         + (f", vouching that {', '.join(vouch)} only read"
@@ -580,12 +611,13 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                 return _refusal("RUN_IN_PROGRESS", f"an ingest of {source_id!r} is already "
                                                    f"running", status=409)
         _record(rt, spec, step="discover", status="started", by=principal.principal_id,
+                requested_by=actor_of(principal),
                 reason=f"started a capture-only discovery of {source_id} ({run_id}): it reads "
                        f"and screens the source and proposes a mapping; nothing is built until "
                        f"a person approves it and hands the source off")
         worker = threading.Thread(target=_discover_job,
                                   args=(app, source_id, run_id, job["job_id"], rev, spec,
-                                        principal.principal_id),
+                                        principal.principal_id, actor_of(principal)),
                                   name=f"discover-{source_id}-{run_id}", daemon=True)
         worker.start()
         background.add_task(worker.join)
@@ -629,6 +661,7 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
         by_status = {s: sum(1 for t in tables if t["status"] == s)
                      for s in ("proposed", "approved", "unmapped")}
         _record(rt, spec, step="explain", status="completed", by=principal.principal_id,
+                requested_by=actor_of(principal),
                 reason=(f"proposed the mapping of {source_id} ({by_status['proposed']} table(s) "
                         f"proposed, {by_status['unmapped']} unmapped) and explained it "
                         f"({explanation['produced_by']['mode']}); a person approves it"),
@@ -705,6 +738,7 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                           .items() if (tm.get("approval") or {}).get("principal_id")
                           == principal.principal_id and tm.get("status") == "approved")
         _record(rt, spec, step="approve_mapping", status="completed", by=principal.principal_id,
+                requested_by=actor_of(principal),
                 who=actor_of(principal),
                 actor="person", reason=f"approved the mapping of {', '.join(approved) or 'no '}"
                                        f" table(s) of {source_id}",
@@ -715,7 +749,9 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
     def setup_documents_approve(source_id: str, body: DocumentsBody = Body(...),
                                 principal: AuthenticatedPrincipal = Depends(require_principal)):
         """Codex R-027 AAX f2 #7: a PERSON decides to build the documents the latest discovery
-        captured - the discovery run and the documents digest they were shown."""
+        captured - the discovery run and the documents digest they were shown. W-05: documents
+        an earlier sync already built are in the same decision, as documents the keeper KEEPS
+        (not rebuilt); a source that is entirely built is adopted this way."""
         from databridge_adapter_agents.setup import (discovery_problems,  # noqa: PLC0415
                                                      documents_digest, record_documents_decision)
         from databridge_mcp_ingest.plans import (ApprovalRefused,  # noqa: PLC0415
@@ -742,7 +778,8 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
             digest = documents_digest(g["discovery"])
             if digest is None:
                 return _refusal("NO_DOCUMENTS", "the discovery captured no document the screen "
-                                                "allowed", status=409)
+                                                "allowed and none an earlier run built",
+                                status=409)
             if body.discovery_run_id != g["discovery"].get("run_id") or \
                     body.documents_digest != digest:
                 return _refusal("DOCUMENTS_CHANGED", "the documents shown are not the latest "
@@ -751,8 +788,11 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                                             discovery=g["discovery"])
         _record(rt, spec, step="approve_documents", status="completed",
                 by=principal.principal_id, who=who, actor="person",
-                reason=f"decided to build the documents discovery {rec['discovery_run_id']} "
-                       f"captured from {source_id}")
+                requested_by=actor_of(principal),
+                reason=(f"decided to build {rec.get('to_build', 0)} and keep "
+                        f"{rec.get('to_keep', 0)} already-built document(s) discovery "
+                        f"{rec['discovery_run_id']} captured from {source_id}"),
+                counts={"to_build": rec.get("to_build", 0), "to_keep": rec.get("to_keep", 0)})
         return {"decision": rec, "state": setup_state(app, conn)}
 
     @app.post("/adapter-setup/{source_id}/handoff", status_code=202)
@@ -843,6 +883,7 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                                                f"and nothing was built", status=409)
                 _record(rt, spec, step="activate", status="completed",
                         by=principal.principal_id, who=actor_of(principal), actor="person",
+                        requested_by=actor_of(principal),
                         reason=f"activated {spec.id} as the keeper of {source_id} "
                                f"(sync: {cadence}; deferred: {len(deferred)})")
         except Exception as exc:                                      # noqa: BLE001
@@ -855,10 +896,11 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
         except JobBusy:
             return _refusal("SYNC_IN_PROGRESS", f"{spec.id} is already syncing", status=409)
         _record(rt, spec, step="build", status="started", by=principal.principal_id,
+                requested_by=actor_of(principal),
                 reason=f"started the build run of {source_id} from the approved mapping "
                        f"(job {job['job_id']}); its outcome is recorded when it ends")
         background.add_task(_build_job, app, spec.id, job["job_id"], principal.principal_id,
-                            source_id)
+                            source_id, actor_of(principal))
         return {"agent": spec.id, "job_id": job["job_id"], "status": "running",
                 "started_by": principal.principal_id}
 

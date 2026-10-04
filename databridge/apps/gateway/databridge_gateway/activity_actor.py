@@ -75,19 +75,85 @@ def _text(value: Any) -> Optional[str]:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+#: The ONE principal type every person is served as (E2E run 5 W-09). Producers record the class
+#: of the principal they were handed (``AuthenticatedPrincipal``, ``Approver``,
+#: ``DelegatedApproval``) or the word ``person``; for one signed-in person those differed between
+#: families, so the same decision-maker read as two kinds of actor. The class is an implementation
+#: detail of the producer, not a fact about the actor: a recorded type that is not a machine type
+#: is served as ``person`` (a delegated decision keeps its ``delegation``).
+PERSON = "person"
+
+
+def _snake(name: str) -> str:
+    """``AdapterAgent`` -> ``adapter_agent``; ``adapter-agent`` -> ``adapter_agent``."""
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).replace("-", "_").lower()
+
+
+def canonical_type(principal_type: Any, principal_id: Any = None) -> Optional[str]:
+    """The served principal type: a machine type (from the recorded type, or the machine prefix /
+    core rule on the id — a machine id is never served as a person), else ``person``; ``None``
+    when nothing was recorded and the id names no machine."""
+    recorded = _text(principal_type)
+    if recorded is not None and _snake(recorded) in MACHINE_TYPES:
+        return _snake(recorded)
+    machine = machine_type(principal_id)
+    if machine:
+        return machine
+    return PERSON if recorded is not None else None
+
+
+#: R-029 TIDY2: the gateway's mechanism has ONE definition now (`platform_runtime` uses the auth
+#: layer's constants). Records written BEFORE that named the signed-in path ``gateway:auth`` in the
+#: agent runtime's events; this is the name those records carry (history, not a second
+#: definition), read as the auth layer's canonical name.
+LEGACY_MECHANISMS: dict[str, str] = {"gateway:auth": "GATEWAY_MECHANISM"}
+
+_MECHANISM_ALIASES: Optional[dict[str, str]] = None
+
+
+def mechanism_aliases() -> dict[str, str]:
+    """``{recorded mechanism name: canonical name}`` (E2E run 5 W-09). The gateway authenticates
+    one way and names that mechanism ``auth.GATEWAY_MECHANISM`` (the dev token
+    ``auth.DEV_MECHANISM``); since R-029 TIDY2 the agent runtime is registered under the SAME
+    constants (`platform_runtime`), so only records written before carry another name
+    (`LEGACY_MECHANISMS`, mapped onto the auth layer's constant by attribute name). Empty when the
+    auth module cannot be imported (then nothing is renamed)."""
+    global _MECHANISM_ALIASES
+    if _MECHANISM_ALIASES is None:
+        try:
+            from . import auth, platform_runtime                          # noqa: PLC0415
+            pairs = {platform_runtime.GATEWAY_MECHANISM: auth.GATEWAY_MECHANISM,
+                     platform_runtime.GATEWAY_DEV_MECHANISM: auth.DEV_MECHANISM}
+            pairs.update({old: getattr(auth, attr) for old, attr in LEGACY_MECHANISMS.items()})
+            _MECHANISM_ALIASES = {k: v for k, v in pairs.items()
+                                  if isinstance(k, str) and isinstance(v, str) and k != v}
+        except Exception:                                                 # noqa: BLE001
+            return {}
+    return _MECHANISM_ALIASES
+
+
+def canonical_mechanism(authenticated_by: Any) -> Optional[str]:
+    mech = _text(authenticated_by)
+    return mechanism_aliases().get(mech, mech) if mech is not None else None
+
+
 def make_actor(principal_id: Any, principal_type: Any, *, authenticated_by: Any = None,
                dev_only: Any = None, delegation: Optional[dict] = None,
                why: str = NOT_RECORDED) -> dict:
-    """The actor object. A field the producer did not record is the absent envelope; for a
-    machine actor, authentication and the dev token do not apply (``machine_actor``)."""
-    ptype = _text(principal_type)
+    """The actor object — ONE schema for every family (E2E run 5 W-09). A field the producer did
+    not record is the absent envelope. ``principal_type`` is ``person`` or a machine type
+    (`canonical_type`); ``authenticated_by`` is the mechanism's canonical name
+    (`canonical_mechanism`); for a machine actor, authentication and the dev token do not apply,
+    so both are the ``machine_actor`` envelope whatever its producer wrote beside it."""
+    ptype = canonical_type(principal_type, principal_id)
     machine = ptype in MACHINE_TYPES
     out: dict[str, Any] = {
         "principal_id": _text(principal_id) or absent(why),
         "principal_type": ptype or absent(why),
-        "authenticated_by": _text(authenticated_by) or absent(MACHINE_ACTOR if machine else why),
-        "dev_only": dev_only if isinstance(dev_only, bool) else absent(
-            MACHINE_ACTOR if machine else why),
+        "authenticated_by": (absent(MACHINE_ACTOR) if machine else
+                             canonical_mechanism(authenticated_by) or absent(why)),
+        "dev_only": (absent(MACHINE_ACTOR) if machine else
+                     dev_only if isinstance(dev_only, bool) else absent(why)),
     }
     if delegation:
         out["delegation"] = delegation
@@ -144,7 +210,8 @@ def actor_pid(actor: Any) -> Optional[str]:
     return _text(actor.get("principal_id")) if isinstance(actor, dict) else None
 
 
-__all__ = ["WITHHELD", "ABSENT", "NOT_RECORDED", "MACHINE_ACTOR", "NOT_IN_ALLOW_LIST",
+__all__ = ["WITHHELD", "ABSENT", "NOT_RECORDED", "MACHINE_ACTOR", "NOT_IN_ALLOW_LIST", "PERSON",
+           "canonical_type", "canonical_mechanism", "mechanism_aliases",
            "SENSITIVE_FIELD", "FREE_TEXT", "ERROR_TEXT", "TOO_DEEP", "UNEXPECTED_SHAPE",
            "SQL_WITH_LITERALS", "MACHINE_TYPES", "LEGACY_DEV_SUFFIX", "withheld", "absent",
            "is_envelope", "make_actor", "machine_type", "actor_from_record", "actor_pid"]

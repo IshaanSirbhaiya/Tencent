@@ -69,8 +69,9 @@ node_kinds:
     binds_to: entity
     description: >
       An agency staff member whose decisions, inspections and assignments are attributable.
-      A human in the world, held apart from `person` on purpose: staff identity is administrative
-      and IS keyed (`officer_ref`), so it merges exactly and never fuzzily. Fuzzy-merging two staff
+      A human in the world, held apart from the register's person on purpose: staff identity is administrative
+      and IS keyed (`officer_ref`). A natural person, so a subject (below): two records are never
+      merged, and a name in a document is a candidate, never a join. Fuzzy-merging two staff
       records would silently reassign a caseload — and because assignment is an access predicate,
       it would rewrite who may READ the case too.
 
@@ -759,5 +760,15 @@ subject_kinds:
     never_fuzzy_merge: true
     attestation: verified_channel
     grant_type: ClaimantReadGrant
+    attested_by: a named officer
+    held_by: the agency
+
+  # E2E run 5 F-04: an officer is a natural person (holds roles, sends messages); a person kind
+  # left off this list lost `never_fuzzy_merge` silently. Its identifier is the staff register's.
+  - kind: officer
+    identifiers: [officer_ref]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: OfficerReadGrant
     attested_by: a named officer
     held_by: the agency

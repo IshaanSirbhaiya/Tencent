@@ -31,6 +31,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from .auth import AuthenticatedPrincipal, require_principal
+from .public_errors import error_ref, exception_refusal, refusal_body
 
 log = logging.getLogger("databridge.gateway.identity_rules")
 
@@ -48,8 +49,16 @@ class IdentityRuleDecision(BaseModel):
     decision: Literal["approved", "revoked"] = "approved"
 
 
-def _refusal(code: str, message: str, status: int) -> JSONResponse:
-    return JSONResponse({"refusal": {"code": code, "message": message}}, status_code=status)
+#: Fixed public sentences (R-029 TIDY2, CONS standard 4): never an exception's text. The detail
+#: is in the server log under the payload's ``error_ref``.
+RULE_REFUSED = ("that identity rule cannot be decided: only a rule a bound pack declares, on a "
+                "kind that is not a person, can be approved")
+RULES_UNREADABLE = "the identity rules could not be read"
+PREVIEW_FAILED = "the preview could not be computed"
+
+
+def _refusal(code: str, message: str, status: int, *, ref: Optional[str] = None) -> JSONResponse:
+    return JSONResponse(refusal_body(code, message, ref=ref), status_code=status)
 
 
 def _store(app: FastAPI) -> Any:
@@ -168,7 +177,10 @@ def listing(app: FastAPI) -> dict:
                     try:
                         entry["preview"] = preview(store, vocab, kind, t, approved_now)
                     except Exception as exc:                        # noqa: BLE001
-                        entry["preview_note"] = f"{type(exc).__name__}: {exc}"
+                        # a fixed sentence and a reference: never the exception's text
+                        entry["preview_note"] = PREVIEW_FAILED
+                        entry["preview_error_ref"] = error_ref(
+                            log, "identity rule preview", exc, kind=kind, rule=t)
             types.append(entry)
         rules.append({"pack": rule.pack, "kind": kind,
                       "business_keys": list(rule.business_keys), "exact_name": rule.exact_name,
@@ -186,7 +198,8 @@ def register_identity_rules_routes(app: FastAPI) -> None:
         try:
             return listing(app)
         except Exception as exc:                                    # noqa: BLE001
-            return _refusal("IDENTITY_RULES_UNREADABLE", f"{type(exc).__name__}: {exc}", 500)
+            return _refusal("IDENTITY_RULES_UNREADABLE", RULES_UNREADABLE, 500,
+                            ref=error_ref(log, "identity rules listing", exc))
 
     @app.post("/ontology/identity-rules/decide")
     def identity_rules_decide(body: IdentityRuleDecision = Body(...),
@@ -200,7 +213,11 @@ def register_identity_rules_routes(app: FastAPI) -> None:
         try:
             who = require_authenticated_approver(principal, what="identity rule decision")
         except ApprovalRefused as exc:
-            return _refusal("UNAUTHENTICATED_APPROVER", str(exc), 403)
+            # the standard codes (CONS standard 3), from the gate's own code: MACHINE_ACTOR for a
+            # machine principal, APPROVER_NOT_AUTHENTICATED otherwise; a fixed sentence, never
+            # the gate's text
+            return exception_refusal(log, exc, default_code="APPROVER_NOT_AUTHENTICATED",
+                                     status=403, context="identity rule decision")
         vocab = active_vocabulary()
         at = dt.datetime.now(dt.timezone.utc).isoformat()
         try:
@@ -208,7 +225,9 @@ def register_identity_rules_routes(app: FastAPI) -> None:
                                                 principal=who["principal_id"],
                                                 decision=body.decision, vocab=vocab, at=at)
         except ValueError as exc:
-            return _refusal("IDENTITY_RULE_REFUSED", str(exc), 409)
+            return _refusal("IDENTITY_RULE_REFUSED", RULE_REFUSED, 409,
+                            ref=error_ref(log, "identity rule decision refused", exc,
+                                          pack=body.pack, kind=body.kind, rule=body.rule))
         _append_audit({"pack": rec["pack"], "kind": rec["kind"], "rule": rec["rule"],
                        "decision": rec["decision"], "principal": rec["principal"],
                        "at": rec["at"], "authenticated_by": who.get("authenticated_by"),

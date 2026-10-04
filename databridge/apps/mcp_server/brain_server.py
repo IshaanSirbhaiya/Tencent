@@ -297,6 +297,113 @@ def passages_answer(question: str, passages: list[dict]) -> Optional[str]:
     return "\n".join(lines)
 
 
+# --- reading a LARGE graph by index (E2E run 5, F-05) -----------------------------------------
+# On the finance estate (50k nodes, 49k edges) one /brain question took 18-140 s. Profiled on a
+# copy of that graph, nearly all of it was two whole-graph reads: entity linking turned EVERY open
+# node into a typed `GraphNode` (two pointer queries each) to score its text, and the 1-hop
+# neighbourhood turned EVERY open edge into a `GraphEdge` to keep the few touching one node. The
+# readers below compute the same things from the raw rows and the indexes, and type only what
+# they return.
+
+#: The open edges touching one node, by index (R-029 TIDY2: ONE definition, the graph package's).
+from databridge_graph.query import TOUCHING_EDGES_SQL  # noqa: E402
+
+
+def link_entities_indexed(store, question: str, *, top_k: int = 3) -> list:
+    """`databridge_graph.link_entities` — which itself reads by index since R-029 TIDY2 (the BM25
+    index built from raw rows, cached per store, and only the top ``top_k`` typed; moved there from
+    here so every caller is fast, not only /brain). Kept as a name for this module's callers."""
+    from databridge_graph.query import link_entities
+
+    return link_entities(store, question, top_k=top_k)
+
+
+class NeighbourhoodView:
+    """A read-only view of a store in which "the open graph" is ONE record's 1-hop neighbourhood:
+    ``open_edges()`` is every open edge touching it (all of them, read by index) and
+    ``open_nodes()`` the record and every open node at their other ends. Every other read passes
+    through to the store.
+
+    `nl_query` answers about its primary record from `neighbors(primary)`, which reads
+    ``open_edges()``/``open_nodes()``: over this view it sees exactly the same neighbourhood, by
+    index instead of by materialising the whole graph (E2E run 5, F-05). Used only where the
+    record is ADDRESSED (named by id), so ranking other records — which this view narrows to the
+    neighbourhood — never decides what is answered."""
+
+    #: A token no question carries and no node id can be (a node id never holds this prefix), by
+    #: which `address` names the root record to `nl_query`'s id door (`_named_outright`). Node ids
+    #: may contain spaces ("organisation:pellucid freightways ltd"), so appending the id itself to
+    #: a question would be split into tokens, one of which can be ANOTHER node's id.
+    ADDRESS_TOKEN = "__addressed-record__"
+
+    def __init__(self, store, root_id: str) -> None:
+        self._store = store
+        self._root = root_id
+        self._edges = store.fetchall(TOUCHING_EDGES_SQL, (root_id, root_id, root_id))
+        ids = [root_id, *{x for r in self._edges for x in (r["src_id"], r["dst_id"])}]
+        rows: list = []
+        for i in range(0, len(ids), 500):
+            chunk = ids[i:i + 500]
+            rows += store.fetchall("SELECT * FROM nodes WHERE system_to IS NULL AND id IN ("
+                                   + ", ".join("?" for _ in chunk) + ")", tuple(chunk))
+        self._nodes = sorted(rows, key=lambda r: r["rowid_pk"])
+
+    def open_edges(self) -> list:
+        return list(self._edges)
+
+    def open_nodes(self) -> list:
+        return list(self._nodes)
+
+    def open_node_row(self, entity_id: str):
+        if entity_id == self.ADDRESS_TOKEN:
+            return self._store.open_node_row(self._root)
+        return self._store.open_node_row(entity_id)
+
+    def address(self, question: str) -> str:
+        """``question`` addressed to the root record by id (see `ADDRESS_TOKEN`)."""
+        return f"{question} {self.ADDRESS_TOKEN}"
+
+    def __getattr__(self, name):
+        return getattr(self._store, name)
+
+
+def nl_query_indexed(store, question: str) -> GroundedAnswer:
+    """`databridge_graph.nl_query`, with its two whole-graph reads done by index (F-05).
+
+    `nl_query` links the question to its primary record (BM25 over every open node), refuses a
+    name several records share, and answers about the primary record from its 1-hop
+    neighbourhood. Its answer depends on the question ONLY through that primary record. So:
+
+    * the primary record is chosen by the same ranking, read by index (`link_entities_indexed`,
+      ``top_k=3`` as `nl_query` asks) — or is the node the question names by id;
+    * the same-name refusal is the same rule (`same_label_node_ids`, `ambiguous_refusal`), applied
+      here before anything is answered;
+    * the answer is `nl_query` itself, ADDRESSED to the primary record by its id, over the
+      record's `NeighbourhoodView` — the same neighbourhood, read by index;
+    * ``question`` and ``matched_entities`` are restored to what `nl_query` returns: the asked
+      question, and the primary record followed by the rest of the global ranking."""
+    import dataclasses
+
+    from databridge_graph.query import _named_outright
+
+    explicit = _named_outright(store, question)
+    matches = link_entities_indexed(store, question)
+    if explicit is None and not matches:
+        return GroundedAnswer(question, "", grounded=False,
+                              refusal="no matching entity in the graph")
+    primary = explicit if explicit is not None else matches[0]
+    matched_ids = [primary.id, *(m.id for m in matches if m.id != primary.id)]
+    if explicit is None:
+        shared = same_label_node_ids(store, primary.id)
+        if len(shared) > 1:
+            return GroundedAnswer(question, "", grounded=False, matched_entities=matched_ids,
+                                  candidates=shared, refusal=ambiguous_refusal(question, shared))
+    view = NeighbourhoodView(store, primary.id)
+    a = nl_query(view, question if explicit is not None else view.address(question))
+    return dataclasses.replace(a, question=question, matched_entities=(
+        matched_ids if a.matched_entities else list(a.matched_entities)))
+
+
 # --- a record named by its identifier (E2E run 3, P-06) ----------------------------------------
 #: An identifier-shaped token: letters and digits (at least one of EACH), optionally joined by
 #: ``- _ . / :``. "INV-2026-0057", "C-1002", "SOW-2026-021" — never a bare year or a plain word.
@@ -371,7 +478,7 @@ def default_ingest_root() -> Optional[pathlib.Path]:
     return ingest_paths.ingest_dir()
 
 
-def withheld_items(question: str, ingest_root=None) -> list[dict]:
+def withheld_items(question: str, ingest_root=None, *, named: bool = False) -> list[dict]:
     """Items the ingestion screen kept OUT of the graph that the question names by file name.
 
     A blocked or held document is not *missing*: it was captured, screened and withheld by a rule.
@@ -380,6 +487,14 @@ def withheld_items(question: str, ingest_root=None) -> list[dict]:
     lines with decision ``block``/``review`` are the withheld items. One is returned when a word
     of its file name (4+ letters) is a word of the question; the best-overlapping items only.
     Nothing of the item's CONTENT is read or returned — its name, the rule and how to reverse it.
+
+    ``named=True`` (E2E run 5, F-06) keeps only items the question NAMES: at least two words of
+    the file name, and at least half of them. That is the rule used when graph entities ALSO
+    match — "What does the Yolande Mining interim review 2024 say?" matched the company's records
+    and the held filing was never mentioned, so the answer said the review did not exist. A
+    question that only shares a company name with a held file ("…Yolande Mining's limit?") is
+    not about the file. A BLOCKED item and one HELD FOR REVIEW are the same here: both are named
+    with their rule, and neither is quoted.
     """
     root = pathlib.Path(ingest_root) if ingest_root is not None else default_ingest_root()
     if root is None or not root.is_dir():
@@ -406,9 +521,14 @@ def withheld_items(question: str, ingest_root=None) -> list[dict]:
                 continue
             name = pathlib.PureWindowsPath(rec.uri).name if "\\" in rec.uri \
                 else pathlib.PurePosixPath(rec.uri).name
-            overlap = asked & _name_words(pathlib.PurePath(name).stem.replace("_", " ")
-                                          .replace("-", " "))
+            own = _name_words(pathlib.PurePath(name).stem.replace("_", " ").replace("-", " "))
+            overlap = asked & own
             if not overlap:
+                continue
+            # a singular form counts with its plural, so a word is counted once
+            spoken = {w for w in overlap if not (w + "s") in overlap}
+            whole = {w for w in own if not (w + "s") in own}
+            if named and (len(spoken) < 2 or 2 * len(spoken) < len(whole)):
                 continue
             fired = [str(f.get("rule")) if isinstance(f, dict) else str(f) for f in rec.fired]
             scored.append((len(overlap), {
@@ -477,10 +597,12 @@ def clarification_for(store, question: str) -> dict:
     record the question is about. The options are the KINDS of record the graph holds (with
     counts), read from the store; never a name, so no person is put forward as a choice."""
     counts: dict[str, int] = {}
-    for r in store.open_nodes():
+    # counted in SQL (E2E run 5, F-05: materialising every open node row took seconds at 50k)
+    for r in store.fetchall("SELECT kind, COUNT(*) AS n FROM nodes WHERE system_to IS NULL "
+                            "GROUP BY kind"):
         if is_subject_kind(r["kind"]):
             continue
-        counts[str(r["kind"])] = counts.get(str(r["kind"]), 0) + 1
+        counts[str(r["kind"])] = counts.get(str(r["kind"]), 0) + int(r["n"])
     options = [f"{k} ({n} record{'s' if n != 1 else ''})" for k, n in
                sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
     text = ("Your question does not name a record I can look up. Which one do you mean? Name "
@@ -1190,6 +1312,19 @@ class BrainTools:
         # as_of (valid-time) narrows the snapshot the answer is drawn from (audit/replay).
         explicit = _named_outright(self.store, question)
         records = record_id_matches(self.store, question) if explicit is None else [[], []]
+        named_held = ([] if explicit is not None or records[0] or records[1]
+                      else withheld_items(question, self.ingest_root, named=True))
+        if named_held:
+            # E2E run 5, F-06: the question NAMES an item the ingestion screen withheld or holds
+            # for review. Records that share a word with it (the company a held filing is about)
+            # are not what was asked about: the item is named as withheld, with its rule, and
+            # nothing of it is quoted — never "it does not exist".
+            return {"question": question, "answer": withheld_notice(named_held),
+                    "grounded": False, "refusal": "", "answer_kind": "withheld",
+                    "withheld_items": named_held, "matched_entities": [], "candidates": [],
+                    "citations": [], "values": [], "unresolved": [], "passages": [],
+                    "retrieval": {"available": False, "reason": "not searched: the question "
+                                  "names a withheld item"}, "as_of": as_of}
         if records[0] or records[1]:
             # P-06: a record named by its identifier is answered about THAT record — the same
             # claim-checked `nl_query`, addressed by the node's id, so every printed value keeps
@@ -1203,8 +1338,22 @@ class BrainTools:
                                     "answered": [n.id for n in primary[:3]],
                                     "also_carrying_the_identifier": extra}
             a = None
+        elif (explicit is None and is_vague_question(question)
+              and not withheld_items(question, self.ingest_root)
+              and not link_entities_indexed(self.store, question)):
+            # P-13, F-05: a vague question that links to no record (the same ranking `nl_query`
+            # would run, read by index) gets its question back without a whole-graph read
+            out = {"question": question, "answer": "", "grounded": False, "refusal": "",
+                   "answer_kind": "needs_clarification", "needs_clarification": True,
+                   "matched_entities": [], "candidates": [], "citations": [], "values": [],
+                   "unresolved": [], "passages": [], "as_of": as_of,
+                   "retrieval": {"available": False,
+                                 "reason": "not searched: the question needs a question back"},
+                   **clarification_for(self.store, question)}
+            return out
         else:
-            a = nl_query(self.store, question)
+            # F-05: the same answer as `nl_query(self.store, question)`, read by index
+            a = nl_query_indexed(self.store, question)
             out = answer_to_dict(a, self.store)
         out["as_of"] = as_of
         out["answer_kind"] = "graph" if out["grounded"] else "refused"
@@ -1275,7 +1424,14 @@ class BrainTools:
             if held:
                 out["withheld_items"] = held
             text = passages_answer(question, passages)
-            if text is not None:
+            if not held and is_vague_question(question):
+                # P-13: a vague question about the asker's own affairs gets a question back.
+                # E2E run 5, F-05: BEFORE any passage answer — on a large estate some passage
+                # always shares a word ("should", "book") with a vague question, and a dump of
+                # loosely matching extracts is not an answer to "is everything okay?".
+                out.update(answer="", refusal="", answer_kind="needs_clarification",
+                           needs_clarification=True, **clarification_for(self.store, question))
+            elif text is not None:
                 joined = "\n\n".join(x for x in (notice, text) if x)
                 out.update(answer=joined, grounded=True,
                            refusal="", answer_kind="passages",
@@ -1283,17 +1439,17 @@ class BrainTools:
                                       if p.get("lexical_match")])
             elif held:
                 out.update(answer=notice, refusal="", answer_kind="withheld")
-            elif is_vague_question(question):
-                # P-13: a vague question about the asker's own affairs gets a question back.
-                out.update(answer="", refusal="", answer_kind="needs_clarification",
-                           needs_clarification=True, **clarification_for(self.store, question))
         return out
 
     def _answer_records(self, question: str, nodes: list) -> dict:
         """`nl_query` addressed to each record by its node id, merged (P-06). Only the records
         the identifier named are answered; each answer is the claim-checked deterministic one."""
-        parts = [answer_to_dict(nl_query(self.store, f"{question} {n.id}"), self.store)
-                 for n in nodes]
+        # F-05: each record is ADDRESSED by its id, so `nl_query` answers about it from its own
+        # neighbourhood, read by index (`NeighbourhoodView`), not from the whole graph
+        parts = []
+        for n in nodes:
+            view = NeighbourhoodView(self.store, n.id)
+            parts.append(answer_to_dict(nl_query(view, view.address(question)), self.store))
         if len(parts) == 1:
             out = parts[0]
         else:

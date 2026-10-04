@@ -374,7 +374,10 @@ def register_agents_routes(app: FastAPI) -> None:
             return _refusal("AGENT_NOT_RUNNABLE", f"agent {agent_id!r} cannot run: {refused}",
                             status=409)
         body = body or RunRequest()
-        trigger = {"type": "manual", "by": principal.principal_id, "question": body.question}
+        # R-029 TIDY2: the trigger carries the full common actor object, not only a name
+        from .public_errors import actor_of                           # noqa: PLC0415
+        trigger = {"type": "manual", "by": principal.principal_id, "actor": actor_of(principal),
+                   "question": body.question}
         rt = platform_of(app)
         if body.wait:
             try:

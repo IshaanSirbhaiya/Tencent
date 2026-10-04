@@ -37,7 +37,7 @@ from databridge_core import GroundedValue, SourcePointer
 from databridge_core.provenance import SnapshotIdentity, Trust
 from databridge_agent_runtime import sql_is_read_only
 
-from .catalogue import Catalogue, ConnectionEntry, FactsTable, key_proof_sql
+from .catalogue import Catalogue, ConnectionEntry, FactsTable, index_complete, key_proof_sql
 from .contracts import (
     DATE_FIELD,
     RECORD_TIME_FIELD,
@@ -733,10 +733,109 @@ def _contains(outer: Any, inner: list[SourcePointer]) -> bool:
     return False
 
 
+#: E2E run 5, F-07: the soft time budget of a documents read. Past it the delegate stops reading
+#: and returns what it has, marked truncated and non-exhaustive (said in coverage), instead of
+#: being cut off at the dispatch deadline with nothing. Kept below `service.SUBTASK_TIMEOUT_S`.
+DOCUMENTS_BUDGET_S = 20.0
+
+#: The open edges touching one node, through `ix_edges_src` / `ix_edges_dst`; a self-loop once.
+_TOUCHING_SQL = ("SELECT * FROM edges WHERE system_to IS NULL AND src_id = ? "
+                 "UNION ALL "
+                 "SELECT * FROM edges WHERE system_to IS NULL AND dst_id = ? AND src_id <> ? "
+                 "ORDER BY rowid_pk")
+
+
+class _GraphView:
+    """What a documents read sees of the graph: candidate nodes of one connection, a node by id,
+    and the edges touching a node — each restricted to what the caller may read (a node needs an
+    admitted pointer; an edge needs one too, and both ends visible).
+
+    Two ways to read it, with the SAME result: ``full`` holds every open node and edge (the only
+    way for a system-time window, which reads the graph as believed then, and for a store whose
+    reverse pointer index is incomplete); otherwise the nodes of the connection come from the
+    reverse pointer index and everything else is read by id through the node and edge indexes
+    (E2E run 5, F-07: materialising 50k nodes and 49k edges per sub-task timed the filings keeper
+    out at 30 s)."""
+
+    def __init__(self, store: Any, admits: Admits, cancel: Any = None, *,
+                 nodes: Optional[list] = None, edges: Optional[list] = None) -> None:
+        self.store, self.admits, self.cancel = store, admits, cancel
+        self.full = nodes is not None
+        self._node: dict[str, Any] = {}
+        self._touch: dict[str, list] = {}
+        self._order: list = []
+        if self.full:
+            vis = [n for n in nodes if admitted_source(n.sources, admits) is not None]
+            self._order = vis
+            self._node = {n.id: n for n in vis}
+            for e in edges or []:
+                if e.src_id in self._node and e.dst_id in self._node and \
+                        admitted_source(e.sources, admits) is not None:
+                    self._touch.setdefault(e.src_id, []).append(e)
+                    if e.dst_id != e.src_id:
+                        self._touch.setdefault(e.dst_id, []).append(e)
+
+    def candidates(self, conn: str, kinds: set) -> list:
+        """The visible open nodes of ``kinds`` (all kinds when empty) that hold a pointer into
+        ``conn`` in some version — a superset of the nodes whose CURRENT pointers are in it,
+        which the caller then checks node by node."""
+        if self.full:
+            return [n for n in self._order if not kinds or _kind(n) in kinds]
+        from databridge_graph.store import row_to_node        # noqa: PLC0415
+        # CROSS JOIN fixes the join order: the connection's pointers first, by index
+        sql = ("SELECT DISTINCT n.* FROM ptr_index p CROSS JOIN ptr_binding b CROSS JOIN nodes n "
+               "WHERE p.source_id = ? AND b.pointer_id = p.pointer_id AND b.entity_kind = 'node' "
+               "AND n.id = b.entity_id AND n.system_to IS NULL")
+        params: list[Any] = [conn]
+        if kinds:
+            sql += " AND n.kind IN (" + ", ".join("?" for _ in kinds) + ")"
+            params += sorted(kinds)
+        _checkpoint(self.cancel)
+        out = []
+        for r in self.store.fetchall(sql + " ORDER BY n.rowid_pk", tuple(params)):
+            if r["id"] in self._node:
+                n = self._node[r["id"]]
+            else:
+                n = row_to_node(self.store, r)
+                n = n if admitted_source(n.sources, self.admits) is not None else None
+                self._node[r["id"]] = n
+            if n is not None:
+                out.append(n)
+        return out
+
+    def node(self, nid: str) -> Any:
+        if self.full or nid in self._node:
+            return self._node.get(nid)
+        from databridge_graph.store import row_to_node        # noqa: PLC0415
+        row = self.store.open_node_row(nid)
+        n = row_to_node(self.store, row) if row is not None else None
+        if n is not None and admitted_source(n.sources, self.admits) is None:
+            n = None
+        self._node[nid] = n
+        return n
+
+    def touching(self, nid: str) -> list:
+        if self.full or nid in self._touch:
+            return self._touch.get(nid, [])
+        from databridge_graph.store import row_to_edge        # noqa: PLC0415
+        _checkpoint(self.cancel)
+        out = []
+        if self.node(nid) is not None:
+            for r in self.store.fetchall(_TOUCHING_SQL, (nid, nid, nid)):
+                other = r["dst_id"] if r["src_id"] == nid else r["src_id"]
+                if self.node(other) is None:
+                    continue
+                e = row_to_edge(self.store, r)
+                if admitted_source(e.sources, self.admits) is not None:
+                    out.append(e)
+        self._touch[nid] = out
+        return out
+
+
 def _nodes_for(task: SubTask, store: Any, today: dt.date, admits: Admits, cancel: Any = None
-               ) -> tuple[list, list, str]:
-    """(nodes, edges, how) — the graph as the time window asks for it, restricted to nodes and
-    edges whose provenance the caller may read (an edge also needs both ends visible). A set
+               ) -> tuple[_GraphView, str]:
+    """(view, how) — the graph as the time window asks for it, restricted to nodes and edges
+    whose provenance the caller may read (an edge also needs both ends visible). A set
     ``cancel`` stops it before EACH store read (R-021 r2 #11)."""
     from databridge_graph import query as gq                   # noqa: PLC0415
     from databridge_graph.store import row_to_edge, row_to_node  # noqa: PLC0415
@@ -748,27 +847,23 @@ def _nodes_for(task: SubTask, store: Any, today: dt.date, admits: Admits, cancel
             dt.timedelta(microseconds=1)
         _checkpoint(cancel)
         snap = gq.as_of(store, valid_time=at, system_time=at)
-        nodes, edges = snap.nodes, snap.edges
-        how = f"graph as believed at {at.isoformat()} (system_time)"
-    else:
-        _checkpoint(cancel)
-        nodes = [row_to_node(store, r) for r in store.fetchall(
-            "SELECT * FROM nodes WHERE system_to IS NULL")]
-        _checkpoint(cancel)                   # a deadline that passed during the node read
-        edges = [row_to_edge(store, r) for r in store.fetchall(
-            "SELECT * FROM edges WHERE system_to IS NULL")]
-        how = "current graph"
-    nodes = [n for n in nodes if admitted_source(n.sources, admits) is not None]
-    visible = {n.id for n in nodes}
-    edges = [e for e in edges if e.src_id in visible and e.dst_id in visible
-             and admitted_source(e.sources, admits) is not None]
-    return nodes, edges, how
+        return (_GraphView(store, admits, cancel, nodes=snap.nodes, edges=snap.edges),
+                f"graph as believed at {at.isoformat()} (system_time)")
+    if index_complete(store):
+        return _GraphView(store, admits, cancel), "current graph"
+    _checkpoint(cancel)
+    nodes = [row_to_node(store, r) for r in store.fetchall(
+        "SELECT * FROM nodes WHERE system_to IS NULL")]
+    _checkpoint(cancel)                   # a deadline that passed during the node read
+    edges = [row_to_edge(store, r) for r in store.fetchall(
+        "SELECT * FROM edges WHERE system_to IS NULL")]
+    return _GraphView(store, admits, cancel, nodes=nodes, edges=edges), "current graph"
 
 
 def run_documents(task: SubTask, entry: ConnectionEntry, *, store: Any, retriever: Any,
                   catalogue: Catalogue, today: dt.date, principal: str,
                   run_id: Optional[str], admits: Optional[Admits] = None,
-                  cancel: Any = None) -> SubResult:
+                  cancel: Any = None, budget_s: Optional[float] = None) -> SubResult:
     """``admits(source_id)`` is the CALLER's read scope over graph provenance; without one only
     this connection's own evidence is visible (fail closed)."""
     conn = entry.connection
@@ -794,9 +889,20 @@ def run_documents(task: SubTask, entry: ConnectionEntry, *, store: Any, retrieve
                                 f"not {f.describe()}")
         if _parse_dt(f.value) is None:
             raise DelegateError(f"{f.describe()}: the value is not a date")
-    nodes, edges, how = _nodes_for(task, store, today, scope, cancel)
+    view, how = _nodes_for(task, store, today, scope, cancel)
     _checkpoint(cancel)
     kinds = set(task.entity_kinds)
+    out_of_time: list[str] = []
+    budget_s = DOCUMENTS_BUDGET_S if budget_s is None else budget_s
+
+    def over_budget(stage: str, done: int, of: int) -> bool:
+        """F-07: past the soft budget the read stops HERE and says how far it got."""
+        if time.perf_counter() - t0 <= budget_s:
+            return False
+        out_of_time.append(f"{conn}: the read stopped at its {budget_s:g}s time budget while "
+                           f"{stage} ({done} of {of}); the rest was not read, so this result "
+                           f"is partial")
+        return True
     tw = task.time_window
     lo_hi = tw.bounds(today) if (tw is not None and tw.axis == "valid_time") else None
     date_field = tw.field if (tw is not None and tw.field) else DATE_FIELD
@@ -816,7 +922,10 @@ def run_documents(task: SubTask, entry: ConnectionEntry, *, store: Any, retrieve
 
     candidates = []
     undated = 0
-    for n in nodes:
+    pool = view.candidates(conn, kinds)
+    for i, n in enumerate(pool):
+        if over_budget("selecting records", i, len(pool)):
+            break
         kind = _kind(n)
         if kinds and kind not in kinds:
             continue
@@ -841,20 +950,15 @@ def run_documents(task: SubTask, entry: ConnectionEntry, *, store: Any, retrieve
             if p.document_id:
                 by_doc.setdefault(p.document_id, []).append(c)
     edge_ok = set(task.link_edges)
-    node_by_id = {n.id: n for n in nodes}
-    touching: dict[str, list] = {}
-    for e in edges:
-        touching.setdefault(e.src_id, []).append(e)
-        touching.setdefault(e.dst_id, []).append(e)
 
     def neighbours(nid: str) -> list[tuple[Any, str, SourcePointer]]:
         """(node, edge kind, edge pointer) over the declared, admitted edges."""
         out = []
-        for e in touching.get(nid, []):
+        for e in view.touching(nid):
             ek = _kind(e)
             if ek not in catalogue.edge_kinds or (edge_ok and ek not in edge_ok):
                 continue
-            o = node_by_id.get(e.dst_id if e.src_id == nid else e.src_id)
+            o = view.node(e.dst_id if e.src_id == nid else e.src_id)
             ptr = admitted_source(e.sources, scope)
             if o is not None and ptr is not None:
                 out.append((o, ek, ptr))
@@ -932,13 +1036,19 @@ def run_documents(task: SubTask, entry: ConnectionEntry, *, store: Any, retrieve
         notes.append(f"passage search for {text_terms[0]!r} (keyword, k={PASSAGE_K}), exact "
                      f"containment of {text_terms}; ranked retrieval — not an exhaustive scan")
     else:
-        for (n, kind, mine, d, dptr, draw) in candidates:
+        for i, (n, kind, mine, d, dptr, draw) in enumerate(candidates):
+            if over_budget("linking records to what they are about", i, len(candidates)):
+                break
             cells = {"document": GroundedValue(value=n.label, pointer=mine[0]),
                      **date_cell(dptr, draw)}
             rows.append(ResultRow(row_id=f"{conn}:{n.id}", cells=cells,
                                   entities=entities(n, mine)))
     if len(rows) > task.limit:
         rows, truncated = rows[:task.limit], True
+    if out_of_time:
+        # partial, and said so: capped (totals may be incomplete) and not exhaustive
+        truncated, exhaustive = True, False
+        excluded.extend(out_of_time)
     return SubResult(subtask_id=task.id, adapter_agent=task.adapter_agent, connection=conn,
                      method="graph_passages", rows=tuple(rows),
                      coverage=DelegateCoverage(sources_read=(conn,), skipped=tuple(skipped),

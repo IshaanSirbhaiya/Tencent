@@ -34,7 +34,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from databridge_core import SourcePointer, Trust
 from databridge_core.provenance import SnapshotIdentity
@@ -42,6 +42,49 @@ from databridge_core.provenance import SnapshotIdentity
 from .screen import ScreenConfig, apply_masks, screen_text
 
 CHUNK_CHARS = 1800
+#: a table build reports progress every this many nodes / edges (E2E run 5 F-02)
+PROGRESS_EVERY = 2000
+#: E2E run 5 F-02: the table build refreshes the store's query-planner statistics each time the
+#: open nodes it has written since the last refresh reach this many, then double that
+STATS_FIRST = 1000
+
+
+def truncate_wal(store) -> bool:
+    """E2E run 5 F-02: after a large table build commits, checkpoint the store's write-ahead log
+    and truncate it — one table build's transaction grew the log past a gigabyte, and SQLite
+    never shrinks it on its own. Best effort: a reader holding the log makes it a no-op (the next
+    build retries); never fatal, and only a plain sqlite `GraphStore` in WAL mode is touched."""
+    conn = getattr(store, "conn", None)
+    lock = getattr(store, "_lock", None)
+    if not isinstance(conn, sqlite3.Connection) or lock is None:
+        return False
+    try:
+        with lock:
+            mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
+            if str(mode).lower() != "wal":
+                return False
+            busy = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()[0]
+        return not busy
+    except sqlite3.Error:
+        return False
+
+
+def refresh_planner_stats(store) -> bool:
+    """E2E run 5 F-02 (measured, `bench/bench_tables.py`): with no statistics SQLite answers the
+    row build's per-row lookups ("the open node of this kind with this canonical id", "the one
+    keyless mention with this label") through the KIND index — a scan of every open node of the
+    kind, per row, so a 24,000-row table cost O(n^2) (32 ms a lookup at the end; 0.02 ms with
+    statistics). `ANALYZE nodes` gives the planner the statistics to use the selective index.
+    A plain sqlite `GraphStore` only; never fatal (the build is correct either way, only slower)."""
+    conn = getattr(store, "conn", None)
+    raw = getattr(conn, "_conn", conn)                # inside `store_batch`: the real connection
+    if not isinstance(raw, sqlite3.Connection):
+        return False
+    try:
+        raw.execute("ANALYZE nodes")
+        return True
+    except sqlite3.Error:
+        return False
 CHUNK_OVERLAP = 0.15
 MIN_CHUNK = 120
 
@@ -666,7 +709,7 @@ class ProseBuilder:
                         # attribute pointers (a grounded canonical_id / identifier) are
                         # chunk-relative too
                         "attr_sources": attr_ptrs})
-                    subject = self.vocab.is_subject(str(node.kind))
+                    subject = _is_person_kind(self.vocab, node.kind)
                     if not subject and not node.canonical_id:
                         # E2E run-2 N-16: a mention whose grounded span IS a declared business
                         # key of its kind carries that key as its canonical id
@@ -845,6 +888,18 @@ def _declared_key_twin(store, n) -> Optional[str]:
     return rows[0]["id"] if len(rows) == 1 else None
 
 
+def _is_person_kind(vocab, kind) -> bool:
+    """IDN (E2E run 5 F-04): a SUBJECT, or a kind whose records are natural persons although the
+    pack forgot to declare it one (`Vocabulary.person_kinds`). Either way its records are
+    document-scoped mentions or id-only rows: never merged, joined or aliased by name. A
+    vocabulary that cannot say fails CLOSED (a person)."""
+    try:
+        probe = getattr(vocab, "is_person", None)
+        return bool(vocab.is_subject(str(kind))) or bool(callable(probe) and probe(str(kind)))
+    except Exception:                                                # noqa: BLE001
+        return True
+
+
 def _note_id(out: DocBuild, gid: str) -> None:
     if gid not in out.graph_ids:
         out.graph_ids.append(gid)
@@ -976,7 +1031,7 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
                candidate_col: Optional[str] = None, candidate_values: Optional[dict] = None,
                candidate_masked: Optional[list] = None,
                ref_index: Optional[dict] = None, links: Optional[list[dict]] = None,
-               split: Optional[dict] = None):
+               split: Optional[dict] = None, verdicts: Optional[dict] = None):
     """Rows of one captured table as `AdapterRow`s with our own `table_cell` pointers. Adds
     `walnut_row_key` (source-qualified row identity) and `walnut_fk_<col>` (the referenced row's
     identity) so a mapping can key nodes and join edges without colliding across tables/sources.
@@ -999,7 +1054,12 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
     `split` (an APPROVED mapping's FIN-04 kind split) adds `walnut_kind`: the kind THIS row's node
     is built as — the kind the split binds the row's normalised discriminator value to, else the
     split's default (the subject: an unrecognised, NULL or MASKED value is never moved off the
-    protected side). It is cited as derived from the discriminator cell (or the row identity)."""
+    protected side). It is cited as derived from the discriminator cell (or the row identity).
+
+    `verdicts` ({row_ref: (row_digest, ScreenResult)}, E2E run 5 F-01/F-02): the verdicts this
+    run's SCREEN stage reached on exactly these rows, under the same rules and overrides — used
+    instead of checking a row twice. A row it does not hold (or holds at another digest) is
+    screened here, so a missing verdict never admits anything."""
     import hashlib
 
     from databridge_graph.adapter_ingest import AdapterRow
@@ -1026,9 +1086,13 @@ def table_rows(snapshot: dict, *, source_id: str, sha: str, mask_cfg: Optional[S
                                  "decision": decision})
 
         if screen_cfg is not None:
-            approved = overrides is not None and overrides.allows(ref, digest)
-            verdict = screen_text(json.dumps(row, sort_keys=True, default=str), screen_cfg,
-                                  override_allow=approved)
+            known = (verdicts or {}).get(ref)
+            if known is not None and known[0] == digest:
+                verdict = known[1]
+            else:
+                approved = overrides is not None and overrides.allows(ref, digest)
+                verdict = screen_text(json.dumps(row, sort_keys=True, default=str), screen_cfg,
+                                      override_allow=approved)
             if verdict.decision != "allow":
                 rec = verdict.as_record()
                 if verdict.decision == "review":
@@ -1247,17 +1311,59 @@ def reference_index(snapshots, wanted: list[tuple[str, str, Optional[str]]]) -> 
     return out
 
 
+#: `reference_index` key prefix of an approved LINK's normalised index (F-11)
+_NORM = "normalised"
+
+
+def link_index(snapshots, links: list[tuple[str, str, Optional[str]]]) -> dict:
+    """E2E run 5 F-11: {(_NORM, source, table, column): {normalised value: the row's rendered key}}
+    for each approved LINK's target. A link was PROPOSED by a normalised comparison
+    (`mapping.link_value`: case, width and surrounding whitespace folded), so its reference is
+    resolved the same way — to the target row's OWN key. A normalised value two rows share is
+    left out (ambiguous: the raw value stands, and a miss is counted, never guessed)."""
+    from .mapping import link_value
+
+    out: dict = {}
+    for source, table, column in links:
+        snap = (snapshots or {}).get((source, table))
+        if snap is None:
+            continue
+        pk = list(snap.get("primary_key") or [])
+        col = column or (pk[0] if len(pk) == 1 else None)
+        if not pk or col is None:
+            continue
+        idx: dict[str, Optional[str]] = {}
+        for r in snap.get("rows") or []:
+            v, k = r.get(col), _render_pk(r, pk)
+            if v is None or k is None:
+                continue
+            n = link_value(v)
+            idx[n] = k if idx.get(n, k) == k else None
+        out[(_NORM, source, table, column)] = {n: k for n, k in idx.items() if k is not None}
+    return out
+
+
 def resolve_reference(ref_index: Optional[dict], source: str, table: str,
                       column: Optional[str], value) -> tuple[str, str]:
     """(the referenced row's key, how it was found). Through `ref_index` when the reference names
     a non-key column (an unknown value stays itself: the edge then dangles and is COUNTED, never
     guessed); otherwise the value is the key."""
     idx = (ref_index or {}).get((source, table, column)) if column else None
+    norm = (ref_index or {}).get((_NORM, source, table, column))
     if idx is not None:
         hit = idx.get(str(value))
         if hit is not None:
             return hit, f"the key of the row whose {column} = the reference"
-        return str(value), f"the reference (no row of {table} has {column} = it)"
+        if norm is None:
+            return str(value), f"the reference (no row of {table} has {column} = it)"
+    if norm is not None:
+        from .mapping import link_value
+
+        hit = norm.get(link_value(value))
+        if hit is not None:
+            return hit, (f"the key of the row whose {column or 'key'} equals the reference "
+                         f"(normalised: case, width and surrounding spaces)")
+        return str(value), f"the reference (no row of {table} matches it, even normalised)"
     return str(value), "the reference"
 
 
@@ -1293,7 +1399,9 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                  screen_cfg: Optional[ScreenConfig] = None, overrides=None,
                  item_ids: Optional[dict] = None,
                  context: Optional[dict] = None,
-                 kind_splits: Optional[dict] = None) -> dict:
+                 kind_splits: Optional[dict] = None,
+                 row_verdicts: Optional[dict] = None,
+                 progress: Optional[Callable[..., None]] = None) -> dict:
     """`tables`: (snapshot, sha, table_mapping) for every table with an APPROVED mapping. Builds
     all rows first (so FK edges between tables resolve), drops dangling edges (counted), then
     upserts. Returns counts + the pointers minted, for verification.
@@ -1347,6 +1455,9 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                    for f in s.get("foreign_keys") or [] if f.get("ref_table")]
         wanted += [(lk["source"], lk["table"], lk.get("key")) for lk in _links_of(tmap)]
     ref_index = reference_index(snaps, wanted)
+    # F-11: an approved link resolves through its target's normalised keys
+    ref_index.update(link_index(snaps, [(lk["source"], lk["table"], lk.get("key"))
+                                        for _, _, tmap in tables for lk in _links_of(tmap)]))
     alternatives: dict[str, set] = {}
     splits = [*(kind_splits or {}).values(),
               *((tm.get("split") for _, _, tm in tables if tm.get("node")))]
@@ -1359,8 +1470,19 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
     #: per table: what came in, what was built, and per reference column what became an edge
     complete: dict[str, dict] = {}
     edge_origin: dict[str, tuple[str, str]] = {}            # edge id -> (table, column)
-    for snapshot, sha, tmap in tables:
+    def tick(**info) -> None:
+        # E2E run 5 F-02: real progress through a long table build (never one stage name for
+        # half an hour); a failing callback never fails the build
+        if progress is not None:
+            try:
+                progress(**info)
+            except Exception:                                        # noqa: BLE001
+                pass
+
+    for n_table, (snapshot, sha, tmap) in enumerate(tables, 1):
         tref = _snap_ref(snapshot)
+        tick(phase="rows", table=tref, tables_done=n_table - 1, tables_total=len(tables),
+             rows=len(snapshot.get("rows") or []))
         # a JOIN table (`association`) has no node of its own: its rows are edges between the
         # rows it references, each citing the join row's own cells
         node = tmap.get("node") or {}
@@ -1386,7 +1508,8 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                                candidate_col=node.get("candidate_identifier"),
                                candidate_values=candidate_values,
                                candidate_masked=candidate_masked,
-                               ref_index=ref_index, links=links, split=split))
+                               ref_index=ref_index, links=links, split=split,
+                               verdicts=row_verdicts))
         before = set(edges)
         rows_to_graph(rows, dataset=dataset, seed=seed, source_id=source_ref(source_id),
                       vocab=vocab, nodes=nodes, raw_keys=raw_keys, edges=edges, report=report)
@@ -1398,6 +1521,8 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                                              source_id=source_id,
                                              withheld=blocked_rows[n_blocked:],
                                              masked_refs=withheld_fks[n_masked:])
+        if split and node:
+            _count_split_not_admitted(complete[tref], tmap, rows, vocab)
         # endpoint id -> (kind, referenced table, referenced row id, source): how a later run
         # finds a referenced row that merged onto another node in an earlier run
         for e in tmap.get("edges") or []:
@@ -1439,7 +1564,13 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
         # document node's id, and dangled). Identity rule: a SUBJECT row is never merged onto
         # another record (id-only: re-sighting its own row); a non-subject merges only on an
         # EXACT canonical id, never on label similarity.
-        for n in node_list:
+        stats_at = STATS_FIRST
+        for n_done, n in enumerate(node_list):
+            if n_done % PROGRESS_EVERY == 0:
+                tick(phase="nodes", done=n_done, total=len(node_list))
+            if n_done == stats_at:
+                refresh_planner_stats(store)
+                stats_at *= 2
             outcome, cand = _upsert_row_node(store, n, vocab, upsert_node,
                                              candidate_value=candidate_for.get(n.id))
             id_map[n.id] = outcome.id
@@ -1453,7 +1584,10 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                 if rec is not None:
                     pointers.append({"entity": outcome.id, **rec})
         kept, dangling_ids, ambiguous = [], [], []
-        for edge in reconcile_edge_validity(node_list, list(edges.values())):
+        tick(phase="edges", done=0, total=len(edges))
+        for e_done, edge in enumerate(reconcile_edge_validity(node_list, list(edges.values()))):
+            if e_done and e_done % PROGRESS_EVERY == 0:
+                tick(phase="edges", done=e_done, total=len(edges))
             origin = edge_origin.get(edge.id)
             src = _resolve_endpoint(store, edge.src_id, id_map, fk_targets, source_id, ambiguous,
                                     alternatives)
@@ -1486,6 +1620,9 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                 rec = _ledger_pointer(p, item_ids)
                 if rec is not None:
                     pointers.append({"entity": e.id, **rec})
+    # F-02: the one transaction's write-ahead log is copied into the graph and cut back, so a
+    # large table build does not leave a log as big as the graph on disk
+    truncate_wal(store)
     completeness = [finish_completeness(rec) for _, rec in sorted(complete.items())]
     return {"nodes": len(node_list), "edges": len(kept), "dangling_edges": len(dangling_ids),
             "dangling_edge_ids": dangling_ids, "merged": merged,
@@ -1512,19 +1649,46 @@ def consolidate_identity_after_run(store, vocab) -> dict:
     the record names the error. Returns {status, merged, refused, kinds, absorbed}."""
     assert_may_build("consolidate_identity_after_run")
     try:
-        from databridge_graph.merge import consolidate_identity
-    except ImportError as exc:                                       # pragma: no cover
-        return {"status": "unavailable", "error": str(exc), "merged": [], "refused": [],
-                "kinds": {}, "absorbed": 0}
+        from databridge_graph.merge import consolidate_identity, reconcile_keyless
+    except ImportError:                                              # pragma: no cover
+        return {"status": "unavailable", "error": "the graph merge module is unavailable",
+                "merged": [], "refused": [], "kinds": {}, "absorbed": 0, "reconciled": {}}
+    # IDN (E2E run 5 W-02): first the joins a keyless mention would have made had its keyed record
+    # been in the graph when the mention was read — so the graph does not depend on which source
+    # was read first. Same rules as at write time; never a person, a document, or a kind whose
+    # pack turned name similarity off. Needs no approval because it only re-applies, in the other
+    # order, what a write already does.
+    try:
+        rec = reconcile_keyless(store, vocab).as_record()
+        reconciled = {"status": "ran", **rec,
+                      "absorbed": sum(len(m.get("absorbed") or ()) for m in rec["merged"])}
+    except Exception as exc:                                         # noqa: BLE001
+        reconciled = {"status": "refused", **_error_ref("reconcile_keyless", exc),
+                      "merged": [], "refused": [], "absorbed": 0}
     if not getattr(vocab, "identity_rules", None):
-        return {"status": "no_rules", "merged": [], "refused": [], "kinds": {}, "absorbed": 0}
+        return {"status": "no_rules", "merged": [], "refused": [], "kinds": {}, "absorbed": 0,
+                "reconciled": reconciled}
     try:
         rep = consolidate_identity(store, vocab).as_record()
     except Exception as exc:                                         # noqa: BLE001
-        return {"status": "refused", "error": f"{type(exc).__name__}: {str(exc)[:300]}",
-                "merged": [], "refused": [], "kinds": {}, "absorbed": 0}
+        return {"status": "refused", **_error_ref("consolidate_identity", exc),
+                "merged": [], "refused": [], "kinds": {}, "absorbed": 0,
+                "reconciled": reconciled}
     return {"status": "ran", **rep,
-            "absorbed": sum(len(m.get("absorbed") or ()) for m in rep.get("merged") or ())}
+            "absorbed": sum(len(m.get("absorbed") or ()) for m in rep.get("merged") or ()),
+            "reconciled": reconciled}
+
+
+def _error_ref(step: str, exc: BaseException) -> dict:
+    """R-028 standard 4: no exception text in a visible record. A fixed public message plus an
+    opaque reference; the detail goes to the server log under that reference."""
+    import logging
+    import uuid
+
+    ref = uuid.uuid4().hex[:12]
+    logging.getLogger(__name__).error("%s failed (error_ref=%s): %s: %s", step, ref,
+                                      type(exc).__name__, exc)
+    return {"error": f"{step} could not run; nothing was merged", "error_ref": ref}
 
 
 def _links_of(tmap: dict) -> list[dict]:
@@ -1583,13 +1747,21 @@ def reference_completeness(snapshot: dict, rows: list, links: list[dict], snaps:
     for col, src, table, ref_col, origin in declared:
         keys = _target_keys(snaps, src, table, ref_col)
         present = [r.get(col) for r in rows if r.get(col) is not None]
-        expected = sum(1 for v in present if keys is not None and str(v) in keys)
+        if origin == "approved_link" and keys is not None:
+            # F-11: a link resolves normalised (`link_index`), so it is counted the same way
+            from .mapping import link_value
+
+            keys = {link_value(k) for k in keys}
+            expected = sum(1 for v in present if link_value(v) in keys)
+        else:
+            expected = sum(1 for v in present if keys is not None and str(v) in keys)
         e = (edge_for or {}).get(col)
         out.append({"column": col, "origin": origin,
                     "references": table if src == source_id else f"{src}:{table}",
                     "edge_kind": e.get("kind") if e else None,
                     "target_captured": keys is not None, "rows_with_value": len(present),
                     "edges_expected": expected, "edges_built": 0, "dangling": 0,
+                    "kind_not_admitted": 0,
                     "masked": sum(1 for m in masked_refs or () if m.get("column") == col),
                     "unresolved_references": len(present) - expected})
     return out
@@ -1621,6 +1793,30 @@ def _table_completeness(snapshot: dict, tmap: dict, rows: list, links: list[dict
                 and str(row.get(c)) in keysets[c] for c in cols))
         rec["association_edges_built"] = 0
     return rec
+
+
+def _count_split_not_admitted(rec: dict, tmap: dict, rows: list, vocab) -> None:
+    """E2E run 5 F-03 (completeness honesty): a row a kind SPLIT builds as another kind keeps only
+    the edges whose declaration admits that kind at the row's end; the others are not built, and
+    are COUNTED here per reference column (`kind_not_admitted`) — an edge the mapping has but the
+    row's kind cannot carry is a reason, never a silent `edges_missing`."""
+    base = (tmap.get("node") or {}).get("kind")
+    own = f"{base}:{{{ROW_KEY}}}"
+    for e in tmap.get("edges") or []:
+        end = "src" if e.get("src") == own else ("dst" if e.get("dst") == own else None)
+        cols = e.get("evidence") or []
+        if end is None or not cols:
+            continue
+        try:
+            decl = vocab.edge(e["kind"])
+        except Exception:                                            # noqa: BLE001
+            continue
+        n = sum(1 for r in rows if r.get(KIND_KEY) not in (None, base)
+                and r.get(f"{FK_PREFIX}{cols[0]}") is not None
+                and not _admits(decl, end, str(r.get(KIND_KEY))))
+        for ref in rec.get("foreign_keys") or []:
+            if ref["column"] == cols[0]:
+                ref["kind_not_admitted"] = ref.get("kind_not_admitted", 0) + n
 
 
 def _row_counts(snapshot: dict, *, rows_built: int, withheld: int) -> dict:
@@ -1720,7 +1916,7 @@ def _upsert_row_node(store, n, vocab, upsert_node, candidate_value: Optional[str
       link (`requires_human_selection`), never merged (CLAUDE.md hard constraint 1, spine D4b);
     * any other kind merges only on the same id or an EXACT canonical id — never by label
       similarity (a fuzzy merge of a row onto a document mention is a guess, not a key)."""
-    subject = vocab.is_subject(str(n.kind))
+    subject = _is_person_kind(vocab, n.kind)
     exact = None
     # a subject's lookup value is its declared identifier (`candidate_identifier`), which is
     # never written onto the node; any other kind's is its exact-merge key
@@ -1752,13 +1948,35 @@ def _upsert_row_node(store, n, vocab, upsert_node, candidate_value: Optional[str
     return upsert_node(store, n, vocab, id_only=exact is None), None
 
 
+def _direct_hit(store, node_ref: str, id_map: dict) -> Optional[str]:
+    """The node an endpoint names by its OWN id: this run's node (re-pointed if it merged), or an
+    open node of that id. None: not found by id (the merged-row search may still find it)."""
+    if node_ref in id_map:
+        return id_map[node_ref]
+    return node_ref if store.open_node_row(node_ref) is not None else None
+
+
 def _resolve_endpoint(store, node_ref: str, id_map: dict, fk_targets: dict,
                       source_id: str, ambiguous: Optional[list] = None,
                       alternatives: Optional[dict] = None) -> Optional[str]:
     """`_resolve_one`, then — FIN-04 — the same row under each kind an approved kind split may
     have built it as (`alternatives`: {kind: other kinds}): a reference to a `party` row that the
     split built as a `legal_entity` meets that node. The row identity is the same; only the kind
-    differs. Exactly one hit is used; two are ambiguous (refused, listed)."""
+    differs. Exactly one hit is used; two are ambiguous (refused, listed).
+
+    E2E run 5 F-02 (measured): the row's OWN id under the named kind or under exactly one kind of
+    the split is looked up first — an index lookup — before the merged-row search (a scan of
+    stored pointers, ~65 ms each at 44k rows), which a reference into a split table otherwise
+    paid for every row the split built as another kind."""
+    direct = _direct_hit(store, node_ref, id_map)
+    if direct is not None:
+        return direct
+    kind, sep, rest = node_ref.partition(":")
+    if sep and alternatives:
+        alts = {h for h in (_direct_hit(store, f"{alt}:{rest}", id_map)
+                            for alt in sorted(alternatives.get(kind) or ())) if h is not None}
+        if len(alts) == 1:
+            return alts.pop()
     got = _resolve_one(store, node_ref, id_map, fk_targets, source_id, ambiguous)
     if got is not None or not alternatives:
         return got

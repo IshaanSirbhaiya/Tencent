@@ -29,6 +29,7 @@ import {
   basisWords,
   canRediscover,
   citedEvidence,
+  documentsDecisionLabel,
   documentsDecisionOffered,
   handoffOffered,
   liveStatus,
@@ -422,7 +423,10 @@ export function SourceSetupPanel({ id, openAgent }: { id: string; openAgent: (ag
           testId="setup-explanation"
           aside={
             <span className="text-2xs text-subtle">
-              {ex.produced_by.mode === "model" ? `model ${ex.produced_by.model ?? ""}` : "rules"} · {fmtTime(ex.generated_at)}
+              {ex.produced_by.mode === "model"
+                ? `model ${ex.produced_by.model ?? "not named by the harness"} · task class ${ex.produced_by.task_class}`
+                : "rules"}{" "}
+              · {fmtTime(ex.generated_at)}
             </span>
           }
         >
@@ -471,12 +475,13 @@ export function SourceSetupPanel({ id, openAgent }: { id: string; openAgent: (ag
         <Section title="Documents" testId="setup-documents">
           <p className="mb-2 text-2xs text-subtle">
             The discovery captured {state.documents.captured} document(s): {state.documents.allowed} the screen allowed
-            {state.documents.held > 0 && `, ${state.documents.held} held for review`}. Nothing is built until you decide to build
-            them.
+            {(state.documents.kept ?? 0) > 0 && `, ${state.documents.kept} already built by an earlier run (kept, not rebuilt)`}
+            {state.documents.held > 0 && `, ${state.documents.held} held for review`}. Nothing is built or handed to the keeper
+            until you decide.
           </p>
           {state.documents.decided ? (
             <p data-testid="setup-documents-decided" className="text-xs">
-              You decided to build them; they are built at the hand-off.
+              You decided on them; new documents are built at the hand-off and already-built ones are kept.
             </p>
           ) : (
             <button
@@ -490,7 +495,7 @@ export function SourceSetupPanel({ id, openAgent }: { id: string; openAgent: (ag
               }
               className={cn(btn, "bg-accent text-accent-fg hover:bg-accent/90")}
             >
-              Build these {state.documents.allowed} document(s)
+              {documentsDecisionLabel(state.documents)}
             </button>
           )}
           <ErrorLine error={approveDocs.error} testId="setup-approve-documents-error" />

@@ -33,6 +33,45 @@ async function settle(page: Page): Promise<"canvas" | "empty"> {
   return (await empty.isVisible()) ? "empty" : "canvas";
 }
 
+/**
+ * E2E run 5 W-12: wait until the canvas has SETTLED — every node measured and no camera move in
+ * flight (`components/graph/camera.ts`, `data-graph-settled`). A click on a node that is still
+ * moving, or that the camera has just moved off the canvas, never lands.
+ */
+async function settled(page: Page): Promise<void> {
+  await expect(
+    page.getByTestId("graph-canvas-viewport"),
+  ).toHaveAttribute("data-graph-settled", "true", { timeout: 20_000 });
+}
+
+/**
+ * Indices of the drawn nodes whose centre is inside the canvas viewport now (after `settled`),
+ * excluding `except`. The camera centres a clicked node, so a node that WAS on screen may now lie
+ * outside the canvas's clipped box, under the page around it — clicking it there would hit
+ * whatever is on top. Which nodes are on screen is the page's own answer, never a constant.
+ */
+async function onScreen(page: Page, except: string[] = []): Promise<number[]> {
+  await settled(page);
+  const box = await page.getByTestId("graph-canvas-viewport").boundingBox();
+  if (!box) return [];
+  const nodes = page.locator(".react-flow__node");
+  const out: number[] = [];
+  const count = await nodes.count();
+  for (let i = 0; i < count; i += 1) {
+    const id = await nodes.nth(i).getAttribute("data-id");
+    if (id && except.includes(id)) continue;
+    const b = await nodes.nth(i).boundingBox();
+    if (!b) continue;
+    const cx = b.x + b.width / 2;
+    const cy = b.y + b.height / 2;
+    // inside, with a margin for the floating search box and the controls
+    if (cx > box.x + 24 && cx < box.x + box.width - 24 && cy > box.y + 56 && cy < box.y + box.height - 24) {
+      out.push(i);
+    }
+  }
+  return out;
+}
+
 test("graph renders a connected canvas, or says there is no data and links to connectors", async ({
   page,
 }) => {
@@ -64,7 +103,9 @@ test("double-clicking a node merges its neighbourhood into the canvas", async ({
   test.skip((await settle(page)) === "empty", "the shared store is empty");
   const nodes = page.locator(".react-flow__node");
   const before = await nodes.count();
-  await nodes.first().dblclick();
+  const [first] = await onScreen(page);
+  test.skip(first === undefined, "no node drawn inside the canvas");
+  await nodes.nth(first).dblclick();
   const notice = page.getByTestId("graph-notice");
   await expect(notice).toContainText(/Expanded/, { timeout: 20_000 });
   // A merge never removes what was already drawn.
@@ -82,9 +123,15 @@ test("marking two nodes asks for the path between them and reports the answer", 
   test.skip((await settle(page)) === "empty", "the shared store is empty");
   const nodes = page.locator(".react-flow__node");
   test.skip((await nodes.count()) < 2, "fewer than two nodes drawn");
-  await nodes.nth(0).click();
+  const [a] = await onScreen(page);
+  test.skip(a === undefined, "no node drawn inside the canvas");
+  const fromId = (await nodes.nth(a).getAttribute("data-id")) as string;
+  await nodes.nth(a).click();
   await page.getByTestId("graph-path-from").click();
-  await nodes.nth(1).click();
+  // the camera centred the first node: pick the second from what is on screen NOW
+  const [b] = await onScreen(page, [fromId]);
+  test.skip(b === undefined, "no second node inside the canvas");
+  await nodes.nth(b).click();
   await page.getByTestId("graph-path-to").click();
   const result = page.getByTestId("graph-path-result");
   // Either a highlighted path or one of the server's named reasons — never silence.
@@ -107,7 +154,9 @@ test("each expand is recorded on the trail; back, forward, copy and clear work",
   const trail = page.getByTestId("graph-trail");
   await expect(trail).toHaveCount(0); // nothing traversed yet → no trail drawn
 
-  await nodes.nth(0).dblclick();
+  const [startAt] = await onScreen(page);
+  test.skip(startAt === undefined, "no node drawn inside the canvas");
+  await nodes.nth(startAt).dblclick();
   await expect(page.getByTestId("graph-notice")).toContainText(/Expanded/, {
     timeout: 20_000,
   });
@@ -120,16 +169,9 @@ test("each expand is recorded on the trail; back, forward, copy and clear work",
     firstId as string,
   );
 
-  // A second, different node — the trail grows by one.
-  const count = await nodes.count();
-  let second = -1;
-  for (let i = 0; i < count; i += 1) {
-    const id = await nodes.nth(i).getAttribute("data-id");
-    if (id && id !== firstId) {
-      second = i;
-      break;
-    }
-  }
+  // A second, different node ON SCREEN now (the camera moved after the expand) — the trail
+  // grows by one.
+  const [second = -1] = await onScreen(page, [firstId as string]);
   test.skip(second < 0, "no second node to expand");
   await nodes.nth(second).dblclick();
   await expect(crumbs).toHaveCount(2, { timeout: 20_000 });

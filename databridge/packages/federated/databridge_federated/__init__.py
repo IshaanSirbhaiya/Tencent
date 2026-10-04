@@ -31,6 +31,7 @@ from .catalogue import (
     build_catalogue,
     declared_connections,
     registry_specs,
+    unowned_document_specs,
     unowned_facts_specs,
 )
 from .combine import CombinedTable, CombineError, TableRow, combine, table_from_result
@@ -85,6 +86,10 @@ def build_service(*, store: Any = None, harness: Any = None, facts: Any = None,
     unowned, said = unowned_facts_specs(specs, facts, connections)
     specs = [*specs, *unowned]
     problems += said
+    # E2E run 5, W-03: a declared documents source with graph records and no adapter agent
+    docs, said = unowned_document_specs(specs, store, facts, connections)
+    specs = [*specs, *docs]
+    problems += said
     if vocabulary is None:
         try:
             from databridge_graph.packs import active_vocabulary  # noqa: PLC0415
@@ -92,7 +97,7 @@ def build_service(*, store: Any = None, harness: Any = None, facts: Any = None,
         except Exception as e:                               # noqa: BLE001 - reported
             problems.append(f"vocabulary unavailable: {e}")
     cat = build_catalogue(specs, facts=facts, vocabulary=vocabulary,
-                          documents=store is not None or retriever is not None)
+                          documents=store is not None or retriever is not None, store=store)
     cat.problems[:0] = problems
     return FederatedService(catalogue=cat, facts=facts, store=store, retriever=retriever,
                             gateway_factory=gateway_factory, harness=harness, runs_dir=runs_dir)
@@ -108,7 +113,7 @@ def answer(question: str, *, service: Optional[FederatedService] = None,
 
 __all__ = [
     "AdapterAgentEntry", "Catalogue", "ConnectionEntry", "FactsTable", "SteadyFacts",
-    "build_catalogue", "declared_connections", "unowned_facts_specs",
+    "build_catalogue", "declared_connections", "unowned_facts_specs", "unowned_document_specs",
     "registry_specs", "CombinedTable", "CombineError", "TableRow", "combine",
     "table_from_result", "PERIODS", "Aggregate", "CombineSpec", "CompareSpec",
     "DelegateCoverage", "DelegationPlan", "EntityRef", "Filter", "LinkSpec", "ResultRow",

@@ -177,6 +177,11 @@ function DecisionFields({ item }: { item: ActivityItem }) {
     ["agent", item.adapter_agent],
     ["step", item.step],
     ["task", item.task_id],
+    ["held item", item.item_id],
+    ["content digest", item.digest],
+    ["pack", item.pack],
+    ["node kind", item.node_kind],
+    ["identity rule", item.rule],
     ["error ref", item.error_ref],
   ];
   return (

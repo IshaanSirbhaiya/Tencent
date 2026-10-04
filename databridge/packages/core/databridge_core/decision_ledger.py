@@ -5,7 +5,9 @@ setup documents decisions and hand-offs, and dataset-design events — is writte
 `DecisionLedger`. It is the standard of R-028 (Codex consistency review, findings #2, #4):
 
 * **the deployment HMAC approval key** (`approval_key`): ``WALNUT_APPROVAL_KEY`` (>= 32 chars), else
-  the key file ``WALNUT_APPROVAL_KEY_FILE`` (default ``~/.walnut/keys/approval.key``), created once.
+  the key file ``WALNUT_APPROVAL_KEY_FILE`` (default ``~/.walnut/keys/approval.key``), provisioned
+  once by an explicit step (`provision_approval_key`) and NEVER created implicitly: a read never
+  writes, and a write with no key is refused (``APPROVAL_KEY_UNAVAILABLE``).
   A key that lies inside the directory of the log it seals is refused: whoever could write a
   record could then also seal it;
 * **canonical JSON** (`canonical`): sorted keys, no whitespace, ``default=str``;
@@ -250,15 +252,13 @@ def _inside(p: Path, d: Path) -> bool:
     return p == d or d in p.parents
 
 
-def approval_key(*, protect: Iterable[Path] = ()) -> bytes:
-    """The deployment approval key (the same key `mcp_ingest.screen` seals overrides with). A key
-    FILE inside any ``protect`` directory is refused (`APPROVAL_KEY_UNAVAILABLE`)."""
-    raw = os.environ.get(APPROVAL_KEY_ENV, "")
-    if raw:
-        if len(raw.strip()) < _MIN_KEY_CHARS:
-            raise DecisionRefused(APPROVAL_KEY_UNAVAILABLE, f"{APPROVAL_KEY_ENV} is shorter than "
-                                                            f"{_MIN_KEY_CHARS} characters", 503)
-        return raw.strip().encode("utf-8")
+#: The fixed, public reason a key is missing (no path: a refusal never names a server path).
+_NO_KEY = ("no deployment approval key is provisioned, so nothing can be sealed or verified. An "
+           "operator provisions it once (`provision_approval_key`, or WALNUT_APPROVAL_KEY / "
+           "WALNUT_APPROVAL_KEY_FILE); it is never created implicitly")
+
+
+def _key_file(protect: Iterable[Path]) -> Path:
     kp = approval_key_path().resolve()
     for d in protect:
         if _inside(kp, Path(d).resolve()):
@@ -266,6 +266,39 @@ def approval_key(*, protect: Iterable[Path] = ()) -> bytes:
                                                             "directory whose decisions it seals; "
                                                             f"keep it elsewhere "
                                                             f"({APPROVAL_KEY_FILE_ENV})", 503)
+    return kp
+
+
+def approval_key(*, protect: Iterable[Path] = ()) -> bytes:
+    """The deployment approval key (the same key `mcp_ingest.screen` seals overrides with).
+    READ ONLY (R-029 TIDY2): it is never created here. A missing key refuses
+    (`APPROVAL_KEY_UNAVAILABLE`): on a write path that is the explicit refusal, on a read path the
+    caller reports the log as not readable. A key FILE inside any ``protect`` directory is refused.
+    Provisioning is its own explicit step (`provision_approval_key`)."""
+    raw = os.environ.get(APPROVAL_KEY_ENV, "")
+    if raw:
+        if len(raw.strip()) < _MIN_KEY_CHARS:
+            raise DecisionRefused(APPROVAL_KEY_UNAVAILABLE, f"{APPROVAL_KEY_ENV} is shorter than "
+                                                            f"{_MIN_KEY_CHARS} characters", 503)
+        return raw.strip().encode("utf-8")
+    kp = _key_file(protect)
+    try:
+        key = kp.read_text(encoding="utf-8").strip() if kp.is_file() else None
+    except OSError:
+        key = None
+    if key is None:
+        raise DecisionRefused(APPROVAL_KEY_UNAVAILABLE, _NO_KEY, 503)
+    if len(key) < _MIN_KEY_CHARS:
+        raise DecisionRefused(APPROVAL_KEY_UNAVAILABLE, f"the approval key file holds fewer than "
+                                                        f"{_MIN_KEY_CHARS} characters", 503)
+    return key.encode("utf-8")
+
+
+def provision_approval_key(*, protect: Iterable[Path] = ()) -> Path:
+    """The operator's EXPLICIT provisioning step: create the deployment key file with a random
+    256-bit key if it does not exist (atomically; an existing key is never overwritten). Returns
+    its path. Never called by a read, nor implicitly by a write."""
+    kp = _key_file(protect)
     if not kp.is_file():
         kp.parent.mkdir(parents=True, exist_ok=True)
         tmp = kp.with_name(f".{kp.name}.{os.getpid()}.{secrets.token_hex(6)}.tmp")
@@ -280,11 +313,7 @@ def approval_key(*, protect: Iterable[Path] = ()) -> bytes:
             with contextlib.suppress(OSError):
                 os.rename(tmp, kp)
         tmp.unlink(missing_ok=True)
-    key = kp.read_text(encoding="utf-8").strip()
-    if len(key) < _MIN_KEY_CHARS:
-        raise DecisionRefused(APPROVAL_KEY_UNAVAILABLE, f"the approval key file holds fewer than "
-                                                        f"{_MIN_KEY_CHARS} characters", 503)
-    return key.encode("utf-8")
+    return kp
 
 
 # =================================================================================================
@@ -541,6 +570,28 @@ class DecisionLedger:
     def _anchors(self) -> AnchorLedger:
         return AnchorLedger(self.key, self.anchors_path)
 
+    def _wait_for_writer(self):
+        """For a READ: wait for a writer that may be between its two writes, by taking the lock
+        only when its file exists. A read never creates the lock file: with no lock file, no
+        writer is mid-append (every writer creates it before it writes)."""
+        return self.lock() if self.lock_path.is_file() else contextlib.nullcontext()
+
+    def _read_scan(self) -> "_Scan":
+        """`_scan` for a READ: a log (or anchor ledger) that exists but cannot be verified for want
+        of a key is NOT READABLE (the refusal says so). A log that does not exist needs no key."""
+        if not self.path.is_file() and not self.anchors_path.is_file():
+            return _Scan()                                                # state "empty"
+        try:
+            self.key
+        except DecisionRefused as exc:
+            raise DecisionRefused(exc.code, f"the {self.what} is not readable: {exc.message}",
+                                  exc.status) from None
+        s = self._scan()
+        if s.state in ("pending", "torn"):
+            with self._wait_for_writer():
+                s = self._scan()
+        return s
+
     def _refuse(self, why: str) -> DecisionRefused:
         return DecisionRefused(LEDGER_INTEGRITY_FAILED,
                                f"the {self.what} does not verify ({why}): the append-only, sealed "
@@ -644,11 +695,9 @@ class DecisionLedger:
     def read(self, *, raw: bool = False) -> list[dict]:
         """Every decision record, after verifying the WHOLE log and its anchor. Raises
         `DecisionRefused` (`LEDGER_INTEGRITY_FAILED`) otherwise. Never writes: an interrupted
-        append is waited for (the lock), and refused if it is still incomplete."""
-        s = self._scan()
-        if s.state in ("pending", "torn"):
-            with self.lock():                         # a writer may be between its two writes
-                s = self._scan()
+        append is waited for (the lock, when one exists), and refused if it is still incomplete.
+        Never creates anything: no key, no lock file (R-029 TIDY2)."""
+        s = self._read_scan()
         if s.state in ("ok", "empty"):
             return self._visible(s.records, raw)
         if s.state == "legacy":
@@ -666,10 +715,10 @@ class DecisionLedger:
         """(the verified PREFIX of decision records, why the log does not verify or ""). Never
         raises for a broken log and never writes: for a view that must still say whose a broken
         log was and why it is not honoured. Nothing in a log with a reason is evidence."""
-        s = self._scan()
-        if s.state in ("pending", "torn"):
-            with self.lock():
-                s = self._scan()
+        try:
+            s = self._read_scan()
+        except DecisionRefused as exc:
+            return [], exc.message
         if s.state in ("ok", "empty"):
             return self._visible(s.records, False), ""
         if s.state == "legacy":
@@ -681,8 +730,10 @@ class DecisionLedger:
         return self._visible(s.records, False), why
 
     def interrupted(self) -> bool:
-        """Is the log's last append incomplete (waiting for the lock first)?"""
-        with self.lock():
+        """Is the log's last append incomplete (waiting for the lock first, when one exists)?"""
+        if not self.path.is_file():
+            return False
+        with self._wait_for_writer():
             return self._scan().state in ("pending", "torn")
 
     def verify(self) -> tuple[bool, str]:
@@ -754,7 +805,10 @@ class DecisionLedger:
     def append(self, payload: Mapping[str, Any]) -> dict:
         """Verify the whole log and its anchor, then append ONE sealed record and anchor it, all
         under the log's lock. Returns the record as written. A broken log refuses
-        (`LEDGER_INTEGRITY_FAILED`) and nothing is written; a legacy log is superseded."""
+        (`LEDGER_INTEGRITY_FAILED`) and nothing is written; a legacy log is superseded. With no
+        provisioned key it refuses (`APPROVAL_KEY_UNAVAILABLE`) before taking the lock, so nothing
+        at all is written."""
+        self.key                                     # an explicit refusal, before any write
         with self.lock():
             s = self._scan()
             if s.state in ("pending", "torn"):
@@ -782,7 +836,7 @@ __all__ = [
     "MACHINE_PREFIXES", "ACTOR_FIELDS", "is_machine_principal", "Actor", "actor_of",
     "require_person",
     "canonical", "digest_of", "seal_of", "APPROVAL_KEY_ENV", "APPROVAL_KEY_FILE_ENV",
-    "approval_key_path", "approval_key",
+    "approval_key_path", "approval_key", "provision_approval_key",
     "LockTimeout", "file_lock", "lock_held", "atomic_write_text",
     "ANCHORS_ENV", "ANCHORS_NAME", "AnchorLedger", "LEDGER_EVENT", "DecisionLedger",
 ]

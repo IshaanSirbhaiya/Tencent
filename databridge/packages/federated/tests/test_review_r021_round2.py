@@ -434,7 +434,10 @@ def test_r2_f11_cancel_stops_before_the_edge_read(world):
         run_documents(task, entry, store=Store(world.store), retriever=world.retriever,
                       catalogue=svc.catalogue, today=TODAY, principal="x", run_id=None,
                       admits=svc.admits(ADMIN), cancel=cancel)
-    assert len(seen) == 1 and "nodes" in seen[0]         # the edge read never started
+    # the deadline passed during the FIRST read, and no read of graph ROWS followed it (E2E
+    # run 5: the first reads are now the pointer index's bookkeeping, not a scan of every node)
+    assert seen and not any("FROM edges" in q or "FROM nodes" in q or "nodes n" in q
+                            for q in seen)
 
 
 # ------------------------------------------------------------------------------------------------

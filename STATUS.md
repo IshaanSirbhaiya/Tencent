@@ -254,6 +254,48 @@ Dataset scope (founder): Walnut provides data plus per-column "known when" metad
 
 **Founder instruction (2026-10-02 late):** do NOT run E2E yet. After FX-AAX lands, run the cross-section Codex review, fix its findings, run the tests and commit. Then start the website for the founder to go through manually. If the founder says nothing for 30 minutes after the site is up, kill all app ports and run the E2E (both estates, with completeness checks).
 
+**2026-10-03 E2E run 5 launched** (brief: scratchpad codex3/E2E5_BRIEF.md). FEAT8 plus the consistency work is committed (8f7e282), with all suites green when run sequentially. The founder's 30-minute manual window passed with no message, so the app was stopped and E2E5 started: both estates (workspace, then finance), the completeness checks, entity identity, ONE/AAX/PLX/DSD, Activity consistency, security, random requests and frontend Playwright. One estate and one process at a time (memory). Old unsealed approvals must be re-approved once.
+
+**2026-10-03 E2E RUN 5 DONE: neither estate fully passes.** There are 24 findings (0 Critical, 4 High, 13 Medium, 7 Low) in wiki/40-reviews/E2E-2026-10-02-run5.md.
+- **Workspace:** every new feature worked live, with 527/527 pointers and the security probes refused. Its High is W-07, a regression: the founder's cross-source question loses Corriedale because cross-source joins weakened (W-02). Frontend 36/45.
+- **Finance:** isolated nodes 33% → 3.4%; no row cap; the mailbox completes; 17 injections held; 579,140/579,140 pointers; count cards at 50k nodes; Fairmont = 1 node; the delegation matches Postgres in 29/29 groups. Highs:
+  - F-03: FK edges are not re-resolved after a later build (2,251 missing);
+  - F-04: HARD CONSTRAINT 1 — 72 person contacts merged by name, because `contact` is not declared a subject;
+  - F-10: the raw dataset over 24k transactions is refused (bad size gate, time filter dropped).
+
+Fix wave (brief codex3/E2E5_FIX_BRIEF.md; targeted tests only, because of memory):
+- IDN: F-04 plus an engine person guard, W-02/W-07, F-08;
+- TABX: F-03, F-11, F-01 per-cell screen, F-02 perf, W-01;
+- BRN: W-03, W-04, F-05 latency/vague, F-06, F-07;
+- DSX: F-10, W-10, W-11;
+- SETX: W-05, W-06, W-08, F-09;
+- ACT2: F-12, W-09, W-12.
+
+Then: all suites run sequentially by the coordinator, Codex review per track, fixes, commit.
+
+**2026-10-03 R-029 fix wave LANDED (uncommitted), with targeted tests green per track.** Dispositions are in `wiki/40-reviews/R-029-{IDN,TABX,BRN,DSX,SETX,ACT2,TIDY2}.md`.
+
+TIDY2 then closed the tracks' cross-track items:
+- The UI8 test now asserts per-row holds.
+- **Reads never write:** the approval key is never created implicitly. A write with no key refuses `APPROVAL_KEY_UNAVAILABLE`; `provision_approval_key()` is the explicit step, and the launchers call it.
+- Identity-rules refusals use `MACHINE_ACTOR` plus `error_ref`.
+- There is one gateway mechanism constant.
+- Run triggers carry the full actor.
+- **Graph readers by index** in `databridge_graph.query`, proven identical on copies of both estates. On finance, `/brain/neighbors` went from 6–8 s to 0.5 s, `path` from 8 s to under 1 s, and linking from 40 s to 0.2 s warm.
+- Composite node indexes.
+- No server paths in `report.json` or the discovery manifest.
+- The facts file is hashed once per snapshot.
+- The fs-corpus-under-finance "0 nodes" was traced: the ontology mismatch and AMBIGUOUS document kind are expected, but a real defect was found and fixed: a document is now rebuilt when its anchor kind changes.
+- D-004 addendum.
+
+Mutation: 28 of 29 killed; 1 is equivalent, with the reason given.
+
+**NEXT (exact):**
+1. Coordinator runs every suite sequentially.
+2. One Codex review per R-029 track, verified with `verify_codex_output.py`.
+3. Fix, then commit.
+4. E2E run 6 re-checks the planner repair round (BRN) and the finance documents re-anchored after `document_kind` is set (needs one forced re-sync: old state has no `anchor_kind`).
+
 ## 3. START HERE — the next actions, in order
 
 > **`PHASE_PLAN.md` now ends with a FORWARD PLAN (Phases 7–12)** covering the same work in more

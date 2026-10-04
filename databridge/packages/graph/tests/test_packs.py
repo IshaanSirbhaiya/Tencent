@@ -191,15 +191,22 @@ def test_two_packs_may_not_bind_one_kind_name_to_two_shapes(tmp_path):
 def test_never_fuzzy_merge_is_derived_from_the_enabled_packs():
     """The set the resolver enforces is COMPUTED from `subject_kinds`. If this were a literal in
     engine code, changing the domain would silently drop the protection."""
+    # IDN (E2E run 5 F-04): derived from the packs' own declarations, never written down here,
+    # so a deliberate widening of a pack's subjects (finance `contact`, government `officer`)
+    # moves the expectation with it. Non-vacuous: every pack named declares subjects.
+    def declared(*packs):
+        out = frozenset().union(*(frozenset(load_pack(p).subject_kinds) for p in packs))
+        assert out
+        return out
+
     with deployment("healthcare"):
-        assert never_fuzzy_merge_kinds() == frozenset({"patient"})
+        assert never_fuzzy_merge_kinds() == declared("healthcare")
+        assert "patient" in never_fuzzy_merge_kinds()
     with deployment("finance"):
-        assert never_fuzzy_merge_kinds() == frozenset(
-            {"party", "counterparty", "beneficial_owner"})
+        assert never_fuzzy_merge_kinds() == declared("finance")
+        assert {"party", "counterparty", "beneficial_owner"} <= never_fuzzy_merge_kinds()
     with deployment("finance", "government"):
-        assert never_fuzzy_merge_kinds() == frozenset(
-            {"party", "counterparty", "beneficial_owner",
-             "applicant", "claimant", "person", "organisation"})
+        assert never_fuzzy_merge_kinds() == declared("finance", "government")
 
 
 def test_the_old_constant_name_is_gone_rather_than_made_dynamic():
@@ -219,10 +226,10 @@ def test_the_old_constant_name_is_gone_rather_than_made_dynamic():
     with pytest.raises(AttributeError):
         merge.NEVER_FUZZY_MERGE
     with deployment("healthcare"):
-        assert merge.never_fuzzy_merge_kinds() == frozenset({"patient"})
+        assert merge.never_fuzzy_merge_kinds() == frozenset(load_pack("healthcare").subject_kinds)
     with deployment("government"):
-        assert merge.never_fuzzy_merge_kinds() == frozenset(
-            {"applicant", "claimant", "person", "organisation"})
+        assert merge.never_fuzzy_merge_kinds() == frozenset(load_pack("government").subject_kinds)
+        assert {"applicant", "claimant", "person", "organisation"} <=             merge.never_fuzzy_merge_kinds()
 
 
 def test_never_fuzzy_merge_is_not_written_down_in_engine_code():

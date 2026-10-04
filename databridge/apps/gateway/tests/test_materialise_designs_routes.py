@@ -130,6 +130,15 @@ def test_propose_edit_approve_build_download(world):
     assert job["status"] == "succeeded", job
     res = job["result"]
     assert res["mode"] == "raw_delegated"
+    # E2E5 W-10: the build is in the reverse index, and its sealed `built` event names the
+    # common actor object of the signed-in person who asked for it
+    assert res["index_registered"]["registered"] is True, res["index_registered"]
+    from databridge_materialise.delegated import DesignStore
+    built = [ev for ev in DesignStore(e.materialiser().out_root)._chain(doc["id"])[0]
+             if ev.get("action") == "built"]
+    assert built and built[-1]["actor"]["principal_id"] == "staff"
+    assert built[-1]["actor"]["authenticated_by"] == "gateway"
+    assert built[-1]["actor"]["principal_type"] and built[-1]["actor"]["dev_only"] is not None
     assert res["statement"] == "raw extract; time as metadata; not leakage-filtered"
     pc = res["pointer_check"]
     assert pc["all_resolved"] and pc["all_match"] and pc["grounded_cells"] > 0

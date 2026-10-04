@@ -43,13 +43,28 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import logging
 import re
+import uuid
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+log = logging.getLogger("databridge.adapter_agents.explain")
+
 #: the models.yaml task class the explanation is routed through (data -> plain words)
 EXPLAIN_TASK_CLASS = "data_to_text"
+
+
+def model_of_event(event: Any) -> Optional[str]:
+    """The model a harness call RAN on, from its event (`PipelineEvent.model_used`; a dict event's
+    ``model_used`` or ``model``), or None when the event does not say (E2E run 5 W-06: never a
+    placeholder word in its place)."""
+    if isinstance(event, dict):
+        got = event.get("model_used") or event.get("model")
+    else:
+        got = getattr(event, "model_used", None) or getattr(event, "model", None)
+    return str(got) if isinstance(got, str) and got.strip() else None
 #: sampled rows per table offered as evidence
 SAMPLE_ROWS = 3
 #: supporting facts the model may choose per table
@@ -471,12 +486,14 @@ def explain_mapping(source_id: str, mapping: Any, vocab, *, harness: Any = None,
             result = harness.complete_structured(EXPLAIN_TASK_CLASS, [system, user], _Answer,
                                                  seed=7)
             answer: _Answer = result.parsed
-            event = getattr(result, "event", None)
-            model_name = (event.get("model") if isinstance(event, dict)
-                          else getattr(event, "model", None)) or "model"
+            model_name = model_of_event(getattr(result, "event", None))
         except Exception as exc:                                     # noqa: BLE001
             answer = _Answer()
-            model_error = f"{type(exc).__name__}: {exc}"[:300]
+            # R-028 #6 / W-06: a fixed sentence and a reference; the text is in the server log
+            ref = f"ERR-{uuid.uuid4().hex[:10]}"
+            log.error("[%s] explanation model call failed (%s)", ref, EXPLAIN_TASK_CLASS,
+                      exc_info=exc)
+            model_error = f"the model call failed (reference {ref})"
         got: dict[str, _TableChoice] = {}
         for t in answer.tables:
             got.setdefault(t.table, t)                 # keyed by the ALIAS the model was given
@@ -489,8 +506,7 @@ def explain_mapping(source_id: str, mapping: Any, vocab, *, harness: Any = None,
                 entry["not_sent_reason"] = ("the model returned nothing for this table; "
                                             "explained from the rules"
                                             if model_error is None else
-                                            f"the model call failed ({model_error}); explained "
-                                            f"from the rules")
+                                            f"{model_error}; explained from the rules")
                 continue
             reasons, dropped = select_facts(list(t.reasons), offered_by[entry["table"]])
             entry["model_dropped"] = dropped
@@ -516,4 +532,5 @@ def explain_mapping(source_id: str, mapping: Any, vocab, *, harness: Any = None,
 
 
 __all__ = ["EXPLAIN_TASK_CLASS", "MANDATORY", "discovery_captures", "explain_mapping",
+           "model_of_event",
            "select_facts", "table_explanation_facts", "table_facts"]

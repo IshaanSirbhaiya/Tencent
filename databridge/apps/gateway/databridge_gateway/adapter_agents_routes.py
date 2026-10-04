@@ -158,20 +158,29 @@ def _proposals(manager: Any) -> list[dict]:
     return list(rows.values())
 
 
-def _sync_job(app: FastAPI, agent_id: str, job_id: str, by: str) -> dict:
+def _sync_job(app: FastAPI, agent_id: str, job_id: str, by: str, *,
+              actor: Optional[dict] = None) -> dict:
     """Run one sync as a job. Returns the sync's summary, or ``{"status": "failed", "error": ...}``
-    when it raised - so a caller (the setup hand-off) can record the TERMINAL outcome."""
+    when it raised - so a caller (the setup hand-off) can record the TERMINAL outcome. ``actor``
+    (R-029 TIDY2) is the common actor object of the person who asked; it rides on the trigger."""
     rt = platform_of(app)
     data: dict = {}
+    trigger: dict = {"type": "manual", "by": by}
+    if actor is not None:
+        trigger["actor"] = actor
     try:
-        summary = rt.manager.sync(agent_id, trigger={"type": "manual", "by": by})
+        summary = rt.manager.sync(agent_id, trigger=trigger)
         data = summary.as_dict()
         rt.jobs.finish(job_id, status=("failed" if data.get("status") in ("failed", "refused")
                                        else "completed"), result=data)
     except Exception as exc:                                          # noqa: BLE001
         log.exception("adapter agent %s sync failed", agent_id)
-        data = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"}
-        rt.jobs.finish(job_id, status="failed", error=data["error"])
+        # a fixed sentence and a reference, never the exception's text (CONS standard 4)
+        from .public_errors import failed_job_error                   # noqa: PLC0415
+        failed = failed_job_error(log, exc, context="adapter agent sync", agent_id=agent_id)
+        data = {"status": "failed", **failed}
+        rt.jobs.finish(job_id, status="failed", error=failed["error"],
+                       error_ref=failed["error_ref"])
     finally:
         rt.jobs.update(job_id, graph_counts=reload_graph(app))
     return data
@@ -533,7 +542,9 @@ def register_adapter_agents_routes(app: FastAPI) -> None:
             job = rt.jobs.start("adapter_sync", agent_id, by=principal.principal_id)
         except JobBusy as busy:
             return _refusal("SYNC_IN_PROGRESS", str(busy), status=409)
-        background.add_task(_sync_job, app, agent_id, job["job_id"], principal.principal_id)
+        from .public_errors import actor_of                           # noqa: PLC0415
+        background.add_task(_sync_job, app, agent_id, job["job_id"], principal.principal_id,
+                            actor=actor_of(principal))
         return {"job_id": job["job_id"], "status": "running", "started_by": principal.principal_id}
 
     @app.get("/adapter-agents/{agent_id}/jobs/{job_id}")

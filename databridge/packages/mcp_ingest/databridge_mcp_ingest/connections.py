@@ -767,6 +767,19 @@ def import_declarations(path: Optional[Path] = None, *, route: str = "direct",
         raise ConnectionError_(f"{path}: expected version 1, got {data.get('version')!r}")
     if route not in ("direct", "mcpjungle"):
         raise ConnectionError_(f"route must be direct or mcpjungle, not {route!r}")
+    # E2E run 5 W-01: a declaration that names a WRITE tool is a write connection; left with the
+    # default purpose it would be proposed for a crawl no one can ever approve. Refused before
+    # anything is registered, naming every such declaration.
+    crawlable_writers = sorted(
+        str(d.get("id") or "?") for d in data.get("servers") or []
+        if isinstance(d, dict) and (not only or str(d.get("id") or "") in only)
+        and (d.get("tools_hint") or {}).get("write")
+        and (d.get("purpose") or "ingest") != "agent_write")
+    if crawlable_writers:
+        raise ConnectionError_(
+            f"{path}: {', '.join(crawlable_writers)} name(s) a write tool (tools_hint.write) but "
+            f"not `purpose: agent_write`; a write connection is never crawled — declare its "
+            f"purpose (and ingest the same source through a separate read-only connection)")
     out: list[SourceConnection] = []
     for decl in data.get("servers") or []:
         sid = str(decl.get("id") or "")
@@ -806,7 +819,10 @@ def import_declarations(path: Optional[Path] = None, *, route: str = "direct",
             "tools_hint": dict(decl.get("tools_hint") or {}),
             "writes_for": ([decl["writes_for"]] if isinstance(decl.get("writes_for"), str)
                            else [str(w) for w in decl.get("writes_for") or []]),
-            "aliases": [str(a) for a in decl.get("aliases") or []]}
+            "aliases": [str(a) for a in decl.get("aliases") or []],
+            # R-029 (IDN F-08): the per-item anchor kind the operator declares
+            **({"document_kind": str(decl["document_kind"])} if decl.get("document_kind")
+               else {})}
         # FXI3 (Codex f1 #6): scan the RAW declaration first and validate without echoing
         # inputs, so a refused literal can never come back out in a pydantic error message.
         _refuse_raw(raw)

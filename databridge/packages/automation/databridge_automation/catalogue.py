@@ -107,6 +107,10 @@ class ConnectionInfo:
     facts: Optional[bool] = None
     """Whether the connection has a read-only facts store (`facts.query:<id>`). None = derive from
     `kind` (a ``database`` has one)."""
+    holds: tuple[str, ...] = ()
+    """E2E run 5 F-09: what the connection's mapping says it HOLDS - its tables (``schema.table``)
+    and the ontology kinds they map to - from ``<id>.mapping.yaml``. What the compiler matches a
+    request against when the request names no source (it then ASKS; nothing is added unasked)."""
     reading_path: tuple[str, ...] = ()
     """FIN-11: the tools a HUMAN-APPROVED crawl plan reads this connection with (its roots, list
     and read steps; `plan_read_tools`), SQL aside. A document source is listed AND read along this
@@ -250,6 +254,7 @@ class Catalogue:
                              "tools": [{"name": t.name, "write": t.write, "basis": t.basis}
                                        for t in c.tools],
                              "locations": list(c.locations), "aliases": list(c.aliases),
+                             "holds": list(c.holds),
                              "plan_status": c.plan_status, "purpose": c.purpose or None,
                              "writes_for": list(c.writes_for), "facts": c.facts_capable}
                             for c in self.connections],
@@ -493,6 +498,7 @@ def load_connection_info(path: Path, *, ingest_root: Optional[Path] = None
     wf = data.get("writes_for")
     writes_for = tuple(str(x) for x in ([wf] if isinstance(wf, str) else (wf or []))
                        if isinstance(x, str) and x)
+    holds = _mapping_holds(_read_yaml(base / f"{cid}.mapping.yaml"))
     sql_steps = {str(s.get("sql", {}).get("tool")) for s in (plan or {}).get("steps") or []
                  if isinstance(s, dict) and isinstance(s.get("sql"), dict)}
     reading_path = tuple(sorted(t for t in vouched if t in tools and t not in sql_steps
@@ -501,7 +507,25 @@ def load_connection_info(path: Path, *, ingest_root: Optional[Path] = None
                           tools=tuple(tools.values()), locations=tuple(locations),
                           aliases=aliases, plan_status=plan_status,
                           purpose=str(data.get("purpose") or ""), writes_for=writes_for,
-                          facts=facts, reading_path=reading_path)
+                          facts=facts, reading_path=reading_path, holds=holds)
+
+
+def _mapping_holds(mapping: Any) -> tuple[str, ...]:
+    """The tables a stored mapping lists, and the kinds it maps them to (F-09). Unreadable or
+    absent: nothing (never invented)."""
+    tables = mapping.get("tables") if isinstance(mapping, dict) else None
+    if not isinstance(tables, dict):
+        return ()
+    out: set[str] = set()
+    for ref, tm in tables.items():
+        if not isinstance(ref, str) or not ref:
+            continue
+        out.add(ref)
+        node = tm.get("node") if isinstance(tm, dict) else None
+        kind = node.get("kind") if isinstance(node, dict) else None
+        if isinstance(kind, str) and kind:
+            out.add(kind)
+    return tuple(sorted(out))
 
 
 def writers_for(catalogue: CatalogueLike, cid: str) -> list[ConnectionInfo]:

@@ -38,6 +38,13 @@ federation itself is unavailable — the graph path answers and the delegation a
 its questions) rides along, so the caller sees both. When delegation DID read and could not
 compute (a refused source, a failed link), its reduced-coverage answer is returned as-is: a graph
 narration of the same question would be a total computed from half the evidence.
+
+**Except an aggregate the RULES routed** (E2E run 5, W-03/W-04): a count, total, statistic,
+ranking, comparison or row set. The graph path computes none of those, so when the planner asks
+instead of reading, its question IS the answer (``answer_kind: needs_clarification``, with
+``questions`` and ``question_items``) — never a graph narration that the data "does not contain"
+what the planner only needed a word about. A question the router (a model) routed keeps the
+graph fallback: it was not shown to be an aggregate.
 """
 from __future__ import annotations
 
@@ -60,6 +67,10 @@ ROUTE_UNDECIDED = "undecided"
 ROUTER_TASK_CLASS = "brain_routing"
 #: Where the Activity page shows one run (the founder's link shape).
 ACTIVITY_PATH = "/trace"
+#: The rules whose questions the graph path cannot answer at all (it computes nothing): when the
+#: planner asks instead of reading, the question goes back to the asker (E2E run 5, W-03).
+AGGREGATE_RULES = frozenset({"count", "statistic", "ranking", "comparison", "total",
+                             "set_intersection", "set_of_rows", "period_over_table"})
 
 # --- the generic lexicon: English function words and quantifiers, never a domain noun ----------
 _COUNT = re.compile(r"\b(?:how many|number of|count (?:of|the|all|every))\b")
@@ -90,6 +101,10 @@ def _noun_forms(name: str) -> tuple[str, str]:
     """A table name as (singular, plural) phrases: ``follow_up_tasks`` → ``follow up task(s)``."""
     words = name.lower().replace("_", " ").strip()
     singular = words[:-1] if words.endswith("s") and not words.endswith("ss") else words
+    if singular.endswith("y") and len(singular) > 2 and singular[-2] not in "aeiou":
+        return singular, singular[:-1] + "ies"           # facility -> facilities (E2E run 5)
+    if singular.endswith(("ss", "x", "z", "ch", "sh")):
+        return singular, singular + "es"                 # address -> addresses
     return singular, singular + "s"
 
 
@@ -333,6 +348,47 @@ def federated_payload(answer: dict, route: dict, *, request_id: Optional[str]) -
     }
 
 
+def clarification_payload(answer: dict, route: dict, *, request_id: Optional[str]) -> dict:
+    """The `/brain/query` body when a RULE-routed aggregate was planned and the planner asked
+    instead of reading (E2E run 5, W-03): the `/federated/ask` needs-input shape (``questions``,
+    ``question_items`` with their ``fed:`` ids), the run and its Activity link. Nothing was read,
+    so nothing is grounded and nothing is said to be absent."""
+    run_id = answer.get("run_id")
+    questions = list(answer.get("questions") or [])
+    items = list(answer.get("question_items") or []) or [{"id": None, "text": q}
+                                                          for q in questions]
+    return {
+        "question": answer.get("question"),
+        "routed_to": ROUTE_FEDERATED,
+        "route": route,
+        "answer": answer.get("answer_markdown") or "",
+        "answer_kind": "needs_clarification",
+        "needs_clarification": True,
+        "grounded": False,
+        "refusal": "",
+        "is_real_llm": bool(((answer.get("produced_by") or {}).get("narrator") or {})
+                            .get("model")),
+        "matched_entities": [],
+        "status": answer.get("status"),
+        "table": {},
+        "claims": [],
+        "citations": [],
+        "questions": questions,
+        "question_items": items,
+        "coverage": coverage_summary(answer.get("coverage") or {}),
+        "plan": answer.get("plan"),
+        "timings": answer.get("timings") or {},
+        "run_id": run_id,
+        "trace_request_id": request_id,
+        "activity_url": activity_url(run_id, request_id),
+    }
+
+
+def _error_ref() -> str:
+    import uuid                                                      # noqa: PLC0415
+    return "brain-" + uuid.uuid4().hex[:12]
+
+
 def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> dict:
     """Decide the route and, for a delegated question, ask the federated service.
 
@@ -367,10 +423,15 @@ def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> 
         return {"route": route}
     try:
         svc = _service(app)
-    except Exception as exc:                                         # noqa: BLE001
-        log.warning("federated service unavailable for /brain: %s", exc)
+    except Exception:                                                # noqa: BLE001
+        # no exception text in a public payload (CONS standard 4): a fixed message, and the
+        # details in the server log under an opaque reference
+        ref = _error_ref()
+        log.exception("federated service unavailable for /brain (error_ref %s)", ref)
         return {"route": {**pre, "route": ROUTE_GRAPH,
-                          "delegation_unavailable": f"{type(exc).__name__}: {exc}"}}
+                          "delegation_unavailable": "the delegated query service could not be "
+                                                    "started; the graph path answered",
+                          "error_ref": ref}}
     decision = route_question(question, catalogue=svc.catalogue, router=router)
     if getattr(svc.catalogue, "refreshing", None) and decision["route"] != ROUTE_FEDERATED:
         # E2E4 Q-01: a facts store exists but could not be read, so its tables are missing from
@@ -392,13 +453,24 @@ def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> 
         ans = svc.answer(question, admission=CatalogueAdmission(
             principal.principal_id, set(scope) if scope is not None else None), trace=trace)
         answer = ans.model_dump(mode="json")
-    except Exception as exc:                                         # noqa: BLE001
-        log.exception("delegated /brain question failed")
+    except Exception:                                                # noqa: BLE001
+        ref = _error_ref()
+        log.exception("delegated /brain question failed (error_ref %s)", ref)
         return {"route": {**decision, "route": ROUTE_GRAPH,
-                          "delegation_failed": f"{type(exc).__name__}: {exc}"}}
+                          "delegation_failed": "the delegated query failed; the graph path "
+                                               "answered",
+                          "error_ref": ref}}
     cov = answer.get("coverage") or {}
     read_nothing = not (cov.get("searched") or cov.get("skipped"))
     if not (answer.get("table") or {}).get("rows") and read_nothing:
+        if (answer.get("questions") and decision.get("decided_by") == "rules"
+                and decision.get("rule") in AGGREGATE_RULES
+                and getattr(svc, "harness", None) is not None):
+            # W-03: an aggregate the rules routed, and the planning model asked instead of
+            # reading. The graph computes no aggregate, so its narration could only say the data
+            # is missing; the planner's question is returned instead.
+            return {"route": decision, "payload": clarification_payload(
+                answer, decision, request_id=request_id)}
         # The planner asked instead of guessing (or nothing could be planned): nothing was read,
         # so the graph path answers what it can, and the attempt travels with it.
         return {"route": {**decision, "route": ROUTE_GRAPH, "fallback_from": ROUTE_FEDERATED},
@@ -411,5 +483,6 @@ def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> 
 
 
 __all__ = ["route_by_rules", "route_question", "delegate", "federated_payload",
+           "clarification_payload", "AGGREGATE_RULES",
            "coverage_summary", "candidate_flags", "activity_url", "RouteDecision",
            "ROUTE_FEDERATED", "ROUTE_GRAPH", "ROUTE_UNDECIDED", "ROUTER_TASK_CLASS"]

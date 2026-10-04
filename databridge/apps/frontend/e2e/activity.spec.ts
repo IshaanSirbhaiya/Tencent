@@ -342,3 +342,40 @@ test.describe("@unit activity nulls (Codex f1 #3)", () => {
     expect(actorText(null)).toBe(NOT_RECORDED);                 // a starter nobody recorded
   });
 });
+
+test.describe("@unit E2E run 5 F-12 decision families", () => {
+  test("the page's kind vocabulary is the gateway's, hold lifts and identity rules included", async () => {
+    // derived from the gateway's own source, not written down twice
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const py = readFileSync(
+      join(__dirname, "..", "..", "gateway", "databridge_gateway", "activity_routes.py"),
+      "utf-8",
+    );
+    const tuple = (name: string) => {
+      const m = py.match(new RegExp(`^${name} = \(([^)]*)\)`, "m"));
+      expect(m, name).toBeTruthy();
+      return Array.from((m as RegExpMatchArray)[1].matchAll(/"([a-z_]+)"/g), (x) => x[1]);
+    };
+    const gatewayDecisions = tuple("DECISION_KINDS");
+    expect(gatewayDecisions.length).toBeGreaterThan(0);                      // non-vacuous
+    expect([...DECISION_KINDS]).toEqual(gatewayDecisions);
+    expect(gatewayDecisions).toEqual(expect.arrayContaining(["screen_override", "identity_rule_decision"]));
+    for (const k of gatewayDecisions) {
+      expect(KIND_LABEL[k as keyof typeof KIND_LABEL]).toBeTruthy();
+      expect(RUNLESS_KINDS).toContain(k);                                    // a decision opens no run
+    }
+    // every integrity value the decision families serve is worded, and the override log's
+    // (sealed + chained, not anchored) is never worded as anchored
+    const integrity = Array.from(
+      readFileSync(
+        join(__dirname, "..", "..", "gateway", "databridge_gateway", "activity_decisions.py"),
+        "utf-8",
+      ).matchAll(/^[A-Z_]+ = "([a-z_]+)"\s+#/gm),
+      (x) => x[1],
+    );
+    expect(integrity).toContain("sealed_and_chained");
+    for (const v of integrity) expect(INTEGRITY_TEXT[v], v).toBeTruthy();
+    expect(INTEGRITY_TEXT.sealed_and_chained).not.toContain("anchored —");
+  });
+});

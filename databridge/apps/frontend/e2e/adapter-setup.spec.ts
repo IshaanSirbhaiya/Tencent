@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import {
   allDeferred,
   approvableTables,
+  documentsDecisionLabel,
   documentsDecisionOffered,
   basisWords,
   canRediscover,
@@ -128,6 +129,14 @@ test.describe("@unit adapter setup helpers", () => {
     expect(documentsDecisionOffered({ ...d, decided: true })).toBe(false);
     expect(documentsDecisionOffered({ ...d, digest: null })).toBe(false);
     expect(documentsDecisionOffered(null)).toBe(false);
+  });
+
+  test("W-05: an already-built document source is offered to be KEPT, never silently adopted", () => {
+    const kept = { captured: 15, allowed: 0, kept: 13, held: 1, digest: "sha256:k", decided: false, discovery_run_id: "r" };
+    expect(documentsDecisionOffered(kept)).toBe(true);
+    expect(documentsDecisionLabel(kept)).toContain(`keep these ${kept.kept}`.replace("keep", "Keep"));
+    expect(documentsDecisionLabel({ allowed: 2, kept: 3 })).toContain("Build 2 and keep 3");
+    expect(documentsDecisionLabel({ allowed: 2 })).toBe("Build these 2 document(s)");
   });
 
   test("the mapping approval is offered only against the current explanation", () => {

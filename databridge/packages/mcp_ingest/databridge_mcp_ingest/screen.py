@@ -393,7 +393,12 @@ def detection_text(text: str) -> str:
         ch = chr(int(m.group(1), 16))
         return "" if unicodedata.category(ch) == "Cf" else m.group(0)
 
-    folded = unicodedata.normalize("NFKC", _JSON_ESCAPE.sub(unescape, text))
+    unescaped = _JSON_ESCAPE.sub(unescape, text) if "\\u" in text else text
+    if unescaped.isascii():
+        # F-02 (E2E run 5): ASCII holds no format character and NFKC leaves it unchanged, so the
+        # per-character pass (most of the screen stage on a large table) is skipped — same result
+        return unescaped
+    folded = unicodedata.normalize("NFKC", unescaped)
     return "".join(ch for ch in folded if unicodedata.category(ch) != "Cf")
 
 
@@ -585,44 +590,18 @@ def approval_key_path() -> Path:
 
 def _approval_key(root: Optional[Path]) -> bytes:
     """The deployment approval key. `WALNUT_APPROVAL_KEY` (>= 32 chars) wins; else the key file
-    (`WALNUT_APPROVAL_KEY_FILE`, default `~/.walnut/keys/approval.key`), created once with a random
-    256-bit key. A key file INSIDE the sources directory is refused: whoever can append an approval
-    line could then also read the key that seals it."""
-    import os
-    import secrets
+    (`WALNUT_APPROVAL_KEY_FILE`, default `~/.walnut/keys/approval.key`). It is the ONE core rule
+    (`databridge_core.decision_ledger.approval_key`): READ ONLY, never created implicitly (R-029
+    TIDY2: a read never writes). A missing key refuses (`OverrideRefused`): a write is refused
+    explicitly, and a read verifies nothing. A key file INSIDE the sources directory is refused:
+    whoever can append an approval line could then also read the key that seals it."""
+    from databridge_core import decision_ledger as _dl
 
-    raw = os.environ.get(APPROVAL_KEY_ENV, "")
-    if raw:
-        if len(raw.strip()) < _MIN_KEY_CHARS:
-            raise OverrideRefused(f"{APPROVAL_KEY_ENV} is shorter than {_MIN_KEY_CHARS} chars")
-        return raw.strip().encode("utf-8")
-    kp = approval_key_path().resolve()
     sources = (root or paths.sources_dir()).resolve()
-    if kp == sources or sources in kp.parents:
-        raise OverrideRefused(f"the approval key file {kp} lies inside the sources directory "
-                              f"{sources}; keep it elsewhere ({APPROVAL_KEY_FILE_ENV})")
-    if not kp.is_file():
-        kp.parent.mkdir(parents=True, exist_ok=True)
-        tmp = kp.with_name(f".{kp.name}.{os.getpid()}.{secrets.token_hex(6)}.tmp")
-        tmp.write_text(secrets.token_hex(32), encoding="utf-8")
-        try:
-            os.chmod(tmp, 0o600)
-        except OSError:
-            pass
-        try:
-            os.link(tmp, kp)                # atomic, never overwrites a key another writer made
-        except FileExistsError:
-            pass
-        except OSError:
-            try:
-                os.rename(tmp, kp)          # Windows: fails if the key appeared meanwhile
-            except OSError:
-                pass
-        tmp.unlink(missing_ok=True)
-    key = kp.read_text(encoding="utf-8").strip()
-    if len(key) < _MIN_KEY_CHARS:
-        raise OverrideRefused(f"the approval key file {kp} holds fewer than {_MIN_KEY_CHARS} chars")
-    return key.encode("utf-8")
+    try:
+        return _dl.approval_key(protect=[sources])
+    except _dl.DecisionRefused as exc:
+        raise OverrideRefused(exc.message) from None
 
 
 def _seal(key: bytes, record_digest: str) -> str:

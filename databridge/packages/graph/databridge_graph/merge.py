@@ -148,7 +148,10 @@ def resolve_existing(store: GraphStore, incoming: GraphNode,
     fuzzy-guarded under another.
     """
     v = vocab if vocab is not None else active_vocabulary()
-    is_subject = v.is_subject(str(incoming.kind))
+    # IDN (E2E run 5 F-04): a kind whose records are natural persons is treated exactly as a
+    # subject here, declared or not (`Vocabulary.person_kinds`): no rule, no similarity, no
+    # ungrounded key ever decides that two records are one person.
+    is_subject = v.is_subject(str(incoming.kind)) or v.is_person(str(incoming.kind))
     # 0) the SAME NODE, by id. `id` is `f"{kind}:{slug}"` and is computed by whoever wrote it, so
     #    two upserts of one id are two sightings of one record — matching them is bookkeeping, not
     #    an identity judgement, and no similarity is involved.
@@ -187,8 +190,13 @@ def resolve_existing(store: GraphStore, incoming: GraphNode,
     # FIN-04: a record an approved identity rule ALREADY merged into another (`consolidate_identity`)
     # re-sights the survivor, not a fresh copy of itself. `identity_rule_for` is None for every
     # subject kind, so no subject can reach this branch.
+    #
+    # IDN (E2E run 5 W-02): the same for a mention `reconcile_keyless` joined to its keyed record
+    # after the record arrived. Never for a person: nothing ever absorbs one.
+    # Only a MENTION can have been absorbed that way (a table row is written `id_only` and is
+    # never a keyless mention), so a row upsert does not pay for the lookup.
     rule = v.identity_rule_for(str(incoming.kind))
-    if rule is not None:
+    if not is_subject and (rule is not None or not id_only):
         survivor = _absorbed_into(store, incoming)
         if survivor is not None:
             return survivor, "absorbed"
@@ -310,8 +318,17 @@ def name_prefix_join(store: GraphStore, incoming: GraphNode,
     No name, pattern or list is written down: the names compared are the source's own."""
     v = vocab if vocab is not None else active_vocabulary()
     kind = str(incoming.kind)
-    if v.is_subject(kind) or kind in never_fuzzy_merge_kinds(v) or incoming.canonical_id:
+    if (v.is_subject(kind) or v.is_person(kind) or kind in never_fuzzy_merge_kinds(v)
+            or incoming.canonical_id):
         return None
+    # IDN (D-004): a kind whose pack turned name similarity OFF (`similarity_merge: false`) is
+    # joined only by the rules a named human approved. A prefix join folds legal forms ("... Ltd"
+    # leads "... LLC"), which is exactly the near-name-twin join D-004 forbids for such a kind.
+    rule = v.identity_rule_for(kind)
+    if rule is not None and not rule.similarity_merge:
+        return None
+    if v.is_document_kind(kind):
+        return None                        # FIN-07: a document is never one with another by name
     want = _token_seq(incoming.label)
     if not want:
         return None
@@ -492,7 +509,7 @@ def consolidate_identity(store: GraphStore, vocab: Optional[Vocabulary] = None, 
     v = vocab if vocab is not None else active_vocabulary()
     report = ConsolidationReport()
     for kind, rule in sorted(v.identity_rules.items()):
-        if v.is_subject(kind):                     # unreachable by construction; a wall anyway
+        if v.is_subject(kind) or v.is_person(kind):   # unreachable by construction; a wall anyway
             continue
         types = (approved or {}).get(kind) if approved is not None else approved_rule_types(rule, v)
         types = frozenset(t for t in (types or ()) if t in rule.rule_types)
@@ -577,16 +594,152 @@ def consolidate_identity(store: GraphStore, vocab: Optional[Vocabulary] = None, 
     return report
 
 
+#: How `reconcile_keyless` cites a join: the same rules a mention meets at write time, applied
+#: once the keyed record exists, so the graph no longer depends on which source was read first.
+RECONCILE_DERIVATION = ("joined after its keyed record arrived, by the rule the mention would have "
+                        "met had the record been there when it was read ({how}); a candidate "
+                        "join by name, not by key")
+
+
+def _pointer_leaf_kinds(p: SourcePointer, depth: int = 0) -> set[str]:
+    if p.kind == "derived" and depth < 8:
+        out: set[str] = set()
+        for q in p.derived_from or ():
+            out |= _pointer_leaf_kinds(q, depth + 1)
+        return out
+    return {str(p.kind)}
+
+
+def _is_prose_mention(node: GraphNode) -> bool:
+    """Every pointer grounding the node itself is a document span (directly or under a
+    derivation): a name read from prose, not a row a source declared."""
+    leaves: set[str] = set()
+    for p in node.sources:
+        leaves |= _pointer_leaf_kinds(p)
+    return leaves == {"doc_span"}
+
+
+def reconcile_keyless(store: GraphStore, vocab: Optional[Vocabulary] = None) -> ConsolidationReport:
+    """IDN (E2E run 5 W-02): make cross-source joins independent of the ORDER sources were read.
+
+    A document read before the register it names leaves keyless mention nodes ("Tamsinbay Water
+    Authority", "Corriedale") that the register's keyed rows, written `id_only`, never meet: the
+    join the mention would have made at write time (`resolve_existing`'s name-similarity step, or
+    `name_prefix_join`) had nothing keyed to make it against. Run 4 read the database first and
+    joined; run 5 read the documents first and did not. This applies those SAME rules now, to
+    every keyless mention, against the keyed records now present, and absorbs the mention into
+    the ONE record they select (`_absorb`: closed, never deleted; edges re-pointed; the mention's
+    id listed in `merged_record_ids`, so a later sighting re-finds the record; its spans cited as
+    derived pointers naming the surface form).
+
+    What it will not do:
+      * touch a subject or person kind (hard constraint 1) or a document kind (FIN-07);
+      * apply a rule the pack turned off: a kind whose identity rule says
+        `similarity_merge: false` is joined only by `consolidate_identity`'s APPROVED rules;
+      * absorb a table row (only a node every pointer of which is a document span) or join a
+        mention to a record without a declared key;
+      * choose: a mention two records score equally for, or that the two rules send to different
+        records, is listed as refused and left alone;
+      * re-point an attested determination edge (the mention is refused, listed).
+    """
+    from .meta import ATTESTED_META_KINDS                               # noqa: PLC0415
+
+    v = vocab if vocab is not None else active_vocabulary()
+    report = ConsolidationReport()
+    kinds = sorted({r["kind"] for r in store.fetchall(
+        "SELECT DISTINCT kind FROM nodes WHERE system_to IS NULL AND valid_to IS NULL "
+        "AND canonical_id IS NULL")})
+    for kind in kinds:
+        if (kind not in v.node_kinds or v.is_subject(kind) or v.is_person(kind)
+                or kind in never_fuzzy_merge_kinds(v) or v.is_document_kind(kind)):
+            continue
+        rule = v.identity_rule_for(kind)
+        if rule is not None and not rule.similarity_merge:
+            continue
+        keyed = _open_of_kind(store, kind, "AND canonical_id IS NOT NULL")
+        if not keyed:
+            continue
+        index: dict[str, set[int]] = {}
+        for i, r in enumerate(keyed):
+            for t in _tokens(r["label"] or ""):
+                index.setdefault(t, set()).add(i)
+        joined: dict[str, list[GraphNode]] = {}
+        survivors: dict[str, GraphNode] = {}
+        for r in _open_of_kind(store, kind, "AND canonical_id IS NULL"):
+            node = row_to_node(store, r)
+            if not _is_prose_mention(node):
+                continue
+            targets: dict[str, str] = {}
+            # the similarity step, exactly as `resolve_existing` scores it, over keyed records
+            pool = set().union(*(index.get(t, set()) for t in _tokens(node.label or "")))
+            best, best_ids = 0.0, set()
+            for i in pool:
+                score = token_set_ratio(node.label, keyed[i]["label"])
+                if score > best:
+                    best, best_ids = score, {keyed[i]["id"]}
+                elif score == best:
+                    best_ids.add(keyed[i]["id"])
+            if best >= FUZZY_THRESHOLD:
+                if len(best_ids) > 1:
+                    report.refused.append({"kind": kind, "records": sorted([node.id, *best_ids]),
+                                           "rule": "similarity", "reason": "the mention scores "
+                                           "equally for more than one keyed record; none chosen"})
+                    continue
+                targets[next(iter(best_ids))] = "name similarity"
+            hit = name_prefix_join(store, node, v)
+            if hit is not None:
+                targets.setdefault(hit.row["id"], "leading words of the record's own name")
+            if len(targets) != 1:
+                if len(targets) > 1:
+                    report.refused.append({"kind": kind, "records": sorted([node.id, *targets]),
+                                           "rule": "similarity/prefix", "reason": "the rules "
+                                           "select different records; none chosen"})
+                continue
+            if any(e["system_to"] is None and _edge_is_attested(e, v, ATTESTED_META_KINDS)
+                   for e in store.edges_touching(node.id)):
+                report.refused.append({"kind": kind, "records": [node.id],
+                                       "reason": "carries an attested determination edge; a "
+                                                 "join never re-points what a human attested"})
+                continue
+            target, how = next(iter(targets.items()))
+            if target not in survivors:
+                survivors[target] = row_to_node(store, store.open_node_row(target))
+            joined.setdefault(target, []).append((node, how))
+        for target, pairs in sorted(joined.items()):
+            hows = sorted({h for _, h in pairs})
+            _absorb(store, survivors[target], [n for n, _ in pairs],
+                    derivation=RECONCILE_DERIVATION.format(how="; ".join(hows)),
+                    cite_as_mentions=True)
+            report.merged.append({"kind": kind, "survivor": target,
+                                  "absorbed": [n.id for n, _ in pairs],
+                                  "rules": hows, "status": "candidate_join",
+                                  "reverse": "a person restores the absorbed mention (it is "
+                                             "closed, not deleted); its spans are unchanged"})
+        report.kinds[kind] = ["similarity", "prefix"]
+    return report
+
+
 def _edge_is_attested(row, vocab: Vocabulary, attested_metas) -> bool:
     decl = vocab.edge_kinds.get(str(row["kind"]))
     return decl is not None and decl.binds_to in attested_metas
 
 
 def _absorb(store: GraphStore, survivor: GraphNode, absorbed: list[GraphNode],
-            rule: IdentityRule) -> None:
+            rule: Optional[IdentityRule] = None, *, derivation: Optional[str] = None,
+            cite_as_mentions: bool = False) -> None:
     """Close each absorbed record, re-point its open edges at the survivor, and open ONE new
-    version of the survivor carrying their pointers and the attributes it lacked."""
+    version of the survivor carrying their pointers and the attributes it lacked.
+
+    ``cite_as_mentions`` (IDN, `reconcile_keyless`): an absorbed MENTION's spans say its surface
+    form, not the survivor's name, so each is cited as a `derived` pointer naming both ("mention
+    of <label>: the text says <surface>"), exactly as a write-time join cites them (E2E run-2
+    N-17): no node shows a label that a pointer beside it does not hold."""
     from .store import row_to_edge                                      # noqa: PLC0415
+
+    if derivation is None:
+        assert rule is not None, "an absorption names the rule or the derivation behind it"
+        derivation = (f"identity rule for {rule.kind!r} declared by pack {rule.pack!r} and "
+                      f"approved by a named human (ontology state): these records are one record")
 
     at = store.now()
     floor = max([survivor.system_from, *(n.system_from for n in absorbed)])
@@ -604,7 +757,15 @@ def _absorb(store: GraphStore, survivor: GraphNode, absorbed: list[GraphNode],
             if key in node.attr_sources:
                 attrs[key] = value
                 attr_sources[key] = node.attr_sources[key]
-        sources = sources + _new_pointers(sources, node.sources)
+        node_ptrs = tuple(node.sources)
+        if cite_as_mentions and (normalise_legal_name(node.label)
+                                 != normalise_legal_name(survivor.label)):
+            node_ptrs = tuple(SourcePointer(
+                source_id=p.source_id, kind="derived", derived_from=[p], trust=p.trust,
+                derivation=(f"mention of {survivor.label!r} (key {survivor.canonical_id!r}): "
+                            f"the text says {node.label!r}; {derivation}"))
+                for p in node.sources)
+        sources = sources + _new_pointers(sources, node_ptrs)
         for mid in [node.id, *(node.attrs.get(MERGED_IDS_ATTR) or [])]:
             if mid not in merged_ids and mid != survivor.id:
                 merged_ids.append(mid)
@@ -615,9 +776,7 @@ def _absorb(store: GraphStore, survivor: GraphNode, absorbed: list[GraphNode],
     attrs[MERGED_IDS_ATTR] = merged_ids
     attr_sources[MERGED_IDS_ATTR] = SourcePointer(
         source_id=basis[0].source_id, kind="derived", derived_from=basis,
-        derivation=(f"identity rule for {rule.kind!r} declared by pack {rule.pack!r} and "
-                    f"approved by a named human (ontology state): these records are one record"),
-        trust=basis[0].trust)
+        derivation=derivation, trust=basis[0].trust)
     merged = survivor.model_copy(update={"attrs": attrs, "attr_sources": attr_sources,
                                          "sources": sources, "system_from": at})
     closed = store.replace_node(merged, at=at)

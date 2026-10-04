@@ -33,7 +33,9 @@ def test_f08_import_carries_tools_hint_writes_for_and_aliases(walnut_env):
 
 def test_aliases_crm_names_the_database_that_holds_the_crm(walnut_env):
     decls = {d["id"]: d for d in _manifest()["servers"]}
-    writers = [d for d in decls.values() if d.get("purpose") == "agent_write"]
+    # a writer that names the ingest connection it changes (a create-only files root names none)
+    writers = [d for d in decls.values() if d.get("purpose") == "agent_write"
+               and d.get("writes_for")]
     assert writers
     target = writers[0]["writes_for"][0]                                  # derived, not named
     assert "crm" in [a.lower() for a in decls[target].get("aliases") or []]
@@ -45,7 +47,7 @@ def test_the_catalogue_sees_write_tools_and_aliases(walnut_env):
     from databridge_mcp_ingest.connections import connection_path, import_declarations
 
     conns = import_declarations(MANIFEST, advertise=False)
-    writer = next(c for c in conns if c.purpose == "agent_write")
+    writer = next(c for c in conns if c.purpose == "agent_write" and c.writes_for)
     info = catalogue.load_connection_info(connection_path(writer.id))
     assert info.writes_for == tuple(writer.writes_for) and info.agent_write
     hinted = writer.tools_hint.get("write")

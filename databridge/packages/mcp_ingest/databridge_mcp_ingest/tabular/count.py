@@ -28,6 +28,7 @@ import os
 import json
 import re
 import sqlite3
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -275,6 +276,50 @@ def _run(path: Path, stmt: str, params, max_rows: int):
     return schema, ordered, columns, fetched
 
 
+# --- the facts file's digest, once per SNAPSHOT (R-029 TIDY2; BRN cross-track) ----------------
+#: A cached digest is re-verified (the file hashed again) after this many seconds, so an in-place
+#: edit that restores the file's size and mtime is caught within the bound.
+DIGEST_TTL_S = 60.0
+_DIGEST_LOCK = threading.Lock()
+#: resolved path -> (file identity, digest, when it was hashed)
+_DIGESTS: dict[str, tuple[tuple, str, float]] = {}
+
+
+def _now() -> float:
+    return time.monotonic()
+
+
+def _file_key(path: Path) -> tuple:
+    """The identity of the file's current SNAPSHOT: an atomic publication (a new file, then
+    `os.replace`) changes the inode; a write in place changes the size or the mtime."""
+    st = os.stat(path)
+    return (st.st_size, st.st_mtime_ns, st.st_ino, st.st_dev,
+            getattr(st, "st_ctime_ns", None) if os.name != "nt" else None)
+
+
+def clear_digest_cache() -> None:
+    with _DIGEST_LOCK:
+        _DIGESTS.clear()
+
+
+def facts_digest(path: Path) -> str:
+    """The sha256 of the facts file, hashed ONCE per snapshot. Cached only when the file did not
+    change while it was hashed (its identity before == after); a different identity, or a cached
+    digest older than `DIGEST_TTL_S`, is hashed again. Every integrity check that compares this
+    digest (the manifest's hash, a pointer's capture digest) is unchanged."""
+    name = str(Path(path).resolve())
+    key = _file_key(path)
+    with _DIGEST_LOCK:
+        hit = _DIGESTS.get(name)
+    if hit is not None and hit[0] == key and _now() - hit[2] <= DIGEST_TTL_S:
+        return hit[1]
+    digest = sha256_file(path)
+    if _file_key(path) == key:                       # verified: the snapshot held still
+        with _DIGEST_LOCK:
+            _DIGESTS[name] = (key, digest, _now())
+    return digest
+
+
 def count_query(source_id: str, sql: str, *, params: Optional[tuple | dict] = None,
                 question: Optional[str] = None, max_rows: int = MAX_ROWS,
                 facts_dir: Optional[Path | str] = None) -> CountAnswer:
@@ -286,8 +331,13 @@ def count_query(source_id: str, sql: str, *, params: Optional[tuple | dict] = No
         raise FactsQueryError(f"no facts store for source {source_id!r} at {path}; run the "
                               f"tabular stage first")
     stmt = _check_statement(sql)
-    digest = sha256_file(path)
+    snapshot = _file_key(path)
+    digest = facts_digest(path)
     schema, ordered, columns, fetched = _run(path, stmt, params, max_rows)
+    if _file_key(path) != snapshot:
+        # the result must belong to the snapshot the digest names: never cite a mixed read
+        raise FactsQueryError("the facts file changed while the statement ran (a new snapshot "
+                              "was published); ask again")
     # R-022 f1 #6: a pointer names a cell by (query, row ordinal, COLUMN NAME) — two result
     # columns with one name would be two cells with one pointer. Refused; alias them.
     dupes = sorted({c for c in columns if columns.count(c) > 1})
@@ -347,7 +397,7 @@ def resolve_query_cell(pointer: SourcePointer, *, sql: Optional[str] = None,
     if pointer.kind != "query_cell" or not pointer.query_hash:
         raise FactsQueryError("not a query_cell pointer")
     path = facts_path(pointer.source_id, facts_dir)
-    if not path.is_file() or sha256_file(path) != pointer.capture_digest:
+    if not path.is_file() or facts_digest(path) != pointer.capture_digest:
         raise FactsQueryError("the facts file the pointer captured is no longer published")
     art = queries_dir(pointer.source_id, facts_dir) / f"{pointer.query_hash}.json"
     if art.is_file():
@@ -397,4 +447,4 @@ def describe_facts(source_id: str, *, facts_dir: Optional[Path | str] = None) ->
 
 __all__ = ["count_query", "describe_facts", "CountAnswer", "FactsQueryError", "params_digest",
            "result_digest", "query_identity", "proven_order", "resolve_query_cell",
-           "queries_dir"]
+           "queries_dir", "facts_digest", "clear_digest_cache", "DIGEST_TTL_S"]

@@ -43,8 +43,8 @@ ESTATES: dict[str, dict[str, str]] = {
                   "golden_set": "packs/workspace/evals/agent_contract.jsonl",
                   "mcp_servers": "mcp_servers.yaml", "passages": "", "live_db": "larkspur"},
     "finance": {"packs": "finance", "graph": "finance.db",
-                "agent_purpose": "lending.portfolio_reporting",
-                "golden_set": "packs/finance/evals/credit_memo_v3.jsonl",
+                "agent_purpose": "finance.agent_run",
+                "golden_set": "packs/finance/evals/agent_contract.jsonl",
                 "mcp_servers": "infra/mcp_servers.finance.yaml", "passages": "1",
                 "live_db": "finance_demo"},
 }
@@ -82,6 +82,8 @@ def setup_env(load_keys: bool = True, estate: str | None = None) -> Path:
     preset = ESTATES[estate_name(estate)]
     servers = preset["mcp_servers"]
     servers_path = ROOT / servers if servers.startswith("infra/") else E / servers
+    if (E / "mcp_servers.yaml").is_file():      # run 5: every run carries its manifest copy
+        servers_path = E / "mcp_servers.yaml"
     deploy_root = E / "root"
     for p in PACKAGES:
         sp = str(ROOT / p)
@@ -119,6 +121,7 @@ def setup_env(load_keys: bool = True, estate: str | None = None) -> Path:
         "WALNUT_ACT_REGISTRY_PATH": str(E / "ontology" / "act_registry.json"),
         "WALNUT_MCP_STATE": str(E / "mcp_state"),
         "WALNUT_MCP_SERVERS": str(servers_path),
+        "WALNUT_MCP_DECLARATIONS": str(servers_path),
         "WALNUT_FOLLOWUPS_DIR": str(followups_dir(E)),
         "WALNUT_E2E_CORPUS": str(corpus_dir(E)),
         "WALNUT_DEMO_PG_PORT": "5433",

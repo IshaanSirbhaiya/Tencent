@@ -32,6 +32,7 @@ import re
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
+from functools import cached_property
 from pathlib import Path
 from types import MappingProxyType
 from typing import Iterator, Mapping, Optional, Sequence
@@ -40,7 +41,8 @@ import yaml
 
 from databridge_core import SourcePointer, Trust
 
-from .meta import SUBJECT_ELIGIBLE_META_KINDS, EdgeMetaKind, NodeMetaKind
+from .meta import (PERSON_ACTOR_META_EDGES, PERSON_META_KIND, SUBJECT_ELIGIBLE_META_KINDS,
+                   EdgeMetaKind, NodeMetaKind)
 
 # packs/ at the databridge root: parents[0]=databridge_graph, [1]=graph, [2]=packages,
 # [3]=databridge/ (the same walk `databridge_core.config` uses for config/models.yaml).
@@ -276,6 +278,23 @@ def _sealed(mapping: Optional[Mapping]) -> Mapping:
     return MappingProxyType(dict(mapping or {}))
 
 
+def person_like_kinds(node_kinds: Mapping[str, "NodeKindDecl"],
+                      edge_kinds: Mapping[str, "EdgeKindDecl"]) -> frozenset[str]:
+    """E2E run 5 F-04: the kinds whose records are NATURAL PERSONS, derived from the declarations'
+    STRUCTURE (`meta.PERSON_ACTOR_META_EDGES`), never from a name: an ENTITY-bound kind the pack
+    names explicitly as the actor (``src``) of a role-holding or artefact-issuing edge. A wildcard
+    endpoint names no kind and proves nothing."""
+    out = set()
+    for decl in edge_kinds.values():
+        if decl.binds_to not in PERSON_ACTOR_META_EDGES:
+            continue
+        for kind in decl.src:
+            node = node_kinds.get(kind)
+            if node is not None and node.binds_to is PERSON_META_KIND:
+                out.add(kind)
+    return frozenset(out)
+
+
 @dataclass(frozen=True)
 class Pack:
     """One loaded, validated pack — Layer 1. Its mappings are SEALED; see `_sealed`."""
@@ -361,16 +380,31 @@ class Vocabulary:
     @property
     def never_fuzzy_merge(self) -> frozenset[str]:
         """Kind names that name similarity must NEVER merge. Computed from the enabled packs'
-        `subject_kinds` — never a literal in engine code."""
-        return frozenset(s.kind for s in self.subject_kinds.values() if s.never_fuzzy_merge)
+        `subject_kinds` AND from every kind whose records are natural persons (`person_kinds`)
+        — never a literal in engine code. E2E run 5 F-04: a person kind a pack forgot to declare
+        a subject (finance `contact`) used to lose this protection silently."""
+        return frozenset(s.kind for s in self.subject_kinds.values()
+                         if s.never_fuzzy_merge) | self.person_kinds
+
+    @cached_property
+    def person_kinds(self) -> frozenset[str]:
+        """Kinds whose records stand for PEOPLE: every declared subject, plus every kind the bound
+        declarations mark structurally as a natural person (`person_like_kinds`). None of them is
+        ever merged by name, similarity, prefix or an identity rule, in any pack (hard
+        constraint 1): a mention of one is a candidate for a named human, never a join."""
+        return frozenset(self.subject_kinds) | person_like_kinds(self.node_kinds,
+                                                                 self.edge_kinds)
+
+    def is_person(self, kind: str) -> bool:
+        return str(kind) in self.person_kinds
 
     def is_subject(self, kind: str) -> bool:
         return str(kind) in self.subject_kinds
 
     def identity_rule_for(self, kind: str) -> Optional[IdentityRule]:
-        """The declared merge rules of a NON-subject kind, or ``None`` (FIN-04). A subject kind
-        never has one, whatever any mapping says."""
-        if self.is_subject(str(kind)):
+        """The declared merge rules of a NON-subject, NON-person kind, or ``None`` (FIN-04). A
+        subject or a person kind never has one, whatever any mapping says."""
+        if self.is_subject(str(kind)) or self.is_person(str(kind)):
             return None
         return self.identity_rules.get(str(kind))
 
@@ -716,6 +750,11 @@ def load_pack(name: str, root: Optional[Path] = None, *, use_cache: bool = True)
                 f"{where}: identity rule for {rkind!r}, which this pack declares a SUBJECT. A "
                 f"subject is never merged by a rule (CLAUDE.md hard constraint 1): its records "
                 f"stay candidates for a named human")
+        if rkind in person_like_kinds(node_kinds, edge_kinds):
+            raise PackError(
+                f"{where}: identity rule for {rkind!r}, whose records are natural persons (an "
+                f"entity the pack names as the actor of a role or of an artefact). A person is "
+                f"never merged by a rule (CLAUDE.md hard constraint 1)")
         if node_kinds[rkind].binds_to not in SUBJECT_ELIGIBLE_META_KINDS:
             raise PackError(
                 f"{where}: identity rule for {rkind!r}, which binds to "
@@ -879,7 +918,7 @@ def build_vocabulary(names: Sequence[str], root: Optional[Path] = None) -> Vocab
                 prior_r, sources=tuple(dict.fromkeys(prior_r.sources + r.sources)))
     # FIN-04: a kind ANY bound pack declares a subject is never merged by a rule, whichever pack
     # declared the rule. Refused, not resolved by order.
-    clash = sorted(set(rules) & set(subjects))
+    clash = sorted(set(rules) & (set(subjects) | person_like_kinds(nodes, edges)))
     if clash:
         raise PackError(
             f"identity rules for {clash} (pack(s) {sorted({rules[k].pack for k in clash})}) clash "
@@ -975,5 +1014,5 @@ __all__ = [
     "SubjectKind", "UnknownKind",
     "Vocabulary", "active_vocabulary", "available_packs", "bind_deployment",
     "build_vocabulary", "clear_caches", "configured_packs", "deployment", "load_pack",
-    "never_fuzzy_merge_kinds", "packs_root",
+    "never_fuzzy_merge_kinds", "packs_root", "person_like_kinds",
 ]

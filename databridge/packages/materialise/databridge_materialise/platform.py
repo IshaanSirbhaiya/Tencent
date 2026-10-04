@@ -124,10 +124,15 @@ class RunRefused(Exception):
 
     def __init__(self, code: str, message: str, *,
                  question_items: Optional[list[dict]] = None,
-                 error_ref: Optional[str] = None) -> None:
+                 error_ref: Optional[str] = None, reason_code: Optional[str] = None,
+                 nearest_alternative: Optional[str] = None) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
+        #: E2E5 W-11: the package's specific code when ``code`` is the standard one for the cause
+        self.reason_code = reason_code
+        #: E2E5 W-11: the flow that DOES build what was asked for, when this one cannot
+        self.nearest_alternative = nearest_alternative
         #: R-028 TIDY #4: set when the cause was a failure whose text is only in the server log.
         self.error_ref = error_ref
         #: E2E run 3, P-10: the planner's questions as ``[{id, text}]``. Answer them by posting
@@ -140,6 +145,10 @@ class RunRefused(Exception):
         out: dict = {"code": self.code, "message": self.message}
         if self.error_ref:
             out["error_ref"] = self.error_ref
+        if self.reason_code:
+            out["reason_code"] = self.reason_code
+        if self.nearest_alternative:
+            out["nearest_alternative"] = self.nearest_alternative
         if self.question_items:
             out["question_items"] = self.question_items
             out["answer_with"] = {"answers": {q["id"]: "" for q in self.question_items},
@@ -148,11 +157,31 @@ class RunRefused(Exception):
         return out
 
 
+#: E2E5 W-11: the planner's refusals answer with a STANDARD code (upper snake case, like every
+#: other refusal of this API); the exception class survives as ``reason_code``.
+PLANNER_CODES = {"PlanNeedsInput": "PLAN_NEEDS_INPUT",
+                 "ShapeNotImplemented": "SHAPE_NOT_IMPLEMENTED"}
+#: ...and names the flow that builds a plain, unlabelled table, which this planner does not:
+#: a raw TABLE DESIGN (`delegated.py`), built by delegation with a pointer per cell.
+RAW_DESIGN_ALTERNATIVE = (
+    "a raw table design: Data → Raw dataset by delegation (POST /materialise/designs) builds one "
+    "row per source row with every cell cited, and needs no label or decision instant")
+#: The same, said in the refusal's sentence (no route path: a public sentence names no path).
+RAW_DESIGN_SENTENCE = (
+    "For a plain table without a label, use a raw table design (Data → Raw dataset by "
+    "delegation): one row per source row, every cell cited, no label or decision instant needed.")
+
+
 def _asked(exc: Exception, message: Optional[str] = None) -> RunRefused:
-    """A planner refusal as a `RunRefused`, carrying any question it asked with its id."""
+    """A planner refusal as a `RunRefused`, carrying any question it asked with its id, a standard
+    code, and the raw-design flow as the nearest alternative (E2E5 W-11)."""
     qs = list(getattr(exc, "questions", ()) or ())
-    return RunRefused(type(exc).__name__, message or str(exc),
-                      question_items=question_items(qs) if qs else None)
+    name = type(exc).__name__
+    text = message or str(exc)
+    return RunRefused(PLANNER_CODES.get(name, name),
+                      f"{text} {RAW_DESIGN_SENTENCE}",
+                      question_items=question_items(qs) if qs else None,
+                      reason_code=name, nearest_alternative=RAW_DESIGN_ALTERNATIVE)
 
 
 class PlatformMaterialiser:
@@ -441,7 +470,9 @@ class PlatformMaterialiser:
             event = getattr(agent, "last_event", None)
             produced_by = {"agent": "data_agent", "agent_version": EXECUTOR_VERSION,
                            "task_class": PLAN_TASK_CLASS,
-                           "model": (getattr(event, "model", None) if planner == "model"
+                           # E2E5 W-10: the harness records the routed model as `model_used`
+                           "model": ((getattr(event, "model_used", None)
+                                      or getattr(event, "model", None)) if planner == "model"
                                      else "offline/gold-planner"),
                            "prompt_version": "data_agent/_PROMPT",
                            "run_id": staging.name.replace(".staging-", ""), "at": _now()}
@@ -786,15 +817,24 @@ class PlatformMaterialiser:
 
     def build_design(self, design_id: str, *, digest: str, by: str, service: Any,
                      admission: Any, progress: Optional[Callable[[dict], None]] = None,
-                     allowed: Optional[set] = None) -> dict:
+                     allowed: Optional[set] = None, actor: Optional[dict] = None) -> dict:
         """Build the APPROVED design at exactly ``digest`` by delegation; publish the raw table,
-        its receipt and the per-cell pointer sidecar after a full live pointer check."""
+        its receipt and the per-cell pointer sidecar after a full live pointer check. ``actor``
+        is the common actor object of the signed-in person who asked for the build (CONS_BRIEF
+        §1), recorded on the sealed ``built`` event."""
         import hashlib
         from types import SimpleNamespace
 
         from .delegated import (MODE, RAW_STATEMENT, DesignDraft, DesignRefused,
                                 approved_design, build_raw, validate_design)
         emit = progress or (lambda _e: None)
+        if actor is not None:
+            # checked BEFORE anything is read or published (the sealed event records it last)
+            from databridge_core.decision_ledger import actor_of as _actor_of
+            actor = _actor_of(actor)
+            if actor["principal_id"] != by:
+                raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "the build's actor is not the "
+                                                                  "person running it", 403)
         store = self.design_store()
         doc, design = approved_design(store, design_id, digest=digest, owner=by)
         approval = dict(doc["approval"])
@@ -811,8 +851,9 @@ class PlatformMaterialiser:
             c = self.design_catalogue(service, allowed=allowed)
             body = design.model_dump(mode="json")
             body["label"] = design.label.model_dump() if design.label else None
-            if validate_design(DesignDraft(**body), c, request=design.request).digest != \
-                    design.digest:
+            # the approved design's own filters are the APPLIED ones (a time scope included)
+            if validate_design(DesignDraft(**body), c, request=design.request,
+                               time_scope=True).digest != design.digest:
                 raise DesignRefused("DESIGN_STALE", "the catalogue no longer supports the "
                                                     "approved design exactly (a link, column or "
                                                     "approval changed); open it, review and "
@@ -916,11 +957,12 @@ class PlatformMaterialiser:
                     out, indent=2, sort_keys=True, default=str), encoding="utf-8")
                 published = self._publish(staging, final, out)
                 store.record_build(design_id, by=by, build_id=build_id, rev=doc["rev"],
-                                   digest=digest)
+                                   digest=digest, actor=actor)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
+        # E2E5 W-10: the index takes the build INSTANT (a datetime), not its text
         index = self._register_emission(built.dataset, SimpleNamespace(
-            plan_hash=build_id, executed_at=executed), final)
+            plan_hash=build_id, executed_at=datetime.fromisoformat(executed)), final)
         emit({"stage": "done", "plan_hash": build_id, "at": _now()})
         prior = self.receipt(build_id) or out
         return {**summary_from_doc(prior, files=self.files(build_id)), "design_id": design_id,

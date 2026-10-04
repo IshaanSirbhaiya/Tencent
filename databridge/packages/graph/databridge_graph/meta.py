@@ -93,6 +93,16 @@ class EdgeMetaKind(str, Enum):
 #: declaring something the engine cannot honour, so the loader refuses it.
 SUBJECT_ELIGIBLE_META_KINDS = frozenset({NodeMetaKind.ENTITY, NodeMetaKind.ORGANISATION})
 
+#: E2E run 5 F-04: the STRUCTURAL mark of a natural person, read from a pack's own declarations
+#: and never from a kind's name. A kind is person-like when it binds to the ENTITY meta-kind (an
+#: organisation binds to ORGANISATION) and the pack names it, explicitly, as the ACTOR of an edge
+#: of one of these meta-kinds: it holds a role with respect to something (ROLE_OF) or it produced
+#: an artefact (ISSUED). A thing that holds a role and writes letters, and is not an organisation,
+#: is a human. Such a kind is never merged by name, similarity or prefix in ANY pack, declared a
+#: subject or not (`Vocabulary.person_kinds`), and a pack may not declare an identity rule for it.
+PERSON_META_KIND = NodeMetaKind.ENTITY
+PERSON_ACTOR_META_EDGES = frozenset({EdgeMetaKind.ROLE_OF, EdgeMetaKind.ISSUED})
+
 #: Meta-edges that record a CLAIM about which entity an artefact concerns. Every surface that
 #: renders one must attach the caveat that it is a claim; see `identity.py`.
 CLAIM_META_KINDS = frozenset({EdgeMetaKind.ABOUT})

@@ -25,10 +25,14 @@ NOW = dt.datetime(2026, 9, 30, tzinfo=dt.timezone.utc)
 
 @pytest.fixture(autouse=True)
 def approval_key(tmp_path, monkeypatch):
-    """Every test here seals with its own key file, outside the sources directory."""
+    """Every test here seals with its own key file, outside the sources directory (provisioned
+    explicitly, as a deployment does)."""
     monkeypatch.delenv("WALNUT_APPROVAL_KEY", raising=False)
     kp = tmp_path / "keys" / "approval.key"
     monkeypatch.setenv("WALNUT_APPROVAL_KEY_FILE", str(kp))
+    # R-029 TIDY2: the key is never created implicitly; the deployment provisions it explicitly
+    from databridge_core.decision_ledger import provision_approval_key
+    provision_approval_key()
     return kp
 
 

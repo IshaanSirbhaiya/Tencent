@@ -248,6 +248,18 @@ def _write_connections(spec: Any) -> set[str]:
     return {c for c in (_connection_of(a.tool) for a in spec.actions) if c}
 
 
+def _public_path(path: Any) -> Optional[str]:
+    """A file the plan names, as a person may see it (R-029 W-06): from its ``packs/`` folder on
+    (``packs/<pack>/evals/<file>``), else its name alone - never the server's directory."""
+    if not path:
+        return None
+    parts = [p for p in re.split(r"[\\/]+", str(path)) if p]
+    low = [p.lower() for p in parts]
+    if "packs" in low:
+        return "/".join(parts[len(low) - 1 - low[::-1].index("packs"):])
+    return parts[-1] if parts else None
+
+
 def _grants(compilation: Any) -> Optional[dict]:
     """What the agent compiler granted, read off the compiled object (never re-derived)."""
     decision = getattr(compilation, "decision", None)
@@ -258,7 +270,7 @@ def _grants(compilation: Any) -> Optional[dict]:
         "purpose": compiled.purpose,
         "capabilities": [{"source_id": g.source_id, "capability": g.capability,
                           "max_trust": g.max_trust} for g in compiled.grants.grants],
-        "golden_set": compiled.evals.golden_set,
+        "golden_set": _public_path(compiled.evals.golden_set),
         "golden_set_records": compiled.evals.records,
         "citation": compiled.citation,
         "tokens_per_run": compiled.budget.tokens_per_run,
@@ -560,8 +572,10 @@ def _execute(app: Any, d: Path, task: dict, principal: Any):
         if getattr(spec, "delegates", None):
             from .federated_routes import _factory as _federated_factory  # noqa: PLC0415
             federation = _federated_factory(app)()
-        trigger = {"type": TRIGGER_TYPE, "by": principal.principal_id, "question": None,
-                   "task_id": task_id}
+        # R-029 TIDY2: the trigger carries the full common actor object, not only a name
+        from .public_errors import actor_of                           # noqa: PLC0415
+        trigger = {"type": TRIGGER_TYPE, "by": principal.principal_id,
+                   "actor": actor_of(principal), "question": None, "task_id": task_id}
         record = ar.run_agent(spec, decl, store=getattr(app.state, "graph_store", None),
                               harness=rt.harness, gateway=gw, retriever=rt.new_retriever(),
                               trigger=trigger, trace=trace, federation=federation)

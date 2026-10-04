@@ -39,6 +39,46 @@ def scrub(text: object) -> str:
     return _CRED_KV.sub(lambda m: f"{m.group('k')}{m.group('q')}[REDACTED]", out)
 
 
+#: An absolute server path left in free text after the known directories are made relative:
+#: a drive path (``C:\\x\\y``, ``C:/x/y``), a UNC path, or a POSIX path of two or more segments
+#: (never a URL's path: a ``scheme://`` or a ``host/`` precedes it).
+_ABS_PATH = re.compile(r"(?<![\w])(?:[A-Za-z]:[\\/]|\\\\)[^\s'\"<>|*?,;()]*"
+                       r"|(?<![\w:/.~-])/(?:[\w.-]+/)+[\w.-]+")
+
+
+def _known_dirs() -> list[tuple[str, str]]:
+    """``(server directory, what it is shown as)``: the deployment's own tree, shown relative to
+    it. Anything else absolute is reduced to its last component (`public_text`)."""
+    from . import paths as _paths                                  # noqa: PLC0415
+
+    out: list[tuple[str, str]] = []
+    for d, shown in ((_paths.DATABRIDGE_ROOT, ""),):
+        try:
+            full = str(Path(d).resolve())
+        except OSError:
+            continue
+        out.append((full, shown))
+    return sorted(out, key=lambda x: len(x[0]), reverse=True)
+
+
+def public_text(text: object, roots: tuple = ()) -> str:
+    """``text`` with no SERVER path in it (R-029 TIDY2): a path under one of the source's
+    ``roots`` is shown relative to that root, one under the deployment's own tree relative to it,
+    and any other absolute path by its last component (``.../name``).
+    For the free text a person reads back (a run report's notes and message); never for an
+    identity or locator a stage reads (those stay as the source names them)."""
+    out = str(text)
+    pairs = [(str(r), "") for r in roots if isinstance(r, str) and r.strip()] + _known_dirs()
+    for full, shown in sorted(pairs, key=lambda x: len(x[0]), reverse=True):
+        for form in {full, full.replace("\\", "/")}:
+            if not form:
+                continue
+            out = re.sub(re.escape(form.rstrip("\\/")) + r"[\\/]?",
+                         lambda _m, s=shown: s, out, flags=re.IGNORECASE)
+    return _ABS_PATH.sub(lambda m: ".../" + re.split(r"[\\/]", m.group(0).rstrip("\\/"))[-1],
+                         out)
+
+
 def _scrub_value(value: object) -> object:
     if isinstance(value, str):
         return scrub(value)

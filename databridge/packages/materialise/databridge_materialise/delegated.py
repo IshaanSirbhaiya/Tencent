@@ -60,10 +60,46 @@ NOT_DONE = ("no data cleaning", "no imputation (a missing cell stays missing, wi
             "yourself; use the labelled dataset mode for a leakage-checked training set")
 DESIGN_TASK_CLASS = "agentic_orchestration"
 DESIGN_PROMPT_VERSION = "dsd.design/1"
-#: The delegate's own row ceiling: a base larger than this is refused, never silently truncated.
-MAX_BASE_ROWS = 5000
-#: Values per pushed-down ``IN (...)`` statement.
+#: E2E5 F-10: the bound on ONE raw table's rows. It is the deployment's (``WALNUT_DSD_MAX_BASE_
+#: ROWS``), it is checked against the source's own pushed-down COUNT of the design's selection
+#: BEFORE any row is read, and the refusal names both numbers. (Before this the only bound was a
+#: page ceiling — the facts store's 1,000 rows per statement — misreported as "more than 5000".)
+MAX_BASE_ROWS_ENV = "WALNUT_DSD_MAX_BASE_ROWS"
+DEFAULT_MAX_BASE_ROWS = 100_000
+#: Rows per base PAGE (keyset-paged on the proven row key; ``WALNUT_DSD_PAGE_ROWS``). A store that
+#: returns fewer per statement is paged at its own size: a page is read until the delegate says it
+#: is complete, never assumed to be.
+PAGE_ROWS_ENV = "WALNUT_DSD_PAGE_ROWS"
+DEFAULT_PAGE_ROWS = 500
+#: A delegate sub-task's own ``limit`` ceiling (`SubTask.limit`).
+_SUBTASK_LIMIT = 5000
+#: Values per pushed-down ``IN (...)`` statement (never more than a page).
 IN_CHUNK = 500
+
+
+def _env_int(name: str, default: int, *, lo: int, hi: Optional[int] = None) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        v = int(raw)
+    except ValueError:
+        raise DesignRefused("BOUND_MISCONFIGURED", f"{name} must be a whole number of rows",
+                            500) from None
+    if v < lo or (hi is not None and v > hi):
+        raise DesignRefused("BOUND_MISCONFIGURED", f"{name} must be between {lo} and "
+                                                   f"{hi if hi is not None else 'any'} rows", 500)
+    return v
+
+
+def max_base_rows() -> int:
+    """The deployment's bound on one raw table's rows (`MAX_BASE_ROWS_ENV`)."""
+    return _env_int(MAX_BASE_ROWS_ENV, DEFAULT_MAX_BASE_ROWS, lo=1)
+
+
+def page_rows() -> int:
+    """Rows per base page (`PAGE_ROWS_ENV`), at most a sub-task's limit."""
+    return _env_int(PAGE_ROWS_ENV, DEFAULT_PAGE_ROWS, lo=1, hi=_SUBTASK_LIMIT - 1)
 #: Distinct values shown for a categorical column (more than this: not categorical).
 MAX_CATEGORY_VALUES = 12
 CANDIDATE_POLICY = "dsd.subject_link"
@@ -658,11 +694,20 @@ def _approved(cat: DesignCatalogue, base: SourceRef, draft: dict) -> Optional[De
     return None
 
 
-def validate_design(draft: DesignDraft, cat: DesignCatalogue, *, request: str
-                    ) -> TableDesign:
+def validate_design(draft: DesignDraft, cat: DesignCatalogue, *, request: str,
+                    time_scope: bool = False) -> TableDesign:
     """The gate. Every name is checked against the MEASURED catalogue; a link is accepted only if
-    it is an APPROVED one; time columns are made metadata and never filters. Whatever cannot be
-    honoured becomes a QUESTION (a design with questions cannot be approved)."""
+    it is an APPROVED one; time columns are made metadata. Whatever cannot be honoured becomes a
+    QUESTION (a design with questions cannot be approved).
+
+    A filter on a TIME column (E2E5 F-10: never dropped silently):
+
+    * ``time_scope=False`` — a filter a MODEL drafted is not applied, and the design says so and
+      how to apply it (time stays a column; the person decides);
+    * ``time_scope=True`` — a filter a PERSON put in an edit (`apply_edit`), or one already in an
+      approved design's own filters (re-validation), is APPLIED as a row scope, pushed down to the
+      source like any other filter, and the design says so. It is a selection the person chose,
+      not leakage filtering: every time column is still a column."""
     qs = [str(q) for q in draft.questions if str(q).strip()]
     notes = [str(a) for a in draft.assumptions if str(a).strip()]
     g = draft.grain or {}
@@ -757,9 +802,16 @@ def validate_design(draft: DesignDraft, cat: DesignCatalogue, *, request: str
             qs.append(f"filter on {df.field!r}: {base.table} has no such column")
             continue
         if df.field in base.temporal:
-            notes.append(f"the filter {df.field} {df.op} {df.value!r} was NOT applied: time is "
-                         f"kept as a column for you to filter, never as a filter")
-            continue
+            if not time_scope:
+                notes.append(f"the filter {df.field} {df.op} {df.value!r} was NOT applied: time "
+                             f"is kept as a column for you to filter. To keep only those rows, "
+                             f"add it as a filter in an edit: it is then applied as a row scope")
+                continue
+            dropped = f"the filter {df.field} {df.op} {df.value!r} was NOT applied"
+            notes = [n for n in notes if not n.startswith(dropped)]
+            notes.append(f"the filter {df.field} {df.op} {df.value!r} is APPLIED as a row scope "
+                         f"(pushed down to the source), as the editor asked; time stays a column "
+                         f"and nothing else is filtered by time")
         filters.append(df)
     label = None
     lc = str((draft.label or {}).get("column") or "") if draft.label else ""
@@ -1072,8 +1124,10 @@ def propose_design(request: str, cat: DesignCatalogue, *, harness: Any = None,
                                               DesignDraft, strict=False)
             draft = res.parsed
             ev = getattr(res, "event", None)
-            produced.update(task_class=DESIGN_TASK_CLASS, by="model",
-                            model=getattr(ev, "model", None),
+            # E2E5 W-10: the harness records the ROUTED model on its event as `model_used`
+            produced.update(task_class=getattr(ev, "task_class", None) or DESIGN_TASK_CLASS,
+                            by="model",
+                            model=getattr(ev, "model_used", None) or getattr(ev, "model", None),
                             prompt_version=DESIGN_PROMPT_VERSION)
         except Exception as e:                                    # noqa: BLE001 - said
             produced["model_error"], model_note = _model_error(e)
@@ -1127,7 +1181,9 @@ def apply_edit(design: TableDesign, edit: dict, cat: DesignCatalogue) -> TableDe
                         filters=list(body.get("filters") or []), label=body.get("label"),
                         questions=still_open,
                         assumptions=[*design.assumptions, *answered])
-    return validate_design(draft, cat, request=design.request)
+    # E2E5 F-10: a filter a PERSON puts in an edit is applied, a time filter included (as a row
+    # scope, said in the design) — never dropped silently
+    return validate_design(draft, cat, request=design.request, time_scope=True)
 
 
 # ================================================================================================
@@ -1251,7 +1307,13 @@ class DesignStore:
         d = self._ddir(design_id)
         if d is None or not (d / "events.jsonl").is_file():
             return [], "no such design"
-        events, why = self._ledger(design_id).inspect()
+        try:
+            led = self._ledger(design_id)
+        except DesignRefused as exc:
+            # R-029 TIDY2: a READ never provisions the key (nor writes anything). With no key the
+            # log cannot be verified, so nothing in it is honoured: it is NOT READABLE.
+            return [], f"the design log is not readable: {exc.message}"
+        events, why = led.inspect()
         for n, rec in enumerate(events, start=1):
             if rec.get("design_id") != design_id:
                 return events[:n - 1], why or f"record {n} names another design"
@@ -1266,7 +1328,8 @@ class DesignStore:
 
     def _recover(self, design_id: str) -> None:
         """Under the design lock, before a change: complete an interrupted append of THIS log
-        explicitly (`DecisionLedger.recover`, recorded in the log). Nothing else is repaired."""
+        explicitly (`DecisionLedger.recover`, recorded in the log). Nothing else is repaired. With
+        no provisioned key the change refuses here (`APPROVAL_KEY_UNAVAILABLE`), explicitly."""
         led = self._ledger(design_id)
         if led.path.is_file() and led.interrupted():
             try:
@@ -1408,15 +1471,22 @@ class DesignStore:
         return self.view(design_id)
 
     def record_build(self, design_id: str, *, by: str, build_id: str, rev: int,
-                     digest: str) -> None:
-        """A build is an EVENT; it never rewrites the design's state."""
+                     digest: str, actor: Optional[dict] = None) -> None:
+        """A build is an EVENT; it never rewrites the design's state. ``actor`` (E2E5 W-10) is
+        the common actor object of whoever asked for the build; its id must be ``by``."""
+        if actor is not None:
+            actor = _dl.actor_of(actor)
+            if actor["principal_id"] != by:
+                raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "the build's actor is not the "
+                                                                  "person running it", 403)
         with self._lock(design_id):
             self._recover(design_id)
             events, broken = self._chain(design_id)
             if broken:
                 raise DesignRefused("DESIGN_INTEGRITY_FAILED", broken, 409)
             self._append(design_id, events, {"action": "built", "by": by, "build": build_id,
-                                             "rev": rev, "digest": digest})
+                                             "rev": rev, "digest": digest,
+                                             **({"actor": actor} if actor else {})})
 
 
 def design_of(doc: dict) -> TableDesign:
@@ -1688,10 +1758,12 @@ def _refuse_ambiguous(index: dict, what: str) -> None:
                                               f"by picking one", 422)
 
 
-def _prove_base(service: Any, base: "TableInfo", design: TableDesign, res: Any,
-                admission: Any) -> Any:
-    """An INDEPENDENT proof of the base read (R-027 f1 #4): one pushed-down COUNT over the same
-    selection, whose contributing row keys must be exactly the rows the delegate returned."""
+def _count_base(service: Any, base: "TableInfo", design: TableDesign,
+                admission: Any) -> tuple[Any, int, str]:
+    """The source's OWN pushed-down COUNT of the design's selection, read FIRST (E2E5 F-10): it is
+    what the size bound is checked against before any row is read, and — independently — the
+    proof of the paged read (R-027 f1 #4): its contributing row keys must be exactly the rows the
+    pages returned. Returns ``(result, count, key-set digest)``."""
     from databridge_federated.contracts import Aggregate, Filter, SubTask  # noqa: PLC0415
     from databridge_federated.pointers import rows_digest                  # noqa: PLC0415
     task = SubTask(id="base-count", adapter_agent=base.adapter_agent,
@@ -1700,18 +1772,91 @@ def _prove_base(service: Any, base: "TableInfo", design: TableDesign, res: Any,
                    filters=tuple(Filter(field=f.field, op=f.op, value=f.value)
                                  for f in design.filters))
     got = service.run_subtask(task, admission=admission)
-    keys = [str(r.cells[base.key].value) for r in res.rows]
-    if got.error or got.coverage.excluded:
-        raise DesignRefused("BASE_UNPROVEN", f"the base row count could not be proven: "
-                            f"{got.error or '; '.join(got.coverage.excluded)}", 422)
+    if got.error:
+        raise DesignRefused("BASE_NOT_READ", f"the adapter agent {base.adapter_agent!r} could not "
+                                             f"read {base.table}: {got.error}")
+    if got.coverage.excluded or got.coverage.skipped:
+        raise DesignRefused("BASE_UNPROVEN", "the base row count could not be proven: "
+                            + "; ".join([*got.coverage.excluded,
+                                         *(s.reason for s in got.coverage.skipped)]), 422)
     cell = got.rows[0].cells.get("count") if got.rows else None
     n = int(cell.value) if cell is not None else 0
     digest = cell.pointer.rows_digest if cell is not None else rows_digest([])
+    return got, n, digest
+
+
+def _prove_base(base: "TableInfo", res: Any, n: int, digest: str) -> None:
+    """The paged read is exactly the counted selection: same number of rows, same key set."""
+    from databridge_federated.pointers import rows_digest                  # noqa: PLC0415
+    keys = [str(r.cells[base.key].value) for r in res.rows]
     if n != len(keys) or digest != rows_digest(keys):
         raise DesignRefused("BASE_UNPROVEN", f"the delegate returned {len(keys)} {base.table} "
                                              f"row(s) and the source counts {n} (or a different "
                                              f"key set); nothing is built", 422)
-    return got
+
+
+def _read_paged(service: Any, task: Any, key: str, *, admission: Any, first: Any = None,
+                max_pages: Optional[int] = None) -> tuple[Any, int]:
+    """Every row of ``task``'s selection, KEYSET-PAGED on the table's proven row key (E2E5 F-10).
+
+    The delegate orders by the row key and says when a read was cut (`coverage.truncated`: its own
+    limit, or the store's per-statement ceiling). Each further page is the same statement with one
+    more bound filter, ``key > <the last key read>`` — pushed down, read-only, a pointer per cell
+    exactly as on page one. Paging ends only when a page says it is complete. A cut page with no
+    row to continue from, or a page read from another snapshot than the first, refuses; a page
+    with an error or rows the delegate could not use is returned merged, for the caller to refuse.
+    Returns ``(one merged result, pages read)``."""
+    from databridge_federated.contracts import Filter                       # noqa: PLC0415
+    pages: list = []
+    r = first
+    what = task.entity_kinds[0] if task.entity_kinds else "the source"
+    while True:
+        if r is None and not pages:
+            r = service.run_subtask(task, admission=admission)
+        elif r is None:
+            after = pages[-1].rows[-1].cells[key].value
+            r = service.run_subtask(task.model_copy(update={
+                "id": f"{task.id[:24]}-p{len(pages)}",
+                "filters": (*task.filters, Filter(field=key, op="gt", value=after))}),
+                admission=admission)
+        if r.error or r.coverage.excluded or r.coverage.skipped:
+            pages.append(r)
+            break
+        if pages and r.snapshot is not None and (
+                pages[0].snapshot is None
+                or r.snapshot.content_hash != pages[0].snapshot.content_hash):
+            raise DesignRefused("SOURCE_MOVED", f"{what} changed between two pages of one read; "
+                                                f"nothing is built from a mix of two snapshots",
+                                409)
+        pages.append(r)
+        if not r.coverage.truncated:
+            break
+        if not r.rows or key not in r.rows[-1].cells:
+            raise DesignRefused("BASE_UNPROVEN", f"a page of the {what} read was cut short with no "
+                                                 f"usable row to continue from; nothing is built",
+                                422)
+        if max_pages is not None and len(pages) >= max_pages:
+            raise DesignRefused("BASE_UNPROVEN", f"the {what} read did not finish within "
+                                                 f"{max_pages} pages; nothing is built", 422)
+        r = None
+    return (pages[0] if len(pages) == 1 else _merge_pages(pages)), len(pages)
+
+
+def _merge_pages(pages: list) -> Any:
+    """The pages of one read as ONE result: every row in key order, every statement in its
+    notes, every exclusion kept."""
+    first = pages[0]
+    cov = first.coverage.model_copy(update={
+        "truncated": pages[-1].coverage.truncated,
+        "notes": tuple(n for p in pages for n in p.coverage.notes),
+        "excluded": tuple(e for p in pages for e in p.coverage.excluded),
+        "skipped": tuple(s for p in pages for s in p.coverage.skipped)})
+    return first.model_copy(update={
+        "rows": tuple(row for p in pages for row in p.rows), "coverage": cov,
+        "queries": sum(int(p.queries or 0) for p in pages),
+        "error": next((p.error for p in pages if p.error), None),
+        "timings": {"ms": sum(int((p.timings or {}).get("ms", 0)) for p in pages),
+                    "pages": len(pages)}})
 
 
 def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admission: Any,
@@ -1732,21 +1877,32 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
     if base.split:
         base_fields.append(base.split.get("column"))
     base_fields = [f for f in dict.fromkeys([base.key, *base_fields]) if f]
+    size = page_rows()
+    bound = max_base_rows()
     base_task = SubTask(
         id="base", adapter_agent=base.adapter_agent, connection=base.connection,
-        entity_kinds=(base.table,), fields=tuple(base_fields), limit=MAX_BASE_ROWS,
+        entity_kinds=(base.table,), fields=tuple(base_fields), limit=size,
         record_time=True,
         filters=tuple(Filter(field=f.field, op=f.op, value=f.value) for f in design.filters))
     emit({"stage": "delegating", "part": "base", "adapter_agent": base.adapter_agent,
           "at": _now()})
-    res = service.run_subtask(base_task, admission=admission)
+    # E2E5 F-10: the source COUNTS the selection first; the bound is checked against that count
+    # before a single row is read, and the refusal names both numbers
+    proof, counted, counted_digest = _count_base(service, base, design, admission)
+    if counted > bound:
+        raise DesignRefused("BASE_TOO_LARGE", f"{base.table} has {counted} row(s) in this "
+                                              f"design's selection (counted by the source); this "
+                                              f"deployment builds at most {bound} rows in one raw "
+                                              f"table ({MAX_BASE_ROWS_ENV}). Add a filter to the "
+                                              f"design, or ask an operator to raise the bound. "
+                                              f"Nothing was read", 422)
+    emit({"stage": "delegating", "part": "base", "rows_counted": counted, "page_rows": size,
+          "at": _now()})
+    res, base_pages = _read_paged(service, base_task, base.key, admission=admission,
+                                  max_pages=counted + 2)
     if res.error:
         raise DesignRefused("BASE_NOT_READ", f"the adapter agent {base.adapter_agent!r} could not "
                                              f"read {base.table}: {res.error}")
-    if res.coverage.truncated:
-        raise DesignRefused("BASE_TOO_LARGE", f"{base.table} returned more than {MAX_BASE_ROWS} "
-                                              f"rows; add a filter to the design (a raw table "
-                                              f"is never silently truncated)", 422)
     if res.coverage.excluded or res.coverage.skipped:
         # R-027 f1 #4: a raw grain is one row per base row; a row the delegate could not use
         # (no pointer, no key) is never silently dropped from it
@@ -1755,12 +1911,13 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                             + "; ".join([*res.coverage.excluded,
                                          *(s.reason for s in res.coverage.skipped)])
                             + ". Nothing is built rather than a table missing rows", 422)
-    proof = _prove_base(service, base, design, res, admission)
+    _prove_base(base, res, counted, counted_digest)
     results = {"base": res, "base-count": proof}
     rows = sorted(res.rows, key=lambda r: str(r.cells[base.key].value))
     # ---- the linked parts, all at once (each a pushed-down statement per chunk) ----------------
     tasks: list = []
     plan: dict[str, list[str]] = {}
+    paged: dict[str, tuple] = {}            # lookup sub-task id -> (task, the far table's key)
     agg_cols = [c for c in design.columns if c.via and links[c.via].kind == "aggregate"]
     for lk in design.links:
         vals = sorted({r.cells[lk.from_field].value for r in rows
@@ -1778,7 +1935,8 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
         if not vals:
             continue
         far = cat.table(lk.target)
-        chunks = [vals[i:i + IN_CHUNK] for i in range(0, len(vals), IN_CHUNK)]
+        step = min(IN_CHUNK, size)
+        chunks = [vals[i:i + step] for i in range(0, len(vals), step)]
         if lk.kind == "lookup":
             need = [c.field for c in design.columns if c.via == lk.id]
             if lk.split:
@@ -1787,9 +1945,10 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
             for i, ch in enumerate(chunks):
                 t = SubTask(id=_tid(lk.id, i), adapter_agent=lk.target.adapter_agent,
                             connection=lk.target.connection, entity_kinds=(far.table,),
-                            fields=fields, limit=min(5000, len(ch) + 1),
+                            fields=fields, limit=min(_SUBTASK_LIMIT, len(ch) + 1),
                             filters=(Filter(field=lk.to_field, op="in", value=list(ch)),))
                 tasks.append(t)
+                paged[t.id] = (t, far.key)
                 plan.setdefault(lk.id, []).append(t.id)
         else:
             for c in [c for c in agg_cols if c.via == lk.id]:
@@ -1806,6 +1965,19 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
     if tasks:
         emit({"stage": "delegating", "parts": len(tasks), "at": _now()})
         results.update(service.dispatch(tasks, admission=admission))
+        # E2E5 F-10: a lookup read the store cut short is CONTINUED, keyset-paged on the far
+        # table's proven key — never read as "no such row" (which would be an orphan it is not)
+        for tid, (t, far_key) in paged.items():
+            r = results.get(tid)
+            if r is None or r.error or not r.coverage.truncated:
+                continue
+            if far_key is None:
+                results[tid] = r.model_copy(update={"error": "the read was cut short and the "
+                                                             "table has no proven row key to "
+                                                             "page on"})
+                continue
+            results[tid], _n = _read_paged(service, t, far_key, admission=admission, first=r,
+                                           max_pages=len(t.filters[0].value) + 2)
     # ---- assembly ------------------------------------------------------------------------------
     redactions, apply_masks = _screen()
     unmatched: dict[str, dict] = {}
@@ -1821,6 +1993,10 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
             r = results.get(tid)
             if r is None or r.error:
                 lookup_failed[lk.id] = (r.error if r is not None else "not run")
+                continue
+            if r.coverage.truncated:
+                lookup_failed[lk.id] = "the read was cut short, so an unmatched row could not be " \
+                                       "told from an orphan reference"
                 continue
             for row in r.rows:
                 k = row.cells.get(lk.to_field)
@@ -1838,6 +2014,11 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
             r = results.get(tid)
             if r is None or r.error:
                 agg_failed[c.name] = r.error if r is not None else "not run"
+                continue
+            if r.coverage.truncated:
+                # a grouped read cut short would make a missing group look like a zero
+                agg_failed[c.name] = ("the grouped read was cut short, so a missing group could "
+                                      "not be told from an unlinked row")
                 continue
             if r.snapshot is not None:
                 agg_snap[c.name] = r.snapshot
@@ -2065,6 +2246,11 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
     receipt = _receipt(design, cat, results, plan, dataset, unmatched,
                        masked | screened, screen_note, base)
     receipt["subject_rows_withheld"] = subject_rows
+    # E2E5 F-10: how the base was read, and the bound it was checked against (before reading)
+    receipt["rows"].update({"base_pages": base_pages, "page_rows": size,
+                            "bound": {"max_rows": bound, "set_by": MAX_BASE_ROWS_ENV,
+                                      "checked_against": "the source's own COUNT of the "
+                                                         "selection, before any row was read"}})
     return RawBuild(dataset=dataset, receipt=receipt, results=results)
 
 

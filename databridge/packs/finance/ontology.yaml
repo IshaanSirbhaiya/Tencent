@@ -71,15 +71,16 @@ node_kinds:
   - name: relationship_manager
     binds_to: entity
     description: >
-      The banker who owns the relationship. An entity rather than an `agent` object: a named human
-      whose attestations and approvals are attributable. Staff identity is keyed and merges
-      exactly.
+      The banker who owns the relationship. An entity rather than an agent object: a named human
+      whose attestations and approvals are attributable. A natural person, so a subject (below):
+      two records are never merged, and a name in a document is a candidate, never a join.
 
   - name: contact
     binds_to: entity
     description: >
-      A named individual at a party or institution, as the CRM holds them. Weaker than
-      `party`: a contact is a channel, not an obligor, and is not onboarded.
+      A named individual at a party or institution, as the CRM holds them. Weaker than a
+      KYC party: a contact is a channel, not an obligor, and is not onboarded. Still a natural
+      person, so a subject (below): an email naming one is a candidate, never merged.
 
   - name: committee
     binds_to: organisation
@@ -637,6 +638,26 @@ subject_kinds:
     attestation: in_person
     grant_type: BeneficialOwnerReadGrant
     attested_by: a named member of the onboarding team
+    held_by: the bank
+
+  # E2E run 5 F-04: `contact` and `relationship_manager` are natural people (each holds a role
+  # and sends messages). Undeclared, 72 CRM contacts absorbed email mentions BY NAME. Their
+  # identifiers are the registers' own keys, never an email address (CRM role mailboxes are
+  # shared by several people, so an email is not a person's key).
+  - kind: contact
+    identifiers: [crm_contact_id, contact_id]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: ContactReadGrant
+    attested_by: a named member of the relationship team
+    held_by: the bank
+
+  - kind: relationship_manager
+    identifiers: [rm_code]
+    never_fuzzy_merge: true
+    attestation: verified_channel
+    grant_type: RelationshipManagerReadGrant
+    attested_by: a named member of the relationship team
     held_by: the bank
 
 identity_rules:

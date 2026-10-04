@@ -119,14 +119,20 @@ def _now() -> dt.datetime:
 def record_step(runs_root: Optional[Path], spec: Any, *, step: str, status: str, by: str,
                 reason: str, actor: str = "agent", counts: Optional[dict[str, Any]] = None,
                 model: Optional[str] = None,
-                who: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+                who: Optional[dict[str, Any]] = None,
+                requested_by: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Write ONE Activity record for a setup step. ``actor`` is ``agent`` (the agent proposed or
     did it, at ``by``'s request) or ``person`` (``by`` decided it). Returns the record.
 
     R-028 #7: the record carries the common actor object (``actor``): the agent's machine actor
     for an ``agent`` step; for a ``person`` step, the actor of ``who`` (what the authentication
     gate returned) — whose ``principal_id`` must be ``by``. A person step written without ``who``
-    has ``actor: null`` (nothing is invented) and says so in ``actor_unrecorded``."""
+    has ``actor: null`` (nothing is invented) and says so in ``actor_unrecorded``.
+
+    R-029 TIDY2: the record's ``trigger`` carries the full common actor object (``actor``) of the
+    PERSON behind the step, never only a name: for a ``person`` step that person; for an ``agent``
+    step the person at whose request it ran (``requested_by``, whose ``principal_id`` must be
+    ``by``). Without one, the trigger has no ``actor`` (nothing is invented)."""
     now = _now()
     stamp = now.strftime("%Y%m%dT%H%M%S")
     run_id = f"setup-{stamp}-{uuid.uuid4().hex[:6]}-{re.sub(r'[^a-z0-9]', '', step)[:20]}"
@@ -140,6 +146,15 @@ def record_step(runs_root: Optional[Path], spec: Any, *, step: str, status: str,
         step_actor = person
     else:
         step_actor = agent_actor(spec.id)
+    if actor == "person":
+        trigger_actor = step_actor
+    elif requested_by is not None:
+        trigger_actor = actor_of(requested_by)
+        if trigger_actor["principal_id"] != str(by):
+            raise DecisionRefused("APPROVER_NOT_AUTHENTICATED", "a setup step names the person "
+                                  "who asked for it, and that person signed in", 403)
+    else:
+        trigger_actor = None
     who = agent_principal(spec.id)
     step_rec = {"tool": f"setup.{step}", "status": status, "reason": reason[:500],
                 "started": at, "ended": at,
@@ -154,7 +169,8 @@ def record_step(runs_root: Optional[Path], spec: Any, *, step: str, status: str,
                            if isinstance(v, (int, str)) or v is None}}
     record = {"run_id": run_id, "kind": SETUP_KIND, "agent_id": spec.id, "spec_digest": digest,
               "recorded_at": now.isoformat(),
-              "trigger": {"type": "setup", "by": by},
+              "trigger": {"type": "setup", "by": by,
+                          **({"actor": trigger_actor} if trigger_actor else {})},
               "started": at, "ended": at, "status": status,
               "reason": (f"{'Proposed by the agent' if actor == 'agent' else 'Decided by ' + by}: "
                          f"{reason}")[:600],
@@ -284,30 +300,53 @@ def explanation_problems(explanation: Optional[dict], mapping: Any,
     return out
 
 
+#: a document an earlier sync built and verified, captured again with the same bytes (the
+#: discovery's own word for it, `runner._discover`)
+_KEPT = "unchanged"
+
+
+def document_items(discovery: Optional[dict]) -> tuple[list[dict], list[dict]]:
+    """(to build, to keep) of a discovery's documents. To BUILD: the screen allowed it now. To
+    KEEP (E2E run 5 W-05): an earlier sync already built it and its bytes are unchanged - the
+    keeper adopts it as it is, nothing is rebuilt. A held, blocked or review item is neither."""
+    items = ((discovery or {}).get("documents") or {}).get("items") or []
+    build = [d for d in items if d.get("decision") == "allow" and not d.get("held")]
+    keep = [d for d in items if d.get("decision") == _KEPT and not d.get("held")]
+    return build, keep
+
+
 def documents_digest(discovery: Optional[dict]) -> Optional[str]:
-    """The digest of the documents a discovery captured and the screen ALLOWED (what a hand-off
-    would build), or None when there are none."""
-    items = sorted(f"{d.get('item_id')}:{d.get('sha256')}"
-                   for d in (((discovery or {}).get("documents") or {}).get("items") or [])
-                   if d.get("decision") == "allow" and not d.get("held"))
+    """The digest of the documents a hand-off would hand to the keeper: those the screen ALLOWED
+    (built at the hand-off) and those an earlier sync already built (kept, W-05), or None when
+    there are none. A build-only discovery digests exactly as it always did."""
+    build, keep = document_items(discovery)
+    items = sorted([*(f"{d.get('item_id')}:{d.get('sha256')}" for d in build),
+                    *(f"{d.get('item_id')}:{d.get('sha256')}:keep" for d in keep)])
     if not items:
         return None
     return "sha256:" + hashlib.sha256("\n".join(items).encode("utf-8")).hexdigest()
 
 
+#: the decisions a person can record on a discovery's documents (build them / keep the built ones)
+DOCUMENT_DECISIONS = ("build", "adopt")
+
+
 def documents_problems(decision: Optional[dict], discovery: Optional[dict]) -> list[str]:
     """Codex R-027 AAX f2 #7: documents are built only after a PERSON decided to build exactly
-    the documents this discovery captured (their digest, this run)."""
+    the documents this discovery captured (their digest, this run). W-05: documents an earlier
+    sync already built are KEPT under the same kind of decision - never adopted silently."""
     digest = documents_digest(discovery)
     if digest is None:
         return []
-    n = sum(1 for d in ((discovery or {}).get("documents") or {}).get("items") or []
-            if d.get("decision") == "allow" and not d.get("held"))
+    build, keep = document_items(discovery)
     if decision and decision.get("refusal"):
         return [f"the documents decision log does not verify "
                 f"({decision['refusal']['code']}); decide again"]
-    if not decision or decision.get("decision") != "build":
-        return [f"a person has not decided to build the {n} document(s) the discovery captured"]
+    if not decision or decision.get("decision") not in DOCUMENT_DECISIONS:
+        what = ([f"to build the {len(build)} document(s) the discovery captured"] if build
+                else []) + ([f"to keep the {len(keep)} document(s) an earlier run already built "
+                             f"(nothing is rebuilt)"] if keep else [])
+        return [f"a person has not decided {' and '.join(what)}"]
     if decision.get("discovery_run_id") != (discovery or {}).get("run_id") or \
             decision.get("documents_digest") != digest:
         return ["the documents decision was made on another discovery; decide again"]
@@ -373,6 +412,38 @@ def handoff_problems(source_id: str, *, plan_status: Optional[str], plan_stale: 
     return out
 
 
+# --- what a person is shown of an item (E2E run 5 W-06) -------------------------------------------
+_FS_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|[\\/]|file:)")
+
+
+def _segments(uri: str) -> list[str]:
+    path = re.sub(r"^file:/*", "/", uri)
+    return [p for p in re.split(r"[\\/]+", path) if p]
+
+
+def display_ref(uri: Optional[str], uris: list[Optional[str]]) -> Optional[str]:
+    """How a captured item is named to a person: a SERVER filesystem path loses the folders every
+    captured item shares (the source's own root, which says where the server keeps its files),
+    leaving its path inside the source; anything else (a table, an ``mcp://`` resource) is
+    already source-relative and is shown as it is. Only a shared prefix is removed - when the
+    item has no peer to bound the root, only its own name is shown."""
+    if not uri or not _FS_PATH.match(str(uri)):
+        return uri
+    mine = _segments(str(uri))
+    if not mine:
+        return None
+    peers = [_segments(str(u)) for u in uris if u and _FS_PATH.match(str(u))]
+    peers = [p for p in peers if p != mine] + [mine]
+    if len(peers) == 1:
+        return mine[-1]
+    common = 0
+    for parts in zip(*peers):
+        if len({p.lower() for p in parts}) != 1:
+            break
+        common += 1
+    return "/".join(mine[min(common, len(mine) - 1):])
+
+
 # --- pending decisions (Codex R-027 AAX f2 #8) ----------------------------------------------------
 def _identity_decided(pack: str, kind: str) -> bool:
     try:
@@ -426,11 +497,14 @@ def pending_decisions(source_id: str, *, mapping: Any, discovery: Optional[dict]
     items = [*({**e, "ref": t, "kind": "table"} for t, e in disc_tables.items()),
              *({**d, "ref": d.get("uri"), "kind": "document"}
                for d in ((discovery or {}).get("documents") or {}).get("items") or [])]
+    uris = [e.get("ref") for e in items if e["kind"] == "document"]
     for e in sorted(items, key=lambda x: str(x.get("item_id"))):
         held = e.get("held") or e.get("decision") == "review"
         if held and not lifted(str(e.get("item_id")), str(e.get("sha256"))):
-            out.append({"key": f"hold:{e.get('item_id')}", "kind": "hold", "table": e.get("ref"),
-                        "what": f"the {e['kind']} {e.get('ref')} is held by the screen - it stays "
+            # W-06: a document is named by its path inside the source, never the server's path
+            ref = display_ref(e.get("ref"), uris) if e["kind"] == "document" else e.get("ref")
+            out.append({"key": f"hold:{e.get('item_id')}", "kind": "hold", "table": ref,
+                        "what": f"the {e['kind']} {ref} is held by the screen - it stays "
                                 f"held (not built) until its owner lifts the hold",
                         "deferral": "keep held"})
     for t, tm in sorted(tables.items()):
@@ -513,13 +587,18 @@ def _latest(ledger: DecisionLedger, keep) -> Optional[dict]:
 def record_documents_decision(registry_root: Path, source_id: str, *, who: dict,
                               discovery: dict, decision: str = "build") -> dict:
     """A PERSON's decision on the documents a discovery captured: one sealed record in the
-    decision ledger, carrying the actor object (R-028 #2/#7). A machine actor or a delegation is
+    decision ledger, carrying the actor object (R-028 #2/#7). It names how many it builds and how
+    many already-built ones the keeper keeps (W-05; ``adopt`` when there is nothing to build). A machine actor or a delegation is
     refused (`MACHINE_ACTOR`); a log that does not verify refuses (`LEDGER_INTEGRITY_FAILED`)."""
     actor = require_person(who, what="a documents decision")
+    build, keep = document_items(discovery)
+    if decision == "build" and not build and keep:
+        decision = "adopt"            # W-05: nothing new to build; the built ones are kept
     return documents_ledger(registry_root, source_id).append({
         "kind": "documents", "decision": decision, **actor,
         "discovery_run_id": discovery.get("run_id"),
-        "documents_digest": documents_digest(discovery), "at": _now().isoformat()})
+        "documents_digest": documents_digest(discovery), "to_build": len(build),
+        "to_keep": len(keep), "at": _now().isoformat()})
 
 
 def documents_decision(registry_root: Path, source_id: str) -> Optional[dict]:
@@ -630,7 +709,8 @@ def authorization_problems(registry_root: Path, source_id: str, agent_id: str, *
 __all__ = ["CADENCES", "SETUP_KIND", "agent_principal", "agent_actor", "approved_by_people",
            "draft_spec", "documents_ledger", "handoff_ledger",
            "discovery_problems", "explanation_problems", "handoff_problems",
-           "documents_digest", "documents_problems", "pending_decisions", "mark_setup_agent",
+           "documents_digest", "documents_problems", "document_items", "display_ref",
+           "DOCUMENT_DECISIONS", "pending_decisions", "mark_setup_agent",
            "setup_source_of", "record_documents_decision", "documents_decision", "gate_binding",
            "record_authorization", "latest_authorization", "load_gate",
            "authorization_problems", "keeper_id", "load_explanation", "record_step", "save_explanation",

@@ -256,7 +256,7 @@ def _refused(m, body):
 def test_a_model_question_comes_back_with_an_id_and_its_answer_reaches_the_planner(db_ledger):
     db_ledger._harness, prompts = _asking_model()
     asked = _refused(db_ledger, {"request": RUN3_LABELLED_UNANSWERED})
-    assert asked.code == "PlanNeedsInput"
+    assert asked.code == "PLAN_NEEDS_INPUT" and asked.reason_code == "PlanNeedsInput"
     items = asked.question_items
     assert [q["text"] for q in items] == [RUN3_QUESTION]
     qid = items[0]["id"]
@@ -279,7 +279,7 @@ def test_a_model_question_comes_back_with_an_id_and_its_answer_reaches_the_plann
 
 def test_the_offline_planner_reads_the_answer_as_part_of_the_request(db_ledger):
     asked = _refused(db_ledger, {"request": NO_OUTCOME})
-    assert asked.code == "PlanNeedsInput" and len(asked.question_items) == 1
+    assert asked.code == "PLAN_NEEDS_INPUT" and len(asked.question_items) == 1
     qid = asked.question_items[0]["id"]
     # non-vacuous: an EMPTY answer is no answer, and the planner asks the same question again
     again = _refused(db_ledger, {"request": NO_OUTCOME, "answers": {qid: "  "}})

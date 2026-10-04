@@ -28,10 +28,13 @@ import {
   type DesignJob,
   type Refusal,
   type RawRunSummary,
+  type TableDesign,
 } from "@/lib/data-api";
 
 const ROLES: DesignColumn["role"][] = ["key", "feature", "label", "time"];
 const AGGS = ["", "count", "sum", "avg", "min", "max"] as const;
+const FILTER_OPS = ["eq", "ne", "lt", "le", "gt", "ge", "contains", "is_null", "not_null"] as const;
+type DesignFilter = TableDesign["filters"][number];
 
 function RefusalNote({ r }: { r: Refusal }) {
   return (
@@ -65,12 +68,17 @@ export function DesignBuilder() {
   const [job, setJob] = React.useState<DesignJob | null>(null);
   const [answers, setAnswers] = React.useState<Record<string, string>>({});
   const [newCol, setNewCol] = React.useState<{ field: string; via: string; aggregate: string }>({ field: "", via: "", aggregate: "" });
+  // E2E5 F-10: the design's filters are editable. Each is pushed down to the source; a filter on a
+  // time column is applied as a ROW SCOPE (the design says so), never dropped silently.
+  const [filters, setFilters] = React.useState<DesignFilter[]>([]);
+  const [newFilter, setNewFilter] = React.useState<{ field: string; op: string; value: string }>({ field: "", op: "eq", value: "" });
 
   const load = React.useCallback((d: DesignDoc) => {
     setDoc(d);
     setAnswers({});
     if (!d.design) return;
     setCols(d.design.columns);
+    setFilters(d.design.filters);
     setGrainEntity(d.design.grain.entity);
     setLabelCol(d.design.label?.column ?? "");
     setLabelDef(d.design.label?.definition ?? "");
@@ -82,6 +90,7 @@ export function DesignBuilder() {
     !!design &&
     (Object.keys(answered).length > 0 ||
       !sameColumns(cols, design.columns) ||
+      JSON.stringify(filters) !== JSON.stringify(design.filters) ||
       grainEntity !== design.grain.entity ||
       labelCol !== (design.label?.column ?? "") ||
       labelDef !== (design.label?.definition ?? ""));
@@ -105,6 +114,7 @@ export function DesignBuilder() {
       rev: doc.rev,
       ...(Object.keys(answered).length > 0 ? { answers: answered } : {}),
       columns: cols,
+      filters,
       ...(grainEntity !== design.grain.entity ? { grain: { ...design.grain, entity: grainEntity }, links: [] } : {}),
       label: labelCol ? { column: labelCol, definition: labelDef || `the value of ${labelCol}` } : null,
     };
@@ -340,6 +350,48 @@ export function DesignBuilder() {
             <Button variant="outline" size="sm" onClick={addColumn} disabled={!newCol.field.trim()}>
               <Plus className="h-3 w-3" /> Add
             </Button>
+          </div>
+
+          <div className="space-y-1 text-2xs" data-testid="design-filters">
+            <div className="text-subtle">
+              Filters — each is applied at the source. A filter on a time column keeps only those rows (a row scope you chose); time stays a column.
+            </div>
+            {filters.map((f, i) => (
+              <div key={`${f.field}-${f.op}-${i}`} className="flex items-center gap-2">
+                <span className="font-mono">
+                  {f.field} {f.op} {f.value === null || f.value === undefined ? "" : JSON.stringify(f.value)}
+                </span>
+                <Button variant="ghost" size="sm" aria-label={`Remove filter on ${f.field}`} onClick={() => setFilters((fs) => fs.filter((_x, j) => j !== i))}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <Input className="h-6 w-32 font-mono text-2xs" placeholder="column" value={newFilter.field} onChange={(e) => setNewFilter({ ...newFilter, field: e.target.value })} />
+              <select className="h-6 rounded border border-border bg-transparent px-1" value={newFilter.op} onChange={(e) => setNewFilter({ ...newFilter, op: e.target.value })}>
+                {FILTER_OPS.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+              {newFilter.op !== "is_null" && newFilter.op !== "not_null" ? (
+                <Input className="h-6 w-36 font-mono text-2xs" placeholder="value" value={newFilter.value} onChange={(e) => setNewFilter({ ...newFilter, value: e.target.value })} />
+              ) : null}
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="design-add-filter"
+                disabled={!newFilter.field.trim() || (newFilter.op !== "is_null" && newFilter.op !== "not_null" && !newFilter.value.trim())}
+                onClick={() => {
+                  const nullary = newFilter.op === "is_null" || newFilter.op === "not_null";
+                  setFilters((fs) => [...fs, { field: newFilter.field.trim(), op: newFilter.op, value: nullary ? null : newFilter.value }]);
+                  setNewFilter({ field: "", op: "eq", value: "" });
+                }}
+              >
+                <Plus className="h-3 w-3" /> Add filter
+              </Button>
+            </div>
           </div>
 
           {design.links.length > 0 && (

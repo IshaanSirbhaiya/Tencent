@@ -25,6 +25,7 @@ from typing import Any, Optional
 from .catalogue import Catalogue, ConnectionEntry
 from .contracts import (
     DATE_FIELD,
+    Filter,
     TEXT_FIELD,
     TODAY_TOKEN,
     Aggregate,
@@ -186,10 +187,18 @@ def validate_plan(plan: DelegationPlan, catalogue: Catalogue) -> list[str]:
                           f"documents cannot be checked against it and are not read. Fix the "
                           f"vocabulary, or ask about a facts table instead.")
                 continue
+            held = catalogue.connection_kinds(entry) if entry.kinds is not None else None
             for k in t.entity_kinds:
                 if k not in catalogue.node_kinds:
                     qs.append(f"{k!r} is not a kind in the ontology; known kinds are "
                               f"{sorted(catalogue.node_kinds)}.")
+                elif held is not None and k not in held:
+                    # E2E run 5, F-07: the kind is in the ontology, but this connection holds no
+                    # record of it (measured), so a read of it can only come back empty or time
+                    # out. Which source holds it is a question, never a guess.
+                    qs.append(f"{entry.connection} holds no {k!r} records (it holds "
+                              f"{held or 'none'}); is {k!r} recorded somewhere else, such as a "
+                              f"column of a facts table?")
             for e in t.link_edges:
                 if e not in catalogue.edge_kinds:
                     qs.append(f"{e!r} is not an edge kind in the ontology.")
@@ -473,8 +482,11 @@ _BY = r"(?: (?:by|per) (?:the )?(?P<g>[a-z0-9_ ]+?))?"
 
 def _name_pat(name: str) -> str:
     words = name.lower().replace("_", " ")
-    stem = words[:-1] if words.endswith("s") else words
-    return rf"{re.escape(stem)}s?"
+    stem = words[:-1] if words.endswith("s") and not words.endswith("ss") else words
+    if stem.endswith("y") and len(stem) > 2 and stem[-2] not in "aeiou":
+        # E2E run 5: "facility" / "facilities" — the English -y plural
+        return rf"{re.escape(stem[:-1])}(?:y|ies)"
+    return rf"{re.escape(stem)}(?:es|s)?"
 
 
 def _column(phrase: Optional[str], columns: tuple[str, ...]) -> Optional[str]:
@@ -486,6 +498,32 @@ def _column(phrase: Optional[str], columns: tuple[str, ...]) -> Optional[str]:
 
 def _normalise(question: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[?.!]+\s*$", "", question.strip().lower())).strip()
+
+
+def _fold(v: Any) -> str:
+    return " ".join(str(v).casefold().replace("_", " ").replace("-", " ").split())
+
+
+def _value_filter(phrase: str, table: Any) -> Optional[tuple[str, str]]:
+    """``(column, stored spelling)`` when ``phrase`` is, letter case and spacing aside, exactly ONE
+    categorical value of exactly ONE column of ``table`` (MEASURED by the catalogue); else None —
+    two columns or two values holding it is not a choice this rule makes."""
+    want = _fold(phrase)
+    if not want:
+        return None
+    hits = {(col, _fold(v)): v for col, vs in getattr(table, "values", ()) for v in vs
+            if _fold(v) == want}
+    cols = {c for c, _f in hits}
+    if len(cols) != 1:
+        return None
+    col = cols.pop()
+    spellings = sorted(v for (c, _f), v in hits.items() if c == col)
+    return col, spellings[0]
+
+
+#: E2E run 5, F-07: "how many <table> are on the <value>" / "how many <value> <table>", where
+#: <value> is a measured categorical value of one column of that table.
+_BE = r"(?: (?:are|is|were|was))?(?: (?:on|in|at|under|marked|flagged|with status))?(?: (?:the|a))?"
 
 
 def rules_plan(question: str, catalogue: Catalogue) -> Optional[DelegationPlan]:
@@ -519,12 +557,47 @@ def rules_plan(question: str, catalogue: Catalogue) -> Optional[DelegationPlan]:
                         continue
                     hits.append((aa, conn, table, Aggregate(
                         op="sum", field=f, group_by=(col,) if col else ())))
-    if len(hits) != 1:
+    if len(hits) == 1:
+        aa, conn, table, agg = hits[0]
+        return DelegationPlan(subtasks=(SubTask(id="t1", adapter_agent=aa.id,
+                                                connection=conn.connection,
+                                                entity_kinds=(table.name,), aggregate=agg),))
+    if hits:
         return None
-    aa, conn, table, agg = hits[0]
-    return DelegationPlan(subtasks=(SubTask(id="t1", adapter_agent=aa.id,
-                                            connection=conn.connection,
-                                            entity_kinds=(table.name,), aggregate=agg),))
+    # E2E run 5, F-07: "How many facilities are on the watchlist?" — a count of one table whose
+    # qualifier is a STORED value of one of its columns (measured, `FactsTable.values`). Planned
+    # by rule as a count with that filter; the other spellings of the value are read too
+    # (`delegates.fold_case_variants`). The reading is stated as an assumption.
+    found: list[tuple[Any, Any, Any, str, str]] = []
+    for aa in catalogue.agents.values():
+        for conn in aa.connections:
+            if conn.channel != "tabular":
+                continue
+            for table in conn.tables:
+                if not table.values:
+                    continue
+                t = _name_pat(table.name)
+                for pat in (rf"{_LEAD_COUNT} (?:all )?(?:the )?{t}{_BE} (?P<v>[a-z0-9 _-]+?)"
+                            rf"{_TAIL_COUNT}",
+                            rf"{_LEAD_COUNT} (?:the )?(?P<v>[a-z0-9 _-]+?) {t}{_TAIL_COUNT}"):
+                    m = re.fullmatch(pat, q)
+                    if not m:
+                        continue
+                    hit = _value_filter(m.group("v"), table)
+                    if hit is not None:
+                        found.append((aa, conn, table, *hit))
+                        break
+    if len(found) != 1:
+        return None
+    aa, conn, table, col, spelling = found[0]
+    return DelegationPlan(
+        subtasks=(SubTask(id="t1", adapter_agent=aa.id, connection=conn.connection,
+                          entity_kinds=(table.name,),
+                          filters=(Filter(field=col, op="eq", value=spelling),),
+                          aggregate=Aggregate(op="count")),),
+        assumptions=(f"the question's qualifier is read as {table.name}.{col} = {spelling!r}, a "
+                     f"value that column holds (every spelling of it that differs only in letter "
+                     f"case or spacing is counted too)",))
 
 
 # ------------------------------------------------------------------------------------------------
@@ -568,6 +641,11 @@ def _prompt(catalogue: Catalogue) -> str:
         "\"customers mentioned in meeting notes\" is entity_kinds [meeting] with link_edges "
         "[mentions] and a canonical_id link to organisation. An organisation is linked by its "
         "canonical id only; a person only ever as a candidate.",
+        "Ownership: a documents connection may be asked ONLY for the entity_kinds listed under "
+        "it (what it was measured to hold). A facts table's `categorical_values` are the values "
+        "its column holds: a status, type or flag the question names (\"on the watchlist\", "
+        "\"cancelled\") is a filter on the table whose column holds that value — prefer it to "
+        "a document kind. Filter with one stored spelling; other spellings of it are read too.",
         "Catalogue:\n" + json.dumps(catalogue.describe(), indent=1, sort_keys=True),
     ])
 
@@ -603,11 +681,17 @@ def model_plan(question: str, catalogue: Catalogue, harness: Any,
                 *_repair_block(previous, problems)]
     try:
         result = harness.complete_structured(PLAN_TASK_CLASS, messages, DelegationPlan)
-    except Exception as e:                                   # noqa: BLE001 - plain words
+    except Exception:                                        # noqa: BLE001 - plain words
+        # no exception text in an answer (CONS standard 4): a fixed sentence, details in the log
+        import logging                                       # noqa: PLC0415
+        import uuid                                          # noqa: PLC0415
+        ref = "plan-" + uuid.uuid4().hex[:12]
+        logging.getLogger("databridge.federated.planner").exception(
+            "the planning model could not be asked (error_ref %s)", ref)
         return PlanOutcome(plan=None, method="model",
-                           questions=[f"The planner could not be asked ({type(e).__name__}: {e});"
-                                      f" rephrase the question as a count or total over one "
-                                      f"table, or try again."])
+                           questions=[f"The planner could not be asked just now (error_ref "
+                                      f"{ref}); rephrase the question as a count or total over "
+                                      f"one table, or try again."])
     ev = getattr(result, "event", None)
     pb = {"agent": "federated.planner", "agent_version": None,
           "task_class": getattr(ev, "task_class", None) or PLAN_TASK_CLASS,

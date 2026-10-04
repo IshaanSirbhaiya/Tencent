@@ -111,6 +111,8 @@ def test_graph_has_no_dangling_edges_and_spans_both_sources():
 def test_briefing_cites_two_sources():
     recs = [json.loads(Path(p).read_text(encoding="utf-8"))
             for p in glob.glob(str(E / "runs" / "agent" / "account_briefing" / "*.json"))]
+    if not recs and (E / "estate.txt").is_file():
+        pytest.skip("run 5 has no briefing scenario")
     done = [r for r in recs if r.get("status") == "completed"]
     assert done, "no completed briefing run"
     sources = {c.get("source_id") for c in (done[-1]["answer"].get("citations") or [])}
@@ -413,8 +415,9 @@ def test_6b_an_approved_write_executes():
 # scripts/e2e/run2_phase1.py + run3_phase{2,3,3c,3d}.py, run3_withhold.py, run3_typechange.py and
 # fed_check3.py. Findings: wiki/40-reviews/E2E-2026-10-01-run3.md (P-01 ...).
 def _run3():
-    if not (E / "random_requests.json").is_file():
-        pytest.skip("not a run-3 directory")
+    # run 5 also writes random_requests.json, in its own per-estate shape (estate.txt marks it)
+    if not (E / "random_requests.json").is_file() or (E / "estate.txt").is_file():
+        pytest.skip("not a run-3/4 directory")
 
 
 def _psql(sql: str) -> list:
@@ -734,3 +737,321 @@ def test_r4_briefing_uses_only_tools_the_runtime_accepts():
 def test_r4_random_requests_all_pass():
     _run4()
     test_r3_random_requests_are_answered_asked_or_refused_honestly()
+
+
+# ===================================================================================== run 5 (E2E5)
+# Both estates (WALNUT_E2E_ESTATE=workspace|finance), the FEAT8 features (PLX batch plans, AAX
+# adapter setup, ONE one-time tasks, DSD raw designs) and the R-028 consistency pass. The run is
+# driven by `scripts/e2e/run5_*.py`; every HTTP exchange is saved under <run>/artefacts/http/ by
+# name. Expectations are derived from the run's own review, plan, graph, receipts or live DB.
+def _run5():
+    if not (E / "estate.txt").is_file():
+        pytest.skip("not a run-5 directory")
+
+
+def _http_opt(name: str):
+    hits = sorted((E / "artefacts" / "http").glob(f"[0-9][0-9][0-9][0-9]_{name}.json"))
+    return json.loads(hits[-1].read_text(encoding="utf-8")) if hits else None
+
+
+def _http(name: str):
+    """The latest saved exchange whose label is `name` (artefacts/http/NNNN_<name>.json)."""
+    rec = _http_opt(name)
+    if rec is None:
+        pytest.skip(f"{name}: not exercised in this run")
+    return rec
+
+
+def _code(rec: dict):
+    return ((rec.get("response") or {}).get("refusal") or {}).get("code")
+
+
+def test_r5_batch_approval_needs_each_unclassified_tool_ticked():
+    """PLX: the review names the tools that need a vouch; a batch item that does not tick them is
+    sent to individual review, and the one that does is approved with exactly those tools."""
+    _run5()
+    review = _http("s1_batch_review")["response"]["pending"]
+    vouchable = {r["source_id"]: sorted(v["tool"] for v in r["vouchable"]) for r in review}
+    needing = {s: t for s, t in vouchable.items() if t}
+    assert needing, "vacuous: no plan needed a vouch"
+    probe = {r["source_id"]: r for r in _http("s1_batch_probe")["response"]["results"]}
+    unticked = [s for s in needing if s in probe]
+    assert unticked, "vacuous: no unticked plan was probed"
+    assert all(probe[s]["outcome"] == "needs_individual_review" for s in unticked), probe
+    approved = {r["source_id"]: r for r in _http("s1_batch_approve")["response"]["results"]}
+    assert approved, "vacuous"
+    for s, r in approved.items():
+        assert r["outcome"] == "approved", r
+        assert sorted(r["approval"]["vouched_read_tools"]) == needing.get(s, [])
+        assert r["approval"]["dev_only"] is False and r["approval"]["authenticated_by"]
+
+
+def test_r5_a_single_approval_is_bound_to_the_reviewed_digest():
+    _run5()
+    assert _http("s1_approve_no_digest")["status"] == 422
+    stale = _http("s1_approve_wrong_digest")
+    assert stale["status"] == 409 and _code(stale) == "DECISION_STALE"
+    ok = _http("s1_approve_individual")
+    assert ok["status"] == 200 and ok["response"]["plan"]["status"] == "approved"
+
+
+def test_r5_a_write_tool_is_never_vouchable():
+    _run5()
+    b = [r for r in _http("s1_batch_probe")["response"]["results"]
+         if "not an unclassified tool" in (r.get("reason") or "")]
+    assert b and all(r["outcome"] == "needs_individual_review" for r in b), "vacuous or approved"
+    assert _http("s11_vouch_write_individual")["status"] == 409
+
+
+def test_r5_the_runs_own_completeness_block_agrees_with_the_graph():
+    """TAB6's per-run `counts.completeness`: every built table's source rows became nodes and every
+    expected FK edge was built, on the LATEST run that built each table."""
+    _run5()
+    reports = {}
+    for src in (E / "ingest").iterdir():
+        for run in sorted(p for p in src.iterdir() if (p / "report.json").is_file()):
+            rep = json.loads((run / "report.json").read_text(encoding="utf-8"))
+            for t in ((rep.get("counts") or {}).get("completeness") or {}).get("tables") or []:
+                if t.get("built"):
+                    reports[t["table"]] = t
+    assert reports, "vacuous: no built table"
+    # a join table becomes edges, not nodes; a row withheld after a lifted hold is reported as
+    # withheld, never silently dropped
+    short = {t: (r["source_rows"], r["nodes"], r.get("rows_withheld"), r["edges_missing"])
+             for t, r in reports.items()
+             if (not r.get("association") and r["source_rows"] != r["nodes"] + (r.get("rows_withheld") or 0))
+             or r["edges_missing"]}
+    assert not short, short
+
+
+def test_r5_capture_only_discovery_writes_nothing_to_the_graph():
+    """AAX: between a discovery's first and last stage no node or edge version was written."""
+    _run5()
+    import sqlite3
+    finals = [r for n in ("s8_discover_db_final", "s8_discover_files_final", "s8_discover_final",
+                          "s8_discover_doc_final") for r in (_http_opt(n),) if r]
+    assert finals, "vacuous: no discovery ran"
+    c = sqlite3.connect(f"{GRAPH.resolve().as_uri()}?mode=ro", uri=True)
+    before, after = (E / "artefacts" / "srccount_before_discover.json",
+                     E / "artefacts" / "srccount_after_discover.json")
+    for f in finals:
+        resp = f["response"]
+        assert resp["status"] == "discovered", resp["status"]
+        assert resp["verify"]["counts"]["built"] == 0
+        if before.is_file() and after.is_file():
+            # another source was building concurrently: count the discovered source's own
+            # pointer rows before and after instead of a time window (run5_srccount.py)
+            b, a = (json.loads(x.read_text(encoding="utf-8")) for x in (before, after))
+            if b["source"] == resp["source_id"]:
+                assert a["pointer_rows"] == b["pointer_rows"], (b, a)
+                continue
+        done = [s["done_at"].replace("Z", "") for s in resp["stages"].values()]
+        start, end = min(done)[:17] + "00", max(done)
+        for t in ("nodes", "edges"):
+            n = c.execute(f"select count(*) from {t} where substr(system_from,1,19) between ? and ?",
+                          (start, end)).fetchone()[0]
+            assert n == 0, (resp["run_id"], t, n)
+
+
+def test_r5_setup_and_design_decisions_refuse_a_machine_principal():
+    _run5()
+    recs = [r for n in ("s8_plan_approve_machine", "s8_handoff_machine", "s9_approve_machine",
+                        "s8_documents_machine", "s1_link_approve_machine", "s1_hold_lift_machine")
+            for r in (_http_opt(n),) if r]
+    assert recs, "vacuous"
+    assert all(_code(r) == "MACHINE_ACTOR" for r in recs), [(r["path"], _code(r)) for r in recs]
+
+
+def test_r5_a_handoff_seals_a_delegation_for_the_person_who_handed_off():
+    _run5()
+    h = _http_opt("s8_handoff") or _http("s8_handoff_doc")
+    assert h["status"] == 202
+    agent = h["response"]["agent"]
+    seals = _jsonl(E / "adapter_agents" / "_delegations" / f"{agent}.delegations.jsonl")
+    sealed = [s for s in seals if s.get("event") == "delegation_sealed"]
+    assert sealed and sealed[-1]["principal_id"] == _principals()["primary"]
+    assert sealed[-1]["authenticated_by"] and sealed[-1]["hash"]
+
+
+def test_r5_a_document_only_source_can_be_handed_off():
+    """W-05: a document source must reach the hand-off (explain says NO_TABLES, documents decided)."""
+    _run5()
+    hs = [r for n in ("s8_handoff_files", "s8_handoff_doc") for r in (_http_opt(n),) if r]
+    assert hs, "vacuous: no document-only setup was attempted"
+    assert all(r["status"] == 202 for r in hs), [(r["path"], r["status"], _code(r)) for r in hs]
+
+
+def test_r5_the_delegated_answer_rereads_every_cell_and_is_complete():
+    _run5()
+    fed = _art("s6_fed.json")
+    assert fed["second"]["status"] == 403
+    if ESTATE == "workspace":
+        import fed_check3
+        out = fed_check3.main(E / "artefacts" / "s6_fed.json", "r1" if "r1" in fed else "r0", "pytest5")
+        assert out["expected"] and out["rows_returned"] > 0, "vacuous"
+        assert out["every_returned_value_correct"] and out["all_leaves_reread"]
+        assert out["missing_groups"] == [], (out["missing_groups"], out["coverage_status"])
+    else:
+        chk = _art("s6_fed_check.json")
+        assert chk["cells"] > 0 and chk["reread_ok"] == chk["cells"], chk
+        assert chk["matches_independent"], chk
+
+
+def test_r5_a_one_time_write_is_held_until_its_owner_approves_it():
+    _run5()
+    run = _http("s7_run_rw")["response"]
+    assert run["state"] == "waiting_for_approval" and run["held"] >= 1
+    other, missing = _http("s7_get_other"), _http("s7_get_missing")
+    assert other["status"] == missing["status"] == 404 and other["response"] == missing["response"]
+    assert _http("s7_approve_other")["status"] == 404
+    assert _http("s7_approve_owner")["response"]["state"] == "done"
+    again = _http("s7_approve_again")
+    assert again["status"] == 409 and _code(again) == "DECISION_ALREADY_FINAL"
+
+
+def test_r5_an_unconnected_channel_is_never_compiled_runnable():
+    _run5()
+    c = _http("s7_compile_email")["response"]
+    assert c["runnable"] is False and c["open_questions"]
+
+
+def test_r5_every_design_cell_rereads_live_and_subject_rows_are_withheld():
+    _run5()
+    chk = _art("ptrcheck_s9_dsd.json")
+    assert chk["grounded"] > 0 and chk["all_reread"], {k: v for k, v in chk.items() if k != "failures"}
+    job = _http("s9_build_job")["response"]["result"]
+    assert job["pointer_check"]["all_resolved"] and job["pointer_check"]["all_match"]
+    subj = _http("s9_subject_job")["response"]["result"]
+    receipt = json.loads((E / "materialise" / subj["plan_hash"] / "receipt.json").read_text("utf-8"))
+    withheld = (receipt.get("receipt") or {}).get("subject_rows_withheld",
+                                                  receipt.get("subject_rows_withheld"))
+    assert withheld and withheld > 0 and subj["cells"]["policy_suppressed"] > 0
+
+
+def test_r5_a_design_is_built_with_sql_pushdown():
+    _run5()
+    job = _http("s9_build_job")["response"]["result"]
+    receipt = json.loads((E / "materialise" / job["plan_hash"] / "receipt.json").read_text("utf-8"))
+    assert "facts_sql_pushdown" in json.dumps(receipt)
+
+
+def test_r5_a_tampered_design_log_is_refused_and_shown_loudly():
+    _run5()
+    b = _http("s9_build_tampered")
+    assert b["status"] == 409 and _code(b) == "LEDGER_INTEGRITY_FAILED"
+    act = _http("s10_activity_tampered")["response"]["items"]
+    assert any(i["kind"] == "decision_log" and i.get("loud") for i in act)
+
+
+def test_r5_security_probes():
+    _run5()
+    sec = _art("s11_sec.json")
+    assert sec["no_token"] and set(sec["no_token"].values()) == {401}
+    assert sec["bad_token"] == 401 and sec["batch_approval_plain_string"]["status"] == 422
+    assert sec["package_typed_name"].startswith("refused")
+    assert sec["literal_secret"]["status"] >= 400 and not sec["literal_secret"]["echoed"]
+    assert sec["ssrf"] and {v["status"] for v in sec["ssrf"].values()} == {403}
+    assert sec["command_source"]["code"] == "COMMAND_SOURCES_DISABLED"
+    assert not {"e2e5_ssrf", "e2e5_cmd", "e2e5_leaky_url"} & set(sec["sources_after"])
+
+
+def test_r5_a_planted_injection_document_is_held_not_built():
+    _run5()
+    inj = _art("s11_injection.json")
+    assert inj["decision"] in ("review", "block") and inj["rules"], inj
+    assert not inj["built"], inj
+
+
+def test_r5_activity_is_owner_or_operator_only():
+    _run5()
+    a = {w: _http(f"s10_activity_{w}")["response"] for w in ("primary", "second", "operator")}
+    assert a["primary"]["items"], "vacuous"
+    mine = {i["id"] for i in a["primary"]["items"]}
+    second = _principals()["second"]
+    # the second principal sees only what it decided or started (a decision on a source whose
+    # keeper the primary created is visible to BOTH, by Activity's own rule)
+    for i in a["second"]["items"]:
+        who = {(i.get("actor") or {}).get("principal_id"), (i.get("started_by") or {}).get("principal_id")}
+        assert second in who, (i["kind"], i["id"], who)
+    assert len(a["second"]["items"]) < len(mine)
+    assert mine <= {i["id"] for i in a["operator"]["items"]}
+    other, missing = _http("s10_run_other"), _http("s10_run_missing")
+    assert other["status"] == missing["status"] == 404 and other["response"] == missing["response"]
+
+
+def test_r5_every_activity_row_names_its_actor_with_one_shape():
+    """R-028 #7: one actor object. A signed-in person's principal_type/authenticated_by must not
+    differ between families (W-09)."""
+    _run5()
+    items = _http("s10_activity_final")["response"]["items"]
+    assert items, "vacuous"
+    shapes = collections.defaultdict(set)
+    for i in items:
+        a = i.get("actor") or {}
+        assert "principal_id" in a, i["kind"]
+        if isinstance(a.get("dev_only"), bool):              # a person (machines are 'absent')
+            shapes[a["principal_id"]].add((a.get("principal_type"), a.get("authenticated_by")))
+    assert shapes, "vacuous: no person row"
+    assert all(len(v) == 1 for v in shapes.values()), dict(shapes)
+
+
+def test_r5_no_response_carries_exception_text():
+    _run5()
+    import re
+    pat = re.compile(r"Traceback|\b[A-Z][A-Za-z]+(Error|Exception): |no such table")
+    files = sorted((E / "artefacts" / "http").glob("*.json"))
+    assert len(files) > 20, "vacuous"
+    hits = [p.name for p in files
+            if pat.search(json.dumps(json.loads(p.read_text(encoding="utf-8")).get("response")))]
+    assert not hits, hits
+
+
+def test_r5_no_two_nodes_of_a_non_subject_kind_share_a_label_across_sources():
+    """W-02: an organisation (or a keyed agreement such as a project) named identically in two
+    sources must be ONE node. People are exempt: they are never merged (constraint 1)."""
+    _run5()
+    import sqlite3
+    sys.path.insert(0, str(ROOT / "packages" / "graph"))
+    from databridge_graph.packs import load_pack  # noqa: PLC0415
+    # organisations and agreements only: a kind bound to `entity` may be a natural person even
+    # when the pack does not declare it a subject (F-04), and people are never joined by name
+    named = set()
+    for p in ESTATES[ESTATE]["packs"].split(","):
+        pack = load_pack(p)
+        named |= {k for k, v in pack.node_kinds.items()
+                  if str(getattr(v.binds_to, "value", v.binds_to)) in ("organisation", "agreement")}
+        named -= set(pack.subject_kinds)
+    c = sqlite3.connect(f"{GRAPH.resolve().as_uri()}?mode=ro", uri=True)
+    rows = c.execute("select n.id, n.kind, lower(trim(n.label)), s.source_pointer_json from nodes n "
+                     "join sources s on s.entity_id = n.id where n.system_to is null").fetchall()
+    srcs, meta = collections.defaultdict(set), {}
+    for nid, kind, label, ptr in rows:
+        srcs[nid].add((json.loads(ptr) or {}).get("source_id"))
+        meta[nid] = (kind, label)
+    by_label = collections.defaultdict(list)
+    for nid, (kind, label) in meta.items():
+        if kind in named:
+            by_label[(kind, label)].append(nid)
+    assert by_label, "vacuous"
+    split = {k: v for k, v in by_label.items()
+             if len(v) > 1 and len(set().union(*(srcs[n] for n in v))) > 1}
+    assert not split, list(split.items())[:5]
+
+
+def test_r5_random_requests_all_pass():
+    _run5()
+    v = json.loads((E / "random_verdicts.json").read_text(encoding="utf-8"))
+    reqs = json.loads((E / "random_requests.json").read_text(encoding="utf-8"))[ESTATE]
+    assert set(v["verdicts"]) == {r["id"] for r in reqs}, "every request graded"
+    assert any(r["cat"] == "dataset" and "fine-tun" in r["text"].lower() for r in reqs)
+    assert [k for k, x in v["verdicts"].items() if x["verdict"] != "PASS"] == []
+
+
+@pytest.mark.skipif(ESTATE != "finance", reason="the finance pack declares the identity rule")
+def test_r5_an_approved_identity_rule_makes_one_legal_entity_and_never_merges_a_person():
+    _run5()
+    chk = _art("s3_identity.json")
+    assert chk["decision_status"] == 200
+    assert len(chk["legal_entity_nodes"]) == 1, chk["legal_entity_nodes"]
+    assert set(chk["expected_sources"]) <= set(chk["sources_cited"]), chk
+    assert chk["person_nodes_merged_across_sources"] == 0

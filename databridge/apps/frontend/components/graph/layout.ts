@@ -32,6 +32,14 @@ interface SimNode extends SimulationNodeDatum {
 }
 type SimLink = SimulationLinkDatum<SimNode>;
 
+/** The most simulation ticks one layout may take (W-12: bounded, never open-ended). */
+export const LAYOUT_MAX_TICKS = 300;
+let lastLayoutTicks = 0;
+/** Ticks the most recent `computeGraphLayout` call took (for tests: proves the bound held). */
+export function layoutTicksUsed(): number {
+  return lastLayoutTicks;
+}
+
 // Same canvas size and golden-angle seed as `lib/brain-layout.ts`.
 export const CANVAS_W = 1200;
 export const CANVAS_H = 760;
@@ -89,6 +97,12 @@ export function computeGraphLayout(
 
   // Same prompt params as `lib/brain-layout.ts`: repulsion 300, linkDistance 80, gravity 0.05, 300
   // iterations, then freeze.
+  //
+  // E2E run 5 W-12: the layout is BOUNDED and CONVERGED before anything is drawn — at most
+  // `LAYOUT_MAX_TICKS` ticks, stopping earlier once the simulation's alpha falls below its own
+  // `alphaMin` (d3's convergence threshold), and the simulation is `.stop()`ped so no timer ever
+  // ticks it again. Nothing moves after this function returns: a node changes position only when
+  // the node set changes, and a node already on screen is pinned (`fx`/`fy`) even then.
   const sim = forceSimulation<SimNode>(simNodes)
     .force("charge", forceManyBody<SimNode>().strength(-300))
     .force("link", forceLink<SimNode, SimLink>(links).id((d) => d.id).distance(80))
@@ -96,7 +110,12 @@ export function computeGraphLayout(
     .force("x", forceX<SimNode>(CANVAS_W / 2).strength(0.05))
     .force("y", forceY<SimNode>(CANVAS_H / 2).strength(0.05))
     .stop();
-  for (let i = 0; i < 300; i++) sim.tick();
+  let ticks = 0;
+  while (ticks < LAYOUT_MAX_TICKS && sim.alpha() >= sim.alphaMin()) {
+    sim.tick();
+    ticks += 1;
+  }
+  lastLayoutTicks = ticks;
 
   for (const s of simNodes) pos.set(s.id, { x: s.x, y: s.y });
   return pos;

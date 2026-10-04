@@ -37,6 +37,7 @@ import ReactFlow, {
   MiniMap,
   Position,
   ReactFlowProvider,
+  useNodesInitialized,
   useReactFlow,
   useStore,
   type Edge,
@@ -50,12 +51,22 @@ import { nodeLabelText } from "@/lib/graph-api";
 import { hasArrow } from "@/lib/brain-layout";
 import { computeGraphLayout, degreeMap, nodeRadius, type Pos } from "./layout";
 import { useKindPalette } from "./kind-palette";
+import {
+  MOVE_MS,
+  SETTLE_SLACK_MS,
+  cameraMove,
+  isSettled,
+  joinKey,
+  type CameraInputs,
+} from "./camera";
 import type { TrailHighlight } from "./trail";
 import { cn } from "@/lib/utils";
 
 export type GraphSelection = { type: "node"; id: string } | { type: "edge"; id: string } | null;
 
 const HUB_DEGREE = 8;
+/** How long a re-fit after a container resize animates (ms). */
+const RESIZE_MS = 200;
 
 const HIGHLIGHT = "#f59e0b";
 /** The traversal trail — the single accent, deliberately NOT the path amber, so a found path and
@@ -299,23 +310,48 @@ function GraphInner({
     return next;
   }, [nodeIds, edgeEnds, layoutEpoch]);
 
+  // Camera moves in flight (W-12). Every programmatic move goes through `runMove`, which counts
+  // it from the moment it is requested (before its frame) until its duration has passed.
+  const [movesInFlight, setMovesInFlight] = React.useState(0);
+  const moveTimers = React.useRef<Set<number>>(new Set());
+  React.useEffect(() => {
+    const timers = moveTimers.current;
+    return () => {
+      timers.forEach((t) => window.clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
+  const runMove = React.useCallback((ms: number, move: () => void) => {
+    setMovesInFlight((n) => n + 1);
+    const raf = requestAnimationFrame(move);
+    const t = window.setTimeout(() => {
+      cancelAnimationFrame(raf);
+      moveTimers.current.delete(t);
+      setMovesInFlight((n) => Math.max(0, n - 1));
+    }, ms + SETTLE_SLACK_MS + 20);
+    moveTimers.current.add(t);
+  }, []);
+
   // Re-fit whenever the container resizes — `/graph` has no resizable bottom panel today, but a
   // window resize (or a future one) should still re-frame rather than clip.
   const containerRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    let raf = 0;
-    const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => rf.fitView({ duration: 200, padding: 0.15 }));
+    let lastW = -1;
+    let lastH = -1;
+    const ro = new ResizeObserver((entries) => {
+      // only a real size change re-frames (W-12: an observer callback with the same size must
+      // not restart the camera)
+      const box = entries[entries.length - 1]?.contentRect;
+      if (box && box.width === lastW && box.height === lastH) return;
+      lastW = box?.width ?? -1;
+      lastH = box?.height ?? -1;
+      runMove(RESIZE_MS, () => rf.fitView({ duration: RESIZE_MS, padding: 0.15 }));
     });
     ro.observe(el);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-    };
-  }, [rf]);
+    return () => ro.disconnect();
+  }, [rf, runMove]);
 
   const q = search.trim().toLowerCase();
   const byId = React.useMemo(() => new Map(rawNodes.map((n) => [n.id, n])), [rawNodes]);
@@ -400,44 +436,56 @@ function GraphInner({
   );
 
   // ONE camera effect, deliberately (the lesson `brain-graph.tsx` names: two effects driving one
-  // camera is a race by construction). A search match frames every match; a click centres on the
-  // one node clicked.
+  // camera is a race by construction). E2E run 5 W-12: there were still two here (a re-centre
+  // that re-ran whenever the layout OBJECT changed, and a re-fit on every node-set change), so an
+  // expand started competing transitions and a re-layout restarted the camera. `cameraMove`
+  // (pure, unit-tested) now picks at most ONE move per change of what the camera frames — a path,
+  // the search matches, the node set, the selected node — and nothing else restarts it.
   const searchMatches = React.useMemo(() => {
     if (q.length === 0) return [];
     return rawNodes.filter((n) => (n.label ?? "").toLowerCase().includes(q)).map((n) => n.id);
   }, [rawNodes, q]);
-  const matchKey = searchMatches.join("|");
+  const matchKey = joinKey(searchMatches);
+  const nodeSetKey = joinKey(nodeIds);
+  const pathKey = pathNodeIds ? joinKey(pathNodeIds) : "";
+  const selectedId = selection?.type === "node" ? selection.id : null;
+  const layoutRef = React.useRef(layout);
+  layoutRef.current = layout;
+  const framedRef = React.useRef<CameraInputs | null>(null);
   React.useEffect(() => {
-    if (searchMatches.length > 1) {
-      rf.fitView({ nodes: searchMatches.map((id) => ({ id })), duration: 600, padding: 0.45, maxZoom: 1.6 });
-      return;
-    }
-    const only = searchMatches.length === 1 ? searchMatches[0] : selection?.type === "node" ? selection.id : null;
-    if (!only) return;
-    const p = layout.get(only);
-    if (p) rf.setCenter(p.x, p.y, { zoom: 1.4, duration: 600 });
+    const next: CameraInputs = { nodeSetKey, pathKey, matchKey, selectedId };
+    const move = cameraMove(framedRef.current, next);
+    framedRef.current = next;
+    if (!move) return;
+    const ms = MOVE_MS[move.type];
+    // wait one frame so newly merged nodes are measured before framing them
+    runMove(ms, () => {
+      if (move.type === "fit-all") {
+        if (nodeIds.length > 0) rf.fitView({ duration: ms, padding: 0.15 });
+      } else if (move.type === "fit-path") {
+        rf.fitView({ nodes: move.ids.map((id) => ({ id })), duration: ms, padding: 0.35, maxZoom: 1.6 });
+      } else if (move.type === "fit-matches") {
+        rf.fitView({ nodes: move.ids.map((id) => ({ id })), duration: ms, padding: 0.45, maxZoom: 1.6 });
+      } else {
+        const p = layoutRef.current.get(move.id);
+        if (p) rf.setCenter(p.x, p.y, { zoom: 1.4, duration: ms });
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchKey, selection, layout, rf]);
+  }, [nodeSetKey, pathKey, matchKey, selectedId, rf, runMove]);
 
-  // The node set changed (a replace OR a merge) — re-fit so everything is framed. A found path
-  // takes precedence: frame the path itself.
-  const nodeSetKey = nodeIds.join("|");
-  const pathKey = pathNodeIds ? Array.from(pathNodeIds).join("\u0000") : "";
-  React.useEffect(() => {
-    if (pathKey) {
-      const ids = pathKey.split("\u0000").map((id) => ({ id }));
-      // wait one frame so newly merged path nodes are measured before framing them
-      const raf = requestAnimationFrame(() =>
-        rf.fitView({ nodes: ids, duration: 500, padding: 0.35, maxZoom: 1.6 }),
-      );
-      return () => cancelAnimationFrame(raf);
-    }
-    if (nodeIds.length > 0) rf.fitView({ duration: 300, padding: 0.15 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeSetKey, pathKey, rf]);
+  // The deterministic "settled" signal (W-12): every node measured, and no camera move in flight.
+  // Readers and specs wait on `data-graph-settled="true"` instead of guessing at animation time.
+  const nodesMeasured = useNodesInitialized();
+  const settled = isSettled(nodesMeasured, movesInFlight);
 
   return (
-    <div ref={containerRef} className="relative h-full w-full bg-graph-bg">
+    <div
+      ref={containerRef}
+      className="relative h-full w-full bg-graph-bg"
+      data-graph-settled={settled ? "true" : "false"}
+      data-testid="graph-canvas-viewport"
+    >
       <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-graph-subtle" />

@@ -322,7 +322,11 @@ def propose_split(snap: dict, kind: str, vocab, policy: Optional[dict] = None
             return None, []
     except Exception:                                                # noqa: BLE001
         return None, []
-    cands = [k for k in split_candidates(vocab, kind) if k in vocab.node_kinds]
+    # R-029 (IDN cross-track 2): rows are only ever split OFF the protected side INTO a kind that
+    # is not a person kind (`vocab.is_person`: subjects plus structurally natural persons) — a
+    # split never moves rows from one kind of person to another (e.g. a contact into a party)
+    cands = [k for k in split_candidates(vocab, kind) if k in vocab.node_kinds
+             and not is_person_kind(vocab, k)]
     if not cands:
         return None, []
     max_distinct, min_rows = _split_policy(policy)
@@ -1380,6 +1384,10 @@ def split_problems(table: str, tm: TableMapping, vocab) -> list[str]:
         except Exception:                                            # noqa: BLE001
             return True                                              # cannot tell: fail closed
 
+    for value, k in sorted(sp.kinds.items()):
+        if k != sp.default and is_person_kind(vocab, k):
+            problems.append(f"{table}: kind split binds {value!r} to {k!r}, a person kind: a "
+                            f"split never moves rows from one kind of person to another (R-029)")
     if any(subject(k) for k in {sp.default, *sp.kinds.values()}) and not subject(sp.default):
         problems.append(f"{table}: kind split names a subject kind but its default "
                         f"{sp.default!r} is not one: an unrecognised row would leave the "
@@ -1920,39 +1928,113 @@ def _key_values(snap: dict) -> Optional[tuple[str, set[str]]]:
     return pk[0], vals
 
 
+#: column types a link is never measured on: a key a link points at is text (`_key_values`), and a
+#: date, time, boolean or document column holds no other table's key (E2E run 5 F-11: TYPED)
+_NON_KEY_TYPE = re.compile(r"date|time|interval|bool|json|xml|bytea|blob|binary|array", re.I)
+
+
+def link_value(value: Any) -> str:
+    """A value as a link proposal compares it (E2E run 5 F-11): NFKC, surrounding whitespace
+    stripped, case-folded — `CB-P-000363`, `cb-p-000363` and ` CB-P-000363 ` are one key. Only the
+    COMPARISON is normalised; the build resolves the reference to the target row's own key."""
+    import unicodedata
+
+    return unicodedata.normalize("NFKC", str(value)).strip().casefold()
+
+
+def _measured(values: list[str], cap: int) -> tuple[list[str], Optional[dict]]:
+    """The values a column is measured on. Every value, up to `cap` DISTINCT normalised ones;
+    beyond that, the `cap` whose stable hash is smallest — a sample fixed by the values
+    themselves, so the order the rows were read in can never change it (F-11)."""
+    distinct = set(values)
+    if cap <= 0 or len(distinct) <= cap:
+        return values, None
+    keep = set(sorted(distinct, key=lambda v: hashlib.blake2b(
+        v.encode("utf-8"), digest_size=8).digest())[:cap])
+    return [v for v in values if v in keep], {"distinct": len(distinct), "measured": cap,
+                                              "how": "the values with the smallest stable hash"}
+
+
+def _link_targets(source: str, table: str, snap: dict, kind: Optional[str], split: Any
+                  ) -> list[tuple[str, str, str, set[str], str]]:
+    """(source, table, key column, key values, kind) a link may point into, from one mapped table.
+    A table with a kind SPLIT (FIN-04) is one target PER KIND its rows are built as: the key
+    values are grouped by the kind the split binds each row to (`split_value` of the
+    discriminator, else the split's default), so a link into a table whose default kind is a
+    subject still meets the rows the split builds as another kind — and only those (F-11)."""
+    kv = _key_values(snap)
+    if not kind or kv is None:
+        return []
+    if not (isinstance(split, dict) and split.get("column") and split.get("default")):
+        return [(source, table, kv[0], kv[1], kind)]
+    col, default, kinds = split["column"], split["default"], split.get("kinds") or {}
+    groups: dict[str, set[str]] = {}
+    for r in snap.get("rows") or []:
+        k = r.get(kv[0])
+        if k is None:
+            continue
+        raw = r.get(col)
+        groups.setdefault(kinds.get(split_value(raw), default) if raw is not None else default,
+                          set()).add(str(k))
+    return [(source, table, kv[0], vals, k) for k, vals in sorted(groups.items())]
+
+
 def propose_links(source_id: str, snapshots: dict[str, dict], tables: dict[str, TableMapping],
-                  vocab, *, others: Optional[dict[str, dict[str, tuple[dict, str]]]] = None,
+                  vocab, *, others: Optional[dict[str, dict[str, tuple]]] = None,
                   policy: Optional[dict] = None) -> dict[str, list[dict]]:
     """{table: [link proposal, ...]} — C-3: a column no foreign key declares whose values are,
     by MEASUREMENT, keys of another table (in this source, or — `others` {source: {table:
-    (snapshot, kind)}} — in another source): a reference column holding the other system's key.
+    (snapshot, kind[, split])}} — in another source): a reference column holding the other
+    system's key.
+
+    E2E run 5 F-11: the comparison is TYPED (a numeric, temporal, boolean or document column is
+    never measured; a key is text, `_key_values`) and NORMALISED (`link_value`); every value read
+    is measured — beyond `link_proposals.max_distinct_values` distinct values, a sample fixed by
+    the values' own hashes, never by row order. A target table with a kind split is measured per
+    kind (`_link_targets`).
 
     A proposal names the column, the table and key it points into, how many of the column's
     values matched (`matched` of `with_value`), and the declared edge kind it would become
     (`_fk_edge`, the same ranking a declared key gets) — or why none can. It is a PROPOSAL: it
     changes nothing until a person approves it (`approve_link`). It never points at a SUBJECT
-    kind (`is_subject_kind`, R-028; persons are subjects) and it never merges anything: two rows describing one organisation
-    stay two nodes joined by an edge (a merge on a declared business key is a person's merge
-    rule). Thresholds are policy (`link_proposals`). No table, column or kind is named here."""
+    kind (`is_subject_kind`, R-028; persons are subjects) and it never merges anything: two rows
+    describing one organisation stay two nodes joined by an edge (a merge on a declared business
+    key is a person's merge rule). Thresholds are policy (`link_proposals`). No table, column or
+    kind is named here."""
     policy = policy if policy is not None else _policy()
     lp = policy.get("link_proposals") or {}
     min_matched = int(lp.get("min_matched", 3))
     min_ratio = float(lp.get("min_ratio", 0.8))
+    cap = int(lp.get("max_distinct_values", 50000))
     targets: list[tuple[str, str, str, set[str], str]] = []   # (source, table, key, keys, kind)
+    #: indices of WHOLE-table targets of a split table: measured only when no single kind of the
+    #: split holds enough of a column's values (then named by the split's default kind)
+    whole: set[int] = set()
+
+    def add(src: str, t: str, snap: dict, kind: Optional[str], split: Any) -> None:
+        per_kind = _link_targets(src, t, snap, kind, split)
+        targets.extend(per_kind)
+        kv = _key_values(snap)
+        if kind and kv is not None and isinstance(split, dict) and split.get("default") \
+                and len(per_kind) > 1:
+            whole.add(len(targets))
+            targets.append((src, t, kv[0], kv[1], split["default"]))
+
     for t, snap in snapshots.items():
         tm = tables.get(t)
-        kind = (tm.node or {}).get("kind") if tm is not None and tm.status != "unmapped" \
-            else None
-        kv = _key_values(snap)
-        if kind and kv:
-            targets.append((source_id, t, kv[0], kv[1], kind))
+        if tm is None or tm.status == "unmapped" or not tm.node:
+            continue
+        add(source_id, t, snap, (tm.node or {}).get("kind"), tm.split)
     for other, tabs in sorted((others or {}).items()):
         if other == source_id:
             continue
-        for t, (snap, kind) in sorted(tabs.items()):
-            kv = _key_values(snap)
-            if kind and kv:
-                targets.append((other, t, kv[0], kv[1], kind))
+        for t, entry in sorted(tabs.items()):
+            add(other, t, entry[0], entry[1], entry[2] if len(entry) > 2 else None)
+    # one inverted index over every target's NORMALISED keys: a value is looked up once
+    index: dict[str, list[int]] = {}
+    for i, (_, _, _, keys, _) in enumerate(targets):
+        for k in {link_value(x) for x in keys}:
+            index.setdefault(k, []).append(i)
     out: dict[str, list[dict]] = {}
     for t, snap in sorted(snapshots.items()):
         tm = tables.get(t)
@@ -1966,28 +2048,45 @@ def propose_links(source_id: str, snapshots: dict[str, dict], tables: dict[str, 
         rows = snap.get("rows") or []
         found: list[dict] = []
         for col in _columns(snap):
-            if col in pk or col in declared or col in have or _NUMERIC_TYPE.search(
-                    types.get(col, "")):
+            ctype = types.get(col, "")
+            if col in pk or col in declared or col in have or _NUMERIC_TYPE.search(ctype) \
+                    or _NON_KEY_TYPE.search(ctype):
                 continue
-            vals = [str(r.get(col)) for r in rows if r.get(col) is not None]
-            if len(vals) < min_matched:
+            raw_vals = [r.get(col) for r in rows if r.get(col) is not None]
+            if len(raw_vals) < min_matched or any(isinstance(v, (bool, int, float))
+                                                  for v in raw_vals):
                 continue
+            vals, sampled = _measured([link_value(v) for v in raw_vals], cap)
+            counts: dict[int, int] = {}
+            for v in vals:
+                for i in index.get(v, ()):
+                    counts[i] = counts.get(i, 0) + 1
             hits = []
-            for (tsrc, ttab, tkey, keys, tkind) in targets:
+            for i, matched in counts.items():
+                tsrc, ttab, tkey, _, tkind = targets[i]
                 if tsrc == source_id and ttab == t and tkey == col:
                     continue
-                matched = sum(1 for v in vals if v in keys)
                 if matched >= min_matched and matched / len(vals) >= min_ratio:
-                    hits.append((matched / len(vals), matched, tsrc, ttab, tkey, tkind))
+                    hits.append((matched / len(vals), matched, tsrc, ttab, tkey, tkind,
+                                 i in whole))
+            # a kind of a split that holds enough of the values wins over its whole table
+            hits = [h for h in hits if not h[6]] or hits
             if not hits:
                 continue
-            hits.sort(key=lambda h: (-h[0], -h[1], h[2], h[3]))
-            ratio, matched, tsrc, ttab, tkey, tkind = hits[0]
+            hits.sort(key=lambda h: (-h[0], -h[1], h[2], h[3], str(h[5])))
+            ratio, matched, tsrc, ttab, tkey, tkind, as_table = hits[0]
             link = {"column": col, "source": tsrc, "table": ttab, "key": tkey,
                     "target_kind": tkind, "matched": matched, "with_value": len(vals),
-                    "basis": "value overlap with the target's key (measured on the rows read)",
+                    "basis": "value overlap with the target's key (measured on the rows read; "
+                             "typed and normalised)",
                     "status": "proposed", "edge": None}
-            tied = [f"{h[2]}:{h[3]}" for h in hits[1:] if (h[0], h[1]) == (ratio, matched)]
+            if sampled:
+                link["sampled"] = sampled
+            if as_table:
+                link["measured_as"] = ("the whole table: no single kind of its split holds "
+                                       "enough of the values")
+            tied = [f"{h[2]}:{h[3]}" for h in hits[1:] if (h[0], h[1]) == (ratio, matched)
+                    and (h[2], h[3]) != (tsrc, ttab)]
             if tied:
                 link["alternatives"] = tied
             if is_subject_kind(vocab, tkind):
@@ -2068,12 +2167,13 @@ def captured_tables(source_id: str) -> dict[str, dict]:
 
 
 def link_context(source_id: str, root: Optional[Path] = None, vocab=None
-                 ) -> dict[str, dict[str, tuple[dict, str]]]:
-    """{other source: {table: (snapshot, kind)}} for every OTHER ingest source whose mapping maps
-    a table to a kind that is not a subject kind — what a cross-source link may point into."""
+                 ) -> dict[str, dict[str, tuple]]:
+    """{other source: {table: (snapshot, kind, split)}} for every OTHER ingest source whose mapping
+    maps a table to a kind that is not a subject kind — or splits some of its rows into one —
+    what a cross-source link may point into."""
     from .connections import list_connections
 
-    out: dict[str, dict[str, tuple[dict, str]]] = {}
+    out: dict[str, dict[str, tuple]] = {}
     for conn in list_connections(root):
         if conn.id == source_id or getattr(conn, "purpose", "ingest") != "ingest":
             continue
@@ -2081,13 +2181,15 @@ def link_context(source_id: str, root: Optional[Path] = None, vocab=None
             m = load_mapping(conn.id, root)
         except Exception:                                            # noqa: BLE001
             continue
-        kinds = {t: (tm.node or {}).get("kind") for t, tm in m.tables.items()
-                 if tm.status != "unmapped" and tm.node}
-        kinds = {t: k for t, k in kinds.items() if k and not is_subject_kind(vocab, k)}
-        if not kinds:
+        # F-11: a table whose kind SPLIT builds some rows as a non-subject kind is a target for
+        # those rows (`_link_targets` measures it per kind), even when its default is a subject
+        tabs = {t: tm for t, tm in m.tables.items()
+                if tm.status != "unmapped" and tm.node and (tm.node or {}).get("kind")
+                and any(not is_subject_kind(vocab, k) for k in split_kinds(tm))}
+        if not tabs:
             continue
         snaps = captured_tables(conn.id)
-        got = {t: (snaps[t], k) for t, k in kinds.items() if t in snaps}
+        got = {t: (snaps[t], tm.node["kind"], tm.split) for t, tm in tabs.items() if t in snaps}
         if got:
             out[conn.id] = got
     return out

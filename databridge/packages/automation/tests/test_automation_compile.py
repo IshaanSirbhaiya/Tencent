@@ -78,9 +78,27 @@ def _check_schedule(trigger, intent):
         assert set(cron.hours) == set(range(0, 24, n)) and len(cron.minutes) == 1
 
 
+def _answer_sources(text, cat, res, **kw):
+    """R-029 F-09: an agent whose words name no source is ASKED which to read (a task that reads
+    no source sees nothing). When that is the question, it is the only one; the person confirms
+    the sources the catalogue says hold what the words name, and the draft is compiled again."""
+    from databridge_automation.compiler import SOURCES_QID, infer_sources
+
+    if not any(q.id == SOURCES_QID for q in res.open_questions):
+        return res, None
+    assert res.spec is None and [q.id for q in res.open_questions] == [SOURCES_QID]
+    again = compile_english(text, cat, answers={SOURCES_QID: "yes", **kw.pop("answers", {})},
+                            **kw)
+    return again, {cid for cid, _ in infer_sources(text, cat)}
+
+
 @pytest.mark.parametrize("text,conns,intent", SAMPLES, ids=[s[0][:40] for s in SAMPLES])
 def test_english_sample_compiles_to_its_stated_intent(text, conns, intent):
     res = compile_english(text, catalogue(*conns), harness=None)      # offline: rules only
+    res, inferred = _answer_sources(text, catalogue(*conns), res, harness=None)
+    if inferred is not None:
+        assert inferred and not intent.get("sources")      # only a request naming no source
+        intent = {**intent, "sources": inferred}
     # the only question allowed is an adapter agent's unapproved crawl plan (R-017 #2), one per
     # connection whose plan the catalogue says is not approved — derived, not listed
     unapproved = {f"plan:{c.id}" for c in conns if c.plan_status != "approved"}
@@ -136,6 +154,7 @@ def test_plan_examples_need_no_model():
     """The build plan's two example sentences and the adapter sentence compile fully offline."""
     for text in (OVERDUE, BRIEFING, ADAPTER_PLAN):
         res = compile_english(text, catalogue(FILES, DB), harness=None)
+        res, _ = _answer_sources(text, catalogue(FILES, DB), res, harness=None)
         assert res.spec is not None and not res.open_questions and not res.model_used
 
 
@@ -262,7 +281,8 @@ def test_overdue_declaration_compiles_and_activates(tmp_path):
 def test_read_only_declaration_has_no_actions(tmp_path):
     root = repo_with_golden(tmp_path)
     cat = catalogue(FILES, DB, golden="packs/workspace/evals/automations.jsonl")
-    res = compile_english(BRIEFING, cat, purposes=purposes(), repo_root=root)
+    res = compile_english(BRIEFING, cat, purposes=purposes(), repo_root=root,
+                          answers={"sources": "yes"})               # R-029 F-09: confirmed
     assert res.compilation.compiled
     # the runtime generator writes an explicit empty list (W2); the claim is: no write path at all
     assert not yaml.safe_load(res.declaration_yaml).get("actions")

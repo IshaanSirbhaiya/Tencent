@@ -269,11 +269,15 @@ def test_f6_qualified_question_is_not_answered_by_rules(world):
     cat = world.service().catalogue
     assert rules_plan("What is the total amount of invoices by account owner?", cat) is not None
     for q in ("Sum amount in invoices for APAC customers during this quarter",
-              "How many invoices are overdue?",
+              "How many invoices are in APAC?",
               "Total amount of invoices this quarter"):
         assert rules_plan(q, cat) is None, q
-    ans = world.service(harness=None).answer("How many invoices are overdue?", admission=ADMIN)
+    ans = world.service(harness=None).answer("How many invoices are in APAC?", admission=ADMIN)
     assert ans.status == "stopped" and world.facts.calls == []
+    # E2E run 5 (F-07): a qualifier that IS a measured stored value of one column is parsed, not
+    # dropped — the count carries it as a filter, and says so
+    plan = rules_plan("How many invoices are overdue?", cat)
+    assert plan is not None and [f.describe() for f in plan.subtasks[0].filters] ==         ["status eq 'overdue'"] and plan.assumptions
 
 
 # ------------------------------------------------------------------------------------------------

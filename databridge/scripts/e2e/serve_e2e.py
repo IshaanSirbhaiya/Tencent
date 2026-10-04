@@ -41,8 +41,17 @@ if (_auth / "api_tokens.json").is_file():
         os.environ.pop("WALNUT_APPROVAL_KEY", None)
         os.environ.setdefault("WALNUT_DEMO_PG_READER_PASSWORD", "walnut_reader_synthetic")
         os.environ.setdefault("WALNUT_DEMO_PG_WRITER_PASSWORD", "walnut_agent_writer_synthetic")
+        # run 5: the finance estate's synthetic roles (start-walnut-finance.ps1's values)
+        os.environ.setdefault("WALNUT_FIN_PG_READER_PASSWORD", "finance_reader_synthetic")
+        os.environ.setdefault("WALNUT_FIN_PG_WRITER_PASSWORD", "finance_agent_writer_synthetic")
 else:
     os.environ["WALNUT_DEV_AUTH"] = "1"
+
+# R-029 TIDY2: the approval key is never created implicitly; the E2E operator provisions it
+# explicitly (an existing key is never overwritten).
+if not os.environ.get("WALNUT_APPROVAL_KEY"):
+    from databridge_core.decision_ledger import provision_approval_key  # noqa: E402
+    provision_approval_key()
 
 import uvicorn  # noqa: E402
 from datetime import datetime  # noqa: E402
@@ -51,8 +60,16 @@ from fastapi import Body  # noqa: E402
 from databridge_gateway.main import create_app  # noqa: E402
 
 
-def build():
+def build(frontend_port=None):
     app = create_app()
+    if frontend_port:
+        # run 5: the run's private frontend copy on its own port (the gateway's allow-list is the
+        # :3000 origins only, FIN-19) - the same one CORS middleware serve_finance.py adds
+        from fastapi.middleware.cors import CORSMiddleware
+        app.add_middleware(CORSMiddleware,
+                           allow_origins=[f"http://localhost:{frontend_port}",
+                                          f"http://127.0.0.1:{frontend_port}"],
+                           allow_methods=["*"], allow_headers=["*"])
 
     @app.post("/__e2e/tick")
     async def _e2e_tick(body: dict = Body(...)):
@@ -77,7 +94,8 @@ def build():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8012)
+    ap.add_argument("--frontend-port", type=int, default=None)
     a = ap.parse_args()
-    assert a.port not in (8000, 3000)
+    assert a.port not in (8000, 3000, 8100, 3100) and a.frontend_port not in (3000, 3100)
     print(f"[e2e] scratch={E} port={a.port} graph={os.environ['WALNUT_GRAPH_DB_PATH']}", flush=True)
-    uvicorn.run(build(), host="127.0.0.1", port=a.port, log_level="info")
+    uvicorn.run(build(a.frontend_port), host="127.0.0.1", port=a.port, log_level="info")

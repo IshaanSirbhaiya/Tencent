@@ -343,9 +343,11 @@ def test_c1_build_counts_every_reference_and_every_edge(walnut_env, estate, tmp_
             assert r["unresolved_references"] == len(present) - expected
             assert r["target_captured"] is (keys is not None)
             # an expected edge is built — unless the mapping has no edge for the key, which is
-            # then COUNTED as missing, never silent
-            assert r["edges_built"] == (expected if r["edge_kind"] else 0), (t, fk, r)
-            assert r["edges_missing"] == (0 if r["edge_kind"] else expected)
+            # then COUNTED as missing, never silent; or (R-029) the row's kind split built it as
+            # a kind the edge's declaration does not admit, which is counted by that reason
+            assert r["edges_built"] + r["kind_not_admitted"] == \
+                (expected if r["edge_kind"] else 0), (t, fk, r)
+            assert r["edges_missing"] == (r["kind_not_admitted"] if r["edge_kind"] else expected)
             checked += expected > 0
     assert checked > 0
     assert out["edges"] == sum(rec["edges_built"] for rec in recs.values())
@@ -489,7 +491,7 @@ def test_c3_an_undeclared_reference_is_proposed_like_the_fk_it_should_have_been(
     """Remove each declared FK in turn: the measured overlap proposes the same target, with the
     same edge kind the declared FK gets — and never a link INTO a person kind."""
     from databridge_mcp_ingest.mapping import (_key_values, is_person_kind, propose_links,
-                                               propose_rules)
+                                               propose_rules, split_kinds, split_value)
 
     vocab, snaps = estate["vocab"], estate["snaps"]
     rules = propose_rules(snaps, vocab)
@@ -510,17 +512,44 @@ def test_c3_an_undeclared_reference_is_proposed_like_the_fk_it_should_have_been(
             links = propose_links("src", stripped, tables, vocab).get(t, [])
             link = next(lk for lk in links if lk["column"] == fk["column"])
             assert (link["source"], link["table"]) == ("src", target)
-            assert link["matched"] == sum(1 for v in values if str(v) in {
-                str(r[fk["ref_column"]]) for r in snaps[target]["rows"]})
-            if is_person_kind(vocab, rules[target].node["kind"]):
+            # R-029 F-11: a target with a kind SPLIT is measured per kind — the link names the
+            # kind its matched rows are built as, and counts only those
+            split = rules[target].split or {}
+            kind_of = {str(r[fk["ref_column"]]): (
+                (split.get("kinds") or {}).get(split_value(r[split["column"]]), split["default"])
+                if split and r.get(split["column"]) is not None
+                else split.get("default", rules[target].node["kind"]))
+                for r in snaps[target]["rows"]}
+            assert link["target_kind"] in split_kinds(rules[target])
+            if link.get("measured_as"):            # no single kind held enough: the whole table
+                assert link["target_kind"] == split["default"]
+                assert link["matched"] == sum(1 for v in values if str(v) in kind_of)
+            else:
+                assert link["matched"] == sum(1 for v in values
+                                              if kind_of.get(str(v)) == link["target_kind"])
+            if is_person_kind(vocab, link["target_kind"]):
                 refused += 1
                 assert link["status"] == "not_proposed" and link["edge"] is None
             else:
                 proposed += 1
                 want = next(e for e in rules[t].edges if e["evidence"] == [fk["column"]])
                 assert link["status"] == "proposed"
-                assert (link["edge"]["kind"], link["edge"]["src"], link["edge"]["dst"]) == \
-                    (want["kind"], want["src"], want["dst"])
+                if link["target_kind"] == rules[target].node["kind"]:
+                    assert (link["edge"]["kind"], link["edge"]["src"], link["edge"]["dst"]) == \
+                        (want["kind"], want["src"], want["dst"])
+                else:
+                    # into a split kind: the end names THAT kind, and the declared edge kind
+                    # admits the row's kind and it (the vocabulary's own declaration)
+                    from databridge_mcp_ingest.build import _admits
+
+                    e = link["edge"]
+                    ref_end = e["src"] if e["reversed"] else e["dst"]
+                    assert ref_end.startswith(f"{link['target_kind']}:")
+                    decl = vocab.edge(e["kind"])
+                    ends = (("src", link["target_kind"]), ("dst", rules[t].node["kind"])) \
+                        if e["reversed"] else (("src", rules[t].node["kind"]),
+                                               ("dst", link["target_kind"]))
+                    assert all(_admits(decl, end, k) for end, k in ends)
     assert seen and proposed                                              # non-vacuous
 
 
@@ -811,5 +840,6 @@ def test_e2e_one_run_directory_and_completeness_in_the_report(walnut_env, estate
             if t["built"] and fk["edge_kind"]:
                 # a missing edge has a counted reason: its target row is not in the graph (e.g.
                 # the screen kept that table out) or the value was masked
-                assert fk["edges_missing"] <= fk["dangling"] + fk["masked"], (t["table"], fk)
+                assert fk["edges_missing"] <= fk["dangling"] + fk["masked"] + \
+                    fk.get("kind_not_admitted", 0), (t["table"], fk)
     assert comp["totals"]["edges_built"] > 0

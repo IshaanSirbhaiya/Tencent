@@ -23,6 +23,7 @@ from __future__ import annotations
 import collections
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import subprocess
@@ -97,10 +98,20 @@ def snapshot(sha: str):
     return _snap[sha], _snapmeta[sha]
 
 
+#: run 5: on a big estate a live read of EVERY cell is ~500k `docker exec`s. WALNUT_E2E_LIVE_EVERY=N
+#: re-reads live a deterministic 1-in-N sample of cells (by a hash of table/row/column); every
+#: pointer is still checked against its capture snapshot and the facts store. 1 (default) = all.
+FACTS_ROWS: dict = {}
+LIVE_EVERY = max(1, int(os.environ.get("WALNUT_E2E_LIVE_EVERY") or "1"))
+
+
 def live_cell(table: str, pk: list, row_id: str, column: str) -> str:
     key = (table, row_id, column)
     if key in LIVE:
         return LIVE[key]
+    if LIVE_EVERY > 1 and int(hashlib.sha256(repr(key).encode()).hexdigest(), 16) % LIVE_EVERY:
+        LIVE[key] = "n/a"
+        return "n/a"
     if not pk or len(pk) != 1:
         LIVE[key] = "n/a"
         return "n/a"
@@ -228,8 +239,18 @@ def main(label: str = "") -> dict:
             if facts is not None and len(pk) == 1:
                 tname = table.split(".")[-1]
                 try:
-                    fr = facts.execute(f'select "{col}" from "{tname}" where cast("{pk[0]}" as text)=?',
-                                       (str(p.get("row_id")),)).fetchone()
+                    # run 5: one indexed read of each facts table (a per-pointer full scan of a
+                    # 24k-row table, ~400k times, never finished on the finance estate)
+                    tk = (p.get("source_id"), tname, pk[0])
+                    if tk not in FACTS_ROWS:
+                        cur = facts.execute(f'select * from "{tname}"')
+                        names = [d[0] for d in cur.description]
+                        FACTS_ROWS[tk] = {str(r[names.index(pk[0])]): dict(zip(names, r))
+                                          for r in cur.fetchall()}
+                    hit = FACTS_ROWS[tk].get(str(p.get("row_id")))
+                    if hit is not None and col not in hit:
+                        raise KeyError(f"no column {col} in facts {tname}")
+                    fr = None if hit is None else (hit[col],)
                     cells["facts_checked"] += 1
                     if fr is None or (not num_eq(fr[0], row[col])
                                       and not (fr[0] is None and row[col] is None)):

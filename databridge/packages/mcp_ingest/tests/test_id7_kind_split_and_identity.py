@@ -640,20 +640,15 @@ def test_e2e_finance_one_organisation_node_from_banking_crm_and_documents(
         mi.propose_plan("fin_sql", client=client)
         rep1 = mi.run_ingest("fin_sql", store=store, client=client, vocab=vocab)
         assert rep1.status in ("ok", "unverified"), (rep1.status, rep1.message)
-        # the estate plants text addressed to an automated reader in some tables: the screen
-        # holds those tables for a person. The owner reads them and lifts each, by its content
-        # digest (their planted rows stay withheld row by row); the next sync builds them.
+        # the estate plants text addressed to an automated reader in some tables: since R-029
+        # (E2E run 5 F-01) the screen holds those ROWS, one by one, and the rest of each table
+        # builds — the table itself is allowed, the planted rows are withheld and listed
         from databridge_mcp_ingest.runner import read_jsonl
-        from databridge_mcp_ingest.screen import approve_override
-        held = [r for r in read_jsonl(Path(rep1.run_dir) / "governance.jsonl")
-                if r.get("decision") == "review" and r.get("kind") == "table"]
-        assert any(r["uri"] == "core_banking.party" for r in held)
-        for r in held:
-            approve_override("fin_sql", r["item_id"], digest=r["sha256"],
-                             principal=_principal("data owner"),
-                             reason="synthetic estate: planted notes reviewed")
-        rep1 = mi.run_ingest("fin_sql", store=store, client=client, vocab=vocab)
-        assert rep1.status in ("ok", "unverified"), (rep1.status, rep1.message)
+        gov = read_jsonl(Path(rep1.run_dir) / "governance.jsonl")
+        assert any(r["uri"] == "core_banking.party" and r.get("kind") == "table"
+                   and r["decision"] == "allow" for r in gov)
+        assert any(r.get("kind") == "table_row" and r.get("table") == "core_banking.party"
+                   and r["decision"] == "review" for r in gov)
         from databridge_mcp_ingest.mapping import load_mapping
         m = load_mapping("fin_sql")
         assert m.tables["core_banking.party"].split["kinds"]

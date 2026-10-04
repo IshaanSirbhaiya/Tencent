@@ -206,11 +206,14 @@ def test_f04_model_source_not_in_the_users_words_is_asked():
 
 
 def test_f04_model_tool_on_an_unconfirmed_connection_is_dropped():
+    # R-029 F-09: the person names the files source when asked (a task reading no source is
+    # never compiled); the model's tool on the OTHER, unconfirmed connection is still dropped
     res = compile_english("Summarise contracts for me.", catalogue(FILES, DB), harness=_harness(
         {"kind": "agent", "title": "t", "instructions": ["x"],
-         "tools": ["source.query:larkspur-db", "retrieve.search"]}))
+         "tools": ["source.query:larkspur-db", "retrieve.search"]}),
+        answers={"sources": "larkspur-files"})
     assert res.spec is not None
-    assert not any(t.startswith("source.") for t in res.spec.tools)
+    assert not any(t.startswith("source.") and "larkspur-db" in t for t in res.spec.tools)
     assert any("source.query:larkspur-db" in n for n in res.notes)
 
 

@@ -20,6 +20,7 @@ issued. Every expectation is derived from what was written, on both estates.
 """
 from __future__ import annotations
 
+import collections
 import json
 import sqlite3
 import sys
@@ -50,6 +51,7 @@ from databridge_gateway.activity_decisions import (
     APPEND_ONLY,
     LEDGER_INTEGRITY_FAILED,
     SEALED,
+    SEALED_CHAINED,
     UNVERIFIED,
     _producer_on_ledger,
 )
@@ -73,16 +75,26 @@ WRITTEN_KINDS = tuple(k for k in DECISION_KINDS if k != "decision_log") + ("one_
 
 
 def _who(pid: str, *, dev: bool) -> tuple[object, dict]:
-    """An approver the gateway's authentication layer issued, and the actor dict the shared
-    approval gate records for it (exactly what every producer stores)."""
+    """The principal the gateway's authentication layer issued for a request (what every gateway
+    route hands the shared approval gate), and the actor dict that gate records for it (exactly
+    what the producers store)."""
     from databridge_mcp_ingest.plans import require_authenticated_approver
 
     from databridge_gateway.auth import AuthenticatedPrincipal
-    from databridge_gateway.platform_runtime import approver_for, register_gateway_authenticators
+    from databridge_gateway.platform_runtime import register_gateway_authenticators
 
     register_gateway_authenticators()
-    approver = approver_for(AuthenticatedPrincipal(principal_id=pid, dev_mode=dev))
-    return approver, require_authenticated_approver(approver)
+    principal = AuthenticatedPrincipal(principal_id=pid, dev_mode=dev)
+    return principal, require_authenticated_approver(principal)
+
+
+def _runtime_approver(pid: str, *, dev: bool) -> object:
+    """The agent runtime's `Approver` for the same signed-in person — what the gateway hands the
+    runtime when that person decides an agent's action (`platform_runtime.approver_for`)."""
+    from databridge_gateway.auth import AuthenticatedPrincipal
+    from databridge_gateway.platform_runtime import approver_for
+
+    return approver_for(AuthenticatedPrincipal(principal_id=pid, dev_mode=dev))
 
 
 def _pointer_json() -> str:
@@ -128,7 +140,7 @@ def estate(request, tmp_path, monkeypatch):
     for d in (src_dir, aa_dir, runs, mat, once, outbox_db.parent):
         d.mkdir(parents=True, exist_ok=True)
     sid = f"{name}_ledger"
-    written: dict[str, list[dict]] = {k: [] for k in ACTIVITY_KINDS}
+    written: dict[str, list[dict]] = collections.defaultdict(list)
 
     # -- KEEPER created the source's keeper agent (Set up's `keeper-<source>`) ---------------
     reg = AdapterAgentRegistry(aa_dir)
@@ -181,7 +193,9 @@ def estate(request, tmp_path, monkeypatch):
         adapter_agent=keeper, connection=sid, entity="invoices"), grain_key="id")
     view = store.create(design, owner=OWNER, produced_by={"agent": "rules"})
     delegated.approve(store, view["id"], principal=approver, digest=view["digest"], owner=OWNER)
-    store.record_build(view["id"], by=OWNER, build_id="b-1", rev=1, digest=view["digest"])
+    # R-029 TIDY2: as the gateway's build route does, the build names the full actor object
+    store.record_build(view["id"], by=OWNER, build_id="b-1", rev=1, digest=view["digest"],
+                       actor=who)
     written["design_approval"].append({"who": who, "design": view["id"]})
     written["design_build"].append({"design": view["id"]})
 
@@ -225,15 +239,66 @@ def estate(request, tmp_path, monkeypatch):
         "run_id": "run-once-1", "spec_digest": "sha256:t",
         "trigger": {"type": "one_time", "by": OWNER, "question": None, "task_id": "once_ran"},
         "started": "2026-10-02T09:06:00+00:00", "ended": "2026-10-02T09:06:05+00:00",
-        "status": "completed", "models_used": [], "actions": [],
+        "status": "completed", "models_used": [],
+        "actions": [{"name": "log_one_follow_up_task", "automation_mode": "human_required",
+                     "status": "executed", "by": OWNER}],
         "answer": {"markdown": "1", "produced_by": None}})
-    write_run(rec, run_path("run-once-1", agent="once_ran", runs_dir=runs))
+    once_path = run_path("run-once-1", agent="once_ran", runs_dir=runs)
+    write_run(rec, once_path)
+    # E2E run 5 W-09: OWNER approves the task's action through the agent runtime, which records
+    # how the decider authenticated with ITS mechanism name (`runtime._decided_by`)
+    from databridge_agent_runtime import ActionLog
+    from databridge_agent_runtime.runs import actions_path
+    from databridge_agent_runtime.runtime import _decided_by
+
+    rt_approver = _runtime_approver(OWNER, dev=False)
+    alog = ActionLog(actions_path(once_path))
+    for ev in ({"event": "proposed", "at": "2026-10-02T09:06:01+00:00",
+                "tool": "source.write:db.execute_sql", "automation_mode": "human_required"},
+               {"event": "approved", "by": OWNER, **_decided_by(rt_approver),
+                "idempotency_key": "run-once-1/a1", "at": "2026-10-02T09:06:02+00:00"},
+               {"event": "executed", "by": OWNER, **_decided_by(rt_approver),
+                "at": "2026-10-02T09:06:03+00:00", "result_pointers": []}):
+        alog.append({"action_id": "a1", "name": "log_one_follow_up_task", **ev})
+    written["approval"].append({"who": OWNER})
     written["one_time_task"] += [{"task": "once_ran"}, {"task": "once_failed"}]
+
+    # -- E2E run 5 F-12: OWNER lifts a screen hold (the sealed override log) -------------------
+    from databridge_mcp_ingest.screen import approve_override, content_digest
+
+    held = content_digest("the held item's captured bytes")
+    approve_override(sid, "item-held-1", digest=held, principal=approver, reason=SECRET,
+                     root=src_dir)
+    written["screen_override"].append({"who": who, "decision": "lifted", "digest": held})
+
+    # -- E2E run 5 F-12: OWNER approves a declared identity rule (the ontology state + the
+    #    gateway's audit of how the decider signed in), written by the producers' own writers ---
+    from databridge_graph import ontology_state
+    from databridge_graph.packs import load_pack
+
+    from databridge_gateway import identity_rules_routes
+
+    monkeypatch.setenv(ontology_state.STATE_ENV, str(tmp_path / "ontology" / "state.json"))
+    (tmp_path / "ontology").mkdir()
+    pack = load_pack(name)
+    rule_kind = sorted(k for k in pack.node_kinds if k not in set(pack.subject_kinds))[0]
+    declared = type("Declared", (), {"pack": name, "rule_types": ("exact_name",)})()
+    vocab = type("Vocab", (), {"packs": (name,),
+                               "identity_rule_for": staticmethod(
+                                   lambda k: declared if k == rule_kind else None)})()
+    rule_rec = ontology_state.record_identity_rule_decision(
+        pack=name, kind=rule_kind, rule="exact_name", principal=who["principal_id"],
+        vocab=vocab, at="2026-10-02T09:07:00+00:00")
+    identity_rules_routes._append_audit({**rule_rec, "authenticated_by": who["authenticated_by"],
+                                         "dev_only": bool(who["dev_only"])})
+    written["identity_rule_decision"].append({"who": who, "kind": rule_kind})
 
     app = FastAPI()
     app.state.activity_sources = ActivitySources(
         runs, tmp_path / "firings.jsonl", aa_dir, sources_dir=src_dir, materialise_root=mat,
-        one_time_root=once, outbox_db=outbox_db, setup_decisions=True)
+        one_time_root=once, outbox_db=outbox_db, setup_decisions=True,
+        ontology_state=ontology_state.state_path(),
+        identity_rule_audit=identity_rules_routes.audit_path())
     register_activity_routes(app)
     return {"app": app, "sid": sid, "written": written, "src": src_dir, "mat": mat,
             "design": view["id"], "outbox": outbox_db, "who": who, "who_dev": who_dev}
@@ -301,10 +366,18 @@ def test_every_row_names_its_actor_with_the_common_object(estate):
                         ("setup_handoff", "handoffs.jsonl")):
         lines = (aa / "_setup" / sid / fname).read_text(encoding="utf-8").splitlines()
         stored[kind] = json.loads([ln for ln in lines if ln.strip()][-1])
+    # (E2E run 5 W-09: the producer's principal CLASS is served as the one type vocabulary, and a
+    # mechanism under the canonical name the gateway gives it — derived by the same rule)
+    from databridge_gateway.activity_actor import canonical_mechanism, canonical_type
+
     for kind, rec in stored.items():
         [row] = got[kind]
         for k in keys:
             want = rec[k] if k in rec else absent()
+            if k == "principal_type" and k in rec:
+                want = canonical_type(rec[k], rec.get("principal_id"))
+            if k == "authenticated_by" and k in rec:
+                want = canonical_mechanism(rec[k])
             assert row["actor"][k] == want, (kind, k, row["actor"])
     # link and outbox decisions: matched per decision
     for kind in ("link_decision", "outbox_decision"):
@@ -406,7 +479,8 @@ def test_owner_or_operator_sees_the_decisions_and_nobody_else(estate, monkeypatc
     # the design or the one-time tasks, which belong to who filed / proposed / ran them)
     kept = _by_kind(_feed(estate["app"], KEEPER)["items"])
     assert set(kept) == {"plan_approval", "mapping_approval", "link_decision",
-                         "setup_documents", "setup_handoff", "adapter_setup"}, set(kept)
+                         "setup_documents", "setup_handoff", "adapter_setup",
+                         "screen_override"}, set(kept)
     # an operator (the platform rule: `agent_ownership.is_operator`) sees everything
     monkeypatch.setenv(agent_ownership.OPERATORS_ENV, json.dumps([OPERATOR]))
     everything = mine | {i["id"] for i in _feed(estate["app"], KEEPER)["items"]}
@@ -503,3 +577,162 @@ def test_unknown_kind_is_refused_and_the_vocabulary_is_served(estate):
 def test_absent_is_the_envelope_and_not_a_bare_null():
     assert absent() == {"status": ABSENT, "reason": "not_recorded_by_producer"}
     assert is_envelope(withheld(FREE_TEXT)) and not is_envelope({"status": "approved"})
+
+
+# ------------------------------------------------------------------------------------------------
+# E2E run 5 (wiki/40-reviews/E2E-2026-10-02-run5.md)
+# ------------------------------------------------------------------------------------------------
+def _rows_with_actors(items: list[dict]):
+    """Every actor object a feed serves: each row's ``actor`` and, on a run, ``started_by``."""
+    for i in items:
+        yield i["kind"], "actor", i["actor"]
+        if isinstance(i.get("started_by"), dict):
+            yield i["kind"], "started_by", i["started_by"]
+
+
+def test_r5_w09_every_family_serves_the_identical_actor_schema(estate, monkeypatch):
+    """W-09: the agent runtime's approval rows said ``{person, gateway:auth}`` while every other
+    family said ``{AuthenticatedPrincipal, gateway}`` for the SAME signed-in person. Every family
+    now serves one schema: the same keys, ``principal_type`` from one closed vocabulary (a person,
+    or one of the machine types), and one name per authentication mechanism."""
+    from databridge_gateway.activity_actor import MACHINE_TYPES, PERSON
+
+    monkeypatch.setenv(agent_ownership.OPERATORS_ENV, json.dumps([OPERATOR]))
+    items = _feed(estate["app"], OPERATOR)["items"]
+    keys = {"principal_id", "authenticated_by", "principal_type", "dev_only"}
+    families: set[str] = set()
+    person_shapes: dict[tuple, set] = collections.defaultdict(set)
+    person_families: dict[tuple, set] = collections.defaultdict(set)
+    for kind, field, a in _rows_with_actors(items):
+        families.add(kind)
+        assert keys <= set(a) <= keys | {"delegation"}, (kind, field, a)
+        for k in keys:
+            v = a[k]
+            assert v is not None and (is_envelope(v) or isinstance(v, (str, bool))), (kind, k, a)
+        if isinstance(a["dev_only"], bool):
+            assert isinstance(a["authenticated_by"], str), (kind, a)
+        ptype = a["principal_type"]
+        if is_envelope(ptype):
+            continue
+        assert ptype in (PERSON, *MACHINE_TYPES), (kind, field, a)
+        if ptype in MACHINE_TYPES:
+            # authentication and the dev token do not apply to a machine: one envelope, always
+            assert a["authenticated_by"] == absent(MACHINE_ACTOR), (kind, a)
+            assert a["dev_only"] == absent(MACHINE_ACTOR), (kind, a)
+        elif isinstance(a["dev_only"], bool):
+            who = (a["principal_id"], a["dev_only"])
+            person_shapes[who].add((ptype, a["authenticated_by"]))
+            person_families[who].add(kind)
+    # non-vacuous: every family the fixture wrote was walked, the runtime's approval among them,
+    # and one person's real sign-in was recorded by several producers
+    assert set(WRITTEN_KINDS) | {"approval", "adapter_setup"} <= families, families
+    real = (OWNER, False)
+    assert {"approval", "mapping_approval", "screen_override"} <= person_families[real], \
+        person_families[real]
+    for who, shapes in person_shapes.items():
+        assert len(shapes) == 1, (who, shapes, person_families[who])
+
+
+def test_r5_w09_mechanism_and_type_names_are_read_from_the_gateway_not_written_down():
+    """The canonical names are the gateway's own: the agent runtime's mechanism name for the
+    signed-in path (`platform_runtime.GATEWAY_MECHANISM`) is the same mechanism as the auth
+    layer's (`auth.GATEWAY_MECHANISM`); a recorded principal class is a person unless it is a
+    machine type (``AdapterAgent`` is the ``adapter_agent`` machine)."""
+    from databridge_adapter_agents.setup import agent_actor
+
+    from databridge_gateway import auth, platform_runtime
+    from databridge_gateway.activity_actor import PERSON, make_actor
+
+    rt = actor_from_record({"by": OWNER, "authenticated_by": platform_runtime.GATEWAY_MECHANISM,
+                            "dev_only": False}, pid_key="by", default_type="person")
+    gw = make_actor(OWNER, auth.AuthenticatedPrincipal.__name__,
+                    authenticated_by=auth.GATEWAY_MECHANISM, dev_only=False)
+    assert rt == gw and gw["principal_type"] == PERSON
+    assert gw["authenticated_by"] == auth.GATEWAY_MECHANISM
+    dev = make_actor(OWNER, "Approver", authenticated_by=platform_runtime.GATEWAY_DEV_MECHANISM,
+                     dev_only=True)
+    assert dev["authenticated_by"] == auth.DEV_MECHANISM
+    machine = actor_from_record(agent_actor("keeper-x"))
+    assert machine["principal_type"] == "adapter_agent"
+    assert machine["authenticated_by"] == absent(MACHINE_ACTOR)
+    # a delegated decision keeps its own mechanism and its delegation
+    deleg = make_actor(OWNER, "DelegatedApproval", authenticated_by="delegated:abc",
+                       dev_only=False, delegation={"policy_digest": "abc"})
+    assert deleg["principal_type"] == PERSON and deleg["authenticated_by"] == "delegated:abc"
+    assert deleg["delegation"] == {"policy_digest": "abc"}
+
+
+def test_r5_f12_a_hold_lift_and_an_identity_rule_decision_reach_activity(estate, monkeypatch):
+    """F-12: lifting a screen hold and approving an identity rule both WIDEN what the graph holds;
+    neither reached Activity. Each is now a row of its own kind with the common actor object,
+    what was verified about it, owner-or-operator visibility, and its free text withheld."""
+    got = _by_kind(_feed(estate["app"], OWNER)["items"])
+    w = estate["written"]
+    [lift] = got["screen_override"]
+    assert lift["decision"] == "lifted" and lift["source_id"] == estate["sid"]
+    assert lift["item_id"] == "item-held-1" and lift["digest"] == w["screen_override"][0]["digest"]
+    assert lift["reason"] == withheld(FREE_TEXT)
+    for k in ("principal_id", "authenticated_by", "dev_only"):
+        assert lift["actor"][k] == w["screen_override"][0]["who"][k], (k, lift["actor"])
+    assert lift["integrity"] == SEALED_CHAINED
+    [rule] = got["identity_rule_decision"]
+    assert rule["decision"] == "approved" and rule["rule"] == "exact_name"
+    assert rule["node_kind"] == w["identity_rule_decision"][0]["kind"]
+    for k in ("principal_id", "authenticated_by", "dev_only"):
+        assert rule["actor"][k] == w["identity_rule_decision"][0]["who"][k], (k, rule["actor"])
+    assert rule["integrity"] == UNVERIFIED
+    assert SECRET not in json.dumps(got)
+    # the kind filter selects exactly that family
+    for kind in ("screen_override", "identity_rule_decision"):
+        assert {i["kind"] for i in _feed(estate["app"], OWNER, kinds=kind)["items"]} == {kind}
+    # the keeper's creator sees the hold lift on its source; nobody else sees either; an
+    # operator sees both
+    kept = _by_kind(_feed(estate["app"], KEEPER)["items"])
+    assert "screen_override" in kept and "identity_rule_decision" not in kept
+    assert _feed(estate["app"], OTHER)["items"] == []
+    monkeypatch.setenv(agent_ownership.OPERATORS_ENV, json.dumps([OPERATOR]))
+    ops = _by_kind(_feed(estate["app"], OPERATOR)["items"])
+    assert len(ops["screen_override"]) == len(ops["identity_rule_decision"]) == 1
+
+
+def test_r5_f12_a_tampered_override_log_is_an_integrity_row_not_a_decision(estate):
+    from databridge_mcp_ingest.screen import override_log_path
+
+    path = override_log_path(estate["sid"], estate["src"])
+    rec = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    rec["principal_id"] = OTHER                                   # an edited lift
+    path.write_text(json.dumps(rec, sort_keys=True) + "\n", encoding="utf-8")
+    got = _by_kind(_feed(estate["app"], KEEPER)["items"])
+    assert "screen_override" not in got
+    [bad] = got["decision_log"]
+    assert bad["refusal"]["code"] == LEDGER_INTEGRITY_FAILED
+    assert bad["family"] == "screen_override"
+    assert _feed(estate["app"], OTHER)["items"] == []
+
+
+def test_r5_f12_an_unreadable_identity_state_is_an_integrity_row_for_operators_only(
+        estate, monkeypatch):
+    state = estate["app"].state.activity_sources.ontology_state
+    state.write_text("{not json", encoding="utf-8")
+    mine = _by_kind(_feed(estate["app"], OWNER)["items"])
+    assert "identity_rule_decision" not in mine and "decision_log" not in mine
+    monkeypatch.setenv(agent_ownership.OPERATORS_ENV, json.dumps([OPERATOR]))
+    ops = _by_kind(_feed(estate["app"], OPERATOR)["items"])
+    assert "identity_rule_decision" not in ops
+    assert [r["family"] for r in ops["decision_log"]] == ["identity_rule_decision"]
+
+
+def test_r5_f12_reading_the_hold_lifts_never_creates_the_approval_key(estate, monkeypatch,
+                                                                       tmp_path):
+    """Read-only never writes: with no key in the environment and no key file, the lifts cannot
+    be verified, so none is shown — and reading creates no key file."""
+    from databridge_mcp_ingest import screen
+
+    key_file = tmp_path / "no-such-dir" / "approval.key"
+    monkeypatch.delenv(screen.APPROVAL_KEY_ENV)
+    monkeypatch.setenv(screen.APPROVAL_KEY_FILE_ENV, str(key_file))
+    body = _feed(estate["app"], OWNER, kinds="screen_override")
+    assert body["items"] == []
+    # non-vacuous: the family was read, and said it could not be verified
+    assert "screen_override" in (body.get("counts_incomplete") or []), body
+    assert not key_file.exists() and not key_file.parent.exists()

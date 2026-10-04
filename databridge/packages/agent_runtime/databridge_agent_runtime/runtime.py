@@ -75,6 +75,8 @@ from .shape import describe_schema, shape_args
 from .write_paths import normalise_write_paths, path_derivations
 from .subtask_shape import delegate_holdings, describe_subtask, summarise_error
 from .capture import capture_live_read
+from . import public_errors
+from .public_errors import scrub as _scrub
 from .mapping import (
     DELEGATE_SOURCE,
     FACTS_SOURCE,
@@ -135,6 +137,22 @@ PLANNER_PROMPT_VERSION = "agent_runtime.planner/5"
 #: Failed tool calls (refused, failed, or arguments that do not fit the tool) one run may make
 #: before the planner is told to stop calling tools and answer from what it has (N-11).
 MAX_FAILED_TOOL_CALLS = 5
+#: E2E run 5 F-09: every run is bounded in wall-clock seconds (``WALNUT_AGENT_RUN_SECONDS``,
+#: default below). Past WRAP_AT of it the planner is told to answer from what it has; at the
+#: budget the run stops and says so.
+RUN_SECONDS_ENV = "WALNUT_AGENT_RUN_SECONDS"
+DEFAULT_RUN_SECONDS = 300.0
+WRAP_AT = 0.75
+_clock = time.monotonic
+
+
+def run_seconds() -> float:
+    """The deployment's wall-clock budget for one run, in seconds (a bad value: the default)."""
+    try:
+        v = float(os.environ.get(RUN_SECONDS_ENV, "") or DEFAULT_RUN_SECONDS)
+    except ValueError:
+        return DEFAULT_RUN_SECONDS
+    return v if v > 0 else DEFAULT_RUN_SECONDS
 
 
 class ActionRefused(ValueError):
@@ -200,7 +218,7 @@ _AUTH_LOCK = threading.Lock()
 def register_authenticator(mechanism: str, *, dev_only: bool = False) -> Authenticator:
     """Register an authentication mechanism and return the ONLY object that can mint approvers
     for it. Called once, at boot, by the code that authenticates requests (e.g. the gateway's
-    auth layer: ``AUTH = register_authenticator("gateway:auth")`` then ``AUTH.issue(principal_id)``
+    auth layer: ``AUTH = register_authenticator("gateway")`` then ``AUTH.issue(principal_id)``
     per authenticated request). Registering the same mechanism again returns the same
     authenticator (an app built twice in one process); a mechanism cannot change its ``dev_only``
     marking."""
@@ -670,6 +688,15 @@ def _reply_error(res: Any) -> Optional[str]:
     return None
 
 
+def _scrub_public(reasons: list, skipped: list) -> None:
+    """W-08: no coverage note or skipped detail a person reads carries an exception's text (each
+    such sentence becomes a fixed one with a reference; the original is logged)."""
+    reasons[:] = [_scrub(r) for r in reasons]
+    for s in skipped:
+        if isinstance(s, dict) and isinstance(s.get("detail"), str):
+            s["detail"] = _scrub(s["detail"])
+
+
 def _load_screen(screen: Any) -> tuple[Any, Optional[str]]:
     if screen is not None:
         return screen, None
@@ -677,7 +704,8 @@ def _load_screen(screen: Any) -> tuple[Any, Optional[str]]:
         from databridge_mcp_ingest.screen import load_screen   # noqa: PLC0415 - one screen
         return load_screen(), None
     except Exception as e:                                   # noqa: BLE001 - fail closed
-        return None, f"{type(e).__name__}: {e}"
+        return None, public_errors.failed("the ingestion screen could not be loaded",
+                                          "screen not loaded", e)
 
 
 def _execute(tool: str, args: dict, gateway: Optional[SourceGateway],
@@ -705,13 +733,14 @@ def _execute(tool: str, args: dict, gateway: Optional[SourceGateway],
         uri = str(args.get("path") or args.get("uri") or "") or \
             f"mcp://{conn}/{parts['tool']}?{arg_hash}"
     except Exception as e:                                   # noqa: BLE001 - nothing sent yet
-        return _Execution("not_sent", f"the source could not be described: "
-                                      f"{type(e).__name__}: {e}")
+        return _Execution("not_sent", public_errors.failed(
+            "the source could not be described", "write: advertise failed", e, tool=tool))
     try:
         res = send()
     except Exception as e:                                   # noqa: BLE001 - reported
-        return _Execution("unknown", f"the source call raised {type(e).__name__}: {e}; whether "
-                                     f"the write happened is unknown")
+        return _Execution("unknown", public_errors.failed(
+            "the source call failed", "write: call failed", e, tool=tool)
+            + "; whether the write happened is unknown")
     if res.is_error:
         return _Execution("source_error", (res.text or "the source returned an error")[:500])
     prefixes = _write_error_prefixes(gateway, conn)
@@ -766,7 +795,9 @@ def _execute(tool: str, args: dict, gateway: Optional[SourceGateway],
                                       mime=mime, root=capture_root)
     except Exception as e:                                   # noqa: BLE001 - the write happened
         return _Execution("executed", "executed; its result could not be captured",
-                          capture_error=f"{type(e).__name__}: {e}")
+                          capture_error=public_errors.failed(
+                              "the result could not be captured", "write: capture failed", e,
+                              tool=tool))
     return _Execution("executed", "executed", (_ptr_json(ptr),))
 
 
@@ -799,7 +830,8 @@ def args_schema_problems(args: Any, schema: Optional[Mapping[str, Any]]) -> list
     except ImportError:
         pass
     except Exception as e:                                   # noqa: BLE001 - a broken schema
-        return [f"the tool's input schema could not be applied: {type(e).__name__}: {e}"]
+        return [public_errors.failed("the tool's input schema could not be applied",
+                                     "tool input schema unusable", e)]
     out: list[str] = []
     props = schema.get("properties") if isinstance(schema.get("properties"), Mapping) else {}
     for key in schema.get("required") or []:
@@ -1051,6 +1083,8 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
     (`withheld.screen_withheld`, the default); the planner is told their names and rule ids only.
     """
     t_start = time.perf_counter()
+    t_clock = _clock()
+    budget_s = run_seconds()
     started = utcnow()
     tr = trace if trace is not None else _NullTrace()
     spec = _as_spec(workflow)
@@ -1082,6 +1116,12 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
     decision, problems = compile_for_run(spec, decl, store=store, retriever=retriever,
                                          gateway=gateway, inputs=compile_inputs, facts=facts,
                                          federation=federation)
+    if not spec.sources and not getattr(spec, "delegates", None):
+        # F-09: an agent's scope IS its declared sources - one that declares none (and delegates
+        # to no adapter agent) can read nothing, so it is not run at all
+        problems = [*problems, "it declares no source to read and delegates to no adapter agent, "
+                               "so it can see nothing (its scope is its declared sources); name "
+                               "the source(s) it should read"]
     if problems or decision is None or decision.outcome is not Outcome.COMPILED:
         reasons = list(problems)
         if decision is not None and decision.outcome is not Outcome.COMPILED:
@@ -1177,7 +1217,7 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
             reasons.append(f"{o.tool} was refused ({o.reason_code}): {o.detail}")
         elif not o.ok:
             obs = o.observation if isinstance(o.observation, dict) else {}
-            err = summarise_error(obs.get("error", "no result"))          # P-02: no raw dumps
+            err = _scrub(summarise_error(obs.get("error", "no result")))  # P-02 / W-08
             code = "tool_args_invalid" if obs.get("args_invalid") else "tool_failed"
             entry = {"tool": o.tool, "reason_code": code, "detail": err}
             skipped.append(entry)
@@ -1387,7 +1427,9 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
             try:
                 notify(notice)
             except Exception as e:                           # noqa: BLE001 - reported
-                reasons.append(f"the notification for action {aid} could not be delivered: {e}")
+                reasons.append(public_errors.failed(
+                    f"the notification for action {aid} could not be delivered",
+                    "notification failed", e))
             tr.escalation(to="owner (notified)", reason=f"action {aid} {req.name} executed",
                           blocking=False)
         return {"action_id": aid, "status": "executed", "result_pointers": len(result_ptrs)}
@@ -1419,6 +1461,13 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
             if tokens_used >= token_cap:
                 stop_reason = f"the token budget for one run ({token_cap}) was used up"
                 break
+            # F-09: the wall clock bounds every run; near it the planner answers from what it has
+            spent = _clock() - t_clock
+            if spent >= budget_s:
+                stop_reason = f"the time budget for one run ({budget_s:g} s) was used up"
+                break
+            if wrap_up is None and step_no > 0 and spent >= WRAP_AT * budget_s:
+                wrap_up = f"the time budget for one run ({budget_s:g} s) is nearly used up"
             if wrap_up is None and step_no > 0:
                 if step_no == spec.limits.max_steps - 1:
                     wrap_up = f"the step limit ({spec.limits.max_steps}) is reached after this turn"
@@ -1436,9 +1485,11 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
             except Exception as e:                               # noqa: BLE001 - plain words
                 name = type(e).__name__
                 if name == "BudgetExceeded":
-                    stop_reason = f"the model budget was reached ({e})"
+                    stop_reason = public_errors.failed("the model budget was reached",
+                                                       "model budget reached", e)
                 else:
-                    stop_reason = f"the model could not be asked ({name}: {e})"
+                    stop_reason = public_errors.failed("the model could not be asked",
+                                                       "planner call failed", e)
                     failed = True
                 break
             model_calls += 1
@@ -1562,6 +1613,7 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
         tr.cost(llm_tokens=tokens_used, wall_ms=elapsed, model_calls=model_calls)
         record.steps = steps
         record.actions = action_entries
+        _scrub_public(reasons, skipped)                                    # W-08: the net
         record.coverage = Coverage(searched=sorted(searched), skipped=skipped, reasons=reasons)
         audit = (f"Measured: {model_calls} model call(s), {tool_calls} tool call(s), "
                  f"{len(searched)} source(s) searched ({', '.join(sorted(searched)) or 'none'}), "
@@ -1594,14 +1646,17 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
         status = "failed" if failed else ("completed" if final is not None else "stopped")
         return finish(status, md)
     except Exception as e:                                   # noqa: BLE001 - a run never vanishes
-        reasons.append(f"the run failed: {type(e).__name__}: {e}")
+        # W-08: the answer says the run failed and names the reference; the text is logged
+        why = public_errors.failed("the run failed", "agent run failed", e, run_id=run_id)
+        reasons.append(why)
         record.steps = steps
         record.actions = action_entries
+        _scrub_public(reasons, skipped)
         record.coverage = Coverage(searched=sorted(searched), skipped=skipped, reasons=reasons)
         record.outcome = RunOutcome(reason_code="no_answer", coverage_status="reduced")
-        tr.unrecordable(what="the remainder of this run", because=f"{type(e).__name__}: {e}")
+        tr.unrecordable(what="the remainder of this run", because=why)
         return finish("failed", f"**{heading} (verbatim):** {_md(verbatim)}\n\n**The run "
-                                f"failed:** {_md(f'{type(e).__name__}: {e}')}")
+                                f"failed:** {_md(why)}")
 
 
 # ================================================================================================

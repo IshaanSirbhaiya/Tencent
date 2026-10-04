@@ -237,16 +237,54 @@ def test_a_narrowed_grant_returns_reduced_coverage_and_no_half_computed_table(
     assert body["table"] == {}
 
 
-def test_when_the_planner_asks_instead_the_graph_answers_and_the_attempt_travels(
+def test_when_the_planner_asks_about_a_rule_routed_aggregate_its_question_is_the_answer(
         world, brain_app):
+    """E2E run 5, W-03: the founder's total, routed by rule, met a planner question. The graph
+    path computes no aggregate, so it could only narrate that the data "does not contain" the
+    total; the planner's question goes back instead (the `/federated/ask` needs-input shape)."""
     mount, holder = brain_app
     c = mount(plan=None)                          # the scripted planner returns a question
     body = c.post("/brain/query", json={"question": FOUNDER_Q}).json()
+    assert body["route"]["decided_by"] == "rules"
+    assert body["route"]["rule"] in bd.AGGREGATE_RULES                  # non-vacuous
+    assert body["routed_to"] == "federated" and body["answer_kind"] == "needs_clarification"
+    assert body["needs_clarification"] is True and body["grounded"] is False
+    assert body["questions"] and [i["text"] for i in body["question_items"]] == body["questions"]
+    assert all(i["id"].startswith("fed:") for i in body["question_items"])
+    assert body["run_id"] and body["activity_url"].startswith(f"/trace?run={body['run_id']}")
+    assert "delegation_attempt" not in body and not body["citations"]
+    assert [k["kind"] for k in holder["calls"]] == ["plan"]       # nothing was read or narrated
+
+
+def test_when_the_planner_asks_about_a_router_routed_question_the_graph_answers_and_the_attempt_travels(
+        world, brain_app):
+    """A question the ROUTER (a model) sent to delegation was not shown to be an aggregate: the
+    graph path still answers what it can, and the attempt travels with it."""
+    mount, holder = brain_app
+    c = mount(plan=None)
+    c.app.state.brain_llm = _Router(route="federated")
+    q = f"Do the meeting notes say anything about overdue {bd._noun_forms('invoices')[1]}?"
+    body = c.post("/brain/query", json={"question": q}).json()
+    assert body["route"]["decided_by"] == "router", body["route"]
     assert body["routed_to"] == "graph" and body["route"]["fallback_from"] == "federated"
     attempt = body["delegation_attempt"]
     assert attempt["questions"] and attempt["run_id"]
     assert attempt["activity_url"].startswith(f"/trace?run={attempt['run_id']}")
     assert [k["kind"] for k in holder["calls"]] == ["plan"]       # nothing was read or narrated
+
+
+def test_a_delegation_failure_carries_no_exception_text(world, brain_app):
+    """CONS standard 4: a fixed message and an opaque reference, never the exception's text."""
+    mount, _ = brain_app
+    c = mount()
+
+    def boom():
+        raise RuntimeError("secret-detail-7f3a in a private path")
+    c.app.state.federated_factory = boom
+    r = c.post("/brain/query", json={"question": FOUNDER_Q})
+    route = r.json()["route"]
+    assert route["delegation_unavailable"] and route["error_ref"].startswith("brain-")
+    assert "secret-detail-7f3a" not in r.text and "RuntimeError" not in r.text
 
 
 def test_candidate_rows_are_flagged_structurally(world, brain_app):
@@ -333,3 +371,11 @@ def test_e2e4_q01_a_refreshing_catalogue_is_said_never_planned_against(world, br
         assert body["grounded"] is False and body["table"] == {}
     else:
         assert "catalogue_refreshing" in body["route"]
+
+
+def test_a_table_name_is_routed_by_its_english_plural():
+    """E2E run 5: "which facilities ..." never named a `facility` table ("facilitys")."""
+    assert bd._noun_forms("facility") == ("facility", "facilities")
+    assert bd._noun_forms("invoices") == ("invoice", "invoices")
+    assert bd._noun_forms("survey") == ("survey", "surveys")
+    assert bd._noun_forms("address") == ("address", "addresses")

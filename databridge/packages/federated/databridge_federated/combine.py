@@ -126,17 +126,36 @@ def _admitted(sources: Any, admits: Admits) -> Optional[SourcePointer]:
     return None
 
 
+def _touching_sql(n_kinds: int) -> str:
+    """The open edges of the given kinds touching one node, through `ix_edges_src` /
+    `ix_edges_dst`, oldest first — a self-loop twice, as a whole-graph adjacency list held it."""
+    ks = ", ".join("?" for _ in range(n_kinds))
+    return (f"SELECT * FROM edges WHERE system_to IS NULL AND src_id = ? AND kind IN ({ks}) "
+            f"UNION ALL "
+            f"SELECT * FROM edges WHERE system_to IS NULL AND dst_id = ? AND kind IN ({ks}) "
+            f"ORDER BY rowid_pk")
+
+
 def _graph_reach(store: Any, start: str, *, hops: int, edge_kinds: set[str], kind: str,
-                 admits: Admits) -> list[tuple[Any, list[SourcePointer], list[str]]]:
+                 admits: Admits, cache: Optional[dict] = None
+                 ) -> list[tuple[Any, list[SourcePointer], list[str]]]:
     """Nodes of ``kind`` reachable from ``start`` within ``hops`` over the DECLARED edge kinds
     only, each with the edge pointers along the path (the link's evidence) and the kinds of EVERY
     node on the path. Only nodes and edges whose provenance the caller may read are traversed: a
-    path that needs an unadmitted node or edge does not exist for this caller."""
+    path that needs an unadmitted node or edge does not exist for this caller.
+
+    E2E run 5, F-05/F-07: the edges of each node the walk reaches are read by index, when it
+    reaches it — not every open edge of the graph once per row (201 s for 21 rows on the finance
+    graph). ``cache`` (one per link) keeps nodes and adjacency across the rows of one link."""
     from databridge_graph.store import row_to_edge, row_to_node  # noqa: PLC0415
 
     if not edge_kinds:                        # an undeclared edge set traverses nothing
         return []
-    visible: dict[str, Any] = {}
+    cache = cache if cache is not None else {}
+    visible: dict[str, Any] = cache.setdefault(("nodes",), {})
+    adj: dict[str, list[tuple[Any, SourcePointer]]] = cache.setdefault(
+        ("adj", tuple(sorted(edge_kinds))), {})
+    edge_list = sorted(edge_kinds)
 
     def node(nid: str) -> Any:
         if nid not in visible:
@@ -145,19 +164,21 @@ def _graph_reach(store: Any, start: str, *, hops: int, edge_kinds: set[str], kin
             visible[nid] = n if (n is not None and _admitted(n.sources, admits)) else None
         return visible[nid]
 
+    def touching(nid: str) -> list[tuple[Any, SourcePointer]]:
+        if nid not in adj:
+            out = []
+            for r in store.fetchall(_touching_sql(len(edge_list)),
+                                    (nid, *edge_list, nid, *edge_list)):
+                e = row_to_edge(store, r)
+                ptr = _admitted(e.sources, admits)
+                if ptr is not None:
+                    out.append((e, ptr))
+            adj[nid] = out
+        return adj[nid]
+
     first = node(start)
     if first is None:
         return []
-    adj: dict[str, list[tuple[Any, SourcePointer]]] = {}
-    for r in store.fetchall("SELECT * FROM edges WHERE system_to IS NULL"):
-        e = row_to_edge(store, r)
-        if str(getattr(e.kind, "value", e.kind)) not in edge_kinds:
-            continue
-        ptr = _admitted(e.sources, admits)
-        if ptr is None:
-            continue
-        adj.setdefault(e.src_id, []).append((e, ptr))
-        adj.setdefault(e.dst_id, []).append((e, ptr))
     seen: dict[str, tuple[list[SourcePointer], list[str]]] = {
         start: ([], [str(getattr(first.kind, "value", first.kind))])}
     q = deque([(start, 0)])
@@ -165,7 +186,7 @@ def _graph_reach(store: Any, start: str, *, hops: int, edge_kinds: set[str], kin
         nid, d = q.popleft()
         if d >= hops:
             continue
-        for e, ptr in adj.get(nid, []):
+        for e, ptr in touching(nid):
             o = e.dst_id if e.src_id == nid else e.src_id
             if o in seen:
                 continue
@@ -201,6 +222,7 @@ def _link_index(link: LinkSpec, other: SubResult, *, store: Any, catalogue: Cata
     idx: dict[str, list[tuple[list[SourcePointer], bool]]] = {}
     scope: Admits = admits if admits is not None else (lambda sid: sid == other.connection)
     field_subject = link.key_kind is not None and catalogue.is_subject(link.key_kind)
+    reach_cache: dict = {}                    # one link's graph reads, shared across its rows
     for row in other.rows:
         if link.other_field is not None:
             gv = row.cells.get(link.other_field)
@@ -219,7 +241,8 @@ def _link_index(link: LinkSpec, other: SubResult, *, store: Any, catalogue: Cata
                 raise CombineError("a graph link needs the graph store")
             for node, path, kinds in _graph_reach(store, ent.node_id, hops=link.max_hops,
                                                   edge_kinds=set(link.edge_kinds),
-                                                  kind=str(link.entity_kind), admits=scope):
+                                                  kind=str(link.entity_kind), admits=scope,
+                                                  cache=reach_cache):
                 if node.canonical_id:
                     through_subject = any(catalogue.is_subject(k) for k in kinds)
                     idx.setdefault(str(node.canonical_id), []).append(

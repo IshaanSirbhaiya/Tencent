@@ -31,6 +31,7 @@ from databridge_agentdef import AmbientAuthorityRefused, GrantedAuthority
 from databridge_core import SourcePointer
 from databridge_workflow_spec import SpecError, WorkflowSpec, parse_tool
 
+from . import public_errors
 from .capture import capture_live_read, document_identity
 from .classify import classify_tool as _classify_one
 from .classify import plan_read_tools
@@ -116,7 +117,113 @@ class McpFactsStore:
 
     def query(self, connection: str, sql: str, *, params: Any = None,
               question: Optional[str] = None) -> Any:
+        # E2E run 5 W-08: `public.invoices` (the catalogue's and the plan's name) and `invoices`
+        # (the facts store's) are one table - resolved from the store's own catalogue
+        sql = resolve_table_names(sql, self.table_names(connection))
         return self._count.count_query(connection, sql, params=params, question=question)
+
+    def catalogue(self, connection: str) -> list[dict]:
+        """The store's table catalogue (its manifest): one entry per source table, with the facts
+        table it was copied to (None when it was excluded, with the reason)."""
+        try:
+            manifest = self._facts.load_manifest(connection) or {}
+        except Exception:                                    # noqa: BLE001 - none readable
+            return []
+        return [t for t in manifest.get("tables") or [] if isinstance(t, dict)]
+
+    def table_names(self, connection: str) -> dict[str, str]:
+        """source table (``schema.table``) -> facts table, for the tables the store holds."""
+        return {str(t["source_table"]): str(t["facts_table"])
+                for t in self.catalogue(connection)
+                if t.get("source_table") and isinstance(t.get("facts_table"), str)
+                and t["facts_table"]}
+
+
+# --- facts table names (E2E run 5 W-08) -------------------------------------------------------
+_SQL_IDENT = r'(?:"(?:[^"]|"")+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_$]*)'
+_QUALIFIED = re.compile(rf'(?<![\w."`\]])({_SQL_IDENT})\s*\.\s*({_SQL_IDENT})(?![\w"`\[])')
+_BARE_TABLE = re.compile(rf'(?i)\b(FROM|JOIN)(\s+)({_SQL_IDENT})(?![\w$])(?!\s*\.)')
+#: string literals and comments are never rewritten
+_SQL_SKIP = re.compile(r"'(?:[^']|'')*'|--[^\n]*|/\*.*?\*/", re.S)
+
+
+def _unquote(ident: str) -> str:
+    if len(ident) >= 2 and ident[0] + ident[-1] in ('""', "``", "[]"):
+        return ident[1:-1].replace('""', '"')
+    return ident
+
+
+def _quote(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def resolve_table_names(sql: str, names: Mapping[str, str]) -> str:
+    """``sql`` with every table named the way the SOURCE names it (``schema.table``, quoted or
+    not, any case) written as the facts store names it, and a bare ``FROM t`` / ``JOIN t`` that is
+    not a facts table but is exactly one source table's name written as that table. Nothing in a
+    string literal or a comment is touched, an ``alias.column`` is never a table, and an ambiguous
+    or unknown name is left as written (its error then lists the store's tables)."""
+    if not names or not sql:
+        return sql
+    by_ref = {k.lower(): v for k, v in names.items()}
+    facts_names = {v.lower() for v in names.values()}
+    by_bare: dict[str, list[str]] = {}
+    for ref, ft in names.items():
+        by_bare.setdefault(ref.rsplit(".", 1)[-1].lower(), []).append(ft)
+
+    def qualified(m: "re.Match[str]") -> str:
+        ft = by_ref.get(f"{_unquote(m.group(1))}.{_unquote(m.group(2))}".lower())
+        return _quote(ft) if ft else m.group(0)
+
+    def bare(m: "re.Match[str]") -> str:
+        name = _unquote(m.group(3)).lower()
+        hits = by_bare.get(name) or []
+        if name in facts_names or len(hits) != 1:
+            return m.group(0)
+        return f"{m.group(1)}{m.group(2)}{_quote(hits[0])}"
+
+    out, last = [], 0
+    for m in _SQL_SKIP.finditer(sql):
+        part = sql[last:m.start()]
+        out.append(_BARE_TABLE.sub(bare, _QUALIFIED.sub(qualified, part)))
+        out.append(m.group(0))
+        last = m.end()
+    part = sql[last:]
+    out.append(_BARE_TABLE.sub(bare, _QUALIFIED.sub(qualified, part)))
+    return "".join(out)
+
+
+def facts_failure(store: Any, connection: str, exc: BaseException) -> dict:
+    """What the planner (and, through the coverage notes, a person) is told when a facts query
+    fails: a fixed sentence chosen by the KIND of failure, the store's own table list when the
+    statement named a table it does not hold, and a reference to the logged detail - never the
+    exception's text (W-08)."""
+    ref = public_errors.error_ref("facts query failed", exc, connection=connection)
+    low = str(exc).lower()
+    entries = []
+    cat = getattr(store, "catalogue", None)
+    if callable(cat):
+        try:
+            entries = list(cat(connection))
+        except Exception:                                    # noqa: BLE001 - none to list
+            entries = []
+    if "no such table" in low:
+        held = sorted(f"{t.get('facts_table')} (source: {t.get('source_table')})"
+                      for t in entries if isinstance(t.get("facts_table"), str))
+        excluded = sorted(str(t.get("source_table")) for t in entries
+                          if not isinstance(t.get("facts_table"), str) and t.get("source_table"))
+        msg = (f"the statement names a table this facts store does not hold (reference {ref})"
+               + (f"; it holds: {', '.join(held)} - a source table may be named either way"
+                  if held else "")
+               + (f"; excluded from the store: {', '.join(excluded)}" if excluded else ""))
+        return {"error": msg, "error_ref": ref}
+    elif "no such column" in low:
+        msg = "the statement names a column the table does not have"
+    elif "duplicate column" in low:
+        msg = "the result has two columns with one name; alias each one (AS ...)"
+    else:
+        msg = "the facts query was refused or failed"
+    return {"error": f"{msg} (reference {ref})", "error_ref": ref}
 
 
 def default_facts() -> Optional[FactsStore]:
@@ -841,7 +948,9 @@ class ToolLayer:
                 self._source(parts, args, out)
         except Exception as e:                               # noqa: BLE001 - reported, not raised
             out.ok = False
-            out.observation = {"error": f"the tool failed: {type(e).__name__}: {e}"}
+            # W-08: a fixed sentence and a reference; the exception is in the server log
+            ref = public_errors.error_ref("tool failed", e, tool=tool)
+            out.observation = {"error": f"the tool failed (reference {ref})", "error_ref": ref}
         if parts["family"] in (FACTS_SOURCE, "source") and out.pointers:
             ids = query_ids(out.args)                        # P-12: what the query was ABOUT
             for p in out.pointers:
@@ -1039,7 +1148,7 @@ class ToolLayer:
                                              else None))
         except Exception as e:                               # noqa: BLE001 - reported
             out.ok = False
-            out.observation = {"error": f"the facts query failed: {type(e).__name__}: {e}"}
+            out.observation = facts_failure(self.facts, conn, e)      # W-08: no exception text
             return
         columns = list(getattr(ans, "columns", []) or [])
         rows = [list(r) for r in (getattr(ans, "rows", []) or [])]
@@ -1524,7 +1633,8 @@ class ToolLayer:
                 from databridge_mcp_ingest.screen import load_screen   # noqa: PLC0415 - one screen
                 self._screen_cfg = load_screen()
             except Exception as e:                           # noqa: BLE001 - fail closed
-                self._screen_problem = f"{type(e).__name__}: {e}"
+                self._screen_problem = public_errors.failed(
+                    "the ingestion screen could not be loaded", "screen not loaded", e)
         return self._screen_cfg
 
     def _overrides_for(self, conn: str) -> Any:
@@ -1629,9 +1739,10 @@ def _extract_text(data: bytes, *, name: str, mime: Optional[str],
     try:
         return extract_text(data, name=name, mime=mime, source_id=source_id).text, ""
     except ExtractionFailed as e:
-        return None, str(e)
+        return None, public_errors.scrub(str(e), "extraction refused")
     except Exception as e:                                   # noqa: BLE001 - reported
-        return None, f"{type(e).__name__}: {e}"
+        return None, public_errors.failed("the text could not be extracted",
+                                          "extraction failed", e, source_id=source_id)
 
 
 def _screen_sql_result(raw: str, cfg: Any) -> tuple[str, str, list[dict]]:
@@ -1681,5 +1792,5 @@ def _short_hash(s: str) -> str:
 __all__ = ["pointer_id", "Evidence", "GatewayResult", "SourceGateway", "Retriever", "RetrievalModuleRetriever",
            "McpSourceGateway", "default_gateway", "default_retriever", "sql_is_read_only",
            "SQL_READ_FUNCTIONS", "classify_tools", "FactsStore", "McpFactsStore",
-           "default_facts",
+           "default_facts", "resolve_table_names", "facts_failure",
            "Evidence", "PointerRegistry", "ToolOutcome", "ToolLayer", "OBSERVATION_CHARS"]

@@ -236,7 +236,7 @@ def test_f2_3_a_table_held_for_review_reaches_the_mapper_as_schema_only_and_no_m
             man = json.loads((Path(rep.run_dir) / runner.DISCOVERY_FILE).read_text("utf-8"))
             held = [t for t, e in man["tables"].items() if e["decision"] == "review"]
             allowed = [t for t, e in man["tables"].items() if e["decision"] == "allow"]
-            assert held and allowed                                       # non-vacuous
+            assert allowed                                                # non-vacuous
             for snaps, harness in seen:
                 for t, snap in snaps.items():
                     if t in held:
@@ -246,6 +246,19 @@ def test_f2_3_a_table_held_for_review_reaches_the_mapper_as_schema_only_and_no_m
             assert any(h is sentinel for snaps, h in seen if set(snaps) & set(allowed))
             for t in held:
                 assert "mapping_digest" in man["tables"][t]
+            # R-029 (E2E run 5 F-01): the planted text holds its ROWS, not its table; no held
+            # row reaches the mapper, and the discovery says how many it kept out
+            from databridge_mcp_ingest.screen import row_digest
+            gov = runner.read_jsonl(Path(rep.run_dir) / "governance.jsonl")
+            rows_held = [g for g in gov if g.get("kind") == "table_row"
+                         and g.get("decision") != "allow"]
+            assert rows_held                                              # non-vacuous
+            digests = {g["sha256"] for g in rows_held}
+            for snaps, _ in seen:
+                for t, snap in snaps.items():
+                    assert not [r for r in snap.get("rows") or [] if row_digest(r) in digests], t
+            for t in {g["table"] for g in rows_held}:
+                assert man["tables"][t]["rows_held"] == sum(g["table"] == t for g in rows_held)
     finally:
         clear_caches()
         db.close()

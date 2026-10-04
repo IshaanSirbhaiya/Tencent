@@ -4,11 +4,12 @@ is approved, and the screen's HOLDS with an owner action to lift one.
 Driven end to end on TWO estates, through real syncs (`run_ingest` on the estate's own rows) and
 the real gateway routes (`rt.ingest` is the real `IngestFacade`):
 
-1. The first sync's screen HOLDS the mixed people/organisation table (finance: the planted note in
+1. The first sync's screen HOLDS the ROW of the mixed people/organisation table that carries the
+   planted note (E2E run 5 F-01: rows are held one by one, never the whole table; finance: the note in
    `core_banking.party`; workspace: the same note, copied from the finance row that carries it,
    in a table assembled from Larkspur's own employees and customers).
    `GET /sources/{id}/holds` lists exactly the run ledger's review decisions, with the rules that
-   fired and the screen's reason. An owner lifts the hold with `POST /sources/{id}/overrides`
+   fired and the screen's reason. An owner lifts that ROW's hold with `POST /sources/{id}/overrides`
    (refused without a credential); the hold then reads "lifted, by whom".
 2. The next sync captures the table and PROPOSES its kind split. `GET /sources/{id}/mapping/review`
    shows it before approval: the column, every value -> kind with its row count, and the rows
@@ -177,10 +178,28 @@ def _ledger(run_dir: Path) -> list[dict]:
 
 
 # --- 1. the screen's holds, and the owner's action ------------------------------------------------
-def test_a_held_table_is_listed_with_its_reason_and_an_owner_lifts_it(synced):
+def _row_holds(ledger: list[dict], table: str) -> list[dict]:
+    """The run ledger's REVIEW decisions on ROWS of `table` (E2E run 5 F-01: a planted cell holds
+    its ROW, never the table). Read by the ledger's own `kind`/`table` fields."""
+    from databridge_mcp_ingest.runner import TABLE_ROW
+
+    return [r for r in ledger if r.get("decision") == "review"
+            and r.get("kind") == TABLE_ROW and r.get("table") == table]
+
+
+def test_a_held_row_is_listed_with_its_reason_and_an_owner_lifts_it(synced):
     app, mixed = synced["app"], synced["mixed"]
-    review = [r for r in _ledger(synced["run_dir"]) if r.get("decision") == "review"]
-    assert any(r["uri"] == mixed for r in review)                         # non-vacuous
+    ledger = _ledger(synced["run_dir"])
+    review = [r for r in ledger if r.get("decision") == "review"]
+    rows_held = _row_holds(ledger, mixed)
+    assert rows_held                                                      # non-vacuous
+    # the table itself is ALLOWED (its metadata), and it counts the rows it holds
+    [table_dec] = [r for r in ledger if r.get("uri") == mixed and r.get("kind") != "table_row"]
+    assert table_dec["decision"] == "allow"
+    assert table_dec["rows_held"]["review"] == len(rows_held)
+    assert table_dec["rows_screened"] == len(synced["rows"])
+    # only the rows carrying the planted note are held: the rest of the table is not
+    assert len(rows_held) < len(synced["rows"])
     with TestClient(app) as anon:
         assert anon.get(f"/sources/{SID}/holds").status_code == 401
     with TestClient(app, headers=auth_headers("analyst-7")) as c:
@@ -188,10 +207,11 @@ def test_a_held_table_is_listed_with_its_reason_and_an_owner_lifts_it(synced):
         assert got.status_code == 200, got.text
         body = got.json()
         assert body["run_id"] == synced["run_dir"].name
-        assert {(h["item_id"], h["digest"]) for h in body["holds"]} == \
-            {(r["item_id"], r["sha256"]) for r in review}
-        [h] = [h for h in body["holds"] if h["uri"] == mixed]
-        want = next(r for r in review if r["uri"] == mixed)
+        assert {(h["item_id"], h["digest"]) for h in body["holds"]} ==             {(r["item_id"], r["sha256"]) for r in review}
+        want = rows_held[0]
+        [h] = [h for h in body["holds"] if h["item_id"] == want["item_id"]]
+        assert h["item_kind"] == "table_row" and h["uri"] == want["uri"]
+        assert h["uri"].startswith(mixed + "#")
         assert [x["rule"] for x in h["rules"]] == [f["rule"] for f in want["fired"]]
         assert h["rationale"] == want["rationale"] and h["reverse"] == want["reverse"]
         assert h["rationale"] and h["lifted"] is False and h["lifted_by"] is None
@@ -200,16 +220,22 @@ def test_a_held_table_is_listed_with_its_reason_and_an_owner_lifts_it(synced):
             assert anon.post(f"/sources/{SID}/overrides", json=lift).status_code == 401
         r = c.post(f"/sources/{SID}/overrides", json={**lift, "principal_id": "mallory"})
         assert r.status_code == 200, r.text
-        [h] = [x for x in c.get(f"/sources/{SID}/holds").json()["holds"] if x["uri"] == mixed]
+        [h] = [x for x in c.get(f"/sources/{SID}/holds").json()["holds"]
+               if x["item_id"] == want["item_id"]]
         assert h["lifted"] is True and h["lifted_by"] == "analyst-7"           # never a body name
         assert h["lifted_reason"] == "note read; not data" and h["lifted_dev_only"] is False
-    # the next sync builds past the hold: the table is no longer held
+        # lifting one row lifts THAT row only
+        others = [x for x in c.get(f"/sources/{SID}/holds").json()["holds"]
+                  if x["item_id"] != want["item_id"]]
+        assert all(x["lifted"] is False for x in others)
+    # the next sync builds past the hold: the lifted row is no longer held
     rep = synced["sync"]()
-    assert not [r for r in _ledger(Path(rep.run_dir))
-                if r.get("decision") == "review" and r.get("uri") == mixed]
+    after = _ledger(Path(rep.run_dir))
+    assert not [r for r in _row_holds(after, mixed) if r["item_id"] == want["item_id"]]
+    assert len(_row_holds(after, mixed)) == len(rows_held) - 1
     with TestClient(app, headers=auth_headers("analyst-7")) as c:
         assert not [x for x in c.get(f"/sources/{SID}/holds").json()["holds"]
-                    if x["uri"] == mixed]
+                    if x["item_id"] == want["item_id"]]
 
 
 # --- 2 + 3. the kind split, shown before approval and approved with the table ---------------------

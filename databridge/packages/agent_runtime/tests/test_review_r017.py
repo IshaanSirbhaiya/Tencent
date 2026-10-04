@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import re
 import sqlite3
 import sys
 import threading
@@ -472,7 +473,10 @@ def test_a_write_that_succeeded_is_recorded_even_if_capture_fails(
     after = approve(rec.run_id, "a1", person(), gateway=gateway, **decide)
     assert after.actions[0].status == "executed"
     executed = [e for e in _events(rec, dirs) if e["event"] == "executed"]
-    assert len(executed) == 1 and "capture store unavailable" in executed[0]["capture_error"]
+    # R-029 W-08: a fixed sentence and a reference; the exception's text is in the server log
+    assert len(executed) == 1 and "could not be captured" in executed[0]["capture_error"]
+    assert "capture store unavailable" not in executed[0]["capture_error"]
+    assert re.search(r"ERR-[0-9a-f]{10}", executed[0]["capture_error"])
     with pytest.raises(ActionRefused):
         approve(rec.run_id, "a1", person(), gateway=gateway, **decide)
     assert len(gateway.writes()) == 1

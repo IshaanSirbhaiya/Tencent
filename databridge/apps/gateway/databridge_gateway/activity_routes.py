@@ -123,6 +123,7 @@ from .activity_actor import (
     TOO_DEEP,
     UNEXPECTED_SHAPE,
     actor_from_record,
+    canonical_mechanism,
     make_actor,
     withheld,
 )
@@ -146,12 +147,14 @@ log = logging.getLogger("databridge.gateway.activity")
 #:   design_approval      a dataset design approved (the design's sealed log)
 #:   design_build         a dataset design built (the design's sealed log)
 #:   outbox_decision      an outbound draft approved, rejected or sent
+#:   screen_override      a person lifted (or reinstated) a screen hold (the sealed override log)
+#:   identity_rule_decision  a person approved or revoked a declared identity rule (ontology state)
 #:   decision_log         a decision log that did not verify (LEDGER_INTEGRITY_FAILED)
 RUN_FEED_KINDS = ("agent_run", "federated_run", "adapter_sync", "adapter_setup", "one_time_task",
                   "firing", "approval", "drift_proposal", "ontology_proposal")
 DECISION_KINDS = ("plan_approval", "mapping_approval", "link_decision", "setup_documents",
                   "setup_handoff", "design_approval", "design_build", "outbox_decision",
-                  "decision_log")
+                  "screen_override", "identity_rule_decision", "decision_log")
 ACTIVITY_KINDS = RUN_FEED_KINDS + DECISION_KINDS
 #: The trigger type a one-time task's run record carries (`one_time_routes.TRIGGER_TYPE`).
 ONE_TIME_TRIGGER = "one_time"
@@ -273,6 +276,10 @@ class ActivitySources:
     #: Setup decisions (``_setup/<source>/decisions.jsonl``, ``handoffs.jsonl``) live under the
     #: adapter-agent registry root; True reads them.
     setup_decisions: bool = False
+    #: E2E run 5 F-12 — identity-rule decisions: the ontology state file (who and when; what the
+    #: merge honours) and the gateway's audit beside it (how the decider signed in).
+    ontology_state: Optional[Path] = None
+    identity_rule_audit: Optional[Path] = None
 
 
 def resolve_sources(app: Any) -> ActivitySources:
@@ -344,6 +351,14 @@ def _decision_roots(app: Any) -> dict:
     try:
         from .outbox_routes import outbox_db_path                         # noqa: PLC0415
         out["outbox_db"] = Path(outbox_db_path(app))
+    except Exception:                                                     # noqa: BLE001
+        pass
+    try:
+        from databridge_graph.ontology_state import state_path            # noqa: PLC0415
+
+        from .identity_rules_routes import audit_path                     # noqa: PLC0415
+        out["ontology_state"] = Path(state_path())
+        out["identity_rule_audit"] = Path(audit_path())
     except Exception:                                                     # noqa: BLE001
         pass
     return out
@@ -1121,7 +1136,10 @@ def approval_items(run_id: str, agent: str, events: list[dict], record: dict) ->
         # records `authenticated_by` and, for the dev token's mechanism, `dev_only: true`). A
         # decision made with the public dev token is marked, never shown as a plain sign-in.
         decider_dev_only = bool(decider_ev is not None and decider_ev.get("dev_only") is True)
-        decider_auth = _scalar(decider_ev.get("authenticated_by")) if decider_ev else None
+        # (E2E run 5 W-09: the runtime's name for the gateway's mechanism is read as the auth
+        # layer's, so this field and the actor say the same as every other family)
+        decider_auth = (canonical_mechanism(_scalar(decider_ev.get("authenticated_by")))
+                        if decider_ev else None)
         # the row sits at its LATEST recorded event: the outcome, else the decision, else the ask
         last = max((e for e in evs if parse_ts(e.get("at"))),
                    key=lambda e: sort_key(e.get("at")), default=proposal)

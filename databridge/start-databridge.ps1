@@ -61,6 +61,12 @@ $env:WALNUT_SOURCE_REGISTRATION = "operator"
 # A local demo that insists on defaulted credentials can set
 # $env:WALNUT_DEV_ALLOW_CREDENTIAL_DEFAULTS = "1" (dev only; never in a deployment).
 
+# R-029 TIDY2: the deployment approval key (it seals every human decision) is NEVER created
+# implicitly any more: a read never writes, and a decision with no key is refused. This launcher is
+# the host operator, so it provisions the key ONCE, explicitly (WALNUT_APPROVAL_KEY_FILE, default
+# ~/.walnut/keys/approval.key). An existing key is never overwritten.
+python -c "from databridge_core.decision_ledger import provision_approval_key as p; p()"
+
 Write-Host "Starting gateway (backend, port 8000)..." -ForegroundColor Green
 Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd '$root'; python apps\gateway\serve.py"
 

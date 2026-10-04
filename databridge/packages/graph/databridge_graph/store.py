@@ -150,6 +150,14 @@ CREATE INDEX IF NOT EXISTS ix_edges_open_triple ON edges(src_id, dst_id, kind)
 -- scoring. There was no index on `kind` at all, so that narrowing was itself a full table scan.
 -- Same partial-index reasoning as above.
 CREATE INDEX IF NOT EXISTS ix_nodes_kind_open ON nodes(kind) WHERE system_to IS NULL;
+-- R-029 TIDY2 (TABX cross-track 3a): a table build looks up "the open node of THIS kind with
+-- THIS canonical id" (`find_by_canonical`) and "of this kind with this exact label" (the declared
+-- key twin) once per ROW. With only the single-column indexes, the planner on a fresh store (no
+-- ANALYZE) picks `ix_nodes_kind_open` and walks every open node of the kind. Partial composites
+-- make each lookup one SEARCH on both columns, selective without statistics.
+CREATE INDEX IF NOT EXISTS ix_nodes_kind_canon_open ON nodes(kind, canonical_id)
+    WHERE system_to IS NULL;
+CREATE INDEX IF NOT EXISTS ix_nodes_kind_label_open ON nodes(kind, label) WHERE system_to IS NULL;
 -- `extractor._subject_candidates` asks "which open subject mentions carry this grounded
 -- `extracted_identifier`?" (review R-019 t06 M1). An expression index over exactly the
 -- expression `open_nodes_with_identifier` queries, so that lookup is a SEARCH, not a scan.

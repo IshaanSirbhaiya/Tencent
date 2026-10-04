@@ -265,7 +265,9 @@ def _model_pass(text: str, catalogue: CatalogueLike, pp: PrePass, harness: Any,
     cat = {"connections": [{"id": c.id, "title": c.title, "kind": c.kind,
                             "read_tools": [t.name for t in c.read_tools],
                             "write_tools": [t.name for t in c.write_tools],
-                            "query": c.query_capable, "folders": list(c.locations)[:50]}
+                            "query": c.query_capable, "folders": list(c.locations)[:50],
+                            # F-09: the tables and kinds its mapping says it holds
+                            **({"holds": list(c.holds)[:50]} if c.holds else {})}
                            for c in catalogue.connections],
            "internal_tools": list(catalogue.internal_tools), "kinds": list(catalogue.kinds),
            # E2E N-04: registered adapter agents a workflow agent may delegate to
@@ -292,6 +294,84 @@ def _model_pass(text: str, catalogue: CatalogueLike, pp: PrePass, harness: Any,
 # --------------------------------------------------------------------------------------------
 # assembly
 # --------------------------------------------------------------------------------------------
+#: E2E run 5 F-09: the question asked when the words name no source to read
+SOURCES_QID = "sources"
+_YES = ("yes", "y", "true")
+
+
+def _stem(word: str) -> str:
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _stems(text: str) -> list[str]:
+    return [_stem(w) for w in re.findall(r"[a-z0-9]+", text.lower())]
+
+
+def _contains(seq: list[str], sub: list[str]) -> bool:
+    n = len(sub)
+    return n > 0 and any(seq[i:i + n] == sub for i in range(len(seq) - n + 1))
+
+
+def infer_sources(text: str, catalogue: CatalogueLike) -> list[tuple[str, list[str]]]:
+    """(connection id, what it holds that the words name), most matches first, for every READABLE
+    connection that holds something the request names: a table or kind its mapping lists, the
+    last segment of a folder it holds, or one of its aliases - word for word, in order. A hint
+    for the question the compiler ASKS; never a source on its own (R-017 #4)."""
+    words = _stems(text)
+    out: list[tuple[str, list[str]]] = []
+    for c in catalogue.connections:
+        if c.agent_write:
+            continue
+        hits: list[str] = []
+        for h in (*getattr(c, "holds", ()), *c.locations, *c.aliases):
+            name = re.split(r"[./\\]", str(h))[-1]
+            if _contains(words, _stems(name.replace("_", " "))) and name not in hits:
+                hits.append(name)
+        if hits:
+            out.append((c.id, hits))
+    out.sort(key=lambda x: (-len(x[1]), x[0]))
+    return out
+
+
+def _answered_sources(answers: dict[str, str], text: str,
+                      catalogue: CatalogueLike) -> tuple[list[str], str]:
+    """The sources the person gave for `SOURCES_QID` ("yes" = the inferred ones), and how. Only
+    readable connections count; anything else is ignored (and the question asked again)."""
+    ans = str(answers.get(SOURCES_QID) or "").strip()
+    if not ans:
+        return [], ""
+    if ans.lower() in _YES:
+        return [cid for cid, _ in infer_sources(text, catalogue)], "catalogue+answer"
+    picked = []
+    for cid in re.split(r"[,\s]+", ans):
+        conn = connection_of(catalogue, cid) if cid else None
+        if conn is not None and not conn.agent_write and cid not in picked:
+            picked.append(cid)
+    return picked, "answer"
+
+
+def _sources_question(text: str, catalogue: CatalogueLike) -> Question:
+    """F-09: a task that reads no source can see nothing (its scope IS its sources), so it is
+    never compiled runnable: the person is asked which to read, the catalogue's matches first."""
+    readable = [c.id for c in catalogue.connections if not c.agent_write]
+    inferred = infer_sources(text, catalogue)
+    if inferred:
+        named = "; ".join(f"{cid} (holds {', '.join(h[:4])})" for cid, h in inferred)
+        q = (f"You didn't name a source to read, and a task that reads no source can see "
+             f"nothing. From what each source holds, these look relevant: {named}. Should it "
+             f"read {' and '.join(cid for cid, _ in inferred)}? Answer yes, or name the "
+             f"source(s) it should read.")
+        first = [cid for cid, _ in inferred]
+        return Question(SOURCES_QID, q, ["yes", *first, *(c for c in readable if c not in first)])
+    return Question(SOURCES_QID, "You didn't name a source to read, and a task that reads no "
+                                 "source can see nothing. Which connected source(s) should it "
+                                 "read?", readable)
+
+
 def facts_supported() -> bool:
     """Whether the installed workflow_spec grammar knows `facts.query:<connection>` (S2/F1).
     Checked at call time, so the compiler degrades to `source.query` on an older grammar."""
@@ -599,6 +679,16 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
     questions = list(pp.questions)
     sources = list(pp.sources)
     grounded = set(pp.sources)            # connections the user's words or answers named
+    # F-09: the sources a person named (or confirmed) when asked which to read
+    picked, picked_by = _answered_sources(answers, text, catalogue)
+    for c in picked:
+        if c not in sources:
+            sources.append(c)
+        grounded.add(c)
+        derive(f"sources[{c}]", c, picked_by,
+               evidence=f"{SOURCES_QID} = {answers.get(SOURCES_QID)}"
+                        + (" (the sources the catalogue says hold what the request names)"
+                           if picked_by == "catalogue+answer" else ""))
     kind = pp.kind
     title = ""
     steps = list(pp.steps)
@@ -812,6 +902,13 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
             questions.append(Question("connections", "Which connected sources should this adapter "
                                                      "agent keep in the graph?",
                                       [c.id for c in catalogue.connections]))
+
+    # F-09: an agent whose words named no source, and that delegates to no adapter agent, could
+    # read nothing (its scope is its sources) - it is asked about, never compiled runnable. A
+    # source question already pending (the model's suggestion, an unknown name) is asked first.
+    if kind == "agent" and not sources and not pp.delegates and not any(
+            q.id.startswith(("model_source:", "source:")) for q in questions):
+        questions.append(_sources_question(text, catalogue))
 
     result.open_questions = questions
     result.derivations = derivations

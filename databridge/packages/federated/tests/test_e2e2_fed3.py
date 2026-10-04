@@ -335,6 +335,9 @@ def test_n02_a_person_row_links_only_as_a_candidate(lark, env):
     svc.store.add_node(GraphNode(id="person:dana", kind=NodeKind("person"), label="Dana Lee",
                                  canonical_id="C-1005", sources=(_span("kickoff", 200, 208),),
                                  valid_from=t, system_from=t))
+    # a request after the write: the catalogue MEASURES which kinds a connection holds (E2E run
+    # 5, F-07), so it is built after the person exists, as every request builds its own
+    svc = lark()
     plan = _live_plan(("person",))
     plan["combine"]["links"][0]["entity_kind"] = "person"
     ans = svc.answer("q", admission=ANALYST, plan=DelegationPlan.model_validate(plan))

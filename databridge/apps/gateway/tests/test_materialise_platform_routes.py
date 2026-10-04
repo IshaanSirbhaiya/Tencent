@@ -231,7 +231,10 @@ VAGUE_REQUEST = "a table of people"
 
 def test_p10_a_planner_question_is_answered_back_with_the_same_request(client):
     asked = _run(client, {"request": VAGUE_REQUEST})
-    assert asked["status"] == "refused" and asked["refusal"]["code"] == "PlanNeedsInput"
+    assert asked["status"] == "refused" and asked["refusal"]["code"] == "PLAN_NEEDS_INPUT"
+    assert asked["refusal"]["reason_code"] == "PlanNeedsInput"
+    # E2E5 W-11: the refusal routes to the flow that builds a plain table
+    assert "/materialise/designs" in asked["refusal"]["nearest_alternative"]
     items = asked["refusal"]["question_items"]
     assert len(items) == 1 and items[0]["text"] in asked["refusal"]["message"]
     qid = items[0]["id"]

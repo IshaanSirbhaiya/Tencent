@@ -166,7 +166,19 @@ function RefusalBlock({
           ))}
         </ul>
       )}
-      {refusal.nearest_alternative ? <p className="mt-1 text-2xs text-subtle">Nearest alternative: {refusal.nearest_alternative}</p> : null}
+      {refusal.nearest_alternative ? (
+        <p className="mt-1 text-2xs text-subtle" data-testid="agent-refusal-alternative">
+          Nearest alternative: {refusal.nearest_alternative}
+          {refusal.nearest_alternative.includes("/materialise/designs") ? (
+            <>
+              {" "}
+              <a className="underline" href="#raw">
+                Open Raw dataset by delegation
+              </a>
+            </>
+          ) : null}
+        </p>
+      ) : null}
       <QuestionForm refusal={refusal} onAnswer={onAnswer} disabled={answerDisabled} />
     </div>
   );

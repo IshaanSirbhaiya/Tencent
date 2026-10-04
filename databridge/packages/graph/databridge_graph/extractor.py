@@ -480,7 +480,9 @@ def extract_graph(doc, harness: Harness, *, store: Optional[GraphStore] = None,
                     f"(never used to build an id or drive a merge)")
             else:
                 cid, cid_ptr = text[hit[0]:hit[1]], pointer(*hit)
-        if bound.is_subject(ent.kind):
+        if bound.is_subject(ent.kind) or bound.is_person(ent.kind):
+            # IDN (E2E run 5 F-04): a PERSON kind the pack forgot to declare a subject is a
+            # person all the same (`Vocabulary.person_kinds`) and gets the same scoping.
             # A SUBJECT mention is scoped to its GROUNDED MENTION: document + span (review
             # R-019 t06 C2 — scoping by name@document fused two different same-named people in
             # one document). Its id cannot collide with any other mention, it carries no
@@ -512,7 +514,7 @@ def extract_graph(doc, harness: Harness, *, store: Optional[GraphStore] = None,
                              sources=[pointer(gs, ge)], valid_from=vf, system_from=sf)
         if any(n.id == node.id for n in out.entities):
             continue                              # the same entity listed twice: one node
-        if bound.is_subject(ent.kind):
+        if bound.is_subject(ent.kind) or bound.is_person(ent.kind):
             # recorded only for the node that SURVIVES dedup, so a candidate lookup can never run
             # on an identifier the stored node does not carry (R-019 t06 C2)
             subject_identifier[node.id] = cid

@@ -84,8 +84,8 @@ from pydantic import BaseModel, ConfigDict
 from . import agent_ownership
 from .auth import AuthenticatedPrincipal, install_auth_handler, require_principal
 from .platform_runtime import JobBusy, JobTracker
-from .public_errors import (FAILURE_MESSAGES, REF_NOTE, error_ref, from_exception, refusal,
-                            refusal_body)
+from .public_errors import (FAILURE_MESSAGES, REF_NOTE, actor_of, error_ref, from_exception,
+                            refusal, refusal_body)
 
 log = logging.getLogger("databridge.gateway.materialise")
 
@@ -321,15 +321,17 @@ def _federation(app: FastAPI) -> Any:
 
 
 def _run_design_job(app: FastAPI, impl: Any, design_id: str, digest: str,
-                    principal_id: str, allowed: Optional[set], job_id: str) -> None:
+                    principal_id: str, allowed: Optional[set], job_id: str, *,
+                    actor: Optional[dict] = None) -> None:
     jobs = _jobs(app)
     try:
         from databridge_federated import CatalogueAdmission          # noqa: PLC0415
         service = _federation(app)
+        # E2E5 W-10: the sealed `built` event names the common actor object (CONS_BRIEF §1)
         result = impl.build_design(design_id, digest=digest, by=principal_id, service=service,
                                    admission=CatalogueAdmission(principal_id, allowed),
                                    progress=lambda ev: jobs.progress(job_id, ev),
-                                   allowed=allowed)
+                                   allowed=allowed, **({"actor": actor} if actor else {}))
     except Exception as exc:                                         # noqa: BLE001
         code = getattr(exc, "code", None)
         if code:
@@ -434,6 +436,7 @@ def _register_design_routes(app: FastAPI) -> None:
             from databridge_materialise.delegated import approved_design  # noqa: PLC0415
             approved_design(impl.design_store(), design_id, digest=body.digest,
                             owner=principal.principal_id)
+            actor = actor_of(principal)
         except Exception as exc:                                     # noqa: BLE001
             if getattr(exc, "code", None):
                 return _design_refusal(exc, principal)
@@ -447,7 +450,8 @@ def _register_design_routes(app: FastAPI) -> None:
             return _refusal("ALREADY_RUNNING", "this design is already being built at that "
                                                "digest", 409, job_id=busy.job["job_id"])
         background.add_task(_run_design_job, app, impl, design_id, body.digest,
-                            principal.principal_id, allowed, job["job_id"])
+                            principal.principal_id, allowed, job["job_id"],
+                            actor=actor)
         return JSONResponse(status_code=202, content={
             "job_id": job["job_id"], "status": "running",
             "poll": f"/materialise/designs/jobs/{job['job_id']}"})

@@ -43,6 +43,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from . import auth as _auth
+
 log = logging.getLogger("databridge.gateway.platform")
 
 ENGINE_ENV = "WALNUT_AUTOMATION_ENGINE"
@@ -627,8 +629,12 @@ def engine_should_start() -> bool:
 # build / start / stop
 # ================================================================================================
 #: The gateway's authentication mechanisms, as the agent runtime and adapter agents know them.
-GATEWAY_MECHANISM = "gateway:auth"
-GATEWAY_DEV_MECHANISM = "gateway:dev-token"
+#: R-029 TIDY2: ONE definition, the auth layer's (`auth.GATEWAY_MECHANISM` / `auth.DEV_MECHANISM`),
+#: which every approval the shared gates record already names. This module registered the same
+#: mechanism as ``gateway:auth``, so the runtime's records diverged; Activity still reads that old
+#: name on records written before (`activity_actor.LEGACY_MECHANISMS`).
+GATEWAY_MECHANISM = _auth.GATEWAY_MECHANISM
+GATEWAY_DEV_MECHANISM = _auth.DEV_MECHANISM
 
 
 def register_gateway_authenticators() -> dict:
@@ -646,7 +652,7 @@ def register_gateway_authenticators() -> dict:
 
     from .auth import AuthenticatedPrincipal                          # noqa: PLC0415
 
-    trust_principal_type(AuthenticatedPrincipal, authenticated_by="gateway")
+    trust_principal_type(AuthenticatedPrincipal, authenticated_by=GATEWAY_MECHANISM)
     return {GATEWAY_MECHANISM: ar.register_authenticator(GATEWAY_MECHANISM),
             GATEWAY_DEV_MECHANISM: ar.register_authenticator(GATEWAY_DEV_MECHANISM,
                                                              dev_only=True)}

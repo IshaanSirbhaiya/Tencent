@@ -368,7 +368,7 @@ def ledger(tmp_path, vocab):
 def test_the_run_requests_are_answered_with_a_question_through_the_platform(ledger):
     with pytest.raises(RunRefused) as err:
         ledger.run({"request": RUN_PLAIN}, by="staff")
-    assert err.value.code == "PlanNeedsInput"
+    assert err.value.code == "PLAN_NEEDS_INPUT" and err.value.reason_code == "PlanNeedsInput"
     assert "status" in err.value.message
 
 

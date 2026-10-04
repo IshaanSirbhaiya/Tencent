@@ -97,6 +97,8 @@ servers:
     title: Larkspur Follow-ups (write, create-only)
     description: Write connection for read-write agents; agents use source.write:larkspur-followups:write_file.
     source_class: files
+    # E2E run 5 W-01: a write root is never crawled (plans, runs and batch-propose skip it)
+    purpose: agent_write
     trust: untrusted
     direct:
       transport: stdio
