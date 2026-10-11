@@ -129,6 +129,7 @@ export type TaskState =
   | "running"
   | "waiting_for_approval"
   | "done"
+  | "stopped"
   | "failed"
   | "refused"
   | string;
@@ -231,6 +232,10 @@ export function taskHeadline(task: Pick<OneTimeTask, "state" | "actions"> & { er
     const rj = task.actions.filter((a) => a.status === "rejected").length;
     const parts = [ex ? `${ex} write${ex === 1 ? "" : "s"} executed` : "", rj ? `${rj} rejected` : ""].filter(Boolean);
     return { tone: "done", text: parts.length ? `Done: ${parts.join(", ")}.` : "Done: read-only, nothing was written." };
+  }
+  if (task.state === "stopped") {
+    // R-029 Codex f1 #3: stopped by a limit (time, steps, tokens) - not done
+    return { tone: "failed", text: "Stopped before it finished: see the answer for why." };
   }
   return { tone: "failed", text: `The run ended ${task.state}: see the answer for why.` };
 }

@@ -736,3 +736,122 @@ def test_r5_f12_reading_the_hold_lifts_never_creates_the_approval_key(estate, mo
     # non-vacuous: the family was read, and said it could not be verified
     assert "screen_override" in (body.get("counts_incomplete") or []), body
     assert not key_file.exists() and not key_file.parent.exists()
+
+
+# ------------------------------------------------------------------------------------------------
+# R-029 Codex round 1 (wiki/40-reviews/R-029-ACT2.md)
+# ------------------------------------------------------------------------------------------------
+def _tree(root: Path) -> dict:
+    """Every file and directory under ``root`` with its size and mtime: what a read must not
+    change."""
+    out = {}
+    for p in sorted(root.rglob("*")):
+        st = p.stat()
+        out[str(p.relative_to(root))] = (p.is_dir(), None if p.is_dir() else st.st_size,
+                                         None if p.is_dir() else st.st_mtime_ns)
+    return out
+
+
+@pytest.mark.parametrize("with_key", [True, False])
+def test_r29_f1_02_get_activity_writes_nothing_anywhere(estate, monkeypatch, tmp_path, with_key):
+    """#2: GET /activity (every kind, as the owner, the keeper and an operator) creates, changes
+    or deletes NOTHING — no approval key, no lock file, no store, no directory — with the key
+    provisioned and without it."""
+    from databridge_mcp_ingest import screen
+
+    root = estate["src"].parent
+    key_file = tmp_path / "keys-elsewhere" / "approval.key"
+    monkeypatch.setenv(screen.APPROVAL_KEY_FILE_ENV, str(key_file))
+    if not with_key:
+        monkeypatch.delenv(screen.APPROVAL_KEY_ENV)
+    monkeypatch.setenv(agent_ownership.OPERATORS_ENV, json.dumps([OPERATOR]))
+    before = _tree(root)
+    seen = 0
+    for who in (OWNER, KEEPER, OPERATOR):
+        body = _feed(estate["app"], who)
+        seen += len(body["items"])
+        for kind in DECISION_KINDS:
+            _feed(estate["app"], who, kinds=kind)
+    assert seen > 0                                                     # non-vacuous
+    assert _tree(root) == before
+    assert not key_file.exists() and not key_file.parent.exists()
+    if not with_key:
+        # nothing sealed could be verified: those families are not totals, and said once
+        body = _feed(estate["app"], OPERATOR)
+        from databridge_gateway.activity_decisions import SEALED_FAMILIES
+        assert set(SEALED_FAMILIES) <= set(body.get("counts_incomplete") or [])
+        assert not {i["kind"] for i in body["items"]} & set(SEALED_FAMILIES)
+        assert "decision_log" not in {i["kind"] for i in body["items"]}
+
+
+def test_r29_f1_03_a_task_with_no_recorded_status_has_none(estate):
+    """#3: a one-time task whose record names no status is not "not_run" — its status is not
+    recorded — and its owner's type, which the task does not record, is absent."""
+    once = estate["app"].state.activity_sources.one_time_root
+    task = json.loads((once / "once_failed" / "task.json").read_text(encoding="utf-8"))
+    task.pop("status")
+    (once / "once_failed" / "task.json").write_text(json.dumps(task), encoding="utf-8")
+    got = _by_kind(_feed(estate["app"], OWNER)["items"])
+    [row] = [r for r in got["one_time_task"] if r.get("task_id") == "once_failed"]
+    assert row["status"] is None
+    assert row["actor"]["principal_type"] == absent()
+
+
+def test_r29_f1_04_a_broken_log_makes_its_families_incomplete_and_tells_its_decider(estate):
+    """#4: a tampered mapping log suppresses every decision in it — so mapping and link counts are
+    no totals — and the decider (not the keeper) still gets the integrity row, from the part of
+    the log that verifies (the sealed records before the edit)."""
+    from databridge_mcp_ingest.mapping import approval_log_path
+
+    path = approval_log_path(estate["sid"], estate["src"])
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) >= 2                                              # non-vacuous
+    rec = json.loads(lines[-1])
+    rec["table"] = "tampered"
+    lines[-1] = json.dumps(rec)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    body = _feed(estate["app"], OWNER)
+    got = _by_kind(body["items"])
+    assert "mapping_approval" not in got and "link_decision" not in got
+    assert [r["family"] for r in got["decision_log"]] == ["mapping_approval"]
+    assert {"mapping_approval", "link_decision"} <= set(body.get("counts_incomplete") or [])
+    assert body["counts"].get("mapping_approval") is None
+    # someone who owns nothing there learns nothing (no row, no incompleteness)
+    other = _feed(estate["app"], OTHER)
+    assert other["items"] == [] and not other.get("counts_incomplete")
+
+
+def test_r29_f1_05_outbox_rows_are_append_only_only_when_the_triggers_are_verified(estate):
+    """#5: `append_only_store` is said only when the database carries the producer's own
+    UPDATE/DELETE-blocking triggers; a database without them is `unverified`."""
+    got = _by_kind(_feed(estate["app"], OWNER)["items"])
+    assert {r["integrity"] for r in got["outbox_decision"]} == {APPEND_ONLY}
+    conn = sqlite3.connect(estate["outbox"])
+    names = [r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'outbox'")]
+    assert names                                                        # non-vacuous
+    conn.execute(f"DROP TRIGGER {names[0]}")
+    conn.commit()
+    conn.close()
+    got = _by_kind(_feed(estate["app"], OWNER)["items"])
+    assert {r["integrity"] for r in got["outbox_decision"]} == {UNVERIFIED}
+
+
+def test_r29_f1_06_a_delegation_serves_only_its_vocabulary():
+    """#6: a structured delegation carrying anything beyond the delegation vocabulary (a subject
+    id, a note, a nested object) serves only the vocabulary; the run-record schema is closed."""
+    from databridge_gateway.activity_actor import DELEGATION_KEYS, DELEGATION_SCHEMA_KEYS
+    from databridge_gateway.activity_routes import ACTOR_SCHEMA
+
+    a = actor_from_record({"actor": {
+        "principal_id": OWNER, "authenticated_by": "delegated:abc", "principal_type": "person",
+        "dev_only": False,
+        "delegation": {"policy_digest": "abc", "delegated_by": OWNER, "subject_id": "S1234567D",
+                       "note": SECRET, "nested": {"x": 1}, "scope": "mapping"}}})
+    assert set(a["delegation"]) == {"policy_digest", "delegated_by", "scope"}
+    assert set(a["delegation"]) <= set(DELEGATION_KEYS)
+    assert SECRET not in json.dumps(a) and "S1234567D" not in json.dumps(a)
+    flat = actor_from_record({"principal_id": OWNER, "authenticated_by": "delegated:abc",
+                              "delegated_by": OWNER, "free_text": SECRET})
+    assert flat["delegation"] == {"delegated_by": OWNER}
+    assert set(ACTOR_SCHEMA["delegation"]) == set(DELEGATION_SCHEMA_KEYS)

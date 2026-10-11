@@ -78,10 +78,12 @@ def _strip_fk(snap, col):
     return out
 
 
-def _link_case(estate):
-    """A declared FK whose target is mapped, not a person kind, keyed by a non-numeric single key,
-    with enough values to be measured: stripping the declaration makes it a link PROPOSAL."""
-    from databridge_mcp_ingest.mapping import _key_values, is_person_kind, propose_rules
+def _fk_cases(estate):
+    """Every declared FK whose two ends are mapped, keyed by a non-numeric single key, with enough
+    values to be measured: stripping the declaration makes it a link CANDIDATE. Yields
+    ``(table, fk, target, rules, never_linked_end)`` - the last says whether either end is a kind
+    an inferred link may never touch (`mapping.never_linked`, hard constraint 1)."""
+    from databridge_mcp_ingest.mapping import _key_values, never_linked, propose_rules
 
     snaps, vocab = estate["snaps"], estate["vocab"]
     rules = propose_rules(snaps, vocab)
@@ -92,12 +94,39 @@ def _link_case(estate):
             target = _ref(fk)
             if target == t or not (rules.get(target) and rules[target].node):
                 continue
-            if is_person_kind(vocab, rules[target].node["kind"]):
-                continue
             if not _key_values(snaps[target]):
                 continue
+            blocked = (never_linked(vocab, rules[t].node["kind"])
+                       or never_linked(vocab, rules[target].node["kind"]))
+            yield t, fk, target, rules, blocked
+
+
+def _link_case(estate):
+    """A link CANDIDATE whose BOTH ends may be linked (`never_linked` false at either end) - the
+    one a person reviews. R-029: a person-kind end is refused, asserted separately below."""
+    for t, fk, target, rules, blocked in _fk_cases(estate):
+        if not blocked:
             return t, fk, target, rules
-    raise AssertionError("no declared FK into a non-person, string-keyed table")  # non-vacuous
+    raise AssertionError("no declared FK between two linkable, string-keyed tables")  # non-vacuous
+
+
+def test_a_link_with_a_person_kind_end_is_never_proposed(estate):
+    """Hard constraint 1 (Codex R-029 #1): an inferred link never touches a subject or person kind
+    at either end; a stripped FK with such an end is NOT proposed (a per-record, human-selected
+    candidate only). Derived from the estate: every such FK it declares is checked."""
+    from databridge_mcp_ingest.mapping import SourceMapping, propose_rules,         refresh_link_proposals, save_mapping
+
+    vocab, snaps = estate["vocab"], estate["snaps"]
+    cases = [c for c in _fk_cases(estate) if c[4]]
+    if not cases:
+        pytest.skip(f"the {estate['name']} estate declares no FK with a person-kind end")
+    for t, fk, target, rules, _ in cases:
+        mine = {t: _strip_fk(snaps[t], fk["column"])}
+        save_mapping(SourceMapping(source_id=LEFT, tables=propose_rules(mine, vocab)))
+        others = {RIGHT: {target: (snaps[target], rules[target].node["kind"])}}
+        m = refresh_link_proposals(LEFT, mine, vocab, others=others)
+        got = [lk for lk in (m.tables[t].links or []) if lk["column"] == fk["column"]]
+        assert all(lk.get("status") != "proposed" for lk in got), (t, fk, got)
 
 
 def _seed_link(estate, monkeypatch):

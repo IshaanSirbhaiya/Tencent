@@ -33,6 +33,16 @@ class FactsTable:
     #: repeated; see `measure_values`), ``((column, (value, ...)), ...)``. The planner reads a
     #: status as a filter on the table that holds it instead of guessing a document kind.
     values: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    #: Codex R-029 r1 #1/#6: the columns whose values name or identify a SUBJECT (a person),
+    #: read from the source's APPROVED mapping (`<sources>/<connection>.mapping.yaml`): every
+    #: column of a table mapped to a subject kind, and every column that is the evidence of an
+    #: edge to a subject kind. ``None`` = the table is not in an approved mapping, so no column is
+    #: known to be safe: nothing of it is resolved, case-widened or shown (fail closed).
+    subject_columns: Optional[frozenset[str]] = None
+
+    def is_subject_column(self, column: str) -> bool:
+        """True unless the approved mapping shows ``column`` holds no subject's name or id."""
+        return self.subject_columns is None or column in self.subject_columns
 
 
 @dataclass(frozen=True)
@@ -87,9 +97,10 @@ class Catalogue:
 
     def connection_kinds(self, entry: "ConnectionEntry") -> list[str]:
         """The ontology kinds a documents connection may be asked for: the kinds it was MEASURED
-        to hold (F-07), else — unmeasured — every ontology kind."""
+        to hold (F-07). Unmeasured holds NOTHING (Codex R-029 r1 #7: fail closed — a source is
+        never assigned a kind nobody showed it holds)."""
         if entry.kinds is None:
-            return sorted(self.node_kinds)
+            return []
         return sorted(k for k, _n in entry.kinds if k in self.node_kinds)
 
     def describe(self) -> dict:
@@ -100,8 +111,12 @@ class Catalogue:
                  "connections": [
                      {"connection": c.connection, "channel": c.channel,
                       **({"facts_tables": [{"table": t.name, "columns": list(t.columns),
-                                            **({"categorical_values": {
-                                                col: list(vs) for col, vs in t.values}}
+                                            # Codex R-029 r1 #5: column NAMES only. Stored
+                                            # values never enter the planner's prompt (a value
+                                            # is source data, and could carry instructions);
+                                            # they are matched by rule outside the model.
+                                            **({"categorical_columns": [
+                                                col for col, _vs in t.values]}
                                                if t.values else {})}
                                            for t in c.tables],
                           "extracted_at": c.extract_date} if c.channel == "tabular" else
@@ -392,21 +407,83 @@ def subject_terms(store: Any, subject_kinds: Iterable[str]) -> Optional[frozense
 
 
 def screen_values(table: FactsTable, terms: Optional[frozenset[str]]) -> FactsTable:
-    """A table's categorical values as the PLANNING MODEL may see them (CONS standard 7: the
-    subject predicate governs model exposure). A column any of whose values is the name or id of
-    a subject-kind record (a person) is not listed; with no way to check (``None``), no value of
-    any column is listed (fail closed)."""
+    """A table's categorical values as anything downstream may use them (CONS standard 7: the
+    subject predicate governs exposure). Codex R-029 r1 #6: a column the approved mapping marks
+    subject-valued is dropped WHOLE (`FactsTable.subject_columns`); a table the mapping does not
+    cover keeps none (fail closed). As a second guard, a column any of whose values is the name or
+    id of a subject record in the graph is dropped too; with no way to check, none is kept."""
     if not table.values:
         return table
-    if terms is None:
+    if terms is None or table.subject_columns is None:
         return replace(table, values=())
     kept = tuple((c, vs) for c, vs in table.values
-                 if not any(" ".join(v.casefold().split()) in terms for v in vs))
+                 if c not in table.subject_columns
+                 and not any(" ".join(v.casefold().split()) in terms for v in vs))
     return replace(table, values=kept)
 
 
+def _endpoint_kind(template: Any) -> Optional[str]:
+    """``person:{walnut_fk_x}`` -> ``person``; ``None`` for the row's own endpoint."""
+    text = str(template or "")
+    if "{walnut_row_key}" in text or ":" not in text:
+        return None
+    return text.split(":", 1)[0].strip() or None
+
+
+def mapped_subject_columns(connection: str, *, is_subject: Any,
+                           sources_dir: Any = None) -> Optional[dict[str, frozenset[str]]]:
+    """``{facts table: subject-valued columns}`` from the connection's APPROVED mapping, or
+    ``None`` when there is no readable mapping. A facts table is named by the source table's last
+    dotted part (``core_banking.facility`` -> ``facility``), as the facts store names it.
+
+    Subject-valued: every column of a table whose node kind (or any kind its row split may
+    assign) is a subject kind; the evidence and key columns of every edge or approved link whose
+    other end is a subject kind. Decided from the mapping and the vocabulary — never a name."""
+    from pathlib import Path                                      # noqa: PLC0415
+
+    if sources_dir is None:
+        try:
+            from databridge_mcp_ingest import paths as _paths      # noqa: PLC0415
+            sources_dir = _paths.sources_dir()
+        except Exception:                                         # noqa: BLE001 - unknown
+            return None
+    path = Path(sources_dir) / f"{connection}.mapping.yaml"
+    try:
+        import yaml                                               # noqa: PLC0415
+        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:                                             # noqa: BLE001 - unknown
+        return None
+    out: dict[str, frozenset[str]] = {}
+    for src_table, spec in (doc.get("tables") or {}).items():
+        if not isinstance(spec, dict) or spec.get("status") not in (None, "approved"):
+            continue
+        cols = {str(c) for c in (spec.get("columns") or [])}
+        node = spec.get("node") or {}
+        split = spec.get("split") or {}
+        kinds = {str(node.get("kind") or "")} | {str(k) for k in
+                                                  ((split.get("kinds") or {}).values())}
+        if split.get("default"):
+            kinds.add(str(split["default"]))
+        subj: set[str] = set()
+        if any(k and is_subject(k) for k in kinds):
+            subj = set(cols) | {str(c) for c in (node.get("attrs") or {}).values()}
+        for e in list(spec.get("edges") or []) + [
+                {**(lk.get("edge") or {}), "evidence": [lk.get("column")],
+                 "target": lk.get("target_kind")} for lk in (spec.get("links") or [])
+                if isinstance(lk, dict)]:
+            ends = {_endpoint_kind(e.get("src")), _endpoint_kind(e.get("dst")), e.get("target")}
+            if any(k and is_subject(str(k)) for k in ends):
+                subj |= {str(c) for c in (e.get("evidence") or []) if c}
+                fk = str(e.get("fk") or "")
+                if "->" in fk:
+                    subj.add(fk.split("->", 1)[0].strip())
+        out[str(src_table).rsplit(".", 1)[-1]] = frozenset(subj)
+    return out
+
+
 def build_catalogue(specs: Iterable[Any], *, facts: Any = None, documents: bool = True,
-                    vocabulary: Any = None, store: Any = None) -> Catalogue:
+                    vocabulary: Any = None, store: Any = None,
+                    sources_dir: Any = None) -> Catalogue:
     """From adapter-agent specs (``AdapterAgentSpec``: ``id``, ``title``, ``status``,
     ``connections``), the facts store and the vocabulary. Paused agents are left out (their
     sources are not being kept right); their absence is recorded as a problem, not hidden."""
@@ -434,6 +511,12 @@ def build_catalogue(specs: Iterable[Any], *, facts: Any = None, documents: bool 
             if has_facts:
                 try:
                     tables, extracted = describe_steady(facts, cid)
+                    if cat.vocabulary_loaded:
+                        people = _people_kinds(vocabulary, cat)
+                        mapped = mapped_subject_columns(cid, is_subject=people.__contains__,
+                                                        sources_dir=sources_dir)
+                        tables = [replace(t, subject_columns=(mapped or {}).get(t.name))
+                                  for t in tables]
                     if terms is _UNSET:
                         terms = (subject_terms(store, _people_kinds(vocabulary, cat))
                                  if store is not None and cat.vocabulary_loaded else None)
@@ -449,9 +532,13 @@ def build_catalogue(specs: Iterable[Any], *, facts: Any = None, documents: bool 
                     cat.problems.append(f"{cid}: facts store could not be described: {why}")
                 continue
             if documents:
-                conns.append(ConnectionEntry(
-                    cid, "documents",
-                    kinds=source_node_kinds(store, cid) if store is not None else None))
+                kinds = source_node_kinds(store, cid) if store is not None else None
+                if kinds is None:
+                    # r1 #7: unmeasured is not "every kind"; it is said, and nothing is planned
+                    # against it until it is measured
+                    cat.problems.append(f"{cid}: which record kinds it holds could not be "
+                                        f"measured; its documents are not offered")
+                conns.append(ConnectionEntry(cid, "documents", kinds=kinds))
         cat.agents[spec.id] = AdapterAgentEntry(id=spec.id, title=getattr(spec, "title", spec.id),
                                                 status=getattr(spec, "status", "active"),
                                                 connections=tuple(conns))
@@ -564,6 +651,6 @@ def unowned_document_specs(specs: Iterable[Any], store: Any, facts: Any = None,
 
 __all__ = ["DirectFactsSpec", "declared_connections", "unowned_facts_specs",
            "unowned_document_specs", "source_node_kinds", "measure_values", "index_complete",
-           "subject_terms", "screen_values", "FactsTable", "ConnectionEntry", "AdapterAgentEntry", "Catalogue", "build_catalogue",
+           "subject_terms", "screen_values", "mapped_subject_columns", "FactsTable", "ConnectionEntry", "AdapterAgentEntry", "Catalogue", "build_catalogue",
            "describe_facts_tables", "describe_steady", "SteadyFacts", "DESCRIBE_ATTEMPTS",
            "registry_specs", "measure_key", "key_proof_sql"]

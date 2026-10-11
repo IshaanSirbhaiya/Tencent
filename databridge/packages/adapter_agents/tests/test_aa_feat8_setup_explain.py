@@ -311,7 +311,11 @@ def test_setup_records_are_activity_not_syncs(tmp_path):
     spec = mgr.create(draft_spec("db", "workspace"), by="alice")
     rec = record_step(mgr.runs_root, spec, step="propose_plan", status="completed", by="alice",
                       reason="proposed")
-    assert rec["kind"] == "adapter_setup" and rec["trigger"] == {"type": "setup", "by": "alice"}
+    # R-029 Codex f1 #6: an agent step nobody passed a requester for names the agent's machine
+    # actor - a trigger is never actor-less
+    from databridge_adapter_agents.setup import agent_actor
+    assert rec["kind"] == "adapter_setup" and rec["trigger"] == {
+        "type": "setup", "by": "alice", "actor": agent_actor(spec.id)}
     assert rec["produced_by"]["agent"] == f"adapter_agent:{spec.id}"
     started = record_step(mgr.runs_root, spec, step="build", status="started", by="alice",
                           reason="b")

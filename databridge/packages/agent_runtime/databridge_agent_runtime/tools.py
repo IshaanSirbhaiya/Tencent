@@ -122,6 +122,11 @@ class McpFactsStore:
         sql = resolve_table_names(sql, self.table_names(connection))
         return self._count.count_query(connection, sql, params=params, question=question)
 
+    def persist_query_artefact(self, answer: Any) -> Optional[str]:
+        """Save the query artefact the answer's `query_cell` pointers resolve through (R-029
+        TIDY2: the read wrote nothing; whoever publishes the pointers saves it)."""
+        return self._count.persist_query_artefact(answer)
+
     def catalogue(self, connection: str) -> list[dict]:
         """The store's table catalogue (its manifest): one entry per source table, with the facts
         table it was copied to (None when it was excluded, with the reason)."""
@@ -140,11 +145,14 @@ class McpFactsStore:
 
 
 # --- facts table names (E2E run 5 W-08) -------------------------------------------------------
-_SQL_IDENT = r'(?:"(?:[^"]|"")+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_$]*)'
-_QUALIFIED = re.compile(rf'(?<![\w."`\]])({_SQL_IDENT})\s*\.\s*({_SQL_IDENT})(?![\w"`\[])')
-_BARE_TABLE = re.compile(rf'(?i)\b(FROM|JOIN)(\s+)({_SQL_IDENT})(?![\w$])(?!\s*\.)')
-#: string literals and comments are never rewritten
-_SQL_SKIP = re.compile(r"'(?:[^']|'')*'|--[^\n]*|/\*.*?\*/", re.S)
+#: one SQL token: a string literal or a comment (never rewritten), an identifier (quoted or not),
+#: whitespace, or any other single character
+_SQL_TOKEN = re.compile(r"('(?:[^']|'')*'|--[^\n]*|/\*.*?\*/)"
+                        r'|("(?:[^"]|"")+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_$]*)'
+                        r"|(\s+)|(.)", re.S)
+#: words that end a FROM clause's comma-separated table list
+_FROM_END = frozenset({"WHERE", "GROUP", "ORDER", "LIMIT", "HAVING", "UNION", "EXCEPT",
+                       "INTERSECT", "ON", "USING", "WINDOW", "SELECT", "VALUES", "RETURNING"})
 
 
 def _unquote(ident: str) -> str:
@@ -158,11 +166,15 @@ def _quote(name: str) -> str:
 
 
 def resolve_table_names(sql: str, names: Mapping[str, str]) -> str:
-    """``sql`` with every table named the way the SOURCE names it (``schema.table``, quoted or
-    not, any case) written as the facts store names it, and a bare ``FROM t`` / ``JOIN t`` that is
-    not a facts table but is exactly one source table's name written as that table. Nothing in a
-    string literal or a comment is touched, an ``alias.column`` is never a table, and an ambiguous
-    or unknown name is left as written (its error then lists the store's tables)."""
+    """``sql`` with every table reference named the way the SOURCE names it (``schema.table``,
+    quoted or not, any case) written as the facts store names it, and a bare table name that is
+    not a facts table but is exactly one source table's name written as that table.
+
+    R-029 Codex f1 #7: only TABLE POSITIONS are rewritten - the reference right after ``FROM`` or
+    ``JOIN``, and each further one in a FROM clause's comma list. A dotted name anywhere else
+    (``alias.column``, ``schema.table.column`` in a WHERE) is left exactly as written, and so is
+    anything in a string literal or a comment, and an ambiguous or unknown name (its error then
+    lists the store's tables)."""
     if not names or not sql:
         return sql
     by_ref = {k.lower(): v for k, v in names.items()}
@@ -171,25 +183,50 @@ def resolve_table_names(sql: str, names: Mapping[str, str]) -> str:
     for ref, ft in names.items():
         by_bare.setdefault(ref.rsplit(".", 1)[-1].lower(), []).append(ft)
 
-    def qualified(m: "re.Match[str]") -> str:
-        ft = by_ref.get(f"{_unquote(m.group(1))}.{_unquote(m.group(2))}".lower())
-        return _quote(ft) if ft else m.group(0)
+    toks = [(m.lastindex, m.group(0)) for m in _SQL_TOKEN.finditer(sql)]
+    opaque, ident, space = 1, 2, 3
 
-    def bare(m: "re.Match[str]") -> str:
-        name = _unquote(m.group(3)).lower()
-        hits = by_bare.get(name) or []
-        if name in facts_names or len(hits) != 1:
-            return m.group(0)
-        return f"{m.group(1)}{m.group(2)}{_quote(hits[0])}"
+    def nxt(i: int) -> int:
+        """The index of the next token that is not whitespace or a comment."""
+        while i < len(toks) and (toks[i][0] == space or (toks[i][0] == opaque
+                                                         and not toks[i][1].startswith("'"))):
+            i += 1
+        return i
 
-    out, last = [], 0
-    for m in _SQL_SKIP.finditer(sql):
-        part = sql[last:m.start()]
-        out.append(_BARE_TABLE.sub(bare, _QUALIFIED.sub(qualified, part)))
-        out.append(m.group(0))
-        last = m.end()
-    part = sql[last:]
-    out.append(_BARE_TABLE.sub(bare, _QUALIFIED.sub(qualified, part)))
+    out: list[str] = []
+    i, expect, in_from = 0, False, False
+    while i < len(toks):
+        kind, text = toks[i]
+        if kind == ident and expect:
+            expect = False
+            j = nxt(i + 1)
+            if j < len(toks) and toks[j][1] == ".":
+                k = nxt(j + 1)
+                if k < len(toks) and toks[k][0] == ident:
+                    ft = by_ref.get(f"{_unquote(text)}.{_unquote(toks[k][1])}".lower())
+                    if ft is not None:
+                        out.append(_quote(ft))
+                    else:
+                        out.extend(t for _, t in toks[i:k + 1])
+                    i = k + 1
+                    continue
+            name = _unquote(text).lower()
+            hits = by_bare.get(name) or []
+            out.append(_quote(hits[0]) if name not in facts_names and len(hits) == 1 else text)
+            i += 1
+            continue
+        if kind == ident:
+            word = text.upper()
+            if word in ("FROM", "JOIN"):
+                expect, in_from = True, in_from or word == "FROM"
+            elif word in _FROM_END:
+                in_from = False
+        elif kind != space and kind != opaque and text in ("(", ")"):
+            expect, in_from = False, False
+        elif text == "," and in_from:
+            expect = True
+        out.append(text)
+        i += 1
     return "".join(out)
 
 
@@ -393,7 +430,11 @@ class McpSourceGateway:
         try:
             tools = self._client(connection).list_tools()
         except Exception as e:                               # noqa: BLE001
-            return ConnectionAdvert(connection=connection, reachable=False, problem=str(e))
+            # R-029 Codex f1 #4: never the exception's text (it can name a path or a credential)
+            return ConnectionAdvert(connection=connection, reachable=False,
+                                    problem=public_errors.failed(
+                                        "the connection could not be reached",
+                                        "advertise failed", e, connection=connection))
         plan = self._plan(connection)
         write_only = self._write_only(connection)
         approved_reads = plan_read_tools(plan)          # the SAME function the compiler uses
@@ -1164,6 +1205,21 @@ class ToolLayer:
                                         f"source pointer(s); a value without a pointer is not "
                                         f"evidence, so nothing from this result is shown"}
             return
+        # R-029 TIDY2: a facts READ writes nothing - this tool PUBLISHES the answer's
+        # `query_cell` pointers, so it saves what they cite (`persist_query_artefact`) before
+        # returning any of them; a store that cannot save it shows nothing (fail closed)
+        persist_query_artefact = getattr(self.facts, "persist_query_artefact", None)
+        if pointers and callable(persist_query_artefact):
+            try:
+                persist_query_artefact(ans)
+            except Exception as e:                           # noqa: BLE001 - reported
+                out.ok = False
+                ref = public_errors.error_ref("facts query artefact not saved", e,
+                                              connection=conn)
+                out.observation = {"error": f"the facts answer's citations could not be saved, "
+                                            f"so nothing from it is shown (reference {ref})",
+                                   "error_ref": ref}
+                return
         shown_rows = []
         withheld = 0
         k = 0

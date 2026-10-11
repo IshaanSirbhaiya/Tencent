@@ -262,7 +262,9 @@ def test_a_pack_with_no_subject_kind_gets_no_identity_resolution(tmp_path):
     try:
         vocab = build_vocabulary(["quiet"], tmp_path)
         assert vocab.subject_kinds == {}
-        assert vocab.never_fuzzy_merge == frozenset()
+        # R-029 Codex round 1 (IDN): person protection is fail-closed — an entity kind its pack
+        # did not declare `person: false` is never merged by name, subject or not
+        assert vocab.never_fuzzy_merge == frozenset({"thing"})
         assert vocab.is_subject("thing") is False
         assert vocab.identity_grant_for("thing") is None      # no fallback grant, by design
         assert vocab.attestation_for("thing") is None

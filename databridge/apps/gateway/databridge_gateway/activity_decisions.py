@@ -42,6 +42,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -82,6 +83,24 @@ FAILED = "failed"
 PLAN_SUFFIX = ".plan.approvals.jsonl"
 MAPPING_LOG_SUFFIX = ".mapping.approvals.jsonl"
 OVERRIDE_SUFFIX = ".override_approvals.jsonl"
+
+
+#: Families whose records can only be verified with the deployment approval key.
+SEALED_FAMILIES = ("plan_approval", "mapping_approval", "link_decision", "design_approval",
+                   "design_build", "screen_override")
+
+
+def approval_key_available() -> bool:
+    """Can the sealed logs be verified at all? Asks the core's READ-ONLY key reader
+    (`decision_ledger.approval_key`: environment, else an existing key file; never created). No
+    key: nothing sealed can be verified, so no sealed family is read (R-029 Codex f1 #2) — and no
+    reader is ever constructed that could provision anything."""
+    try:
+        from databridge_core.decision_ledger import approval_key            # noqa: PLC0415
+        approval_key()
+    except Exception:                                                     # noqa: BLE001
+        return False
+    return True
 
 
 def _no_run(**rest: Any) -> dict:
@@ -183,6 +202,22 @@ def integrity_row(log: str, namespace: str, at: Any, *, family: str,
 # ================================================================================================
 # plan approvals + mapping approvals (+ link decisions kept on the mapping)
 # ================================================================================================
+def verified_prefix(path: Path, what: str) -> list[dict]:
+    """The records of a log that DO verify (sealed and chained) before the point it breaks
+    (`DecisionLedger.inspect`, read-only). Used only to say WHOSE a broken log was — never shown as
+    decisions."""
+    try:
+        from databridge_core.decision_ledger import DecisionLedger         # noqa: PLC0415
+        recs, _why = DecisionLedger(path, what=what).inspect()
+        return list(recs)
+    except Exception:                                                     # noqa: BLE001
+        return []
+
+
+def _deciders(recs: Iterable[dict]) -> set[str]:
+    return {p for p in (actor_pid(actor_from_record(r)) for r in recs) if p}
+
+
 def read_ledger(path: Path, what: str) -> tuple[Optional[list[dict]], str]:
     """``(decision records, integrity)`` of a decision log, verified by THE decision ledger
     (`databridge_core.decision_ledger.DecisionLedger`: seal, chain and anchor, the anchor equal to
@@ -199,10 +234,14 @@ def read_ledger(path: Path, what: str) -> tuple[Optional[list[dict]], str]:
 
 
 def _source_logs(viewer: Viewer, src: ActivitySources, kind: str, suffix: str, what: str,
-                 problems: Problems, incomplete: set[str], out: list[dict]):
-    """Yield ``(source_id, keeper owner, verified records)`` per log; a log that does not verify
-    becomes ONE integrity row (for those who may see the source's decisions) instead."""
+                 problems: Problems, incomplete: set[str], out: list[dict],
+                 families: tuple[str, ...] = ()):
+    """Yield ``(source_id, keeper owner, verified records)`` per log. A log that does not verify
+    becomes ONE integrity row instead, and every family read from it is INCOMPLETE (its count is
+    no total: R-029 Codex f1 #4) — for those who may see the source's decisions: its keeper's
+    creator, an operator, and every decider named by the part of the log that still verifies."""
     budget = _Budget()
+    families = families or (kind,)
     for path in _listed(src.sources_dir, f"*{suffix}", kind, incomplete):
         sid = path.name[: -len(suffix)]
         keeper = keeper_owner(viewer, sid)
@@ -210,8 +249,9 @@ def _source_logs(viewer: Viewer, src: ActivitySources, kind: str, suffix: str, w
             continue
         recs, _integrity = read_ledger(path, what)
         if recs is None:
-            if may_see(viewer, keeper):
+            if may_see(viewer, keeper, *_deciders(verified_prefix(path, what))):
                 out.append(integrity_row(what, sid, None, family=kind, source_id=sid))
+                incomplete.update(families)
             continue
         yield sid, keeper, recs
 
@@ -271,7 +311,8 @@ def mapping_items(viewer: Viewer, src: ActivitySources, want: set[str], problems
     out: list[dict] = []
     kind = "mapping_approval" if "mapping_approval" in want else "link_decision"
     for sid, keeper, recs in _source_logs(viewer, src, kind, MAPPING_LOG_SUFFIX,
-                                          "mapping approval log", problems, incomplete, out):
+                                          "mapping approval log", problems, incomplete, out,
+                                          families=("mapping_approval", "link_decision")):
         for r in recs:
             action = r.get("action")
             if action == "approve" and not _mapping_line_ok(r, sid):
@@ -334,12 +375,16 @@ def _producer_on_ledger(module: str) -> bool:
 
 
 def _setup_log(path: Path, kind: str, problems: Problems, incomplete: set[str], *,
-               visible: bool) -> tuple[Optional[list[dict]], str]:
+               visible: bool, key_ok: bool = True) -> tuple[Optional[list[dict]], str]:
     """A setup decision log, read the way its producer reads it: through the decision ledger
     when it is sealed — or when the producer writes sealed logs (an unsealed one is then a legacy
     log, never evidence: ``None``); as plain append-only JSONL (``unverified``) while the producer
     still writes plain JSONL."""
     if _is_sealed(path) or _producer_on_ledger("databridge_adapter_agents.setup"):
+        if not key_ok:
+            # R-029 Codex f1 #2: a sealed log with no key to verify it is not READ (nothing
+            # is created to try) and is not a tamper alarm: it is unverifiable
+            return None, "no_key"
         recs, integrity = read_ledger(path, f"setup {path.name}")
         return recs, integrity
     recs, lossy = _read_jsonl(path, problems, kind, visible=visible)
@@ -349,7 +394,7 @@ def _setup_log(path: Path, kind: str, problems: Problems, incomplete: set[str], 
 
 
 def setup_items(viewer: Viewer, src: ActivitySources, want: set[str], problems: Problems,
-                incomplete: set[str]) -> list[dict]:
+                incomplete: set[str], key_ok: bool = True) -> list[dict]:
     out: list[dict] = []
     root = Path(src.adapter_agents_dir) / "_setup"
     budget = _Budget()
@@ -368,9 +413,13 @@ def setup_items(viewer: Viewer, src: ActivitySources, want: set[str], problems: 
                           visible=may_see(viewer, keeper)):
                 continue
             recs, integrity = _setup_log(path, kind, problems, incomplete,
-                                         visible=may_see(viewer, keeper))
+                                         visible=may_see(viewer, keeper), key_ok=key_ok)
+            if integrity == "no_key":
+                incomplete.add(kind)
+                continue
             if recs is None:
                 if may_see(viewer, keeper):
+                    incomplete.add(kind)
                     out.append(integrity_row(f"setup {fname}", sid, None, family=kind,
                                              source_id=sid))
                 continue
@@ -454,6 +503,7 @@ def design_items(viewer: Viewer, src: ActivitySources, want: set[str], problems:
             out.append(integrity_row("dataset design log", d.name,
                                      events[-1].get("at") if events else None,
                                      family="design_approval", design_id=d.name))
+            incomplete.update({"design_approval", "design_build"})
             continue
         for e in events:
             action = e.get("action")
@@ -520,6 +570,34 @@ def _outbox_actor(row: dict, role: str) -> Optional[dict]:
     return actor_from_record(row, pid_key=f"{role}_by", default_type=None)
 
 
+def _sql_norm(sql: str) -> str:
+    sql = re.sub(r"--[^\n]*", " ", sql)
+    sql = re.sub(r"\bIF\s+NOT\s+EXISTS\b", " ", sql, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", sql).strip().rstrip(";").strip().lower()
+
+
+def outbox_append_only(conn: sqlite3.Connection) -> bool:
+    """Does this database carry EXACTLY the producer's append-only triggers
+    (`databridge_outbox.store.SCHEMA`: every ``CREATE TRIGGER`` in it, by name and body)? Only then
+    are its rows an ``append_only_store`` (R-029 Codex f1 #5); a legacy, replaced or modified
+    database is ``unverified``. Read-only: ``sqlite_master`` is only queried."""
+    try:
+        from databridge_outbox.store import SCHEMA                          # noqa: PLC0415
+    except Exception:                                                     # noqa: BLE001
+        return False
+    want = {name: _sql_norm(stmt) for stmt, name in re.findall(
+        r"(CREATE\s+TRIGGER\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+).*?\bEND\s*;)", SCHEMA,
+        flags=re.IGNORECASE | re.DOTALL)}
+    if not want:
+        return False
+    try:
+        have = {r[0]: _sql_norm(r[1] or "") for r in conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'outbox'")}
+    except sqlite3.Error:
+        return False
+    return all(have.get(name) == body for name, body in want.items())
+
+
 def outbox_items(viewer: Viewer, src: ActivitySources, problems: Problems,
                  incomplete: set[str]) -> list[dict]:
     kind = "outbox_decision"
@@ -532,6 +610,7 @@ def outbox_items(viewer: Viewer, src: ActivitySources, problems: Problems,
     try:
         conn = _ro(db)
         try:
+            integrity = APPEND_ONLY if outbox_append_only(conn) else UNVERIFIED
             rows = [dict(r) for r in conn.execute(
                 "SELECT * FROM outbox WHERE status IN ('approved', 'rejected', 'sent') "
                 "ORDER BY rowid_pk DESC LIMIT ?", (MAX_DIR_ENTRIES,))]
@@ -563,7 +642,7 @@ def outbox_items(viewer: Viewer, src: ActivitySources, problems: Problems,
             recipient_origin=_scalar(r.get("recipient_origin")),
             # the rejection's reason is the decider's own sentence: withheld in place
             reason=withheld(FREE_TEXT) if r.get("reason") else None,
-            actor=actor or make_actor(None, None), integrity=APPEND_ONLY,
+            actor=actor or make_actor(None, None), integrity=integrity,
             title=f"outbound draft {draft} {status}",
             loud=actor is None, **_no_run()))
     return out
@@ -600,13 +679,15 @@ def one_time_task_items(viewer: Viewer, src: ActivitySources, problems: Problems
         owner = task.get("owner") if isinstance(task.get("owner"), str) else None
         if not may_see(viewer, owner) or task.get("run_id"):
             continue
-        status = _scalar(task.get("status")) or "not_run"
+        # R-029 Codex f1 #3: a status the producer did not record is None (not recorded), never
+        # a status it never wrote
+        status = _scalar(task.get("status"))
         out.append(_base(
             kind, f"task/{d.name}", task.get("failed_at") or task.get("created_at"),
             status=status, task_id=d.name, run_kind="agent", run_owner=d.name,
             error_ref=_scalar(task.get("error_ref")),
-            actor=actor_from_record(task, pid_key="owner", default_type="person")
-            or make_actor(None, None),
+            # the task records its owner's id only: how they are typed is not recorded
+            actor=actor_from_record(task, pid_key="owner") or make_actor(None, None),
             title=(_scalar(task.get("created_from")) or f"one-time task {d.name}")[:300],
             reason=("it failed before a run was recorded; any detail is in the server log under "
                     "the task's error reference" if status == "failed" else None),
@@ -640,28 +721,30 @@ def _override_key(sources_dir: Optional[Path]) -> Optional[bytes]:
 
 
 def _override_records(path: Path, sid: str, sources_dir: Optional[Path]
-                      ) -> tuple[Optional[list[dict]], str]:
+                      ) -> tuple[Optional[list[dict]], str, list[dict]]:
     """``(verified records, integrity)`` of one override log, verified exactly as its producer
     verifies it: through THE decision ledger once `screen` writes through it, else the screen's
     own sealed chain (`screen._read_chain`: seal, digest, ``seq``/``prev``, well-formedness). An
     unsealed legacy line is never a record. ``(None, FAILED)`` for a log that does not verify —
     and when no approval key can be read, since nothing could then be verified."""
     if _producer_on_ledger("databridge_mcp_ingest.screen"):
-        return read_ledger(path, "screen override log")
+        recs, integrity = read_ledger(path, "screen override log")
+        return recs, integrity, (verified_prefix(path, "screen override log")
+                                 if recs is None else [])
     try:
         from databridge_mcp_ingest.screen import _read_chain               # noqa: PLC0415
         key = _override_key(sources_dir)
     except Exception:                                                     # noqa: BLE001
-        return None, FAILED
+        return None, FAILED, []
     if key is None:
-        return None, "no_key"
+        return None, "no_key", []
     try:
         chain = _read_chain(path, key, sid)
     except Exception:                                                     # noqa: BLE001
-        return None, FAILED
+        return None, FAILED, []
     if chain.broken:
-        return None, FAILED
-    return list(chain.records), SEALED_CHAINED
+        return None, FAILED, list(chain.records)
+    return list(chain.records), SEALED_CHAINED, []
 
 
 def screen_override_items(viewer: Viewer, src: ActivitySources, problems: Problems,
@@ -680,14 +763,15 @@ def screen_override_items(viewer: Viewer, src: ActivitySources, problems: Proble
         keeper = keeper_owner(viewer, sid)
         if not _admit(path, kind, budget, problems, incomplete, visible=may_see(viewer, keeper)):
             continue
-        recs, integrity = _override_records(path, sid, src.sources_dir)
+        recs, integrity, prefix = _override_records(path, sid, src.sources_dir)
         if integrity == "no_key":
             no_key = True
             continue
         if recs is None:
-            if may_see(viewer, keeper):
+            if may_see(viewer, keeper, *_deciders(prefix)):
                 out.append(integrity_row("screen override log", sid, None, family=kind,
                                          source_id=sid))
+                incomplete.add(kind)
             continue
         for r in recs:
             if r.get("source_id") != sid or r.get("action") not in ("approve", "revoke"):
@@ -755,6 +839,7 @@ def identity_rule_items(viewer: Viewer, src: ActivitySources, problems: Problems
     except Exception:                                                     # noqa: BLE001
         if viewer.operator:
             out.append(integrity_row("ontology state", "identity rules", None, family=kind))
+            incomplete.add(kind)
         return out
     audit = _identity_audit(src.identity_rule_audit, problems, incomplete, viewer.operator)
     for n, r in enumerate(recs):
@@ -789,20 +874,32 @@ def decision_items(viewer: Viewer, want: Iterable[str], problems: Problems,
     want = set(want)
     src = viewer.sources
     out: list[dict] = []
-    if want & {"plan_approval", "decision_log"}:
+    sealed_wanted = want & (set(SEALED_FAMILIES) | {"decision_log", "setup_documents",
+                                                    "setup_handoff"})
+    if sealed_wanted and not approval_key_available():
+        # R-029 Codex f1 #2: nothing sealed can be verified, and nothing is created to try. Said
+        # once, naming no log; those families are not totals.
+        problems.add({"source": "decisions", "file": None,
+                      "error": "sealed decision logs cannot be verified: no deployment approval "
+                               "key is provisioned, so they are not shown"})
+        incomplete.update(set(SEALED_FAMILIES) & want)
+        sealed_ok = False
+    else:
+        sealed_ok = True
+    if sealed_ok and want & {"plan_approval", "decision_log"}:
         out += plan_approval_items(viewer, src, problems, incomplete)
-    if want & {"mapping_approval", "link_decision", "decision_log"}:
+    if sealed_ok and want & {"mapping_approval", "link_decision", "decision_log"}:
         out += mapping_items(viewer, src, want | ({"mapping_approval"} if "decision_log" in want
                                                   else set()), problems, incomplete)
     if src.setup_decisions and want & {"setup_documents", "setup_handoff"}:
-        out += setup_items(viewer, src, want, problems, incomplete)
-    if want & {"design_approval", "design_build", "decision_log"}:
+        out += setup_items(viewer, src, want, problems, incomplete, key_ok=sealed_ok)
+    if sealed_ok and want & {"design_approval", "design_build", "decision_log"}:
         out += design_items(viewer, src, want, problems, incomplete)
     if "outbox_decision" in want:
         out += outbox_items(viewer, src, problems, incomplete)
     if "one_time_task" in want:
         out += one_time_task_items(viewer, src, problems, incomplete)
-    if want & {"screen_override", "decision_log"}:
+    if sealed_ok and want & {"screen_override", "decision_log"}:
         out += screen_override_items(viewer, src, problems, incomplete)
     if want & {"identity_rule_decision", "decision_log"}:
         out += identity_rule_items(viewer, src, problems, incomplete)

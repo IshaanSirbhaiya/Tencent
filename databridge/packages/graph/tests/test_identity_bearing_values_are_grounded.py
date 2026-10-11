@@ -129,15 +129,12 @@ def test_an_ungrounded_identifier_does_not_merge_two_subject_records():
     assert len(store.open_nodes_of_kind(kind)) == 2, "the duplicate must stay visible"
 
 
-def test_a_grounded_identifier_still_corroborates_the_same_subject_record():
-    """The tightening must not cost idempotency: a second record carrying the SAME grounded
-    identifier corroborates rather than duplicating.
-
-    The two nodes are given different ids on purpose. `_resolve_existing` matches an equal id
-    first (that is bookkeeping, not an identity judgement), so re-applying a byte-identical node
-    would corroborate without the canonical branch running at all — and the canonical branch is
-    what the grounding rule above guards. Different ids, one grounded identifier: the identifier
-    is the only thing that can join them, which is the case this test exists for.
+def test_a_grounded_identifier_never_joins_two_subject_records():
+    """IDN (R-029 Codex round 1, Critical) REVERSES the earlier expectation here, which let a
+    grounded identifier join two DIFFERENT subject records ("record linkage"). Hard constraint 1
+    as the founder states it: persons are never merged or auto-resolved, only candidates. Two
+    records with one grounded identifier stay two (a named human may link them); idempotency is
+    kept by the same-id re-sighting, asserted at the end.
     """
     store = GraphStore()
     kind = _subject_kind()
@@ -145,9 +142,10 @@ def test_a_grounded_identifier_still_corroborates_the_same_subject_record():
     second = _node(kind, "two", "Someone", canonical="KEY", ground_canonical=True)
     assert upsert_node(store, first).action == "inserted"
     again = upsert_node(store, second)
-    assert again.action == "corroborated"
-    assert again.matched_by == "canonical"
-    assert len(store.open_nodes_of_kind(kind)) == 1
+    assert again.action == "inserted" and again.requires_human_selection is True
+    assert len(store.open_nodes_of_kind(kind)) == 2
+    assert upsert_node(store, first).action == "corroborated"           # same record: bookkeeping
+    assert len(store.open_nodes_of_kind(kind)) == 2
 
 
 def test_a_non_subject_is_unaffected_by_the_identifier_rule():

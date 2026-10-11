@@ -26,6 +26,7 @@ import os
 import re
 import shutil
 import uuid
+import contextlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional, get_args
@@ -506,6 +507,9 @@ class PlatformMaterialiser:
         if read_notes:
             receipt = receipt.model_copy(update={"notes": receipt.notes + read_notes})
         plan = built.plan
+        # R-029 TIDY2: a facts read writes nothing; this BUILD publishes the query artefact of
+        # every query_cell cell it ships, so the receipt's pointers re-read in a later request
+        _persist_artefacts(built.dataset, reader.answers, reader._roots()[0])
         emit({"stage": "checking_pointers", "at": _now()})
         check = pointer_check(built.dataset, reader, plan=built.plan)
         if not (check["all_resolved"] and check["all_match"]):
@@ -828,13 +832,22 @@ class PlatformMaterialiser:
         from .delegated import (MODE, RAW_STATEMENT, DesignDraft, DesignRefused,
                                 approved_design, build_raw, validate_design)
         emit = progress or (lambda _e: None)
-        if actor is not None:
-            # checked BEFORE anything is read or published (the sealed event records it last)
-            from databridge_core.decision_ledger import actor_of as _actor_of
+        # R-029 codex r1 #4: the actor object is REQUIRED, and checked BEFORE anything is read or
+        # published (the sealed `built` event records it last)
+        from databridge_core.decision_ledger import DecisionRefused as _DecisionRefused
+        from databridge_core.decision_ledger import actor_of as _actor_of
+        if not actor:
+            raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "a build names the signed-in person "
+                                                              "running it (its actor object)", 403)
+        try:
             actor = _actor_of(actor)
-            if actor["principal_id"] != by:
-                raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "the build's actor is not the "
-                                                                  "person running it", 403)
+        except _DecisionRefused:
+            raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "a build names the signed-in person "
+                                                              "running it (its actor object)",
+                                403) from None
+        if actor["principal_id"] != by:
+            raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "the build's actor is not the "
+                                                              "person running it", 403)
         store = self.design_store()
         doc, design = approved_design(store, design_id, digest=digest, owner=by)
         approval = dict(doc["approval"])
@@ -861,13 +874,18 @@ class PlatformMaterialiser:
             return c
         cat = still_holds()
         emit({"stage": "delegating", "design": design_id, "at": _now()})
-        built = build_raw(design, cat, service, admission=admission, by=by,
-                          facts_dir=self._facts_root, emit=emit)
+        with _capturing(service) as answers:
+            built = build_raw(design, cat, service, admission=admission, by=by,
+                              facts_dir=self._facts_root, emit=emit)
+        # The facts store's reads write nothing (R-029 TIDY2: `count_query` is a pure read); a
+        # BUILD is a write, and the query artefacts its SHIPPED cells resolve through are
+        # published by it, explicitly, before any pointer is checked
+        _persist_artefacts(built.dataset, answers, self._facts_root)
         # R-027 f2 #3: the source snapshots this build READ (each facts store's content hash, as
         # its delegate's statements were bound to it); publication re-checks them
-        pins = {r.connection: r.snapshot.content_hash
-                for r in built.results.values()
-                if r is not None and r.snapshot is not None and r.connection}
+        # R-029 codex r1 #1: the build's OWN pins — one snapshot per connection, proven by
+        # `build_raw` (never "the last snapshot seen" per connection)
+        pins = dict(built.pins)
 
         def check_pointers() -> dict:
             got = pointer_check(built.dataset, self.reader(principal=by))
@@ -994,6 +1012,56 @@ class PlatformMaterialiser:
         if declared not in (None, plan_hash):
             out["declared"] = declared
         return out
+
+
+@contextlib.contextmanager
+def _capturing(service: Any):
+    """For the duration of one build, the federated ``service``'s facts store also hands back
+    every answer it gave (the answers carry the query artefacts their pointers need). The store is
+    restored afterwards. (The gateway builds each design on its own service; were one shared and
+    built twice at once, a read missed here leaves its pointers unresolvable, and the publication's
+    pointer check refuses — it never ships them.)"""
+    answers: list = []
+    facts = getattr(service, "facts", None)
+    if facts is None:
+        yield answers
+        return
+
+    class _Capture:
+        def __init__(self, inner: Any) -> None:
+            self._inner = inner
+
+        def query(self, connection: str, sql: str, **kw: Any) -> Any:
+            ans = self._inner.query(connection, sql, **kw)
+            answers.append(ans)
+            return ans
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._inner, name)
+    service.facts = _Capture(facts)
+    try:
+        yield answers
+    finally:
+        service.facts = facts
+
+
+def _persist_artefacts(dataset: Any, answers: list, facts_root: Optional[Path]) -> int:
+    """Publish the query artefact of every answer a SHIPPED ``query_cell`` cell cites (and only
+    those). An answer that already persisted its own (older stores) needs nothing."""
+    from databridge_core import GroundedValue
+    shipped = {cell.pointer.query_hash for row in dataset.rows for cell in row
+               if isinstance(cell, GroundedValue) and cell.pointer.kind == "query_cell"}
+    try:
+        from databridge_mcp_ingest.tabular.count import persist_query_artefact
+    except ImportError:                                 # a store that persists on read
+        return 0
+    n = 0
+    for ans in answers:
+        body = getattr(ans, "query_artefact", None)
+        if body and not getattr(ans, "query_ref", "") and body.get("query_hash") in shipped:
+            persist_query_artefact(ans, facts_dir=facts_root)
+            n += 1
+    return n
 
 
 def plan_entities(plan: MaterialisationPlan) -> tuple[str, ...]:

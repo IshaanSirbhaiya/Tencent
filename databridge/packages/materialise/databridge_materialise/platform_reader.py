@@ -290,6 +290,9 @@ class PlatformReader:
         self._excluded: list[dict] = []
         self._cache: dict[tuple, PlatformEntityRead] = {}
         self._queries: dict[str, tuple[str, str]] = {}           # query_hash -> (source, sql)
+        #: every facts answer this reader was given (each carries the query artefact its pointers
+        #: need; `count_query` is a pure read, R-029 TIDY2). A publisher persists the shipped ones.
+        self.answers: list = []
         self._reruns: dict[str, Any] = {}
         self._capture_text: dict[str, Optional[str]] = {}
         #: digest -> the capture's digest-verified `.json` (R-021 round 2, Finding 4)
@@ -769,8 +772,12 @@ class PlatformReader:
         params = inspect.signature(cq.count_query).parameters
         for name in ("facts_dir", "root"):
             if name in params:
-                return cq.count_query(source, sql, max_rows=self._max_rows, **{name: root})
-        return _facts_query_at(root, source, sql, max_rows=self._max_rows)
+                ans = cq.count_query(source, sql, max_rows=self._max_rows, **{name: root})
+                self.answers.append(ans)
+                return ans
+        ans = _facts_query_at(root, source, sql, max_rows=self._max_rows)
+        self.answers.append(ans)
+        return ans
 
     def _facts_entities(self) -> list[PlatformEntity]:
         out: list[PlatformEntity] = []

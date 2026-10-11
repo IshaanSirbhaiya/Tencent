@@ -100,6 +100,8 @@ def estates(tmp_path, monkeypatch):
         cols, rows = _rows(files, table)
         assert rows, est
         _write_facts(tmp_path / "facts", conn, table, cols, rows)
+        from fed_testkit import write_mapping       # the approved mapping (Codex R-029 r1)
+        write_mapping(tmp_path / "sources", conn, {table: list(cols)})
         (tmp_path / "sources" / f"{conn}.yaml").write_text(f"id: {conn}\n", encoding="utf-8")
         out[est] = {"conn": conn, "table": table, "rows": rows, "key": key, "fcol": fcol,
                     "acol": acol, "gcol": gcol}

@@ -1401,7 +1401,8 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                  context: Optional[dict] = None,
                  kind_splits: Optional[dict] = None,
                  row_verdicts: Optional[dict] = None,
-                 progress: Optional[Callable[..., None]] = None) -> dict:
+                 progress: Optional[Callable[..., None]] = None,
+                 previous: Optional[dict] = None) -> dict:
     """`tables`: (snapshot, sha, table_mapping) for every table with an APPROVED mapping. Builds
     all rows first (so FK edges between tables resolve), drops dangling edges (counted), then
     upserts. Returns counts + the pointers minted, for verification.
@@ -1583,6 +1584,23 @@ def build_tables(store, vocab, *, source_id: str, tables: list[tuple[dict, str, 
                 rec = _ledger_pointer(p, item_ids)
                 if rec is not None:
                     pointers.append({"entity": outcome.id, **rec})
+        # Codex R-029 #2: a table rebuild REPLACES its version - a row built before and not
+        # emitted now (withheld by the screen, or gone from the source) leaves no open footprint.
+        # Done BEFORE the edges resolve, so a reference into such a row dangles (counted).
+        written = set(id_map.values())
+        for snapshot, _sha, _tmap in tables:
+            tref = _snap_ref(snapshot)
+            gone = unemitted_row_ids(snapshot, (previous or {}).get(tref), blocked_rows,
+                                     source_id=source_id)
+            closed = (close_unemitted_rows(store, source_id, tref, gone, protect=written)
+                      if gone else {"nodes_closed": [], "edges_closed": [],
+                                    "kept_other_evidence": 0})
+            if tref in complete:
+                complete[tref]["rows_not_emitted"] = len(gone)
+                complete[tref]["graph_rows_closed"] = (len(closed["nodes_closed"])
+                                                       + len(closed["edges_closed"]))
+                complete[tref]["closed_rows_kept_other_evidence"] = (
+                    closed["kept_other_evidence"])
         kept, dangling_ids, ambiguous = [], [], []
         tick(phase="edges", done=0, total=len(edges))
         for e_done, edge in enumerate(reconcile_edge_validity(node_list, list(edges.values()))):
@@ -1793,6 +1811,80 @@ def _table_completeness(snapshot: dict, tmap: dict, rows: list, links: list[dict
                 and str(row.get(c)) in keysets[c] for c in cols))
         rec["association_edges_built"] = 0
     return rec
+
+
+def unemitted_row_ids(snapshot: dict, previous: Optional[dict], blocked_rows: list, *,
+                      source_id: str) -> set[str]:
+    """Codex R-029 #2: the row ids (as their cells cite them) of rows of this table that are NOT
+    in the graph after this build: the rows the screen withheld now, and — when the table had an
+    earlier capture (`previous`) — the keyed rows that capture held and this one no longer does."""
+    from .screen import row_ref
+
+    tref = _snap_ref(snapshot)
+    pk = list(snapshot.get("primary_key") or [])
+    ids = [(_render_pk(r, pk) if _render_pk(r, pk) is not None else f"#{i}")
+           for i, r in enumerate(snapshot.get("rows") or [])]
+    by_ref = {row_ref(source_id, tref, rid): rid for rid in ids}
+    gone = {by_ref[b["row_ref"]] for b in blocked_rows
+            if b.get("table") == tref and b.get("row_ref") in by_ref}
+    if previous is not None and pk:
+        now = set(ids)
+        ppk = list(previous.get("primary_key") or [])
+        if ppk == pk:
+            gone |= {k for k in (_render_pk(r, pk) for r in previous.get("rows") or [])
+                     if k is not None and k not in now}
+    return gone
+
+
+def close_unemitted_rows(store, source_id: str, table: str, row_ids: set[str], *,
+                         protect: set) -> dict:
+    """Close — never delete — the open graph rows whose ONLY evidence is cells of `row_ids` in
+    `table` (`close_removed_item`'s rule, per row): a node or edge any other row or document also
+    grounds stays open, and so does anything this build wrote (`protect`). An open edge left
+    touching a closed node is closed too. Runs inside the caller's batch."""
+    src = source_ref(source_id)
+
+    def mine(p) -> bool:
+        if p.kind == "derived":
+            return bool(p.derived_from) and all(mine(b) for b in p.derived_from)
+        return (p.kind == "table_cell" and p.source_id in (src, source_id)
+                and p.table == table and str(p.row_id) in row_ids)
+
+    found: set[str] = set()
+    ids = sorted(row_ids)
+    for i in range(0, len(ids), 50):          # narrowed by the cited row ids, 50 per query
+        chunk = ids[i:i + 50]
+        found |= {r["entity_id"] for r in store.fetchall(
+            "SELECT DISTINCT entity_id FROM sources WHERE source_pointer_json LIKE ? AND ("
+            + " OR ".join("source_pointer_json LIKE ?" for _ in chunk) + ")",
+            (f"%{table}%", *(f'%"row_id":{json.dumps(str(r))}%' for r in chunk)))}
+    nodes_closed, edges_closed, kept = [], [], 0
+    at = store.now()
+    for eid in sorted(found - set(protect)):
+        is_node = store.open_node_row(eid) is not None
+        is_edge = not is_node and store.fetchone(
+            "SELECT 1 AS x FROM edges WHERE id = ? AND system_to IS NULL", (eid,)) is not None
+        if not (is_node or is_edge):
+            continue
+        ptrs = store.sources_for(eid)
+        if not ptrs or not any(mine(p) for p in ptrs):
+            continue
+        if not all(mine(p) for p in ptrs):
+            kept += 1
+            continue
+        if is_node:
+            store.close_node(eid, at=at, _commit=False)
+            nodes_closed.append(eid)
+        else:
+            store.close_edge(eid, at=at, _commit=False)
+            edges_closed.append(eid)
+    for nid in nodes_closed:
+        for r in store.fetchall("SELECT DISTINCT id FROM edges WHERE (src_id = ? OR dst_id = ?) "
+                                "AND system_to IS NULL", (nid, nid)):
+            store.close_edge(r["id"], at=at, _commit=False)
+            edges_closed.append(r["id"])
+    return {"nodes_closed": nodes_closed, "edges_closed": edges_closed,
+            "kept_other_evidence": kept}
 
 
 def _count_split_not_admitted(rec: dict, tmap: dict, rows: list, vocab) -> None:

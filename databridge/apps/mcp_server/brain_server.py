@@ -228,8 +228,52 @@ def _lexically_relevant(question: str, text: str) -> bool:
     return any(len(t) >= 3 and t in hay for t in _q_tokens(question))
 
 
+def held_identities(ingest_root=None) -> frozenset[str]:
+    """Every document identity the ingestion screen BLOCKED or HOLDS FOR REVIEW, in each source's
+    latest reported run: its item id (the document id its pointers carry) and its content sha256
+    (their capture digest). Codex R-029 r1 #2: a passage of such an item — a stale index entry,
+    say — is never quoted, whatever it matches."""
+    root = pathlib.Path(ingest_root) if ingest_root is not None else default_ingest_root()
+    if root is None or not root.is_dir():
+        return frozenset()
+    try:
+        from databridge_mcp_ingest.records import GovernanceRecord, read_jsonl_typed
+    except Exception:                                                # noqa: BLE001 - optional
+        return frozenset()
+    out: set[str] = set()
+    for src in sorted(p for p in root.iterdir() if p.is_dir()):
+        runs = sorted(p for p in src.iterdir() if p.is_dir() and (p / "report.json").is_file())
+        if not runs:
+            continue
+        try:
+            recs = read_jsonl_typed(runs[-1] / "governance.jsonl", GovernanceRecord)
+        except Exception:                                            # noqa: BLE001
+            continue
+        for rec in recs:
+            if rec.decision in ("block", "review"):
+                out |= {str(x) for x in (rec.item_id, rec.sha256) if x}
+                out |= {f"sha256:{rec.sha256}"} if rec.sha256 else set()
+    return frozenset(out)
+
+
+def drop_held_passages(passages: list[dict], held: frozenset[str]) -> list[dict]:
+    """``passages`` without any passage of a withheld or held item (by document id, capture
+    digest or the passage's own doc id)."""
+    if not held:
+        return passages
+    out = []
+    for p in passages:
+        ptr = p.get("pointer") or {}
+        ids = {str(x) for x in (ptr.get("document_id"), ptr.get("capture_digest"),
+                                p.get("doc_id")) if x}
+        if not ids & held:
+            out.append(p)
+    return out
+
+
 def search_passages(question: str, *, search=None, k: int = PASSAGE_K,
-                    sources: Optional[list[str]] = None) -> tuple[list[dict], dict]:
+                    sources: Optional[list[str]] = None,
+                    ingest_root=None) -> tuple[list[dict], dict]:
     """``(passages, retrieval)`` — every passage with the pointer that grounds it.
 
     ``retrieval`` states how the list was made: whether an index was available at all, whether
@@ -260,12 +304,16 @@ def search_passages(question: str, *, search=None, k: int = PASSAGE_K,
             "lexical_match": _lexically_relevant(question, text),
             "pointer": pointer_to_dict(pointer),
         })
+    # r1 #2: an item the screen withheld or holds for review is never quoted
+    kept = drop_held_passages(out, held_identities(ingest_root))
+    withheld_n, out = len(out) - len(kept), kept
     meta = {
         "available": True,
         "offline_embedding": bool(getattr(found, "offline_embedding", False)),
         "embedding_label": getattr(found, "embedding_label", None),
         "coverage": getattr(found, "coverage", None),
         "notices": list(getattr(found, "notices", None) or []),
+        "withheld_by_screen": withheld_n,
     }
     return out, meta
 
@@ -596,15 +644,13 @@ def clarification_for(store, question: str) -> dict:
     """``{questions, question_items}`` — the `/federated/ask` needs-input shape — asking which
     record the question is about. The options are the KINDS of record the graph holds (with
     counts), read from the store; never a name, so no person is put forward as a choice."""
-    counts: dict[str, int] = {}
-    # counted in SQL (E2E run 5, F-05: materialising every open node row took seconds at 50k)
-    for r in store.fetchall("SELECT kind, COUNT(*) AS n FROM nodes WHERE system_to IS NULL "
-                            "GROUP BY kind"):
-        if is_subject_kind(r["kind"]):
-            continue
-        counts[str(r["kind"])] = counts.get(str(r["kind"]), 0) + int(r["n"])
-    options = [f"{k} ({n} record{'s' if n != 1 else ''})" for k, n in
-               sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    # Codex R-029 r1 #3: the options are the KINDS the store holds — a schema fact, not a value —
+    # and NO count: a number with no SourcePointer is not emitted (hard constraint 2). Read with
+    # one indexed statement (E2E run 5, F-05).
+    kinds = sorted({str(r["kind"]) for r in store.fetchall(
+        "SELECT DISTINCT kind FROM nodes WHERE system_to IS NULL")
+        if not is_subject_kind(r["kind"])})
+    options = kinds
     text = ("Your question does not name a record I can look up. Which one do you mean? Name "
             "it (by its name or its id) and the fact you want — a status, an amount, a date, a "
             "contact.")
@@ -1359,7 +1405,8 @@ class BrainTools:
         out["answer_kind"] = "graph" if out["grounded"] else "refused"
         if a is None:
             out["passages"], out["retrieval"] = search_passages(
-                question, search=getattr(self, "passage_search", None))
+                question, search=getattr(self, "passage_search", None),
+                ingest_root=self.ingest_root)
             return out
         addressed = explicit.id if explicit is not None else None
         # EVERY matched entity is screened, not only the first (Codex f2 #3), plus every entity
@@ -1407,7 +1454,8 @@ class BrainTools:
             # Addressed by id: served as ONE record, a candidate — never "the" person (f2 #1).
             out["addressed_record"] = {"id": addressed, **subject_annotation(explicit.kind)}
         passages, retrieval = search_passages(question, search=getattr(self, "passage_search",
-                                                                       None))
+                                                                       None),
+                                              ingest_root=self.ingest_root)
         if explicit is not None and is_subject_kind(explicit.kind):
             # A human selected ONE subject by id; only passages bound to it may ride along
             # (Codex r2 #1) — the question's words match every same-named person's documents.
@@ -1424,7 +1472,13 @@ class BrainTools:
             if held:
                 out["withheld_items"] = held
             text = passages_answer(question, passages)
-            if not held and is_vague_question(question):
+            if held:
+                # Codex R-029 r1 #2: once an item the question names is withheld or held for
+                # review, the answer is that notice ALONE — no passage is searched into it or
+                # quoted beside it (a stale extract of the held file would disclose it).
+                out.update(answer=notice, refusal="", answer_kind="withheld", passages=[],
+                           citations=[], values=[])
+            elif is_vague_question(question):
                 # P-13: a vague question about the asker's own affairs gets a question back.
                 # E2E run 5, F-05: BEFORE any passage answer — on a large estate some passage
                 # always shares a word ("should", "book") with a vague question, and a dump of
@@ -1432,13 +1486,10 @@ class BrainTools:
                 out.update(answer="", refusal="", answer_kind="needs_clarification",
                            needs_clarification=True, **clarification_for(self.store, question))
             elif text is not None:
-                joined = "\n\n".join(x for x in (notice, text) if x)
-                out.update(answer=joined, grounded=True,
+                out.update(answer=text, grounded=True,
                            refusal="", answer_kind="passages",
                            citations=[passage_citation(p) for p in passages
                                       if p.get("lexical_match")])
-            elif held:
-                out.update(answer=notice, refusal="", answer_kind="withheld")
         return out
 
     def _answer_records(self, question: str, nodes: list) -> dict:
@@ -1583,14 +1634,19 @@ class BrainTools:
         # only where a test or the seed injected it (GraphStore(clock=...)).
         snap = SnapshotIdentity(source_id=source_path, as_of=self.store.now(),
                                 content_hash=f"sha256:{digest}", schema_hash="doc")
-        doc = DocumentRecord(document_id=source_path, sha256=digest, snapshot=snap,
+        # Codex R-029 r1 #9: the DOCUMENT's identity is its source-qualified path, hashed (P4,
+        # `capture.document_identity`), so two registered sources that share a file name never
+        # collide; the CONTENT's identity (version) stays `sha256`.
+        document_id = hashlib.sha256(f"brain://ingest/{source_path}".encode("utf-8")).hexdigest()
+        doc = DocumentRecord(document_id=document_id, sha256=digest, snapshot=snap,
                              blocks=[Block(kind="Paragraph", text=text)])
         res = extract_graph(doc, self.harness, store=self.store,
                             capture_digest=f"sha256:{digest}")
         # report the genuinely NEW nodes (upsert action "inserted") vs corroborated existing ones —
         # the node upserts are the first len(entities) of res.upserts (edges are appended after).
         new_entities = [n.label for n, up in zip(res.entities, res.upserts) if up.action == "inserted"]
-        return {"source_path": source_path, "entities_added": len(res.entities),
+        return {"source_path": source_path, "document_id": document_id,
+                "entities_added": len(res.entities),
                 "new_entities": new_entities, "relations_added": len(res.relations),
                 "refused": res.refused, "content_sha256": digest,
                 "extraction_route": self.extraction_route,

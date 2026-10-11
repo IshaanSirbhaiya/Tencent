@@ -80,6 +80,7 @@ node_kinds:
 
   - name: account
     binds_to: entity
+    person: false
     description: >
       A holding with a persistent identity of its own — a bank account, a policy number, a case
       file — distinct from the person or organisation it belongs to.

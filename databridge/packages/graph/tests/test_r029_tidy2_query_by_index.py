@@ -234,3 +234,160 @@ def test_no_whole_graph_typing_on_a_large_graph(graph, monkeypatch):
     typed.update(n=0, e=0)
     got = query.link_entities(store, "atlas cedar", top_k=3)
     assert typed["n"] == len(got) and typed["e"] == 0
+
+
+# --- R-029 Codex round 1 (TIDY2) ---------------------------------------------------------------
+def _concurrent_after_first_read(store, monkeypatch, write):
+    """Run ``write(other)`` — another connection to the same file — right after the operation's
+    FIRST statement, as a concurrent writer would. A writer blocked by the reader's snapshot is
+    a correct outcome too (it is recorded, not raised)."""
+    from databridge_graph.store import GraphStore
+
+    other = GraphStore(store.path)
+    other.conn.execute("PRAGMA busy_timeout = 100")
+    real = store.fetchall
+    state = {"done": False, "blocked": False}
+
+    def spy(sql, params=()):
+        out = real(sql, params)
+        if not state["done"]:
+            state["done"] = True
+            try:
+                write(other)
+            except Exception:                                            # noqa: BLE001
+                state["blocked"] = True
+                other.conn.rollback()
+            finally:
+                other.close()
+        return out
+
+    monkeypatch.setattr(store, "fetchall", spy)
+    return state
+
+
+def test_as_of_never_returns_a_row_outside_its_own_interval(graph, monkeypatch):
+    """f1 #5: a row selected live, then closed by a concurrent supersession BEFORE the asked
+    system time, must not come back in the snapshot."""
+    from databridge_graph import query
+    from databridge_graph.query import _live_at
+
+    _vocab, store, ids = graph
+    vt = st = store.now() + dt.timedelta(days=1)
+    _concurrent_after_first_read(
+        store, monkeypatch, lambda o: o.close_node(ids[2], at=store.now()))
+    snap = query.as_of(store, vt, st)
+    rows = {r["rowid_pk"]: r for r in store._s.fetchall("SELECT * FROM nodes")} \
+        if hasattr(store, "_s") else None
+    for n in snap.nodes:
+        assert n.system_to is None or n.system_to > st, n.id
+    assert snap.nodes                                                     # non-vacuous
+
+
+def test_path_and_neighbors_hydrate_from_the_snapshot_they_searched(graph, monkeypatch):
+    """f1 #5: an edge found open must not be hydrated after a concurrent close."""
+    from databridge_graph import query
+
+    _vocab, store, ids = graph
+    probe = query.path(store, ids[0], ids[13])
+    assert probe.found and probe.steps                                    # non-vacuous
+    first = probe.steps[0].edge.id
+    _concurrent_after_first_read(store, monkeypatch,
+                                 lambda o: o.close_edge(first, at=store.now()))
+    got = query.path(store, ids[0], ids[13])
+    assert all(s.edge.system_to is None for s in got.steps)
+    monkeypatch.undo()
+    sub_edge = query.neighbors(store, ids[0], depth=2).edges[0].id
+    _concurrent_after_first_read(store, monkeypatch,
+                                 lambda o: o.close_edge(sub_edge, at=store.now()))
+    sub = query.neighbors(store, ids[0], depth=2)
+    assert all(e.system_to is None for e in sub.edges)
+
+
+def test_a_refreshed_store_never_links_against_the_previous_files_text(tmp_path):
+    """f1 #6: `refresh()` swaps the file under the same store object; equal counts and rowids
+    must not keep the old BM25 index."""
+    import os
+    import shutil
+
+    from databridge_graph import query
+    from databridge_graph.kinds import NodeKind
+    from databridge_graph.schema import GraphNode
+    from databridge_graph.store import GraphStore
+
+    clear_caches()
+    with deployment("workspace") as vocab:
+        kind = sorted(k for k in vocab.node_kinds if not vocab.is_document_kind(k))[0]
+
+        def one(path, label):
+            s = GraphStore(str(path))
+            for i, lab in enumerate([label, "north ledger", "cedar delta", "orbit atlas"]):
+                s.add_node(GraphNode(id=f"{kind}:n{i}", kind=NodeKind(kind), label=lab,
+                                     attrs={"name": lab}, attr_sources={"name": _ptr(i)},
+                                     sources=(_ptr(i, "id"),), valid_from=T0, system_from=T0))
+            s.close()
+
+        one(tmp_path / "a.db", "amber quarry")
+        one(tmp_path / "b.db", "zircon bay")
+        live = tmp_path / "live.db"
+        shutil.copy(tmp_path / "a.db", live)
+        store = GraphStore(str(live))
+        assert [n.label for n in query.link_entities(store, "amber quarry")] == ["amber quarry"]
+        store.conn.close()
+        os.replace(tmp_path / "b.db", live)
+        store.refresh()
+        assert [n.label for n in query.link_entities(store, "zircon bay")] == ["zircon bay"]
+    clear_caches()
+
+
+def test_path_expands_its_frontier_by_index_and_as_of_filters_in_sql(graph, monkeypatch):
+    """f1 #9: a near target is found without reading every edge's endpoints, and `as_of` reads
+    only the rows live at the asked time (filtered by SQL, not by scanning history in Python)."""
+    from databridge_graph import query
+    from databridge_graph.query import _live_at
+
+    _vocab, store, ids = graph
+    near = next(e for e in store.open_edges() if e["src_id"] != e["dst_id"])
+    seen: list[tuple[str, int]] = []
+    real = store.fetchall
+
+    def spy(sql, params=()):
+        out = real(sql, params)
+        seen.append((" ".join(sql.split()), len(out)))
+        return out
+
+    monkeypatch.setattr(store, "fetchall", spy)
+    got = query.path(store, near["src_id"], near["dst_id"])
+    assert got.found and len(got.steps) == 1
+    whole = ("SELECT rowid_pk, src_id, dst_id FROM edges WHERE system_to IS NULL "
+             "ORDER BY rowid_pk")
+    assert seen and not any(s == whole for s, _ in seen), seen
+    seen.clear()
+    vt = st = T0 + dt.timedelta(days=20)
+    snap = query.as_of(store, vt, st)
+    live_nodes = sum(1 for r in real("SELECT * FROM nodes") if _live_at(r, vt, st))
+    node_reads = [n for s, n in seen if s.startswith("SELECT") and "FROM nodes" in s
+                  and "sources" not in s]
+    assert len(snap.nodes) == live_nodes and max(node_reads) <= live_nodes
+
+
+def test_as_of_agrees_with_the_rule_on_legacy_timestamp_spellings(graph):
+    """f1 #5/#9: `as_of` filters in SQL, then re-checks every row by `_live_at`. A row written in
+    an older spelling (no microseconds) must be judged by the rule, never by string order: one
+    the strings call live but the rule does not, and one the strings would wrongly drop."""
+    from databridge_graph import query
+
+    _vocab, store, ids = graph
+    vt = T0 + dt.timedelta(days=200)                       # a whole second: .000000
+    st = T0 + dt.timedelta(days=200, microseconds=500000)
+    sec = lambda t: t.strftime("%Y-%m-%dT%H:%M:%S") + "Z"          # noqa: E731
+    a = store.open_node_row(ids[20])["rowid_pk"]
+    b = store.open_node_row(ids[21])["rowid_pk"]
+    # closed at st's second, i.e. BEFORE st (rule: not live); as strings 'Z' sorts after '.5'
+    store.conn.execute("UPDATE nodes SET system_to = ? WHERE rowid_pk = ?", (sec(st), a))
+    # valid from exactly vt (rule: live); as strings 'Z' sorts after '.000000'
+    store.conn.execute("UPDATE nodes SET valid_from = ? WHERE rowid_pk = ?", (sec(vt), b))
+    store.conn.commit()
+    got, want = query.as_of(store, vt, st), query.as_of(_WholeGraph(store), vt, st)
+    assert _dump(got.nodes) == _dump(want.nodes)
+    ids_got = {n.id for n in got.nodes}
+    assert ids[20] not in ids_got and ids[21] in ids_got                  # non-vacuous

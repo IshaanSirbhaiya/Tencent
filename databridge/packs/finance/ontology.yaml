@@ -89,6 +89,7 @@ node_kinds:
 
   - name: sector
     binds_to: entity
+    person: false
     description: An industry classification a party sits in. A node rather than an attribute so
       that concentration limits can point at it.
 
@@ -108,11 +109,13 @@ node_kinds:
 
   - name: collateral
     binds_to: entity
+    person: false
     description: A pledged asset — property, receivable, security or cash — with its own identity,
       its own valuation history and its own location.
 
   - name: instrument
     binds_to: entity
+    person: false
     description: A traded security or index a price series attaches to. An entity because it
       persists and is referenced across sources under different symbologies.
 

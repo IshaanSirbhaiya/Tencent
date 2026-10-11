@@ -93,6 +93,18 @@ _DOC_WORDS = re.compile(r"\b(?:documents?|files?|notes?|emails?|mentioned|mentio
 _RECORD_ID = re.compile(r"\b[A-Za-z]{1,8}[-_]?\d[\w-]*\b|\b[a-z_]+:[^\s]+")
 
 
+#: A period token (``Q1``, ``H2``, ``FY2025``, ``FY25``): identifier-SHAPED, but it names a span
+#: of time, never one record (Codex R-029 r1 #8).
+_PERIOD_TOKEN = re.compile(r"^(?:q[1-4]|h[12]|fy\d{2}(?:\d{2})?|\d{4}|\d{4}-\d{2}(?:-\d{2})?)$",
+                           re.I)
+
+
+def _record_tokens(question: str) -> list[str]:
+    """Identifier-shaped tokens that are not periods."""
+    return [m.group(0) for m in _RECORD_ID.finditer(question or "")
+            if not _PERIOD_TOKEN.match(m.group(0))]
+
+
 def _norm(question: str) -> str:
     return re.sub(r"\s+", " ", (question or "").strip().lower())
 
@@ -141,12 +153,18 @@ def _plural_tables_named(q: str, tables: list[str]) -> list[str]:
     return [t for t in tables if re.search(rf"\b{re.escape(_noun_forms(t)[1])}\b", q)]
 
 
-def route_by_rules(question: str, catalogue: Any = None) -> dict:
+def route_by_rules(question: str, catalogue: Any = None, *, names_record: Any = None) -> dict:
     """``{route: federated|graph|undecided, rule, reason, signals}``. Deterministic: the same
-    question over the same catalogue always routes the same way, with no model reached."""
+    question over the same catalogue always routes the same way, with no model reached.
+
+    ``names_record(question) -> bool`` (Codex R-029 r1 #8): when given, an identifier-shaped
+    token counts as naming ONE record only if it is an actual record; a period (``Q1``) never
+    does."""
     q = _norm(question)
     signals: list[str] = []
-    record = bool(_RECORD_ID.search(question or ""))
+    record = bool(_record_tokens(question))
+    if record and names_record is not None and not names_record(question):
+        record = False
     if record:
         signals.append("record_identifier")
     rank = bool(_RANK.search(q)) and not _NOT_RANK.search(q)
@@ -226,9 +244,10 @@ def _router_prompt(catalogue: Any) -> str:
     ])
 
 
-def route_question(question: str, *, catalogue: Any = None, router: Any = None) -> dict:
+def route_question(question: str, *, catalogue: Any = None, router: Any = None,
+                   names_record: Any = None) -> dict:
     """Rules first; the harness router only for an undecided question. Never raises."""
-    decision = dict(route_by_rules(question, catalogue))
+    decision = dict(route_by_rules(question, catalogue, names_record=names_record))
     decision["decided_by"] = "rules"
     if decision["route"] != ROUTE_UNDECIDED:
         return decision
@@ -284,7 +303,18 @@ def coverage_summary(coverage: dict) -> dict:
     reasons = list(cov.get("reasons") or [])
     cov["skipped"], cov["reasons"] = skipped, reasons
     cov["searched"] = list(cov.get("searched") or [])
-    cov["reduced"] = bool(skipped or reasons)
+    # Codex R-029 r1 #4: every signal of an incomplete read counts — and an upstream "reduced"
+    # is never overwritten with False
+    partial_codes = {"truncated", "non_exhaustive", "delegate_skipped", "delegate_failed",
+                     "combine_failed", "excluded", "uncertain"}
+    cov["partial"] = bool(
+        cov.get("partial") or cov.get("truncated") or cov.get("exhaustive") is False
+        or any(isinstance(s, dict) and s.get("reason_code") in partial_codes for s in skipped)
+        or any("time budget" in str(x) or "partial" in str(x).lower()
+               for x in [*reasons, *(cov.get("excluded") or [])]))
+    cov["reduced"] = bool(cov.get("reduced") or cov.get("status") == "reduced" or skipped
+                          or reasons or cov.get("excluded") or cov.get("uncertain")
+                          or cov["partial"])
     return cov
 
 
@@ -315,11 +345,18 @@ def federated_payload(answer: dict, route: dict, *, request_id: Optional[str]) -
                  for r in rows)
     computed = stated and answer.get("status") == "completed"
     run_id = answer.get("run_id")
+    coverage = coverage_summary(answer.get("coverage") or {})
+    md = answer.get("answer_markdown") or ""
+    if coverage["partial"] and "partial" not in md[:400].lower():
+        # r1 #4: a partial result is said FIRST, not only in the coverage block
+        md = ("> **Partial result.** Some of what this answer needs was not read completely; "
+              "the figures below may be incomplete.\n\n" + md)
     return {
         "question": answer.get("question"),
         "routed_to": ROUTE_FEDERATED,
         "route": route,
-        "answer": answer.get("answer_markdown") or "",
+        "answer": md,
+        "partial": coverage["partial"],
         # grounded = a computed table whose every cell carries its derived pointer; an answer
         # with no table (stopped, or nothing computable) is not a grounded answer
         "grounded": computed,
@@ -335,7 +372,7 @@ def federated_payload(answer: dict, route: dict, *, request_id: Optional[str]) -
         "claims": list(answer.get("claims") or []),
         "citations": list(answer.get("citations") or []),
         "unsupported_claims": list(answer.get("unsupported_claims") or []),
-        "coverage": coverage_summary(answer.get("coverage") or {}),
+        "coverage": coverage,
         "candidate_flags": candidate_flags(answer),
         "requires_human_selection": bool(answer.get("requires_human_selection")),
         "questions": list(answer.get("questions") or []),
@@ -389,6 +426,20 @@ def _error_ref() -> str:
     return "brain-" + uuid.uuid4().hex[:12]
 
 
+def _names_a_record(app: Any, question: str) -> bool:
+    """True when an identifier token of the question is EXACTLY one open non-subject record's
+    canonical id or label in the graph (`brain_server.record_id_matches`)."""
+    store = getattr(getattr(getattr(app, "state", None), "brain", None), "store", None)
+    if store is None:
+        return False
+    try:
+        from brain_server import record_id_matches                   # noqa: PLC0415
+        tiers = record_id_matches(store, " ".join(_record_tokens(question)))
+    except Exception:                                                # noqa: BLE001 - unknown
+        return False
+    return bool(tiers[0] or tiers[1])
+
+
 def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> dict:
     """Decide the route and, for a delegated question, ask the federated service.
 
@@ -403,7 +454,8 @@ def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> 
     # The lexicon first, with no catalogue: most questions are decided by words alone, and the
     # catalogue (which measures every facts table) is built only when it can matter.
     q = _norm(question)
-    pre = {**route_by_rules(question), "decided_by": "rules"}
+    names = (lambda text: _names_a_record(app, text))  # noqa: E731 - r1 #8
+    pre = {**route_by_rules(question, names_record=names), "decided_by": "rules"}
     if pre["route"] == ROUTE_GRAPH and not (
             pre["rule"] == "lookup" and (_DOC_WORDS.search(q) or _PERIOD.search(q) or re.search(
                 r"\b(?:which|all|every|list|show)\b", q))):
@@ -432,7 +484,8 @@ def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> 
                           "delegation_unavailable": "the delegated query service could not be "
                                                     "started; the graph path answered",
                           "error_ref": ref}}
-    decision = route_question(question, catalogue=svc.catalogue, router=router)
+    decision = route_question(question, catalogue=svc.catalogue, router=router,
+                              names_record=names)
     if getattr(svc.catalogue, "refreshing", None) and decision["route"] != ROUTE_FEDERATED:
         # E2E4 Q-01: a facts store exists but could not be read, so its tables are missing from
         # the catalogue this route was decided over; the route says so instead of implying the
@@ -464,8 +517,7 @@ def delegate(app: Any, question: str, principal: Any, *, router: Any = None) -> 
     read_nothing = not (cov.get("searched") or cov.get("skipped"))
     if not (answer.get("table") or {}).get("rows") and read_nothing:
         if (answer.get("questions") and decision.get("decided_by") == "rules"
-                and decision.get("rule") in AGGREGATE_RULES
-                and getattr(svc, "harness", None) is not None):
+                and decision.get("rule") in AGGREGATE_RULES):
             # W-03: an aggregate the rules routed, and the planning model asked instead of
             # reading. The graph computes no aggregate, so its narration could only say the data
             # is missing; the planner's question is returned instead.

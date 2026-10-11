@@ -379,3 +379,43 @@ def test_a_table_name_is_routed_by_its_english_plural():
     assert bd._noun_forms("invoices") == ("invoice", "invoices")
     assert bd._noun_forms("survey") == ("survey", "surveys")
     assert bd._noun_forms("address") == ("address", "addresses")
+
+
+
+# ================================================================================================
+# Codex R-029 round 1
+# ================================================================================================
+def test_r1_4_partial_coverage_is_reduced_and_said_first():
+    cov = bd.coverage_summary({"searched": ["x"], "skipped": [], "reasons": [],
+                               "truncated": True, "exhaustive": False,
+                               "excluded": ["x: the read stopped at its 20s time budget"]})
+    assert cov["reduced"] is True and cov["partial"] is True
+    assert bd.coverage_summary({"reduced": True})["reduced"] is True      # never overwritten
+    body = bd.federated_payload({"status": "completed", "answer_markdown": "**Q**",
+                                 "table": {"rows": [{"cells": {"n": {"value": 3}}}]},
+                                 "coverage": {"skipped": [{"reason_code": "truncated"}],
+                                              "reasons": ["capped"]}},
+                                {"route": "federated"}, request_id=None)
+    assert body["partial"] is True and body["answer"].startswith("> **Partial result.**")
+    clean = bd.coverage_summary({"searched": ["x"], "skipped": [], "reasons": []})
+    assert clean["reduced"] is False and clean["partial"] is False      # non-vacuous
+
+
+def test_r1_8_a_period_is_not_a_record_and_an_unknown_id_is_not_one_record(catalogue):
+    d = bd.route_by_rules("What was the total for Q1 invoices?", catalogue)
+    assert d["route"] == bd.ROUTE_FEDERATED and d["rule"] == "total"
+    q = "what is the total of invoice ZZ-9999-0001?"
+    assert bd.route_by_rules(q, catalogue)["rule"] == "total_of_one_record"
+    assert bd.route_by_rules(q, catalogue, names_record=lambda t: False)["route"] == \
+        bd.ROUTE_FEDERATED
+    assert bd.route_by_rules(q, catalogue, names_record=lambda t: True)["route"] == \
+        bd.ROUTE_GRAPH
+
+
+def test_r1_11_a_rule_routed_aggregate_asks_back_even_with_no_planning_model(world, brain_app):
+    mount, _ = brain_app
+    c = mount()
+    c.app.state.federated_factory = lambda: world.service(harness=None)
+    body = c.post("/brain/query", json={"question": FOUNDER_Q}).json()
+    assert body["route"]["decided_by"] == "rules", body["route"]
+    assert body["answer_kind"] == "needs_clarification" and body["questions"], body

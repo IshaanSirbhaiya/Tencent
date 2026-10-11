@@ -57,7 +57,9 @@ import {
   cameraMove,
   isSettled,
   joinKey,
+  supersede,
   type CameraInputs,
+  type MoveSlot,
 } from "./camera";
 import type { TrailHighlight } from "./trail";
 import { cn } from "@/lib/utils";
@@ -310,26 +312,29 @@ function GraphInner({
     return next;
   }, [nodeIds, edgeEnds, layoutEpoch]);
 
-  // Camera moves in flight (W-12). Every programmatic move goes through `runMove`, which counts
-  // it from the moment it is requested (before its frame) until its duration has passed.
+  // The ONE camera controller (W-12; R-029 Codex f1 #7). Every programmatic move — the initial
+  // fit, a resize re-fit, a path, a search, a selection — goes through `runMove`. A new move
+  // supersedes the one in flight (its frame and its settle timer are cancelled; d3 interrupts the
+  // running transition), so at most one move is ever in flight, and the move counts as in flight
+  // from the moment it is requested until its duration has passed. ReactFlow's own `fitView`
+  // prop is NOT used: it was a second, untracked camera driver.
   const [movesInFlight, setMovesInFlight] = React.useState(0);
-  const moveTimers = React.useRef<Set<number>>(new Set());
+  const slot = React.useRef<MoveSlot>({ raf: null, timer: null });
   React.useEffect(() => {
-    const timers = moveTimers.current;
-    return () => {
-      timers.forEach((t) => window.clearTimeout(t));
-      timers.clear();
-    };
+    const s = slot.current;
+    return () => supersede(s, cancelAnimationFrame, window.clearTimeout);
   }, []);
   const runMove = React.useCallback((ms: number, move: () => void) => {
-    setMovesInFlight((n) => n + 1);
-    const raf = requestAnimationFrame(move);
-    const t = window.setTimeout(() => {
-      cancelAnimationFrame(raf);
-      moveTimers.current.delete(t);
-      setMovesInFlight((n) => Math.max(0, n - 1));
+    supersede(slot.current, cancelAnimationFrame, window.clearTimeout);
+    setMovesInFlight(1);
+    slot.current.raf = requestAnimationFrame(() => {
+      slot.current.raf = null;
+      move();
+    });
+    slot.current.timer = window.setTimeout(() => {
+      slot.current.timer = null;
+      setMovesInFlight(0);
     }, ms + SETTLE_SLACK_MS + 20);
-    moveTimers.current.add(t);
   }, []);
 
   // Re-fit whenever the container resizes — `/graph` has no resizable bottom panel today, but a
@@ -504,7 +509,6 @@ function GraphInner({
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
         minZoom={0.2}
         maxZoom={3}
         proOptions={{ hideAttribution: true }}

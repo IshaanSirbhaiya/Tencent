@@ -125,11 +125,13 @@ class ExtractionVocabulary:
     descriptions: dict                     # kind name → description, for the prompt
 
 
-def extraction_vocabulary(vocabulary: Optional[Vocabulary] = None) -> ExtractionVocabulary:
+def extraction_vocabulary(vocabulary: Optional[Vocabulary] = None, *,
+                          bound: Optional[Vocabulary] = None) -> ExtractionVocabulary:
     """Resolve the vocabulary for one call. Read per call, never at import: the deployment
     binding decides which packs are enabled, and a module-level snapshot would freeze whichever
-    were bound at first import."""
-    bound = active_vocabulary()
+    were bound at first import. ``bound``: the deployment snapshot the caller already holds, so
+    one extraction offers, classifies and upserts under ONE binding (R-029 Codex round 1)."""
+    bound = bound if bound is not None else active_vocabulary()
     v = vocabulary if vocabulary is not None else bound
     # A kind the owner removed on /ontology is DEPRECATED, not deleted (see ontology_state): it
     # stays declared so existing rows read back, but it is never offered or accepted again.
@@ -404,8 +406,8 @@ def extract_graph(doc, harness: Harness, *, store: Optional[GraphStore] = None,
     human to select — a candidate, never a link.
     """
     text = doc_text(doc)
-    ev = extraction_vocabulary(vocabulary)
-    bound = active_vocabulary()
+    bound = active_vocabulary()                 # ONE snapshot for the whole call
+    ev = extraction_vocabulary(vocabulary, bound=bound)
     meta = getattr(doc, "source_meta", None) or {}
     digest = capture_digest
     if digest is None:

@@ -99,7 +99,10 @@ def test_f07_categorical_values_are_measured_from_the_facts_store(world):
                if c.connection == CRM)
     inv = tab.table("invoices")
     rows = make_invoices()
-    want = {c for c in inv.columns if _categorical(rows, c, inv.key)}
+    from fed_testkit import SUBJECT_COLUMNS
+    # r1 #6: a column the approved mapping marks as naming people is never listed
+    want = {c for c in inv.columns if _categorical(rows, c, inv.key)
+            and c not in SUBJECT_COLUMNS["invoices"]}
     assert "status" in want and want != set(inv.columns)                 # non-vacuous
     got = dict(inv.values)
     assert set(got) == want
@@ -115,10 +118,10 @@ def test_f07_a_column_holding_a_subjects_name_is_never_shown_to_the_planner(worl
     from databridge_core import SourcePointer
 
     rows = make_invoices()
-    owner = sorted({r["account_owner"] for r in rows})[0]
+    owner = sorted({r["customer_id"] for r in rows})[0]
     before = dict(next(c for a in world.service().catalogue.agents.values()
                        for c in a.connections if c.connection == CRM).table("invoices").values)
-    assert "account_owner" in before                                    # non-vacuous
+    assert "customer_id" in before and "account_owner" not in before    # mapped people hidden
     subj = sorted(world.vocab.subject_kinds)[0]
     t = dt.datetime(2026, 9, 14, tzinfo=dt.timezone.utc)
     world.store.add_node(GraphNode(id="subj:owner", kind=NodeKind(subj), label=owner.title(),
@@ -128,7 +131,7 @@ def test_f07_a_column_holding_a_subjects_name_is_never_shown_to_the_planner(worl
                                    valid_from=t, system_from=t))
     after = dict(next(c for a in world.service().catalogue.agents.values()
                       for c in a.connections if c.connection == CRM).table("invoices").values)
-    assert "account_owner" not in after and "status" in after
+    assert "customer_id" not in after and "status" in after    # the graph guard, too
 
 
 @pytest.mark.parametrize("shape", ["How many invoices are {v}?", "How many {v} invoices are there?",
@@ -300,3 +303,152 @@ def test_f07_a_table_name_matches_its_english_plural():
                          ("txn", "txns"), ("address", "addresses"), ("survey", "surveys")):
         assert re.fullmatch(_name_pat(name), plural), (name, plural)
         assert re.fullmatch(_name_pat(name), name), name
+
+
+
+# ================================================================================================
+# Codex R-029 round 1
+# ================================================================================================
+def _staff_world(env, *, mapped: bool):
+    """A facts store with a person-name column and an organisation-name column, each holding
+    multi-word values that a one-word filter is a whole-word part of."""
+    from fed_testkit import _write_facts
+    from databridge_agent_runtime import McpFactsStore
+    from databridge_federated import build_catalogue
+    from databridge_graph.packs import deployment
+
+    pairs = [("Alice Smith", "Pellmore Freight Ltd"), ("Bram Ostlund", "Quillon Grocers"),
+             ("Cora Vane", "Quillon Grocers"), ("Dov Arkin", "Pellmore Freight Ltd")]
+    rows = [{"staff_id": f"S-{i}", "full_name": n, "employer": e}
+            for i, (n, e) in enumerate(pairs)]
+    _write_facts(env / "facts", "staff-db", {"staff": (["staff_id", "full_name", "employer"],
+                                                       rows)},
+                 subject={"staff": ["full_name"]})
+    if not mapped:
+        (env / "sources" / "staff-db.mapping.yaml").unlink()
+
+    class Spec:
+        id, title, status, connections = "staff-db", "staff", "active", ("staff-db",)
+    with deployment("workspace") as vocab:
+        cat = build_catalogue([Spec()], facts=McpFactsStore(), vocabulary=vocab,
+                              sources_dir=env / "sources")
+    return cat, McpFactsStore()
+
+
+def _read(cat, facts, field, value, *, resolve=False, fold=False):
+    from databridge_federated import run_tabular
+    entry = cat.agent("staff-db").connections[0]
+    task = SubTask.model_validate({"id": "t", "adapter_agent": "staff-db",
+                                   "entity_kinds": ["staff"], "fields": ["staff_id", field],
+                                   "filters": [{"field": field, "op": "eq", "value": value}]})
+    return run_tabular(task, entry, facts=facts, today=TODAY, principal="x", run_id=None,
+                       resolve_names=resolve, fold_case=fold)
+
+
+def test_r1_1_a_persons_name_is_never_resolved_or_case_widened(env):
+    cat, facts = _staff_world(env, mapped=True)
+    # non-vacuous: the SAME mechanisms still work on an organisation name in the same table
+    org = _read(cat, facts, "employer", "Pellmore Freight", resolve=True)
+    assert len(org.rows) == 2 and org.coverage.resolved
+    assert len(_read(cat, facts, "employer", "QUILLON GROCERS", fold=True).rows) == 2
+    person = _read(cat, facts, "full_name", "Alice", resolve=True)
+    assert person.rows == () and not person.coverage.resolved
+    assert any("may name people" in u for u in person.coverage.uncertain)
+    assert _read(cat, facts, "full_name", "ALICE SMITH", fold=True).rows == ()
+
+
+def test_r1_1_a_table_no_approved_mapping_covers_is_never_resolved(env):
+    cat, facts = _staff_world(env, mapped=False)
+    assert cat.agent("staff-db").connections[0].table("staff").subject_columns is None
+    assert _read(cat, facts, "employer", "Pellmore Freight", resolve=True).rows == ()
+
+
+def test_r1_6_a_mapped_person_column_is_hidden_whole_whatever_its_values(env):
+    from databridge_federated.catalogue import FactsTable, screen_values
+
+    cat, _f = _staff_world(env, mapped=True)
+    assert cat.agent("staff-db").connections[0].table("staff").subject_columns == \
+        frozenset({"full_name"})
+    decorated = FactsTable(name="x", columns=("id", "owner", "status"), key="id",
+                           values=(("owner", ("Alice Smith (CFO)", "Bram O.")),
+                                   ("status", ("open", "paid"))),
+                           subject_columns=frozenset({"owner"}))
+    assert dict(screen_values(decorated, frozenset()).values) == {"status": ("open", "paid")}
+    unmapped = FactsTable(name="x", columns=decorated.columns, key="id",
+                          values=decorated.values, subject_columns=None)
+    assert screen_values(unmapped, frozenset()).values == ()
+
+
+def test_r1_5_no_stored_value_enters_the_planner_prompt(world):
+    from databridge_federated.planner import _prompt
+    svc = world.service()
+    inv = next(c for a in svc.catalogue.agents.values() for c in a.connections
+               if c.connection == CRM).table("invoices")
+    assert inv.values                                                     # non-vacuous
+    prompt = _prompt(svc.catalogue)
+    described = json.dumps(svc.catalogue.describe())
+    for _col, vals in inv.values:
+        for v in vals:
+            assert f'"{v}"' not in prompt and f'"{v}"' not in described, v
+    assert all(f'"{col}"' in described for col, _v in inv.values)        # names only
+
+
+def test_r1_7_unmeasured_documents_ownership_offers_nothing(world):
+    from dataclasses import replace
+    svc = world.service()
+    blind = replace(_docs_entry(svc), kinds=None)
+    assert svc.catalogue.connection_kinds(blind) == []
+    aa = svc.catalogue.agents["notes_sources"]
+    svc.catalogue.agents["notes_sources"] = replace(aa, connections=(blind,))
+    plan = DelegationPlan.model_validate({"subtasks": [
+        {"id": "t", "adapter_agent": "notes_sources", "connection": NOTES,
+         "entity_kinds": ["meeting"]}]})
+    qs = validate_plan(plan, svc.catalogue)
+    assert any("could not be measured" in q for q in qs), qs
+
+
+def test_r1_10_a_search_that_overruns_the_budget_is_not_processed(world):
+    import time as _t
+    svc = world.service()
+
+    class Slow:
+        def search(self, *a, **k):
+            _t.sleep(0.2)
+            return world.retriever.search(*a, **k)
+
+    res = run_documents(_doc_tasks(world)[2], _docs_entry(svc), store=world.store,
+                        retriever=Slow(), catalogue=svc.catalogue, today=TODAY, principal="x",
+                        run_id=None, admits=svc.admits(ADMIN), budget_s=0.1)
+    assert res.rows == () and res.coverage.truncated and not res.coverage.exhaustive
+    assert any("searching passages" in x for x in res.coverage.excluded)
+
+
+
+def _artefacts(env, source):
+    d = env / "facts" / f"{source}_facts.queries"
+    return {x.name: x.read_text(encoding="utf-8") for x in d.glob("*.json")} if d.is_dir() else {}
+
+
+def test_tidy2_probes_persist_nothing_and_evidence_reads_persist_their_query(env):
+    """BRN review of TIDY2's `_read_evidence`: a resolve or spelling PROBE binds the asker's own
+    words and is never cited, so it writes no query artefact; a read whose cells ARE returned as
+    evidence persists its artefact (so its pointers resolve later)."""
+    cat, facts = _staff_world(env, mapped=True)
+    before = _artefacts(env, "staff-db")
+    # a probe-only path: the person column is never probed; an org filter that matches nothing
+    # exactly is probed, then its evidence read re-runs
+    _read(cat, facts, "employer", "Nowhere Haulage", resolve=True, fold=True)
+    after = _artefacts(env, "staff-db")
+    new = {k: v for k, v in after.items() if k not in before}
+    import json as _json
+    sqls = [_json.loads(v).get("sql", "") for v in new.values()]
+    # (the resolve step's exact-count probe is the same statement as the empty read's own
+    # cited count, R-021 r2 #6, so it is evidence either way; the two candidate probes are not)
+    probe_shapes = ("instr(lower(", "lower(trim(")
+    assert not any(any(p in q for p in probe_shapes) for q in sqls), sqls
+    got = _read(cat, facts, "employer", "Quillon Grocers")
+    assert got.rows                                                       # non-vacuous
+    refs = {gv.pointer.query_hash for r in got.rows for gv in r.cells.values()
+            if gv.pointer.kind == "query_cell"}
+    persisted = _artefacts(env, "staff-db")
+    assert not refs or all(f"{h}.json" in persisted for h in refs if h)

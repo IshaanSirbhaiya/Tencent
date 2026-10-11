@@ -113,19 +113,24 @@ export interface Actor {
 export const MACHINE_TYPES = ["agent", "adapter_agent", "automation"] as const;
 export type ActorType = (typeof MACHINE_TYPES)[number] | "person";
 
-/** What an actor is: one of the machine types, or a person (any other recorded type). */
+/** What an actor is: one of the machine types, or `person` — exactly as the gateway served it
+ *  (it serves every recorded non-machine type as `person`). A type the producer did not record
+ *  (the absent / withheld envelope) or one outside that vocabulary is `null`: NOT RECORDED, never
+ *  presented as a person (R-029 Codex f1 #3). */
 export function actorType(a: Actor | null | undefined): ActorType | null {
   if (!a) return null;
   const t = a.principal_type;
-  if (typeof t === "string" && (MACHINE_TYPES as readonly string[]).includes(t)) {
-    return t as ActorType;
-  }
-  return "person";
+  if (typeof t !== "string") return null;
+  if ((MACHINE_TYPES as readonly string[]).includes(t)) return t as ActorType;
+  return t === "person" ? "person" : null;
 }
 
 export function isPerson(a: Actor | null | undefined): boolean {
   return actorType(a) === "person";
 }
+
+/** Said when the producer did not record whether the actor is a person or a machine. */
+export const ACTOR_TYPE_NOT_RECORDED = "person or machine not recorded";
 
 /** The actor's principal id, or null when the producer did not record one. */
 export function actorId(a: Actor | null | undefined): string | null {
@@ -633,6 +638,8 @@ export function actorText(a: Actor | null | undefined): string {
       return `automation (${id})`;
     case "agent":
       return `agent ${id}`;
+    case null:
+      return `${id} (${ACTOR_TYPE_NOT_RECORDED})`;
     default: {
       const how = authText(a);
       const via = a.delegation ? " (through a delegation)" : "";

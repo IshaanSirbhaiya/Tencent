@@ -37,6 +37,7 @@ node_kinds:
 
   - name: test
     binds_to: entity
+    person: false
     description: A catalogue entry (chest_xray, resting_ecg).
 
   - name: document

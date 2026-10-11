@@ -505,7 +505,7 @@ class McpIngestService:
 
     #: per-run options an adapter agent's spec sets (`extract.passages` -> `passages`), passed on
     #: when `run_ingest` takes them (E2E F-11)
-    RUN_OPTIONS = ("passages",)
+    RUN_OPTIONS = ("passages", "only_items")
 
     def run_ingest(self, source_id: str, *, store: Any, harness: Any,
                    progress_cb: Optional[Callable[[dict], None]] = None,
@@ -523,6 +523,9 @@ class McpIngestService:
         unknown = sorted(k for k in options if k not in self.RUN_OPTIONS)
         if unknown:
             raise TypeError(f"unknown run option(s) {unknown}")
+        if options.get("only_items") is not None and "only_items" not in params and not var_kw:
+            # R-029 SETX #1: a pinned build never silently becomes an unpinned one
+            raise IngestUnavailable("this ingest cannot build a pinned set of items")
         for k, v in options.items():
             if v is not None and (k in params or var_kw):
                 kwargs[k] = v

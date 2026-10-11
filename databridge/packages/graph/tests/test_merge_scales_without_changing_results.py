@@ -101,10 +101,13 @@ def _edge(ident, src_id, dst_id, kind, src="d"):
 # re-typing it would let this "old" reference quietly drift from what was actually shipped.
 def _resolve_existing_old(store, incoming, vocab=None):
     v = vocab if vocab is not None else active_vocabulary()
-    is_subject = v.is_subject(str(incoming.kind))
+    is_subject = v.is_subject(str(incoming.kind)) or v.is_person(str(incoming.kind))
     same = store.open_node_row(incoming.id)
     if same is not None:
         return same, "id"
+    if is_subject:
+        # R-029 Codex round 1 (IDN): a person record is never joined to another, by any key
+        return None, ""
     if incoming.canonical_id and is_subject and not incoming.identity_field_is_grounded(
             "canonical_id"):
         return None, ""
@@ -130,7 +133,7 @@ def _upsert_node_old(store, incoming, vocab=None):
     if not incoming.sources:
         raise ValueError("upsert_node REFUSED: ungrounded node")
     v = vocab if vocab is not None else active_vocabulary()
-    subject = v.is_subject(str(incoming.kind))
+    subject = v.is_subject(str(incoming.kind)) or v.is_person(str(incoming.kind))
     row, matched_by = _resolve_existing_old(store, incoming, v)
     if row is None:
         store.add_node(incoming)
@@ -197,7 +200,7 @@ def _node_sequence():
     patient_b1 = _patient("Devi Hui Min", "p-b1", canonical="S1234567A",
                           grounded=True, src="doc15")
     patient_b2 = _patient("Devi Hui Min", "p-b2", canonical="S1234567A",
-                          grounded=True, src="doc16")                       # grounded canonical -> corroborate
+                          grounded=True, src="doc16")                       # grounded canonical -> STILL distinct (R-029)
     patient_c1 = _patient("Ravi Kumar", "p-c1", canonical="FAKE999X",
                           grounded=False, src="doc17")                      # ungrounded canonical -> A4, distinct
     patient_c2 = _patient("Ravi Kumar", "p-c2", canonical="FAKE999X",
@@ -272,8 +275,11 @@ def test_node_upsert_equivalence_old_vs_new():
     assert actions >= {"id", "canonical", "fuzzy", ""}
     # 8 distinct orgs (coral*3->1, everwell_a+a2->1, everwell_b, northstar*2->1 supersede,
     # meridian, northwind, bank, bank_of_america) + 5 distinct patients (a1, a2, b1+b2->1,
-    # c1, c2 — a subject NEVER fuzzy-merges, so only the grounded-canonical pair collapses).
-    assert new_store.counts()["nodes"] == 13, "orgs merge (fuzzy/canonical); patients never do"
+    # c1, c2 — a subject NEVER fuzzy-merges) — and, since R-029 Codex round 1, b1 and b2 stay
+    # two as well: a grounded identifier proposes a candidate, it never joins two people.
+    patients = [n for n in _node_sequence() if active_vocabulary().is_person(str(n.kind))]
+    orgs = 8
+    assert new_store.counts()["nodes"] == orgs + len({n.id for n in patients}),         "orgs merge (fuzzy/canonical); patients never do"
 
 
 def test_edge_upsert_equivalence_old_vs_new():

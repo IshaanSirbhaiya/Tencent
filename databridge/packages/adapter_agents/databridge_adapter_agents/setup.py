@@ -26,6 +26,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import logging
 import os
 import re
 import uuid
@@ -37,6 +38,8 @@ from databridge_core.decision_ledger import (DecisionLedger, DecisionRefused, ac
 
 from . import paths
 from .registry import spec_digest
+
+_log = logging.getLogger("databridge.adapter_agents.setup")
 
 SETUP_KIND = "adapter_setup"
 #: run-record kind the Activity feed reads for adapter agents (manager.RUN_KIND)
@@ -154,7 +157,9 @@ def record_step(runs_root: Optional[Path], spec: Any, *, step: str, status: str,
             raise DecisionRefused("APPROVER_NOT_AUTHENTICATED", "a setup step names the person "
                                   "who asked for it, and that person signed in", 403)
     else:
-        trigger_actor = None
+        # R-029 Codex f1 #6: never a trigger without an actor - an agent step no person asked
+        # for names the agent's own MACHINE actor
+        trigger_actor = step_actor
     who = agent_principal(spec.id)
     step_rec = {"tool": f"setup.{step}", "status": status, "reason": reason[:500],
                 "started": at, "ended": at,
@@ -655,7 +660,11 @@ def load_gate(source_id: str, registry_root: Path, *, plan_stale: Optional[str])
     try:
         discovery = latest_discovery(source_id)
     except Exception as exc:                                         # noqa: BLE001
-        discovery = {"run_id": None, "status": "unreadable", "message": str(exc), "tables": {}}
+        # R-029 Codex f1 #4: a fixed sentence and a reference; the text is in the server log
+        ref = f"ERR-{uuid.uuid4().hex[:10]}"
+        _log.error("[%s] latest discovery of %s unreadable", ref, source_id, exc_info=exc)
+        discovery = {"run_id": None, "status": "unreadable", "tables": {},
+                     "message": f"the latest discovery could not be read (reference {ref})"}
     vocab = active_vocabulary()
     explanation = load_explanation(registry_root, source_id)
     docs = documents_decision(registry_root, source_id)
@@ -671,6 +680,45 @@ def load_gate(source_id: str, registry_root: Path, *, plan_stale: Optional[str])
                                          documents_decision=docs),
             "pending": pending_decisions(source_id, mapping=mapping, discovery=discovery,
                                          vocab=vocab)}
+
+
+def authorization_ref(auth: Optional[dict]) -> Optional[str]:
+    """The immutable id of one hand-off authorisation: its decision-ledger record hash."""
+    h = (auth or {}).get("hash")
+    return str(h) if isinstance(h, str) and h else None
+
+
+def handoff_build_problems(registry_root: Path, source_id: str, agent_id: str, *,
+                           authorization: Optional[str], plan_stale: Optional[str]) -> list[str]:
+    """R-029 Codex f1 #1: why the hand-off BUILD may not start (empty: it may). The build carries
+    the id of the authorisation the person gave; immediately before it reads the source it must
+    still be the LATEST authorisation of this agent, a person's, and cover the setup exactly as
+    it is now (gate passing, plan, discovery, explanation, mapping, documents and deferred
+    decisions unchanged). Anything else refuses: hand off again."""
+    if not authorization:
+        return [f"the build of {agent_id} carries no hand-off authorisation"]
+    auth = latest_authorization(registry_root, source_id, agent_id)
+    if auth is not None and not auth.get("refusal") and authorization_ref(auth) != authorization:
+        return [f"a newer hand-off of {agent_id} was recorded after this build was queued; this "
+                f"build is not the one it authorised"]
+    return authorization_problems(registry_root, source_id, agent_id, plan_stale=plan_stale,
+                                  activating=True)
+
+
+def pinned_items(discovery: Optional[dict], approved_tables: list[str]) -> dict[str, str]:
+    """R-029 SETX #1: {item_id: capture sha256} a hand-off build is PINNED to - exactly what the
+    person authorised: the documents they decided on (to build or keep) and each table a person
+    approved, at the capture the discovery recorded. The build (`run_ingest(only_items=...)`)
+    builds only these bytes; an item changed since is not built and is reported."""
+    build, keep = document_items(discovery)
+    out = {str(d.get("item_id")): str(d.get("sha256")) for d in [*build, *keep]
+           if d.get("item_id") and d.get("sha256")}
+    tables = (discovery or {}).get("tables") or {}
+    for t in approved_tables:
+        e = tables.get(t) or {}
+        if e.get("item_id") and e.get("sha256") and not e.get("held"):
+            out[str(e["item_id"])] = str(e["sha256"])
+    return out
 
 
 def authorization_problems(registry_root: Path, source_id: str, agent_id: str, *,
@@ -713,5 +761,6 @@ __all__ = ["CADENCES", "SETUP_KIND", "agent_principal", "agent_actor", "approved
            "DOCUMENT_DECISIONS", "pending_decisions", "mark_setup_agent",
            "setup_source_of", "record_documents_decision", "documents_decision", "gate_binding",
            "record_authorization", "latest_authorization", "load_gate",
+           "authorization_ref", "handoff_build_problems", "pinned_items",
            "authorization_problems", "keeper_id", "load_explanation", "record_step", "save_explanation",
            "setup_dir", "setup_records"]

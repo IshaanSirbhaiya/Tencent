@@ -146,6 +146,48 @@ WRAP_AT = 0.75
 _clock = time.monotonic
 
 
+class _Overrun(Exception):
+    """A call did not return within the time the run had left."""
+
+
+def call_within(fn: Callable[[], Any], seconds: float) -> Any:
+    """``fn()`` on a worker thread, waited for at most ``seconds`` (R-029 Codex f1 #3): past it,
+    `_Overrun` - the run stops and its result, if it ever comes, is never acted on. An exception
+    ``fn`` raises is raised here."""
+    import contextvars  # noqa: PLC0415
+    import queue  # noqa: PLC0415
+
+    if seconds <= 0:
+        raise _Overrun()
+    box: "queue.Queue[tuple[bool, Any]]" = queue.Queue(maxsize=1)
+
+    ctx = contextvars.copy_context()           # the caller's context travels with the call
+
+    def work() -> None:
+        try:
+            box.put((True, ctx.run(fn)))
+        except BaseException as e:                           # noqa: BLE001 - handed back
+            box.put((False, e))
+
+    threading.Thread(target=work, name="agent-runtime-call", daemon=True).start()
+    try:
+        ok, value = box.get(timeout=seconds)
+    except queue.Empty:
+        raise _Overrun() from None
+    if ok:
+        return value
+    raise value
+
+
+def readable_sources(spec: WorkflowSpec) -> list[str]:
+    """The declared sources this agent can READ: every source except one that is only ever an
+    action's destination (a write connection with no read tool of its own)."""
+    written = {str(parse_tool(a.tool)["connection"]) for a in spec.actions}
+    read = {str(parse_tool(t)["connection"]) for t in spec.tools
+            if parse_tool(t)["verb"] != "write" and parse_tool(t)["connection"]}
+    return [s for s in spec.sources if s not in written or s in read]
+
+
 def run_seconds() -> float:
     """The deployment's wall-clock budget for one run, in seconds (a bad value: the default)."""
     try:
@@ -304,12 +346,39 @@ def _as_decl(declaration: Union[AgentDeclaration, str, Path]) -> AgentDeclaratio
     return parse_declaration_text(str(declaration), declared_in="<inline>")
 
 
+#: R-029 Codex f1 #6: how a trigger names its actor when the caller passed none
+_RUNTIME_AUTH = "agent_runtime"
+_UNVERIFIED_AUTH = "unverified:caller-named"
+
+
 def _trigger(trigger: Optional[Mapping[str, Any]], at: dt.datetime) -> dict:
+    """The run's trigger with a VALIDATED common actor object (R-029 Codex f1 #6). A passed
+    actor must be complete (`decision_ledger.actor_of`) and its principal must be ``by``, else
+    the run is refused (ValueError). With none passed: a schedule, an event or an unnamed caller
+    is the runtime's own MACHINE actor; a caller that only TYPED a name is recorded as exactly
+    that (``authenticated_by: unverified:…``), never passed off as authenticated."""
+    from databridge_core.decision_ledger import actor_of  # noqa: PLC0415
+
     t = dict(trigger or {})
     t.setdefault("type", "manual")
     t.setdefault("by", None)
     t.setdefault("question", None)
     t.setdefault("fired_at", iso(at))
+    if t.get("actor") is not None:
+        try:
+            actor = actor_of(t["actor"])
+        except Exception:                                    # noqa: BLE001 - fail closed
+            raise ValueError("the trigger's actor is not a complete actor object") from None
+        if t["by"] is not None and actor["principal_id"] != str(t["by"]):
+            raise ValueError("the trigger's actor is not the principal it names in 'by'")
+        t["actor"] = actor
+    elif t["type"] in ("schedule", "event") or not t["by"]:
+        t["actor"] = {"principal_id": f"agent_runtime:{t['type']}",
+                      "authenticated_by": _RUNTIME_AUTH, "principal_type": "Runtime",
+                      "dev_only": False}
+    else:
+        t["actor"] = {"principal_id": str(t["by"]), "authenticated_by": _UNVERIFIED_AUTH,
+                      "principal_type": "CallerNamed", "dev_only": False}
     return t
 
 
@@ -434,7 +503,11 @@ def _connection_adverts(spec: WorkflowSpec, gateway: Optional[SourceGateway]) ->
         try:
             out.append(gateway.advertise(conn))
         except Exception as e:                               # noqa: BLE001 - reported
-            out.append(ConnectionAdvert(connection=conn, reachable=False, problem=str(e)))
+            # R-029 Codex f1 #4: a fixed sentence and a reference at the catch site
+            out.append(ConnectionAdvert(connection=conn, reachable=False,
+                                        problem=public_errors.failed(
+                                            "the connection could not be reached",
+                                            "advertise failed", e, connection=conn)))
     return out
 
 
@@ -1085,6 +1158,9 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
     t_start = time.perf_counter()
     t_clock = _clock()
     budget_s = run_seconds()
+
+    def past_deadline() -> bool:
+        return _clock() - t_clock >= budget_s
     started = utcnow()
     tr = trace if trace is not None else _NullTrace()
     spec = _as_spec(workflow)
@@ -1116,16 +1192,18 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
     decision, problems = compile_for_run(spec, decl, store=store, retriever=retriever,
                                          gateway=gateway, inputs=compile_inputs, facts=facts,
                                          federation=federation)
-    if not spec.sources and not getattr(spec, "delegates", None):
-        # F-09: an agent's scope IS its declared sources - one that declares none (and delegates
-        # to no adapter agent) can read nothing, so it is not run at all
-        problems = [*problems, "it declares no source to read and delegates to no adapter agent, "
-                               "so it can see nothing (its scope is its declared sources); name "
-                               "the source(s) it should read"]
+    if not readable_sources(spec) and not spec.actions:
+        # F-09 / R-029 Codex f1 #2: an agent's scope IS its declared sources - a delegate reads
+        # only within them, and a write-only destination is not a read path. One with nothing
+        # readable (and nothing to write from the owner's words) can see nothing: not run
+        problems = [*problems, "it declares no source it can read (a delegate reads only within "
+                               "the agent's own sources, and a write destination is not a read "
+                               "path), so it can see nothing; name the source(s) it should read"]
     if problems or decision is None or decision.outcome is not Outcome.COMPILED:
         reasons = list(problems)
         if decision is not None and decision.outcome is not Outcome.COMPILED:
             reasons += [f"{r.code.value}: {r.detail}" for r in decision.refusals]
+        reasons = [_scrub(r) for r in reasons]          # R-029 Codex f1 #4: the early path too
         record.coverage = Coverage(searched=[], skipped=[{"tool": "*", "reason_code":
                                                           "agent_not_runnable"}],
                                    reasons=[f"the agent cannot run: {r}" for r in reasons])
@@ -1481,7 +1559,13 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
                     f"from what you have been shown: answer what the evidence settles, cite it, "
                     f"and say in a clarification what could not be checked.")})
             try:
-                result = harness.complete_structured(AGENT_TASK_CLASS, messages, PlannerTurn)
+                result = call_within(
+                    lambda: harness.complete_structured(AGENT_TASK_CLASS, messages, PlannerTurn),
+                    budget_s - (_clock() - t_clock))
+            except _Overrun:
+                stop_reason = (f"the time budget for one run ({budget_s:g} s) was used up while "
+                               f"the model was answering; nothing it returned is acted on")
+                break
             except Exception as e:                               # noqa: BLE001 - plain words
                 name = type(e).__name__
                 if name == "BudgetExceeded":
@@ -1508,8 +1592,18 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
                 break
             turn: PlannerTurn = result.parsed
             observations: list[dict] = []
+            if past_deadline() and not wrapping:
+                # R-029 Codex f1 #3: the reply came back after the deadline - no tool runs and
+                # no automatic write starts; a final answer from what was shown still counts
+                wrapping = True
+                wrap_up = f"the time budget for one run ({budget_s:g} s) was used up"
+                tr.note(key="planner_wrap_up", text=wrap_up)
             if turn.tool_calls and not wrapping:
                 for call in turn.tool_calls:
+                    if past_deadline():
+                        wrap_up = f"the time budget for one run ({budget_s:g} s) was used up"
+                        observations.append({"protocol": f"not run: {wrap_up}"})
+                        break
                     if tool_calls >= spec.limits.max_tool_calls:
                         wrap_up = (f"the tool-call limit ({spec.limits.max_tool_calls}) was "
                                    f"reached")
@@ -1575,6 +1669,17 @@ def run_agent(workflow: Union[WorkflowSpec, str, Path, dict],
                     observations.append({"protocol": note})
                     tr.note(key="planner_protocol", text=note)
                 for req in turn.actions:
+                    mode = next((a.automation_mode for a in spec.actions if a.name == req.name),
+                                None)
+                    if mode not in (None, "human_required") and (wrapping or past_deadline()):
+                        # R-029 Codex f1 #3: no automatic write starts in the wrap-up or after
+                        # the deadline (a person-approved proposal still may be filed)
+                        refuse_action(req, "time_budget",
+                                      f"an automatic write does not start {'in the wrap-up' if wrapping else 'after the deadline'}"
+                                      f" ({wrap_up or 'the time budget was used up'})")
+                        observations.append({"action": req.name,
+                                             "refused": skipped[-1]["detail"]})
+                        continue
                     res = propose(req)
                     observations.append({"action": req.name,
                                          **(res if res else {"refused": skipped[-1]["detail"]})})

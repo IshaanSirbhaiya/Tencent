@@ -1336,10 +1336,14 @@ def validate_table_mapping(table: str, tm: TableMapping, vocab, *,
                                 f"or whose evidence names no column")
             other = e.dst if e.src == own else e.src
             okind = other.split(":", 1)[0]
-            if is_subject_kind(vocab, okind):
-                problems.append(f"{table}: edge {i} is a link to subject kind {okind!r}; an "
-                                f"inferred link never points at a subject or a person (hard "
-                                f"constraint 1)")
+            if never_linked(vocab, okind):
+                problems.append(f"{table}: edge {i} is a link to subject kind or person kind "
+                                f"{okind!r}; an inferred link never points at a subject or a "
+                                f"person (hard constraint 1)")
+            if never_linked(vocab, own.split(":", 1)[0]):
+                problems.append(f"{table}: edge {i} is a link from subject kind or person kind "
+                                f"{own.split(':', 1)[0]!r}; an inferred link never joins a "
+                                f"subject's or person's rows (hard constraint 1)")
         try:
             decl = vocab.edge(e.kind)
         except Exception:                                            # noqa: BLE001
@@ -1877,6 +1881,14 @@ def _set_table_mapping_locked(source_id: str, table: str, *, edited_by: str, nod
 
 
 # --- C-3: proposed links where no foreign key is declared --------------------------------------------
+def never_linked(vocab, kind: Optional[str]) -> bool:
+    """Codex R-029 #1 (hard constraint 1): a kind an INFERRED link may never touch, at either end
+    — a subject, or a person kind (`vocab.is_person`: subjects plus the kinds the pack marks
+    structurally as natural persons). A match on one is a per-record candidate a named human
+    selects, never a table-wide edge. Cannot tell: refused (fail closed)."""
+    return is_subject_kind(vocab, kind) or is_person_kind(vocab, kind)
+
+
 def is_subject_kind(vocab, kind: Optional[str]) -> bool:
     """THE subject predicate for linking, matching and withholding (R-028 standard 7):
     `vocab.is_subject(kind)`. Persons are a subset of subjects. An inferred link never points at a
@@ -2089,11 +2101,13 @@ def propose_links(source_id: str, snapshots: dict[str, dict], tables: dict[str, 
                     and (h[2], h[3]) != (tsrc, ttab)]
             if tied:
                 link["alternatives"] = tied
-            if is_subject_kind(vocab, tkind):
+            if never_linked(vocab, tkind) or never_linked(vocab, kind):
+                side = tkind if never_linked(vocab, tkind) else kind
                 link.update(status="not_proposed", why=(
-                    f"the target kind {tkind!r} is a subject: an inferred link never points at "
-                    f"a subject or a person record (hard constraint 1); a person who knows the "
-                    f"match records it per record through the subject's verified channel"))
+                    f"the {'target' if side == tkind else 'source'} kind {side!r} is a subject "
+                    f"or person kind: an inferred link never touches a subject or a person "
+                    f"record (hard constraint 1); a person who knows the match records it per "
+                    f"record, as a candidate, through the subject's verified channel"))
                 found.append(link)
                 continue
             roots = fk_hint_roots(col, kind, tkind, ttab)
@@ -2141,9 +2155,29 @@ def merge_link_proposals(tables: dict[str, TableMapping], proposals: dict[str, l
     return out
 
 
+def strip_withheld_rows(snapshot: dict, source_id: str, withheld) -> dict:
+    """The snapshot without the rows (by `row_ref`) its build withheld (Codex R-029 #3)."""
+    from .build import _render_pk
+    from .screen import row_ref
+
+    held = set(withheld or ())
+    if not held:
+        return snapshot
+    tref = _table_ref(snapshot.get("schema"), snapshot["table"])
+    pk = list(snapshot.get("primary_key") or [])
+    keep = []
+    for ordinal, row in enumerate(snapshot.get("rows") or []):
+        key = _render_pk(row, pk)
+        if row_ref(source_id, tref, key if key is not None else f"#{ordinal}") not in held:
+            keep.append(row)
+    return {**snapshot, "rows": keep}
+
+
 def captured_tables(source_id: str) -> dict[str, dict]:
     """{table: snapshot} of every table the source's LAST verified state holds (its captures),
-    read-only — the other side of a cross-source link proposal."""
+    read-only — the other side of a cross-source link proposal. Codex R-029 #3: as BUILT — the
+    rows its build withheld are left out, and a table whose state records no screen (built before
+    that was kept) is left out until its next build."""
     from . import capture
     from .runner import load_state
 
@@ -2154,7 +2188,7 @@ def captured_tables(source_id: str) -> dict[str, dict]:
         return out
     for entry in state.values():
         sha = (entry or {}).get("content_hash")
-        if not sha or (entry or {}).get("graph") is False:
+        if not sha or (entry or {}).get("graph") is False or "screen" not in (entry or {}):
             continue
         try:
             data = json.loads(capture.get_bytes(sha))
@@ -2162,7 +2196,7 @@ def captured_tables(source_id: str) -> dict[str, dict]:
             continue
         if isinstance(data, dict) and data.get("table") and isinstance(data.get("rows"), list):
             ref = _table_ref(data.get("schema"), data["table"])
-            out[ref] = data
+            out[ref] = strip_withheld_rows(data, source_id, entry.get("withheld_rows"))
     return out
 
 
@@ -2185,7 +2219,7 @@ def link_context(source_id: str, root: Optional[Path] = None, vocab=None
         # those rows (`_link_targets` measures it per kind), even when its default is a subject
         tabs = {t: tm for t, tm in m.tables.items()
                 if tm.status != "unmapped" and tm.node and (tm.node or {}).get("kind")
-                and any(not is_subject_kind(vocab, k) for k in split_kinds(tm))}
+                and any(not never_linked(vocab, k) for k in split_kinds(tm))}
         if not tabs:
             continue
         snaps = captured_tables(conn.id)
@@ -2265,9 +2299,10 @@ def _approve_link_locked(source_id: str, table: str, column: str, *, principal: 
         raise MappingApprovalRefused(f"{table}.{column}: the link is {link.get('status')!r}"
                                      f"{'' if link.get('edge') else ' with no edge kind'}; "
                                      f"only a proposal with an edge can be approved")
-    if is_subject_kind(vocab, link.get("target_kind")):
-        raise MappingApprovalRefused(f"{table}.{column}: the link points at subject kind "
-                                     f"{link.get('target_kind')!r}; refused (hard constraint 1)")
+    if never_linked(vocab, link.get("target_kind")) or never_linked(vocab, tm.node.get("kind")):
+        raise MappingApprovalRefused(f"{table}.{column}: the link touches a subject kind or "
+                                     f"person kind ({link.get('target_kind')!r} / "
+                                     f"{tm.node.get('kind')!r}); refused (hard constraint 1)")
     e = link["edge"]
     edge = {"kind": e["kind"], "src": e["src"], "dst": e["dst"], "evidence": [column],
             "fk": f"{column} -> {link['source']}:{link['table']} (approved link)",
@@ -2377,7 +2412,7 @@ __all__ = ["SourceMapping", "TableMapping", "propose_rules", "propose_model", "e
            "kind_for_table", "resolve_kind", "MAPPING_TASK_CLASS", "fk_edges", "fk_hint_roots",
            "resolve_pending_fks", "propose_links", "merge_link_proposals", "refresh_link_proposals",
            "approve_link", "reject_link", "link_context", "captured_tables", "is_person_kind",
-           "is_subject_kind", "mapping_lock", "mapping_ledger",
+           "is_subject_kind", "never_linked", "mapping_lock", "mapping_ledger",
            "FK_NO_KIND",
            "is_association", "association_mapping", "propose_split", "split_value",
            "split_candidates", "split_problems", "split_kinds", "resolve_pending_splits",

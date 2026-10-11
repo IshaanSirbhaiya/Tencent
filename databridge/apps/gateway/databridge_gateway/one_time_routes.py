@@ -364,8 +364,11 @@ def task_state(run_status: Optional[str], statuses: list[str]) -> str:
     """``waiting_for_approval`` while ANY write still waits on a person — never ``done``."""
     if any(s in HELD for s in statuses):
         return "waiting_for_approval"
-    if run_status in ("completed", "stopped"):
+    if run_status == "completed":
         return "done"
+    # R-029 Codex f1 #3: a run stopped by a limit (time, steps, tokens) did not finish - it is
+    # reported as stopped, never as done
+
     return run_status or "unknown"
 
 

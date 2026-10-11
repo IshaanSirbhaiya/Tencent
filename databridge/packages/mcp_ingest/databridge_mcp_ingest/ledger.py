@@ -41,9 +41,11 @@ def scrub(text: object) -> str:
 
 #: An absolute server path left in free text after the known directories are made relative:
 #: a drive path (``C:\\x\\y``, ``C:/x/y``), a UNC path, or a POSIX path of two or more segments
-#: (never a URL's path: a ``scheme://`` or a ``host/`` precedes it).
-_ABS_PATH = re.compile(r"(?<![\w])(?:[A-Za-z]:[\\/]|\\\\)[^\s'\"<>|*?,;()]*"
-                       r"|(?<![\w:/.~-])/(?:[\w.-]+/)+[\w.-]+")
+#: — including one right after a colon (``path:/opt/x``) and a ``file:`` URI — but never a URL's
+#: path (a ``scheme://host`` precedes it; R-029 Codex f1 #8).
+_ABS_PATH = re.compile(r"\bfile:/+[^\s'\"<>|*?,;()]*"
+                       r"|(?<![\w])(?:[A-Za-z]:[\\/]|\\\\)[^\s'\"<>|*?,;()]*"
+                       r"|(?<![\w/.~-])/(?:[\w.-]+/)+[\w.-]+")
 
 
 def _known_dirs() -> list[tuple[str, str]]:

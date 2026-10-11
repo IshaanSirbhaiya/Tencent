@@ -296,24 +296,39 @@ def approval_key(*, protect: Iterable[Path] = ()) -> bytes:
 
 def provision_approval_key(*, protect: Iterable[Path] = ()) -> Path:
     """The operator's EXPLICIT provisioning step: create the deployment key file with a random
-    256-bit key if it does not exist (atomically; an existing key is never overwritten). Returns
-    its path. Never called by a read, nor implicitly by a write."""
+    256-bit key if it does not exist. Returns its path. Never called by a read, nor implicitly by
+    a write.
+
+    R-029 Codex f1 #7: created EXCLUSIVELY (``O_CREAT | O_EXCL``, mode 0600, fsynced) — never a
+    rename or link that could replace a key another provisioner created meanwhile. A key that
+    exists (or appears first) is never overwritten. A half-written key cannot be read as valid:
+    `approval_key` refuses one shorter than the minimum."""
     kp = _key_file(protect)
     if not kp.is_file():
         kp.parent.mkdir(parents=True, exist_ok=True)
-        tmp = kp.with_name(f".{kp.name}.{os.getpid()}.{secrets.token_hex(6)}.tmp")
-        tmp.write_text(secrets.token_hex(32), encoding="utf-8")
-        with contextlib.suppress(OSError):
-            os.chmod(tmp, 0o600)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
         try:
-            os.link(tmp, kp)                 # atomic, never overwrites a key another writer made
+            fd = os.open(kp, flags, 0o600)
         except FileExistsError:
-            pass
-        except OSError:
-            with contextlib.suppress(OSError):
-                os.rename(tmp, kp)
-        tmp.unlink(missing_ok=True)
+            return kp
+        try:
+            os.write(fd, secrets.token_hex(32).encode("ascii"))
+            os.fsync(fd)
+        finally:
+            os.close(fd)
     return kp
+
+
+def _checked_key(key: bytes) -> bytes:
+    """R-029 Codex f1 #2: a key handed to a ledger directly meets the same minimum as the
+    deployment key. An empty or short key would seal records anyone could forge."""
+    raw = bytes(key or b"")
+    if len(raw.strip()) < _MIN_KEY_CHARS:
+        raise DecisionRefused(APPROVAL_KEY_UNAVAILABLE, f"the approval key supplied to the ledger "
+                                                        f"is shorter than {_MIN_KEY_CHARS} "
+                                                        f"characters; nothing is sealed or "
+                                                        f"verified with it", 503)
+    return raw
 
 
 # =================================================================================================
@@ -553,9 +568,13 @@ class DecisionLedger:
     # --- plumbing -------------------------------------------------------------------------------
     @property
     def key(self) -> bytes:
-        if self._key is None:
-            self._key = approval_key(protect=self.protect)
-        return self._key
+        """The sealing key, resolved on EVERY use (R-029 Codex f1 #3): the deployment key is
+        re-read (a key deleted or replaced since the last operation refuses or fails
+        verification; it is never kept in memory to seal more records), and a supplied key is
+        checked against the minimum (f1 #2). Each operation reads it once."""
+        if self._key is not None:
+            return _checked_key(self._key)
+        return approval_key(protect=self.protect)
 
     @property
     def lock_path(self) -> Path:
@@ -604,7 +623,8 @@ class DecisionLedger:
     # --- verification -----------------------------------------------------------------------------
     def _scan(self) -> _Scan:
         s = _Scan()
-        anchor, why = self._anchors().latest(self.log_id)
+        key = self.key                                   # once per scan (f1 #3)
+        anchor, why = AnchorLedger(key, self.anchors_path).latest(self.log_id)
         if why:
             s.state, s.why = "broken", f"the anchor ledger does not verify: {why}"
             return s
@@ -653,7 +673,7 @@ class DecisionLedger:
         for n, (end, rec, last) in enumerate(parsed, start=1):
             if not isinstance(rec, dict) or rec.get(self.digest_field) != self._digest(rec) or \
                     not hmac.compare_digest(str(rec.get("seal") or ""),
-                                            seal_of(self.key, str(rec.get(self.digest_field)))):
+                                            seal_of(key, str(rec.get(self.digest_field)))):
                 if last and not terminated:
                     s.torn = chunks[-1]
                     break
@@ -752,7 +772,8 @@ class DecisionLedger:
         rec["seq"] = (last["seq"] if last else 0) + 1
         rec["prev"] = last[self.digest_field] if last else self.genesis
         rec[self.digest_field] = self._digest(rec)
-        rec["seal"] = seal_of(self.key, rec[self.digest_field])
+        key = self.key                                   # re-resolved before every append
+        rec["seal"] = seal_of(key, rec[self.digest_field])
         self.path.parent.mkdir(parents=True, exist_ok=True)
         lead = b""
         if self.path.is_file() and self.path.stat().st_size:
@@ -764,7 +785,8 @@ class DecisionLedger:
             fh.flush()
             os.fsync(fh.fileno())
         recs.append(rec)
-        self._anchors().anchor(self.log_id, rec["seq"], rec[self.digest_field])
+        AnchorLedger(key, self.anchors_path).anchor(self.log_id, rec["seq"],
+                                                    rec[self.digest_field])
         return rec
 
     def _recover_locked(self, s: _Scan) -> _Scan:

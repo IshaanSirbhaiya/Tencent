@@ -12,9 +12,11 @@ softened, and the answer says "as at <extract date>".
 
 Resolvable pointers (R-022 f2 #8). A `query_cell` pointer whose identity is the statement alone
 (no parameters, and a row order PROVEN unique, or at most one row) is resolved by re-running that
-statement. Every other answer writes a QUERY ARTEFACT beside the facts store,
-`<source>_facts.queries/<query_hash>.json`: the statement, the bound parameters (typed, so they can
-be re-bound), their digest and the result digest. `resolve_query_cell(pointer)` loads it, re-runs
+statement. Every other answer carries a QUERY ARTEFACT (`CountAnswer.query_artefact`): the
+statement, the bound parameters (typed, so they can be re-bound), their digest and the result
+digest. A READ never writes it (R-029 Codex f1 #1): persisting it beside the facts store,
+`<source>_facts.queries/<query_hash>.json`, is the explicit write `persist_query_artefact(answer)`
+(or `count_query(..., persist_query=True)`). `resolve_query_cell(pointer)` loads it, re-runs
 the query against the facts file the pointer captured, checks the identity again and returns the
 cell. ORDER BY alone is not proof of a stable order (ties): the order is proven only when the
 ORDER BY terms of a single-table query cover `rowid` or a declared key of that table.
@@ -75,8 +77,13 @@ class CountAnswer:
     params_sha256: str = ""
     #: True when the row order is PROVEN unique (`proven_order`): ordinals are a stable identity
     ordered: bool = False
-    #: the query artefact that makes the pointers resolvable ("" when the statement alone does)
+    #: the PERSISTED query artefact that makes the pointers resolvable, as a reference relative
+    #: to the facts directory ("" when the statement alone does, or it is not persisted yet)
     query_ref: str = ""
+    #: the query artefact that re-derives this answer's pointers from their query hash alone, not
+    #: yet written (a read writes nothing; `persist_query_artefact` — the ONE publisher API — is
+    #: the write a publisher makes for every answer whose pointers it emits).
+    query_artefact: Optional[dict] = None
 
     @property
     def scalar(self) -> Any:
@@ -94,6 +101,7 @@ class CountAnswer:
                 "citation": self.citation, "result_sha256": self.result_sha256,
                 "params_sha256": self.params_sha256, "ordered": self.ordered,
                 "query_ref": self.query_ref,
+                "query_artefact_pending": bool(self.query_artefact) and not self.query_ref,
                 "pointers": [p.model_dump(mode="json", exclude_none=True)
                              for p in self.pointers]}
 
@@ -225,8 +233,9 @@ def _write_query_artefact(source_id: str, facts_dir, qhash: str, body: dict) -> 
     d.mkdir(parents=True, exist_ok=True)
     final = d / f"{qhash}.json"
     data = json.dumps(body, sort_keys=True, default=str, indent=1)
+    ref = f"{d.name}/{final.name}"              # f1 #8: a reference, never the server path
     if _matches(final, data):
-        return str(final)
+        return ref
     # Unique per CALL, not per process: concurrent threads in one gateway raced on a pid-only name
     # (E2E run 4, Q-01 root cause). On Windows a replace (or a read) can still fail transiently
     # while another writer holds the target; the artefact is content-addressed, so the outcome is
@@ -237,10 +246,10 @@ def _write_query_artefact(source_id: str, facts_dir, qhash: str, body: dict) -> 
         for attempt in range(40):
             try:
                 os.replace(tmp, final)
-                return str(final)
+                return ref
             except PermissionError:
                 if _matches(final, data):
-                    return str(final)
+                    return ref
                 time.sleep(0.005 * (attempt + 1))
         raise PermissionError(f"could not publish query artefact {final.name}")
     finally:
@@ -289,12 +298,49 @@ def _now() -> float:
     return time.monotonic()
 
 
+def _change_time(path: Path) -> Optional[int]:
+    """The file's CHANGE time — updated by every write AND every metadata change, so restoring
+    the mtime after an in-place edit does not restore it (R-029 Codex f1 #4). POSIX: `st_ctime`.
+    Windows: `FILE_BASIC_INFO.ChangeTime` (os.stat's ctime there is the creation time). None when
+    it cannot be read; then nothing is cached (`facts_digest` hashes every time)."""
+    if os.name != "nt":
+        return os.stat(path).st_ctime_ns
+    try:
+        import ctypes                                                     # noqa: PLC0415
+        from ctypes import wintypes                                       # noqa: PLC0415
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateFileW.restype = wintypes.HANDLE
+        k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                                    wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD,
+                                    wintypes.HANDLE]
+
+        class _BasicInfo(ctypes.Structure):
+            _fields_ = [("CreationTime", ctypes.c_longlong), ("LastAccessTime", ctypes.c_longlong),
+                        ("LastWriteTime", ctypes.c_longlong), ("ChangeTime", ctypes.c_longlong),
+                        ("FileAttributes", wintypes.DWORD)]
+
+        h = k32.CreateFileW(str(path), 0x80, 0x7, None, 3, 0x02000000, None)
+        if h in (None, wintypes.HANDLE(-1).value):
+            return None
+        try:
+            info = _BasicInfo()
+            if not k32.GetFileInformationByHandleEx(h, 0, ctypes.byref(info),
+                                                    ctypes.sizeof(info)):
+                return None
+            return int(info.ChangeTime)
+        finally:
+            k32.CloseHandle(h)
+    except Exception:                                                     # noqa: BLE001
+        return None
+
+
 def _file_key(path: Path) -> tuple:
     """The identity of the file's current SNAPSHOT: an atomic publication (a new file, then
-    `os.replace`) changes the inode; a write in place changes the size or the mtime."""
+    `os.replace`) changes the inode; a write in place changes the size, the mtime and — even when
+    the mtime is restored — the change time."""
     st = os.stat(path)
-    return (st.st_size, st.st_mtime_ns, st.st_ino, st.st_dev,
-            getattr(st, "st_ctime_ns", None) if os.name != "nt" else None)
+    return (st.st_size, st.st_mtime_ns, st.st_ino, st.st_dev, _change_time(path))
 
 
 def clear_digest_cache() -> None:
@@ -311,7 +357,8 @@ def facts_digest(path: Path) -> str:
     key = _file_key(path)
     with _DIGEST_LOCK:
         hit = _DIGESTS.get(name)
-    if hit is not None and hit[0] == key and _now() - hit[2] <= DIGEST_TTL_S:
+    if hit is not None and key[-1] is not None and hit[0] == key \
+            and _now() - hit[2] <= DIGEST_TTL_S:
         return hit[1]
     digest = sha256_file(path)
     if _file_key(path) == key:                       # verified: the snapshot held still
@@ -322,9 +369,14 @@ def facts_digest(path: Path) -> str:
 
 def count_query(source_id: str, sql: str, *, params: Optional[tuple | dict] = None,
                 question: Optional[str] = None, max_rows: int = MAX_ROWS,
-                facts_dir: Optional[Path | str] = None) -> CountAnswer:
+                facts_dir: Optional[Path | str] = None,
+                persist_query: bool = False) -> CountAnswer:
     """`facts_dir`: read the facts store in THIS directory instead of the process default
-    (`WALNUT_FACTS_DIR`) — additive, for a caller that owns its own store (materialise)."""
+    (`WALNUT_FACTS_DIR`) — additive, for a caller that owns its own store (materialise).
+
+    A READ: nothing is written (R-029 Codex f1 #1). An answer whose pointers need a query artefact
+    carries it (`query_artefact`); ``persist_query=True`` — or `persist_query_artefact` later — is
+    the explicit, separate write that makes those pointers resolvable from disk."""
     path = facts_path(source_id, facts_dir)
     manifest = load_manifest(source_id, facts_dir) or {}
     if not path.is_file():
@@ -356,18 +408,21 @@ def count_query(source_id: str, sql: str, *, params: Optional[tuple | dict] = No
                                    for r in rows])
     qhash = query_identity(stmt, psha, rsha, ordered=ordered, rows=len(rows))
     query_ref = ""
-    if qhash != hashlib.sha256(stmt.encode("utf-8")).hexdigest():
-        # R-022 f2 #8: the statement alone does not resolve these pointers — persist what does
-        if isinstance(params, dict):
-            bound: Any = {str(k): _param_value(v) for k, v in params.items()}
-        else:
-            bound = [_param_value(v) for v in (params or ())]
-        query_ref = _write_query_artefact(source_id, facts_dir, qhash, {
-            "query_hash": qhash, "source_id": source_id, "sql": stmt, "params": bound,
-            "params_kind": "named" if isinstance(params, dict) else "positional",
-            "params_sha256": psha, "ordered": ordered,
-            "result_sha256": rsha if not (ordered or len(rows) <= 1) else None,
-            "rows": len(rows), "max_rows": max_rows})
+    # R-022 f2 #8: what re-derives these pointers. R-029 TIDY2: built for EVERY answer — even a
+    # statement-only identity is resolvable from its query hash ALONE once persisted, so a
+    # publisher never depends on the resolver knowing the statement. A read writes nothing.
+    if isinstance(params, dict):
+        bound: Any = {str(k): _param_value(v) for k, v in params.items()}
+    else:
+        bound = [_param_value(v) for v in (params or ())]
+    artefact: Optional[dict] = {
+        "query_hash": qhash, "source_id": source_id, "sql": stmt, "params": bound,
+        "params_kind": "named" if isinstance(params, dict) else "positional",
+        "params_sha256": psha, "ordered": ordered,
+        "result_sha256": rsha if not (ordered or len(rows) <= 1) else None,
+        "rows": len(rows), "max_rows": max_rows}
+    if persist_query:
+        query_ref = _write_query_artefact(source_id, facts_dir, qhash, artefact)
     snap = SnapshotIdentity(source_id=source_id,
                             as_of=dt.datetime.fromisoformat(extracted.replace("Z", "+00:00")),
                             content_hash=digest,
@@ -383,9 +438,24 @@ def count_query(source_id: str, sql: str, *, params: Optional[tuple | dict] = No
                 f"{source_id}, extracted {extracted}; result sha256 {rsha[:12]}…")
     return CountAnswer(source_id=source_id, sql=stmt, columns=columns, rows=rows,
                        row_count=len(rows), truncated=truncated, extract_date=extracted,
-                       facts_file=str(path), facts_sha256=digest, citation=citation,
+                       facts_file=path.name, facts_sha256=digest, citation=citation,
                        question=question, pointers=pointers, result_sha256=rsha,
-                       params_sha256=psha, ordered=ordered, query_ref=query_ref)
+                       params_sha256=psha, ordered=ordered, query_ref=query_ref,
+                       query_artefact=artefact)
+
+
+def persist_query_artefact(answer: CountAnswer, *, facts_dir: Optional[Path | str] = None) -> str:
+    """THE publisher API (R-029 TIDY2): a facts READ writes nothing, so whoever PUBLISHES an
+    answer's `query_cell` pointers (returns them as evidence, ships them in a dataset, cites them
+    in an answer) calls this, explicitly, for that answer. Its query artefact is published
+    (content-addressed, atomically) beside the facts store, so every pointer resolves from its
+    query hash alone (`resolve_query_cell`). Returns the reference, relative to the facts
+    directory, and records it on the answer. Idempotent."""
+    body = answer.query_artefact
+    if not body:
+        return answer.query_ref
+    answer.query_ref = _write_query_artefact(answer.source_id, facts_dir, body["query_hash"], body)
+    return answer.query_ref
 
 
 def resolve_query_cell(pointer: SourcePointer, *, sql: Optional[str] = None,
@@ -447,4 +517,5 @@ def describe_facts(source_id: str, *, facts_dir: Optional[Path | str] = None) ->
 
 __all__ = ["count_query", "describe_facts", "CountAnswer", "FactsQueryError", "params_digest",
            "result_digest", "query_identity", "proven_order", "resolve_query_cell",
-           "queries_dir", "facts_digest", "clear_digest_cache", "DIGEST_TTL_S"]
+           "queries_dir", "facts_digest", "clear_digest_cache", "DIGEST_TTL_S",
+           "persist_query_artefact"]

@@ -74,7 +74,7 @@ _PACK_NAME = re.compile(r"^[a-z][a-z0-9_-]*$")
 #: complaint (packs finding 8) — the security-relevant typo is exactly the one that must fail.
 _PACK_TOP_LEVEL_KEYS = frozenset({
     "pack", "title", "version", "node_kinds", "edge_kinds", "subject_kinds", "identity_rules"})
-_NODE_KIND_KEYS = frozenset({"name", "binds_to", "description"})
+_NODE_KIND_KEYS = frozenset({"name", "binds_to", "description", "person"})
 _EDGE_KIND_KEYS = frozenset({"name", "binds_to", "src", "dst", "description"})
 _SUBJECT_KIND_KEYS = frozenset({
     "kind", "identifiers", "never_fuzzy_merge", "attestation", "grant_type", "attested_by",
@@ -138,6 +138,11 @@ class NodeKindDecl:
     rather than a single pointer because a merged declaration has more than one origin, and
     attributing a composite to whichever pack happened to be first is the misattribution packs
     finding 4 names."""
+    person: Optional[bool] = None
+    """IDN (R-029 Codex round 1): whether the kind's records are NATURAL PERSONS. ``None`` (the
+    pack said nothing) is read as YES for an entity-bound kind — protection is fail-closed, so a
+    pack cannot switch hard constraint 1 off by forgetting. A pack writes ``person: false`` to
+    declare an entity kind that is not a person (a product, a sector, a pledged asset)."""
 
     @property
     def symbol(self) -> str:
@@ -295,6 +300,42 @@ def person_like_kinds(node_kinds: Mapping[str, "NodeKindDecl"],
     return frozenset(out)
 
 
+def person_kinds_of(node_kinds: Mapping[str, "NodeKindDecl"],
+                    edge_kinds: Mapping[str, "EdgeKindDecl"],
+                    subject_kinds: Mapping[str, object]) -> frozenset[str]:
+    """IDN (R-029 Codex round 1): every kind whose records are natural persons — FAIL-CLOSED.
+
+    * every declared subject;
+    * every kind the declarations mark structurally (`person_like_kinds`);
+    * every ENTITY-bound kind its pack has not declared ``person: false``.
+
+    Topology alone is not a reliable classifier (a person kind may appear only as a destination,
+    or behind a wildcard), so it only ever ADDS kinds; omission never removes protection."""
+    out = set(subject_kinds) | person_like_kinds(node_kinds, edge_kinds)
+    out |= {k for k, d in node_kinds.items()
+            if d.binds_to is PERSON_META_KIND and getattr(d, "person", None) is not False}
+    return frozenset(out)
+
+
+def _person_flag_problems(node_kinds, edge_kinds, subject_kinds, where: str) -> None:
+    """Refuse a declaration that contradicts itself: ``person: true`` on a kind that is not an
+    entity, or ``person: false`` on a subject or on a kind the pack names as a role-holding or
+    artefact-issuing actor."""
+    structural = person_like_kinds(node_kinds, edge_kinds)
+    for k, d in node_kinds.items():
+        flag = getattr(d, "person", None)
+        if flag is True and d.binds_to is not PERSON_META_KIND:
+            raise PackError(
+                f"{where}: node kind {k!r} declares person: true but binds to "
+                f"{d.binds_to.value!r}; only an {PERSON_META_KIND.value!r} kind can be a person")
+        if flag is False and (k in subject_kinds or k in structural):
+            why = "a declared subject" if k in subject_kinds else (
+                "named as the actor of a role or of an artefact")
+            raise PackError(
+                f"{where}: node kind {k!r} declares person: false but is {why}; a person kind "
+                f"cannot be declared out of hard constraint 1")
+
+
 @dataclass(frozen=True)
 class Pack:
     """One loaded, validated pack — Layer 1. Its mappings are SEALED; see `_sealed`."""
@@ -388,12 +429,12 @@ class Vocabulary:
 
     @cached_property
     def person_kinds(self) -> frozenset[str]:
-        """Kinds whose records stand for PEOPLE: every declared subject, plus every kind the bound
-        declarations mark structurally as a natural person (`person_like_kinds`). None of them is
-        ever merged by name, similarity, prefix or an identity rule, in any pack (hard
-        constraint 1): a mention of one is a candidate for a named human, never a join."""
-        return frozenset(self.subject_kinds) | person_like_kinds(self.node_kinds,
-                                                                 self.edge_kinds)
+        """Kinds whose records stand for PEOPLE (`person_kinds_of`, fail-closed): every declared
+        subject, every kind marked structurally, and every entity kind its pack did not declare
+        ``person: false``. None of them is ever merged by an identifier, name, similarity, prefix
+        or identity rule, in any pack (hard constraint 1): a mention or a twin record of one is a
+        candidate for a named human, never a join."""
+        return person_kinds_of(self.node_kinds, self.edge_kinds, self.subject_kinds)
 
     def is_person(self, kind: str) -> bool:
         return str(kind) in self.person_kinds
@@ -652,10 +693,14 @@ def load_pack(name: str, root: Optional[Path] = None, *, use_cache: bool = True)
                 f"Valid: {[m.value for m in NodeMetaKind]}") from None
         if kname in node_kinds:
             raise PackError(f"{where}: node kind {kname!r} declared twice")
+        person = entry.get("person")
+        if person is not None and type(person) is not bool:
+            raise PackError(f"{where}: node kind {kname!r}: person must be true or false, not "
+                            f"{person!r}")
         node_kinds[kname] = NodeKindDecl(
             name=kname, binds_to=meta, pack=name,
             description=str(entry.get("description") or ""),
-            sources=(_decl_pointer(path, "node_kinds", index),))
+            sources=(_decl_pointer(path, "node_kinds", index),), person=person)
 
     edge_kinds: dict[str, EdgeKindDecl] = {}
     for index, entry in enumerate(_as_list(_require(data, "edge_kinds", where),
@@ -736,6 +781,7 @@ def load_pack(name: str, root: Optional[Path] = None, *, use_cache: bool = True)
             attestation=attestation, grant_type=grant, pack=name, **wording,
             sources=(_decl_pointer(path, "subject_kinds", index, key="kind"),))
 
+    _person_flag_problems(node_kinds, edge_kinds, subject_kinds, where)
     identity_rules: dict[str, IdentityRule] = {}
     for index, entry in enumerate(_as_list(data.get("identity_rules"), "identity_rules", where)):
         if not isinstance(entry, dict):
@@ -750,11 +796,12 @@ def load_pack(name: str, root: Optional[Path] = None, *, use_cache: bool = True)
                 f"{where}: identity rule for {rkind!r}, which this pack declares a SUBJECT. A "
                 f"subject is never merged by a rule (CLAUDE.md hard constraint 1): its records "
                 f"stay candidates for a named human")
-        if rkind in person_like_kinds(node_kinds, edge_kinds):
+        if rkind in person_kinds_of(node_kinds, edge_kinds, subject_kinds):
             raise PackError(
                 f"{where}: identity rule for {rkind!r}, whose records are natural persons (an "
-                f"entity the pack names as the actor of a role or of an artefact). A person is "
-                f"never merged by a rule (CLAUDE.md hard constraint 1)")
+                f"entity kind the pack did not declare person: false, or names as the actor of "
+                f"a role or of an artefact). A person is never merged by a rule (CLAUDE.md hard "
+                f"constraint 1)")
         if node_kinds[rkind].binds_to not in SUBJECT_ELIGIBLE_META_KINDS:
             raise PackError(
                 f"{where}: identity rule for {rkind!r}, which binds to "
@@ -858,6 +905,12 @@ def build_vocabulary(names: Sequence[str], root: Optional[Path] = None) -> Vocab
                     f"packs {prior.pack!r} and {d.pack!r} both declare node kind {k!r} but bind it "
                     f"to {prior.binds_to.value!r} and {d.binds_to.value!r} — enable only one, or "
                     f"rename")
+            if prior is not None and getattr(prior, "person", None) != getattr(d, "person", None):
+                # IDN: two packs classify one kind differently: the MORE protective reading wins
+                # (a person unless every declaring pack says `person: false`)
+                flags = {getattr(prior, "person", None), getattr(d, "person", None)}
+                nodes[k] = replace(prior, person=True if True in flags else None)
+                continue
             nodes.setdefault(k, d)
         for k, e in pack.edge_kinds.items():
             prior_e = edges.get(k)
@@ -918,13 +971,15 @@ def build_vocabulary(names: Sequence[str], root: Optional[Path] = None) -> Vocab
                 prior_r, sources=tuple(dict.fromkeys(prior_r.sources + r.sources)))
     # FIN-04: a kind ANY bound pack declares a subject is never merged by a rule, whichever pack
     # declared the rule. Refused, not resolved by order.
-    clash = sorted(set(rules) & (set(subjects) | person_like_kinds(nodes, edges)))
+    _person_flag_problems(nodes, edges, subjects, f"packs {list(ordered)}")
+    clash = sorted(set(rules) & person_kinds_of(nodes, edges, subjects))
     if clash:
+        by = sorted({subjects[k].pack for k in clash if k in subjects})
+        persons = sorted(k for k in clash if k not in subjects)
         raise PackError(
             f"identity rules for {clash} (pack(s) {sorted({rules[k].pack for k in clash})}) clash "
-            f"with subject declarations of the same kind(s) (pack(s) "
-            f"{sorted({subjects[k].pack for k in clash})}). A subject is never merged by a rule; "
-            f"enable only one, or rename the kind")
+            f"with kinds the bound packs make subjects (pack(s) {by}) or natural persons "
+            f"({persons}). A person is never merged by a rule; enable only one, or rename the kind")
     with _LOCK:
         generation = _GENERATION
     return Vocabulary(packs=ordered, node_kinds=nodes, edge_kinds=edges, subject_kinds=subjects,
@@ -1014,5 +1069,5 @@ __all__ = [
     "SubjectKind", "UnknownKind",
     "Vocabulary", "active_vocabulary", "available_packs", "bind_deployment",
     "build_vocabulary", "clear_caches", "configured_packs", "deployment", "load_pack",
-    "never_fuzzy_merge_kinds", "packs_root", "person_like_kinds",
+    "never_fuzzy_merge_kinds", "packs_root", "person_kinds_of", "person_like_kinds",
 ]

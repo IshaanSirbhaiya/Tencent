@@ -58,7 +58,7 @@ def test_f1_a_forged_or_replayed_approval_is_never_honoured(estate):  # noqa: F8
     v = m.design(doc["id"], by="staff")
     assert v["status"] == "integrity_failed" and v["approval"] is None
     with pytest.raises(DesignRefused) as e:
-        m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc, admission=_adm())
+        m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc, admission=_adm(), actor=de.build_actor())
     assert e.value.code == "DESIGN_INTEGRITY_FAILED"
     log.write_bytes(clean)
     # (b) a genuine approval line REPLAYED after an edit (seal valid, chain broken)
@@ -70,7 +70,7 @@ def test_f1_a_forged_or_replayed_approval_is_never_honoured(estate):  # noqa: F8
     log.write_bytes(log.read_bytes() + (approval_line + "\n").encode())
     assert m.design(doc["id"], by="staff")["status"] == "integrity_failed"
     with pytest.raises(DesignRefused) as e:
-        m.build_design(doc["id"], digest=ok["digest"], by="staff", service=svc, admission=_adm())
+        m.build_design(doc["id"], digest=ok["digest"], by="staff", service=svc, admission=_adm(), actor=de.build_actor())
     assert e.value.code == "DESIGN_INTEGRITY_FAILED"
     # (c) the old attack: a mutable state file saying "approved" — not an approval
     (m.out_root / "designs" / f"{doc['id']}.json").write_text(json.dumps(
@@ -127,7 +127,7 @@ def test_f2_stale_writes_and_mid_build_edits_cannot_restore_approval(estate, mon
     before = set(p.name for p in m.out_root.iterdir())
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=ok["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert e.value.code == "DESIGN_NOT_APPROVED"
     after = set(p.name for p in m.out_root.iterdir())
     assert {n for n in after - before if not n.startswith(".")} == set(), "nothing published"
@@ -138,7 +138,7 @@ def test_f2_stale_writes_and_mid_build_edits_cannot_restore_approval(estate, mon
     cur = m.design(doc["id"], by="staff")
     ok2 = m.approve_design(doc["id"], digest=cur["digest"], principal=de.issued_principal(),
                            by="staff")
-    m.build_design(doc["id"], digest=ok2["digest"], by="staff", service=svc, admission=_adm())
+    m.build_design(doc["id"], digest=ok2["digest"], by="staff", service=svc, admission=_adm(), actor=de.build_actor())
     v2 = m.design(doc["id"], by="staff")
     assert v2["rev"] == ok2["rev"] and v2["status"] == "approved" and len(v2["builds"]) == 1
     assert [h["action"] for h in v2["history"]][-1] == "built"
@@ -152,7 +152,7 @@ def test_f3_a_partial_document_read_is_never_a_count(estate):  # noqa: F811
     from databridge_materialise.delegated import documents_count_pointer
     m, svc, doc = _approved(estate, model=False)
     res = m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                         admission=_adm())
+                         admission=_adm(), actor=de.build_actor())
     d = doc["design"]
     docs = [c for c in d["columns"] if c["via"] and next(
         lk for lk in d["links"] if lk["id"] == c["via"])["kind"] == "documents"]
@@ -191,7 +191,7 @@ def test_f3_a_partial_document_read_is_never_a_count(estate):  # noqa: F811
     ok = m.approve_design(doc["id"], digest=ed["digest"], principal=de.issued_principal(),
                           by="staff")
     res2 = m.build_design(doc["id"], digest=ok["digest"], by="staff", service=svc,
-                          admission=_adm())
+                          admission=_adm(), actor=de.build_actor())
     rec2 = _receipt(m, res2)["receipt"]
     for c in rec2["columns"]:
         if c["via"] == lk["id"]:
@@ -216,7 +216,7 @@ def test_f4_a_base_row_the_delegate_could_not_use_refuses_the_build(estate, monk
     monkeypatch.setattr(svc, "run_subtask", excluding)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert e.value.code == "BASE_INCOMPLETE"
 
     def dropping(task, **kw):                 # a row lost WITHOUT a word: the count proves it
@@ -225,11 +225,11 @@ def test_f4_a_base_row_the_delegate_could_not_use_refuses_the_build(estate, monk
     monkeypatch.setattr(svc, "run_subtask", dropping)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert e.value.code == "BASE_UNPROVEN"
     monkeypatch.setattr(svc, "run_subtask", real)
     res = m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                         admission=_adm())
+                         admission=_adm(), actor=de.build_actor())
     rows = _receipt(m, res)["receipt"]["rows"]
     grain = doc["design"]["grain"]["entity"]
     assert rows["emitted"] == rows["base_rows_counted"] == len(estate.rows[grain])
@@ -282,7 +282,7 @@ def test_f6_join_keys_keep_their_type_and_ambiguity_is_refused(estate, monkeypat
     monkeypatch.setattr(svc, "dispatch", doubled)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert e.value.code == "AMBIGUOUS_JOIN"
 
     def retyped(tasks, **kw):                  # the target's key comes back as another type

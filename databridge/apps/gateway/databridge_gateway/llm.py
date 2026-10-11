@@ -464,6 +464,29 @@ def _dedupe_passages(passages: list[dict]) -> list[dict]:
 #: and the context SAYS it was cut.
 MAX_NEIGHBOUR_EDGES = 200
 
+def _edge_cells(store, entity_ids: list) -> dict:
+    """``{entity id: [(source_id, table, column, row_id), ...]}`` — the table-cell pointers of the
+    given entities (any field), read by `ix_sources_eid` in chunks; other pointer kinds are
+    skipped. A pointer that cannot be parsed is skipped (it only ORDERS what is read)."""
+    import json as _json
+
+    out: dict = {}
+    ids = list(dict.fromkeys(entity_ids))
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        for r in store.fetchall("SELECT entity_id, source_pointer_json FROM sources WHERE "
+                                "entity_id IN (" + ", ".join("?" for _ in chunk) + ")",
+                                tuple(chunk)):
+            try:
+                p = _json.loads(r["source_pointer_json"])
+            except (TypeError, ValueError):
+                continue
+            if p.get("kind") == "table_cell":
+                out.setdefault(r["entity_id"], []).append(
+                    (p.get("source_id"), p.get("table"), p.get("column"), p.get("row_id")))
+    return out
+
+
 def bounded_neighbourhood(store, node_id: str, *, asked: Optional[set] = None,
                           cap: Optional[int] = None) -> tuple[list, list, int]:
     """``(nodes, edges, total)``: the 1-hop neighbourhood of ``node_id`` over the OPEN graph, the
@@ -484,8 +507,20 @@ def bounded_neighbourhood(store, node_id: str, *, asked: Optional[set] = None,
     cap = MAX_NEIGHBOUR_EDGES if cap is None else cap
     words = asked or set()
     if total > cap:
-        rows = sorted(rows, key=lambda r: (-_relevance(str(r["kind"]), "", words),
-                                           r["rowid_pk"]))[:cap]
+        # Codex R-029 r1 #12: rank on what the full read would surface — a field of the record's
+        # OWN row first (its pointer is a cell of the same source row; `_field_edge_lines`
+        # writes those under the record), then the asked words in the edge's kind AND the column
+        # it was read from — before anything is cut.
+        cells = _edge_cells(store, [node_id, *(r["id"] for r in rows)])
+        own = {(c[0], c[1], c[3]) for c in cells.get(node_id, [])}
+
+        def score(r) -> tuple:
+            mine = cells.get(r["id"], [])
+            field = " ".join(c[2] or "" for c in mine)
+            on_own_row = any((c[0], c[1], c[3]) in own for c in mine)
+            return (-(1000 if on_own_row else 0) - _relevance(str(r["kind"]), field, words),
+                    r["rowid_pk"])
+        rows = sorted(rows, key=score)[:cap]
     rows = sorted(rows, key=lambda r: r["rowid_pk"])
     edges = [row_to_edge(store, r) for r in rows]
     nodes = []
@@ -1383,5 +1418,6 @@ def _passages_for(brain, question: str) -> list[dict]:
         from brain_server import search_passages
     except Exception:                                                # noqa: BLE001
         return []
-    passages, _meta = search_passages(question, search=getattr(brain, "passage_search", None))
+    passages, _meta = search_passages(question, search=getattr(brain, "passage_search", None),
+                                      ingest_root=getattr(brain, "ingest_root", None))
     return passages

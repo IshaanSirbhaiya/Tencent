@@ -119,3 +119,58 @@ def test_a_file_replaced_while_the_statement_ran_is_refused(tmp_path, hashed, mo
     monkeypatch.setattr(count_mod, "_run", racing)
     with pytest.raises(FactsQueryError, match="changed while"):
         count_query(SID, "SELECT COUNT(*) FROM invoices", facts_dir=tmp_path)
+
+
+# --- R-029 Codex round 1 (TIDY2) ---------------------------------------------------------------
+def _tree(d: Path) -> dict:
+    return {str(p): (p.stat().st_size, p.stat().st_mtime_ns) for p in sorted(d.rglob("*"))}
+
+
+def test_a_count_is_read_only_and_persisting_its_query_is_a_separate_write(tmp_path, hashed):
+    """f1 #1: a parameterised or unordered read wrote `<source>_facts.queries/` DURING the read.
+    Now the read writes nothing; the artefact rides on the answer, and making its pointers
+    resolvable later is the explicit `persist_query_artefact` (or `persist_query=True`)."""
+    from databridge_mcp_ingest.tabular.count import (persist_query_artefact, queries_dir,
+                                                     resolve_query_cell)
+
+    _publish(tmp_path, [(f"I-{i}", i % 3) for i in range(9)])
+    before = _tree(tmp_path)
+    a = count_query(SID, "SELECT id, total FROM invoices WHERE total = ?", params=(1,),
+                    facts_dir=tmp_path)
+    tie = count_query(SID, "SELECT total FROM invoices", facts_dir=tmp_path)
+    assert _tree(tmp_path) == before and not queries_dir(SID, tmp_path).exists()
+    assert a.query_artefact and tie.query_artefact and not a.query_ref       # non-vacuous
+    with pytest.raises(FactsQueryError):
+        resolve_query_cell(a.pointers[0], facts_dir=tmp_path)
+    ref = persist_query_artefact(a, facts_dir=tmp_path)
+    assert ref == a.query_ref and not Path(ref).is_absolute()
+    assert resolve_query_cell(a.pointers[1], facts_dir=tmp_path) == a.rows[0][1]
+    b = count_query(SID, "SELECT total FROM invoices", facts_dir=tmp_path, persist_query=True)
+    assert resolve_query_cell(b.pointers[2], facts_dir=tmp_path) == b.rows[2][0]
+
+
+def test_an_answer_names_no_server_path(tmp_path, hashed):
+    """f1 #8: `facts_file` and `query_ref` were absolute server paths."""
+    _publish(tmp_path, [("I-1", 1), ("I-2", 1)])
+    a = count_query(SID, "SELECT total FROM invoices", facts_dir=tmp_path, persist_query=True)
+    d = a.as_dict()
+    assert d["query_ref"] and d["facts_file"]                              # non-vacuous
+    for v in (d["facts_file"], d["query_ref"], a.citation):
+        assert str(tmp_path) not in v and not Path(str(v)).is_absolute()
+
+
+def test_a_same_size_same_mtime_edit_is_caught_at_once(tmp_path, hashed):
+    """f1 #4: the cached digest was trusted for up to 60 s after an equal-length in-place edit
+    that restored the mtime. The snapshot identity now carries the file's CHANGE time (Windows
+    `ChangeTime`, POSIX `st_ctime`), which a timestamp restore does not reset."""
+    final = _publish(tmp_path, [("I-1", 1), ("I-2", 2)])
+    count_query(SID, "SELECT COUNT(*) FROM invoices", facts_dir=tmp_path)
+    st = os.stat(final)
+    raw = bytearray(final.read_bytes())
+    i = raw.rfind(b"I-2")
+    raw[i:i + 3] = b"I-3"
+    with open(final, "r+b") as fh:
+        fh.write(raw)
+    os.utime(final, ns=(st.st_atime_ns, st.st_mtime_ns))
+    with pytest.raises(FactsQueryError, match="manifest"):
+        count_query(SID, "SELECT COUNT(*) FROM invoices", facts_dir=tmp_path)

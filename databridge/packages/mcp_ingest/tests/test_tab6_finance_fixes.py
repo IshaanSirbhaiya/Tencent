@@ -490,7 +490,7 @@ def _strip_fk(snaps, t, col):
 def test_c3_an_undeclared_reference_is_proposed_like_the_fk_it_should_have_been(estate):
     """Remove each declared FK in turn: the measured overlap proposes the same target, with the
     same edge kind the declared FK gets — and never a link INTO a person kind."""
-    from databridge_mcp_ingest.mapping import (_key_values, is_person_kind, propose_links,
+    from databridge_mcp_ingest.mapping import (_key_values, never_linked, propose_links,
                                                propose_rules, split_kinds, split_value)
 
     vocab, snaps = estate["vocab"], estate["snaps"]
@@ -527,7 +527,9 @@ def test_c3_an_undeclared_reference_is_proposed_like_the_fk_it_should_have_been(
             else:
                 assert link["matched"] == sum(1 for v in values
                                               if kind_of.get(str(v)) == link["target_kind"])
-            if is_person_kind(vocab, link["target_kind"]):
+            # R-029 Codex #1: refused when either end is a subject or person kind
+            if never_linked(vocab, link["target_kind"]) or never_linked(vocab,
+                                                                       rules[t].node["kind"]):
                 refused += 1
                 assert link["status"] == "not_proposed" and link["edge"] is None
             else:
@@ -593,7 +595,7 @@ def test_c3_an_approved_link_becomes_an_edge_into_the_other_source(walnut_env, e
 
     from databridge_mcp_ingest.build import build_tables
     from databridge_mcp_ingest.mapping import (MappingApprovalRefused, SourceMapping, approve_link,
-                                               approve_mapping, is_person_kind, load_mapping,
+                                               approve_mapping, never_linked, load_mapping,
                                                propose_rules, refresh_link_proposals,
                                                save_mapping)
 
@@ -602,7 +604,8 @@ def test_c3_an_approved_link_becomes_an_edge_into_the_other_source(walnut_env, e
     case = next(((t, fk) for t, s in sorted(snaps.items()) if rules[t].node
                  and len(s["rows"]) <= 5000 for fk in _fk_list(s)
                  if rules.get(_ref(fk)) and rules[_ref(fk)].node
-                 and not is_person_kind(vocab, rules[_ref(fk)].node["kind"])
+                 and not never_linked(vocab, rules[_ref(fk)].node["kind"])
+                 and not never_linked(vocab, rules[t].node["kind"])
                  and _ref(fk) != t), None)
     assert case
     t, fk = case

@@ -57,6 +57,7 @@ node_kinds:
 
   - name: product
     binds_to: entity
+    person: false
     description: A product, service line or named deliverable an organisation offers.
 
   - name: location
@@ -65,6 +66,7 @@ node_kinds:
 
   - name: topic
     binds_to: entity
+    person: false
     description: A subject area a document or meeting is about — e.g. demand forecasting, data retention.
 
 edge_kinds:

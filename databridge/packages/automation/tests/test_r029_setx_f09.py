@@ -161,3 +161,50 @@ def test_f09_with_no_inference_it_still_asks_and_never_compiles_a_blind_task(tmp
     draft = _compile(cat, "Summarise what changed this quarter.", tmp_path, "workspace")
     q = next((q for q in draft.open_questions if q.id == "sources"), None)
     assert draft.spec is None and q is not None and "docs" in q.options
+
+
+# --- R-029 Codex f1 #2: the gate is on a READABLE scope, not on "a source or a delegate" -------
+def _blind_catalogue():
+    from databridge_automation.catalogue import AdapterAgentInfo, classify_tool
+
+    writer = ConnectionInfo(id="ops_writer", kind="files", purpose="agent_write",
+                            tools=(ToolRef(name="write_file", write=True, basis="declared"),))
+    files = ConnectionInfo(id="docs", kind="files", tools=(classify_tool("read_text_file"),),
+                           plan_status="approved")
+    keeper = AdapterAgentInfo(id="keeper-ops", title="ops keeper", connections=("ops_writer",))
+    return Catalogue(connections=(files, writer), kinds=("document",), subject_kinds=(),
+                     governance=Governance(pack="workspace"), adapter_agents=(keeper,))
+
+
+def test_f1_2_a_delegate_with_no_readable_connection_is_asked_which_source(tmp_path):
+    cat = _blind_catalogue()
+    draft = _compile(cat, "Ask the keeper-ops adapter agent which notes changed this week.",
+                     tmp_path, "workspace")
+    assert draft.spec is None and any(q.id == "sources" for q in draft.open_questions), \
+        [q.id for q in draft.open_questions]
+
+
+def test_f1_2_a_write_only_task_still_compiles_its_values_come_from_the_words(tmp_path):
+    """Recorded as a false positive in R-029 (Codex f1 #2, second half): a task that only WRITES
+    what the person's own words say needs no read path - the runtime grounds every written value
+    in the cited evidence OR the owner's words. Only a task that must READ is asked."""
+    cat = _blind_catalogue()
+    draft = _compile(cat, "Write a note into ops_writer saying the review is done.", tmp_path,
+                     "workspace")
+    assert not any(q.id == "sources" for q in draft.open_questions)
+
+
+def test_f1_4_a_generator_failure_reaches_the_plan_as_a_reference(tmp_path, monkeypatch):
+    import databridge_automation.compiler as comp
+
+    secret = "C:\srv\keys\hunter2"
+
+    def boom(*a, **k):
+        raise RuntimeError(f"cannot read {secret}")
+
+    monkeypatch.setattr(comp, "declaration_from_workflow", boom)
+    cat, text = _estate_catalogue("workspace", tmp_path)
+    res = _compile(cat, text, tmp_path, "workspace", answers={"sources": "yes"})
+    reason = res.compilation.reason
+    assert "hunter2" not in reason and "RuntimeError" not in reason
+    assert re.search(r"ERR-[0-9a-f]{10}", reason)

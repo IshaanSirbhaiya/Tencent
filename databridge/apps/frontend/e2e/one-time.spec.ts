@@ -82,6 +82,10 @@ test.describe("@unit one-time task helpers (FEAT8)", () => {
     expect(h.text).toContain(`${rj} rejected`);
     expect(taskHeadline({ state: "done", actions: [] }).text).toContain("read-only");
     expect(taskHeadline({ state: "refused", actions: [] }).tone).toBe("failed");
+    // R-029 Codex f1 #3: a run stopped by a limit is never shown as done
+    const stopped = taskHeadline({ state: "stopped", actions: [] });
+    expect(stopped.tone).not.toBe("done");
+    expect(stopped.text).toContain("Stopped before it finished");
   });
 
   test("run is blocked by open questions, a refused compile, or no plan — and only then", () => {

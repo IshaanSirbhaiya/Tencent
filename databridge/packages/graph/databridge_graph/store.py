@@ -26,6 +26,7 @@ additionally re-assert ``sources`` is non-empty before any write (defence in dep
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import threading
@@ -179,6 +180,9 @@ class GraphStore:
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self._lock = threading.RLock()
+        #: bumped whenever the connection is replaced (`refresh`): a cache keyed on this store
+        #: (e.g. the linking index) must never outlive the file it was built from (R-029 f1 #6)
+        self.generation = 0
         self.conn.executescript(_SCHEMA)
         self._migrate()
         self.conn.executescript(_INDEXES)
@@ -695,6 +699,28 @@ class GraphStore:
     # returns [] mid-flight → a sourceless GraphNode crash). The RLock serialises every statement;
     # it is reentrant, so a read that calls another read on the same thread (as_of → sources_for)
     # is safe. (Predicted by the T08 review; surfaced under the brain page's concurrent fetches.)
+    @contextlib.contextmanager
+    def read_snapshot(self):
+        """ONE coherent read (R-029 Codex f1 #5): the store's lock is held and every statement in
+        the block runs inside ONE SQLite read transaction, so a multi-statement read (find, then
+        hydrate) sees a single committed state — a concurrent supersession lands before or after
+        it, never in the middle. In WAL mode (every ingested store) it never blocks a writer in
+        another process. Re-entrant: inside a transaction this thread already holds (a write
+        batch), the block simply runs in it. Never writes: the transaction is committed empty."""
+        with self._lock:
+            conn = self.conn
+            if not isinstance(conn, sqlite3.Connection) or conn.in_transaction:
+                yield
+                return
+            conn.execute("BEGIN")
+            try:
+                yield
+            finally:
+                try:
+                    conn.execute("COMMIT")
+                except sqlite3.Error:
+                    conn.rollback()
+
     def fetchall(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
             return self.conn.execute(sql, params).fetchall()
@@ -988,6 +1014,7 @@ class GraphStore:
                 conn = sqlite3.connect(self.path, check_same_thread=False)
                 conn.row_factory = sqlite3.Row
                 self.conn = conn
+                self.generation += 1
                 old.close()
             return self.counts()
 

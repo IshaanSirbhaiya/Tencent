@@ -140,3 +140,57 @@ def test_reading_a_pending_log_never_creates_the_lock_file(tmp_path, monkeypatch
         DecisionLedger(led.path, what="test log").read()
     assert e.value.code == dl.LEDGER_INTEGRITY_FAILED
     assert not led.lock_path.exists() and _tree(tmp_path) == before
+
+
+# --- R-029 Codex round 1 (TIDY2) ---------------------------------------------------------------
+@pytest.mark.parametrize("weak", [b"", b"   ", b"short-key", b"x" * 31])
+def test_a_weak_or_empty_supplied_key_is_refused(tmp_path, monkeypatch, weak):
+    """f1 #2: a key handed to the ledger directly meets the SAME minimum as the deployment key."""
+    monkeypatch.setenv(dl.APPROVAL_KEY_ENV, KEY)
+    led = DecisionLedger(tmp_path / "logs" / "x.approvals.jsonl", key=weak, what="test log")
+    before = _tree(tmp_path)
+    with pytest.raises(DecisionRefused) as e:
+        led.append({"event": "approved", **_who()})
+    assert e.value.code == dl.APPROVAL_KEY_UNAVAILABLE
+    assert _tree(tmp_path) == before
+    ok = DecisionLedger(tmp_path / "logs" / "y.approvals.jsonl", key=KEY.encode(), what="t")
+    assert ok.append({"event": "approved", **_who()})["seq"] == 1           # non-vacuous
+
+
+def test_a_key_deleted_after_use_refuses_the_next_write(tmp_path, no_key):
+    """f1 #3: a long-lived ledger does not keep appending under a key that is gone."""
+    dl.provision_approval_key()
+    led = DecisionLedger(tmp_path / "logs" / "x.approvals.jsonl", what="test log")
+    led.append({"event": "approved", **_who()})
+    no_key.unlink()
+    before = led.path.read_bytes()
+    with pytest.raises(DecisionRefused) as e:
+        led.append({"event": "approved", **_who("bob")})
+    assert e.value.code == dl.APPROVAL_KEY_UNAVAILABLE
+    assert led.path.read_bytes() == before
+    with pytest.raises(DecisionRefused):
+        led.read()
+
+
+def test_provisioning_never_overwrites_a_key_created_meanwhile(tmp_path, no_key, monkeypatch):
+    """f1 #7: another provisioner creates the key after our existence check; ours never replaces
+    it, even where hard links are unsupported and rename overwrites (POSIX semantics)."""
+    import os as _os
+    from pathlib import Path as _P
+
+    real_is_file = _P.is_file
+    first = {"done": False}
+
+    def racing_is_file(self):
+        if self == no_key.resolve() and not first["done"]:
+            first["done"] = True
+            self.parent.mkdir(parents=True, exist_ok=True)
+            self.write_text("k" * 64, encoding="utf-8")       # the other provisioner wins
+            return False
+        return real_is_file(self)
+
+    monkeypatch.setattr(_P, "is_file", racing_is_file)
+    monkeypatch.setattr(_os, "link", lambda *a, **k: (_ for _ in ()).throw(OSError("no links")))
+    monkeypatch.setattr(_os, "rename", _os.replace)
+    dl.provision_approval_key()
+    assert no_key.read_text(encoding="utf-8") == "k" * 64

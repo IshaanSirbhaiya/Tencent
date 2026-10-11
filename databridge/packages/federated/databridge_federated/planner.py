@@ -187,12 +187,18 @@ def validate_plan(plan: DelegationPlan, catalogue: Catalogue) -> list[str]:
                           f"documents cannot be checked against it and are not read. Fix the "
                           f"vocabulary, or ask about a facts table instead.")
                 continue
-            held = catalogue.connection_kinds(entry) if entry.kinds is not None else None
+            held = catalogue.connection_kinds(entry)
+            if entry.kinds is None:
+                # Codex R-029 r1 #7: unmeasured ownership fails CLOSED
+                qs.append(f"Which records {entry.connection} holds could not be measured just "
+                          f"now, so its documents are not read. Ask again in a moment, or ask "
+                          f"about a facts table instead.")
+                continue
             for k in t.entity_kinds:
                 if k not in catalogue.node_kinds:
                     qs.append(f"{k!r} is not a kind in the ontology; known kinds are "
                               f"{sorted(catalogue.node_kinds)}.")
-                elif held is not None and k not in held:
+                elif k not in held:
                     # E2E run 5, F-07: the kind is in the ontology, but this connection holds no
                     # record of it (measured), so a read of it can only come back empty or time
                     # out. Which source holds it is a question, never a guess.

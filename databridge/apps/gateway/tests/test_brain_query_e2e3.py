@@ -228,9 +228,9 @@ def test_a_vague_question_returns_the_federated_needs_input_shape(vocab):
 
     want = Counter(r["kind"] for r in store.open_nodes() if not is_subject_kind(r["kind"]))
     opts = out["question_items"][0]["options"]
-    assert want and len(opts) == len(want)
-    for kind, n in want.items():
-        assert any(o.startswith(f"{kind} ({n} record") for o in opts)
+    # Codex R-029 r1 #3: the kinds only — a count with no pointer is never emitted
+    assert want and sorted(opts) == sorted(want)
+    assert not any(ch.isdigit() for o in opts for ch in o)
     assert not any("Odile" in o for o in opts)
 
 

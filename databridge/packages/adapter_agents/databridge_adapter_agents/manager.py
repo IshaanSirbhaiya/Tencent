@@ -35,6 +35,7 @@ import json
 import os
 import threading
 import time
+import logging
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
@@ -374,7 +375,8 @@ class AdapterAgentManager:
         except Exception:                                             # noqa: BLE001
             return "\x00unreadable-setup-mark"
 
-    def _setup_problems(self, spec: AdapterAgentSpec, *, activating: bool) -> list[str]:
+    def _setup_problems(self, spec: AdapterAgentSpec, *, activating: bool,
+                        handoff: Optional[dict[str, Any]] = None) -> list[str]:
         """Codex R-027 AAX f2 #1: a SETUP-owned agent is activated only under a person's hand-off
         authorisation that covers the setup exactly as it is now, and runs (resume, every sync)
         only with that authorisation on record - and, once active, only with an in-force sealed
@@ -385,15 +387,26 @@ class AdapterAgentManager:
         try:
             from .setup import authorization_problems
 
+            from .setup import handoff_build_problems
+
             stale = None
             check = getattr(self, "plan_stale_check", None) or _PLAN_STALE_CHECK
-            if check is not None and activating:
+            if check is not None and (activating or handoff is not None):
                 stale = check(self.service, src)
-            out = authorization_problems(self.registry.root, src, spec.id, plan_stale=stale,
-                                         activating=activating)
+            if handoff is not None:
+                # R-029 Codex f1 #1: the hand-off BUILD runs only under the authorisation it
+                # carries, re-verified against the setup as it is now
+                out = handoff_build_problems(self.registry.root, src, spec.id,
+                                             authorization=handoff.get("authorization"),
+                                             plan_stale=stale)
+            else:
+                out = authorization_problems(self.registry.root, src, spec.id, plan_stale=stale,
+                                             activating=activating)
         except Exception as exc:                                      # noqa: BLE001
-            return [f"the setup hand-off of {spec.id!r} could not be verified "
-                    f"({type(exc).__name__}: {exc})"]
+            ref = f"ERR-{uuid.uuid4().hex[:10]}"
+            logging.getLogger("databridge.adapter_agents.manager").error(
+                "[%s] setup hand-off of %s not verifiable", ref, spec.id, exc_info=exc)
+            return [f"the setup hand-off of {spec.id!r} could not be verified (reference {ref})"]
         if not out and not activating and spec.status == "active":
             seal, why = self.delegation_status(spec)
             if seal is None:
@@ -442,7 +455,8 @@ class AdapterAgentManager:
         self._seal(spec, who)
         return spec
 
-    def agent_gate(self, spec: AdapterAgentSpec, *, activating: bool = False) -> list[str]:
+    def agent_gate(self, spec: AdapterAgentSpec, *, activating: bool = False,
+                   handoff: Optional[dict[str, Any]] = None) -> list[str]:
         """Why this agent may NOT run at all (empty: it may). EVERY crawl plan it references must
         be human-approved — the spec's record and the plan on disk (P5) — and its `adapt` policy
         must be one the engine knows. Enforced here, not only in the UI (a UI gate is bypassable):
@@ -452,7 +466,7 @@ class AdapterAgentManager:
         why = self.screen_pack_refusal(spec)
         if why:
             reasons.append(why)
-        reasons.extend(self._setup_problems(spec, activating=activating))
+        reasons.extend(self._setup_problems(spec, activating=activating, handoff=handoff))
         try:
             pol = Policy.of(spec)
             if pol.policy not in ("auto_additive", "ask_all", "off"):
@@ -652,7 +666,11 @@ class AdapterAgentManager:
     # --- sync -----------------------------------------------------------------------------
     def sync(self, agent_id: str, *, trigger: Optional[dict[str, Any]] = None,
              spec: Optional[AdapterAgentSpec] = None,
-             connections: Optional[list[str]] = None) -> SyncSummary:
+             connections: Optional[list[str]] = None,
+             only_items: Optional[dict[str, dict[str, str]]] = None) -> SyncSummary:
+        """One sync. ``only_items`` ({connection: {item_id: capture sha256}}) makes it a PINNED
+        build (R-029 SETX #1): only a setup hand-off build carries pins - the capture digests a
+        person authorised - and each pinned connection builds only those bytes."""
         trigger = dict(trigger or {"type": "manual"})
         trigger.setdefault("type", "manual")
         spec = spec or self.registry.get(agent_id)
@@ -669,7 +687,17 @@ class AdapterAgentManager:
                        + (" — activate the draft first (its plans must be approved)"
                           if spec.status == "draft" else ""))
         else:
-            blocked = self.agent_gate(spec)
+            handoff = trigger if trigger.get("type") == "setup_handoff" else None
+            if only_items is not None and handoff is None:
+                blocked = ["a pinned build is only a setup hand-off's build"]
+            elif handoff is not None and only_items is None:
+                blocked = ["a setup hand-off build is pinned to the captures a person "
+                           "authorised, and this one names none"]
+            elif handoff is not None and self._setup_source(spec) is None:
+                blocked = [f"{spec.id!r} was not set up for a source; a setup hand-off build "
+                           f"is refused"]
+            else:
+                blocked = self.agent_gate(spec, handoff=handoff)
             if blocked:
                 refusal = (f"adapter agent {spec.id!r} does not sync until every crawl plan it "
                            f"references is approved: " + "; ".join(blocked))
@@ -691,7 +719,9 @@ class AdapterAgentManager:
             self._extra_occurrences = []
             for c in [c for c in spec.connections if connections is None or c in connections]:
                 try:
-                    results.append(self._sync_one(spec, c, run_id, trigger))
+                    results.append(self._sync_one(
+                        spec, c, run_id, trigger,
+                        pins=(only_items or {}).get(c) if only_items is not None else None))
                 except Exception as exc:                              # noqa: BLE001
                     # isolation holds even for a fault in the manager's own bookkeeping
                     results.append(ConnectionResult(
@@ -795,7 +825,8 @@ class AdapterAgentManager:
                                               f"{type(exc).__name__}: {exc}"}
 
     def _sync_one(self, spec: AdapterAgentSpec, conn: str, agent_run_id: str,
-                  trigger: dict[str, Any]) -> ConnectionResult:
+                  trigger: dict[str, Any],
+                  pins: Optional[dict[str, str]] = None) -> ConnectionResult:
         runnable, why = self._plan_approved(spec, conn)
         if not runnable:
             return ConnectionResult(conn, "skipped", reason=why)
@@ -846,7 +877,9 @@ class AdapterAgentManager:
 
         try:
             raw = self.service.run_ingest(conn, store=self.store, harness=harness,
-                                          progress_cb=progress, **self._run_options(spec))
+                                          progress_cb=progress, **self._run_options(spec),
+                                          **({"only_items": dict(pins)} if pins is not None
+                                             else {}))
         except Exception as exc:                                      # noqa: BLE001
             ms = int((time.monotonic() - t0) * 1000)
             reason = f"{conn!r} failed: {type(exc).__name__}: {exc}"

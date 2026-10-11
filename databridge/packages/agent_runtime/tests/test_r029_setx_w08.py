@@ -167,3 +167,95 @@ def test_w08_any_tool_failure_is_a_fixed_sentence_and_a_reference(store, gateway
     for text in (public, sent):
         assert secret not in text and "RuntimeError" not in text
     assert re.search(r"ERR-[0-9a-f]{10}", public)
+
+
+# --- R-029 Codex f1 #4: exception text at the catch site, early refusal path included --------
+SECRET = "C:\srv\creds\token=hunter2"
+
+
+def test_f1_4_an_unreachable_connection_never_shows_its_exception(store, compile_inputs,
+                                                                  tmp_path):
+    from agent_runtime_helpers import FakeGateway
+
+    from databridge_agent_runtime import run_agent
+
+    class Down(FakeGateway):
+        def advertise(self, connection):
+            raise RuntimeError(f"spawn failed at {SECRET}")
+
+    spec, decl = make_pair(briefing_spec())
+    harness, _ = scripted_harness(lambda i, obs: {"final": {"claims": []}})
+    rec = run_agent(spec, decl, store=store, harness=harness, gateway=Down(),
+                    trigger={"type": "manual", "by": "dana", "question": None},
+                    compile_inputs=compile_inputs, notifier=lambda _e: None,
+                    runs_dir=tmp_path / "runs", capture_dir=tmp_path / "capture")
+    public = json.dumps({"md": rec.answer.markdown, "coverage": rec.coverage.model_dump()})
+    assert SECRET not in public and "hunter2" not in public and not EXC_TEXT.search(public)
+
+
+def test_f1_4_the_mcp_gateway_advert_carries_a_reference_not_the_text(monkeypatch):
+    from databridge_agent_runtime.tools import McpSourceGateway
+
+    gw = McpSourceGateway()
+
+    def boom(connection):
+        raise RuntimeError(f"cannot start {SECRET}")
+
+    monkeypatch.setattr(gw, "_client", boom)
+    adv = gw.advertise("any-source")
+    assert adv.reachable is False and "hunter2" not in str(adv.problem)
+    assert re.search(r"ERR-[0-9a-f]{10}", str(adv.problem))
+
+
+def test_f1_7_only_table_positions_are_rewritten():
+    """R-029 Codex f1 #7: with `sales.total` a source table, `sales.total` used as an
+    alias-qualified COLUMN is not a table and is left exactly as written."""
+    from databridge_agent_runtime.tools import resolve_table_names
+
+    names = {"sales.total": "total", "public.invoices": "invoices", "s.a": "s__a",
+             "x.b": "x__b"}
+    sql = "SELECT sales.total, COUNT(*) FROM ledger AS sales GROUP BY sales.total"
+    assert resolve_table_names(sql, names) == sql
+    got = resolve_table_names("SELECT i.no FROM public.invoices i, s.a AS a2 "
+                              "JOIN x.b ON x.b.id = i.id WHERE public.invoices.no > 0", names)
+    assert 'FROM "invoices" i, "s__a" AS a2 JOIN "x__b" ON x.b.id' in got, got
+    assert "WHERE public.invoices.no > 0" in got                    # a column ref, untouched
+    assert resolve_table_names("SELECT * FROM (SELECT * FROM public.invoices) t", names) == \
+        'SELECT * FROM (SELECT * FROM "invoices") t'
+
+
+@pytest.mark.parametrize("estate", sorted(RUNS))
+def test_tidy2_every_facts_pointer_an_agent_cites_resolves_from_disk(
+        estate, tmp_path, monkeypatch, store, gateway, compile_inputs):
+    """R-029 TIDY2 follow-up: a facts READ writes nothing, so the agent's `facts.query` - a
+    PUBLISHER of `query_cell` pointers - persists the query artefact of every answer it returns;
+    each pointer it returned then re-runs from its query hash alone."""
+    from databridge_agent_runtime import run_agent
+    from databridge_agent_runtime.tools import McpFactsStore
+    from databridge_mcp_ingest.tabular import count as count_mod
+
+    run, sid = RUNS[estate]
+    facts_dir = _copy_store(run, sid, tmp_path / "facts")
+    monkeypatch.setenv("WALNUT_FACTS_DIR", str(facts_dir))
+    count_mod.clear_digest_cache()
+    table = _catalogue(facts_dir, sid)[0][1]
+    spec, decl = make_pair(briefing_spec(sources=[sid], tools=[f"facts.query:{sid}"]))
+
+    def script(i, obs):
+        if i == 0:
+            return {"tool_calls": [{"tool": f"facts.query:{sid}",
+                                    "args": {"sql": f'SELECT COUNT(*) AS n FROM "{table}"'}}]}
+        return {"final": {"claims": []}}
+
+    harness, _ = scripted_harness(script)
+    rec = run_agent(spec, decl, store=store, harness=harness, gateway=gateway,
+                    trigger={"type": "manual", "by": "dana", "question": None},
+                    compile_inputs=compile_inputs, notifier=lambda _e: None,
+                    runs_dir=tmp_path / "runs", capture_dir=tmp_path / "capture",
+                    facts=McpFactsStore())
+    from databridge_core import SourcePointer
+
+    ptrs = [SourcePointer.model_validate(p) for s in rec.steps for p in s.result_pointers]
+    assert ptrs                                                          # non-vacuous
+    for p in ptrs:
+        count_mod.resolve_query_cell(p, facts_dir=facts_dir)             # raises if not saved

@@ -38,6 +38,7 @@ Every route requires `auth.require_principal`; a decision is always the signed-i
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import types
 from typing import Any, Optional
@@ -47,7 +48,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
 from .auth import AuthenticatedPrincipal, install_auth_handler, require_principal
-from .platform_runtime import JobBusy, platform_of
+from .platform_runtime import JobBusy, platform_of, reload_graph
 from .public_errors import (actor_of, error_ref, from_exception, is_machine, refusal,
                             refusal_body)
 
@@ -127,6 +128,40 @@ def _dump(obj: Any) -> Any:
     if hasattr(obj, "as_dict"):
         return obj.as_dict()
     return obj
+
+
+#: R-029 Codex f1 #5: what a person is shown of a connection declaration - its identity, scope
+#: and policy, never how the server starts it (command, arguments, environment, working dir)
+_PUBLIC_CONNECTION_KEYS = ("id", "title", "via", "scope", "auto_approve", "tools_hint",
+                           "writes_for", "aliases", "document_kind", "trust", "purpose")
+_PATHLIKE = re.compile(r"^(?:[A-Za-z]:[\\/]|[\\/]{1,2}[^\\/\s]+[\\/]|file:)")
+
+
+def _public_value(v: Any) -> Any:
+    if isinstance(v, str) and _PATHLIKE.match(v):
+        return "(a server path - not shown)"
+    return v
+
+
+def _public_tree(obj: Any) -> Any:
+    """A JSON tree with every server filesystem path replaced by a fixed placeholder."""
+    if isinstance(obj, dict):
+        return {k: _public_tree(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_public_tree(v) for v in obj]
+    return _public_value(obj)
+
+
+def public_connection(conn: Any) -> Optional[dict]:
+    """The connection as a person may see it: the public keys only, the transport reduced to its
+    TYPE, and any server path in what remains replaced."""
+    d = _dump(conn)
+    if not isinstance(d, dict):
+        return None
+    out = {k: d[k] for k in _PUBLIC_CONNECTION_KEYS if k in d}
+    t = d.get("transport")
+    out["transport"] = {"type": t.get("type")} if isinstance(t, dict) else None
+    return _public_tree(out)
 
 
 def _vocab():
@@ -397,21 +432,115 @@ def _discover_job(app: FastAPI, source_id: str, run_id: str, job_id: str, revisi
                 reason=f"the discovery {run_id} of {source_id} failed (reference {ref})")
 
 
+def _pinned_outcome(source_id: str, run_id: Optional[str]) -> Optional[dict]:
+    """The pinned build's own account (`report.json` -> `counts.pinned`): how many pinned items
+    changed since the decision (not built), were not captured, and were built."""
+    import json  # noqa: PLC0415
+
+    from databridge_mcp_ingest.runner import run_dir_for  # noqa: PLC0415
+
+    if not run_id:
+        return None
+    try:
+        rep = json.loads((run_dir_for(source_id, run_id) / "report.json")
+                         .read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    pinned = (rep.get("counts") or {}).get("pinned")
+    return pinned if isinstance(pinned, dict) else None
+
+
+def _stop_keeper(rt: Any, agent_id: str, principal: Any) -> None:
+    try:
+        rt.manager.pause(agent_id, by=principal)
+    except Exception as exc:                                          # noqa: BLE001
+        error_ref(log, "setup: the keeper could not be paused", exc, agent_id=agent_id)
+
+
 def _build_job(app: FastAPI, agent_id: str, job_id: str, by: str, source_id: str,
-               requester: Optional[dict] = None) -> None:
-    """The hand-off's build: the agent's own sync job, then the TERMINAL Activity record from
-    its outcome (Codex R-027 AAX f1 #9) - never "completed" at queue time."""
-    from .adapter_agents_routes import _sync_job  # noqa: PLC0415
+               requester: Optional[dict] = None, *, authorization: Optional[str] = None,
+               principal: Any = None) -> None:
+    """The hand-off's build, BOUND to the authorisation the person gave (R-029 Codex f1 #1) and
+    PINNED to the captures it covers (R-029 SETX #1, TABX `run_ingest(only_items=...)`).
+
+    Under the source lock (which plan approval, discovery, mapping approval and the documents
+    decision all take), the authorisation is re-verified against the setup as it is NOW - still
+    the latest one, a person's, gate passing, binding unchanged. The build then runs with that
+    authorisation on its trigger (the manager checks it again) and is pinned to the capture
+    digests the person authorised: the decided documents and the person-approved tables, each
+    at the bytes the discovery captured. An item whose bytes changed since is NOT built; the
+    build reports it, and the keeper is paused with that reason. A setup change before the build
+    builds nothing and pauses the keeper. The TERMINAL Activity record follows the outcome
+    (Codex R-027 AAX f1 #9)."""
+    from databridge_adapter_agents.setup import (approved_by_people,  # noqa: PLC0415
+                                                 handoff_build_problems, pinned_items)
 
     rt = platform_of(app)
-    data = _sync_job(app, agent_id, job_id, by, actor=requester) or {}
-    status = data.get("status")
+    data: dict = {}
+    pinned: Optional[dict] = None
+    refused: list[str] = []
     try:
         spec = rt.manager.registry.get(agent_id)
     except Exception:                                                 # noqa: BLE001
-        log.warning("setup: %s vanished before its build was recorded", agent_id)
+        log.warning("setup: %s vanished before its build started", agent_id)
+        rt.jobs.finish(job_id, status="failed", error="the keeper no longer exists")
+        return
+    try:
+        with rt.source_lock(source_id):
+            conn = rt.ingest.load_connection(source_id)
+            g = _gate(rt, conn)
+            refused = handoff_build_problems(rt.manager.registry.root, source_id, agent_id,
+                                             authorization=authorization,
+                                             plan_stale=g["stale"])
+            if not refused:
+                approved = (approved_by_people(source_id, g["mapping"], g["vocab"])[0]
+                            if g["mapping"] is not None else [])
+                pins = pinned_items(g["discovery"], approved)
+                trigger = {"type": "setup_handoff", "by": by, "authorization": authorization,
+                           **({"actor": requester} if requester else {})}
+                summary = rt.manager.sync(agent_id, trigger=trigger,
+                                          only_items={source_id: pins})
+                data = summary.as_dict()
+                for c in summary.connections:
+                    if c.connection == source_id:
+                        pinned = _pinned_outcome(source_id, c.ingest_run_id)
+    except Exception as exc:                                          # noqa: BLE001
+        ref = error_ref(log, "setup: hand-off build failed", exc, agent_id=agent_id)
+        data = {"status": "failed", "error_ref": ref}
+    finally:
+        try:
+            rt.jobs.update(job_id, graph_counts=reload_graph(app))
+        except Exception:                                             # noqa: BLE001
+            pass
+    if refused:
+        _stop_keeper(rt, agent_id, principal)
+        reason = ("the setup changed after the hand-off was authorised, so nothing was built "
+                  "and the keeper is paused; hand off again: " + "; ".join(refused))
+        rt.jobs.finish(job_id, status="refused", error=reason[:500])
+        _record(rt, spec, step="build", status="failed", by=by, requested_by=requester,
+                reason=reason)
+        return
+    status = data.get("status")
+    changed = int((pinned or {}).get("changed_since_decision") or 0)
+    missing = len((pinned or {}).get("not_captured") or [])
+    if status in _BUILD_OK and pinned is None:
+        changed, missing = 0, -1           # a build that cannot say what it pinned: fail closed
+    if changed or missing:
+        _stop_keeper(rt, agent_id, principal)
+        what = (f"{changed} item(s) changed since the decision {by} made and were NOT built"
+                if changed else "") +             ((("; " if changed else "") + f"{missing} authorised item(s) were not found")
+             if missing > 0 else "") +             ("the build did not report what it pinned" if missing < 0 else "")
+        rt.jobs.finish(job_id, status="failed", result=data, error=what[:500])
+        _record(rt, spec, step="build", status="failed", by=by, requested_by=requester,
+                reason=(f"the build of {source_id} was pinned to what {by} authorised: {what}; "
+                        f"the keeper is paused - discover, decide and hand off again"),
+                counts={"changed_since_decision": changed,
+                        "not_captured": max(missing, 0),
+                        "built": int((pinned or {}).get("built") or 0)})
         return
     ok = status in _BUILD_OK
+    rt.jobs.finish(job_id, status="completed" if ok else "failed", result=data,
+                   **({"error_ref": data["error_ref"]} if data.get("error_ref") else {}))
     _record(rt, spec, step="build", status="completed" if ok else "failed", by=by,
             requested_by=requester,
             reason=(f"built {source_id} from the approved mapping (sync {data.get('run_id')} "
@@ -489,10 +618,12 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
             mapping = None
         from .sources_routes import plan_digest  # noqa: PLC0415
 
-        return {"state": setup_state(app, conn), "connection": _dump(conn),
-                "plan": _dump(plan), "plan_digest": plan_digest(plan) if plan is not None else None,
-                "mapping": _dump(mapping),
-                "explanation": load_explanation(rt.manager.registry.root, source_id)}
+        return {"state": setup_state(app, conn), "connection": public_connection(conn),
+                "plan": _public_tree(_dump(plan)),
+                "plan_digest": plan_digest(plan) if plan is not None else None,
+                "mapping": _public_tree(_dump(mapping)),
+                "explanation": _public_tree(load_explanation(rt.manager.registry.root,
+                                                             source_id))}
 
     @app.post("/adapter-setup/{source_id}/start")
     def setup_start(source_id: str,
@@ -849,7 +980,24 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                                    f"no sealed delegation is in force ({why})")
                                 + "; pause and resume it on its page so a person re-activates "
                                   "it, then hand off", status=409)
+        from databridge_adapter_agents.setup import (authorization_ref,  # noqa: PLC0415
+                                                     handoff_build_problems)
+
+        auth_ref: Optional[str] = None
         try:
+            if spec.status == "active":
+                # R-029 Codex f1 #1: an active keeper hands off only under a NEW authorisation by
+                # this person, bound to the setup as it is now, and verified at once
+                g = _gate(rt, conn)
+                auth_ref = authorization_ref(rt.manager.authorize_setup_handoff(
+                    spec.id, by=principal, binding=gate_binding(
+                        plan_digest=g["plan_digest"], discovery=g["discovery"],
+                        mapping=g["mapping"], explanation=g["explanation"],
+                        documents=g["documents_decision"], deferred=deferred)))
+                why = handoff_build_problems(rt.manager.registry.root, source_id, spec.id,
+                                             authorization=auth_ref, plan_stale=g["stale"])
+                if why:
+                    return _refusal("HANDOFF_NOT_READY", "; ".join(why), status=409)
             if spec.status == "draft":
                 if Policy.of(spec).policy != DELEGATED_POLICY:
                     return _refusal("NO_SEAL_POSSIBLE",
@@ -867,10 +1015,11 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                 if g["problems"]:
                     return _refusal("HANDOFF_NOT_READY", "; ".join(g["problems"]), status=409)
                 # Codex R-027 AAX f2 #1: the PERSON's authorisation, bound to the setup as it is
-                rt.manager.authorize_setup_handoff(spec.id, by=principal, binding=gate_binding(
-                    plan_digest=g["plan_digest"], discovery=g["discovery"],
-                    mapping=g["mapping"], explanation=g["explanation"],
-                    documents=g["documents_decision"], deferred=deferred))
+                auth_ref = authorization_ref(rt.manager.authorize_setup_handoff(
+                    spec.id, by=principal, binding=gate_binding(
+                        plan_digest=g["plan_digest"], discovery=g["discovery"],
+                        mapping=g["mapping"], explanation=g["explanation"],
+                        documents=g["documents_decision"], deferred=deferred)))
                 # the PERSON activates it: the manager verifies that authorisation against the
                 # setup as it is now, and mints the sealed delegation for this principal (AA3)
                 spec = rt.manager.activate(spec.id, by=principal)
@@ -900,7 +1049,8 @@ def register_adapter_setup_routes(app: FastAPI) -> None:
                 reason=f"started the build run of {source_id} from the approved mapping "
                        f"(job {job['job_id']}); its outcome is recorded when it ends")
         background.add_task(_build_job, app, spec.id, job["job_id"], principal.principal_id,
-                            source_id, actor_of(principal))
+                            source_id, actor_of(principal), authorization=auth_ref,
+                            principal=principal)
         return {"agent": spec.id, "job_id": job["job_id"], "status": "running",
                 "started_by": principal.principal_id}
 

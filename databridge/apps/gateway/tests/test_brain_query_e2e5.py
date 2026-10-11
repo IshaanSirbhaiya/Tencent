@@ -377,3 +377,70 @@ def test_w04_a_document_whose_source_published_passages_is_quoted_instead(vocab)
                                                          doc="D1")]), Q_MEETING)
     assert "EXTRACTED FROM DOCUMENTS" not in ctx["context"]
     assert "PASSAGES" in ctx["context"]
+
+
+
+# ================================================================================================
+# Codex R-029 round 1
+# ================================================================================================
+def _held_item(tmp_path, name: str, item_id: str, sha: str):
+    from databridge_mcp_ingest.records import GovernanceRecord, line
+
+    run = tmp_path / "ingest" / SRC / "20261003T000000Z-bbbbbb"
+    run.mkdir(parents=True)
+    (run / "report.json").write_text("{}", encoding="utf-8")
+    rec = line(GovernanceRecord, {
+        "item_id": item_id, "uri": f"C:\\data\\{name}", "sha256": sha,
+        "rules_source": "screen.yaml", "at": "2026-10-03T00:00:00Z", "decision": "review",
+        "fired": [{"rule": "automated_reader_directive", "kind": "quarantine", "count": 1,
+                   "weight": None}],
+        "rationale": "held", "reverse": "An owner approves it.", "score": 0.0})
+    (run / "governance.jsonl").write_text(json.dumps(rec) + "\n", encoding="utf-8")
+    return tmp_path / "ingest"
+
+
+def test_r1_2_a_held_items_passage_is_never_quoted(vocab, tmp_path):
+    """A one-word held file fails the 'named' rule; a stale passage of it still matches. Its
+    text must not reach the answer, beside the notice or anywhere else."""
+    item = "9" * 64
+    root = _held_item(tmp_path, "Secret.pdf", item, "8" * 64)
+    leak = "The secret board minutes say the merger closes in March."
+    stale = _Passage(leak, doc=item)
+    q = "What is in the secret file?"
+    from brain_server import withheld_items
+    assert withheld_items(q, root) and not withheld_items(q, root, named=True)   # non-vacuous
+    out = _tools(_world(vocab), passages=[stale], ingest_root=root).brain_query(q)
+    assert out["answer_kind"] == "withheld", out
+    assert "merger" not in json.dumps(out) and "Secret.pdf" in out["answer"]
+    # and at retrieval: the held document's passage is dropped for ANY question
+    from brain_server import search_passages
+    got, meta = search_passages("merger closes", search=lambda *a, **k: [stale],
+                                ingest_root=root)
+    assert got == [] and meta["withheld_by_screen"] == 1
+
+
+def test_r1_12_a_field_of_the_records_own_row_survives_the_cap(vocab, monkeypatch):
+    """With more same-kind edges than the cap, the one read from the record's OWN row (the
+    asked column) is kept, as the uncapped read would show it."""
+    from databridge_core import SourcePointer
+    from databridge_gateway import llm
+
+    store = _world(vocab)
+    org, subj = _meta(vocab, "organisation"), sorted(vocab.subject_kinds)[0]
+    kind = _edge(vocab, subj, org)
+
+    def cell(table, col, row):
+        return SourcePointer(source_id="ledger", kind="table_cell", table=table, column=col,
+                             row_id=row)
+    _add_node(store, "org:led", org, "Brindlecomb Ltd", cell("public.vendors", "id", "V-9"))
+    for i in range(4):
+        _add_node(store, f"p:{i}", subj, f"Liaison {i}", cell("public.liaisons", "id", f"L{i}"))
+        _add_edge(store, f"el{i}", f"p:{i}", "org:led", kind,
+                  cell("public.liaisons", "vendor_ref", f"L{i}"))
+    _add_node(store, "p:lead", subj, "Ines Faro", cell("public.staff", "id", "E1"))
+    _add_edge(store, "elead", "p:lead", "org:led", kind,
+              cell("public.vendors", "stewardship_lead", "V-9"))
+    nodes, edges, total = llm.bounded_neighbourhood(store, "org:led",
+                                                    asked={"stewardship", "lead"}, cap=2)
+    assert total == 5 and len(edges) == 2
+    assert "elead" in {e.id for e in edges}

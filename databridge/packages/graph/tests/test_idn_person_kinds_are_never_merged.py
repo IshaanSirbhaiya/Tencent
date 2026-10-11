@@ -218,3 +218,20 @@ def test_f04_the_extractor_scopes_an_undeclared_person_mention_to_its_span(forge
     out = extract_graph(doc, _Model(), store=None, valid_from=now, system_from=now)
     ents = [n for n in out.entities if str(n.kind) == kind]
     assert len(ents) == 1 and "@msg-1#" in ents[0].id and ents[0].canonical_id is None
+
+
+def test_every_shipped_entity_kind_is_classified_explicitly():
+    """R-029 Codex round 1: in a pack that declares subjects, every entity-bound kind is either a
+    subject or carries an explicit `person: false` — none is left to the fail-closed default."""
+    unclassified, found = {}, 0
+    for pack in PACKS:
+        data = _raw(pack)
+        if not _subjects(data):
+            continue
+        for n in data["node_kinds"]:
+            if n["binds_to"] != "entity":
+                continue
+            found += 1
+            if n["name"] not in _subjects(data) and n.get("person") is not False:
+                unclassified.setdefault(pack, []).append(n["name"])
+    assert found and not unclassified, unclassified

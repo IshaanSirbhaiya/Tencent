@@ -122,6 +122,7 @@ from .activity_actor import (
     SQL_WITH_LITERALS,
     TOO_DEEP,
     UNEXPECTED_SHAPE,
+    DELEGATION_SCHEMA_KEYS,
     actor_from_record,
     canonical_mechanism,
     make_actor,
@@ -720,13 +721,18 @@ class Viewer:
         sid = f.get("spec_id")
         if not isinstance(sid, str) or not sid:
             return False
-        if f.get("spec_kind") == "adapter_agent":
+        kind = _spec_kind(f.get("spec_kind"))
+        if kind is None:                       # namespace unknown: owner unknown, operator-only
+            return False
+        if kind == "adapter_agent":
             return self.adapter_agent_owner(sid) == self.pid
         return self.agent_owner(sid) == self.pid or f.get("by") == self.pid
 
     def spec_visible(self, spec_kind: Any, spec_id: str) -> bool:
         if self.operator:
             return True
+        if _spec_kind(spec_kind) is None:
+            return False
         if spec_kind == "adapter_agent":
             return self.adapter_agent_owner(spec_id) == self.pid
         return self.agent_owner(spec_id) == self.pid
@@ -965,15 +971,23 @@ _FIRING_IMMUTABLE = ("firing_id", "trigger", "scheduled_for", "event_id", "fired
 _FIRING_EVENT_KEYS = ("status", "recorded_at", "attempt", "next_attempt_at", "final")
 
 
-def _spec_kind(value: Any) -> str:
-    """The namespace a firing's spec lives in: an adapter agent, or (anything else) an agent —
-    the same split the visibility rule and the run link use."""
-    return "adapter_agent" if value == "adapter_agent" else "agent"
+#: The closed namespaces a firing's spec can live in (`automation.engine.spec_kind`).
+SPEC_KINDS = ("agent", "adapter_agent")
+#: How a firing whose spec kind is missing or unrecognised is named. It is NEVER guessed into a
+#: namespace (R-029 Codex f1 #1): owner unknown, so operator-only, never folded with a known
+#: namespace's firing, and its run is never resolved.
+UNKNOWN_SPEC_KIND = "unknown"
+
+
+def _spec_kind(value: Any) -> Optional[str]:
+    """The namespace a firing's spec lives in — exactly one of `SPEC_KINDS`, else ``None``."""
+    return value if isinstance(value, str) and value in SPEC_KINDS else None
 
 
 def firing_namespace(f: dict) -> str:
     """The id of a firing row: ``<spec kind>/<spec id>/<idempotency key>``."""
-    return f"{_spec_kind(f.get('spec_kind'))}/{f.get('spec_id') or '-'}/{f['idempotency_key']}"
+    kind = _spec_kind(f.get("spec_kind")) or UNKNOWN_SPEC_KIND
+    return f"{kind}/{f.get('spec_id') or '-'}/{f['idempotency_key']}"
 
 
 def fold_firings(records: Iterable[dict]) -> list[dict]:
@@ -993,7 +1007,7 @@ def fold_firings(records: Iterable[dict]) -> list[dict]:
             continue
         sid = rec.get("spec_id")
         sid = sid if isinstance(sid, str) and sid else None
-        ident = (_spec_kind(rec.get("spec_kind")), sid, key)
+        ident = (_spec_kind(rec.get("spec_kind")) or UNKNOWN_SPEC_KIND, sid, key)
         f = by_key.setdefault(ident, {"idempotency_key": key, "events": [], "firing_id": None,
                                       "spec_id": sid, "spec_kind": None, "trigger": None,
                                       "scheduled_for": None, "event_id": None, "fired_at": None,
@@ -1006,7 +1020,9 @@ def fold_firings(records: Iterable[dict]) -> list[dict]:
             f["conflicts"].append({"recorded_at": _scalar(rec.get("recorded_at")),
                                    "fields": clash})
             continue
-        for k in _FIRING_IMMUTABLE + ("spec_kind",):
+        if f["spec_kind"] is None:
+            f["spec_kind"] = _spec_kind(rec.get("spec_kind"))
+        for k in _FIRING_IMMUTABLE:
             if f[k] is None and _scalar(rec.get(k)) is not None:
                 f[k] = _scalar(rec.get(k))
         info = rec.get("trigger_info") if isinstance(rec.get("trigger_info"), dict) else {}
@@ -1037,10 +1053,14 @@ def fold_firings(records: Iterable[dict]) -> list[dict]:
     return out
 
 
-def _firing_run(f: dict) -> tuple[Optional[str], str, Optional[str]]:
-    """``(run_id, run_kind, run_owner)`` of the run a firing produced: in its spec's namespace."""
+def _firing_run(f: dict) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """``(run_id, run_kind, run_owner)`` of the run a firing produced: in its spec's namespace.
+    A firing whose namespace is unknown resolves no run (``None, None, None``): a run is never
+    looked up in a guessed namespace."""
+    kind = _spec_kind(f.get("spec_kind"))
+    if kind is None:
+        return None, None, None
     run_id = f.get("result") if isinstance(f.get("result"), str) else None
-    kind = "adapter_agent" if f.get("spec_kind") == "adapter_agent" else "agent"
     owner = f.get("spec_id") if isinstance(f.get("spec_id"), str) else None
     return run_id, kind, owner
 
@@ -1489,8 +1509,10 @@ S, SLIST, SVAL, SMAP, SMAP_LISTS, PB, PD, COUNT, PTR, OPS, SKIP = (
 TRIGGER = {k: S for k in ("type", "by", "question", "scheduled_for", "event_id", "fired_at",
                           "firing_id", "idempotency_key", "task_id")}
 #: The common actor object (R-028 CONS standard 1), when a record carries one.
+#: R-029 Codex f1 #6: ``delegation`` is a CLOSED nested schema (its vocabulary only), never an
+#: open map of scalars.
 ACTOR_SCHEMA = {"principal_id": S, "authenticated_by": S, "principal_type": S, "dev_only": S,
-                "delegation": SMAP}
+                "delegation": {k: S for k in DELEGATION_SCHEMA_KEYS}}
 SKIP_ENTRY = {k: S for k in ("tool", "adapter_agent", "connection", "channel", "reason",
                              "reason_code", "recovered", "action", "source")}
 POINTER_KEYS = ("source_id", "kind", "trust", "capture_digest", "table", "column", "row_id",
@@ -2214,7 +2236,7 @@ def register_activity_routes(app: FastAPI) -> None:
         if engine is not None:
             try:
                 # keyed by NAMESPACE (Codex f2 #1): an agent and an adapter agent may share an id
-                engine_specs = {(_spec_kind(s.get("kind")), str(s["id"])): s
+                engine_specs = {(_spec_kind(s.get("kind")) or UNKNOWN_SPEC_KIND, str(s["id"])): s
                                 for s in engine.status().get("specs", [])}
             except Exception as exc:                                      # noqa: BLE001
                 problems.add({"source": "automation", "file": None,
@@ -2225,7 +2247,7 @@ def register_activity_routes(app: FastAPI) -> None:
                                                         or f.get("first_recorded_at")),
                         reverse=True):
             sid = str(f.get("spec_id"))
-            ns = (_spec_kind(f.get("spec_kind")), sid)
+            ns = (_spec_kind(f.get("spec_kind")) or UNKNOWN_SPEC_KIND, sid)
             spec = specs.setdefault(ns, {"spec_id": sid, "spec_kind": f.get("spec_kind"),
                                          "trigger": None, "firings": [], "firing_count": 0,
                                          "trigger_types_seen": []})

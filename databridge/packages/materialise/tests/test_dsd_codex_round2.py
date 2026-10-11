@@ -51,7 +51,7 @@ def test_r2_1_a_truncated_log_cannot_roll_back_to_an_old_approval(estate):  # no
     v = m.design(ok["id"], by="staff")
     assert v is None or v["status"] == "integrity_failed"
     with pytest.raises(DesignRefused) as e:
-        m.build_design(ok["id"], digest=ok["digest"], by="staff", service=svc, admission=_adm())
+        m.build_design(ok["id"], digest=ok["digest"], by="staff", service=svc, admission=_adm(), actor=de.build_actor())
     assert e.value.code in ("DESIGN_INTEGRITY_FAILED", "DESIGN_NOT_FOUND")
 
 
@@ -75,7 +75,7 @@ def test_r2_2_an_edit_cannot_land_inside_the_publication_window(estate, monkeypa
         return real(self, staging, final, doc)
     monkeypatch.setattr(PlatformMaterialiser, "_publish", publish)
     res = m.build_design(ok["id"], digest=ok["digest"], by="staff", service=svc,
-                         admission=_adm())
+                         admission=_adm(), actor=de.build_actor())
     seen["thread"].join(60)
     assert seen["edit_waited"], "the edit committed inside the publication window"
     hist = [h["action"] for h in m.design(ok["id"], by="staff")["history"]]
@@ -115,7 +115,7 @@ def test_r2_3_a_source_that_moves_before_publication_refuses_it(estate, monkeypa
     try:
         with pytest.raises((DesignRefused, RunRefused)) as e:
             m.build_design(ok["id"], digest=ok["digest"], by="staff", service=svc,
-                           admission=_adm())
+                           admission=_adm(), actor=de.build_actor())
         assert e.value.code in ("SOURCE_MOVED", "POINTER_CHECK_FAILED")
         assert {p.name for p in m.out_root.iterdir()} - published <= {
             n for n in {p.name for p in m.out_root.iterdir()} if n.startswith(".")}
@@ -139,7 +139,7 @@ def test_r2_4_subject_rows_of_the_grain_are_withheld(estate):  # noqa: F811
     m, svc, ok = _approved(estate, grain=grain, request=request)
     assert ok["design"]["grain"]["entity"] == grain
     res = m.build_design(ok["id"], digest=ok["digest"], by="staff", service=svc,
-                         admission=_adm())
+                         admission=_adm(), actor=de.build_actor())
     rec = _receipt(m, res)["receipt"]
     side = m.out_root / res["plan_hash"] / rec["pointer_manifest"]["uri"]
     cells = [json.loads(x) for x in side.read_text("utf-8").splitlines()]
@@ -174,7 +174,7 @@ def test_r2_5_a_new_source_snapshot_is_a_new_build(estate):  # noqa: F811
     from databridge_mcp_ingest.tabular.facts import sha256_file
     m, svc, ok = _approved(estate)
     first = m.build_design(ok["id"], digest=ok["digest"], by="staff", service=svc,
-                           admission=_adm())
+                           admission=_adm(), actor=de.build_actor())
     facts = estate.root / "facts" / f"{estate.db}_facts.sqlite"
     manifest = facts.with_name(f"{estate.db}_facts.json")
     before, mbefore = facts.read_bytes(), manifest.read_bytes()
@@ -187,7 +187,7 @@ def test_r2_5_a_new_source_snapshot_is_a_new_build(estate):  # noqa: F811
         mm["sha256"] = sha256_file(facts)
         manifest.write_text(json.dumps(mm), encoding="utf-8")
         second = m.build_design(ok["id"], digest=ok["digest"], by="staff",
-                                service=estate.service(), admission=_adm())
+                                service=estate.service(), admission=_adm(), actor=de.build_actor())
         assert second["content_hash"] == first["content_hash"]
         assert second["plan_hash"] != first["plan_hash"]
         assert not second["reused_prior_run"]

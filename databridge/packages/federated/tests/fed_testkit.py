@@ -144,8 +144,34 @@ class FakeRetriever:
         return out[:k]
 
 
-def _write_facts(facts_dir: Path, source: str, tables: dict[str, tuple[list[str], list[dict]]]
-                 ) -> None:
+def write_mapping(sources_dir: Path, source: str, tables: dict[str, list[str]],
+                  subject: Optional[dict[str, list[str]]] = None,
+                  subject_tables: tuple[str, ...] = ()) -> None:
+    """An APPROVED mapping for ``source`` (the shape `sources/<id>.mapping.yaml` has): each table
+    a non-subject record, except ``subject_tables`` (mapped to the pack's subject kind); each
+    column in ``subject[table]`` the evidence of an edge FROM a subject (Codex R-029 r1 #1/#6:
+    the catalogue reads which columns name people from here, never from a column name)."""
+    import yaml
+
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    doc = {"source_id": source, "tables": {}}
+    for name, cols in tables.items():
+        kind = "person" if name in subject_tables else "record"
+        doc["tables"][f"public.{name}"] = {
+            "status": "approved", "node": {"kind": kind, "label": "{walnut_row_key}"},
+            "columns": list(cols),
+            "edges": [{"kind": "references", "src": f"person:{{walnut_fk_{c}}}",
+                       "dst": "record:{walnut_row_key}", "evidence": [c]}
+                      for c in (subject or {}).get(name, [])]}
+    (sources_dir / f"{source}.mapping.yaml").write_text(yaml.safe_dump(doc), encoding="utf-8")
+
+
+#: Which world columns name people (account owners are staff; ticket contacts are people).
+SUBJECT_COLUMNS = {"invoices": ["account_owner"], "tickets": ["contact_email"]}
+
+
+def _write_facts(facts_dir: Path, source: str, tables: dict[str, tuple[list[str], list[dict]]],
+                 subject: Optional[dict[str, list[str]]] = None) -> None:
     from databridge_mcp_ingest.tabular.facts import sha256_file
     facts_dir.mkdir(parents=True, exist_ok=True)
     path = facts_dir / f"{source}_facts.sqlite"
@@ -159,6 +185,8 @@ def _write_facts(facts_dir: Path, source: str, tables: dict[str, tuple[list[str]
     db.execute("CREATE TABLE _facts_meta (key TEXT PRIMARY KEY, value TEXT)")
     db.commit()
     db.close()
+    write_mapping(facts_dir.parent / "sources", source,
+                  {name: list(cols) for name, (cols, _rows) in tables.items()}, subject)
     (facts_dir / f"{source}_facts.json").write_text(json.dumps(
         {"source_id": source, "extracted_at": "2026-09-15T06:00:00+00:00", "status": "ok",
          "sha256": sha256_file(path), "tables": []}), encoding="utf-8")
@@ -238,7 +266,8 @@ class World:
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     for name, sub in {"WALNUT_FACTS_DIR": "facts", "WALNUT_ADAPTER_AGENTS_DIR": "adapter_agents",
-                      "WALNUT_RUNS_DIR": "runs", "WALNUT_CAPTURE_DIR": "capture"}.items():
+                      "WALNUT_RUNS_DIR": "runs", "WALNUT_CAPTURE_DIR": "capture",
+                      "WALNUT_SOURCES_DIR": "sources"}.items():
         monkeypatch.setenv(name, str(tmp_path / sub))
     return tmp_path
 
@@ -253,7 +282,8 @@ def world(env):
     _write_facts(env / "facts", CRM, {
         "invoices": (["invoice_id", "customer_id", "account_owner", "amount", "due_on", "status",
                       "issued_on"], invoices),
-        "tickets": (["ticket_id", "contact_email", "amount", "opened_on"], TICKETS)})
+        "tickets": (["ticket_id", "contact_email", "amount", "opened_on"], TICKETS)},
+        subject=SUBJECT_COLUMNS)
     aa_dir = env / "adapter_agents"
     aa_dir.mkdir(parents=True, exist_ok=True)
     for aid, conns in (("crm_sources", [CRM]), ("notes_sources", [NOTES])):

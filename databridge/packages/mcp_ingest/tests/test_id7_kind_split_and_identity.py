@@ -719,7 +719,7 @@ def test_e2e_finance_one_organisation_node_from_banking_crm_and_documents(
 def _link_case(est):
     """A declared FK whose target is not a person kind, with its declaration dropped: the link
     the engine proposes in its place (TAB6's C-3 construction), from the estate."""
-    from databridge_mcp_ingest.mapping import is_person_kind, propose_rules
+    from databridge_mcp_ingest.mapping import never_linked, propose_rules
 
     vocab, snaps = est["vocab"], est["snaps"]
     rules = propose_rules(snaps, vocab)
@@ -729,8 +729,10 @@ def _link_case(est):
         for fk in s.get("foreign_keys") or []:
             ref = f"{fk['ref_schema']}.{fk['ref_table']}" if fk.get("ref_schema") \
                 else fk["ref_table"]
+            # R-029 Codex #1: an inferred link touches no subject or person kind, at either end
             if ref != t and rules.get(ref) and rules[ref].node and \
-                    not is_person_kind(vocab, rules[ref].node["kind"]):
+                    not never_linked(vocab, rules[ref].node["kind"]) and \
+                    not never_linked(vocab, rules[t].node["kind"]):
                 mine = copy.deepcopy(s)
                 mine["foreign_keys"] = [f for f in mine["foreign_keys"]
                                         if f["column"] != fk["column"]]

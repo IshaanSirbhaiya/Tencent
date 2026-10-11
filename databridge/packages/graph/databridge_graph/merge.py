@@ -205,6 +205,13 @@ def resolve_existing(store: GraphStore, incoming: GraphNode,
         # R-019 t06 C1): only a re-sighting of that exact mention may match. No canonical and no
         # similarity step — a subject mention read from prose is never resolved to another record.
         return None, ""
+    if is_subject:
+        # IDN (R-029 Codex round 1, Critical): a SUBJECT or PERSON record is never joined to a
+        # DIFFERENT record — not by similarity, and not by an identifier either, however grounded.
+        # Two register rows carrying one national id, or one CRM key, are two records a named
+        # human may link (callers list such twins as candidates, `requires_human_selection`); the
+        # graph never fuses them. Only the same record (step 0) is re-sighted.
+        return None, ""
     # 1) exact canonical match (strongest signal — a declared identifier IS the identity).
     #
     #    For a SUBJECT, the identifier must be grounded BY ITS OWN POINTER before it may decide
@@ -359,9 +366,13 @@ def name_prefix_join(store: GraphStore, incoming: GraphNode,
     if len({r["id"] for r, *_ in keyed}) != 1:
         return None
     row, attr, name, ptr = keyed[0]
-    target = _token_seq(name)
-    if any(seq != target[:len(seq)] for seq in others):
-        return None                               # another record also begins so: ambiguous
+    if others:
+        # IDN (R-029 Codex round 1): ANY other open record that begins with the same words makes
+        # the mention ambiguous — even one whose name is itself a leading part of the record's
+        # ("Corriedale Grocers" beside "Corriedale"): nothing the graph holds says it is the same
+        # organisation rather than another. Such a record is joined first, by its own unique
+        # reading, or never; `reconcile_keyless` re-asks after each join.
+        return None
     return NameJoin(row=row, attr=attr, pointer=ptr, name=name)
 
 
@@ -619,6 +630,59 @@ def _is_prose_mention(node: GraphNode) -> bool:
     return leaves == {"doc_span"}
 
 
+def _reconcile_pass(store: GraphStore, v: Vocabulary, kind: str, keyed, attested_metas):
+    """One `reconcile_keyless` pass over one kind, decided on a graph that does not change during
+    it. Returns ({target: [(mention, rule)]}, {target: node}, refused)."""
+    index: dict[str, set[int]] = {}
+    for i, r in enumerate(keyed):
+        for t in _tokens(r["label"] or ""):
+            index.setdefault(t, set()).add(i)
+    joined: dict[str, list] = {}
+    survivors: dict[str, GraphNode] = {}
+    refused: list[dict] = []
+    for r in _open_of_kind(store, kind, "AND canonical_id IS NULL"):
+        node = row_to_node(store, r)
+        if not _is_prose_mention(node):
+            continue
+        targets: dict[str, str] = {}
+        # the similarity step, exactly as `resolve_existing` scores it, over keyed records
+        pool = set().union(*(index.get(t, set()) for t in _tokens(node.label or "")))
+        best, best_ids = 0.0, set()
+        for i in pool:
+            score = token_set_ratio(node.label, keyed[i]["label"])
+            if score > best:
+                best, best_ids = score, {keyed[i]["id"]}
+            elif score == best:
+                best_ids.add(keyed[i]["id"])
+        if best >= FUZZY_THRESHOLD:
+            if len(best_ids) > 1:
+                refused.append({"kind": kind, "records": sorted([node.id, *best_ids]),
+                                "rule": "similarity", "reason": "the mention scores equally "
+                                "for more than one keyed record; none chosen"})
+                continue
+            targets[next(iter(best_ids))] = "name similarity"
+        hit = name_prefix_join(store, node, v)
+        if hit is not None:
+            targets.setdefault(hit.row["id"], "leading words of the record's own name")
+        if len(targets) != 1:
+            if len(targets) > 1:
+                refused.append({"kind": kind, "records": sorted([node.id, *targets]),
+                                "rule": "similarity/prefix", "reason": "the rules select "
+                                "different records; none chosen"})
+            continue
+        if any(e["system_to"] is None and _edge_is_attested(e, v, attested_metas)
+               for e in store.edges_touching(node.id)):
+            refused.append({"kind": kind, "records": [node.id],
+                            "reason": "carries an attested determination edge; a join never "
+                                      "re-points what a human attested"})
+            continue
+        target, how = next(iter(targets.items()))
+        if target not in survivors:
+            survivors[target] = row_to_node(store, store.open_node_row(target))
+        joined.setdefault(target, []).append((node, how))
+    return joined, survivors, refused
+
+
 def reconcile_keyless(store: GraphStore, vocab: Optional[Vocabulary] = None) -> ConsolidationReport:
     """IDN (E2E run 5 W-02): make cross-source joins independent of the ORDER sources were read.
 
@@ -659,62 +723,26 @@ def reconcile_keyless(store: GraphStore, vocab: Optional[Vocabulary] = None) -> 
         keyed = _open_of_kind(store, kind, "AND canonical_id IS NOT NULL")
         if not keyed:
             continue
-        index: dict[str, set[int]] = {}
-        for i, r in enumerate(keyed):
-            for t in _tokens(r["label"] or ""):
-                index.setdefault(t, set()).add(i)
-        joined: dict[str, list[GraphNode]] = {}
-        survivors: dict[str, GraphNode] = {}
-        for r in _open_of_kind(store, kind, "AND canonical_id IS NULL"):
-            node = row_to_node(store, r)
-            if not _is_prose_mention(node):
-                continue
-            targets: dict[str, str] = {}
-            # the similarity step, exactly as `resolve_existing` scores it, over keyed records
-            pool = set().union(*(index.get(t, set()) for t in _tokens(node.label or "")))
-            best, best_ids = 0.0, set()
-            for i in pool:
-                score = token_set_ratio(node.label, keyed[i]["label"])
-                if score > best:
-                    best, best_ids = score, {keyed[i]["id"]}
-                elif score == best:
-                    best_ids.add(keyed[i]["id"])
-            if best >= FUZZY_THRESHOLD:
-                if len(best_ids) > 1:
-                    report.refused.append({"kind": kind, "records": sorted([node.id, *best_ids]),
-                                           "rule": "similarity", "reason": "the mention scores "
-                                           "equally for more than one keyed record; none chosen"})
-                    continue
-                targets[next(iter(best_ids))] = "name similarity"
-            hit = name_prefix_join(store, node, v)
-            if hit is not None:
-                targets.setdefault(hit.row["id"], "leading words of the record's own name")
-            if len(targets) != 1:
-                if len(targets) > 1:
-                    report.refused.append({"kind": kind, "records": sorted([node.id, *targets]),
-                                           "rule": "similarity/prefix", "reason": "the rules "
-                                           "select different records; none chosen"})
-                continue
-            if any(e["system_to"] is None and _edge_is_attested(e, v, ATTESTED_META_KINDS)
-                   for e in store.edges_touching(node.id)):
-                report.refused.append({"kind": kind, "records": [node.id],
-                                       "reason": "carries an attested determination edge; a "
-                                                 "join never re-points what a human attested"})
-                continue
-            target, how = next(iter(targets.items()))
-            if target not in survivors:
-                survivors[target] = row_to_node(store, store.open_node_row(target))
-            joined.setdefault(target, []).append((node, how))
-        for target, pairs in sorted(joined.items()):
-            hows = sorted({h for _, h in pairs})
-            _absorb(store, survivors[target], [n for n, _ in pairs],
-                    derivation=RECONCILE_DERIVATION.format(how="; ".join(hows)),
-                    cite_as_mentions=True)
-            report.merged.append({"kind": kind, "survivor": target,
-                                  "absorbed": [n.id for n, _ in pairs],
-                                  "rules": hows, "status": "candidate_join",
-                                  "reverse": "a person restores the absorbed mention (it is "
-                                             "closed, not deleted); its spans are unchanged"})
+        # IDN (R-029 Codex round 1): passes until nothing joins. A short form is ambiguous while
+        # a longer keyless form of the same record is still open (`name_prefix_join`); once that
+        # one has joined by its own unique reading, the next pass re-asks. The end state equals
+        # the one a record-first read reaches at write time.
+        for _ in range(1 + len(_open_of_kind(store, kind, "AND canonical_id IS NULL"))):
+            joined, survivors, refused = _reconcile_pass(store, v, kind, keyed, ATTESTED_META_KINDS)
+            if not joined:
+                report.refused.extend(refused)
+                break
+            for target, pairs in sorted(joined.items()):
+                hows = sorted({h for _, h in pairs})
+                _absorb(store, survivors[target], [n for n, _ in pairs],
+                        derivation=RECONCILE_DERIVATION.format(how="; ".join(hows)),
+                        cite_as_mentions=True)
+                report.merged.append({"kind": kind, "survivor": target,
+                                      "absorbed": [n.id for n, _ in pairs],
+                                      "rules": hows, "status": "candidate_join",
+                                      "reverse": "a person restores the absorbed mention (it is "
+                                                 "closed, not deleted); its spans are unchanged"})
+            keyed = _open_of_kind(store, kind, "AND canonical_id IS NOT NULL")
         report.kinds[kind] = ["similarity", "prefix"]
     return report
 
@@ -769,7 +797,12 @@ def _absorb(store: GraphStore, survivor: GraphNode, absorbed: list[GraphNode],
         for mid in [node.id, *(node.attrs.get(MERGED_IDS_ATTR) or [])]:
             if mid not in merged_ids and mid != survivor.id:
                 merged_ids.append(mid)
-        basis.append(node.sources[0])
+        # IDN (R-029 Codex round 1): every pointer that grounds the ids now listed — the
+        # absorbed record's own key and its earlier merge record, then its sources
+        for q in (node.attr_sources.get("canonical_id"), node.attr_sources.get(MERGED_IDS_ATTR),
+                  *node.sources):
+            if q is not None and q not in basis:
+                basis.append(q)
     prior = survivor.attr_sources.get(MERGED_IDS_ATTR)
     if prior is not None:
         basis.insert(0, prior)
@@ -809,7 +842,8 @@ def upsert_node(store: GraphStore, incoming: GraphNode,
     if not incoming.sources:                                  # P4 (also enforced by validator)
         raise ValueError("upsert_node REFUSED: ungrounded node")
     v = vocab if vocab is not None else active_vocabulary()
-    subject = v.is_subject(str(incoming.kind))
+    # IDN (R-029 Codex round 1): every PERSON kind, declared a subject or not
+    subject = v.is_subject(str(incoming.kind)) or v.is_person(str(incoming.kind))
     row, matched_by = resolve_existing(store, incoming, v, id_only=id_only)
     if row is None:
         store.add_node(incoming)

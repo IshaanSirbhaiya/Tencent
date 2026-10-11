@@ -449,6 +449,17 @@ def _grant_basis(tool: str, catalogue: CatalogueLike, instructions: str) -> tupl
                                 f"so it is read through its read tools"}
 
 
+def _error_ref(context: str, exc: BaseException) -> str:
+    """R-029 Codex f1 #4: log a failure under a fresh reference; return only the reference."""
+    import logging  # noqa: PLC0415
+    import uuid  # noqa: PLC0415
+
+    ref = f"ERR-{uuid.uuid4().hex[:10]}"
+    logging.getLogger("databridge.automation.compiler").error("[%s] %s", ref, context,
+                                                              exc_info=exc)
+    return ref
+
+
 def _validate_tool(tool: str, catalogue: CatalogueLike, *, write: bool) -> Optional[str]:
     """None if ``tool`` is real and of the right class, else the reason it is not."""
     try:
@@ -906,7 +917,13 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
     # F-09: an agent whose words named no source, and that delegates to no adapter agent, could
     # read nothing (its scope is its sources) - it is asked about, never compiled runnable. A
     # source question already pending (the model's suggestion, an unknown name) is asked first.
-    if kind == "agent" and not sources and not pp.delegates and not any(
+    # R-029 Codex f1 #2: the gate is on a READABLE scope - a delegate reads only within the
+    # caller's sources, and a write-only destination is not a read path. A task with writes may
+    # take its values from the person's own words (the runtime grounds them there), so only a
+    # task with nothing to write and nothing readable is asked.
+    readable = [s for s in sources if (c := connection_of(catalogue, s)) is not None
+                and not c.agent_write]
+    if kind == "agent" and not readable and not actions and not any(
             q.id.startswith(("model_source:", "source:")) for q in questions):
         questions.append(_sources_question(text, catalogue))
 
@@ -1003,7 +1020,8 @@ def compile_english(text: str, catalogue: CatalogueLike, *, harness: Any = None,
     try:
         spec = load_spec(data)
     except SpecError as exc:
-        result.open_questions.append(Question("spec", f"I could not build a valid draft: {exc}"))
+        result.open_questions.append(Question(
+            "spec", f"I could not build a valid draft (reference {_error_ref('draft spec', exc)})"))
         result.understood = _understood_partial(pp)
         return result
     result.spec = spec
@@ -1164,8 +1182,8 @@ def _governance(result: DraftResult, spec: WorkflowSpec, actions: list, catalogu
         # No fallback generator: a second one that names things differently is the bug W2 fixed.
         result.declaration_source = label
         result.compilation = Compilation(
-            "not_compiled", reason=f"the {label} declaration generator refused this workflow: "
-                                   f"{exc}")
+            "not_compiled", reason=f"the {label} declaration generator refused this workflow "
+                                   f"(reference {_error_ref('declaration generator', exc)})")
         return
     if gov.citation != RUNTIME_CITATION:
         result.notes.append(f"the deployment asks for citation {gov.citation!r}; the declaration "
@@ -1182,7 +1200,8 @@ def _governance(result: DraftResult, spec: WorkflowSpec, actions: list, catalogu
             problems = pair_problems(spec, parse_declaration_text(
                 text, declared_in=f"var/agents/{spec.agent}.agent.yaml"))
         except Exception as exc:                              # noqa: BLE001 - shown, not hidden
-            problems = [f"{type(exc).__name__}: {exc}"]
+            problems = [f"the runtime's pairing check could not be run (reference "
+                        f"{_error_ref('pairing check', exc)})"]
         if problems:
             result.compilation = Compilation(
                 "not_compiled", reason="the runtime would refuse this workflow/declaration pair: "

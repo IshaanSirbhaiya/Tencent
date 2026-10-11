@@ -10,6 +10,8 @@ import {
   envelopeText,
   isEnvelope,
   isPerson,
+  actorType,
+  ACTOR_TYPE_NOT_RECORDED,
   valueText,
   type Actor,
   DEV_TOKEN_NOTE,
@@ -133,8 +135,10 @@ const machine = (id: string, type: string): Actor => ({
   principal_id: id, principal_type: type,
   authenticated_by: absent("machine_actor"), dev_only: absent("machine_actor"),
 });
-const person = (id: string, devOnly: boolean | null, auth: string | null = "gateway:auth"): Actor => ({
-  principal_id: id, principal_type: "Approver",
+// the served shape (E2E run 5 W-09): the gateway serves every person as `person`, under the
+// canonical mechanism name
+const person = (id: string, devOnly: boolean | null, auth: string | null = "gateway"): Actor => ({
+  principal_id: id, principal_type: "person",
   authenticated_by: auth ?? absent(), dev_only: devOnly === null ? absent() : devOnly,
 });
 
@@ -377,5 +381,20 @@ test.describe("@unit E2E run 5 F-12 decision families", () => {
     expect(integrity).toContain("sealed_and_chained");
     for (const v of integrity) expect(INTEGRITY_TEXT[v], v).toBeTruthy();
     expect(INTEGRITY_TEXT.sealed_and_chained).not.toContain("anchored —");
+  });
+});
+
+test.describe("@unit R-029 Codex f1 #3 an unrecorded actor type is not a person", () => {
+  test("absent, withheld or unknown types are null and said as not recorded", () => {
+    const base = { principal_id: "x", authenticated_by: absent(), dev_only: absent() };
+    for (const t of [absent(), { status: "withheld", reason: "not_in_allow_list" }, "Approver", ""]) {
+      const a = { ...base, principal_type: t } as Actor;
+      expect(actorType(a)).toBeNull();
+      expect(isPerson(a)).toBe(false);
+      expect(actorText(a)).toContain(ACTOR_TYPE_NOT_RECORDED);
+      expect(actorText(a)).not.toMatch(/^person /);
+    }
+    expect(actorType(person("p", false))).toBe("person");                // non-vacuous
+    expect(actorType(machine("m", "agent"))).toBe("agent");
   });
 });

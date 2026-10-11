@@ -52,6 +52,21 @@ DELEGATION_KEYS = ("delegated_by", "policy_digest", "agent_id", "adaptation_id",
                    "on_behalf_of")
 
 
+#: The shape every served ``delegation`` takes: the vocabulary above, plus ``recorded: false``
+#: when the record said the decision was delegated but kept none of it.
+DELEGATION_SCHEMA_KEYS = DELEGATION_KEYS + ("recorded",)
+
+
+def delegation_view(raw: Any) -> dict:
+    """The served delegation: exactly the `DELEGATION_KEYS` the record holds as scalars (a bool is
+    a bool, a number a number); anything else is not served. Nothing recorded:
+    ``{"recorded": False}``."""
+    src = raw if isinstance(raw, dict) else {}
+    out = {k: src[k] for k in DELEGATION_KEYS
+           if isinstance(src.get(k), (str, int, bool)) and not isinstance(src.get(k), float)}
+    return out or {"recorded": False}
+
+
 def withheld(reason: str, pointers: Optional[list] = None) -> dict:
     """A value that exists and is not served here."""
     out: dict[str, Any] = {"status": WITHHELD, "reason": reason}
@@ -156,7 +171,7 @@ def make_actor(principal_id: Any, principal_type: Any, *, authenticated_by: Any 
                      dev_only if isinstance(dev_only, bool) else absent(why)),
     }
     if delegation:
-        out["delegation"] = delegation
+        out["delegation"] = delegation_view(delegation)
     return out
 
 
@@ -197,11 +212,11 @@ def actor_from_record(rec: Any, *, pid_key: str = "principal_id",
     delegation = None
     raw_delegation = rec.get("delegation")
     if isinstance(raw_delegation, dict) and raw_delegation:
-        delegation = {k: v for k, v in raw_delegation.items()
-                      if isinstance(k, str) and (v is None or isinstance(v, (str, int, bool)))}
+        # R-029 Codex f1 #6: ONLY the delegation vocabulary, each a scalar — never whatever else a
+        # producer put beside it (a subject id, a note)
+        delegation = delegation_view(raw_delegation)
     elif (auth or "").startswith("delegated:") or _text(rec.get("delegated_by")):
-        delegation = {k: rec[k] for k in DELEGATION_KEYS
-                      if isinstance(rec.get(k), (str, int, bool))} or {"recorded": False}
+        delegation = delegation_view(rec)
     return make_actor(pid, ptype, authenticated_by=auth, dev_only=dev, delegation=delegation)
 
 
@@ -211,7 +226,8 @@ def actor_pid(actor: Any) -> Optional[str]:
 
 
 __all__ = ["WITHHELD", "ABSENT", "NOT_RECORDED", "MACHINE_ACTOR", "NOT_IN_ALLOW_LIST", "PERSON",
-           "canonical_type", "canonical_mechanism", "mechanism_aliases",
+           "canonical_type", "canonical_mechanism", "mechanism_aliases", "delegation_view",
+           "DELEGATION_KEYS", "DELEGATION_SCHEMA_KEYS",
            "SENSITIVE_FIELD", "FREE_TEXT", "ERROR_TEXT", "TOO_DEEP", "UNEXPECTED_SHAPE",
            "SQL_WITH_LITERALS", "MACHINE_TYPES", "LEGACY_DEV_SUFFIX", "withheld", "absent",
            "is_envelope", "make_actor", "machine_type", "actor_from_record", "actor_pid"]

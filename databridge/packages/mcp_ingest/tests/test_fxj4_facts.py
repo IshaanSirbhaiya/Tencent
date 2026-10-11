@@ -91,11 +91,13 @@ def test_8_parameterised_and_unproven_order_pointers_resolve(facts_env, tmp_path
 
     d = tmp_path / "facts"
     _store("q8", d)
-    a = count_query("q8", "SELECT v FROM t WHERE id = ? ORDER BY v", params=(1,))
-    assert a.query_ref and Path(a.query_ref).is_file()
+    # R-029 Codex f1 #1: the read writes nothing; persisting the artefact is the explicit write
+    a = count_query("q8", "SELECT v FROM t WHERE id = ? ORDER BY v", params=(1,),
+                    persist_query=True)
+    assert a.query_ref and (d / a.query_ref).is_file()
     assert resolve_query_cell(a.pointers[1]) == a.rows[1][0]
     # ORDER BY a non-unique column (ties on id) is NOT proof: the result digest is in the identity
-    tie = count_query("q8", "SELECT id, v FROM t ORDER BY id")
+    tie = count_query("q8", "SELECT id, v FROM t ORDER BY id", persist_query=True)
     assert not tie.ordered and tie.query_ref
     assert tie.pointers[0].query_hash != hashlib.sha256(tie.sql.encode()).hexdigest()
     assert resolve_query_cell(tie.pointers[3]) == tie.rows[1][1]

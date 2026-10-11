@@ -4,7 +4,9 @@ import {
   cameraMove,
   isSettled,
   joinKey,
+  supersede,
   type CameraInputs,
+  type MoveSlot,
 } from "../components/graph/camera";
 import {
   LAYOUT_MAX_TICKS,
@@ -90,4 +92,44 @@ test.describe("@unit W-12 graph layout and camera", () => {
     expect(isSettled(false, 0)).toBe(false);
     expect(isSettled(true, 1)).toBe(false);
   });
+
+  test("R-029 f1 #8 clearing a path or a search re-frames what is still in focus", () => {
+    const nodes = joinKey(["a", "b", "c"]);
+    const path: CameraInputs = { nodeSetKey: nodes, pathKey: joinKey(["a", "c"]), matchKey: "", selectedId: null };
+    expect(cameraMove(path, { ...path, pathKey: "" })).toEqual({ type: "fit-all" });
+    const pathSel = { ...path, selectedId: "b" };
+    expect(cameraMove(pathSel, { ...pathSel, pathKey: "" })).toEqual({ type: "center", id: "b" });
+    const search: CameraInputs = { nodeSetKey: nodes, pathKey: "", matchKey: joinKey(["a", "b"]), selectedId: null };
+    expect(cameraMove(search, { ...search, matchKey: "" })).toEqual({ type: "fit-all" });
+    // a search cleared while a path is still shown frames the path
+    const both = { ...search, pathKey: joinKey(["a", "c"]) };
+    expect(cameraMove(both, { ...both, matchKey: "" })).toEqual({ type: "fit-path", ids: ["a", "c"] });
+  });
+
+  test("R-029 f1 #7 a new camera move supersedes the one in flight", () => {
+    const cancelled: number[] = [];
+    const cleared: number[] = [];
+    const slot: MoveSlot = { raf: 7, timer: 9 };
+    supersede(slot, (id) => cancelled.push(id), (id) => cleared.push(id));
+    expect(cancelled).toEqual([7]);
+    expect(cleared).toEqual([9]);
+    expect(slot).toEqual({ raf: null, timer: null });
+    supersede(slot, (id) => cancelled.push(id), (id) => cleared.push(id));   // idle: nothing to cancel
+    expect(cancelled).toEqual([7]);
+  });
+
+  test("R-029 f1 #7 the canvas has no second camera driver", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(__dirname, "..", "components", "graph", "graph-canvas.tsx"), "utf-8");
+    const jsx = src.slice(src.indexOf("<ReactFlow"), src.indexOf("</ReactFlow>"));
+    expect(jsx.length).toBeGreaterThan(0);                               // non-vacuous
+    expect(jsx).not.toMatch(/^\s*fitView\b/m);                          // no prop-driven fit
+    // every programmatic camera call sits inside a runMove(...) callback
+    const calls = Array.from(src.matchAll(/rf\.(fitView|setCenter|setViewport|zoomTo)\(/g)).length;
+    const moved = Array.from(src.matchAll(/runMove\(/g)).length;
+    expect(calls).toBeGreaterThan(0);
+    expect(moved).toBeGreaterThanOrEqual(2);
+  });
 });
+

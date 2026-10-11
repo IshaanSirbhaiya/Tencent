@@ -1471,22 +1471,29 @@ class DesignStore:
         return self.view(design_id)
 
     def record_build(self, design_id: str, *, by: str, build_id: str, rev: int,
-                     digest: str, actor: Optional[dict] = None) -> None:
-        """A build is an EVENT; it never rewrites the design's state. ``actor`` (E2E5 W-10) is
-        the common actor object of whoever asked for the build; its id must be ``by``."""
-        if actor is not None:
+                     digest: str, actor: Optional[dict]) -> None:
+        """A build is an EVENT; it never rewrites the design's state. ``actor`` (E2E5 W-10, R-029
+        codex r1 #4: REQUIRED) is the common actor object of whoever asked for the build; its
+        id must be ``by``."""
+        if not actor:
+            raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "a build names the signed-in "
+                                                              "person running it", 403)
+        try:
             actor = _dl.actor_of(actor)
-            if actor["principal_id"] != by:
-                raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "the build's actor is not the "
-                                                                  "person running it", 403)
+        except _dl.DecisionRefused:
+            raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "a build names the signed-in "
+                                                              "person running it", 403) \
+                from None
+        if actor["principal_id"] != by:
+            raise DesignRefused("APPROVER_NOT_AUTHENTICATED", "the build's actor is not the "
+                                                              "person running it", 403)
         with self._lock(design_id):
             self._recover(design_id)
             events, broken = self._chain(design_id)
             if broken:
                 raise DesignRefused("DESIGN_INTEGRITY_FAILED", broken, 409)
             self._append(design_id, events, {"action": "built", "by": by, "build": build_id,
-                                             "rev": rev, "digest": digest,
-                                             **({"actor": actor} if actor else {})})
+                                             "rev": rev, "digest": digest, "actor": actor})
 
 
 def design_of(doc: dict) -> TableDesign:
@@ -1541,6 +1548,8 @@ class RawBuild:
     dataset: Any
     receipt: dict
     results: dict                    # subtask id -> SubResult
+    #: R-029 codex r1 #1: {connection: the ONE content hash this build read it at}
+    pins: dict = field(default_factory=dict)
 
 
 def _withheld(field_path: str, *, policy: str, reason: str, by: str) -> Withheld:
@@ -1720,6 +1729,26 @@ def resolve_dsd(pointer: SourcePointer, *, facts_dir: Optional[Path],
                      min(nums) if op == "min" else max(nums))
     if len(set(ids)) != pointer.row_count or rows_digest(ids) != pointer.rows_digest:
         return None
+    # R-029 codex r1 #3: the pointer's own snapshot and every leaf it carries name exactly this
+    # file and this selection — a leaf from another snapshot, or of a row the selection does not
+    # hold, never resolves
+    if pointer.snapshot is not None and pointer.snapshot.content_hash != p["content_hash"]:
+        return None
+    leaves = list(pointer.derived_from or [])
+    if leaves:
+        want_col = p.get("field") or p["key"]
+        got_ids = []
+        for leaf in leaves:
+            if leaf.source_id != p["connection"] or leaf.table != p["table"] or \
+                    leaf.column != want_col or leaf.row_id is None:
+                return None
+            if leaf.snapshot is None or leaf.snapshot.content_hash != p["content_hash"]:
+                return None
+            if leaf.capture_digest is not None and leaf.capture_digest != p["content_hash"]:
+                return None
+            got_ids.append(str(leaf.row_id))
+        if sorted(got_ids) != sorted({str(i) for i in ids}):
+            return None
     return value
 
 
@@ -1795,8 +1824,59 @@ def _prove_base(base: "TableInfo", res: Any, n: int, digest: str) -> None:
                                              f"key set); nothing is built", 422)
 
 
+def _snap_id(s: Any) -> Optional[tuple]:
+    """A source snapshot's FILE identity (the statement's own query hash left out): what two
+    reads must share to be one read of one source."""
+    if s is None:
+        return None
+    return (s.source_id, s.as_of.isoformat() if s.as_of else None, s.content_hash,
+            s.schema_hash)
+
+
+_TABULAR = ("facts_sql_rows", "facts_sql_pushdown")
+
+
+def _one_snapshot_per_connection(results: dict) -> dict:
+    """R-029 codex r1 #1/#3: every tabular read of one connection in this build is of ONE
+    snapshot. Returns ``{connection: file identity}``; a second identity refuses, and a tabular
+    read that returned rows without a snapshot refuses (it cannot be bound)."""
+    seen: dict = {}
+    for tid, r in results.items():
+        if r is None or r.method not in _TABULAR or r.error:
+            continue
+        if r.snapshot is None:
+            if r.rows:
+                raise DesignRefused("SOURCE_UNPROVEN", f"the read {tid} of {r.connection} "
+                                                       f"returned rows without a source "
+                                                       f"snapshot; nothing is built", 422)
+            continue
+        sid = _snap_id(r.snapshot)
+        if seen.setdefault(r.connection, sid) != sid:
+            raise DesignRefused("SOURCE_MOVED", f"{r.connection} was read at two different "
+                                                f"snapshots within one build; nothing is built "
+                                                f"from a mix", 409)
+    return seen
+
+
+def _incomplete(r: Any) -> Optional[str]:
+    """Why a linked read cannot stand for its whole selection (None when it can): an error, a
+    skipped source, a ranked or cut read. (Excluded rows are handled per row by the caller.)"""
+    if r is None:
+        return "not run"
+    if r.error:
+        return r.error
+    if r.coverage.skipped:
+        return "; ".join(s.reason for s in r.coverage.skipped)
+    if not r.coverage.exhaustive:
+        return "the read was a ranked search, not every matching row"
+    if r.coverage.truncated:
+        return "the read was cut short"
+    return None
+
+
 def _read_paged(service: Any, task: Any, key: str, *, admission: Any, first: Any = None,
-                max_pages: Optional[int] = None) -> tuple[Any, int]:
+                max_pages: Optional[int] = None, expect: Optional[tuple] = None
+                ) -> tuple[Any, int]:
     """Every row of ``task``'s selection, KEYSET-PAGED on the table's proven row key (E2E5 F-10).
 
     The delegate orders by the row key and says when a read was cut (`coverage.truncated`: its own
@@ -1822,10 +1902,15 @@ def _read_paged(service: Any, task: Any, key: str, *, admission: Any, first: Any
         if r.error or r.coverage.excluded or r.coverage.skipped:
             pages.append(r)
             break
-        if pages and r.snapshot is not None and (
-                pages[0].snapshot is None
-                or r.snapshot.content_hash != pages[0].snapshot.content_hash):
-            raise DesignRefused("SOURCE_MOVED", f"{what} changed between two pages of one read; "
+        # R-029 codex r1 #1: EVERY page names its snapshot, and it is the first page's (the
+        # full file identity: source, as-of, content and schema), never assumed
+        if r.snapshot is None:
+            raise DesignRefused("SOURCE_UNPROVEN", f"a page of the {what} read names no source "
+                                                   f"snapshot, so its rows cannot be bound to "
+                                                   f"one; nothing is built", 422)
+        if (pages and _snap_id(r.snapshot) != _snap_id(pages[0].snapshot)) or (
+                expect is not None and _snap_id(r.snapshot) != expect):
+            raise DesignRefused("SOURCE_MOVED", f"{what} changed between two reads of one build; "
                                                 f"nothing is built from a mix of two snapshots",
                                 409)
         pages.append(r)
@@ -1898,8 +1983,12 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                                               f"Nothing was read", 422)
     emit({"stage": "delegating", "part": "base", "rows_counted": counted, "page_rows": size,
           "at": _now()})
+    if proof.snapshot is None:
+        raise DesignRefused("SOURCE_UNPROVEN", f"the count of {base.table} names no source "
+                                               f"snapshot; nothing is built", 422)
+    # R-029 codex r1 #1: the pages must be read from the snapshot the COUNT was read from
     res, base_pages = _read_paged(service, base_task, base.key, admission=admission,
-                                  max_pages=counted + 2)
+                                  max_pages=counted + 2, expect=_snap_id(proof.snapshot))
     if res.error:
         raise DesignRefused("BASE_NOT_READ", f"the adapter agent {base.adapter_agent!r} could not "
                                              f"read {base.table}: {res.error}")
@@ -1978,6 +2067,24 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                 continue
             results[tid], _n = _read_paged(service, t, far_key, admission=admission, first=r,
                                            max_pages=len(t.filters[0].value) + 2)
+    # R-029 codex r1 #1/#3: the count, the pages and every linked read of one connection are ONE
+    # snapshot (never "the last one seen"); these are the build's pins
+    conn_snap = _one_snapshot_per_connection(results)
+    pins = {c: sid[2] for c, sid in conn_snap.items()}
+    zero_snap: dict = {}
+
+    def snap_for(conn: str) -> Optional[SnapshotIdentity]:
+        """The verified file snapshot of ``conn`` for a zero no read returned a row for."""
+        if conn in conn_snap:
+            src, as_of, content, schema = conn_snap[conn]
+            return SnapshotIdentity(source_id=src, as_of=(dt.datetime.fromisoformat(as_of)
+                                                          if as_of else None),
+                                    content_hash=content, schema_hash=schema)
+        if conn not in zero_snap:
+            zero_snap[conn] = _facts_snapshot(conn, facts_dir)
+            if zero_snap[conn] is not None:
+                pins[conn] = zero_snap[conn].content_hash
+        return zero_snap[conn]
     # ---- assembly ------------------------------------------------------------------------------
     redactions, apply_masks = _screen()
     unmatched: dict[str, dict] = {}
@@ -1985,19 +2092,22 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
     out_rows: list[tuple] = []
     lookup_index: dict[str, dict] = {}
     lookup_failed: dict[str, str] = {}
+    lookup_partial: dict[str, str] = {}
     for lk in design.links:
         if lk.kind != "lookup":
             continue
         idx: dict[str, Any] = {}
         for tid in plan.get(lk.id, []):
             r = results.get(tid)
-            if r is None or r.error:
-                lookup_failed[lk.id] = (r.error if r is not None else "not run")
+            why = _incomplete(r)
+            if why is not None:
+                # R-029 codex r1 #2: an incomplete read never stands for its selection
+                lookup_failed[lk.id] = why
                 continue
-            if r.coverage.truncated:
-                lookup_failed[lk.id] = "the read was cut short, so an unmatched row could not be " \
-                                       "told from an orphan reference"
-                continue
+            if r.coverage.excluded:
+                # rows the delegate could not use: an unmatched row may be one of them, so it is
+                # never called an orphan
+                lookup_partial[lk.id] = "; ".join(r.coverage.excluded)
             for row in r.rows:
                 k = row.cells.get(lk.to_field)
                 if k is not None and k.value is not None:
@@ -2006,28 +2116,26 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
         lookup_index[lk.id] = {k: v[0] for k, v in idx.items()}
     agg_index: dict[str, dict] = {}
     agg_failed: dict[str, str] = {}
-    agg_snap: dict[str, Any] = {}
+    agg_partial: dict[str, str] = {}
     for c in agg_cols:
         lk = links[c.via]
         idx = {}
         for tid in plan.get(f"{lk.id}:{c.name}", []):
             r = results.get(tid)
-            if r is None or r.error:
-                agg_failed[c.name] = r.error if r is not None else "not run"
+            why = _incomplete(r)
+            if why is not None:
+                # R-029 codex r1 #2: a missing group of an incomplete read is never a zero
+                agg_failed[c.name] = why
                 continue
-            if r.coverage.truncated:
-                # a grouped read cut short would make a missing group look like a zero
-                agg_failed[c.name] = ("the grouped read was cut short, so a missing group could "
-                                      "not be told from an unlinked row")
-                continue
-            if r.snapshot is not None:
-                agg_snap[c.name] = r.snapshot
+            if r.coverage.excluded:
+                agg_partial[c.name] = "; ".join(r.coverage.excluded)
             label = Aggregate(op=c.aggregate, field=None if c.field == "*" else c.field).label()
             for row in r.rows:
                 k = row.cells.get(lk.to_field)
                 v = row.cells.get(label)
                 if k is not None and k.value is not None:
-                    idx.setdefault(_tkey(k.value), []).append((v, row))
+                    # R-029 codex r1 #3: each group keeps the snapshot of the chunk it came from
+                    idx.setdefault(_tkey(k.value), []).append((v, row, r.snapshot))
         _refuse_ambiguous(idx, f"{lk.target.entity} grouped by {lk.to_field}")
         agg_index[c.name] = {k: v[0] for k, v in idx.items()}
     doc_index: dict[str, dict] = {}
@@ -2105,6 +2213,13 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                                              f"different type; not joined")
                     cells.append(Absent(field_path=path, snapshot=base_snap))
                     continue
+                if hit is None and lk.id in lookup_partial:
+                    _miss(unmatched, c.name, f"not matched, and the delegate could not use "
+                                             f"every {lk.target.entity} row it read "
+                                             f"({lookup_partial[lk.id]}); the match may be one "
+                                             f"of them")
+                    cells.append(Absent(field_path=path, snapshot=base_snap))
+                    continue
                 if hit is None:
                     _miss(unmatched, c.name, f"no {lk.target.entity} row has {lk.to_field} = "
                                              f"the row's {lk.from_field} (an orphan reference)")
@@ -2139,10 +2254,15 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                     cells.append(Absent(field_path=path, snapshot=base_snap))
                     continue
                 fld = None if c.field == "*" else c.field
+                if got is None and c.name in agg_partial:
+                    _miss(unmatched, c.name, f"no group came back, and the delegate could not "
+                                             f"use every {lk.target.entity} row "
+                                             f"({agg_partial[c.name]}); a zero is not proven")
+                    cells.append(Absent(field_path=path, snapshot=base_snap))
+                    continue
                 if got is None or got[0] is None:
-                    if c.aggregate == "count":
-                        snap = agg_snap.get(c.name) or _facts_snapshot(lk.target.connection,
-                                                                       facts_dir)
+                    if c.aggregate == "count" and got is None:
+                        snap = snap_for(lk.target.connection)
                         if snap is None:
                             cells.append(Absent(field_path=path))
                             continue
@@ -2155,15 +2275,14 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                                                  f"to this row")
                         cells.append(Absent(field_path=path, snapshot=base_snap))
                     continue
-                vcell, grp = got
+                vcell, grp, gsnap = got
                 leaves = list(vcell.pointer.derived_from or [])
                 ids = [p.row_id for p in leaves if p.row_id is not None]
                 if vcell.pointer.derived_from is None:
                     cells.append(Absent(field_path=path))
                     _miss(unmatched, c.name, "too many contributing rows to cite one by one")
                     continue
-                snap = _file_snapshot(agg_snap.get(c.name)) or _facts_snapshot(
-                    lk.target.connection, facts_dir)
+                snap = _file_snapshot(gsnap)
                 if snap is None:
                     _miss(unmatched, c.name, "the facts file could not be identified")
                     cells.append(Absent(field_path=path))
@@ -2251,7 +2370,7 @@ def build_raw(design: TableDesign, cat: DesignCatalogue, service: Any, *, admiss
                             "bound": {"max_rows": bound, "set_by": MAX_BASE_ROWS_ENV,
                                       "checked_against": "the source's own COUNT of the "
                                                          "selection, before any row was read"}})
-    return RawBuild(dataset=dataset, receipt=receipt, results=results)
+    return RawBuild(dataset=dataset, receipt=receipt, results=results, pins=pins)
 
 
 def _file_snapshot(snap: Any) -> Optional[SnapshotIdentity]:

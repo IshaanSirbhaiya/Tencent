@@ -154,7 +154,7 @@ def test_f10_a_base_larger_than_the_store_ceiling_builds_whole(big):
     assert len(source) > _ceiling(), "non-vacuous: the base is over the store's statement ceiling"
     m, svc, doc = _approved(big)
     res = m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                         admission=_adm())
+                         admission=_adm(), actor=de.build_actor())
     rows = _csv_rows(m, res)
     # the grain: exactly one row per source row, every key once
     assert len(rows) == len(source)
@@ -192,7 +192,7 @@ def test_f10_the_bound_is_honest_configurable_and_checked_before_reading(big, mo
     m, svc, doc = _approved(big)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert e.value.code == "BASE_TOO_LARGE"
     msg = e.value.message
     assert str(n) in msg and str(n - 1) in msg and MAX_BASE_ROWS_ENV in msg
@@ -203,7 +203,7 @@ def test_f10_the_bound_is_honest_configurable_and_checked_before_reading(big, mo
     monkeypatch.setenv(MAX_BASE_ROWS_ENV, str(n))
     m2, svc2, doc2 = _approved(big)
     res = m2.build_design(doc2["id"], digest=doc2["digest"], by="staff", service=svc2,
-                          admission=_adm())
+                          admission=_adm(), actor=de.build_actor())
     assert res["rows"]["emitted"] == n
 
 
@@ -224,7 +224,7 @@ def test_f10_a_page_that_moved_or_lost_a_row_is_refused(big, monkeypatch):
     monkeypatch.setattr(type(svc), "run_subtask", lossy)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert seen["pages"] >= 1 and e.value.code == "BASE_UNPROVEN"
 
 
@@ -243,7 +243,7 @@ def test_f10_pages_read_from_two_snapshots_are_refused(big, monkeypatch):
     monkeypatch.setattr(type(svc), "run_subtask", moved)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=_adm())
+                       admission=_adm(), actor=de.build_actor())
     assert e.value.code == "SOURCE_MOVED"
 
 
@@ -260,7 +260,7 @@ def test_f10_a_lookup_read_cut_short_is_continued_never_read_as_orphans(big, mon
     lookups = {lk["id"] for lk in doc["design"]["links"] if lk["kind"] == "lookup"}
     assert lookups, "non-vacuous: the design joins through a lookup"
     whole = _csv_rows(m, m.build_design(doc["id"], digest=doc["digest"], by="staff",
-                                        service=svc, admission=_adm()))
+                                        service=svc, admission=_adm(), actor=de.build_actor()))
     real = type(svc).run_subtask
     cut = {"n": 0}
 
@@ -274,7 +274,7 @@ def test_f10_a_lookup_read_cut_short_is_continued_never_read_as_orphans(big, mon
     monkeypatch.setattr(type(svc), "run_subtask", ceiling)
     m2, svc2, doc2 = _approved(big, grain=grain)
     res = m2.build_design(doc2["id"], digest=doc2["digest"], by="staff", service=svc2,
-                          admission=_adm())
+                          admission=_adm(), actor=de.build_actor())
     assert cut["n"] >= 1
     assert _csv_rows(m2, res) == whole
     rec = m2.receipt(res["plan_hash"])["receipt"]
@@ -304,7 +304,7 @@ def test_f10_a_persons_time_filter_is_applied_as_a_row_scope_never_dropped(big):
     assert any("APPLIED as a row scope" in a for a in d["assumptions"])
     assert not any(f"{tcol} ge {cut!r} was NOT applied" in a for a in d["assumptions"])
     res = m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                         admission=_adm())
+                         admission=_adm(), actor=de.build_actor())
     out = _csv_rows(m, res)
     assert len(out) == len(keep)
     assert all(r[tcol] >= cut for r in out)

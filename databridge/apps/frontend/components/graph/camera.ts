@@ -54,6 +54,14 @@ export function cameraMove(prev: CameraInputs | null, next: CameraInputs): Camer
     return next.pathKey ? { type: "fit-path", ids: split(next.pathKey) } : { type: "fit-all" };
   }
   if (next.selectedId && changed("selectedId")) return { type: "center", id: next.selectedId };
+  // R-029 Codex f1 #8: clearing a path or a search is a framing change too — the camera returns
+  // to what is still in focus (the selected node), else to everything; never left on a result
+  // that is no longer shown.
+  const cleared = (k: "pathKey" | "matchKey") => !!prev && !!prev[k] && !next[k];
+  if (cleared("pathKey") || cleared("matchKey")) {
+    if (next.pathKey) return { type: "fit-path", ids: split(next.pathKey) };
+    return next.selectedId ? { type: "center", id: next.selectedId } : { type: "fit-all" };
+  }
   return null;
 }
 
@@ -66,6 +74,25 @@ export const MOVE_MS: Record<Exclude<CameraMove, null>["type"], number> = {
 };
 /** Slack after a move's duration before the camera counts as still (one frame or two). */
 export const SETTLE_SLACK_MS = 80;
+
+/**
+ * The ONE camera controller's bookkeeping (R-029 Codex f1 #7): every move — the initial fit, a
+ * resize re-fit, a path, a search, a selection — is requested through it; a new move SUPERSEDES
+ * the one in flight (its pending frame and its settle timer are cancelled), so at most one move
+ * is ever in flight and "settled" covers every camera operation.
+ */
+export interface MoveSlot {
+  raf: number | null;
+  timer: number | null;
+}
+
+export function supersede(slot: MoveSlot, cancelFrame: (id: number) => void,
+                          clearTimer: (id: number) => void): void {
+  if (slot.raf !== null) cancelFrame(slot.raf);
+  if (slot.timer !== null) clearTimer(slot.timer);
+  slot.raf = null;
+  slot.timer = null;
+}
 
 /** Settled: the nodes are measured and no camera move is in flight. */
 export function isSettled(nodesMeasured: boolean, movesInFlight: number): boolean {

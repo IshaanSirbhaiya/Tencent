@@ -1377,3 +1377,35 @@ def test_e2e3_p08_plan_questions_and_assumptions_are_served_detail_is_not(fx):
     assert tree["plan"]["questions"] is None and tree["plan"]["assumptions"] is None
     assert "not recorded" in tree["plan"]["questions_note"]
     assert "not recorded" in tree["plan"]["assumptions_note"]
+
+
+def test_r29_f1_01_an_unknown_firing_namespace_is_never_guessed(fx, monkeypatch):
+    """R-029 Codex f1 #1: a firing whose `spec_kind` is missing or unrecognised was coerced into the
+    workflow-agent namespace, so the owner of a same-named agent saw it, its run was resolved
+    there, and it merged with a genuine firing sharing the key. Now: owner unknown
+    (operator-only), never folded with a known namespace, and no run resolved."""
+    from databridge_gateway import agent_ownership
+    app, _w, _r = fx
+    k = "followup:manual:k1"                       # the SAME key as OWNER's genuine firing
+    _fire(app,
+          {"firing_id": "fx1", "idempotency_key": k, "spec_id": "followup",
+           "trigger": "manual", "fired_at": _iso(70), "recorded_at": _iso(70),
+           "status": "failed", "result": "run-owner"},
+          {"firing_id": "fx2", "idempotency_key": "odd-key", "spec_id": "followup",
+           "spec_kind": "workflow_v9", "trigger": "schedule", "fired_at": _iso(71),
+           "recorded_at": _iso(71), "status": "succeeded", "result": "run-owner"})
+    with TestClient(app, headers=auth_headers(OWNER)) as c:
+        mine = [i for i in _all(c, kinds="firing") if i["spec_id"] == "followup"]
+        autos = c.get("/activity/automations").json()["automations"]
+    # OWNER sees exactly their genuine firing, untouched by the unknown-namespace lines
+    assert [(i["spec_kind"], i["idempotency_key"]) for i in mine] == [("agent", k)]
+    assert [e["status"] for e in mine[0]["events"]] == ["pending", "succeeded"]
+    assert "fx1" not in json.dumps(mine) and "fx2" not in json.dumps(autos)
+    monkeypatch.setenv(agent_ownership.OPERATORS_ENV, json.dumps([OPERATOR]))
+    with TestClient(app, headers=auth_headers(OPERATOR)) as c:
+        ops = [i for i in _all(c, kinds="firing") if i["spec_id"] == "followup"]
+    unknown = [i for i in ops if i["spec_kind"] is None]
+    assert len(unknown) == 2 and len(ops) == 3                         # non-vacuous
+    for row in unknown:
+        assert row["id"].startswith("firing:unknown/followup/")
+        assert row["run_id"] is None and row["run_kind"] is None and row["run_owner"] is None

@@ -739,3 +739,258 @@ def test_f03_the_run5_finance_state_rebuilds_the_tables_whose_party_edges_dangle
     assert want                                                      # the run-5 gap is there
     got = runner._rebuild_for_references(captured, state, sid, overrides=set())
     assert {by_uri_e["uri"] for iid, by_uri_e in state.items() if iid in got} == want
+
+
+# === Codex R-029 round 1 =============================================================================
+class _PersonVocab:
+    """The estate's vocabulary with ONE more kind marked a natural person but NOT a subject — the
+    shape (person-like, undeclared) Codex #1 names. Everything else is the real vocabulary."""
+
+    def __init__(self, vocab, person: str):
+        self._v, self._p = vocab, person
+
+    def __getattr__(self, name):
+        return getattr(self._v, name)
+
+    def is_subject(self, kind):
+        return self._v.is_subject(kind)
+
+    def is_person(self, kind):
+        return str(kind) == self._p or self._v.is_person(kind)
+
+
+def test_codex1_a_person_kind_never_receives_an_inferred_link(walnut_env, estate):
+    """A kind that is a person but not a subject: the link INTO it is never proposed, an approved
+    link edge into it fails validation, and its approval is refused — on both estates."""
+    from databridge_mcp_ingest.mapping import (SourceMapping, MappingApprovalRefused,
+                                               approve_link, never_linked, propose_links,
+                                               propose_rules, save_mapping,
+                                               validate_table_mapping)
+
+    vocab = estate["vocab"]
+    case = next(((t, fk, st, lk) for t, fk, st, lk in _link_cases(estate)
+                 if lk["status"] == "proposed"), None)
+    assert case                                                        # non-vacuous
+    t, fk, stripped, link = case
+    pv = _PersonVocab(vocab, link["target_kind"])
+    assert not vocab.is_subject(link["target_kind"]) and never_linked(pv, link["target_kind"])
+    got = propose_links("src", stripped, propose_rules(stripped, vocab), pv)[t]
+    [again] = [lk for lk in got if lk["column"] == fk["column"]]
+    assert again["status"] == "not_proposed" and again["edge"] is None
+    assert "person" in again["why"]
+    # validation: an approved-link edge into it is a problem; the same edge is fine without it
+    rules = propose_rules(stripped, vocab)
+    e = link["edge"]
+    edge = {"kind": e["kind"], "src": e["src"], "dst": e["dst"], "evidence": [fk["column"]],
+            "ref": {"source": "src", "table": link["table"], "key": link["key"]}}
+    tm = rules[t].model_copy(update={"edges": [*rules[t].edges, edge]})
+    assert any("person kind" in p for p in validate_table_mapping(t, tm, pv))
+    assert not any("person kind" in p for p in validate_table_mapping(t, tm, vocab))
+    # approval: the proposal made under the real vocabulary is refused once it is a person kind
+    save_mapping(SourceMapping(source_id="pk", tables={
+        t: rules[t].model_copy(update={"links": [link]})}))
+    with pytest.raises(MappingApprovalRefused, match="person"):
+        approve_link("pk", t, fk["column"], principal=test_principal(), vocab=pv,
+                     target=f"{link['source']}:{link['table']}")
+
+
+def _graph_ids_citing(store, table: str, row_id: str) -> set[str]:
+    rows = store.fetchall("SELECT DISTINCT s.entity_id AS id FROM sources s WHERE "
+                          "s.source_pointer_json LIKE ? AND s.source_pointer_json LIKE ?",
+                          (f"%{table}%", f'%"row_id":{json.dumps(row_id)}%'))
+    out = set()
+    for r in rows:
+        if store.open_node_row(r["id"]) is not None or store.fetchone(
+                "SELECT 1 AS x FROM edges WHERE id = ? AND system_to IS NULL", (r["id"],)):
+            out.add(r["id"])
+    return out
+
+
+@pytest.mark.real_approval
+def test_codex2_a_row_newly_withheld_or_deleted_leaves_no_open_graph(walnut_env, estate,
+                                                                    tmp_path, monkeypatch):
+    """Run A builds every row. Before run B one row of the referenced table gains an injected
+    cell (now held) and one row of a referring table is deleted at the source. After run B
+    neither row has an open node or edge citing only it; every other row is still there."""
+    from databridge_graph.store import GraphStore
+    from databridge_mcp_ingest.mapping import load_mapping
+
+    target, referrers = _target_case(estate)
+    snaps, vocab, db = estate["snaps"], estate["vocab"], estate["db"]
+    sid = f"c2_{estate['name']}"
+    client = _source(tmp_path, monkeypatch, estate, sid, [target, *referrers])
+    store = GraphStore(str(tmp_path / "g.db"))
+    _run(sid, store, client, vocab)
+    _approve(sid, vocab, [t for t, tm in load_mapping(sid).tables.items()
+                          if tm.status == "proposed"])
+    first = _run(sid, store, client, vocab)
+    pk = snaps[target]["primary_key"][0]
+    already = _held_row_ids(first, target)
+    hold_id = next(str(r[pk]) for r in snaps[target]["rows"] if str(r[pk]) not in already)
+    ref = referrers[0]
+    rpk = snaps[ref]["primary_key"][0]
+    gone_id = next(str(r[rpk]) for r in snaps[ref]["rows"]
+                   if str(r[rpk]) not in _held_row_ids(first, ref))
+    held_before = _graph_ids_citing(store, target, hold_id)
+    gone_before = _graph_ids_citing(store, ref, gone_id)
+    assert held_before and gone_before                                # both were built
+    fk_cols = {f["column"] for f in _fks(snaps[target])}
+    col = next(c["name"] for c in snaps[target]["columns"]
+               if c["name"] not in (pk, *fk_cols)
+               and ("char" in str(c["type"]).lower() or "text" in str(c["type"]).lower()))
+    s1, t1 = target.split(".", 1)
+    db.execute(f"UPDATE {s1}.{t1} SET {col} = ? WHERE {pk} = ?", (_injection_text(), hold_id))
+    s2, t2 = ref.split(".", 1)
+    db.execute(f"DELETE FROM {s2}.{t2} WHERE {rpk} = ?", (gone_id,))
+    db.commit()
+    second = _run(sid, store, client, vocab)
+    assert hold_id in _held_row_ids(second, target)
+    assert not _graph_ids_citing(store, target, hold_id) - set()     # nothing open cites only it
+    assert not _graph_ids_citing(store, ref, gone_id)
+    comp = _completeness(second)
+    assert comp[target]["graph_rows_closed"] >= 1 and comp[ref]["graph_rows_closed"] >= 1
+    # every other row of both tables is still in the graph
+    other = next(str(r[pk]) for r in snaps[target]["rows"]
+                 if str(r[pk]) not in already | {hold_id})
+    assert _graph_ids_citing(store, target, other)
+
+
+@pytest.mark.real_approval
+def test_codex3_link_proposals_never_measure_withheld_rows(walnut_env, estate, tmp_path,
+                                                           monkeypatch):
+    """The snapshots every link-proposal path measures — this run's, an unchanged table's, and
+    another source's (`captured_tables`) — hold no row the screen withheld."""
+    from databridge_graph.store import GraphStore
+    from databridge_mcp_ingest import mapping as mp
+    from databridge_mcp_ingest import runner
+    from databridge_mcp_ingest.screen import row_digest
+
+    target, referrers = _target_case(estate)
+    vocab, db, snaps = estate["vocab"], estate["db"], estate["snaps"]
+    pk = snaps[target]["primary_key"][0]
+    fk_cols = {f["column"] for f in _fks(snaps[target])}
+    col = next(c["name"] for c in snaps[target]["columns"]
+               if c["name"] not in (pk, *fk_cols)
+               and ("char" in str(c["type"]).lower() or "text" in str(c["type"]).lower()))
+    s1, t1 = target.split(".", 1)
+    db.execute(f"UPDATE {s1}.{t1} SET {col} = ? WHERE {pk} = ?",
+               (_injection_text(), str(snaps[target]["rows"][0][pk])))
+    db.commit()
+    seen: list[dict] = []
+    real = mp.refresh_link_proposals
+
+    def spy(source_id, snapshots, v, **kw):
+        seen.append(snapshots)
+        return real(source_id, snapshots, v, **kw)
+    monkeypatch.setattr(mp, "refresh_link_proposals", spy)
+    sid = f"c3_{estate['name']}"
+    client = _source(tmp_path, monkeypatch, estate, sid, [target, *referrers])
+    store = GraphStore(str(tmp_path / "g.db"))
+    _run(sid, store, client, vocab)
+    _approve(sid, vocab, [t for t, tm in mp.load_mapping(sid).tables.items()
+                          if tm.status == "proposed"])
+    rep = _run(sid, store, client, vocab)
+    _run(sid, store, client, vocab)                                  # all unchanged
+    held = {g["sha256"] for g in _lines(rep, "governance") if g.get("kind") == "table_row"
+            and g.get("decision") != "allow"}
+    assert held and len(seen) >= 3                                   # non-vacuous
+    measured = [*seen, mp.captured_tables(sid)]
+    for snapshots in measured:
+        for t, snap in snapshots.items():
+            assert not [r for r in snap.get("rows") or [] if row_digest(r) in held], t
+    assert any(target in s for s in measured)
+
+
+@pytest.mark.real_approval
+def test_codex4_a_changed_screen_rereads_an_unchanged_table_and_closes_what_it_now_holds(
+        walnut_env, estate, tmp_path, monkeypatch):
+    from databridge_graph.store import GraphStore
+    from databridge_mcp_ingest import runner, screen
+    from databridge_mcp_ingest.mapping import load_mapping
+
+    target, referrers = _target_case(estate)
+    vocab, snaps = estate["vocab"], estate["snaps"]
+    sid = f"c4_{estate['name']}"
+    client = _source(tmp_path, monkeypatch, estate, sid, [target, *referrers])
+    store = GraphStore(str(tmp_path / "g.db"))
+    _run(sid, store, client, vocab)
+    _approve(sid, vocab, [t for t, tm in load_mapping(sid).tables.items()
+                          if tm.status == "proposed"])
+    first = _run(sid, store, client, vocab)
+    pk = snaps[target]["primary_key"][0]
+    victim = next(str(r[pk]) for r in snaps[target]["rows"]
+                  if str(r[pk]) not in _held_row_ids(first, target))
+    assert _graph_ids_citing(store, target, victim)
+    # policy B: one more decisive rule, matching exactly that row's key
+    base = screen.load_screen()
+    import re as _re
+    policy_b = screen.ScreenConfig(
+        decisive=[*base.decisive, screen.Rule(id="test_policy_b",
+                                              pattern=_re.compile(_re.escape(victim)))],
+        signals=base.signals, redactions=base.redactions, quarantine=base.quarantine,
+        block_threshold=base.block_threshold, review_threshold=base.review_threshold,
+        min_signals_to_block=base.min_signals_to_block, source=base.source)
+    monkeypatch.setattr(runner, "load_screen", lambda *a, **k: policy_b)
+    second = _run(sid, store, client, vocab)
+    rebuilt = {r["uri"]: r.get("rebuild") for r in _lines(second, "extracted")}
+    assert "screen" in str(rebuilt.get(target)), rebuilt
+    assert victim in {g["row_id"] for g in _lines(second, "governance")
+                      if g.get("kind") == "table_row" and g.get("decision") == "block"}
+    assert not _graph_ids_citing(store, target, victim)
+    # and a third run under policy B is unchanged again
+    third = _run(sid, store, client, vocab)
+    assert target not in {r["uri"] for r in _lines(third, "extracted")}
+
+
+def test_codex5_a_legacy_state_without_a_mapping_digest_rebuilds_once():
+    from databridge_mcp_ingest import runner
+
+    cap = [{"item_id": "i1", "uri": "s.t", "sha256": "h", "kind": "table"}]
+    legacy = {"i1": {"content_hash": "h", "uri": "s.t", "run_id": "r", "built_at": "x",
+                     "screen": "fp"}}
+    got = runner._rebuild_for_references(cap, legacy, "src", set(), approved={"s.t": "d1"},
+                                         screen="fp")
+    assert "mapping" in got["i1"]
+    current = {"i1": {**legacy["i1"], "mapping_digest": "d1", "pending_refs": []}}
+    assert runner._rebuild_for_references(cap, current, "src", set(), approved={"s.t": "d1"},
+                                          screen="fp") == {}
+
+
+# === SETX Critical: a build pinned to the capture digests a person authorised ======================
+@pytest.mark.real_approval
+def test_a_pinned_build_builds_only_the_authorised_bytes(walnut_env, estate, tmp_path,
+                                                         monkeypatch):
+    from databridge_graph.store import GraphStore
+    from databridge_mcp_ingest import runner
+    from databridge_mcp_ingest.mapping import load_mapping
+
+    target, referrers = _target_case(estate)
+    vocab = estate["vocab"]
+    sid = f"pin_{estate['name']}"
+    client = _source(tmp_path, monkeypatch, estate, sid, [target, *referrers])
+    store = GraphStore(str(tmp_path / "g.db"))
+    first = _run(sid, store, client, vocab)                          # proposes only
+    _approve(sid, vocab, [t for t, tm in load_mapping(sid).tables.items()
+                          if tm.status == "proposed"])
+    caps = {r["uri"]: r for r in _lines(first, "captured")}
+    ok, moved = caps[target], caps[referrers[0]]
+    pins = {ok["item_id"]: ok["sha256"], moved["item_id"]: "0" * 64}  # one changed since
+    import databridge_mcp_ingest as mi
+    before = {r["id"] for r in store.fetchall("SELECT id FROM nodes WHERE system_to IS NULL")}
+    rep = mi.run_ingest(sid, store=store, client=client, vocab=vocab, only_items=pins)
+    assert rep.status in ("ok", "unverified") and rep.verify["ok"], rep.verify.get("problems")
+    built = {r["uri"] for r in _lines(rep, "build")}
+    assert built == {target}
+    skipped = {r["uri"]: r["reason"] for r in _lines(rep, "extract_skipped")}
+    assert skipped[referrers[0]] == runner.CHANGED_SINCE_DECISION
+    others = set(caps) - {target, referrers[0]}
+    assert all(skipped[u] == runner.NOT_IN_PINNED_SET for u in others)
+    pc = rep.counts["pinned"]
+    assert (pc["pinned"], pc["changed_since_decision"], pc["built"],
+            pc["not_in_pinned_set"]) == (2, 1, 1, len(others))
+    # nothing outside the set reached the graph
+    kinds = {r["kind"] for r in store.fetchall("SELECT id, kind FROM nodes "
+                                               "WHERE system_to IS NULL") if r["id"] not in before}
+    tm = load_mapping(sid).tables[target]
+    from databridge_mcp_ingest.mapping import split_kinds
+    assert kinds and kinds <= set(split_kinds(tm))

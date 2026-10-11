@@ -158,7 +158,7 @@ def _approved_build(estate, *, grain=None, request=None, model=True):
                            by="staff")
     estate.facts.calls.clear()
     res = m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                         admission=CatalogueAdmission("staff"))
+                         admission=CatalogueAdmission("staff"), actor=de.build_actor())
     return m, svc, doc, res
 
 
@@ -443,19 +443,19 @@ def test_an_unapproved_design_is_refused(estate):
     m, svc, doc, _ = _proposed(estate, model=False)
     adm = CatalogueAdmission("staff")
     with pytest.raises(DesignRefused) as e:
-        m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc, admission=adm)
+        m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc, admission=adm, actor=de.build_actor())
     assert e.value.code == "DESIGN_NOT_APPROVED"
     ok = m.approve_design(doc["id"], digest=doc["digest"], principal=de.issued_principal(),
                           by="staff")
     # a different digest than the approved one is refused
     with pytest.raises(DesignRefused) as e:
-        m.build_design(doc["id"], digest="0" * 64, by="staff", service=svc, admission=adm)
+        m.build_design(doc["id"], digest="0" * 64, by="staff", service=svc, admission=adm, actor=de.build_actor())
     assert e.value.code == "DIGEST_MISMATCH"
     # an edit after approval clears it: the old digest no longer builds
     cols = ok["design"]["columns"][:-2]
     m.edit_design(doc["id"], {"columns": cols}, by="staff", service=svc, rev=ok["rev"])
     with pytest.raises(DesignRefused) as e:
-        m.build_design(doc["id"], digest=ok["digest"], by="staff", service=svc, admission=adm)
+        m.build_design(doc["id"], digest=ok["digest"], by="staff", service=svc, admission=adm, actor=de.build_actor())
     assert e.value.code == "DESIGN_NOT_APPROVED"
     # a revision changed on disk after approval no longer hashes to its digest
     doc2 = m.design(doc["id"], by="staff")
@@ -467,13 +467,14 @@ def test_an_unapproved_design_is_refused(estate):
     raw["design"]["request"] = raw["design"]["request"] + " (edited on disk)"
     p.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(DesignRefused) as e:
-        m.build_design(doc["id"], digest=ok2["digest"], by="staff", service=svc, admission=adm)
+        m.build_design(doc["id"], digest=ok2["digest"], by="staff", service=svc, admission=adm, actor=de.build_actor())
     assert e.value.code == "DESIGN_INTEGRITY_FAILED"
     p.write_bytes(before)
     # another principal cannot build (or see) it
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=ok2["digest"], by="someone.else", service=svc,
-                       admission=CatalogueAdmission("someone.else"))
+                       admission=CatalogueAdmission("someone.else"),
+                       actor=de.build_actor("someone.else"))
     assert e.value.code == "DESIGN_NOT_FOUND"
 
 
@@ -570,7 +571,7 @@ def test_a_fanned_out_grain_is_refused(estate, monkeypatch):
     monkeypatch.setattr(svc, "run_subtask", doubled)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=CatalogueAdmission("staff"))
+                       admission=CatalogueAdmission("staff"), actor=de.build_actor())
     # the independent COUNT proof catches it first (R-027 f1 #4) ...
     assert e.value.code == "BASE_UNPROVEN"
     # ... and the assembly's own grain check is the backstop behind it
@@ -578,7 +579,7 @@ def test_a_fanned_out_grain_is_refused(estate, monkeypatch):
     monkeypatch.setattr(dl, "_prove_base", lambda *a, **k: None)
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=CatalogueAdmission("staff"))
+                       admission=CatalogueAdmission("staff"), actor=de.build_actor())
     assert e.value.code == "GRAIN_VIOLATED"
 
 
@@ -593,6 +594,6 @@ def test_an_ungranted_source_is_never_read(estate):
     estate.facts.calls.clear()
     with pytest.raises(DesignRefused) as e:
         m.build_design(doc["id"], digest=doc["digest"], by="staff", service=svc,
-                       admission=CatalogueAdmission("staff", {estate.cfg["docs"]}))
+                       admission=CatalogueAdmission("staff", {estate.cfg["docs"]}), actor=de.build_actor())
     assert e.value.code == "BASE_NOT_READ" and "not admitted" in e.value.message
     assert not [s for s, _p in estate.facts.calls if "_fed_key_dupes" in s]

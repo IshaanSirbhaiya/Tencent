@@ -296,6 +296,10 @@ Mutation: 28 of 29 killed; 1 is equivalent, with the reason given.
 3. Fix, then commit.
 4. E2E run 6 re-checks the planner repair round (BRN) and the finance documents re-anchored after `document_kind` is set (needs one forced re-sync: old state has no `anchor_kind`).
 
+**2026-10-05 PAUSED by the founder: read `RESUME_HERE.md` first.** The R-029 Codex round-1 fixes are done, and every suite passed when run sequentially (3 trivial failures fixed). They are NOT committed and have not had Codex round 2. The next steps are in RESUME_HERE.md §4.
+
+**2026-10-07 D-005 PROPOSED** (`wiki/20-decisions/D-005-locate-then-fetch-and-learning-identity.md`): locate (search index + thin graph) → fetch (adapter agents, facts store) → resolve (identity layer: concept synonyms, keys, confirmed aliases, scored candidates, human review; "found in A and B; not confirmed" answers; every decision a sealed label). The 0.92 fuzzy merge becomes a proposal. Build phases P1–P6 after P0 (commit R-029 + Codex round 2). Awaiting the founder's §12 decisions. `semantica` reviewed at code level: ideas only, not a dependency.
+
 ## 3. START HERE — the next actions, in order
 
 > **`PHASE_PLAN.md` now ends with a FORWARD PLAN (Phases 7–12)** covering the same work in more

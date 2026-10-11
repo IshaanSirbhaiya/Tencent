@@ -795,7 +795,8 @@ def run_ingest(source_id: str, store=None, harness=None,
                verbose: bool = False, vocab=None, concurrency: Optional[int] = None,
                passages: Optional[bool] = None, cache: bool = True,
                bridges: bool = True, tabular: Optional[bool] = None,
-               event_attrs: Optional[dict] = None, capture_only: bool = False) -> RunReport:
+               event_attrs: Optional[dict] = None, capture_only: bool = False,
+               only_items: Optional[dict[str, str]] = None) -> RunReport:
     """Run an APPROVED plan for one source end to end. `run_id` of an existing run resumes it:
     stages already marked done are skipped, collection skips items already decided, and the
     build skips items already built. `harness=None` builds document anchors only and says so.
@@ -830,7 +831,15 @@ def run_ingest(source_id: str, store=None, harness=None,
                    `discovery.json` (each captured table's capture digest and the mapping digest
                    proposed from it) and reports `discovered` (not `ok`: it is no sync, and never
                    freshness evidence) when it captured something and verified. See
-                   `latest_discovery`."""
+                   `latest_discovery`.
+
+    `only_items`   a PINNED build ({item_id: capture sha256}, e.g. the digests a person
+                   authorised at setup handoff): only those items are built, and each only if
+                   the bytes captured NOW are the pinned digest. An item whose bytes changed since
+                   the decision is not built — recorded `changed_since_decision` (extract_skipped)
+                   and counted in `counts.pinned`; every other item is recorded
+                   `not_in_pinned_set` and never built. The database recipe (facts, cards) does
+                   not run around a pinned build; a resume must name the same pins."""
     conn = load_connection(source_id, sources_root)
     if getattr(conn, "purpose", "ingest") != "ingest":
         raise NotAnIngestConnection(
@@ -843,6 +852,19 @@ def run_ingest(source_id: str, store=None, harness=None,
             f"the plan for {source_id!r} is {plan.status!r}; a signed-in person approves it "
             f"before it runs (auto_approve approves nothing)")
     approval_note = _require_plan_approval(plan, sources_root)
+    if only_items is not None:
+        if capture_only:
+            raise PlanError("a pinned build cannot be a capture-only discovery")
+        if getattr(_TABULAR, "kwargs", None) is not None or _inside_tabular_recipe():
+            raise PlanError("a pinned build cannot run inside the database recipe")
+        only_items = {str(k): str(v) for k, v in dict(only_items).items()}
+        with _source_lock(source_id):
+            return _run_core(source_id, conn, plan, store, harness, progress_cb, run_id=run_id,
+                             client=client, sources_root=sources_root, verbose=verbose,
+                             vocab=vocab, concurrency=concurrency, passages=passages,
+                             cache=cache, bridges=bridges, nested=False,
+                             event_attrs=event_attrs, approval_note=approval_note,
+                             only_items=only_items)
     if capture_only:
         if getattr(_TABULAR, "kwargs", None) is not None or _inside_tabular_recipe():
             raise PlanError("a capture-only discovery cannot run inside the database recipe")
@@ -889,7 +911,8 @@ def run_ingest(source_id: str, store=None, harness=None,
 
 def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id, client,
               sources_root, verbose, vocab, concurrency, passages, cache, bridges, nested,
-              event_attrs, approval_note, discovery: bool = False) -> RunReport:
+              event_attrs, approval_note, discovery: bool = False,
+              only_items: Optional[dict] = None) -> RunReport:
     """The body of `run_ingest`, entered holding the source's run lock. `discovery`: the
     capture-only mode (no store is opened; nothing is built; see `run_ingest`)."""
     extra_attrs = dict(event_attrs or {})
@@ -1044,7 +1067,8 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
                 else None
             _extract(captured, state, ledgers, progress, timings, cache, decided=decided,
                      fingerprint=screen_fingerprint(screen_cfg), overrides=overrides,
-                     source_id=source_id, sources_root=sources_root, anchor_kind=anchor_now)
+                     source_id=source_id, sources_root=sources_root, anchor_kind=anchor_now,
+                     pinned=_bind_pins(run_dir, only_items))
             mark("extract", time.monotonic() - t0)
         extracted = read_jsonl(run_dir / "extracted.jsonl")
 
@@ -1136,6 +1160,8 @@ def _run_core(source_id: str, conn, plan, store, harness, progress_cb, *, run_id
         report.timings = {**report.timings,
                           **timings.as_dict(meter.as_dict() if meter is not None else None)}
         report.counts = report.verify.get("counts", {})
+        if only_items is not None:
+            report.counts["pinned"] = _pinned_counts(run_dir, only_items)
         _count_backfill(report, run_dir)
         _note_holds(report, run_dir)
         _finalise_status(report, enumeration_complete)
@@ -1590,11 +1616,47 @@ def held_items(run_dir: Path) -> dict[str, dict]:
             if r.get("item_id") and r.get("rule") == DRIFT_PENDING_APPROVAL}
 
 
+#: `extract_skipped` reasons of a PINNED build (`run_ingest(only_items=...)`)
+CHANGED_SINCE_DECISION = "changed_since_decision"
+NOT_IN_PINNED_SET = "not_in_pinned_set"
+PINS_FILE = "pinned.json"
+
+
+def _bind_pins(run_dir: Path, only_items: Optional[dict]) -> Optional[dict]:
+    """Record a pinned build's pins in the run (written once); a resume must name the same."""
+    p = run_dir / PINS_FILE
+    if only_items is None:
+        if p.is_file():
+            raise ResumeRefused(f"run {run_dir.name} is a pinned build: resume it with its pins")
+        return None
+    if p.is_file():
+        if json.loads(p.read_text(encoding="utf-8")) != only_items:
+            raise ResumeRefused(f"run {run_dir.name} was pinned to other items; start a new run")
+    else:
+        _atomic_text(p, json.dumps(only_items, sort_keys=True))
+    return only_items
+
+
+def _pinned_counts(run_dir: Path, only_items: dict) -> dict:
+    skipped = read_jsonl(run_dir / "extract_skipped.jsonl")
+    captured = {r["item_id"] for r in read_jsonl(run_dir / "captured.jsonl") if r.get("item_id")}
+    changed = sorted(r["item_id"] for r in skipped
+                     if r.get("reason") == CHANGED_SINCE_DECISION)
+    return {"pinned": len(only_items), "changed_since_decision": len(changed),
+            "changed_items": changed,
+            "not_captured": sorted(set(only_items) - captured),
+            "not_in_pinned_set": sum(1 for r in skipped
+                                     if r.get("reason") == NOT_IN_PINNED_SET),
+            "built": len({r["item_id"] for r in read_jsonl(run_dir / "build.jsonl")
+                          if r.get("item_id") in only_items})}
+
+
 def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
              timings: Optional[Timings] = None, cache: bool = True, *,
              decided: Optional[dict] = None, fingerprint: str = "",
              overrides: Optional[set] = None, source_id: Optional[str] = None,
-             sources_root: Optional[Path] = None, anchor_kind: Optional[str] = None) -> None:
+             sources_root: Optional[Path] = None, anchor_kind: Optional[str] = None,
+             pinned: Optional[dict] = None) -> None:
     from .extract import extract_text
 
     timings = timings or Timings()
@@ -1602,10 +1664,21 @@ def _extract(captured: list[dict], state: dict, ledgers: dict, progress,
     # E2E run 5 F-03: unchanged tables that must be rebuilt anyway (a referenced table was built,
     # a held row was lifted) — decided over the WHOLE run's captures first, so order is moot
     rebuild = (_rebuild_for_references(captured, state, source_id, overrides,
-                                       approved=_approved_digests(source_id, sources_root))
+                                       approved=_approved_digests(source_id, sources_root),
+                                       screen=fingerprint)
                if source_id else {})
     for i, rec in enumerate(captured, 1):
         iid, sha = rec["item_id"], rec["sha256"]
+        if pinned is not None and pinned.get(iid) != sha:
+            # a PINNED build: nothing outside the set, and nothing whose bytes moved since the
+            # person decided, is extracted, screened or built - each is recorded and counted
+            changed = iid in pinned
+            ledgers["extract_skipped"].write({
+                "item_id": iid, "uri": rec["uri"], "sha256": sha,
+                "reason": CHANGED_SINCE_DECISION if changed else NOT_IN_PINNED_SET,
+                "detail": (f"decided at {pinned[iid][:12]}, captured now at {sha[:12]}"
+                           if changed else "not among the items this build was pinned to")})
+            continue
         prev = state.get(iid)
         # R-029 TIDY2: a DOCUMENT built under another anchor kind than the one it would get now
         # (an operator named the connection's `document_kind` after it was built with none) is
@@ -2121,7 +2194,8 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
         # proposal. Never fatal: a failure is noted and the build goes on.
         # E2E run 5 F-11: measured over EVERY table this run captured (an unchanged one too),
         # so a link is proposed whichever source or table was built first
-        _refresh_links(conn.id, _own_table_snapshots(conn.id, caps), vocab, sources_root,
+        _refresh_links(conn.id, _screened_snapshots(conn.id, caps, decisions, state, held),
+                       vocab, sources_root,
                        report)
         # Codex f2 #3: the run is BOUND to the approved mapping it first built tables under. The
         # binding is written BEFORE any table row is written; a later attempt of the same run
@@ -2186,7 +2260,10 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                                   kind_splits={t: tm.split for t, tm in mapping.tables.items()
                                                if tm.status == "approved" and tm.split},
                                   row_verdicts=row_verdicts,
-                                  progress=lambda **kw: progress("build", **kw))
+                                  progress=lambda **kw: progress("build", **kw),
+                                  # Codex R-029 #2: the capture each table REPLACES, so its rows
+                                  # no longer present leave no open footprint
+                                  previous=_previous_snapshots(ready, state))
             # E2E run 5 F-03: what each table still waits for — references whose target row
             # is not in the graph yet, and rows held for a person — so the day either changes
             # the table is rebuilt (`_rebuild_for_references`), never left "unchanged"
@@ -2236,7 +2313,9 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
                              "built_at": now_iso(), **waits.get(rec["item_id"], {}),
                              # F-11: the approved mapping it was built under
                              "mapping_digest": mapping_digest(mapping.tables[rec["uri"]])
-                             if rec["uri"] in mapping.tables else None}
+                             if rec["uri"] in mapping.tables else None,
+                             # Codex R-029 #4: and the screen rules it was screened under
+                             "screen": screen_fingerprint(screen_cfg)}
                 ledgers["build"].write({**entry, "outbox": {"event": event, "state": new_state}})
                 if not snapshot.get("rows"):
                     ledgers["build_skipped"].write({"item_id": rec["item_id"],
@@ -2246,7 +2325,8 @@ def _build(conn, store, harness, vocab, doc_kind, screen_cfg, extracted, decisio
         timings.add("build.tables", time.perf_counter() - t_tab)
     elif any(c.get("kind") == "table" for c in caps.values()):
         # nothing to build this run: links are still measured against every captured table
-        _refresh_links(conn.id, _own_table_snapshots(conn.id, caps), vocab, sources_root,
+        _refresh_links(conn.id, _screened_snapshots(conn.id, caps, decisions, state, held),
+                       vocab, sources_root,
                        report)
     _carry_completeness(conn.id, run_dir, caps, state)
     if not_built:
@@ -2532,24 +2612,53 @@ def _write_completeness(run_dir: Path, rec: dict) -> None:
         fh.write(json.dumps(rec, sort_keys=True, default=str) + "\n")
 
 
-def _own_table_snapshots(source_id: str, caps: dict) -> dict[str, dict]:
-    """{table: snapshot} of every table this run captured (built, unchanged or held alike)."""
-    return {ref: snap for (src, ref), snap in _captured_tables_of(source_id, caps).items()}
+def _previous_snapshots(ready: list, state: dict) -> dict[str, dict]:
+    """{table: the snapshot its last BUILT capture held}, for each table rebuilt from new bytes."""
+    out: dict[str, dict] = {}
+    for snapshot, sha, _, rec in ready:
+        prev = state.get(rec["item_id"]) or {}
+        old = prev.get("content_hash")
+        if not old or old == sha or not prev.get("built_at"):
+            continue
+        try:
+            snap = json.loads(capture.get_bytes(old))
+        except Exception:                                            # noqa: BLE001
+            continue
+        if isinstance(snap, dict) and isinstance(snap.get("rows"), list):
+            out[_table_ref(snapshot)] = snap
+    return out
 
 
-def _captured_tables_of(source_id: str, caps: dict) -> dict:
-    out: dict = {}
-    for cap in caps.values():
-        if cap.get("kind") != "table" or not cap.get("sha256"):
+def _screened_snapshots(source_id: str, caps: dict, decisions: dict, state: dict,
+                        drift_held: dict) -> dict[str, dict]:
+    """Codex R-029 #3: {table: snapshot} of what a link proposal may measure — every captured
+    table EXCEPT one a drift holds or the screen holds whole, each WITHOUT its withheld rows:
+    screened this run, by this run's row decisions; unchanged, by the rows its build withheld
+    (`withheld_rows` in state). A table whose state records no screen (built before that was
+    kept) is not measured until its next build."""
+    from .mapping import strip_withheld_rows
+
+    out: dict[str, dict] = {}
+    for iid, cap in caps.items():
+        if cap.get("kind") != "table" or not cap.get("sha256") or iid in (drift_held or {}):
             continue
         try:
             snap = json.loads(capture.get_bytes(cap["sha256"]))
         except Exception:                                            # noqa: BLE001
             continue
-        if isinstance(snap, dict) and snap.get("table"):
-            ref = (f"{snap.get('schema')}.{snap.get('table')}" if snap.get("schema")
-                   else str(snap.get("table")))
-            out[(source_id, ref)] = snap
+        if not (isinstance(snap, dict) and snap.get("table")):
+            continue
+        dec = (decisions.get(iid) or {}).get("decision")
+        if dec is not None:
+            if dec != "allow":
+                continue
+            snap = _without_held_rows(snap, source_id, decisions)
+        else:
+            entry = state.get(iid) or {}
+            if entry.get("content_hash") != cap["sha256"] or "screen" not in entry:
+                continue
+            snap = strip_withheld_rows(snap, source_id, entry.get("withheld_rows") or [])
+        out[_table_ref(snap)] = snap
     return out
 
 
@@ -2630,7 +2739,10 @@ def _table_waits(source_id: str, result: dict, ready: list, state: dict, run_id:
     by_uri = {e.get("uri"): e for e in state.values() if isinstance(e, dict)}
     others: dict[str, dict] = {}
     held: dict[str, list] = {}
+    withheld: dict[str, list] = {}
     for b in result.get("blocked_rows") or []:
+        if b.get("row_ref"):
+            withheld.setdefault(str(b.get("table")), []).append(b["row_ref"])
         if b.get("decision") == "review" and b.get("row_ref") and b.get("row_digest"):
             held.setdefault(str(b.get("table")), []).append([b["row_ref"], b["row_digest"]])
     out: dict[str, dict] = {}
@@ -2662,6 +2774,9 @@ def _table_waits(source_id: str, result: dict, ready: list, state: dict, run_id:
             waits["pending_refs"] = pending
         if held.get(tref):
             waits["held_rows"] = held[tref]
+        # Codex R-029 #3: the rows the graph does NOT hold (any screen decision), so a later
+        # link proposal reads the table as it was built — never a withheld row
+        waits["withheld_rows"] = sorted(set(withheld.get(tref) or []))
         if waits:
             out[rec["item_id"]] = waits
     return out
@@ -2687,7 +2802,8 @@ def _approved_digests(source_id: str, sources_root) -> dict[str, str]:
 
 
 def _rebuild_for_references(captured: list[dict], state: dict, source_id: str, overrides,
-                            approved: Optional[dict] = None) -> dict[str, str]:
+                            approved: Optional[dict] = None,
+                            screen: Optional[str] = None) -> dict[str, str]:
     """E2E run 5 F-03: {item id: why} — UNCHANGED tables this run re-reads and rebuilds anyway.
 
     0. a table whose APPROVED mapping changed since it was built (`mapping_digest`: e.g. a
@@ -2708,8 +2824,14 @@ def _rebuild_for_references(captured: list[dict], state: dict, source_id: str, o
     for rec in tables:
         prev = state.get(rec["item_id"]) or {}
         now = (approved or {}).get(rec["uri"])
-        if unchanged(rec) and now and prev.get("mapping_digest") \
-                and prev["mapping_digest"] != now:
+        if unchanged(rec) and screen and prev.get("screen") != screen:
+            # Codex R-029 #4: rows are re-screened under the rules in force (a state written
+            # before the fingerprint was recorded is re-screened once, then carries it)
+            out[rec["item_id"]] = "the screen rules changed since it was built"
+            continue
+        if unchanged(rec) and now and prev.get("mapping_digest") != now:
+            # Codex R-029 #5: a state with no recorded digest (written before it was) counts as
+            # changed: rebuilt once, so an approval made meanwhile is never left unbuilt
             out[rec["item_id"]] = "its approved mapping changed since it was built"
             continue
         lifted = [r for r, d in prev.get("held_rows") or []

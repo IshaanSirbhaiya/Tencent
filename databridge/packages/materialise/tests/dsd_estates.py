@@ -148,6 +148,14 @@ def issued_principal(name: str = "Dana Reviewer (dsd tests)"):
     return register_authenticator("dsd-tests").issue(name)
 
 
+def build_actor(by: str = "staff") -> dict:
+    """The common actor object (CONS_BRIEF §1) of the signed-in person running a build — R-029
+    codex round 1 #4: a build REQUIRES it."""
+    from databridge_core.decision_ledger import actor_of
+    return actor_of({"principal_id": by, "authenticated_by": "dsd-tests",
+                     "principal_type": "Approver", "dev_only": False})
+
+
 def _import_estates():
     """mcp_ingest's estate loader, by FILE (a `scripts/estates.py` shares its module name)."""
     import importlib.util                              # noqa: PLC0415
@@ -358,5 +366,5 @@ def scripted_designer(answer):
     return h, calls
 
 
-__all__ = ["ESTATES", "Estate", "CountingFacts", "build_estate", "issued_principal",
+__all__ = ["ESTATES", "Estate", "CountingFacts", "build_estate", "issued_principal", "build_actor",
            "scripted_designer", "HARNESS_CONFIG", "EXTRACTED_AT"]

@@ -68,6 +68,21 @@ PASSAGE_K = 200
 Admits = Callable[[str], bool]
 
 
+
+def _read_evidence(facts: Any, *args: Any, **kwargs: Any) -> Any:
+    """A facts read whose cells this delegate returns as EVIDENCE. Since R-029 Codex f1 #1 a facts
+    read writes nothing; the query artefact that makes a parameterised (or unproven-order) read's
+    pointers resolvable later — by the materialiser's live pointer check, in another request —
+    is persisted HERE, explicitly, by the producer of the evidence (`persist_query_artefact`).
+    A read-only agent's own reads never write. A store whose answers carry no artefact is
+    unaffected."""
+    ans = facts.query(*args, **kwargs)
+    if getattr(ans, "query_artefact", None) and not getattr(ans, "query_ref", ""):
+        from databridge_mcp_ingest.tabular.count import persist_query_artefact  # noqa: PLC0415
+        persist_query_artefact(ans)
+    return ans
+
+
 class DelegateError(ValueError):
     """The sub-task cannot be answered by this delegate as written."""
 
@@ -202,10 +217,21 @@ def resolve_text_filters(task: SubTask, table: FactsTable, *, facts: Any, conn: 
         wanted = _words(f.value)
         if not wanted or f.field not in table.columns:
             continue
+        if table.is_subject_column(f.field):
+            # Codex R-029 r1 #1: a column that names a person (or one the approved mapping does
+            # not cover) is never resolved — reading 'Alice' as 'Alice Smith' decides who
+            # someone is (hard constraint 1). The empty result is said to be uncertain instead.
+            uncertain.append(f"{table.name}.{f.field} = {f.value!r} matched no stored value "
+                             f"exactly; that column may name people, so no other stored value "
+                             f"is chosen for it, and this empty result does not show that "
+                             f"nothing qualifies")
+            continue
         c = _q(f.field)
         exact = f"SELECT COUNT(*) AS n FROM {_q(table.name)} WHERE {c} = ?"
         _check(exact)
         _checkpoint(cancel)
+        # a PROBE, not evidence: nothing of it is cited, so nothing is persisted (it binds the
+        # asker's own words) — BRN review of the TIDY2 edit
         got = list(getattr(facts.query(conn, exact, params=(f.value,)), "rows", []) or [])
         if got and got[0][0]:
             continue                          # the value IS stored: not this filter's doing
@@ -215,7 +241,7 @@ def resolve_text_filters(task: SubTask, table: FactsTable, *, facts: Any, conn: 
                f"WHERE instr(lower(CAST({c} AS TEXT)), ?) > 0 ORDER BY v LIMIT ?")
         _check(sql)
         _checkpoint(cancel)
-        ans = facts.query(conn, sql, params=(probe, _RESOLVE_CANDIDATES + 1))
+        ans = facts.query(conn, sql, params=(probe, _RESOLVE_CANDIDATES + 1))   # a probe
         hits = sorted({str(r[0]) for r in (getattr(ans, "rows", []) or [])
                        if r and r[0] is not None and _contains_words(r[0], wanted)})
         if len(hits) == 1:
@@ -265,6 +291,8 @@ def fold_case_variants(task: SubTask, table: FactsTable, *, facts: Any, conn: st
             continue
         if f.field not in table.columns or f.field == table.key or not _fold_text(f.value):
             continue
+        if table.is_subject_column(f.field):
+            continue                  # r1 #1: a person's name is compared as written, never widened
         c = _q(f.field)
         # SQLite's lower() folds ASCII only, so the bound value is folded the same way; Python's
         # casefold then decides, over this narrowed set
@@ -273,7 +301,7 @@ def fold_case_variants(task: SubTask, table: FactsTable, *, facts: Any, conn: st
         _check(sql)
         _checkpoint(cancel)
         probe = "".join(ch.lower() if ch.isascii() else ch for ch in f.value.strip())
-        ans = facts.query(conn, sql, params=(probe, _RESOLVE_CANDIDATES + 1))
+        ans = facts.query(conn, sql, params=(probe, _RESOLVE_CANDIDATES + 1))   # a probe
         probes += 1
         want = _fold_text(f.value)
         spellings = sorted({str(r[0]) for r in (getattr(ans, "rows", []) or [])
@@ -402,7 +430,7 @@ def _run_tabular(task: SubTask, entry: ConnectionEntry, *, facts: Any, today: dt
                + (f" ORDER BY {', '.join(_q(g) for g in agg.group_by)}" if agg.group_by else ""))
         _check(sql)
         _checkpoint(cancel)
-        ans = facts.query(conn, sql, params=tuple(params))
+        ans = _read_evidence(facts, conn, sql, params=tuple(params))
         rows, excluded = _pushdown_rows(task, table, ans, conn,
                                         predicate=f"{sql} -- params {params}")
         method = "facts_sql_pushdown"
@@ -429,7 +457,7 @@ def _run_tabular(task: SubTask, entry: ConnectionEntry, *, facts: Any, today: dt
                f"FROM {_q(table.name)}{where} ORDER BY {_q(table.key)} LIMIT ?")
         _check(sql)
         _checkpoint(cancel)
-        ans = facts.query(conn, sql, params=tuple(params) + (task.limit + 1,))
+        ans = _read_evidence(facts, conn, sql, params=tuple(params) + (task.limit + 1,))
         rows, excluded = _plain_rows(ans, conn, table, limit=task.limit)
         method = "facts_sql_rows"
     truncated = bool(getattr(ans, "truncated", False))
@@ -447,7 +475,7 @@ def _run_tabular(task: SubTask, entry: ConnectionEntry, *, facts: Any, today: dt
         csql = f"SELECT COUNT(*) AS n FROM {_q(table.name)}{where}"
         _check(csql)
         _checkpoint(cancel)
-        cans = facts.query(conn, csql, params=tuple(params))
+        cans = _read_evidence(facts, conn, csql, params=tuple(params))
         queries += 1
         cptrs = list(getattr(cans, "pointers", []) or [])
         crow = list(getattr(cans, "rows", []) or [])
@@ -1006,12 +1034,17 @@ def run_documents(task: SubTask, entry: ConnectionEntry, *, store: Any, retrieve
         _checkpoint(cancel)
         passages = list(retriever.search(text_terms[0], k=PASSAGE_K, sources=[conn],
                                          mode="keyword"))
+        if over_budget("searching passages", 0, 1):
+            # Codex R-029 r1 #10: a search that itself ran past the budget is not processed
+            passages = []
         # ranked retrieval is never an exhaustive scan: a match it did not return was never
         # considered, whatever the page size
         exhaustive = False
         truncated = len(passages) >= PASSAGE_K
         unplaced = 0
-        for ps in passages:
+        for pi, ps in enumerate(passages):
+            if over_budget("reading matching passages", pi, len(passages)):
+                break
             get = (ps.get if isinstance(ps, dict) else lambda k, d=None, _p=ps: getattr(_p, k, d))
             raw = get("pointer")
             if raw is None:

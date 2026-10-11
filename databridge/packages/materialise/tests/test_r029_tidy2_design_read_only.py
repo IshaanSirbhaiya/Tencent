@@ -45,8 +45,14 @@ def test_reading_a_design_without_a_key_creates_nothing_and_reads_as_not_readabl
     assert _tree(m.out_root) == before
     # a change refuses explicitly, and writes no event
     with pytest.raises(DesignRefused) as e:
+        # a complete actor (DSX R-029 r1 #4 makes it required), so the refusal measured is the
+        # missing KEY, not a missing actor
         DesignStore(m.out_root).record_build(doc["id"], by="staff", build_id="b-1", rev=1,
-                                             digest=doc["digest"])
+                                             digest=doc["digest"],
+                                             actor={"principal_id": "staff",
+                                                    "authenticated_by": "gateway",
+                                                    "principal_type": "person",
+                                                    "dev_only": False})
     assert e.value.code == "APPROVAL_KEY_UNAVAILABLE"
     assert not kp.exists()
     assert ev.read_bytes() == log_before

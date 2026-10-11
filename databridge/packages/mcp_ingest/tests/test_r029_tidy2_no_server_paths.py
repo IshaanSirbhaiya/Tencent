@@ -82,3 +82,23 @@ def test_the_report_and_the_discovery_name_no_server_path(walnut_env, corpus, fi
         assert any("screen rules" in n for n in body["notes"])
         for field in ("notes", "message"):
             _assert_no_server_path(json.dumps(body.get(field)), dirs, f"report {field}")
+
+
+@pytest.mark.parametrize("text", [
+    "path:/opt/private/report.json", "see file:///opt/private/report.json now",
+    "uri=file:///C:/secret/dir/a.md", r"x C:\secret\dir\a.md", "at /var/lib/walnut/x.db"])
+def test_public_text_leaves_no_absolute_path(text):
+    """R-029 Codex f1 #8: a POSIX path right after a colon, and a file URI, are server paths too."""
+    from databridge_mcp_ingest.ledger import public_text
+
+    out = public_text(text)
+    for secret in ("/opt/private", "secret", "/var/lib"):
+        assert secret not in out, out
+    assert out.count("...") == 1                                          # replaced, not deleted
+
+
+def test_public_text_keeps_urls_and_relative_paths():
+    from databridge_mcp_ingest.ledger import public_text
+
+    for text in ("see https://host.example/a/b?x=1", "docs/overview.md", "ratio 3/4"):
+        assert public_text(text) == text

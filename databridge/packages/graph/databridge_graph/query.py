@@ -54,24 +54,23 @@ class Snapshot:
     edges: list[GraphEdge]
 
 
-#: The four bi-temporal columns, read first so only the LIVE versions are read whole.
-_TIMES = "rowid_pk, valid_from, valid_to, system_from, system_to"
-
-
 def _live_rows(store: GraphStore, table: str, vt: datetime, st: datetime) -> list:
-    """Every row of ``table`` live at (``vt``, ``st``), in rowid order — decided by `_live_at` (the
-    one rule) over the four time columns, then read whole BY ROWID for the live ones only. The
-    previous read materialised every column of every version (closed history included) before
-    filtering (R-029 TIDY2)."""
-    live = [r["rowid_pk"] for r in store.fetchall(f"SELECT {_TIMES} FROM {table} ORDER BY rowid_pk")
-            if _live_at(r, vt, st)]
-    out: list = []
-    for i in range(0, len(live), 500):
-        chunk = live[i:i + 500]
-        out += store.fetchall(f"SELECT * FROM {table} WHERE rowid_pk IN ("
-                              + ", ".join("?" for _ in chunk) + ") ORDER BY rowid_pk",
-                              tuple(chunk))
-    return out
+    """Every row of ``table`` live at (``vt``, ``st``), in rowid order. SQL narrows by the
+    timestamps' SECOND prefix (``YYYY-MM-DDTHH:MM:SS``, UTC in every spelling the store has
+    written), which can only widen the set — never drop a live row whatever the fractional or
+    zone suffix — so history is not read into Python (R-029 Codex f1 #9). Every returned row is
+    then judged by `_live_at`, the one rule (f1 #5): the answer is the rule's, row for row. The
+    caller holds `read_snapshot`."""
+    from .store import _iso
+
+    v, s = _iso(vt)[:19], _iso(st)[:19]
+    rows = store.fetchall(
+        f"SELECT * FROM {table} WHERE substr(valid_from, 1, 19) <= ? "
+        f"AND (valid_to IS NULL OR substr(valid_to, 1, 19) >= ?) "
+        f"AND substr(system_from, 1, 19) <= ? "
+        f"AND (system_to IS NULL OR substr(system_to, 1, 19) >= ?) ORDER BY rowid_pk",
+        (v, v, s, s))
+    return [r for r in rows if _live_at(r, vt, st)]
 
 
 def as_of(store: GraphStore, valid_time: datetime, system_time: datetime) -> Snapshot:
@@ -79,8 +78,13 @@ def as_of(store: GraphStore, valid_time: datetime, system_time: datetime) -> Sna
     # materialise rows under the lock FIRST (store.fetchall), then build — never iterate a live
     # cursor while issuing sources_for() queries on the same shared connection.
     if isinstance(store, GraphStore):
-        node_rows = _live_rows(store, "nodes", valid_time, system_time)
-        edge_rows = _live_rows(store, "edges", valid_time, system_time)
+        # one snapshot: the rows chosen live are the rows hydrated (R-029 Codex f1 #5)
+        with store.read_snapshot():
+            node_rows = _live_rows(store, "nodes", valid_time, system_time)
+            edge_rows = _live_rows(store, "edges", valid_time, system_time)
+            nodes = [row_to_node(store, r) for r in node_rows]
+            edges = [row_to_edge(store, r) for r in edge_rows]
+        return Snapshot(valid_time, system_time, nodes, edges)
     else:
         node_rows = [r for r in store.fetchall("SELECT * FROM nodes")
                      if _live_at(r, valid_time, system_time)]
@@ -167,7 +171,8 @@ def neighbors(store: GraphStore, node_id: str, *, edge_kind: Optional[EdgeKind] 
     On a `GraphStore` it reads by index (`_neighbors_indexed`); any other store-like object (a
     view that narrows "the open graph") is read through its ``open_edges()``/``open_nodes()``."""
     if isinstance(store, GraphStore):
-        return _neighbors_indexed(store, node_id, edge_kind, depth)
+        with store.read_snapshot():                  # one coherent read (R-029 Codex f1 #5)
+            return _neighbors_indexed(store, node_id, edge_kind, depth)
     open_edges = [row_to_edge(store, r) for r in store.open_edges()]
     if edge_kind is not None:
         open_edges = [e for e in open_edges if e.kind == edge_kind]
@@ -225,15 +230,59 @@ def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
     and nodes ON the path are typed (R-029 TIDY2: it typed every open edge and every open node,
     ~8 s per call on a 49k-edge graph). Same BFS, same edge order, same path."""
     if isinstance(store, GraphStore):
-        ends = store.fetchall("SELECT rowid_pk, src_id, dst_id FROM edges "
-                              "WHERE system_to IS NULL ORDER BY rowid_pk")
-    else:
-        ends = store.open_edges()
+        with store.read_snapshot():                  # one coherent read (R-029 Codex f1 #5)
+            return _path_indexed(store, src_id, dst_id)
     adj: dict[str, list] = {}
-    for e in ends:
+    for e in store.open_edges():
         adj.setdefault(e["src_id"], []).append(e)
         adj.setdefault(e["dst_id"], []).append(e)
+    return _path_from(store, src_id, dst_id, lambda nid: adj.get(nid, []),
+                      lambda e: e)
 
+
+#: The open edges' ENDPOINTS touching one node, by index, in rowid order (`TOUCHING_EDGES_SQL`).
+TOUCHING_ENDS_SQL = ("SELECT rowid_pk, src_id, dst_id FROM edges WHERE system_to IS NULL "
+                     "AND src_id = ? UNION ALL SELECT rowid_pk, src_id, dst_id FROM edges "
+                     "WHERE system_to IS NULL AND dst_id = ? AND src_id <> ? ORDER BY rowid_pk")
+#: `path` expands its frontier by index for up to this many nodes; past it (a far or unreachable
+#: target in a large component) one read of every open edge's endpoints is cheaper. Either way
+#: the BFS — and so the path — is the same.
+PATH_FRONTIER_MAX = 2000
+
+
+class _FrontierTooWide(Exception):
+    pass
+
+
+def _path_indexed(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
+    """`path` on a GraphStore, inside the caller's snapshot: the frontier is expanded through the
+    edge indexes (R-029 Codex f1 #9); only past `PATH_FRONTIER_MAX` expansions is the whole
+    endpoint list read. Only the edges and nodes ON the path are typed."""
+    budget = [PATH_FRONTIER_MAX]
+
+    def touching(nid: str) -> list:
+        budget[0] -= 1
+        if budget[0] < 0:
+            raise _FrontierTooWide
+        return store.fetchall(TOUCHING_ENDS_SQL, (nid, nid, nid))
+
+    def hydrate(e):
+        return store.fetchone("SELECT * FROM edges WHERE rowid_pk = ?", (e["rowid_pk"],))
+
+    try:
+        return _path_from(store, src_id, dst_id, touching, hydrate)
+    except _FrontierTooWide:
+        adj: dict[str, list] = {}
+        for e in store.fetchall("SELECT rowid_pk, src_id, dst_id FROM edges "
+                                "WHERE system_to IS NULL ORDER BY rowid_pk"):
+            adj.setdefault(e["src_id"], []).append(e)
+            adj.setdefault(e["dst_id"], []).append(e)
+        return _path_from(store, src_id, dst_id, lambda nid: adj.get(nid, []), hydrate)
+
+
+def _path_from(store, src_id: str, dst_id: str, touching, hydrate) -> GraphPath:
+    """The BFS of `path` (edges undirected, each node's edges in rowid order), over
+    ``touching(node)`` endpoint rows; ``hydrate(row)`` reads an edge on the path whole."""
     prev: dict[str, tuple[str, object]] = {}
     q = deque([src_id])
     seen = {src_id}
@@ -241,7 +290,7 @@ def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
         nid = q.popleft()
         if nid == dst_id:
             break
-        for e in adj.get(nid, []):
+        for e in touching(nid):
             other = e["dst_id"] if e["src_id"] == nid else e["src_id"]
             if other not in seen:
                 seen.add(other)
@@ -250,7 +299,6 @@ def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
 
     if dst_id not in seen:
         return GraphPath(src_id, dst_id, [], found=False)
-    # reconstruct
     chain: list[tuple[str, object]] = []
     cur = dst_id
     while cur != src_id:
@@ -260,14 +308,11 @@ def path(store: GraphStore, src_id: str, dst_id: str) -> GraphPath:
     chain.reverse()
     steps = []
     for nid, e in chain:
-        if isinstance(store, GraphStore):
-            erow = store.fetchone("SELECT * FROM edges WHERE rowid_pk = ?", (e["rowid_pk"],))
-        else:
-            erow = e
         nrow = store.open_node_row(nid)
         if nrow is None:
             raise KeyError(nid)            # as before: a path step names an open node
-        steps.append(PathStep(edge=row_to_edge(store, erow), to_node=row_to_node(store, nrow)))
+        steps.append(PathStep(edge=row_to_edge(store, hydrate(e)),
+                              to_node=row_to_node(store, nrow)))
     return GraphPath(src_id, dst_id, steps, found=True)
 
 
@@ -425,7 +470,10 @@ def _link_fingerprint(store: GraphStore) -> tuple:
                          "WHERE system_to IS NULL")
     top = store.fetchone("SELECT MAX(rowid_pk) AS m FROM nodes")
     src = store.fetchone("SELECT MAX(rowid) AS m, COUNT(*) AS n FROM sources")
-    return (int(row["n"] or 0), row["m"], top["m"], src["m"], src["n"])
+    # R-029 Codex f1 #6: the connection's generation — a refreshed store (a file swapped under
+    # the same object) never reuses an index built from the previous file, whatever its counts
+    return (getattr(store, "generation", 0), int(row["n"] or 0), row["m"], top["m"], src["m"],
+            src["n"])
 
 
 def _cited_fields(store: GraphStore) -> dict[int, set[str]]:
@@ -453,34 +501,48 @@ def _link_entities_indexed(store: GraphStore, question: str, doc_kinds: frozense
     from .store import _grounded_attrs_only
 
     key = id(store)
-    fp = (_link_fingerprint(store), tuple(sorted(doc_kinds)))
-    with _LINK_LOCK:
-        hit = _LINK_CACHE.get(key)
-    if hit is None or hit[0] != fp or hit[2] is not store:
-        cited = _cited_fields(store)
-        cands = []
-        for r in store.fetchall("SELECT rowid_pk, id, kind, label, canonical_id, attrs_json "
-                                "FROM nodes WHERE system_to IS NULL ORDER BY rowid_pk"):
-            if r["kind"] in doc_kinds:
-                continue
-            attrs = _grounded_attrs_only(json.loads(r["attrs_json"]),
-                                         dict.fromkeys(cited.get(r["rowid_pk"], ())))
-            cands.append(Candidate(id=r["id"], label=r["label"], canonical_id=r["canonical_id"],
-                                   attr_text=" ".join(str(v) for v in attrs.values())))
-        hit = (fp, Bm25Index(cands) if cands else None, store)
-        with _LINK_LOCK:
-            if len(_LINK_CACHE) >= _LINK_CACHE_MAX and key not in _LINK_CACHE:
-                _LINK_CACHE.pop(next(iter(_LINK_CACHE)))
-            _LINK_CACHE[key] = hit
-    index = hit[1]
-    if index is None:
-        return []
-    out = []
-    for scored in index.search(question, top_k=top_k):
-        row = store.open_node_row(scored.id)
-        if row is not None:
-            out.append(row_to_node(store, row))
-    return out
+    for _attempt in range(3):
+        # read what the index needs in ONE snapshot; build it OUTSIDE the lock (a cold build must
+        # not stall every other reader); hydrate the winners in a snapshot that is checked to be
+        # the same graph the index was built from (R-029 Codex f1 #5)
+        with store.read_snapshot():
+            fp = (_link_fingerprint(store), tuple(sorted(doc_kinds)))
+            with _LINK_LOCK:
+                hit = _LINK_CACHE.get(key)
+            fresh = hit is not None and hit[0] == fp and hit[2] is store
+            if not fresh:
+                cited = _cited_fields(store)
+                rows = store.fetchall("SELECT rowid_pk, id, kind, label, canonical_id, "
+                                      "attrs_json FROM nodes WHERE system_to IS NULL "
+                                      "ORDER BY rowid_pk")
+        if not fresh:
+            cands = []
+            for r in rows:
+                if r["kind"] in doc_kinds:
+                    continue
+                attrs = _grounded_attrs_only(json.loads(r["attrs_json"]),
+                                             dict.fromkeys(cited.get(r["rowid_pk"], ())))
+                cands.append(Candidate(id=r["id"], label=r["label"],
+                                       canonical_id=r["canonical_id"],
+                                       attr_text=" ".join(str(v) for v in attrs.values())))
+            hit = (fp, Bm25Index(cands) if cands else None, store)
+            with _LINK_LOCK:
+                if len(_LINK_CACHE) >= _LINK_CACHE_MAX and key not in _LINK_CACHE:
+                    _LINK_CACHE.pop(next(iter(_LINK_CACHE)))
+                _LINK_CACHE[key] = hit
+        index = hit[1]
+        if index is None:
+            return []
+        with store.read_snapshot():
+            if (_link_fingerprint(store), tuple(sorted(doc_kinds))) != hit[0]:
+                continue                             # the graph moved meanwhile: rebuild
+            out = []
+            for scored in index.search(question, top_k=top_k):
+                row = store.open_node_row(scored.id)
+                if row is not None:
+                    out.append(row_to_node(store, row))
+            return out
+    raise RuntimeError("the graph kept changing while it was being linked; ask again")
 
 
 def _document_kinds() -> frozenset[str]:
