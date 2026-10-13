@@ -23,13 +23,26 @@ Fail-closed rules (whole file → ``nobody``):
   owner has published the file beyond the company's identity boundary, and we will not be the
   system that repeats it;
 * an expiring permission (``expirationTime``), an unknown permission type or an unknown role;
-* a file whose permissions cannot be read.
+* a MALFORMED permission entry (not an object; a user / group grant without an email; a domain
+  grant without a domain): the connector cannot tell what the entry meant, so the whole file is
+  ``nobody`` (Codex sec3b #5);
+* a file whose permissions cannot be read, or whose permission listing cannot be read to the end
+  (page cap / repeated page token ⇒ ``ConnectorError`` at ingest, ``source_incomplete`` at Gate 2 —
+  sec3b #6).
 
 Gate 2: Drive has no per-user "can X read this" API in our subset (and the real API has none
 either), so Gate 2 RE-READS the file metadata and ``files/{id}/permissions`` with the service
 client at answer time and evaluates the freshly compiled policy for the user NOW — one attempt
 each, 2 s timeout, any failure denies (``source_*``); trashed / 404 ⇒ ``vanished``. Group and
-domain membership come from the IB directory (cache of the identity source).
+domain membership are re-read from the IB directory AT CHECK TIME (``directory.get(user.id)``, not
+the principal object the request started with); a user the directory no longer knows, or no longer
+lists as active, is denied. The directory is itself a cache of the identity source: a Google-group
+removal reaches Gate 2 when the directory is reloaded (documented, SECURITY.md track 3, sec3b #2).
+
+Folder ACL webhooks are expanded to the descendant files; if that expansion fails, the event
+invalidates the whole CONTAINER (the shared drive named in the signed payload, else the one the
+last crawl saw the folder in, else every known drive) instead of a meaningless ``drive:<folder>``
+doc id (sec3b #15).
 
 Freshness: the ``changes`` feed (``changes/startPageToken`` then ``changes?pageToken=``); the cursor
 keeps the page token, the folder tree and per-file version + permission fingerprints. Removed /
@@ -48,9 +61,9 @@ import httpx
 from .. import acl as A
 from ..models import (AccessCheck, AclDomain, AclExpr, AclNobody, ChangeBatch, ChangeEvent,
                       DirectoryUser, SourceDoc)
-from ._http import (DirectorySource, SourceFailure, WebhookVerifier, event_time, extract_links,
-                    json_of, native_to_ib, now_utc, parse_iso, parse_webhook_body, request_gate2,
-                    request_ingest, resolve_directory)
+from ._http import (DirectorySource, PageGuard, SourceFailure, WebhookVerifier, event_time,
+                    event_user, extract_links, json_of, native_to_ib, now_utc, parse_iso,
+                    parse_webhook_body, request_gate2, request_ingest, resolve_directory)
 from .base import ConnectorError, WebhookRejected
 
 PLATFORM = "drive"
@@ -110,6 +123,9 @@ class DriveConnector:
         self.page_size = page_size
         self._sleep = sleep
         self._verifier = WebhookVerifier(webhook_secret, **({"now": now} if now else {}))
+        #: the folder tree the last ``list_changes`` returned (item id → node) — used only to pick
+        #: the container to invalidate when a folder ACL webhook cannot be expanded
+        self._tree: dict[str, Any] = {}
 
     @property
     def directory(self):
@@ -150,22 +166,30 @@ class DriveConnector:
             raise ConnectorError("drive files.get: unexpected payload")
         return data if data and data.get("id") else None
 
-    def _permissions(self, fid: str, *, gate2: bool = False) -> Optional[list[dict[str, Any]]]:
-        out: list[dict[str, Any]] = []
+    def _permissions(self, fid: str, *, gate2: bool = False) -> Optional[list[Any]]:
+        """EVERY permission entry, as returned (malformed ones included, so ``compile_acl`` can
+        fail the whole file closed). None when the file is gone. Incomplete listing ⇒ raise."""
+        out: list[Any] = []
         token = ""
-        for _ in range(10_000):
+        guard = PageGuard(f"drive permissions.list {fid}", gate2=gate2)
+        while True:
+            guard.next_page(token)
             params: dict[str, Any] = {"supportsAllDrives": "true", "pageSize": self.page_size,
                                       "fields": "nextPageToken,permissions(*)"}
             if token:
                 params["pageToken"] = token
             data = self._json(f"files/{fid}/permissions", params, gate2=gate2)
             if data is None:
-                return None
+                if guard.pages == 1:
+                    return None
+                if gate2:
+                    raise SourceFailure("source_incomplete", detail="vanished while paging")
+                raise ConnectorError("drive permissions.list: vanished while paging")
             if not isinstance(data, dict) or not isinstance(data.get("permissions", []), list):
                 if gate2:
                     raise SourceFailure("source_bad_payload")
                 raise ConnectorError("drive permissions.list: unexpected payload")
-            out.extend(p for p in data.get("permissions") or [] if isinstance(p, dict))
+            out.extend(data.get("permissions") or [])
             token = str(data.get("nextPageToken") or "")
             if not token:
                 break
@@ -174,7 +198,9 @@ class DriveConnector:
     def _list(self, q: str, *, attempts: int = 5) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         token = ""
-        for _ in range(10_000):
+        guard = PageGuard("drive files.list")
+        while True:
+            guard.next_page(token)
             params: dict[str, Any] = {"q": q, "pageSize": self.page_size, "corpora": "allDrives",
                                       "includeItemsFromAllDrives": "true", "supportsAllDrives": "true",
                                       "fields": "nextPageToken,files(*)"}
@@ -282,10 +308,16 @@ class DriveConnector:
         d = self.directory
         return native_to_ib(d, PLATFORM, email) or native_to_ib(d, PLATFORM, email.lower())
 
-    def compile_acl(self, perms: Sequence[Mapping[str, Any]]) -> AclExpr:
+    def compile_acl(self, perms: Sequence[Any]) -> AclExpr:
+        """Fail closed for the WHOLE file on any entry it cannot read with confidence."""
         grants: list[AclExpr] = []
         for p in perms:
-            if p.get("deleted"):
+            if not isinstance(p, dict):
+                return A.nobody("drive-malformed-permission")
+            deleted = p.get("deleted", False)
+            if not isinstance(deleted, bool):
+                return A.nobody("drive-malformed-permission")
+            if deleted:
                 continue                            # a deleted account grants nothing
             t = p.get("type")
             if t == "anyone":
@@ -296,22 +328,30 @@ class DriveConnector:
                 return A.nobody(f"drive-unsupported-permission-type-{t}")
             if p.get("role") not in READ_ROLES:
                 return A.nobody(f"drive-unsupported-role-{p.get('role')}")
-            if t == "user":
-                grants.append(A.users(self._user_id(p.get("emailAddress")) or ""))
-            elif t == "group":
-                grants.append(A.groups(self._group(str(p.get("emailAddress") or "")) or ""))
+            if t in ("user", "group"):
+                email = p.get("emailAddress")
+                if not isinstance(email, str) or "@" not in email:
+                    return A.nobody("drive-malformed-permission")
+                if t == "user":
+                    grants.append(A.users(self._user_id(email) or ""))
+                else:
+                    grants.append(A.groups(self._group(email) or ""))
             else:
-                dom = str(p.get("domain") or "").lower()
-                grants.append(AclDomain(domain=dom) if dom and dom == self.company_domain
+                dom = p.get("domain")
+                if not isinstance(dom, str) or not dom:
+                    return A.nobody("drive-malformed-permission")
+                dom = dom.lower()
+                grants.append(AclDomain(domain=dom) if dom == self.company_domain
                               else A.nobody("drive-foreign-domain"))
         return A.any_of(*grants)
 
     @staticmethod
-    def perms_fingerprint(perms: Optional[Sequence[Mapping[str, Any]]]) -> str:
+    def perms_fingerprint(perms: Optional[Sequence[Any]]) -> str:
         if perms is None:
             return _fp(None)
         rows = sorted(json.dumps({k: p.get(k) for k in ("type", "role", "emailAddress", "domain",
-                                                          "expirationTime", "deleted")},
+                                                          "expirationTime", "deleted")}
+                                 if isinstance(p, dict) else {"malformed": repr(p)},
                                  sort_keys=True) for p in perms)
         return _fp(rows)
 
@@ -359,7 +399,16 @@ class DriveConnector:
             if perms is None:
                 return verdict("vanished", "file_gone")
             expr = self.compile_acl(perms)
-            if not A.allows(expr, user):
+            # group / domain membership as the directory knows it NOW, not as it was when the
+            # request's principal object was built (sec3b #2; the directory is a cache — documented)
+            current_user = self.directory.get(user.id)
+            if current_user is None:
+                return verdict("forbidden", "unknown_user")
+            if not current_user.active:
+                return verdict("forbidden", "deactivated")
+            if current_user.platform_ids.get(PLATFORM) != user.platform_ids.get(PLATFORM):
+                return verdict("forbidden", "identity_changed")
+            if not A.allows(expr, current_user):
                 return verdict("forbidden", "unsupported_acl" if isinstance(expr, AclNobody)
                                else "not_permitted")
         except SourceFailure as exc:
@@ -394,7 +443,9 @@ class DriveConnector:
 
     def _changes(self, token: str) -> tuple[list[dict[str, Any]], str]:
         out: list[dict[str, Any]] = []
-        for _ in range(10_000):
+        guard = PageGuard("drive changes.list")
+        while True:
+            guard.next_page(token)                  # cap / token cycle ⇒ ConnectorError
             data = self._json("changes", {"pageToken": token, "pageSize": self.page_size,
                                           "includeItemsFromAllDrives": "true",
                                           "supportsAllDrives": "true"})
@@ -406,7 +457,6 @@ class DriveConnector:
             token = str(data.get("nextPageToken") or "")
             if not token:
                 raise ConnectorError("drive changes.list: neither nextPageToken nor newStartPageToken")
-        raise ConnectorError("drive changes.list: too many pages")
 
     @staticmethod
     def _node(meta: Mapping[str, Any]) -> dict[str, Any]:
@@ -462,6 +512,7 @@ class DriveConnector:
                     continue
                 docs.append(doc)
                 files[iid] = {"v": doc.version, "acl": self.perms_fingerprint(perms)}
+            self._tree = dict(tree)
             return ChangeBatch(docs=tuple(docs), cursor=self._dump(token, tree, files))
 
         tree = dict(prev.get("tree") or {})
@@ -534,6 +585,7 @@ class DriveConnector:
         for fid in changed_folders:
             if metas.get(fid, {}) is None:          # folder removed: forget it (files handled above)
                 tree.pop(fid, None)
+        self._tree = dict(tree)
         return ChangeBatch(docs=tuple(docs), deleted=tuple(deleted), acl_changed=tuple(acl_changed),
                            cursor=self._dump(token, tree, files))
 
@@ -546,17 +598,19 @@ class DriveConnector:
     # webhooks
     # ---------------------------------------------------------------------------------------
     def _ib_user(self, raw: Optional[str]) -> Optional[str]:
-        if not raw:
-            return None
+        """A native Drive identity (an email) via the directory FIRST; an unmapped email is
+        unresolved (None); an IB id is accepted only if the directory knows it (sec3b #13)."""
         d = self.directory
-        if d.get(raw) is not None:
-            return raw
-        return self._user_id(raw) or raw
+        hit = self._user_id(raw) if isinstance(raw, str) and "@" in raw else None
+        return hit or event_user(d, PLATFORM, raw, lambda v: "@" in v)
 
-    def _expand_acl_ids(self, ids: Sequence[str]) -> tuple[str, ...]:
+    def _expand_acl_ids(self, ids: Sequence[str]) -> tuple[tuple[str, ...], list[str]]:
         """Folder ids → their descendant FILES (an ACL change on a folder moves every inherited
-        entry below it). Lookup failures keep the raw id: never drop an invalidation."""
+        entry below it). Returns (doc ids, ids whose expansion FAILED) — a failed expansion is
+        never turned into a meaningless ``drive:<folder>`` doc id (sec3b #15); the caller
+        invalidates the containing drive instead."""
         out: list[str] = []
+        failed: list[str] = []
 
         def add(x: str) -> None:
             if x not in out:
@@ -564,32 +618,59 @@ class DriveConnector:
 
         for raw in ids:
             fid = raw.split(":", 1)[1] if raw.startswith(f"{PLATFORM}:") else raw
+            if not _FILE_ID.match(fid):
+                failed.append(fid)
+                continue
             try:
-                meta = self._meta(fid, attempts=2) if _FILE_ID.match(fid) else None
-                if meta is not None and meta.get("mimeType") == FOLDER_MIME:
+                meta = self._meta(fid, attempts=2)
+                if meta is None:
+                    if (self._tree.get(fid) or {}).get("f"):
+                        failed.append(fid)          # a folder that vanished: descendants unknown
+                    else:
+                        add(f"{PLATFORM}:{fid}")    # a file that is gone: its own doc id
+                    continue
+                if meta.get("mimeType") == FOLDER_MIME:
                     for c in self._descendant_files(fid, attempts=2):
                         add(f"{PLATFORM}:{c}")
                     continue
             except ConnectorError:
-                pass
+                failed.append(fid)
+                continue
             add(f"{PLATFORM}:{fid}")
-        return tuple(out)
+        return tuple(out), failed
+
+    def _containers_for(self, failed: Sequence[str], payload_container: Optional[str]) -> list[str]:
+        """Containers to invalidate wholesale for ids whose expansion failed."""
+        if payload_container:
+            return [payload_container]                  # inside the signed body
+        known = [self._tree[f] for f in failed if f in self._tree]
+        if known and len(known) == len(failed):
+            return sorted({str(n.get("d") or "my-drive") for n in known})
+        every = sorted({str(n.get("d") or "my-drive") for n in self._tree.values()})
+        if every:
+            return every                                # unknown folder: every drive we know
+        raise ConnectorError("drive acl event: folder expansion failed and no container is known")
 
     def parse_webhook(self, headers: Mapping[str, str], body: bytes) -> Sequence[ChangeEvent]:
         delivery, ts = self._verifier.verify(headers, body)
         data = parse_webhook_body(body, PLATFORM)
         etype = data["type"]
         ids = data.get("object_ids") or []
+        container = data.get("container") or None
+        containers: list[Optional[str]] = [container]
         if etype == "acl.changed":
-            object_ids = self._expand_acl_ids(ids)
+            object_ids, failed = self._expand_acl_ids(ids)
+            if failed:
+                containers = list(self._containers_for(failed, container))
         elif etype in ("content.changed", "content.deleted"):
             object_ids = tuple(i if i.startswith(f"{PLATFORM}:") else f"{PLATFORM}:{i}" for i in ids)
         else:
             object_ids = tuple(ids)
-        return [ChangeEvent(platform=PLATFORM, type=etype, object_ids=object_ids,
-                            container=data.get("container") or None,
-                            user=self._ib_user(data.get("user")), delivery_id=delivery,
-                            at=event_time(data, ts))]
+        user = self._ib_user(data.get("user"))
+        at = event_time(data, ts)
+        return [ChangeEvent(platform=PLATFORM, type=etype, object_ids=object_ids if n == 0 else (),
+                            container=c, user=user, delivery_id=delivery, at=at)
+                for n, c in enumerate(containers)]
 
 
 __all__ = ["DriveConnector", "file_id_of", "supported_mime", "WebhookRejected"]

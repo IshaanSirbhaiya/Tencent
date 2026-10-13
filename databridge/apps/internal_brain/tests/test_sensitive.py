@@ -138,7 +138,6 @@ def test_findings_point_at_the_original_text_and_carry_no_raw_value():
 # --------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("text", [
     "order 20261013000123 shipped",                 # order id: IIN prefix "20" is not a card
-    "order ORD-4111111111111111 shipped",           # glued to an id prefix
     "ticket 4111111111111112",                      # Luhn fails
     "slack ts 1728370000.000100 and 1791256800.003156",
     "epoch ms 1728370000123",
@@ -147,7 +146,7 @@ def test_findings_point_at_the_original_text_and_carry_no_raw_value():
     "SKU 123456789012345678901234",                  # 24 digits: too long, never a card
     "PAY-236 and AUTH-88 and STRO-SYN-2026-0912",
     "GB83 WEST 1234 5698 7654 32",                  # IBAN-shaped, mod-97 fails
-    "S12345678 and T123456 and s1234567d",           # NRIC-shaped but not the format
+    "S12345678 and T123456 and XS1234567D9",         # NRIC-shaped but not the format
     "CNRY-3f9a1c and v7 and Q3",
 ])
 def test_no_false_positives(text):
@@ -201,3 +200,138 @@ def test_world_sens_facts_mask_to_their_recorded_form():
         out, findings = S.mask(f"x {f['raw']} y")
         assert out == f"x {f['masked']} y", f["id"]
         assert f["raw"] not in out and [x["kind"] for x in findings] == [f["sensitive_kind"]]
+
+
+# --------------------------------------------------------------------------------------------
+# Codex security review r1, track 3 (sec3b #7-#10, #16-#19) — regression tests
+# --------------------------------------------------------------------------------------------
+PAN = "4111111111111111"
+
+
+@pytest.mark.parametrize("text,n", [
+    ("4111 1111 1111 1111 4111 1111 1111 1111", 2),
+    ("4111-1111-1111-1111 5555-5555-5555-4444 378282246310005", 3),
+    (f"{PAN} {PAN} {PAN}", 3),
+])
+def test_adjacent_cards_are_all_masked_in_one_pass(text, n):               # sec3b #7
+    out, f = S.mask(text)
+    assert [x["kind"] for x in f] == ["pan"] * n, out
+    assert not re.search(r"\d{11,}", _compact(out)), out          # last 4 + next BIN 6 = 10 max
+    twice, f2 = S.mask(out)
+    assert twice == out and f2 == []                                         # idempotent again
+
+
+@pytest.mark.parametrize("text", [
+    "card 4111 1111 1111 1111 here",                    # NBSP
+    "card 4111 1111 1111 1111 here",                          # narrow/thin/figure
+    "card 4111–1111–1111–1111 here",                          # en dashes
+    "card_4111111111111111", "card-4111111111111111", "ORD-4111111111111111",
+    "(4111111111111111)", "\"4111111111111111\"", "'4111 1111 1111 1111'", "[4111111111111111].",
+    "4111 1111\n1111 1111",                                                  # wrapped line
+    "card ４１１１１１１１１１１１１１"
+    "１１",                                                          # full-width digits
+])
+def test_unicode_spacing_and_wrappers_do_not_hide_a_pan(text):           # sec3b #8
+    out, f = S.mask(text)
+    assert [x["kind"] for x in f] == ["pan"], (text, out)
+    assert f[0]["masked"] == _expect("pan", PAN)
+    assert "1111111111" not in _compact(S.normalise(out))
+
+
+def test_findings_offsets_survive_normalisation():
+    text = "x 4111 1111 1111 1111 y"
+    out, [f] = S.mask(text)
+    assert text[f["start"]:f["end"]] == "4111 1111 1111 1111"
+    assert out == f"x {f['masked']} y"
+
+
+def test_lowercase_and_nbsp_iban_and_nric_are_masked():                    # sec3b #17
+    out, f = S.mask("iban gb82 west 1234 5698 7654 32 ok")
+    assert [x["kind"] for x in f] == ["iban"] and "5698" not in out and out.endswith(" ok")
+    out, f = S.mask("IBAN GB82 WEST 1234 5698 7654 32")
+    assert [x["kind"] for x in f] == ["iban"]
+    out, f = S.mask("nric s1234567d and fin g1234567x")
+    assert [x["kind"] for x in f] == ["sg_nric", "sg_nric"] and "1234567" not in out
+
+
+@pytest.mark.parametrize("pan", ["5018000000000009", "5600000000000003", "6759649826438453"])
+def test_maestro_ranges_are_masked(pan):                                    # sec3b #16
+    assert S.luhn_valid(pan)
+    out, f = S.mask(f"maestro {pan}")
+    assert [x["kind"] for x in f] == ["pan"] and pan not in out
+
+
+def test_maestro_prefix_still_needs_luhn_and_length():
+    assert S.mask("maestro 5018000000000008") == ("maestro 5018000000000008", [])
+    assert S.mask("maestro 501800000009")[1] == []                         # 12 digits
+
+
+def test_masking_work_is_linear_not_cubic():                               # sec3b #9
+    import time
+    for text in ("0 " * 20_000, "4 " * 20_000, "1-" * 20_000, "9" * 50_000):
+        t0 = time.perf_counter()
+        S.mask(text)
+        assert time.perf_counter() - t0 < 5.0, text[:10]
+
+
+def _load(tmp_path, body):
+    p = tmp_path / "s.yaml"
+    p.write_text(body, encoding="utf-8")
+    return S.load_rules(p)
+
+
+@pytest.mark.parametrize("body", ["version: 1\n", "version: 1\nrules: []\n",
+                                  "version: 1\npack: enterprise\nrules:\n"])
+def test_config_without_rules_uses_the_builtins(tmp_path, body):          # sec3b #10
+    assert _load(tmp_path, body) == S.compile_rules(S.DEFAULT_RULES)
+
+
+def test_config_omitting_a_builtin_kind_gets_it_back(tmp_path):
+    rules = _load(tmp_path, "version: 1\nrules:\n  - {id: emp, kind: employee_id, "
+                            "pattern: 'EMP\\d{6}', min_len: 9, max_len: 9, "
+                            "mask: {keep_tail: 2, fill: '*'}}\n")
+    assert {r.kind for r in rules} >= {"employee_id", "pan", "iban", "card_security_code", "sg_nric"}
+    assert S.mask(f"card {PAN}", rules)[1][0]["kind"] == "pan"
+
+
+@pytest.mark.parametrize("rule", [
+    # a PAN mask that keeps all 19 digits
+    r"{id: pan, kind: pan, pattern: '\d+', separators: ' ', min_len: 13, max_len: 19, "
+    r"validate: luhn, mask: {keep_head: 19, fill: '*'}}",
+    # 6 + 7 = all 13 digits of the shortest accepted value
+    r"{id: pan, kind: pan, pattern: '\d+', min_len: 13, max_len: 19, "
+    r"mask: {keep_head: 6, keep_tail: 7, fill: '*'}}",
+    # keeps something but has no explicit min_len to prove it is partial
+    "{id: x, kind: x, pattern: 'a+', mask: {keep_tail: 1, fill: '*'}}",
+    "{id: x, kind: x, pattern: 'a', min_len: 5, mask: {keep_head: -1, fill: '*'}}",
+    "{id: x, kind: x, pattern: 'a', mask: {fill: ''}}",
+    "{id: x, kind: x, pattern: '(a)', group: 2, mask: {fill: '*'}}",
+    "{id: x, kind: x, pattern: 'a', min_len: 3, max_len: 2, mask: {fill: '*'}}",
+    "{id: x, kind: x, pattern: 'a', max_len: 100000, mask: {fill: '*'}}",
+    # catastrophic-backtracking shapes
+    "{id: x, kind: x, pattern: '(a+)+$', mask: {fill: '*'}}",
+    "{id: x, kind: x, pattern: '(?:a|aa)*b', mask: {fill: '*'}}",
+    r"{id: x, kind: x, pattern: '(\d{2,}\s?)*x', mask: {fill: '*'}}",
+    "{id: x, kind: x, pattern: 'a', prefix: '(x*)*y', mask: {fill: '*'}}",
+    "{id: x, kind: x, pattern: '" + "a" * 600 + "', mask: {fill: '*'}}",
+    "{id: x, kind: x, pattern: '(', mask: {fill: '*'}}",
+])
+def test_unsafe_rules_are_rejected(tmp_path, rule):                         # sec3b #10, #18
+    with pytest.raises(ValueError):
+        _load(tmp_path, f"version: 1\nrules:\n  - {rule}\n")
+
+
+def test_mask_doc_masks_every_free_text_field_but_not_identifiers():       # sec3b #19
+    from datetime import datetime, timezone
+    from databridge_ib.models import SourceDoc
+    now = datetime(2026, 10, 13, tzinfo=timezone.utc)
+    doc = SourceDoc(doc_id=f"drive:{PAN}", platform="drive", kind="file",
+                    container=PAN, container_name=f"Cards {PAN}",
+                    title="t", text="x", version=PAN, created_at=now,
+                    updated_at=now, deep_link=f"https://docs.google.com/document/d/{PAN}",
+                    author="jdoe", links=(f"drive:{PAN}",))
+    m = S.mask_doc(doc)
+    assert PAN not in m.container_name and m.container_name.startswith("Cards 411111")
+    assert (m.doc_id, m.container, m.version, m.deep_link, m.links) == \
+        (doc.doc_id, doc.container, doc.version, doc.deep_link, doc.links)
+    assert S.MASK_EXEMPT_FIELDS <= set(type(doc).model_fields)

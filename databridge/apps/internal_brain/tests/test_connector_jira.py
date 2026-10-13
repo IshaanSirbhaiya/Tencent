@@ -524,3 +524,112 @@ def test_mock_permission_check_needs_admin_and_429_denies(mock_env):
     env.admin_post("/admin/ratelimit", {"platform": "jira", "on": True})
     r = conn.check_access(d.get("jdoe"), "jira:PAY-1")
     assert r.verdict == "forbidden" and r.reason_code == "source_rate_limited"
+
+
+# ---------------------------------------------------------------- Codex security review r1, track 3
+def _wrap(conn, fn):
+    """Post-process service-client responses: ``fn(request, response) -> response``."""
+    inner = conn.client._transport.handler
+    conn.client._transport.handler = lambda request: fn(request, inner(request))
+
+
+def _rewrite_issue(conn, key, mutate):
+    import httpx
+
+    def fn(request, resp):
+        if request.url.path.endswith(f"/issue/{key}") and resp.status_code == 200:
+            data = resp.json()
+            mutate(data["fields"])
+            return httpx.Response(200, json=data)
+        return resp
+
+    _wrap(conn, fn)
+
+
+def test_restricted_comment_is_never_indexed(env):                         # sec3b #1
+    d, fake, conn, _, _ = env
+    fake.issues["PAY-1"]["comments"].append(
+        {"author": "sara.sec", "body": "ROLE-ONLY-REMARK incident key", "created": "2026-10-10T10:00:00+08:00",
+         "visibility": {"type": "role", "value": "Administrators"}})
+    fake.issues["PAY-1"]["comments"].append(
+        {"author": "sara.sec", "body": "GROUP-ONLY-REMARK", "created": "2026-10-10T10:00:00+08:00",
+         "visibility": {"type": "group", "value": "grp-security", "identifier": "grp-security"}})
+    doc = conn.fetch("jira:PAY-1")
+    assert "Replica lag is fine." in doc.text                 # the unrestricted comment stays
+    assert "ROLE-ONLY-REMARK" not in doc.text and "GROUP-ONLY-REMARK" not in doc.text
+    crawled = {x.doc_id: x for x in conn.list_changes(None).docs}
+    assert "ROLE-ONLY-REMARK" not in crawled["jira:PAY-1"].text
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda f: f.pop("security", None),                        # requested but absent
+    lambda f: f.__setitem__("security", {"name": "no id"}),
+    lambda f: f.__setitem__("security", "10100"),
+    lambda f: f.__setitem__("security", {"id": None}),
+    lambda f: f.__setitem__("security", {"id": True}),
+    lambda f: f.__setitem__("security", []),
+])
+def test_absent_or_malformed_security_field_is_nobody(env, mutate):        # sec3b #4
+    d, fake, conn, _, _ = env
+    assert fake.issues["PAY-2"]["security_level"] is not None
+    _rewrite_issue(conn, "PAY-2", mutate)
+    e = conn.acl("jira:PAY-2")
+    assert isinstance(e, AclNobody) and e.reason == "jira-security-field-unreadable"
+    assert not any(A.allows(e, u) for u in d.all())
+
+
+def test_explicit_null_security_is_browse_only(env):
+    d, fake, conn, _, _ = env
+    assert fake.issues["PAY-1"]["security_level"] is None
+    assert readers(conn, d, "jira:PAY-1") == expected(fake, d, "PAY-1") != set()
+
+
+def test_crawl_with_absent_security_field_fingerprints_and_fails_closed(env):
+    import httpx
+    d, fake, conn, _, _ = env
+
+    def strip(request, resp):
+        if request.url.path.endswith("/search/jql") and resp.status_code == 200:
+            data = resp.json()
+            for i in data["issues"]:
+                if i["key"] == "PAY-2":
+                    i["fields"].pop("security", None)
+            return httpx.Response(200, json=data)
+        return resp
+
+    _wrap(conn, strip)
+    b = conn.list_changes(None)
+    assert json.loads(b.cursor)["issues"]["PAY-2"]["l"] != fake.issues["PAY-2"]["security_level"]
+
+
+def test_search_pagination_cap_raises(env, monkeypatch):                   # sec3b #6 pattern
+    from databridge_ib.connectors import _http
+    _, _, conn, _, _ = env
+    monkeypatch.setattr(_http, "MAX_PAGES", 1)                # page_size 2, five issues
+    with pytest.raises(ConnectorError):
+        conn.list_changes(None)
+
+
+def test_search_token_cycle_raises(env):
+    import httpx
+    _, _, conn, _, _ = env
+
+    def loop(request, resp):
+        if request.url.path.endswith("/search/jql"):
+            data = resp.json()
+            data["nextPageToken"], data["isLast"] = "2", False       # the same token forever
+            return httpx.Response(200, json=data)
+        return resp
+
+    _wrap(conn, loop)
+    with pytest.raises(ConnectorError):
+        conn.list_changes(None)
+
+
+def test_event_user_native_first_and_unresolved_stays_none(env):           # sec3b #13
+    d, _, conn, _, _ = env
+    assert conn._ib_user(d.get("jdoe").platform_ids["jira"]) == "jdoe"
+    assert conn._ib_user("acc-nobody") is None
+    assert conn._ib_user("557058:0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b") is None
+    assert conn._ib_user("jdoe") == "jdoe"
+    assert conn._ib_user("mallory") is None

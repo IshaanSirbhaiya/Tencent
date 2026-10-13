@@ -8,12 +8,26 @@ Permission semantics compiled into ``AclExpr``:
 * private channel and Slack Connect (``is_ext_shared``) channel → ``users(members)``;
 * archived channel → unchanged (still readable by whoever could read it);
 * DMs / group DMs / anything not returned by ``conversations.list`` → ``nobody`` (unsupported).
+  ``is_im`` / ``is_mpim`` are checked FIRST, before private / shared (a private-flagged group DM is
+  still a DM); a channel object missing any of ``is_im``, ``is_mpim``, ``is_private``,
+  ``is_ext_shared`` (or carrying a non-boolean) is UNCLASSIFIED → ``nobody`` / deny, never "public"
+  (Codex sec3a #2, #3).
 
 Gate 2 asks Slack itself (``users.info`` + ``conversations.list`` + ``conversations.members`` +
-``conversations.replies``) on every call — one attempt each, 2 s timeout, any failure denies.
+``conversations.replies``) on every call — one attempt each, 2 s timeout, any failure denies. The
+returned user / channel ids must be the ones asked for, and ``deleted``, ``is_restricted``,
+``is_ultra_restricted`` and ``is_stranger`` must all be present booleans, else deny.
+
+Thread version (``SourceDoc.version``): ``"<latest ts>|<message count>|<digest>"`` where the digest
+covers every message's ts, edit ts, author and text — deleting or editing ANY message (not only the
+newest) changes it, so Gate 2 reports drift (Codex sec3a #6). The crawler compares the parent's
+``reply_count`` with the stored count, so a deleted reply is re-fetched even when the latest-reply
+ts does not move; an edit to an older reply that Slack does not surface on the parent is caught by
+Gate 2's drift check on the next answer (and the full reconciliation of the next re-fetch).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any, Mapping, Optional, Sequence
@@ -23,9 +37,9 @@ import httpx
 from .. import acl as A
 from ..models import (AccessCheck, AclExpr, ChangeBatch, ChangeEvent, DirectoryUser, SourceDoc,
                       UserKind)
-from ._http import (DirectorySource, SourceFailure, WebhookVerifier, event_time, extract_links,
-                    json_of, native_to_ib, now_utc, parse_webhook_body, request_gate2,
-                    request_ingest, resolve_directory, utc_from_epoch)
+from ._http import (DirectorySource, PageGuard, SourceFailure, WebhookVerifier, event_time,
+                    event_user, extract_links, json_of, native_to_ib, now_utc, parse_webhook_body,
+                    request_gate2, request_ingest, resolve_directory, utc_from_epoch)
 from .base import ConnectorError, WebhookRejected
 
 PLATFORM = "slack"
@@ -57,14 +71,38 @@ def _ts_key(ts: str) -> float:
         return 0.0
 
 
+#: Slack native user ids (U…/W… member ids, B… bots): such a value is never read as an IB user id
+_NATIVE_USER = re.compile(r"^[UWB][A-Z0-9]{2,}$")
+_CLASS_FLAGS = ("is_im", "is_mpim", "is_private", "is_ext_shared")
+#: kinds that are never indexed / never granted
+UNSUPPORTED_KINDS = ("dm", "unclassified")
+
+
 def _channel_kind(ch: Mapping[str, Any]) -> str:
-    if ch.get("is_ext_shared"):
-        return "connect"
-    if ch.get("is_private"):
-        return "private"
-    if ch.get("is_im") or ch.get("is_mpim"):
+    """dm | unclassified | connect | private | public. DM flags are checked FIRST; any missing or
+    non-boolean classification flag ⇒ ``unclassified`` (fail closed — never "public")."""
+    if ch.get("is_im") is True or ch.get("is_mpim") is True:
         return "dm"
+    if not all(isinstance(ch.get(k), bool) for k in _CLASS_FLAGS):
+        return "unclassified"
+    if ch["is_ext_shared"]:
+        return "connect"
+    if ch["is_private"]:
+        return "private"
     return "public"
+
+
+def version_ts(version: Optional[str]) -> str:
+    """The latest-message ts inside a thread version (a bare ts from an older cursor passes)."""
+    return str(version or "").split("|", 1)[0]
+
+
+def version_count(version: Optional[str]) -> Optional[int]:
+    parts = str(version or "").split("|")
+    try:
+        return int(parts[1]) if len(parts) == 3 else None
+    except ValueError:
+        return None
 
 
 class SlackConnector:
@@ -112,7 +150,9 @@ class SlackConnector:
                stop=None) -> list[Any]:
         out: list[Any] = []
         cursor = ""
-        for _ in range(10_000):
+        guard = PageGuard(f"slack {method}", gate2=gate2)
+        while True:
+            guard.next_page(cursor)                 # cap / cursor cycle ⇒ raise, never a partial
             p = dict(params, **({"cursor": cursor} if cursor else {}))
             data = self._gate2(method, p) if gate2 else self._ingest(method, p)
             if not data.get("ok", False):
@@ -122,7 +162,13 @@ class SlackConnector:
                 if err in _GONE:
                     raise _Gone(err)
                 raise ConnectorError(f"slack {method}: {err}")
-            page = data.get(key) or []
+            page = data.get(key)
+            if page is None:
+                page = []
+            if not isinstance(page, list):
+                if gate2:
+                    raise SourceFailure("source_bad_payload", detail=f"{method}.{key}")
+                raise ConnectorError(f"slack {method}: {key} is not a list")
             out.extend(page)
             if stop is not None and any(stop(x) for x in page):
                 break
@@ -155,6 +201,10 @@ class SlackConnector:
             if not isinstance(data, dict):
                 raise SourceFailure("source_bad_payload") if gate2 else ConnectorError("bad payload")
             if data.get("ok") and isinstance(data.get("channel"), dict):
+                if data["channel"].get("id") != channel:          # answered about another channel
+                    if gate2:
+                        raise SourceFailure("source_ambiguous", detail="channel id mismatch")
+                    raise ConnectorError("slack conversations.info: channel id mismatch")
                 return data["channel"]
             err = str(data.get("error") or "not_ok")
             if err in _GONE:
@@ -185,13 +235,21 @@ class SlackConnector:
     # ---------------------------------------------------------------------------------------
     @staticmethod
     def _version(msgs: Sequence[Mapping[str, Any]]) -> str:
+        """``"<latest ts>|<count>|<digest>"`` — any deletion or edit, of ANY message, changes it."""
         best, best_key = "", -1.0
+        rows = []
         for m in msgs:
             edited = m.get("edited")
-            for cand in (m.get("ts"), edited.get("ts") if isinstance(edited, dict) else None):
+            ets = edited.get("ts") if isinstance(edited, dict) else None
+            for cand in (m.get("ts"), ets):
                 if cand and _ts_key(str(cand)) > best_key:
                     best, best_key = str(cand), _ts_key(str(cand))
-        return best
+            rows.append([str(m.get("ts") or ""), str(ets or ""), str(m.get("user") or ""),
+                         str(m.get("text") or "")])
+        rows.sort()
+        digest = hashlib.sha256(json.dumps(rows, separators=(",", ":"), ensure_ascii=False)
+                                .encode("utf-8")).hexdigest()[:16]
+        return f"{best}|{len(rows)}|{digest}"
 
     def deep_link(self, channel: str, ts: str) -> str:
         return f"https://{self.workspace_host}/archives/{channel}/p{ts.replace('.', '')}"
@@ -214,7 +272,8 @@ class SlackConnector:
             doc_id=thread_doc_id(ch["id"], thread_ts), platform=PLATFORM, kind="thread",
             container=ch["id"], container_name=name, title=f"#{name}: {head}".strip(),
             text=text, version=version, created_at=utc_from_epoch(thread_ts),
-            updated_at=utc_from_epoch(version), deep_link=self.deep_link(ch["id"], thread_ts),
+            updated_at=utc_from_epoch(version_ts(version)),
+            deep_link=self.deep_link(ch["id"], thread_ts),
             author=native_to_ib(d, PLATFORM, parent.get("user")),
             links=tuple(l for l in extract_links(text, slack_host=self.workspace_host)
                         if l != thread_doc_id(ch["id"], thread_ts)))
@@ -225,7 +284,7 @@ class SlackConnector:
             return None
         channel, ts = parsed
         ch = self._channel(channel)
-        if ch is None or _channel_kind(ch) == "dm":
+        if ch is None or _channel_kind(ch) in UNSUPPORTED_KINDS:
             return None
         msgs = self._replies(channel, ts)
         if not msgs:
@@ -241,6 +300,8 @@ class SlackConnector:
         kind = _channel_kind(ch)
         if kind == "dm":
             return A.nobody("slack-dm-unsupported")
+        if kind == "unclassified":
+            return A.nobody("slack-unclassified-channel")
         d = self.directory
         members = A.users(*[native_to_ib(d, PLATFORM, m) or "" for m in native_members])
         if kind == "public":
@@ -255,8 +316,9 @@ class SlackConnector:
         if channel[:1] in ("D",):
             return A.nobody("slack-dm-unsupported")
         ch = self._channel(channel)
-        if ch is None or _channel_kind(ch) == "dm":
-            return A.nobody("slack-dm-unsupported" if ch is not None else "slack-unknown-channel")
+        if ch is None or _channel_kind(ch) in UNSUPPORTED_KINDS:
+            return A.nobody(f"slack-{_channel_kind(ch)}-unsupported" if ch is not None
+                            else "slack-unknown-channel")
         try:
             members = self._members(channel)
         except _Gone:
@@ -286,10 +348,15 @@ class SlackConnector:
             if not info.get("ok") or not isinstance(info.get("user"), dict):
                 return verdict("forbidden", "unknown_user")
             su = info["user"]
-            if su.get("deleted"):
+            if su.get("id") != native:                       # answered about someone else
+                return verdict("forbidden", "source_ambiguous")
+            if not all(isinstance(su.get(k), bool) for k in
+                       ("deleted", "is_restricted", "is_ultra_restricted", "is_stranger")):
+                return verdict("forbidden", "source_bad_payload")    # missing flags never widen
+            if su["deleted"]:
                 return verdict("forbidden", "deactivated")
-            is_guest = bool(su.get("is_restricted") or su.get("is_ultra_restricted"))
-            is_stranger = bool(su.get("is_stranger"))
+            is_guest = su["is_restricted"] or su["is_ultra_restricted"]
+            is_stranger = su["is_stranger"]
             if user.kind is not UserKind.MEMBER:      # directory says guest/connect: never widen
                 is_guest = is_guest or user.kind is UserKind.GUEST
                 is_stranger = is_stranger or user.kind is UserKind.CONNECT
@@ -300,6 +367,8 @@ class SlackConnector:
             kind = _channel_kind(ch)
             if kind == "dm":
                 return verdict("forbidden", "unsupported_dm")
+            if kind == "unclassified":
+                return verdict("forbidden", "unsupported_channel")
             members = set(self._members(channel, gate2=True))
             is_member = native in members
             if kind in ("private", "connect"):
@@ -361,7 +430,7 @@ class SlackConnector:
         for ch in self._channels():
             cid = ch["id"]
             kind = _channel_kind(ch)
-            if kind == "dm":
+            if kind in UNSUPPORTED_KINDS:                  # DM / unclassified: never indexed
                 continue
             members = self._members(cid)
             old = prev_ch.get(cid) or {}
@@ -380,14 +449,22 @@ class SlackConnector:
                 hint = str(p.get("latest_reply") or ts)
                 if isinstance(p.get("edited"), dict) and p["edited"].get("ts"):
                     hint = max(hint, str(p["edited"]["ts"]), key=_ts_key)
-                if old_threads.get(ts) is not None and _ts_key(old_threads[ts]) >= _ts_key(hint):
-                    threads[ts] = old_threads[ts]
+                old_v = old_threads.get(ts)
+                rc = p.get("reply_count")
+                if rc is None and not p.get("latest_reply") and not p.get("thread_ts"):
+                    rc = 0                                # a plain message: Slack omits the count
+                same_count = (isinstance(rc, int) and not isinstance(rc, bool)
+                              and version_count(old_v) == rc + 1)
+                if (old_v is not None and same_count
+                        and _ts_key(version_ts(old_v)) >= _ts_key(hint)):
+                    threads[ts] = old_v                   # nothing newer, nothing deleted
                     continue
                 msgs = self._replies(cid, ts)
                 if not msgs:
                     continue
                 doc = self._build_doc(ch, ts, msgs)
-                docs.append(doc)
+                if doc.version != old_v:                  # re-fetched but unchanged: not re-emitted
+                    docs.append(doc)
                 threads[ts] = doc.version
             for ts in old_threads:
                 if ts not in threads:
@@ -397,7 +474,8 @@ class SlackConnector:
                 # every surviving doc of the channel (content-changed ones too: their ACL moved as well)
                 acl_changed.extend(thread_doc_id(cid, ts) for ts in threads if ts in old_threads)
             new_ch[cid] = {"kind": kind, "archived": bool(ch.get("is_archived")), "members": members,
-                           "latest": max(threads.values(), key=_ts_key) if threads else "",
+                           "latest": (max((version_ts(v) for v in threads.values()), key=_ts_key)
+                                      if threads else ""),
                            "threads": threads}
         for cid, old in prev_ch.items():
             if cid not in new_ch:
@@ -424,12 +502,9 @@ class SlackConnector:
         return tuple(out)
 
     def _ib_user(self, raw: Optional[str]) -> Optional[str]:
-        if not raw:
-            return None
-        d = self.directory
-        if d.get(raw) is not None:
-            return raw
-        return native_to_ib(d, PLATFORM, raw) or raw
+        """Native id via the directory FIRST; an unmapped native-format id is unresolved (None);
+        an IB id is accepted only if the directory knows it (Codex sec3a #10)."""
+        return event_user(self.directory, PLATFORM, raw, lambda v: bool(_NATIVE_USER.match(v)))
 
     def parse_webhook(self, headers: Mapping[str, str], body: bytes) -> Sequence[ChangeEvent]:
         delivery, ts = self._verifier.verify(headers, body)

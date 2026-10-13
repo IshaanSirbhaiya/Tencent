@@ -2,7 +2,8 @@
 
 Every admin mutation calls ``WebhookEmitter.emit``. The body is
 ``{"platform","type","object_ids","container","user","at"}`` and is signed with
-``X-IB-Signature: sha256=<hex HMAC-SHA256(secret, f"{timestamp}.{body}")>``.
+``X-IB-Signature: sha256=<hex HMAC-SHA256(secret, f"{timestamp}.{delivery_id}.{body}")>`` — the
+``X-IB-Delivery`` id is inside the MAC, so a captured delivery cannot be replayed under a new id.
 
 Delivery goes either to an in-process ``sink(platform, headers, body_bytes)`` (tests) or, when a
 ``webhook_url`` is configured, to ``POST {webhook_url}/webhooks/{platform}`` on a single background
@@ -30,10 +31,12 @@ EVENT_TYPES = ("content.changed", "content.deleted", "acl.changed", "membership.
 Sink = Callable[[str, dict[str, str], bytes], Any]
 
 
-def sign(secret: str, timestamp: str, body: bytes | str) -> str:
-    """``sha256=<hex>`` over ``f"{timestamp}.{body}"`` (body as the exact UTF-8 text sent)."""
+def sign(secret: str, timestamp: str, delivery_id: str, body: bytes | str) -> str:
+    """``sha256=<hex>`` over ``f"{timestamp}.{delivery_id}.{body}"`` (body as the exact UTF-8 text
+    sent)."""
     text = body.decode("utf-8") if isinstance(body, (bytes, bytearray)) else body
-    mac = hmac.new(secret.encode("utf-8"), f"{timestamp}.{text}".encode("utf-8"), hashlib.sha256)
+    mac = hmac.new(secret.encode("utf-8"), f"{timestamp}.{delivery_id}.{text}".encode("utf-8"),
+                   hashlib.sha256)
     return "sha256=" + mac.hexdigest()
 
 
@@ -57,10 +60,11 @@ class WebhookEmitter:
                    "container": container, "user": user, "at": at}
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         ts = str(int(time.time()))
+        delivery = str(uuid.uuid4())
         headers = {"Content-Type": "application/json",
-                   "X-IB-Delivery": str(uuid.uuid4()),
+                   "X-IB-Delivery": delivery,
                    "X-IB-Timestamp": ts,
-                   "X-IB-Signature": sign(self.secret, ts, body)}
+                   "X-IB-Signature": sign(self.secret, ts, delivery, body)}
         record = {"platform": platform, "headers": headers, "body": body, "payload": payload}
         self.sent.append(record)
         if self.sink is not None:

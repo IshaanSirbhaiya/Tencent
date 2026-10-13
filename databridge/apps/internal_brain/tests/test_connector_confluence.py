@@ -357,3 +357,151 @@ def test_mock_permission_check_needs_admin_and_429_denies(mock_env):
     env.admin_post("/admin/ratelimit", {"platform": "confluence", "on": True})
     r = conn.check_access(d.get("jdoe"), "confluence:cf-1001")
     assert r.verdict == "forbidden" and r.reason_code == "source_rate_limited"
+
+
+# ---------------------------------------------------------------- Codex security review r1, track 3
+def _override(conn, match, payload):
+    """Serve ``payload`` (JSON) for service-client requests whose path ends with ``match``."""
+    import httpx
+    inner = conn.client._transport.handler
+
+    def handler(request):
+        if request.url.path.endswith(match):
+            return httpx.Response(200, json=payload(request) if callable(payload) else payload)
+        return inner(request)
+
+    conn.client._transport.handler = handler
+
+
+def test_ancestors_are_paged_to_the_end(env):                              # sec3a #4
+    d, fake, conn, _ = env
+    fake.ANC_PAGE = 1                                  # cf-1003's two ancestors on two pages
+    fake.pages["cf-1002"]["restriction"] = {"users": ["jdoe"], "groups": []}
+    fake.pages["cf-1003"]["restriction"] = None
+    e = conn.acl("confluence:cf-1003")
+    assert A.allows(e, d.get("jdoe"))
+    assert not A.allows(e, d.get("priya.sre"))         # excluded by the ancestor on page 2
+    for u in d.all():
+        assert A.allows(e, u) == fake.can_read(u.id, "cf-1003"), u.id
+
+
+def test_ancestor_paging_cap_raises_not_partial(env, monkeypatch):
+    from databridge_ib.connectors import _http
+    _, fake, conn, _ = env
+    fake.ANC_PAGE = 1
+    monkeypatch.setattr(_http, "MAX_PAGES", 1)
+    with pytest.raises(ConnectorError):
+        conn.acl("confluence:cf-1003")
+
+
+@pytest.mark.parametrize("payload", [
+    {"nope": 1}, {"results": "cf-1001"}, ["cf-1001"], {"results": [{"type": "page"}]},
+    {"results": [{"id": "cf-1001", "type": "folder"}]}, {"results": [None]},
+])
+def test_malformed_ancestors_are_nobody(env, payload):                      # sec3a #5
+    d, _, conn, _ = env
+    _override(conn, "cf-1002/ancestors", payload)
+    e = conn.acl("confluence:cf-1002")
+    assert isinstance(e, AclNobody) and not A.allows(e, d.get("jdoe"))
+
+
+@pytest.mark.parametrize("payload", [
+    {},
+    {"restrictions": None},
+    {"restrictions": {}},
+    {"restrictions": {"user": {"results": []}}},                              # group part missing
+    {"restrictions": {"user": {"results": []}, "group": {}}},
+    {"restrictions": {"user": {"results": "x"}, "group": {"results": []}}},
+    {"restrictions": {"user": {"results": [{"type": "anonymous"}]}, "group": {"results": []}}},
+    {"restrictions": {"user": {"results": [{"type": "app", "accountId": "a-1"}]},
+                      "group": {"results": []}}},
+    {"restrictions": {"user": {"results": [{"displayName": "no id"}]}, "group": {"results": []}}},
+    {"restrictions": {"user": {"results": []}, "group": {"results": [{"type": "role", "id": "x"}]}}},
+    {"restrictions": {"user": {"results": [7]}, "group": {"results": []}}},
+    {"restrictions": {"user": {"results": [], "size": 3}, "group": {"results": []}}},
+    {"restrictions": {"user": {"results": [], "_links": {"next": "/more"}},
+                      "group": {"results": []}}},
+])
+def test_malformed_or_unknown_restriction_is_nobody(env, payload):          # sec3a #5
+    d, _, conn, _ = env
+    _override(conn, "cf-1001/restriction/byOperation/read", payload)
+    e = conn.acl("confluence:cf-1001")                 # an otherwise unrestricted page
+    assert "confluence-restriction-unreadable" in e.model_dump_json()
+    assert not any(A.allows(e, u) for u in d.all())
+
+
+def test_explicitly_empty_restriction_is_unrestricted(env):
+    d, _, conn, _ = env
+    _override(conn, "cf-1001/restriction/byOperation/read",
+              {"restrictions": {"user": {"results": [], "size": 0},
+                                "group": {"results": [], "size": 0}}})
+    assert A.allows(conn.acl("confluence:cf-1001"), d.get("jdoe"))
+
+
+def test_malformed_space_permission_entry_is_nobody(env):
+    d, fake, conn, _ = env
+    good = {"principal": {"type": "group", "id": "grp-eng"},
+            "operation": {"key": "read", "targetType": "space"}}
+    _override(conn, "spaces/sp-1/permissions", {"results": [good, "garbage"], "_links": {}})
+    e = conn.acl("confluence:cf-1001")
+    assert isinstance(e, AclNobody) and not A.allows(e, d.get("jdoe"))
+
+
+def _page_payload(fake, pid, **changes):
+    p = fake._page_json(fake.pages[pid])
+    for k, v in changes.items():
+        if v is _DROP:
+            p.pop(k, None)
+        else:
+            p[k] = v
+    return p
+
+
+_DROP = object()
+
+
+@pytest.mark.parametrize("changes,reason", [
+    ({"status": _DROP}, "source_bad_payload"),
+    ({"status": None}, "source_bad_payload"),
+    ({"status": ""}, "source_bad_payload"),
+    ({"version": _DROP}, "source_bad_payload"),
+    ({"version": {"number": None}}, "source_bad_payload"),
+    ({"version": {"number": "1"}}, "source_bad_payload"),
+    ({"version": {"number": True}}, "source_bad_payload"),
+    ({"version": {"number": 0}}, "source_bad_payload"),
+    ({"version": None}, "source_bad_payload"),
+    ({"id": "cf-2001"}, "source_ambiguous"),
+])
+def test_gate2_incomplete_status_or_version_denies(env, changes, reason):  # sec3a #13
+    d, fake, conn, _ = env
+    _override(conn, "api/v2/pages/cf-1001", lambda r: _page_payload(fake, "cf-1001", **changes))
+    for known in (None, "None", "1"):
+        r = conn.check_access(d.get("jdoe"), "confluence:cf-1001", known_version=known)
+        assert r.verdict == "forbidden" and r.reason_code == reason and not r.allowed
+
+
+def test_missing_status_is_not_current_for_fetch_and_acl(env):
+    _, fake, conn, _ = env
+    _override(conn, "api/v2/pages/cf-1001", lambda r: _page_payload(fake, "cf-1001", status=_DROP))
+    assert conn.fetch("confluence:cf-1001") is None
+    assert isinstance(conn.acl("confluence:cf-1001"), AclNobody)
+
+
+def test_event_user_native_first_and_unresolved_stays_none(env):           # sec3a #10
+    d, _, conn, _ = env
+    assert conn._ib_user(d.get("jdoe").platform_ids["confluence"]) == "jdoe"
+    assert conn._ib_user("acc-nobody") is None
+    assert conn._ib_user("5b10ac8d82e05b22cc7d4ef5") is None
+    assert conn._ib_user("priya.sre") == "priya.sre"
+    assert conn._ib_user("mallory") is None
+
+
+def test_webhook_delivery_id_swap_rejected(env):                            # sec3a #8
+    _, _, conn, _ = env
+    body = json.dumps({"platform": "confluence", "type": "content.changed",
+                       "object_ids": ["cf-1001"], "container": None, "user": None,
+                       "at": "2026-10-13T01:00:00+00:00"}).encode()
+    h = signed_headers(body)
+    conn.parse_webhook(h, body)
+    with pytest.raises(WebhookRejected):
+        conn.parse_webhook(dict(h, **{"X-IB-Delivery": "another"}), body)

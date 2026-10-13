@@ -2,8 +2,10 @@
 # BEFORE text reaches the index, the embeddings, the narrator prompt or an answer.
 #
 # DATA ONLY. Read by apps/internal_brain/databridge_ib/sensitive.py (pure function, no network, no
-# model). If this file is missing the module falls back to built-in rules equal to these; if it is
-# present but malformed, loading FAILS LOUDLY (a silently skipped mask is worse than a crash).
+# model). If this file is missing, or lists no rules, the module falls back to built-in rules equal
+# to these (never zero rules); a built-in kind this file leaves out is appended from the built-ins,
+# so a config edit can never switch a protection off. If it is present but malformed, loading FAILS
+# LOUDLY (a silently skipped mask is worse than a crash).
 #
 # What it is for (and what it is not):
 #   - Format-preserving display masks, so an answer can still say "the card ending 1111":
@@ -18,25 +20,36 @@
 #
 #   version: 1
 #   pack: enterprise
-#   rules:                       evaluated IN ORDER over the ORIGINAL text; a span claimed by an
-#                                earlier rule is never re-examined by a later one (IBAN before PAN)
+#   rules:                       evaluated IN ORDER over a normalised view of the text (same length,
+#                                so offsets point into the original): NBSP / Unicode spaces, tabs,
+#                                newlines and zero-width characters -> " ", Unicode dashes -> "-",
+#                                full-width digits -> ASCII. A span claimed by an earlier rule is
+#                                never re-examined by a later one (IBAN before PAN)
 #     - id: <snake_case>         stable rule id, reported in findings
 #       kind: <word>             pan | iban | card_security_code | sg_nric | ...
-#       pattern: <Python re>     inline flags at the start, e.g. (?i)
+#       pattern: <Python re>     inline flags at the start, e.g. (?i). At most 512 characters, and
+#                                no repetition may contain another repetition or an alternation
+#                                (catastrophic backtracking) - such a rule is rejected at load
 #       group: <int>             optional; mask only this capture group (default: whole match)
 #       separators: <chars>      optional; the match is split into groups on these characters and
-#                                the earliest, longest run of whole groups whose compact length is
-#                                in [min_len, max_len] and that passes `prefix` and `validate` is
-#                                masked (so "4111 1111 1111 1111 12/28" masks just the PAN)
-#       min_len, max_len: <int>  optional; compact length bounds (separators removed)
+#                                scanned left to right: at each group the longest run of whole
+#                                groups whose compact length is in [min_len, max_len] and that
+#                                passes `prefix` and `validate` is masked, then the scan continues
+#                                AFTER it - so "4111 1111 1111 1111 12/28" masks just the PAN and
+#                                two adjacent cards are both masked
+#       min_len, max_len: <int>  optional; compact length bounds (separators removed);
+#                                1 <= min_len <= max_len <= 256 (default 1 / 256)
 #       prefix: <Python re>      optional; must match the START of the compact value (card IIN)
 #       validate: none | luhn | mod97 | nric
 #                                SHAPE IS NOT ENOUGH for cards and IBANs: a Luhn/mod-97 failure is
 #                                left untouched (order ids, timestamps, phone numbers)
 #       mask:
-#         keep_head: <int>       compact characters kept at the start
-#         fill: <text>           the fixed filler (fixed width: it does not leak the length)
-#         keep_tail: <int>       compact characters kept at the end
+#         keep_head: <int>       compact characters kept at the start (>= 0)
+#         fill: <text>           the fixed filler (fixed width: it does not leak the length);
+#                                non-empty, no letters or digits
+#         keep_tail: <int>       compact characters kept at the end (>= 0)
+#                                keep_head + keep_tail must be < an EXPLICIT min_len: a mask that
+#                                could keep the whole value is rejected at load
 #
 # Unknown keys are an error, not a shrug.
 
@@ -46,24 +59,27 @@ pack: enterprise
 rules:
   - id: iban
     kind: iban
-    pattern: '\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}\b'
+    # any case ("gb82 west ..." too); not glued to other letters/digits
+    pattern: '(?i)(?<![A-Z0-9])[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}(?![A-Z0-9])'
     separators: " "
     min_len: 15
     max_len: 34
-    prefix: '^[A-Z]{2}\d{2}'          # the run must start at the country code + check digits
+    prefix: '(?i)^[A-Z]{2}\d{2}'     # the run must start at the country code + check digits
     validate: mod97
     mask: {keep_head: 4, fill: "••••", keep_tail: 4}
 
   - id: pan
     kind: pan
-    # a run of digits with single space/dash separators, not glued to letters, digits or dashes
-    pattern: '(?<![\w-])\d(?:[ -]?\d)+(?![\w-])'
+    # a run of digits with single space/dash separators, not glued to other digits (a label,
+    # underscore, dash, quote or bracket next to it does not hide a card)
+    pattern: '(?<!\d)\d(?:[ -]?\d)+(?!\d)'
     separators: " -"
     min_len: 13
     max_len: 19
-    # issuer identification prefixes: Visa 4, Mastercard 51-55 and 2221-2720, Amex 34/37,
-    # Diners 30/36/38/39, JCB 35, Discover/UnionPay/RuPay 6
-    prefix: '^(?:4|5[1-5]|2[2-7]|3[0456789]|6)'
+    # issuer identification prefixes: Visa 4, Mastercard 51-55 and 2221-2720, Maestro 50 and
+    # 56-59 (and 6x), Amex 34/37, Diners 30/36/38/39, JCB 35, Discover/UnionPay/RuPay 6.
+    # Length + Luhn still apply to every one of them.
+    prefix: '^(?:4|5[0-9]|2[2-7]|3[0456789]|6)'
     validate: luhn
     mask: {keep_head: 6, fill: "••••••", keep_tail: 4}
 
@@ -76,6 +92,9 @@ rules:
 
   - id: sg_nric
     kind: sg_nric
-    pattern: '\b[STFGM]\d{7}[A-Z]\b'
+    # any case; shape only (no checksum): masking a look-alike is the conservative error
+    pattern: '(?i)(?<![A-Z0-9])[STFGM]\d{7}[A-Z](?![A-Z0-9])'
+    min_len: 9
+    max_len: 9
     validate: none
     mask: {keep_head: 0, fill: "•••••", keep_tail: 4}

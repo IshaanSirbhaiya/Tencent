@@ -9,7 +9,7 @@ import pytest
 from databridge_ib import acl as A
 from databridge_ib.connectors._http import DirectoryIndex, extract_links
 from databridge_ib.connectors.base import SourceConnector, WebhookRejected
-from databridge_ib.connectors.slack import SlackConnector
+from databridge_ib.connectors.slack import SlackConnector, version_count, version_ts
 from databridge_ib.models import AclNobody, UserKind
 
 from fixtures_connectors import SECRET, Directory, FakeSlack, client_for, people, signed_headers
@@ -49,7 +49,8 @@ def test_fetch_thread_doc(env):
     msgs = fake.threads[("C0PUB", "1728370000.000100")]
     assert doc.doc_id == PUB and doc.kind == "thread" and doc.platform == "slack"
     assert doc.container == "C0PUB" and doc.container_name == fake.channels["C0PUB"]["name"]
-    assert doc.version == max((m["ts"] for m in msgs), key=float)
+    assert version_ts(doc.version) == max((m["ts"] for m in msgs), key=float)
+    assert version_count(doc.version) == len(msgs)
     assert doc.deep_link == "https://companya.slack.com/archives/C0PUB/p1728370000000100"
     expected_lines = [f"{d.by_platform_id('slack', m['user']).id}: {m['text']}" for m in msgs]
     assert doc.text.splitlines() == expected_lines
@@ -126,7 +127,8 @@ def test_gate2_member_of_private_channel_verified(env):
     d, fake, conn, _ = env
     r = conn.check_access(d.get("priya.sre"), PRIV)
     assert r.verdict == "verified" and r.allowed
-    assert r.current_version == fake.threads[("C0PRIV", "1728370500.000200")][-1]["ts"]
+    assert version_ts(r.current_version) == fake.threads[("C0PRIV", "1728370500.000200")][-1]["ts"]
+    assert r.current_version == conn.fetch(PRIV).version
 
 
 def test_gate2_non_member_private_denied(env):
@@ -200,7 +202,7 @@ def test_gate2_drift_reports_current_version(env):
     old = conn.fetch(PRIV).version
     new_ts = fake.reply("C0PRIV", "1728370500.000200", "jdoe", "update")
     r = conn.check_access(d.get("priya.sre"), PRIV, known_version=old)
-    assert r.verdict == "drift_material" and r.allowed and r.current_version == new_ts
+    assert r.verdict == "drift_material" and r.allowed and version_ts(r.current_version) == new_ts
 
 
 def test_gate2_no_platform_identity_or_inactive(env):
@@ -413,3 +415,154 @@ def test_mock_rate_limit_denies_gate2_but_ingest_waits(mock_env):
         conn.list_changes(None)
     env.admin_post("/admin/ratelimit", {"platform": "slack", "on": False})
     assert conn.check_access(env.directory.get("priya.sre"), PRIV).allowed
+
+
+# ---------------------------------------------------------------- Codex security review r1, track 3
+@pytest.mark.parametrize("flag", ["is_private", "is_ext_shared", "is_im", "is_mpim"])
+def test_missing_classification_flag_is_unsupported_not_public(env, flag):   # sec3a #2
+    d, fake, conn, _ = env
+    fake.channels["C0PUB"].pop(flag)
+    e = conn.acl(PUB)
+    assert isinstance(e, AclNobody)
+    assert not any(A.allows(e, u) for u in d.all())
+    r = conn.check_access(d.get("leo.ops"), PUB)
+    assert r.verdict == "forbidden" and not r.allowed
+    assert conn.fetch(PUB) is None
+    assert not any(x.doc_id.startswith("slack:C0PUB:") for x in conn.list_changes(None).docs)
+
+
+def test_non_boolean_classification_flag_is_unsupported(env):
+    d, fake, conn, _ = env
+    fake.channels["C0PUB"]["is_private"] = "false"
+    assert isinstance(conn.acl(PUB), AclNobody)
+    assert not conn.check_access(d.get("leo.ops"), PUB).allowed
+
+
+@pytest.mark.parametrize("flag", ["deleted", "is_restricted", "is_ultra_restricted", "is_stranger"])
+def test_gate2_missing_user_flag_denies(env, flag):                          # sec3a #2
+    d, fake, conn, _ = env
+    fake.users[d.get("leo.ops").platform_ids["slack"]].pop(flag)
+    r = conn.check_access(d.get("leo.ops"), PUB)
+    assert r.verdict == "forbidden" and r.reason_code == "source_bad_payload" and not r.allowed
+
+
+def test_gate2_empty_user_object_denies(env):
+    d, fake, conn, _ = env
+    native = d.get("leo.ops").platform_ids["slack"]
+    fake.users[native] = {}
+    assert not conn.check_access(d.get("leo.ops"), PUB).allowed
+
+
+def test_gate2_users_info_about_someone_else_denies(env):
+    d, fake, conn, _ = env
+    native = d.get("leo.ops").platform_ids["slack"]
+    fake.users[native] = dict(fake.users[native], id="U0SOMEONEELSE")
+    r = conn.check_access(d.get("leo.ops"), PUB)
+    assert r.verdict == "forbidden" and r.reason_code == "source_ambiguous"
+
+
+@pytest.mark.parametrize("flag", ["is_mpim", "is_im"])
+def test_dm_flags_win_over_private_and_shared(env, flag):                   # sec3a #3
+    d, fake, conn, _ = env
+    fake.channels["C0PRIV"][flag] = True                    # a private-flagged group DM
+    assert fake.channels["C0PRIV"]["is_private"] is True
+    e = conn.acl(PRIV)
+    assert isinstance(e, AclNobody) and not A.allows(e, d.get("priya.sre"))
+    r = conn.check_access(d.get("priya.sre"), PRIV)
+    assert r.verdict == "forbidden" and r.reason_code == "unsupported_dm"
+    assert conn.fetch(PRIV) is None
+    fake.channels["C0VEND"][flag] = True                    # and a shared one
+    assert conn.check_access(d.get("ken.ext"), VEND).reason_code == "unsupported_dm"
+    assert not any(x.doc_id.startswith(("slack:C0PRIV:", "slack:C0VEND:"))
+                   for x in conn.list_changes(None).docs)
+
+
+def test_deleting_a_middle_reply_changes_the_version(env):                  # sec3a #6
+    d, fake, conn, _ = env
+    key = ("C0PUB", "1728370000.000100")
+    fake.reply(*key, "jdoe", "third, newest")
+    b1 = conn.list_changes(None)
+    v1 = conn.fetch(PUB).version
+    deleted_text = fake.threads[key][1]["text"]
+    del fake.threads[key][1]                                # B goes; C is still the newest
+    v2 = conn.fetch(PUB).version
+    assert version_ts(v2) == version_ts(v1) and v2 != v1
+    r = conn.check_access(d.get("jdoe"), PUB, known_version=v1)
+    assert r.verdict == "drift_material" and r.current_version == v2
+    b2 = conn.list_changes(b1.cursor)                       # crawl sees reply_count drop
+    [doc] = [x for x in b2.docs if x.doc_id == PUB]
+    assert doc.version == v2 and deleted_text not in doc.text
+
+
+def test_editing_an_older_reply_changes_the_version(env):                   # sec3a #6
+    d, fake, conn, _ = env
+    key = ("C0PUB", "1728370000.000100")
+    fake.reply(*key, "jdoe", "newest")
+    v1 = conn.fetch(PUB).version
+    fake.threads[key][0]["text"] = "rewritten parent"        # no new ts anywhere
+    r = conn.check_access(d.get("jdoe"), PUB, known_version=v1)
+    assert r.verdict == "drift_material" and r.current_version != v1
+
+
+def test_unchanged_thread_keeps_its_version(env):
+    _, _, conn, _ = env
+    assert conn.fetch(PUB).version == conn.fetch(PUB).version
+
+
+def test_pagination_cap_denies_gate2_and_fails_ingest(env, monkeypatch):   # sec3a #12
+    from databridge_ib.connectors import _http
+    from databridge_ib.connectors.base import ConnectorError
+    d, fake, conn, _ = env
+    fake.add_thread("C0PRIV", "1728370900.000100", [("priya.sre", "a"), ("jdoe", "b"),
+                                                    ("priya.sre", "c")])        # 2 pages of replies
+    monkeypatch.setattr(_http, "MAX_PAGES", 1)
+    r = conn.check_access(d.get("priya.sre"), "slack:C0PRIV:1728370900.000100")
+    assert r.verdict == "forbidden" and r.reason_code == "source_incomplete"
+    with pytest.raises(ConnectorError):
+        conn.list_changes(None)
+
+
+def test_repeating_cursor_is_rejected(env):
+    from databridge_ib.connectors.base import ConnectorError
+    d, fake, conn, _ = env
+    inner = conn.client._transport.handler                   # wrap the fake: members loop forever
+    import httpx
+
+    def looping(request):
+        if request.url.path.endswith("conversations.members"):
+            return httpx.Response(200, json={"ok": True, "members": [],
+                                             "response_metadata": {"next_cursor": "same"}})
+        return inner(request)
+
+    conn.client._transport.handler = looping
+    r = conn.check_access(d.get("priya.sre"), PRIV)
+    assert r.verdict == "forbidden" and r.reason_code == "source_incomplete"
+    with pytest.raises(ConnectorError):
+        conn.acl(PRIV)
+
+
+def test_event_user_resolves_native_first_and_never_guesses(env):          # sec3a #10
+    from fixtures_connectors import user
+    d, fake, conn, _ = env
+    jdoe_native = d.get("jdoe").platform_ids["slack"]
+    # an unrelated IB user whose id equals jdoe's NATIVE Slack id
+    d2 = Directory(people() + [user(jdoe_native, slack="U0OTHER")])
+    assert d2.get(jdoe_native) is not None and d2.get(jdoe_native).id != "jdoe"
+    conn2 = SlackConnector(conn.client, d2, SECRET)
+    assert conn2._ib_user(jdoe_native) == "jdoe"            # native mapping wins
+    assert conn2._ib_user("U0NOBODY") is None                # native-shaped, unmapped: unresolved
+    assert conn2._ib_user("jdoe") == "jdoe"                  # a known IB id
+    assert conn2._ib_user("mallory") is None                 # unknown: not passed through
+    body = _body(type="membership.changed", container="C0PRIV", user="U0NOBODY")
+    [ev] = conn2.parse_webhook(signed_headers(body), body)
+    assert ev.user is None
+
+
+def test_webhook_delivery_id_is_inside_the_signature(env):                  # sec3a #8
+    _, _, conn, _ = env
+    body = _body(object_ids=["C0PUB:1728370000.000100"])
+    h = signed_headers(body)
+    conn.parse_webhook(h, body)
+    swapped = dict(h, **{"X-IB-Delivery": "a-fresh-id"})     # same signature, new delivery id
+    with pytest.raises(WebhookRejected, match="bad signature"):
+        conn.parse_webhook(swapped, body)

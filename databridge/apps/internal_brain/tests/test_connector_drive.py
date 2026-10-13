@@ -393,12 +393,13 @@ def test_webhook_acl_folder_expands_to_descendant_files(env):
     assert ev.container == "0ACo"
 
 
-def test_webhook_expansion_failure_keeps_raw_id(env):
+def test_webhook_expansion_failure_invalidates_the_container(env):         # sec3b #15
     _, fake, conn, _ = env
     fake.error.add("get")
     body = _body(type="acl.changed", object_ids=["fd-3"], container="0ACo")
     [ev] = conn.parse_webhook(signed_headers(body), body)
-    assert ev.object_ids == ("drive:fd-3",) and ev.container == "0ACo"   # never drop an invalidation
+    # never a meaningless "drive:fd-3" doc id; the whole shared drive is re-evaluated instead
+    assert ev.object_ids == () and ev.container == "0ACo"
 
 
 def test_webhook_user_event(env):
@@ -512,3 +513,103 @@ def test_mock_edit_drift_and_429(mock_env):
     env.admin_post("/admin/ratelimit", {"platform": "drive", "on": True})
     r = conn.check_access(d.get("jdoe"), "drive:df-1")
     assert r.verdict == "forbidden" and r.reason_code == "source_rate_limited"
+
+
+# ---------------------------------------------------------------- Codex security review r1, track 3
+def _wrap_perms(conn, fid, mutate):
+    import httpx
+    inner = conn.client._transport.handler
+
+    def handler(request):
+        resp = inner(request)
+        if request.url.path.endswith(f"files/{fid}/permissions") and resp.status_code == 200:
+            data = resp.json()
+            mutate(data)
+            return httpx.Response(200, json=data)
+        return resp
+
+    conn.client._transport.handler = handler
+
+
+@pytest.mark.parametrize("bad", [
+    "garbage", None, 7, ["user"],
+    {"type": "user", "role": "reader"},                                  # user grant, no email
+    {"type": "user", "role": "reader", "emailAddress": ""},
+    {"type": "group", "role": "reader", "emailAddress": None},
+    {"type": "domain", "role": "reader"},                                # domain grant, no domain
+    {"type": "user", "role": "reader", "emailAddress": "x@companya.example", "deleted": "no"},
+])
+def test_malformed_permission_entry_makes_the_whole_file_nobody(env, bad):  # sec3b #5
+    d, fake, conn, _ = env
+    assert conn.check_access(d.get("jdoe"), "drive:df-1").allowed          # baseline: readable
+    _wrap_perms(conn, "df-1", lambda data: data["permissions"].append(bad))
+    e = conn.acl("drive:df-1")
+    assert isinstance(e, AclNobody) and e.reason == "drive-malformed-permission"
+    r = conn.check_access(d.get("jdoe"), "drive:df-1")
+    assert r.verdict == "forbidden" and r.reason_code == "unsupported_acl"
+
+
+def test_permission_listing_cycle_or_cap_is_never_partial(env, monkeypatch):  # sec3b #6
+    from databridge_ib.connectors import _http
+    d, fake, conn, _ = env
+
+    def loop(data):
+        data["nextPageToken"] = "1"                          # the same token forever
+
+    _wrap_perms(conn, "df-1", loop)
+    r = conn.check_access(d.get("jdoe"), "drive:df-1")
+    assert r.verdict == "forbidden" and r.reason_code == "source_incomplete"
+    with pytest.raises(ConnectorError):
+        conn.acl("drive:df-1")
+    conn2 = DriveConnector(conn.client, d, SECRET, page_size=1)
+    monkeypatch.setattr(_http, "MAX_PAGES", 1)
+    with pytest.raises(ConnectorError):
+        conn2.list_changes(None)
+
+
+def test_gate2_uses_the_directorys_current_group_membership(env):          # sec3b #2
+    d, fake, conn, _ = env
+    stale = d.get("jdoe")                                    # principal built before the change
+    assert "grp-eng" in stale.groups and conn.check_access(stale, "drive:df-1").allowed
+    d._users["jdoe"] = stale.model_copy(update={"groups": ()})   # directory reloaded: removed
+    r = conn.check_access(stale, "drive:df-1")
+    assert r.verdict == "forbidden" and r.reason_code == "not_permitted"
+    d._users.pop("jdoe")
+    assert conn.check_access(stale, "drive:df-1").reason_code == "unknown_user"
+
+
+def test_gate2_deactivated_or_remapped_in_the_directory_denies(env):
+    d, _, conn, _ = env
+    stale = d.get("jdoe")
+    d._users["jdoe"] = stale.model_copy(update={"active": False})
+    assert conn.check_access(stale, "drive:df-1").reason_code == "deactivated"
+    d._users["jdoe"] = stale.model_copy(update={"platform_ids": {"drive": "other@companya.example"}})
+    assert conn.check_access(stale, "drive:df-1").reason_code == "identity_changed"
+
+
+def test_expansion_failure_without_payload_container_uses_the_known_tree(env):  # sec3b #15
+    _, fake, conn, _ = env
+    conn.list_changes(None)                                  # learn the tree
+    fake.error.add("get")
+    body = _body(type="acl.changed", object_ids=["fd-3"])
+    [ev] = conn.parse_webhook(signed_headers(body), body)
+    assert ev.object_ids == () and ev.container == "0ACo"
+    body = _body(type="acl.changed", object_ids=["fd-unknown"])
+    evs = conn.parse_webhook(signed_headers(body), body)     # unknown folder: every known drive
+    assert {e.container for e in evs} == {"0ACo", "0AEng"} and all(e.object_ids == () for e in evs)
+
+
+def test_expansion_failure_with_nothing_known_raises(env):
+    _, fake, conn, _ = env
+    fake.error.add("get")
+    body = _body(type="acl.changed", object_ids=["fd-3"])
+    with pytest.raises(ConnectorError):
+        conn.parse_webhook(signed_headers(body), body)
+
+
+def test_event_user_native_first_and_unresolved_stays_none(env):           # sec3b #13
+    d, _, conn, _ = env
+    assert conn._ib_user(d.get("jdoe").platform_ids["drive"]) == "jdoe"
+    assert conn._ib_user("stranger@elsewhere.example") is None
+    assert conn._ib_user("jdoe") == "jdoe"
+    assert conn._ib_user("mallory") is None

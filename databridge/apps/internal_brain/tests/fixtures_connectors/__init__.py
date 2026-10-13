@@ -63,8 +63,9 @@ def people() -> list[DirectoryUser]:
 def signed_headers(body: bytes, *, secret: str = SECRET, ts: Optional[int] = None,
                    delivery: Optional[str] = None) -> dict[str, str]:
     ts = int(time.time()) if ts is None else ts
-    return {"X-IB-Delivery": delivery or str(uuid.uuid4()), "X-IB-Timestamp": str(ts),
-            "X-IB-Signature": sign_webhook(secret, ts, body)}
+    delivery = delivery or str(uuid.uuid4())
+    return {"X-IB-Delivery": delivery, "X-IB-Timestamp": str(ts),
+            "X-IB-Signature": sign_webhook(secret, ts, delivery, body)}
 
 
 class _Faults:
@@ -126,6 +127,9 @@ class FakeSlack(_Faults):
             "C0OLD": {"id": "C0OLD", "name": "old-incidents", "is_private": True, "is_ext_shared": False,
                       "is_archived": True, "members": [nat("priya.sre")]},
         }
+        for ch in self.channels.values():          # real Slack always sends the DM flags too
+            ch.setdefault("is_im", False)
+            ch.setdefault("is_mpim", False)
         self.threads: dict[tuple[str, str], list[dict[str, Any]]] = {}
         self.add_thread("C0PUB", "1728370000.000100", [
             ("jdoe", "Migration status: cutover planned, see PAY-201 and "
@@ -217,6 +221,7 @@ class FakeSlack(_Faults):
 # --------------------------------------------------------------------------------------------
 class FakeConfluence(_Faults):
     PAGE = 2
+    ANC_PAGE = 200                      # ancestors page size (a test drops it to 1 to force paging)
 
     def __init__(self, directory: Directory):
         super().__init__()
@@ -356,8 +361,9 @@ class FakeConfluence(_Faults):
             pid = parts[3]
             if pid not in self.pages:
                 return httpx.Response(404, json={})
-            return httpx.Response(200, json={"results": [{"id": a, "type": "page"}
-                                                         for a in self._ancestors(pid)]})
+            return httpx.Response(200, json=self._v2([{"id": a, "type": "page"}
+                                                      for a in self._ancestors(pid)],
+                                                     cursor, self.ANC_PAGE, sub))
         if name == "restriction":
             pid = parts[3]
             if pid not in self.pages:

@@ -41,8 +41,20 @@ def test_sign_matches_contract_formula():
     import hashlib
     import hmac
     body = b'{"a":1}'
-    assert sign("k", "123", body) == "sha256=" + hmac.new(b"k", b'123.{"a":1}',
-                                                          hashlib.sha256).hexdigest()
+    assert sign("k", "123", "d-1", body) == "sha256=" + hmac.new(b"k", b'123.d-1.{"a":1}',
+                                                                 hashlib.sha256).hexdigest()
+
+
+def test_signature_binds_the_delivery_id():
+    """Codex sec3 #8/#11: a captured delivery replayed under a NEW delivery id must not verify."""
+    emitter = WebhookEmitter(SECRET)
+    rec = emitter.emit("jira", "content.changed", ["PAY-1"], at="2026-10-13T00:00:00Z")
+    headers, body = rec["headers"], rec["body"]
+    assert verify_signature(headers, body)
+    swapped = {**headers, "X-IB-Delivery": str(uuid.uuid4())}
+    assert not verify_signature(swapped, body)
+    assert sign(SECRET, headers["X-IB-Timestamp"], swapped["X-IB-Delivery"], body) != \
+        headers["X-IB-Signature"]
 
 
 def test_slack_member_remove_and_add(client, svc, admin, sink):

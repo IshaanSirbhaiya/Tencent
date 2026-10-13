@@ -22,8 +22,14 @@ Fail-closed rules:
   branch — inside ``any`` it never grants;
 * an unreadable role, a security level that cannot be read or has no members, or an issue that is
   gone compiles the whole issue to ``nobody``;
-* comment / worklog visibility restrictions are not modelled (comments are indexed with the issue);
-  the generator does not emit them — documented unsupported subset.
+* comment visibility restrictions (``comment.visibility`` = role / group) are NOT modelled, so a
+  restricted comment is DROPPED from the indexed text — it never inherits the issue's broader ACL
+  (Codex sec3b #1; documented unsupported subset: restricted comments are not answerable);
+  worklogs are not indexed at all;
+* the ``security`` field: an explicit ``null`` means "no level"; a field that was requested but is
+  ABSENT, or is not ``{"id": …}``, is unreadable → ``nobody`` (sec3b #4);
+* every paged listing (JQL search, level members) is read to the end or raises — never a partial
+  policy (sec3b #6 pattern).
 
 Gate 2 calls ``POST permissions/check`` with the ADMIN client (``accountId`` + ``BROWSE_PROJECTS``
 for the issue id; real Jira requires Administer Jira, and honours security levels) — one attempt,
@@ -48,12 +54,16 @@ import httpx
 
 from .. import acl as A
 from ..models import AccessCheck, AclExpr, ChangeBatch, ChangeEvent, DirectoryUser, SourceDoc
-from ._http import (DirectorySource, SourceFailure, WebhookVerifier, event_time, extract_links,
-                    json_of, native_to_ib, now_utc, parse_iso, parse_webhook_body, request_gate2,
-                    request_ingest, resolve_directory)
+from ._http import (DirectorySource, PageGuard, SourceFailure, WebhookVerifier, event_time,
+                    event_user, extract_links, json_of, native_to_ib, now_utc, parse_iso,
+                    parse_webhook_body, request_gate2, request_ingest, resolve_directory)
 from .base import ConnectorError, WebhookRejected
 
 PLATFORM = "jira"
+#: the ``security`` field was requested but is absent or malformed (≠ explicit null): fail closed
+SEC_UNREADABLE = "!unreadable"
+#: Atlassian account ids (24-hex, "<n>:<uuid>") and the synthetic world's "acc-…" form
+_NATIVE_ACCOUNT = re.compile(r"^(?:[0-9a-f]{24}|\d+:[0-9a-f-]{36}|acc-[A-Za-z0-9._-]+)$")
 BROWSE = "BROWSE_PROJECTS"
 CURSOR_VERSION = 1
 OVERLAP = timedelta(minutes=2)
@@ -170,7 +180,9 @@ class JiraConnector:
     def _search(self, jql: str, fields: str) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         token = ""
-        for _ in range(10_000):
+        guard = PageGuard("jira search/jql")
+        while True:
+            guard.next_page(token)                  # cap / token cycle ⇒ ConnectorError
             params: dict[str, Any] = {"jql": jql, "fields": fields, "maxResults": self.page_size}
             if token:
                 params["nextPageToken"] = token
@@ -229,6 +241,8 @@ class JiraConnector:
         for c in comments or []:
             if not isinstance(c, dict):
                 continue
+            if c.get("visibility") is not None:         # role/group-restricted comment: never
+                continue                                # indexed under the issue's ACL (sec3b #1)
             acc = _acc(c.get("author"))
             who = native_to_ib(d, PLATFORM, acc) or acc or "unknown"
             body = adf_to_text(c.get("body")).replace("\n", " ")
@@ -326,7 +340,9 @@ class JiraConnector:
     def _level_policy(self, level_id: str, project: str) -> Optional[dict[str, Any]]:
         holders: list[Any] = []
         start = 0
-        for _ in range(10_000):
+        guard = PageGuard("jira issuesecurityschemes/level/member")
+        while True:
+            guard.next_page(start or "")            # cap / offset cycle ⇒ ConnectorError
             data = self._get("issuesecurityschemes/level/member",
                              {"levelId": level_id, "startAt": start, "maxResults": 50}, allow_404=True)
             if not isinstance(data, dict):
@@ -367,6 +383,8 @@ class JiraConnector:
         if project_pol is None:
             return A.nobody("jira-permission-scheme-unreadable")
         parts = [self._branch(project_pol, reporter, assignee, "browse")]
+        if level_id == SEC_UNREADABLE:
+            return A.nobody("jira-security-field-unreadable")
         if level_id is not None:
             if level_pol is None:
                 return A.nobody("jira-security-level-unreadable")
@@ -374,12 +392,28 @@ class JiraConnector:
         return A.all_of(*parts)
 
     @staticmethod
-    def _meta(issue: Mapping[str, Any]) -> dict[str, Any]:
-        f = issue.get("fields") or {}
-        sec = f.get("security")
+    def _level_of(f: Mapping[str, Any]) -> Optional[str]:
+        """The security level id; ``None`` ONLY for an explicit ``"security": null``. Every caller
+        requests the field (``LIST_FIELDS`` / ``*all``), so an absent or malformed value is
+        ``SEC_UNREADABLE`` → nobody (sec3b #4)."""
+        if "security" not in f:
+            return SEC_UNREADABLE
+        sec = f["security"]
+        if sec is None:
+            return None
+        if isinstance(sec, dict) and isinstance(sec.get("id"), (str, int)) \
+                and not isinstance(sec.get("id"), bool) and str(sec["id"]) \
+                and str(sec["id"]) != SEC_UNREADABLE:
+            return str(sec["id"])
+        return SEC_UNREADABLE
+
+    @classmethod
+    def _meta(cls, issue: Mapping[str, Any]) -> dict[str, Any]:
+        f = issue.get("fields")
+        f = f if isinstance(f, dict) else {}
         return {"id": str(issue.get("id") or ""), "u": str(f.get("updated") or ""),
                 "p": str((f.get("project") or {}).get("key") or str(issue["key"]).rsplit("-", 1)[0]),
-                "l": str(sec["id"]) if isinstance(sec, dict) and sec.get("id") is not None else None,
+                "l": cls._level_of(f),
                 "r": _acc(f.get("reporter")), "a": _acc(f.get("assignee"))}
 
     def acl(self, doc_id: str) -> AclExpr:
@@ -390,7 +424,8 @@ class JiraConnector:
         if issue is None or str(issue.get("key")) != key:
             return A.nobody("jira-issue-gone")
         m = self._meta(issue)
-        level_pol = self._level_policy(m["l"], m["p"]) if m["l"] is not None else None
+        level_pol = (self._level_policy(m["l"], m["p"])
+                     if m["l"] not in (None, SEC_UNREADABLE) else None)
         return self._compile(self._project_policy(m["p"]), m["l"], level_pol, m["r"], m["a"])
 
     # ---------------------------------------------------------------------------------------
@@ -510,7 +545,8 @@ class JiraConnector:
         for p in sorted({m["p"] for m in issues.values()}):
             project_fp[p] = _fp(self._project_policy(p))
         level_fp: dict[str, str] = {}
-        for p, l in sorted({(m["p"], m["l"]) for m in issues.values() if m["l"] is not None}):
+        for p, l in sorted({(m["p"], m["l"]) for m in issues.values()
+                            if m["l"] not in (None, SEC_UNREADABLE)}):
             level_fp[f"{p}:{l}"] = _fp(self._level_policy(l, p))
         new_acl: dict[str, str] = {}
         acl_changed: list[str] = []
@@ -534,12 +570,9 @@ class JiraConnector:
     # webhooks
     # ---------------------------------------------------------------------------------------
     def _ib_user(self, raw: Optional[str]) -> Optional[str]:
-        if not raw:
-            return None
-        d = self.directory
-        if d.get(raw) is not None:
-            return raw
-        return native_to_ib(d, PLATFORM, raw) or raw
+        """Native account id via the directory FIRST; an unmapped account-id-shaped value is
+        unresolved (None); an IB id is accepted only if the directory knows it (sec3b #13)."""
+        return event_user(self.directory, PLATFORM, raw, lambda v: bool(_NATIVE_ACCOUNT.match(v)))
 
     def parse_webhook(self, headers: Mapping[str, str], body: bytes) -> Sequence[ChangeEvent]:
         delivery, ts = self._verifier.verify(headers, body)

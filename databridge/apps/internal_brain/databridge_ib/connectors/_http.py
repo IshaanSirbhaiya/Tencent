@@ -7,8 +7,15 @@ Two HTTP disciplines, deliberately different:
 * **Gate 2** (``request_gate2``): exactly ONE attempt with a hard timeout. Any failure surfaces as
   ``SourceFailure`` so the caller can deny with a reason code. Gate 2 never waits out a rate limit.
 
-Webhooks follow CONTRACTS §2: ``X-IB-Signature: sha256=<hex HMAC-SHA256(secret, f"{ts}.{body}")>``,
-``X-IB-Timestamp`` within ±300 s, ``X-IB-Delivery`` never seen before.
+Webhooks: ``X-IB-Signature: sha256=<hex HMAC-SHA256(secret, f"{ts}.{delivery}.{body}")>`` — the
+delivery id is INSIDE the MAC (Codex sec3 #8/#11: otherwise one captured delivery could be replayed
+under fresh ids) — ``X-IB-Timestamp`` within ±300 s, ``X-IB-Delivery`` never seen before. The
+replay set is in-process: a second worker or a restart can accept the same delivery once more inside
+the window (documented in SECURITY.md; events only invalidate, so a replay costs work, not access).
+
+Pagination: every paged loop goes through ``PageGuard`` — a page cap or a repeated cursor raises
+(``ConnectorError`` on ingest, ``SourceFailure("source_incomplete")`` at Gate 2): a partial listing is
+never returned as if it were complete (Codex sec3a #12, sec3b #6).
 """
 from __future__ import annotations
 
@@ -60,6 +67,57 @@ def native_to_ib(directory: DirectoryIndex, platform: str, native_id: Optional[s
         return None
     u = directory.by_platform_id(platform, native_id)
     return u.id if u else None
+
+
+def event_user(directory: DirectoryIndex, platform: str, raw: Optional[str],
+               looks_native: Callable[[str], bool]) -> Optional[str]:
+    """The IB user an event's ``user`` field names (Codex sec3a #10, sec3b #13).
+
+    1. a NATIVE id the directory maps for ``platform`` wins (so native "123" → Alice even when an
+       unrelated IB user is literally called "123");
+    2. a value in the platform's native id format that the directory does NOT map is unresolved
+       (``None``) — never reinterpreted as an IB id;
+    3. otherwise it is accepted as an IB id only if the directory knows it; anything else is ``None``.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    hit = native_to_ib(directory, platform, raw)
+    if hit:
+        return hit
+    if looks_native(raw):
+        return None
+    return raw if directory.get(raw) is not None else None
+
+
+MAX_PAGES = 10_000
+
+
+class PageGuard:
+    """Bounds a cursor loop: ``next_page(cursor)`` before each request after the first. Raises when
+    the cap is hit with pages remaining or a cursor repeats (a cycle) — never a silent partial."""
+
+    def __init__(self, what: str, *, gate2: bool = False, max_pages: Optional[int] = None):
+        self.what = what
+        self.gate2 = gate2
+        self.max_pages = max_pages if max_pages is not None else MAX_PAGES
+        self.pages = 0
+        self._seen: set[str] = set()
+
+    def _fail(self, why: str) -> Exception:
+        if self.gate2:
+            return SourceFailure("source_incomplete", detail=f"{self.what}: {why}")
+        return ConnectorError(f"{self.what}: {why} — listing incomplete")
+
+    def next_page(self, cursor: Any) -> None:
+        """Account for one more request (with ``cursor``; '' for the first)."""
+        self.pages += 1
+        if self.pages > self.max_pages:
+            raise self._fail(f"more than {self.max_pages} pages")
+        key = str(cursor or "")
+        if key:
+            if key in self._seen:
+                raise self._fail("pagination cursor repeated")
+            self._seen.add(key)
 
 
 # --------------------------------------------------------------------------------------------
@@ -143,9 +201,10 @@ def json_of(resp: httpx.Response, *, gate2: bool = False) -> Any:
 # --------------------------------------------------------------------------------------------
 # Webhooks
 # --------------------------------------------------------------------------------------------
-def sign_webhook(secret: str, timestamp: Union[int, str], body: bytes) -> str:
-    """``sha256=<hex>`` exactly as the mock signs it (also used by tests)."""
-    msg = str(timestamp).encode() + b"." + body
+def sign_webhook(secret: str, timestamp: Union[int, str], delivery_id: str, body: bytes) -> str:
+    """``sha256=<hex>`` over ``f"{timestamp}.{delivery_id}.{body}"``, exactly as the mock signs it
+    (also used by tests). The delivery id is authenticated, so it cannot be swapped on a replay."""
+    msg = str(timestamp).encode() + b"." + str(delivery_id).encode() + b"." + body
     return "sha256=" + hmac.new(secret.encode(), msg, hashlib.sha256).hexdigest()
 
 
@@ -158,8 +217,10 @@ def _header(headers: Mapping[str, str], name: str) -> str:
 
 
 class WebhookVerifier:
-    """Signature + ±300 s window + replayed-delivery set. Thread-safe; replay memory is bounded to
-    ids whose timestamps are still inside the window (older ones fail the window check anyway)."""
+    """Signature (over timestamp + delivery id + body) + ±300 s window + replayed-delivery set.
+    Thread-safe; replay memory is bounded to ids whose timestamps are still inside the window
+    (older ones fail the window check anyway). The set is PER PROCESS: multi-worker / restart replay
+    inside the window is a documented limitation (SECURITY.md, track 3 disposition)."""
 
     def __init__(self, secret: str, *, window_s: int = WEBHOOK_WINDOW_S,
                  now: Callable[[], float] = time.time):
@@ -181,7 +242,7 @@ class WebhookVerifier:
             ts = int(ts_raw)
         except ValueError as exc:
             raise WebhookRejected("bad timestamp") from exc
-        expected = sign_webhook(self._secret, ts_raw, body)
+        expected = sign_webhook(self._secret, ts_raw, delivery, body)
         if not hmac.compare_digest(expected.encode(), sig.encode()):
             raise WebhookRejected("bad signature")
         now = self._now()

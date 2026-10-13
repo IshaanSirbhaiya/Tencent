@@ -11,7 +11,20 @@ Permission semantics compiled into ``AclExpr`` (restrictions only ever NARROW)::
 
 * anonymous space access, or any space-read principal that is not a user or group → ``nobody``;
 * a page that is not ``current`` (trashed / archived / draft) → ``fetch`` returns None, ``acl`` is
-  ``nobody``, Gate 2 says ``vanished``.
+  ``nobody``, Gate 2 says ``vanished``; a page with NO status is not assumed current (Codex sec3a #13);
+* ancestors are paged to the end (a page cap or a repeated cursor raises ``ConnectorError``); a
+  malformed ancestors payload, or an ancestor that is not a ``page`` → ``nobody`` (sec3a #4, #5);
+* a restriction payload must carry ``restrictions.user.results`` and ``restrictions.group.results``
+  lists of well-formed entries of a known principal type, and must not be truncated; ``{}``, a
+  missing key, an unknown principal type or a malformed entry → ``nobody`` — only an EXPLICITLY
+  empty restriction means "unrestricted" (sec3a #5).
+
+Gate 2 also requires the page id it asked about, ``status == "current"`` stated explicitly and an
+integer ``version.number`` ≥ 1; anything else denies (sec3a #13).
+
+Native groups: ``group_resolver`` maps a Confluence group (id, else name) to an IB group id; the
+default is the identity because the synthetic world shares one group namespace. A real deployment
+must inject a tenant-scoped mapping (documented: SECURITY.md track 3, sec3a #7).
 
 Gate 2 calls ``POST rest/api/content/{id}/permission/check`` with the ADMIN client (real Confluence
 requires an admin caller — the documented super-reader trade-off), one attempt, 2 s timeout.
@@ -29,12 +42,21 @@ import httpx
 
 from .. import acl as A
 from ..models import AccessCheck, AclExpr, AclNobody, ChangeBatch, ChangeEvent, DirectoryUser, SourceDoc
-from ._http import (DirectorySource, SourceFailure, WebhookVerifier, event_time, extract_links,
-                    json_of, native_to_ib, now_utc, parse_iso, parse_webhook_body, request_gate2,
-                    request_ingest, resolve_directory)
+from ._http import (DirectorySource, PageGuard, SourceFailure, WebhookVerifier, event_time,
+                    event_user, extract_links, json_of, native_to_ib, now_utc, parse_iso,
+                    parse_webhook_body, request_gate2, request_ingest, resolve_directory)
 from .base import ConnectorError, WebhookRejected
 
 PLATFORM = "confluence"
+#: Atlassian account ids (24-hex, "<n>:<uuid>") and the synthetic world's "acc-…" form: such a
+#: value in an event is never read as an IB user id
+_NATIVE_ACCOUNT = re.compile(r"^(?:[0-9a-f]{24}|\d+:[0-9a-f-]{36}|acc-[A-Za-z0-9._-]+)$")
+_USER_TYPES = (None, "known", "user")
+_GROUP_TYPES = (None, "group")
+
+
+class _Malformed(ConnectorError):
+    """A permission structure Confluence returned that cannot be read with confidence."""
 _PAGE_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 CURSOR_VERSION = 1
 _BLOCK = re.compile(r"</?(p|div|br|li|ul|ol|h[1-6]|tr|table|pre|blockquote)\b[^>]*>", re.I)
@@ -114,13 +136,29 @@ class ConfluenceConnector:
             return None
         return json_of(resp)
 
-    def _paged(self, path: str, params: Optional[dict[str, Any]] = None) -> list[Any]:
+    def _paged(self, path: str, params: Optional[dict[str, Any]] = None, *,
+               allow_404: bool = False) -> Optional[list[Any]]:
+        """Every result across all pages. A page cap / repeated cursor raises ``ConnectorError``;
+        a page that is not ``{"results": [...]}`` (or a list) raises ``_Malformed``; a 404 on the
+        first page returns None when ``allow_404``."""
         out: list[Any] = []
         cursor = ""
-        for _ in range(10_000):
+        guard = PageGuard(f"confluence {path}")
+        while True:
+            guard.next_page(cursor)
             p = dict(params or {}, **({"cursor": cursor} if cursor else {}))
-            data = self._get(path, p)
-            out.extend(_results(data))
+            data = self._get(path, p, allow_404=allow_404)
+            if data is None:
+                if not out and guard.pages == 1:
+                    return None
+                raise ConnectorError(f"confluence {path}: vanished while paging")
+            if isinstance(data, list):
+                page = data
+            elif isinstance(data, dict) and isinstance(data.get("results"), list):
+                page = data["results"]
+            else:
+                raise _Malformed(f"confluence {path}: unexpected page shape")
+            out.extend(page)
             cursor = _next_cursor(data)
             if not cursor:
                 break
@@ -169,7 +207,7 @@ class ConfluenceConnector:
         if not pid:
             return None
         page = self._page(pid)
-        if not page or page.get("status", "current") != "current":
+        if not page or page.get("status") != "current":
             return None                                     # trashed / archived / draft → VANISHED
         space = self._space(page.get("spaceId"))
         if space is None:
@@ -181,15 +219,25 @@ class ConfluenceConnector:
     # ---------------------------------------------------------------------------------------
     def _space_grant(self, space: Mapping[str, Any]) -> tuple[AclExpr, Any]:
         """(expression, fingerprint) for the space read permission."""
-        perms = self._paged(f"api/v2/spaces/{space['id']}/permissions")
+        try:
+            perms = self._paged(f"api/v2/spaces/{space['id']}/permissions", allow_404=True)
+        except _Malformed:
+            perms = None
+        if perms is None:
+            return (A.nobody("confluence-space-permissions-unreadable"),
+                    {"unreadable": True, "space": str(space.get("id"))})
         users, groups, unsupported = set(), set(), []
         for p in perms:
-            if not isinstance(p, dict):
+            if not isinstance(p, dict) or not isinstance(p.get("operation"), dict):
+                unsupported.append("malformed-entry")
                 continue
-            op = p.get("operation") or {}
+            op = p["operation"]
             if op.get("key") != "read" or op.get("targetType", "space") != "space":
                 continue
-            pr = p.get("principal") or {}
+            pr = p.get("principal")
+            if not isinstance(pr, dict):
+                unsupported.append("malformed-principal")
+                continue
             ptype, pid = pr.get("type"), pr.get("id")
             if ptype == "user" and pid:
                 users.add(str(pid))
@@ -206,16 +254,49 @@ class ConfluenceConnector:
                         A.groups(*[self._group(g) or "" for g in groups]))
         return expr, fp
 
+    @staticmethod
+    def _parse_restriction(data: Any) -> tuple[list[str], list[str]]:
+        """(user account ids, group ids-or-names) of a read restriction, or ``_Malformed``. Only an
+        explicitly empty pair of result lists means "no restriction" (sec3a #5)."""
+        if not isinstance(data, dict) or not isinstance(data.get("restrictions"), dict):
+            raise _Malformed("no restrictions object")
+        r = data["restrictions"]
+        out: dict[str, set[str]] = {"user": set(), "group": set()}
+        for kind in ("user", "group"):
+            sec = r.get(kind)
+            if not isinstance(sec, dict) or not isinstance(sec.get("results"), list):
+                raise _Malformed(f"no {kind}.results list")
+            res = sec["results"]
+            links = sec.get("_links")
+            size = sec.get("size")
+            total = sec.get("totalSize")
+            if (isinstance(links, dict) and links.get("next")) or \
+                    (isinstance(size, int) and size > len(res)) or \
+                    (isinstance(total, int) and total > len(res)):
+                raise _Malformed(f"{kind} restriction list truncated")
+            for x in res:
+                if not isinstance(x, dict):
+                    raise _Malformed(f"malformed {kind} entry")
+                t = x.get("type")
+                if kind == "user":
+                    if t not in _USER_TYPES or not isinstance(x.get("accountId"), str) \
+                            or not x["accountId"]:
+                        raise _Malformed(f"unsupported user principal {t!r}")
+                    out["user"].add(x["accountId"])
+                else:
+                    gid = x.get("id") or x.get("name")
+                    if t not in _GROUP_TYPES or not isinstance(gid, str) or not gid:
+                        raise _Malformed(f"unsupported group principal {t!r}")
+                    out["group"].add(gid)
+        return sorted(out["user"]), sorted(out["group"])
+
     def _restriction(self, page_id: str) -> tuple[Optional[AclExpr], Any]:
         """(expression or None when unrestricted, fingerprint)."""
         data = self._get(f"rest/api/content/{page_id}/restriction/byOperation/read", allow_404=True)
-        if not isinstance(data, dict):                      # unreadable restriction: fail closed
-            return A.nobody("confluence-restriction-unreadable"), {"unreadable": True}
-        r = data.get("restrictions") or {}
-        users = sorted({str(x.get("accountId")) for x in ((r.get("user") or {}).get("results") or [])
-                        if isinstance(x, dict) and x.get("accountId")})
-        groups = sorted({str(x.get("id") or x.get("name")) for x in ((r.get("group") or {}).get("results") or [])
-                         if isinstance(x, dict) and (x.get("id") or x.get("name"))})
+        try:
+            users, groups = self._parse_restriction(data)
+        except _Malformed as exc:                           # unreadable restriction: fail closed
+            return A.nobody("confluence-restriction-unreadable"), {"unreadable": str(exc)}
         fp = {"users": users, "groups": groups}
         if not users and not groups:
             return None, fp
@@ -228,7 +309,7 @@ class ConfluenceConnector:
         if not pid:
             return A.nobody("confluence-bad-doc-id")
         page = self._page(pid)
-        if not page or page.get("status", "current") != "current":
+        if not page or page.get("status") != "current":       # no status ≠ current (sec3a #13)
             return A.nobody("confluence-not-current")
         space = self._space(page.get("spaceId"))
         if space is None:
@@ -237,14 +318,20 @@ class ConfluenceConnector:
         if isinstance(grant, AclNobody):
             return grant
         parts: list[AclExpr] = [grant]
-        anc = self._get(f"api/v2/pages/{pid}/ancestors", allow_404=True)
+        try:                                                # EVERY page of ancestors (sec3a #4)
+            anc = self._paged(f"api/v2/pages/{pid}/ancestors", allow_404=True)
+        except _Malformed:
+            return A.nobody("confluence-ancestors-unreadable")
         if anc is None:                                     # vanished mid-compile: fail closed
             return A.nobody("confluence-ancestors-unreadable")
-        for a in _results(anc):
-            if isinstance(a, dict) and a.get("id") and a.get("type", "page") == "page":
-                expr, _ = self._restriction(str(a["id"]))
-                if expr is not None:
-                    parts.append(expr)
+        for a in anc:
+            if not isinstance(a, dict) or not isinstance(a.get("id"), (str, int)) or a.get("id") == "":
+                return A.nobody("confluence-ancestor-malformed")
+            if a.get("type", "page") != "page":             # folder / whiteboard / …: unsupported
+                return A.nobody(f"confluence-unsupported-ancestor-{a.get('type')}")
+            expr, _ = self._restriction(str(a["id"]))
+            if expr is not None:
+                parts.append(expr)
         own, _ = self._restriction(pid)
         if own is not None:
             parts.append(own)
@@ -291,11 +378,18 @@ class ConfluenceConnector:
             page = json_of(vresp, gate2=True)
             if not isinstance(page, dict):
                 return verdict("forbidden", "source_bad_payload")
-            if page.get("status", "current") != "current":
-                return verdict("vanished", f"page_{page.get('status')}")
-            current = str((page.get("version") or {}).get("number", ""))
-            if not current:
+            if str(page.get("id")) != pid:                   # answered about another page
+                return verdict("forbidden", "source_ambiguous")
+            status = page.get("status")
+            if not isinstance(status, str) or not status:    # no status is NOT "current"
                 return verdict("forbidden", "source_bad_payload")
+            if status != "current":
+                return verdict("vanished", f"page_{status}")
+            ver = page.get("version")
+            number = ver.get("number") if isinstance(ver, dict) else None
+            if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+                return verdict("forbidden", "source_bad_payload")
+            current = str(number)
         except SourceFailure as exc:
             return verdict("forbidden", exc.reason)
         except Exception:                                   # noqa: BLE001 — fail closed, always
@@ -342,7 +436,7 @@ class ConfluenceConnector:
                                                    "limit": 50}):
                 if not isinstance(pg, dict) or not pg.get("id"):
                     continue
-                if pg.get("status", "current") != "current":
+                if pg.get("status") != "current":            # absent status: not assumed current
                     continue
                 pages[str(pg["id"])] = pg
                 page_space[str(pg["id"])] = space
@@ -382,12 +476,9 @@ class ConfluenceConnector:
     # webhooks
     # ---------------------------------------------------------------------------------------
     def _ib_user(self, raw: Optional[str]) -> Optional[str]:
-        if not raw:
-            return None
-        d = self.directory
-        if d.get(raw) is not None:
-            return raw
-        return native_to_ib(d, PLATFORM, raw) or raw
+        """Native account id via the directory FIRST; an unmapped account-id-shaped value is
+        unresolved (None); an IB id is accepted only if the directory knows it (sec3a #10)."""
+        return event_user(self.directory, PLATFORM, raw, lambda v: bool(_NATIVE_ACCOUNT.match(v)))
 
     def parse_webhook(self, headers: Mapping[str, str], body: bytes) -> Sequence[ChangeEvent]:
         delivery, ts = self._verifier.verify(headers, body)

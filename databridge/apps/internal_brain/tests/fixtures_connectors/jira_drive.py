@@ -162,7 +162,10 @@ class FakeJira(_Faults):
              "security": {"id": lvl, "name": self.levels.get(lvl, {}).get("name")} if lvl else None,
              "created": i["created"], "updated": i["updated"],
              "comment": {"comments": [{"author": self._uref(c["author"]), "body": adf(c["body"]),
-                                       "created": c["created"]} for c in i["comments"]]},
+                                       "created": c["created"],
+                                       **({"visibility": c["visibility"]} if c.get("visibility")
+                                          else {})}
+                                      for c in i["comments"]]},
              "issuelinks": [{"type": {"name": "Relates", "outward": "relates to",
                                       "inward": "relates to"}, "outwardIssue": {"key": k}}
                             for k in i["links"]]}
