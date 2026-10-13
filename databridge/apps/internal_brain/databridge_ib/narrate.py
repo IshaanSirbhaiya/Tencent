@@ -36,6 +36,28 @@ IB_SYSTEM_PROMPT = "\n".join([
 
 _MD = re.compile(r"(\*\*|__|`|^#{1,6}\s*|^\s*[-*•]\s+)", re.M)
 _TAG = re.compile(r"\[C\d+\]")
+_TAG_IN_SOURCE = re.compile(r"\[\s*C\s*(\d+)\s*\]", re.I)
+#: "sentence. [C1]" → "sentence [C1]." so the grounding wall keeps the tag with its sentence
+_TRAILING_TAGS = re.compile(r"([.!?])\s*((?:\[C\d+\]\s*)+)")
+#: sentences addressed to an AI system are quoted data, never answers (injection fixtures)
+_ADDRESSED_TO_AI = re.compile(
+    r"(ignore (all |any )?(the )?(previous|prior|above) (instructions|rules)|\bassistant\b\s*[:,]|"
+    r"system note to ai|\bai assistant\b|you are (an?|the) (ai|assistant|model)|"
+    r"call the \w+ tool|decode this|follow (it|this|these) exactly|reveal the (full )?contents)",
+    re.I)
+
+
+def neutralise_tags(text: str) -> str:
+    """A citation-shaped token INSIDE a source (``[C9]``) must never bind to a real passage tag:
+    it is rewritten to ``(source-text C9)`` before the passage is shown to any model or quoted."""
+    return _TAG_IN_SOURCE.sub(lambda m: f"(source-text C{m.group(1)})", text or "")
+
+
+def move_trailing_tags(text: str) -> str:
+    def fix(m):
+        tail = m.group(2)
+        return f" {tail.strip()}{m.group(1)}" + (tail[len(tail.rstrip()):] or "")
+    return _TRAILING_TAGS.sub(fix, text or "")
 
 
 @dataclass(frozen=True)
@@ -50,7 +72,7 @@ class Passage:
     text: str
 
     def line(self) -> str:
-        body = " ".join(self.text.split())
+        body = neutralise_tags(" ".join(self.text.split()))
         return (f"[{self.tag}] ({self.platform} · {self.container_name} · {self.title} · "
                 f"v{self.version} · {self.updated}) {body}")
 
@@ -85,7 +107,8 @@ class _StripMarkdown:
 
     def complete_text(self, task, messages, *args, **kwargs):
         res = self._inner.complete_text(task, messages, *args, **kwargs)
-        return _Text(strip_markdown(getattr(res, "text", "") or ""), getattr(res, "event", None))
+        text = move_trailing_tags(strip_markdown(getattr(res, "text", "") or ""))
+        return _Text(text, getattr(res, "event", None))
 
 
 class IbGroundedNarrator(GroundedNarrator):
@@ -115,10 +138,10 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
             line = line.strip()
             if not line or _METADATA.match(line) or _URL_ONLY.match(line):
                 continue
-            sentences.extend(_SENT.split(" ".join(line.split())))
+            sentences.extend(_SENT.split(neutralise_tags(" ".join(line.split()))))
         for j, s in enumerate(sentences):
             s = _URL.sub("", s).strip()
-            if len(s) < 12 or len(s) > 400:
+            if len(s) < 12 or len(s) > 400 or _ADDRESSED_TO_AI.search(s):
                 continue
             overlap = len(q & set(tokens(s)))
             if overlap:

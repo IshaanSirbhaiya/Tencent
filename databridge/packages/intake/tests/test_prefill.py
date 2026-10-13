@@ -15,7 +15,7 @@ from databridge_intake.eligibility import determine_coverage
 from databridge_intake.extract import extract_intake
 from databridge_intake.gold import gold_harness
 from databridge_intake.models import PrefillStatus, QuestionnaireKind
-from databridge_intake.paths import fixtures_dir
+from databridge_intake.paths import fixtures_dir, source_data_dir
 from databridge_intake.prefill import (QuestionnaireError, load_questionnaire, prefill,
                                        questionnaire)
 from databridge_intake.registry import registry
@@ -59,7 +59,7 @@ EXPECTED_FIELD_COUNT = {
 
 
 def _mock_columns(kind: QuestionnaireKind) -> list[str]:
-    path = fixtures_dir().parents[2] / "Hack4Health" / MOCK_CSV[kind]
+    path = source_data_dir() / MOCK_CSV[kind]
     with open(path, newline="", encoding="utf-8-sig") as fh:
         return next(csv.reader(fh))
 

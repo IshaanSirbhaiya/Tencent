@@ -137,10 +137,12 @@ class Pipeline:
             context = narrate.build_context(passages)
             text, info, _notes = (self.chain.answer(context, question) if self.chain
                                   else (None, None, []))
-            if text and info:
+            valid = {p.tag for p in passages}
+            if text and info and (text.strip() == REFUSAL_TEXT
+                                  or set(narrate.cited_tags(text)) & valid):
                 answer, model = text, info
                 dropped = 0
-            else:
+            else:                           # no model, or an answer citing no permitted passage
                 answer = narrate.extractive_answer(passages, question)
         refused = answer.strip() == REFUSAL_TEXT
         by_tag = {p.tag: p for p in passages}
