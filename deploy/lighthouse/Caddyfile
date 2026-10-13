@@ -1,0 +1,67 @@
+# Public edge for the Walnut Internal Brain demo. Caddy is the ONLY public listener.
+#
+# - TLS: automatic HTTPS for {$DOMAIN} (Let's Encrypt, with ZeroSSL as Caddy's built-in fallback).
+#   No domain? Use <public-ip-with-dashes>.sslip.io, e.g. 43-134-10-20.sslip.io (deploy.sh does this).
+#   For a local test, DOMAIN=localhost gives a cert from Caddy's internal CA (curl -k).
+# - Routing: only the web app's pages, its static assets and its same-origin API proxy are served.
+#   The IB API (/health, /auth, /ib, /audit, /sim, /webhooks) and the mock platforms (/slack, /jira,
+#   /confluence, /drive, /admin) are NOT reachable through this edge: they are not proxied, and their
+#   containers publish no ports. The web proxy (/api/ib/*) has its own closed allowlist (no webhooks).
+# - Rate limiting: stock Caddy has no rate limiter (it is a plugin, caddy-ratelimit). Not built in;
+#   see README "Rate limiting". Body size and timeouts are capped below.
+{
+	admin off
+	servers {
+		protocols h1 h2
+		timeouts {
+			read_header 10s
+			read_body 30s
+			idle 2m
+		}
+	}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	request_body {
+		max_size 64KB
+	}
+
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		# Next.js 14 inlines its bootstrap and the theme script, hence 'unsafe-inline' for scripts.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+		-X-Powered-By
+	}
+
+	# The only public routes: the four pages, Next's static assets, and the same-origin API proxy.
+	@web path / /login /audit /sim /_next/static/* /api/ib/*
+	handle @web {
+		reverse_proxy web:3100
+	}
+
+	handle /robots.txt {
+		respond "User-agent: *
+Disallow: /
+" 200
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1
+#
+# One image for both Python services of the public demo:
+#   - the Internal Brain API (databridge_ib)      CMD default        :8100 (container network only)
+#   - the mock Slack/Confluence/Jira/Drive        python -m mock_platforms   :8200 (container network only)
+#
+# Build context is the REPO ROOT (see docker-compose.yml). Only the paths whitelisted in
+# Dockerfile.ib.dockerignore are sent to the builder: no .venv, node_modules, var/, tests or docs.
+#
+#   docker build -f deploy/lighthouse/Dockerfile.ib -t walnut-ib:latest .
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore
+
+# Trimmed, fully pinned deps (every pin equals databridge/requirements-lock.txt).
+COPY deploy/lighthouse/requirements-ib.txt /tmp/requirements-ib.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-ib.txt && rm /tmp/requirements-ib.txt
+
+RUN groupadd --gid 10001 ib \
+ && useradd --uid 10001 --gid ib --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin ib \
+ && mkdir -p /var/lib/ib \
+ && chown ib:ib /var/lib/ib
+
+WORKDIR /app
+# Same relative layout as the repo: databridge_ib resolves world.json, packs/ and the gateway's
+# grounding module from its own file location (config.py, sensitive.py, grounding.py).
+COPY databridge/ /app/databridge/
+
+ENV PYTHONPATH=/app/databridge/apps/internal_brain:/app/databridge/apps/mock_platforms:/app/databridge/packages/core:/app/databridge/packages/harness \
+    IB_VAR=/var/lib/ib \
+    IB_WORLD=/app/databridge/fixtures/enterprise/world.json \
+    MOCK_WORLD_PATH=/app/databridge/fixtures/enterprise/world.json \
+    IB_HOST=0.0.0.0 \
+    IB_PORT=8100 \
+    MOCK_HOST=0.0.0.0 \
+    MOCK_PORT=8200
+
+# Build-time proof that the trimmed requirements are enough: import every databridge_ib and
+# mock_platforms module (incl. the gateway grounding wall loaded by path) and the lazy litellm import.
+RUN python - <<'PY'
+import importlib, pkgutil
+import databridge_ib, mock_platforms
+mods = []
+for pkg in (databridge_ib, mock_platforms):
+    for m in pkgutil.walk_packages(pkg.__path__, pkg.__name__ + "."):
+        if m.name.endswith("__main__"):
+            continue
+        importlib.import_module(m.name)
+        mods.append(m.name)
+import databridge_ib.bootstrap, mock_platforms.app, databridge_harness, databridge_core
+import litellm  # noqa: F401  (only used when TOKENHUB_API_KEY is set)
+print(f"import check ok: {len(mods)} modules")
+PY
+
+USER ib
+EXPOSE 8100 8200
+CMD ["python", "-m", "databridge_ib"]

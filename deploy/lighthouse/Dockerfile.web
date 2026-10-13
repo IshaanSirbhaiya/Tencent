@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+#
+# The Internal Brain web app (Next.js 14) as a standalone Node server on :3100 (container network only;
+# Caddy is the only public listener). Build context is databridge/apps/internal_brain_web; only the
+# source is sent (Dockerfile.web.dockerignore keeps node_modules, .next and test output out).
+#
+#   docker build -f deploy/lighthouse/Dockerfile.web -t walnut-web:latest databridge/apps/internal_brain_web
+#
+# The browser only calls same-origin /api/ib/*; the route handler proxies to IB_API_URL, read at
+# RUNTIME on the server (set in docker-compose.yml), so the image holds no backend address or secret.
+
+FROM node:20-bookworm-slim AS deps
+WORKDIR /app
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 NEXT_TELEMETRY_DISABLED=1
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+FROM node:20-bookworm-slim AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_OUTPUT=standalone \
+    NEXT_PUBLIC_IB_MOCK=0 \
+    NODE_OPTIONS=--max-old-space-size=1536
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build && test -f .next/standalone/server.js
+
+FROM node:20-bookworm-slim AS run
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3100
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+USER node
+EXPOSE 3100
+CMD ["node", "server.js"]

@@ -1,0 +1,13 @@
+# For Dockerfile.web (build context = databridge/apps/internal_brain_web).
+node_modules
+.next
+.next-mock
+out
+test-results
+playwright-report
+screenshots
+tests
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

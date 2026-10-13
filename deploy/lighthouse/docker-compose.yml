@@ -1,0 +1,134 @@
+# Walnut Internal Brain: public demo on one Lighthouse VM.
+#
+#   internet ──443/80──▶ caddy ──(edge)──▶ web:3100 ──(backend)──▶ ib:8100 ──(backend)──▶ mock:8200
+#
+# Only caddy publishes ports. ib, mock and web have NO `ports:` entry, so nothing but Caddy is
+# reachable from outside the VM. `backend` is an internal network (no route to the internet); ib is
+# also on `egress` so it can reach TokenHub when TOKENHUB_API_KEY is set. mock never leaves the box.
+#
+# Run (deploy.sh does this for you):
+#   docker compose -p walnut --env-file /opt/walnut/walnut.env -f deploy/lighthouse/docker-compose.yml up -d --build
+#
+# Synthetic data only: the platform base URL is pinned to the in-stack mock. There is no variable
+# here for a real Slack/Atlassian/Google base URL or credential, and none must be added.
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+
+services:
+  mock:
+    <<: *hardening
+    image: walnut-ib:latest
+    build:
+      context: ../..
+      dockerfile: deploy/lighthouse/Dockerfile.ib
+    command: ["python", "-m", "mock_platforms"]
+    environment:
+      MOCK_SVC_TOKEN: "${MOCK_SVC_TOKEN:?set MOCK_SVC_TOKEN in the env file}"
+      MOCK_ADMIN_TOKEN: "${MOCK_ADMIN_TOKEN:?set MOCK_ADMIN_TOKEN in the env file}"
+      MOCK_WEBHOOK_SECRET: "${MOCK_WEBHOOK_SECRET:?set MOCK_WEBHOOK_SECRET in the env file}"
+      MOCK_WEBHOOK_URL: http://ib:8100
+    read_only: true
+    tmpfs: ["/tmp"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  ib:
+    <<: *hardening
+    image: walnut-ib:latest
+    build:
+      context: ../..
+      dockerfile: deploy/lighthouse/Dockerfile.ib
+    command: ["python", "-m", "databridge_ib"]
+    depends_on:
+      mock: {condition: service_healthy}
+    environment:
+      # fixed for the public demo (not overridable from the env file)
+      IB_DEPLOYED: "1"                  # refuses dev/short keys; Secure session cookie
+      IB_DEMO_LOGIN: "1"                # persona picker, gated by the passcode below
+      IB_MOCK_BASE: http://mock:8200    # synthetic platforms only
+      # secrets and tunables from the env file
+      IB_DEMO_PASSCODE: "${IB_DEMO_PASSCODE:?set IB_DEMO_PASSCODE - the public demo must be passcode-gated}"
+      IB_TOKEN_KEY: "${IB_TOKEN_KEY:?set IB_TOKEN_KEY (openssl rand -hex 32)}"
+      IB_LEDGER_KEY: "${IB_LEDGER_KEY:?set IB_LEDGER_KEY (openssl rand -hex 32)}"
+      MOCK_SVC_TOKEN: "${MOCK_SVC_TOKEN:?}"
+      MOCK_ADMIN_TOKEN: "${MOCK_ADMIN_TOKEN:?}"
+      MOCK_WEBHOOK_SECRET: "${MOCK_WEBHOOK_SECRET:?}"
+      IB_POLL_S: ${IB_POLL_S:-120}
+      IB_ANCHOR_INTERVAL_S: ${IB_ANCHOR_INTERVAL_S:-900}
+      IB_ANCHOR_FILE: ${IB_ANCHOR_FILE:-}
+      TOKENHUB_API_KEY: ${TOKENHUB_API_KEY:-}
+      TOKENHUB_BASE: ${TOKENHUB_BASE:-https://tokenhub-intl.tencentcloudmaas.com/v1}
+      IB_FORCE_OFFLINE: ${IB_FORCE_OFFLINE:-0}
+      HOME: /tmp
+    read_only: true
+    tmpfs: ["/tmp"]
+    volumes:
+      - ib-var:/var/lib/ib              # ledger, anchors, answer store, index, revocation list
+    networks: [backend, egress]
+    healthcheck:
+      # /health answers only after the start-up crawl and index of the whole world (about a minute)
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 300s
+
+  web:
+    <<: *hardening
+    image: walnut-web:latest
+    build:
+      context: ../../databridge/apps/internal_brain_web
+      dockerfile: ../../../deploy/lighthouse/Dockerfile.web
+    depends_on:
+      ib: {condition: service_healthy}
+    environment:
+      IB_API_URL: http://ib:8100
+      NEXT_PUBLIC_IB_MOCK: "0"
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache:uid=1000,gid=1000"]
+    networks: [backend, edge]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  caddy:
+    <<: *hardening
+    image: caddy:2.8.4-alpine
+    depends_on:
+      web: {condition: service_healthy}
+    cap_add: ["NET_BIND_SERVICE"]
+    environment:
+      DOMAIN: "${DOMAIN:?set DOMAIN (your domain, or <ip-with-dashes>.sslip.io)}"
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data                # TLS certificates: keep across resets (Let's Encrypt rate limits)
+      - caddy-config:/config
+    networks: [edge]
+
+volumes:
+  ib-var:
+  caddy-data:
+  caddy-config:
+
+networks:
+  backend:
+    internal: true
+  egress: {}
+  edge: {}

@@ -1,0 +1,14 @@
+# Whitelist for Dockerfile.ib (build context = repo root). Everything else stays out of the image.
+*
+!deploy/lighthouse/requirements-ib.txt
+!databridge/apps/internal_brain/databridge_ib
+!databridge/apps/mock_platforms/mock_platforms
+!databridge/apps/gateway/databridge_gateway/llm.py
+!databridge/packages/core/databridge_core
+!databridge/packages/harness/databridge_harness
+!databridge/fixtures/enterprise/world.json
+!databridge/fixtures/enterprise/manifest.json
+!databridge/packs/enterprise
+!databridge/config/models.yaml
+**/__pycache__
+**/*.pyc
