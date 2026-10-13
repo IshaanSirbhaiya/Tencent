@@ -18,23 +18,23 @@ import pathlib
 
 @functools.lru_cache(maxsize=1)
 def repo_root() -> pathlib.Path:
-    """The git root — the directory containing both ``Hack4Health/`` and ``databridge/``.
+    """The git root — the directory containing ``databridge/`` (with its ``fixtures/``).
 
     Walks up from this file rather than trusting the cwd, so pytest, uvicorn and the CLI all
     resolve identically no matter where they were launched from.
     """
     here = pathlib.Path(__file__).resolve()
     for parent in here.parents:
-        if (parent / "Hack4Health").is_dir() and (parent / "databridge").is_dir():
+        if (parent / "databridge" / "fixtures").is_dir():
             return parent
     raise RuntimeError(
-        f"repo root not found above {here}: expected an ancestor containing both "
-        f"'Hack4Health/' and 'databridge/'")
+        f"repo root not found above {here}: expected an ancestor containing 'databridge/fixtures/'")
 
 
 def source_data_dir() -> pathlib.Path:
-    """The competition-provided originals. Read-only — never write here."""
-    return repo_root() / "Hack4Health"
+    """The synthetic source CSVs (moved from the former ``Hack4Health/`` folder, 2026-10-13, when
+    the prior competition's briefs were removed from this branch). Read-only — never write here."""
+    return repo_root() / "databridge" / "fixtures" / "hackathon" / "source_data"
 
 
 def fixtures_dir() -> pathlib.Path:
