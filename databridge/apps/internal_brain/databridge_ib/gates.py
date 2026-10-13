@@ -6,6 +6,8 @@ an exception, a timeout, a 429 or a missing connector is a DENY (fail closed).
 """
 from __future__ import annotations
 
+import time
+
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
 from datetime import datetime, timezone
 from typing import Mapping, Sequence
@@ -22,8 +24,8 @@ def _deny(doc_id: str, reason: str) -> AccessCheck:
 
 
 def check_all(user: DirectoryUser, doc_ids: Sequence[str], platform_of: Mapping[str, str],
-              connectors: Mapping[str, SourceConnector], *, timeout_s: float = 2.0
-              ) -> dict[str, AccessCheck]:
+              connectors: Mapping[str, SourceConnector], *, timeout_s: float = 2.0,
+              known_versions: Mapping[str, str] | None = None) -> dict[str, AccessCheck]:
     futures = {}
     out: dict[str, AccessCheck] = {}
     for d in dict.fromkeys(doc_ids):
@@ -31,10 +33,12 @@ def check_all(user: DirectoryUser, doc_ids: Sequence[str], platform_of: Mapping[
         if conn is None:
             out[d] = _deny(d, "no_connector")
             continue
-        futures[d] = _POOL.submit(conn.check_access, user, d)
+        futures[d] = _POOL.submit(conn.check_access, user, d,
+                                  known_version=(known_versions or {}).get(d))
+    deadline = time.monotonic() + timeout_s             # ONE budget for the whole batch
     for d, fut in futures.items():
         try:
-            res = fut.result(timeout=timeout_s)
+            res = fut.result(timeout=max(0.0, deadline - time.monotonic()))
             out[d] = res if isinstance(res, AccessCheck) and res.doc_id == d else _deny(d, "bad_result")
         except FutTimeout:
             fut.cancel()

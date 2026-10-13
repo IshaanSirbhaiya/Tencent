@@ -38,7 +38,7 @@ class FakeConnector:
     def acl(self, doc_id):
         return acl.users(*self.readers.get(doc_id, ()))
 
-    def check_access(self, user, doc_id):
+    def check_access(self, user, doc_id, *, known_version=None):
         self.calls += 1
         d = self.docs.get(doc_id)
         if d is None:

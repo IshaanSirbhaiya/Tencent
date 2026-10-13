@@ -47,8 +47,12 @@ class SourceConnector(Protocol):
         """The document's effective read policy, compiled from native objects (fail-closed)."""
         ...
 
-    def check_access(self, user: DirectoryUser, doc_id: str) -> AccessCheck:
-        """Gate 2: ask the source whether ``user`` may read ``doc_id`` NOW, and its version."""
+    def check_access(self, user: DirectoryUser, doc_id: str, *,
+                     known_version: Optional[str] = None) -> AccessCheck:
+        """Gate 2: ask the source whether ``user`` may read ``doc_id`` NOW, and its version.
+        With ``known_version`` (the indexed version) a moved-on source returns ``drift_material``.
+        Reason codes for transport failures start with ``source_`` (rate_limited, timeout, error,
+        bad_payload, ambiguous) — ledger consumers match the prefix."""
         ...
 
     def parse_webhook(self, headers: dict[str, str], body: bytes) -> Sequence[ChangeEvent]:

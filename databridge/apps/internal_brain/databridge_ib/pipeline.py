@@ -141,9 +141,10 @@ class Pipeline:
 
     # -- steps --------------------------------------------------------------------------------
     def _gate2(self, user: DirectoryUser, doc_ids: Sequence[str]) -> dict[str, AccessCheck]:
-        platform_of = {d: (self.index.doc(d) or {}).get("platform", "") for d in doc_ids}
-        return gates.check_all(user, doc_ids, platform_of, self.connectors,
-                               timeout_s=self.gate2_timeout_s)
+        rows = {d: (self.index.doc(d) or {}) for d in doc_ids}
+        return gates.check_all(user, doc_ids, {d: r.get("platform", "") for d, r in rows.items()},
+                               self.connectors, timeout_s=self.gate2_timeout_s,
+                               known_versions={d: r.get("version") for d, r in rows.items()})
 
     def _read_through(self, checks: Mapping[str, AccessCheck], live: set[str]) -> set[str]:
         """Allowed docs; a doc whose source version moved on is re-fetched and re-indexed first."""
