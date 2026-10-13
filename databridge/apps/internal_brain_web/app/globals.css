@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens. Dark is the default (projector-tested); light is a toggle.
+   One accent (blue). ok / warn / bad are always paired with an icon AND a text label. */
+:root {
+  --bg: 11 13 16;
+  --surface: 18 21 26;
+  --raised: 25 29 35;
+  --line: 40 45 53;
+  --line-strong: 62 68 78;
+  --fg: 231 233 236;
+  --muted: 163 171 182;
+  --accent: 128 172 255;
+  --accent-solid: 47 100 208;
+  --accent-fg: 255 255 255;
+  --ok: 86 201 146;
+  --warn: 232 184 88;
+  --bad: 244 124 114;
+  --focus: 128 172 255;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: 246 247 249;
+  --surface: 255 255 255;
+  --raised: 242 244 247;
+  --line: 222 226 231;
+  --line-strong: 190 197 206;
+  --fg: 17 20 24;
+  --muted: 72 82 96;
+  --accent: 29 86 196;
+  --accent-solid: 29 86 196;
+  --accent-fg: 255 255 255;
+  --ok: 20 110 68;
+  --warn: 128 84 0;
+  --bad: 176 34 24;
+  --focus: 29 86 196;
+  color-scheme: light;
+}
+
+html,
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+}
+
+body {
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Visible focus everywhere, never removed. */
+:focus-visible {
+  outline: 2px solid rgb(var(--focus));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: rgb(var(--accent-solid));
+  color: rgb(var(--accent-fg));
+  border-radius: 6px;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* Citation target highlight when jumped to from an answer chip. */
+.cite-target:target,
+.cite-target[data-active='true'] {
+  box-shadow: inset 3px 0 0 rgb(var(--accent));
+}
