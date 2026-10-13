@@ -1,3 +1,7 @@
+> **Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 — FinTech Track (Aspire): "The Internal Brain".**
+> Judges: start with **[INTERNAL_BRAIN.md](INTERNAL_BRAIN.md)** — what it is, how to run it, the five scenarios and the
+> evidence for every claim. The Internal Brain is built as a new app on top of the Walnut engine described below.
+
 # Walnut
 
 Walnut is an evidence substrate for AI systems: every value it emits carries a re-executable proof
