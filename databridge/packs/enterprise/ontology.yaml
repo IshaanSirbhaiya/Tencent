@@ -1,0 +1,74 @@
+# packs/enterprise — the Internal Brain's tiny vocabulary (Tencent Cloud Hackathon, Aspire track).
+#
+# The Internal Brain (apps/internal_brain) answers questions over Confluence, Jira, Slack and Google
+# Drive under each platform's own permissions. It does not extract into the knowledge graph, so this
+# pack carries NO engine behaviour: it names the shapes the synthetic estate
+# (fixtures/enterprise/world.json) is made of, so the ontology screens can show them, and it lives
+# under the same loader rules as every other pack (`databridge_graph/packs.py`).
+#
+# Choices worth knowing:
+#   - Kind names are deliberately distinctive (`knowledge_page`, not `page`): the engine's
+#     `test_no_domain_branching` forbids comparing a kind against any pack-declared kind name, and
+#     the IB's own SourceDoc uses the plain words page / issue / thread / file.
+#   - `colleague` is the actor of `on_team` (role_of) and `wrote_item` (issued), which makes it a
+#     person-like kind; the engine therefore never merges it by similarity. This pack declares no
+#     subject kinds: nobody's identity is attested through it (identity comes from the directory).
+#   - Not bound in packs/deployment.yaml; binding is the coordinator's call.
+
+pack: enterprise
+title: Enterprise knowledge (Internal Brain)
+version: "0.1"
+
+node_kinds:
+  - name: colleague
+    binds_to: entity
+    description: A person in the company directory — an employee, a contractor, a guest.
+
+  - name: org_team
+    binds_to: organisation
+    description: A team or directory group, such as payments engineering or security.
+
+  - name: knowledge_space
+    binds_to: organisation
+    description: A container with its own access rules — a Confluence space, Jira project, Slack channel or shared drive.
+
+  - name: knowledge_page
+    binds_to: document
+    description: A wiki page, with versions and page-level read restrictions.
+
+  - name: tracked_issue
+    binds_to: document
+    description: A ticket in an issue tracker, with a status, comments and an optional security level.
+
+  - name: chat_thread
+    binds_to: document
+    description: A chat thread, indexed as one document.
+
+  - name: shared_file
+    binds_to: document
+    description: A file in a shared drive, with file and inherited folder permissions.
+
+edge_kinds:
+  - name: on_team
+    binds_to: role_of
+    src: [colleague]
+    dst: [org_team]
+    description: A colleague is a member of a team or group.
+
+  - name: wrote_item
+    binds_to: issued
+    src: [colleague]
+    dst: [knowledge_page, tracked_issue, chat_thread, shared_file]
+    description: Who authored a page, reported an issue, started a thread or created a file.
+
+  - name: held_in
+    binds_to: part_of
+    src: [knowledge_space]
+    dst: [knowledge_page, tracked_issue, chat_thread, shared_file]
+    description: Containment, WHOLE → PART — the space, project, channel or drive that holds an item.
+
+  - name: cites_item
+    binds_to: references
+    src: [knowledge_page, tracked_issue, chat_thread, shared_file]
+    dst: [knowledge_page, tracked_issue, chat_thread, shared_file]
+    description: One item links to another by key or URL (a thread naming DBMIG-14, an issue linking a page).
