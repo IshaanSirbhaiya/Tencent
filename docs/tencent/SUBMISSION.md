@@ -3,8 +3,8 @@
 > Tencent Cloud AI CAN DO IT Hackathon Singapore 2026. Form: https://tinyurl.com/TCHackathonSGProjectSubmission.
 > Deadline **Fri 16 Oct 2026, 23:59 SGT**. All three team members must confirm.
 >
-> Numbers below are measured, and each is linked to its evidence. **Re-check the bracketed [TBD] items
-> after the hy3 run and the final eval re-run.**
+> Numbers below are measured, and each is linked to its evidence. Eval numbers are from the final run (2026-10-14).
+> **Re-check the bracketed [TBD] items after the hy3 run.**
 
 ---
 
@@ -128,9 +128,9 @@ platforms, and 34+ planted facts.
 
 | Measure | Result | Evidence |
 |---|---|---|
-| Restricted content in answers or prompts | **0 leaks in 4,100 requests** (95% upper bound 0.15% per request) | `databridge/evals/internal_brain/RESULTS.md` |
+| Restricted content in answers or prompts | **0 leaks in 5,958 requests** (95% upper bound 0.10% per request) | `databridge/evals/internal_brain/RESULTS.md` |
 | "With vs without restricted documents" | **0 / 400** response differences | same file |
-| Recall for what users *are* allowed to see | **94–100%** | same file |
+| Recall for what users *are* allowed to see | **100%** of positive probes (both answer paths) | same file |
 | Scenario tests (S1–S5, revocation, freshness, fintech) | **61 / 61** | `apps/internal_brain/tests/` |
 | Answer latency, local | **about 0.4–0.6 s** per question (deterministic path) | [TBD: hy3 latency] |
 | Freshness | a webhook-delivered edit is answerable **on the next query**; poll fallback ≤ 2 min; SLO 5 min (Aspire asked for 30 min) | `test_s2_freshness_via_webhook` |

@@ -238,4 +238,13 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    rc = main()
+    if "--worker-spec" in sys.argv:
+        # A shard's output is fully written before this point. The eval drives the mock platforms
+        # in-process through Starlette's TestClient, which ignores per-call timeouts, so a Gate-2
+        # check abandoned at its deadline can leave a pool thread parked forever and block
+        # interpreter shutdown. Exit hard so the parent is not left waiting on a finished shard.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(rc)
+    raise SystemExit(rc)

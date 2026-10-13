@@ -53,6 +53,14 @@ def neutralise_tags(text: str) -> str:
     return _TAG_IN_SOURCE.sub(lambda m: f"(source-text C{m.group(1)})", text or "")
 
 
+def drop_addressed_to_ai(text: str) -> str:
+    """Remove model-answer sentences that repeat text addressed to an AI system (an injection the
+    model quoted rather than followed); the extractive answerer already skips them at the source."""
+    parts = re.split(r"(?<=[.!?\]])\s+", text or "")
+    kept = [s for s in parts if not _ADDRESSED_TO_AI.search(s)]
+    return text if len(kept) == len(parts) else " ".join(kept).strip()
+
+
 def move_trailing_tags(text: str) -> str:
     def fix(m):
         tail = m.group(2)

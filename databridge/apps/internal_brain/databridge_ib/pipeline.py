@@ -161,6 +161,8 @@ class Pipeline:
             text, info, _notes = (self.chain.answer(context, question) if self.chain
                                   else (None, None, []))
             valid = {p.tag for p in passages}
+            if text and text.strip() != REFUSAL_TEXT:
+                text = narrate.drop_addressed_to_ai(text)
             if text and info and (text.strip() == REFUSAL_TEXT
                                   or set(narrate.cited_tags(text)) & valid):
                 answer, model = text, info

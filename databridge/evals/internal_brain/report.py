@@ -306,7 +306,8 @@ def _md(res: dict) -> str:
     a("")
     a("| Measure | Value |")
     a("|---|---|")
-    a(f"| Leaks found (all modes, all checks) | **{h['leaks']}** in {h['leak_requests']} requests |")
+    a(f"| Leaks found (all modes, all checks) | **{h['leaks']}** across {h['n_requests_all_modes']} requests checked "
+      f"({h['leak_requests']} requests with any leak) |")
     a(f"| Requests, fake-capture model path (N) | {h['n_requests']} |")
     a(f"| 95% upper bound on per-request leak rate (fake-capture) | {h['leak_rate_upper95']:.4%} "
       f"({'rule of three, 3/N' if h['leaks'] == 0 else 'Clopper–Pearson'}) |")

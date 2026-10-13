@@ -3,12 +3,15 @@ pipeline, over the generated Company A world. Webhooks flow mock → connector.p
 verified) → Ingestor.apply_event, exactly as in deployment, just without sockets."""
 from __future__ import annotations
 
+import contextlib
 import importlib
 import json
+import threading
 import uuid
 from pathlib import Path
 from typing import Optional
 
+import anyio.from_thread
 from fastapi.testclient import TestClient
 
 from databridge_ib.directory import Directory
@@ -44,6 +47,47 @@ class MemAnswers:
         return req_id, hashlib.sha256(answer.encode()).hexdigest()
 
 
+_PORTAL = None
+_PORTAL_THREAD = None
+_PORTAL_LOCK = threading.Lock()
+
+
+def _shared_portal():
+    """One long-lived event loop per process for every in-process mock request. Starlette's
+    TestClient otherwise starts a fresh loop per request; on Windows each loop opens a localhost
+    socketpair, and thousands of them across eval shards exhaust ephemeral ports until a socketpair
+    ``accept()`` blocks forever."""
+    global _PORTAL, _PORTAL_THREAD
+    with _PORTAL_LOCK:
+        if _PORTAL is None:
+            holder: list = []
+            ready = threading.Event()
+
+            async def serve():
+                async with anyio.from_thread.BlockingPortal() as portal:
+                    holder.append(portal)
+                    ready.set()
+                    await portal.sleep_until_stopped()
+
+            # a daemon thread, so an idle loop never holds up interpreter shutdown
+            t = threading.Thread(target=anyio.run, args=(serve,), name="e2e-portal", daemon=True)
+            t.start()
+            ready.wait()
+            _PORTAL, _PORTAL_THREAD = holder[0], t.ident
+        return _PORTAL
+
+
+class _Client(TestClient):
+    @contextlib.contextmanager
+    def _portal_factory(self):
+        portal = _shared_portal()
+        if threading.get_ident() == _PORTAL_THREAD:      # nested call from the loop itself
+            with super()._portal_factory() as own:
+                yield own
+        else:
+            yield portal
+
+
 def load_world() -> dict:
     return json.loads(WORLD.read_text(encoding="utf-8"))
 
@@ -62,8 +106,8 @@ class E2E:
         self.deliver = True                       # False ⇒ webhooks are lost (Gate-2-only test)
         self.mock = create_app(world_path or WORLD, webhook_sink=self._sink, svc_token=SVC,
                                admin_token=ADMIN, webhook_secret=SECRET)
-        self.svc = TestClient(self.mock, base_url="http://mock", headers={"Authorization": f"Bearer {SVC}"})
-        self.admin = TestClient(self.mock, base_url="http://mock",
+        self.svc = _Client(self.mock, base_url="http://mock", headers={"Authorization": f"Bearer {SVC}"})
+        self.admin = _Client(self.mock, base_url="http://mock",
                                 headers={"Authorization": f"Bearer {ADMIN}"})
         self.directory = Directory.from_world(self.world)
         self.connectors = {}

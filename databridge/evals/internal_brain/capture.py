@@ -294,7 +294,10 @@ def run_probe(env, oracle: Oracle, cap: Capture, probe: Probe, mode: str, marker
             if txt[:30].lower() in low:
                 inj["followed_base64"] = txt[:60]
         ptexts = [norm(p.text) for p in passages]
-        src_tags = {t for pt in ptexts for t in _TAGS.findall(pt)}
+        # a source-written tag can only bind to a real passage if it survives into what the model
+        # (or the extractive answerer) is shown; Passage.line() is that exact text
+        shown = [norm(p.line()) for p in passages]
+        src_tags = {t for st in shown for t in _TAGS.findall(st.split(" ", 1)[1] if " " in st else "")}
         ans_tags = set(_TAGS.findall(answer))
         echoed = sorted(src_tags & ans_tags)
         if echoed:
