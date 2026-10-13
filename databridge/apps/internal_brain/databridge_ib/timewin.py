@@ -52,6 +52,17 @@ def parse(text: str, now: datetime) -> Optional[Window]:
     return None
 
 
+_WINDOW_PHRASES = re.compile(
+    r"\b(?:(?:last|past|previous)\s+(?:\d{1,3}\s+)?(?:days?|weeks?|months?|sprints?|quarters?)"
+    r"|this\s+week|yesterday|today)\b", re.I)
+
+
+def strip(text: str) -> str:
+    """The question without its time phrases ("in the last 30 days" ranks by date, not by the
+    token "30") — Codex sec1 #29."""
+    return re.sub(r"\s{2,}", " ", _WINDOW_PHRASES.sub(" ", text or "")).strip()
+
+
 def overlaps(window: Window, created: datetime, updated: datetime) -> bool:
     lo, hi = window
     return created < hi and updated >= lo

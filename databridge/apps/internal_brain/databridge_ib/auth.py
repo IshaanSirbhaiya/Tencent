@@ -44,6 +44,17 @@ def mint(key: str, sub: str, roles: list[str], *, ttl_s: int = 3600,
 
 def verify(key: str, token: str, *, revoked: frozenset[str] = frozenset(),
            now: Optional[float] = None) -> dict:
+        try:
+            return _verify(key, token, revoked=revoked, now=now)
+        except TokenError:
+            raise
+        except Exception:                                           # noqa: BLE001
+            raise TokenError("malformed token")       # any decoding/type error is a plain 401
+
+
+def _verify(key: str, token: str, *, revoked: frozenset[str], now: Optional[float]) -> dict:
+    if not isinstance(token, str) or len(token) > 4096 or not token.isascii():
+        raise TokenError("malformed token")
     try:
         body, sig = token.split(".", 1)
     except (ValueError, AttributeError):
@@ -54,6 +65,8 @@ def verify(key: str, token: str, *, revoked: frozenset[str] = frozenset(),
     try:
         claims = json.loads(_unb64(body))
     except Exception:                                               # noqa: BLE001
+        raise TokenError("malformed claims")
+    if not isinstance(claims, dict):
         raise TokenError("malformed claims")
     now = time.time() if now is None else now
     if claims.get("aud") != AUD:
@@ -67,15 +80,33 @@ def verify(key: str, token: str, *, revoked: frozenset[str] = frozenset(),
     return claims
 
 
+class RevocationUnavailable(TokenError):
+    """The revocation list exists but cannot be read: authentication fails CLOSED (sec1 #5)."""
+
+
 def load_revoked(path: Path) -> frozenset[str]:
+    p = Path(path)
+    if not p.exists():
+        return frozenset()                    # no revocations recorded yet
     try:
-        return frozenset(json.loads(Path(path).read_text(encoding="utf-8")))
+        data = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return frozenset()
+        raise RevocationUnavailable("revocation list unreadable")
+    if not isinstance(data, list) or not all(isinstance(x, str) for x in data):
+        raise RevocationUnavailable("revocation list malformed")
+    return frozenset(data)
+
+
+_REVOKE_LOCK = __import__("threading").Lock()
 
 
 def revoke(path: Path, jti: str) -> None:
-    current = set(load_revoked(path))
-    current.add(jti)
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(sorted(current)), encoding="utf-8")
+    """Atomic (temp file + replace) and serialised within the process."""
+    p = Path(path)
+    with _REVOKE_LOCK:
+        current = set(load_revoked(p))
+        current.add(jti)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        tmp.write_text(json.dumps(sorted(current)), encoding="utf-8")
+        tmp.replace(p)

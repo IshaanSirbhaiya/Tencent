@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ from .llm import ModelChain
 from .models import (REFUSAL_TEXT, AccessCheck, AnswerReleased, AskResponse, Citation,
                      DirectoryUser, Gate2Decision, ModelInfo, RequestAccepted, RetrievalDecided)
 from .timewin import parse as parse_window
+from .timewin import strip as strip_window
 
 EXTRACTIVE = ModelInfo(provider="deterministic", model="extractive-v1")
 MAX_PASSAGES = 14
@@ -43,8 +45,9 @@ PLATFORM_HINTS = {
 
 
 def platform_hints(question: str) -> list[str]:
-    q = f" {(question or '').lower()} "
-    return [p for p, words in PLATFORM_HINTS.items() if any(f" {w}" in q for w in words)]
+    q = (question or "").lower()
+    return [p for p, words in PLATFORM_HINTS.items()
+            if any(re.search(rf"\b{re.escape(w)}\b", q) for w in words)]
 
 
 class Ledger(Protocol):
@@ -78,8 +81,23 @@ class Pipeline:
     # -- the call -----------------------------------------------------------------------------
     def ask(self, user: DirectoryUser, question: str, *, channel: str = "ui",
             event_time: Optional[datetime] = None, replay: bool = False) -> AskResponse:
-        t0 = time.perf_counter()
         req_id = uuid.uuid4().hex
+        try:
+            return self._ask(user, question, channel, event_time, replay, req_id)
+        except Exception as exc:
+            # best effort: a sanitized failure record (the error class only, never the message)
+            try:
+                from .models import RequestFailed
+                self.ledger.append(RequestFailed(sub=user.id, stage="ask",
+                                                 error_code=type(exc).__name__, req_id=req_id,
+                                                 event_time=self.clock()))
+            except Exception:                                       # noqa: BLE001
+                pass
+            raise
+
+    def _ask(self, user: DirectoryUser, question: str, channel: str,
+             event_time: Optional[datetime], replay: bool, req_id: str) -> AskResponse:
+        t0 = time.perf_counter()
         now = self.clock()
         etime = event_time or now
         common = dict(req_id=req_id, event_time=etime, synthetic_replay=replay)
@@ -91,15 +109,17 @@ class Pipeline:
                                            **common))
         # 3 — window (ranking preference)
         window = parse_window(question, now)
+        search_q = strip_window(question)       # time phrases rank by date, not as content words
         # 4 — GATE 1 + rank over the permitted corpus only
         readable = self.index.readable(user, epoch)
-        hits = [h for h in self.index.search(question, readable, k=self.top_k, window=window)
-                if h.lexical]                                         # 5 — relevance gate
+        hits = self.index.search(search_q, readable, k=self.top_k, window=window,
+                                 relevant_only=True)                  # 5 — relevance gate
         seen = {h.chunk_id for h in hits}
         for platform in platform_hints(question):                    # per-platform recall slots
             scoped = [d for d in readable if d.startswith(platform + ":")]
-            for h in self.index.search(question, scoped, k=PER_PLATFORM_K, window=window):
-                if h.lexical and h.chunk_id not in seen:
+            for h in self.index.search(search_q, scoped, k=PER_PLATFORM_K, window=window,
+                                       relevant_only=True):
+                if h.chunk_id not in seen:
                     hits.append(h)
                     seen.add(h.chunk_id)
         cand_docs = list(dict.fromkeys(h.doc_id for h in hits))
@@ -110,15 +130,17 @@ class Pipeline:
         if cand_docs:
             # 6 — GATE 2
             checks = self._gate2(user, cand_docs)
-            ok_docs = self._read_through(checks, live)
-            released_hits = self._select(question, hits, ok_docs, readable, window)
+            ok_docs = self._read_through(user, checks, live)
+            denied = {d for d, c in checks.items() if not c.allowed}
+            # source-denied docs leave the ranking corpus too (Codex sec1 #4)
+            released_hits = self._select(search_q, ok_docs, set(readable) - denied, window)
             # 7 — linked objects (only ids the platform shapes allow; Gate 1 + Gate 2 again)
             linked = self._linked(released_hits, readable, set(checks))
             if linked:
                 lchecks = self._gate2(user, linked)
                 checks.update(lchecks)
-                ok_linked = self._read_through(lchecks, live)
-                released_hits += self._best_chunks(question, ok_linked, readable)
+                ok_linked = self._read_through(user, lchecks, live)
+                released_hits += self._best_chunks(search_q, ok_linked)
         released_hits = released_hits[:MAX_PASSAGES]
         released_docs = list(dict.fromkeys(h.doc_id for h in released_hits))
         considered = list(dict.fromkeys(cand_docs + linked))
@@ -144,6 +166,9 @@ class Pipeline:
                 dropped = 0
             else:                           # no model, or an answer citing no permitted passage
                 answer = narrate.extractive_answer(passages, question)
+                if self.chain is not None:      # the model was tried and did not produce a usable answer
+                    model = ModelInfo(provider="deterministic", model="extractive-v1",
+                                      fallback_used=True)
         refused = answer.strip() == REFUSAL_TEXT
         by_tag = {p.tag: p for p in passages}
         cites = [] if refused else [by_tag[t] for t in narrate.cited_tags(answer) if t in by_tag]
@@ -169,8 +194,12 @@ class Pipeline:
                                self.connectors, timeout_s=self.gate2_timeout_s,
                                known_versions={d: r.get("version") for d, r in rows.items()})
 
-    def _read_through(self, checks: Mapping[str, AccessCheck], live: set[str]) -> set[str]:
-        """Allowed docs; a doc whose source version moved on is re-fetched and re-indexed first."""
+    def _read_through(self, user: DirectoryUser, checks: Mapping[str, AccessCheck],
+                      live: set[str]) -> set[str]:
+        """Allowed docs. A doc whose source version moved on is re-fetched and re-indexed first, and
+        admitted ONLY if the fresh version's policy still admits this user and the fetched version is
+        the one Gate 2 checked (Codex sec1 #2, #17)."""
+        from . import acl as aclmod
         ok = set()
         for d, c in checks.items():
             if not c.allowed:
@@ -178,6 +207,8 @@ class Pipeline:
             row = self.index.doc(d)
             if row is None:
                 continue
+            if c.verdict == "drift_material" and not c.current_version:
+                continue                    # material drift with no version: cannot verify -> deny
             if c.current_version and c.current_version != row["version"]:
                 conn = self.connectors.get(row["platform"])
                 try:
@@ -185,15 +216,19 @@ class Pipeline:
                     if fresh is None:
                         self.index.delete(d)
                         continue
-                    self.index.upsert(fresh, conn.acl(d))
+                    fresh_acl = conn.acl(d)
+                    self.index.upsert(fresh, fresh_acl)
+                    if not aclmod.allows(fresh_acl, user):
+                        continue            # the new version is no longer readable by this user
+                    if fresh.version != c.current_version:
+                        continue            # fetched a different version than Gate 2 checked
                     live.add(d)
                 except Exception:                                   # noqa: BLE001
                     continue                                        # cannot confirm content ⇒ omit
             ok.add(d)
         return ok
 
-    def _select(self, question: str, hits: list[Hit], ok_docs: set[str], readable,
-                window) -> list[Hit]:
+    def _select(self, question: str, ok_docs: set[str], readable, window) -> list[Hit]:
         """Re-rank after read-through (content may have changed) and cap chunks per doc."""
         if not ok_docs:
             return []
@@ -201,8 +236,9 @@ class Pipeline:
         # candidate-only corpus would distort IDF and coverage), then keep the Gate-2-allowed docs.
         # Re-running the search also picks up content re-read on drift.
         pool = set(readable) | ok_docs
-        fresh = [h for h in self.index.search(question, pool, k=max(self.top_k * 4, 60), window=window)
-                 if h.lexical and h.doc_id in ok_docs]
+        fresh = [h for h in self.index.search(question, pool, k=max(self.top_k * 4, 60),
+                                              window=window, relevant_only=True)
+                 if h.doc_id in ok_docs]
         ranked, per = [], {}
         for h in fresh:
             if h.doc_id not in ok_docs or per.get(h.doc_id, 0) >= MAX_CHUNKS_PER_DOC:
@@ -226,24 +262,25 @@ class Pipeline:
         for h in released:
             row = self.index.doc(h.doc_id) or {}
             for link in json.loads(row.get("links") or "[]"):
-                d = self._resolve_link(link)
-                if d and d in readable and d not in already and d not in out:
+                d = self._resolve_link(link, readable)
+                if d and d not in already and d not in out:
                     out.append(d)
                 if len(out) >= MAX_LINKED:
                     return out
         return out
 
-    def _resolve_link(self, link: str) -> Optional[str]:
-        if self.index.doc(link):
-            return link
-        for prefix in ("jira:", "confluence:", "drive:"):
-            if self.index.doc(prefix + link):
-                return prefix + link
-        if identifiers(link) and self.index.doc("jira:" + link.upper()):
-            return "jira:" + link.upper()
+    def _resolve_link(self, link: str, readable) -> Optional[str]:
+        """Resolve ONLY within the asker's readable set: whether a restricted object with the same
+        identifier exists must not change which readable object a link resolves to (sec1 #13)."""
+        candidates = [link] + [p + link for p in ("jira:", "confluence:", "drive:")]
+        if identifiers(link):
+            candidates.append("jira:" + link.upper())
+        for c in candidates:
+            if c in readable:
+                return c
         return None
 
-    def _best_chunks(self, question: str, docs: set[str], readable) -> list[Hit]:
+    def _best_chunks(self, question: str, docs: set[str]) -> list[Hit]:
         if not docs:
             return []
         hits = self.index.search(question, docs, k=len(docs) * 2)
@@ -261,9 +298,11 @@ class Pipeline:
 
     def _passages(self, hits: list[Hit]) -> list[narrate.Passage]:
         out = []
-        for i, h in enumerate(hits, start=1):
+        for h in hits:
             row = self.index.doc(h.doc_id)
-            out.append(narrate.Passage(tag=f"C{i}", doc_id=h.doc_id, platform=row["platform"],
+            if row is None:                 # deleted concurrently: drop, never dereference
+                continue
+            out.append(narrate.Passage(tag=f"C{len(out) + 1}", doc_id=h.doc_id, platform=row["platform"],
                                        container_name=row["container_name"], title=row["title"],
                                        version=row["version"], updated=row["updated_at"][:10],
                                        text=h.text))

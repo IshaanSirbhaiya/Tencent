@@ -15,7 +15,9 @@ from typing import Mapping, Sequence
 from .connectors.base import SourceConnector
 from .models import AccessCheck, DirectoryUser
 
-_POOL = ThreadPoolExecutor(max_workers=16, thread_name_prefix="ib-gate2")
+_POOL = ThreadPoolExecutor(max_workers=32, thread_name_prefix="ib-gate2")
+#: connectors enforce their own per-call transport timeout (connectors/_http.request_gate2), so a
+#: hung check is bounded there; this pool only parallelises.
 
 
 def _deny(doc_id: str, reason: str) -> AccessCheck:

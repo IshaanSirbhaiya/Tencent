@@ -120,7 +120,16 @@ def identifiers(text: str) -> list[str]:
 
 
 def chunk_text(text: str, size: int = CHUNK_CHARS) -> list[str]:
-    parts = [p.strip() for p in re.split(r"\n\s*\n|\n", text or "") if p.strip()]
+    parts = []
+    for p in re.split(r"\n\s*\n|\n", text or ""):
+        p = p.strip()
+        while len(p) > size:                 # hard limit: split oversized lines (sec1 #33)
+            cut = p.rfind(" ", 0, size)
+            cut = cut if cut > size // 2 else size
+            parts.append(p[:cut].strip())
+            p = p[cut:].strip()
+        if p:
+            parts.append(p)
     out, cur = [], ""
     for p in parts:
         if cur and len(cur) + len(p) + 1 > size:
@@ -278,7 +287,8 @@ class Index:
 
     def readable(self, user: DirectoryUser, directory_epoch: int = 0) -> frozenset[str]:
         """GATE 1: every doc whose stored policy admits ``user``. Fail-closed (unknown ⇒ no)."""
-        key = (user.id, user.active, user.kind, user.groups, directory_epoch, self.acl_version)
+        key = (user.id, user.active, user.kind, user.groups, user.email, directory_epoch,
+               self.acl_version)
         hit = self._readable_cache.get(key)
         if hit is not None:
             return hit
@@ -288,7 +298,7 @@ class Index:
             return out
 
     def search(self, query: str, allowed: Iterable[str], *, k: int = 12,
-               window: Optional[Window] = None) -> list[Hit]:
+               window: Optional[Window] = None, relevant_only: bool = False) -> list[Hit]:
         """Hybrid ranking over the PERMITTED chunks only. Restricted chunks are never scored."""
         allowed = set(allowed)
         with self._lock:
@@ -355,13 +365,15 @@ class Index:
             if not l and not exact and v < 0.2:
                 continue
             sc = l + w_vec * v + EXACT_BONUS * len(exact)
-            if window is not None:
-                d = self._docs[c["doc_id"]]
+            d = self._docs.get(c["doc_id"]) if window is not None else None
+            if d is not None:
                 if overlaps(window, datetime.fromisoformat(d["created_at"]),
                             datetime.fromisoformat(d["updated_at"])):
                     sc += WINDOW_BONUS
             cov = cover.get(cid, 0.0)
             relevant = bool(exact) or (cov >= MIN_COVERAGE)
             hits.append(Hit(cid, c["doc_id"], c["text"], sc, relevant, cov))
+        if relevant_only:                    # relevance BEFORE top-k truncation (sec1 #28)
+            hits = [h for h in hits if h.lexical]
         hits.sort(key=lambda h: (-h.score, h.chunk_id))
         return hits[:k]

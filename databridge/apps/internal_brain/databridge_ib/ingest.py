@@ -83,7 +83,7 @@ class Ingestor:
                 out.append(self.sync(p, full=full))
             except Exception as exc:                                # noqa: BLE001
                 self.status[p]["state"] = f"error: {type(exc).__name__}"
-                log.warning("sync %s failed: %s", p, exc)
+                log.warning("sync %s failed: %s", p, type(exc).__name__)
         return out
 
     # -- events -------------------------------------------------------------------------------
@@ -109,8 +109,10 @@ class Ingestor:
                 for d in targets:
                     if self.index.doc(d):
                         self.index.set_acl(d, conn.acl(d))
-            elif ev.type == "user.changed" and ev.user and self.directory is not None:
-                self.directory.set_active(ev.user, False)
+            elif ev.type == "user.changed" and self.directory is not None:
+                # never trust the payload (sec1 #8): Gate 2 asks the source about the user on every
+                # query; here we only invalidate cached readable sets.
+                self.directory.epoch += 1
             self.status[ev.platform]["last_event_at"] = datetime.now(timezone.utc).isoformat()
         kind = "membership.changed" if ev.type == "membership.changed" else (
             "acl.changed" if ev.type == "acl.changed" else None)
@@ -127,4 +129,4 @@ class Ingestor:
             self.ledger.append(SourceChangeEvent(kind=kind, platform=platform, detail=detail,
                                                  event_time=datetime.now(timezone.utc)))
         except Exception as exc:                                    # noqa: BLE001
-            log.warning("ledger append for %s failed: %s", kind, exc)
+            log.warning("ledger append for %s failed: %s", kind, type(exc).__name__)

@@ -72,9 +72,10 @@ class Passage:
     text: str
 
     def line(self) -> str:
-        body = neutralise_tags(" ".join(self.text.split()))
-        return (f"[{self.tag}] ({self.platform} · {self.container_name} · {self.title} · "
-                f"v{self.version} · {self.updated}) {body}")
+        clean = lambda s: neutralise_tags(" ".join(str(s or "").split()))   # noqa: E731
+        body = clean(self.text)
+        return (f"[{self.tag}] ({clean(self.platform)} · {clean(self.container_name)} · "
+                f"{clean(self.title)} · v{clean(self.version)} · {clean(self.updated)}) {body}")
 
 
 def build_context(passages: Sequence[Passage]) -> str:

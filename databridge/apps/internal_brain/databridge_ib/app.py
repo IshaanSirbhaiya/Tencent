@@ -6,8 +6,10 @@ is never imported or mounted here.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Optional
@@ -30,6 +32,7 @@ log = logging.getLogger("databridge_ib.app")
 ALLOWED_PREFIXES = ("/health", "/auth/", "/ib/", "/webhooks/", "/audit/", "/sim/")
 COOKIE = "ib_session"
 EMPLOYEE_ROLES = {"employee", "compliance_officer", "admin_it"}
+MAX_WEBHOOK_BYTES = 256 * 1024
 
 
 @dataclass
@@ -87,17 +90,33 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
     # -- auth --------------------------------------------------------------------------------
     @app.post("/auth/demo-login")
     def demo_login(body: dict, response: Response):
+        # Demo sign-in stands in for SSO over SYNTHETIC data only. Off unless IB_DEMO_LOGIN=1; on a
+        # public URL set IB_DEMO_PASSCODE so only people given the passcode can pick a persona.
         if not svc.cfg.demo_login:
             raise HTTPException(404, "not found")
+        passcode = os.environ.get("IB_DEMO_PASSCODE", "")
+        if passcode and not hmac.compare_digest(str(body.get("passcode", "")), passcode):
+            raise HTTPException(401, "passcode required")
         user = svc.directory.get(str(body.get("persona", "")))
         if user is None or not user.active:
             raise HTTPException(400, "unknown persona")
         tok = authmod.mint(svc.cfg.token_key, user.id, list(user.roles), ttl_s=8 * 3600)
-        response.set_cookie(COOKIE, tok, httponly=True, samesite="lax", max_age=8 * 3600)
+        response.set_cookie(COOKIE, tok, httponly=True, samesite="lax", max_age=8 * 3600,
+                            secure=svc.cfg.deployed)
         return {"sub": user.id, "roles": list(user.roles), "name": user.name}
 
     @app.post("/auth/logout")
-    def logout(response: Response, user: DirectoryUser = Depends(current)):
+    def logout(request: Request, response: Response, user: DirectoryUser = Depends(current)):
+        token = request.cookies.get(COOKIE)
+        authz = request.headers.get("authorization", "")
+        if authz.lower().startswith("bearer "):
+            token = authz[7:].strip()
+        try:                                  # revoke the jti actually used (sec1 #6)
+            claims = authmod.verify(svc.cfg.token_key, token or "",
+                                    revoked=authmod.load_revoked(svc.cfg.revoked_path))
+            authmod.revoke(svc.cfg.revoked_path, claims["jti"])
+        except authmod.TokenError:
+            pass
         response.delete_cookie(COOKIE)
         return {"ok": True}
 
@@ -133,11 +152,10 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         now = datetime.now(timezone.utc)
         out = []
         for p, st in svc.ingestor.status.items():
-            last = st.get("last_event_at") or st.get("last_sync_at")
+            last = st.get("last_sync_at")
             lag = (now - datetime.fromisoformat(last)).total_seconds() if last else None
-            out.append({"platform": p, "last_sync_at": st.get("last_sync_at"),
-                        "lag_s": None if lag is None else int(lag),
-                        "last_event_at": st.get("last_event_at"), "slo_s": svc.cfg.slo_s,
+            out.append({"platform": p, "last_sync_at": last,
+                        "lag_s": None if lag is None else int(lag), "slo_s": svc.cfg.slo_s,
                         "state": st.get("state"),
                         "within_slo": None if lag is None else lag <= svc.cfg.slo_s})
         return {"sources": out}
@@ -148,19 +166,27 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         conn = svc.connectors.get(platform)
         if conn is None:
             raise HTTPException(404, "not found")
+        if int(request.headers.get("content-length") or 0) > MAX_WEBHOOK_BYTES:
+            raise HTTPException(413, "too large")
         body = await request.body()
+        if len(body) > MAX_WEBHOOK_BYTES:
+            raise HTTPException(413, "too large")
         try:
             events = conn.parse_webhook({k.lower(): v for k, v in request.headers.items()}, body)
         except WebhookRejected:
             raise HTTPException(401, "rejected")
-        for ev in events:
-            svc.ingestor.apply_event(ev)
+        from starlette.concurrency import run_in_threadpool
+        for ev in events:                     # fetch/embed/index off the event loop (sec1 #23)
+            await run_in_threadpool(svc.ingestor.apply_event, ev)
         return Response(status_code=204)
 
     if audit_router_factory is not None:
         app.include_router(audit_router_factory(current, lambda r: require_role(current, r)))
     if sim_router_factory is not None:
         app.include_router(sim_router_factory(current, lambda r: require_role(current, r)))
+    bad = [p for p in mounted_paths(app) if p and p != "/health" and not p.startswith(ALLOWED_PREFIXES)]
+    if bad:                                   # the allowlist is enforced, not documented (sec1 #26)
+        raise RuntimeError(f"routes outside the allowlist: {bad}")
     return app
 
 
