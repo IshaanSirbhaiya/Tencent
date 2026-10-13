@@ -136,6 +136,7 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             last = st.get("last_event_at") or st.get("last_sync_at")
             lag = (now - datetime.fromisoformat(last)).total_seconds() if last else None
             out.append({"platform": p, "last_sync_at": st.get("last_sync_at"),
+                        "lag_s": None if lag is None else int(lag),
                         "last_event_at": st.get("last_event_at"), "slo_s": svc.cfg.slo_s,
                         "state": st.get("state"),
                         "within_slo": None if lag is None else lag <= svc.cfg.slo_s})

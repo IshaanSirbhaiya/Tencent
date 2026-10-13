@@ -56,11 +56,13 @@ def build_services(cfg: Optional[IbConfig] = None, *, chain: Optional[ModelChain
     from .audit.ledger import AccessLedger
 
     cfg = cfg or IbConfig()
+    cfg.assert_deployable()
     cfg.var_root.mkdir(parents=True, exist_ok=True)
     directory = Directory.from_world_file(cfg.world_path)
     connectors = build_connectors(cfg, directory)
     index = Index(cfg.index_db)
-    ledger = AccessLedger(cfg)
+    sink = build_anchor_sink(cfg)
+    ledger = AccessLedger(cfg, external=sink)
     answers = AnswerStore(cfg)
     chain = chain if chain is not None else ModelChain.tokenhub()
     pipeline = Pipeline(index=index, directory=directory, connectors=connectors, ledger=ledger,
@@ -73,9 +75,41 @@ def build_services(cfg: Optional[IbConfig] = None, *, chain: Optional[ModelChain
         projection = AuditProjection(cfg, ledger)
     except Exception as exc:                                        # noqa: BLE001
         log.warning("audit projection unavailable: %s", exc)
-    return Services(cfg=cfg, directory=directory, index=index, connectors=connectors,
-                    ledger=ledger, answers=answers, pipeline=pipeline, ingestor=ingestor,
-                    projection=projection)
+    svc = Services(cfg=cfg, directory=directory, index=index, connectors=connectors,
+                   ledger=ledger, answers=answers, pipeline=pipeline, ingestor=ingestor,
+                   projection=projection)
+    svc.anchor_sink = sink
+    return svc
+
+
+def build_anchor_sink(cfg: IbConfig):
+    """External head sink: an append-only file meant to live in a SEPARATE git repo
+    (``IB_ANCHOR_FILE``), mirrored to a compliance Slack channel when ``IB_ANCHOR_SLACK_WEBHOOK``
+    is set. Default for local dev: ``<var>/external_anchor/heads.jsonl`` (clearly not off-host)."""
+    from .audit.anchor import FileSink, SlackWebhookSink
+    path = cfg.anchor_file or str(cfg.var_root / "external_anchor" / "heads.jsonl")
+    sink = FileSink(path)
+    if os.environ.get("IB_ANCHOR_SLACK_WEBHOOK"):
+        try:
+            return SlackWebhookSink.from_env(mirror=sink)
+        except Exception as exc:                                    # noqa: BLE001
+            log.warning("slack anchor sink unavailable: %s", exc)
+    return sink
+
+
+def start_anchor_publisher(svc, interval_s: float):
+    """Publish the ledger head off-host every ``interval_s`` (plan §4.7)."""
+    import threading
+    from .audit.anchor import publish_head
+
+    def run():
+        stop = threading.Event()
+        while not stop.wait(interval_s):
+            try:
+                publish_head(svc.ledger, svc.anchor_sink)
+            except Exception as exc:                                # noqa: BLE001
+                log.warning("anchor publish failed: %s", exc)
+    threading.Thread(target=run, name="ib-anchor", daemon=True).start()
 
 
 def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Optional[float] = None):
@@ -84,7 +118,8 @@ def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Opti
 
     def audit_factory(current, require_role):
         from .audit.routes import make_audit_router
-        return make_audit_router(svc.ledger, svc.answers, svc.projection, require_role)
+        return make_audit_router(svc.ledger, svc.answers, svc.projection, require_role,
+                                 sink=svc.anchor_sink)
 
     app = create_app(svc, audit_router_factory=audit_factory,
                      sim_router_factory=lambda cur, rr: make_sim_router(svc.cfg, rr))
@@ -93,6 +128,13 @@ def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Opti
     if poll_s:
         from .freshness.poller import Poller
         Poller(svc.ingestor, poll_s).start()
+    if svc.cfg.anchor_interval_s > 0:
+        try:
+            from .audit.anchor import publish_head
+            publish_head(svc.ledger, svc.anchor_sink)              # an initial head at startup
+        except Exception as exc:                                    # noqa: BLE001
+            log.warning("initial anchor publish failed: %s", exc)
+        start_anchor_publisher(svc, svc.cfg.anchor_interval_s)
     return app
 
 

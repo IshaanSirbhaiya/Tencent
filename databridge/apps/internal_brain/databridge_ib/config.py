@@ -19,6 +19,9 @@ SLO_LIVE_S = 15 * 60
 GATE2_TIMEOUT_S = 2.0
 TOP_K = 12
 POLICY_VERSION = "ib-policy-1"
+#: dev-only defaults (≥32 chars, as DecisionLedger requires); a deployed build refuses them
+DEV_TOKEN_KEY = "ib-token-dev-key-not-for-deployment-0001"
+DEV_LEDGER_KEY = "ib-ledger-dev-key-not-for-deployment-0001"
 
 
 def _env(name: str, default: str = "") -> str:
@@ -36,8 +39,21 @@ class IbConfig:
     svc_token: str = field(default_factory=lambda: _env("MOCK_SVC_TOKEN", "svc-dev"))
     admin_token: str = field(default_factory=lambda: _env("MOCK_ADMIN_TOKEN", "admin-dev"))
     webhook_secret: str = field(default_factory=lambda: _env("MOCK_WEBHOOK_SECRET", "whsec-dev"))
-    token_key: str = field(default_factory=lambda: _env("IB_TOKEN_KEY", "ib-token-dev-key"))
-    ledger_key: str = field(default_factory=lambda: _env("IB_LEDGER_KEY", "ib-ledger-dev-key"))
+    token_key: str = field(default_factory=lambda: _env("IB_TOKEN_KEY", DEV_TOKEN_KEY))
+    ledger_key: str = field(default_factory=lambda: _env("IB_LEDGER_KEY", DEV_LEDGER_KEY))
+    deployed: bool = field(default_factory=lambda: _env("IB_DEPLOYED") == "1")
+    anchor_file: str = field(default_factory=lambda: _env("IB_ANCHOR_FILE"))
+    anchor_interval_s: float = field(default_factory=lambda: float(_env("IB_ANCHOR_INTERVAL_S", "900")))
+
+    def assert_deployable(self) -> None:
+        """A deployed build must never run on the dev defaults (public repo ⇒ public keys)."""
+        if not self.deployed:
+            return
+        bad = [n for n, v, d in (("IB_TOKEN_KEY", self.token_key, DEV_TOKEN_KEY),
+                                 ("IB_LEDGER_KEY", self.ledger_key, DEV_LEDGER_KEY))
+               if v == d or len(v) < 32]
+        if bad:
+            raise RuntimeError(f"refusing to start: set strong values for {', '.join(bad)}")
     demo_login: bool = field(default_factory=lambda: _env("IB_DEMO_LOGIN") == "1")
     live: bool = field(default_factory=lambda: _env("IB_LIVE") == "1")
 

@@ -37,6 +37,8 @@ TITLE_WEIGHT = 0.6
 #: a passage is RELEVANT only if it covers this share of the question's IDF-weighted terms
 #: (IDF from the asker's permitted corpus — P2 holds); below it the passage never reaches a model
 MIN_COVERAGE = 0.4
+#: without a matching adjacent term pair (e.g. "key rotation"), a clause of ≥3 terms needs this much
+MIN_COVERAGE_NO_PHRASE = 0.6
 #: weight of the vector leg; the offline hashing embedding is lexical noise, so it barely counts
 VECTOR_WEIGHT_REAL, VECTOR_WEIGHT_OFFLINE = 0.35, 0.05
 CHUNK_CHARS = 700
@@ -198,7 +200,10 @@ class Index:
         if vec is not None:
             n = float(np.linalg.norm(vec))
             vec = vec / n if n else vec
+        seq = tokens(heading) + ["‖"] + tokens(text)          # ‖ separates heading and body
+        pairs = {(a, b) for a, b in zip(seq, seq[1:])}
         self._chunks[cid] = {"doc_id": doc_id, "text": text, "tf": tf, "len": max(1, len(toks)),
+                             "pairs": pairs,
                              "vec": vec, "idents": set(identifiers(f"{title} {text}")),
                              "title_terms": set(tokens(heading))}
         self._doc_chunks.setdefault(doc_id, []).append(cid)
@@ -321,9 +326,15 @@ class Index:
             if s > 0:
                 lex[cid] = s
                 # best coverage over the question's clauses (multi-intent questions)
-                cover[cid] = max((sum(idf.get(t, 0) for t in p if t in hit_terms) /
-                                  (sum(idf.get(t, 0) for t in p) or 1.0) for p in answerable),
-                                 default=0.0)
+                best = 0.0
+                for p in answerable:
+                    cov = (sum(idf.get(t, 0) for t in p if t in hit_terms) /
+                           (sum(idf.get(t, 0) for t in p) or 1.0))
+                    phrase = len(p) <= 2 or any(pair in c["pairs"] for pair in zip(p, p[1:]))
+                    if not phrase and cov < MIN_COVERAGE_NO_PHRASE:
+                        cov = min(cov, MIN_COVERAGE - 0.01)      # cannot pass the gate on scatter
+                    best = max(best, cov)
+                cover[cid] = best
         max_lex = max(lex.values(), default=0.0) or 1.0
         # vector leg (per-chunk cosine; no routing, no centroids)
         vec_scores: dict[str, float] = {}
