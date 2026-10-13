@@ -24243,7 +24243,7 @@
     "messages": [
      {
       "edited": false,
-      "text": "Leads only, please don't forward yet: The vendor's change-data-capture licence lapses on 31 October 2026, and finance has not approved the renewal, so the cutover may slip by a month. [ref CNRY-03f531]",
+      "text": "Second blocker for the migration, leads only, please don't forward yet: The vendor's change-data-capture licence lapses on 31 October 2026, and finance has not approved the renewal, so the cutover may slip by a month. [ref CNRY-03f531]",
       "ts": "1791425700.000107",
       "user": "nina.k"
      },

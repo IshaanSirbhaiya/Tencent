@@ -12,8 +12,10 @@ log = logging.getLogger("databridge_ib.freshness")
 
 
 class Poller:
-    def __init__(self, ingestor, interval_s: float) -> None:
+    def __init__(self, ingestor, interval_s: float, *, full_every: int = 10) -> None:
         self.ingestor = ingestor
+        self.full_every = max(1, int(full_every))     # every Nth tick: full reconciliation
+        self._ticks = 0
         self.interval_s = max(5.0, float(interval_s))
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -29,7 +31,8 @@ class Poller:
 
     def _run(self) -> None:
         while not self._stop.wait(self.interval_s):
+            self._ticks += 1
             try:
-                self.ingestor.sync_all()
+                self.ingestor.sync_all(full=self._ticks % self.full_every == 0)
             except Exception as exc:                                # noqa: BLE001
                 log.warning("poll tick failed: %s", exc)

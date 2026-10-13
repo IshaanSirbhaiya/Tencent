@@ -48,10 +48,17 @@ class Ingestor:
         tmp.replace(self.cursor_path)
 
     # -- full / incremental sync --------------------------------------------------------------
-    def sync(self, platform: str) -> dict:
+    def sync(self, platform: str, *, full: bool = False) -> dict:
+        """Incremental from the stored cursor, or ``full`` (cursor None): a full reconciliation that
+        also repairs drift between webhook-applied state and the cursor's snapshot."""
         conn = self.connectors[platform]
         with self._lock:
-            batch = conn.list_changes(self._cursors().get(platform))
+            batch = conn.list_changes(None if full else self._cursors().get(platform))
+            if full:
+                seen = {d.doc_id for d in batch.docs}
+                for d in [x for x in self.index.doc_ids() if x.startswith(platform + ":")]:
+                    if d not in seen:
+                        self.index.delete(d)
             for doc in batch.docs:
                 self.index.upsert(doc, conn.acl(doc.doc_id))
             for d in batch.deleted:
@@ -69,11 +76,11 @@ class Ingestor:
         self._ledger_event("ingest.sync", platform, summary)
         return summary
 
-    def sync_all(self) -> list[dict]:
+    def sync_all(self, *, full: bool = False) -> list[dict]:
         out = []
         for p in self.connectors:
             try:
-                out.append(self.sync(p))
+                out.append(self.sync(p, full=full))
             except Exception as exc:                                # noqa: BLE001
                 self.status[p]["state"] = f"error: {type(exc).__name__}"
                 log.warning("sync %s failed: %s", p, exc)

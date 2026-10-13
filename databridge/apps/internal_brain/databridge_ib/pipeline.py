@@ -28,9 +28,23 @@ from .models import (REFUSAL_TEXT, AccessCheck, AnswerReleased, AskResponse, Cit
 from .timewin import parse as parse_window
 
 EXTRACTIVE = ModelInfo(provider="deterministic", model="extractive-v1")
-MAX_PASSAGES = 10
+MAX_PASSAGES = 14
 MAX_CHUNKS_PER_DOC = 2
 MAX_LINKED = 4
+PER_PLATFORM_K = 4
+#: words in a question that name a platform → that platform gets its own top-k slot, searched only
+#: over the asker's readable docs ON that platform (recall, not access: Gate 1 already applied)
+PLATFORM_HINTS = {
+    "slack": ("slack", "channel", "thread", "chat", "discussion", "discussed", "raised"),
+    "confluence": ("confluence", "wiki", "runbook", "page", "decision doc", "adr", "design doc", "rca"),
+    "jira": ("jira", "ticket", "tickets", "issue", "issues", "status", "follow-up", "blocker"),
+    "drive": ("drive", "google drive", "file", "sheet", "spreadsheet", "postmortem", "deck", "pricing"),
+}
+
+
+def platform_hints(question: str) -> list[str]:
+    q = f" {(question or '').lower()} "
+    return [p for p, words in PLATFORM_HINTS.items() if any(f" {w}" in q for w in words)]
 
 
 class Ledger(Protocol):
@@ -81,6 +95,13 @@ class Pipeline:
         readable = self.index.readable(user, epoch)
         hits = [h for h in self.index.search(question, readable, k=self.top_k, window=window)
                 if h.lexical]                                         # 5 — relevance gate
+        seen = {h.chunk_id for h in hits}
+        for platform in platform_hints(question):                    # per-platform recall slots
+            scoped = [d for d in readable if d.startswith(platform + ":")]
+            for h in self.index.search(question, scoped, k=PER_PLATFORM_K, window=window):
+                if h.lexical and h.chunk_id not in seen:
+                    hits.append(h)
+                    seen.add(h.chunk_id)
         cand_docs = list(dict.fromkeys(h.doc_id for h in hits))
         checks: dict[str, AccessCheck] = {}
         released_hits: list[Hit] = []
@@ -174,14 +195,28 @@ class Pipeline:
         """Re-rank after read-through (content may have changed) and cap chunks per doc."""
         if not ok_docs:
             return []
-        fresh = [h for h in self.index.search(question, ok_docs,
-                                              k=self.top_k, window=window) if h.lexical]
-        out, per = [], {}
+        # Rank over the asker's FULL permitted set (the same statistics Gate 1 used — a tiny
+        # candidate-only corpus would distort IDF and coverage), then keep the Gate-2-allowed docs.
+        # Re-running the search also picks up content re-read on drift.
+        pool = set(readable) | ok_docs
+        fresh = [h for h in self.index.search(question, pool, k=max(self.top_k * 4, 60), window=window)
+                 if h.lexical and h.doc_id in ok_docs]
+        ranked, per = [], {}
         for h in fresh:
             if h.doc_id not in ok_docs or per.get(h.doc_id, 0) >= MAX_CHUNKS_PER_DOC:
                 continue
             per[h.doc_id] = per.get(h.doc_id, 0) + 1
-            out.append(h)
+            ranked.append(h)
+        # round-robin across platforms (each keeps its own score order): a cross-platform question
+        # gets cross-platform evidence before the context budget truncates (MAX_PASSAGES)
+        lanes: dict[str, list[Hit]] = {}
+        for h in ranked:
+            lanes.setdefault(h.doc_id.split(":", 1)[0], []).append(h)
+        out = []
+        while any(lanes.values()):
+            for lane in list(lanes.values()):
+                if lane:
+                    out.append(lane.pop(0))
         return out
 
     def _linked(self, released: list[Hit], readable, already: set[str]) -> list[str]:

@@ -144,7 +144,7 @@ def test_s1_permitted_answer_cites_only_permitted(tmp_path):
 def test_p1_restricted_never_in_any_prompt(tmp_path):
     captured = []
     p, _ = _pipe(tmp_path, [PUBLIC, PRIVATE], READERS, chain=_capturing_chain(captured))
-    r = p.ask(p.directory.get("jdoe"), "database migration budget vendor contract risk")
+    r = p.ask(p.directory.get("jdoe"), "database migration status, and the vendor contract risk")
     assert captured, "the model should have been called with the permitted passage"
     assert all(CANARY not in c and "budget overrun" not in c for c in captured)
     assert r.model.model == "hy3"

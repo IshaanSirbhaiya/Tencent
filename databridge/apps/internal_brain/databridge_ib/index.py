@@ -32,7 +32,13 @@ from .timewin import Window, overlaps
 
 RRF_K = 60
 EXACT_BONUS = 1.0
-WINDOW_BONUS = 1.0 / RRF_K
+WINDOW_BONUS = 0.15
+TITLE_WEIGHT = 0.6
+#: a passage is RELEVANT only if it covers this share of the question's IDF-weighted terms
+#: (IDF from the asker's permitted corpus — P2 holds); below it the passage never reaches a model
+MIN_COVERAGE = 0.4
+#: weight of the vector leg; the offline hashing embedding is lexical noise, so it barely counts
+VECTOR_WEIGHT_REAL, VECTOR_WEIGHT_OFFLINE = 0.35, 0.05
 CHUNK_CHARS = 700
 BM25_K1, BM25_B = 1.2, 0.75
 
@@ -42,11 +48,69 @@ STOPWORDS = frozenset(
     "a an and are as at be been but by can could did do does for from had has have how i if in "
     "into is it its me my of on or our so than that the their them then there these they this to "
     "was we were what when where which who why will with would you your about any there's what's "
-    "show tell give find list please latest last week weeks month quarter sprint days day recent".split())
+    "show tell give find list please latest last week weeks month quarter sprint days day recent "
+    "summarize summarise summary explain describe provide link around new current any were".split())
+
+
+#: platform names are routing HINTS (pipeline.platform_hints), not content: "raised in Slack" must
+#: not require the word "slack" to appear in a Slack thread
+PLATFORM_WORDS = frozenset("slack confluence jira drive google gdrive wiki".split())
+_SUFFIXES = ("ing", "ed", "es", "s")
+
+
+def stem(t: str) -> str:
+    """Tiny, deterministic suffix stripper (applied identically to docs and queries):
+    raised/raise/raising → rais, blockers → blocker."""
+    if any(ch.isdigit() for ch in t):
+        return t
+    for suf in _SUFFIXES:
+        if t.endswith(suf) and len(t) - len(suf) >= 4:
+            t = t[: -len(suf)]
+            break
+    if t.endswith("e") and len(t) >= 5:
+        t = t[:-1]
+    return t
 
 
 def tokens(text: str) -> list[str]:
-    return [t for t in _TOKEN.findall((text or "").lower()) if len(t) > 1 and t not in STOPWORDS]
+    out = []
+    for t in _TOKEN.findall((text or "").lower()):
+        parts = [t] + ([p for p in re.split(r"[-_.]", t) if p] if re.search(r"[-_.]", t) else [])
+        for p in parts:
+            if len(p) > 1 and p not in STOPWORDS:
+                out.append(stem(p))
+    return out
+
+
+_CLAUSE = re.compile(r"\band\b|\balso\b|[,;?]|\bplus\b", re.I)
+
+
+def clauses(text: str) -> list[list[str]]:
+    """Content terms per clause of a (possibly multi-intent) question."""
+    out = [query_terms(c) for c in _CLAUSE.split(text or "")]
+    return [c for c in out if c]
+
+
+def query_terms(text: str) -> list[str]:
+    plat = {stem(w) for w in PLATFORM_WORDS} | set(PLATFORM_WORDS)
+    return [t for t in dict.fromkeys(tokens(text)) if t not in plat]
+
+
+_WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'-]*")
+
+
+def anchors(text: str) -> set[str]:
+    """Distinctive question words: tokens with a digit (Q3, wave-4) or capitalised words that do
+    not open the sentence (Indonesian). A clause naming an anchor that occurs in NONE of the asker's
+    permitted chunks cannot be answered from their sources."""
+    out = set()
+    words = _WORD.findall(text or "")
+    for i, w in enumerate(words):
+        if w.lower() in PLATFORM_WORDS or w in ("I",):
+            continue
+        if any(ch.isdigit() for ch in w) or (i > 0 and w[0].isupper()):
+            out.update(tokens(w))
+    return {a for a in out if a not in {stem(p) for p in PLATFORM_WORDS}}
 
 
 def identifiers(text: str) -> list[str]:
@@ -73,7 +137,8 @@ class Hit:
     doc_id: str
     text: str
     score: float
-    lexical: bool          # shares a content word or identifier with the query (relevance gate)
+    lexical: bool          # passes the relevance gate (IDF coverage ≥ MIN_COVERAGE, or exact id)
+    coverage: float = 0.0
 
 
 Embedder = Callable[[list[str]], tuple[list[list[float]], str]]
@@ -122,7 +187,10 @@ class Index:
         self.acl_version += 1
 
     def _add_chunk(self, cid: str, doc_id: str, text: str, vec) -> None:
-        title = self._docs.get(doc_id, {}).get("title", "")
+        row = self._docs.get(doc_id, {})
+        title = row.get("title", "")
+        #: the container (space / project / channel / drive) name is part of a doc's "title" signal
+        heading = f"{title} {row.get('container_name', '')}"
         toks = tokens(f"{title}\n{text}")
         tf: dict[str, int] = {}
         for t in toks:
@@ -131,7 +199,8 @@ class Index:
             n = float(np.linalg.norm(vec))
             vec = vec / n if n else vec
         self._chunks[cid] = {"doc_id": doc_id, "text": text, "tf": tf, "len": max(1, len(toks)),
-                             "vec": vec, "idents": set(identifiers(f"{title} {text}"))}
+                             "vec": vec, "idents": set(identifiers(f"{title} {text}")),
+                             "title_terms": set(tokens(heading))}
         self._doc_chunks.setdefault(doc_id, []).append(cid)
 
     # -- writes ---------------------------------------------------------------------------------
@@ -222,52 +291,66 @@ class Index:
                      for c in (self._chunks.get(cid),) if c is not None]
         if not cands:
             return []
-        q_terms = list(dict.fromkeys(tokens(query)))
+        q_terms = query_terms(query)
         q_idents = set(identifiers(query))
-        # BM25 with statistics from the permitted corpus only
+        # statistics from the permitted corpus only (P2)
         n = len(cands)
         avgdl = sum(c["len"] for _, c in cands) / n
         df = {t: sum(1 for _, c in cands if t in c["tf"]) for t in q_terms}
-        bm25: dict[str, float] = {}
+        idf = {t: math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5)) for t in q_terms}
+        parts = [c for c in clauses(query) if any(t in idf for t in c)] or [q_terms]
+        # A clause naming a distinctive anchor (Q7, Indonesian) that occurs in NONE of the asker's
+        # permitted chunks cannot be answered from their sources: it scores 0. df is over the
+        # permitted corpus only, so this reveals nothing about restricted content.
+        anc = anchors(query)
+        answerable = [p for p in parts if not any(t in anc and df.get(t, 0) == 0 for t in p)]
+        lex: dict[str, float] = {}
+        cover: dict[str, float] = {}
         for cid, c in cands:
             s = 0.0
+            hit_terms = set()
             for t in q_terms:
                 f = c["tf"].get(t, 0)
-                if not f:
-                    continue
-                idf = math.log(1 + (n - df[t] + 0.5) / (df[t] + 0.5))
-                s += idf * f * (BM25_K1 + 1) / (f + BM25_K1 * (1 - BM25_B + BM25_B * c["len"] / avgdl))
+                in_title = t in c["title_terms"]
+                if f:
+                    s += idf[t] * f * (BM25_K1 + 1) / (f + BM25_K1 * (1 - BM25_B + BM25_B * c["len"] / avgdl))
+                if in_title:
+                    s += TITLE_WEIGHT * idf[t]
+                if f or in_title:
+                    hit_terms.add(t)
             if s > 0:
-                bm25[cid] = s
-        # vector leg
+                lex[cid] = s
+                # best coverage over the question's clauses (multi-intent questions)
+                cover[cid] = max((sum(idf.get(t, 0) for t in p if t in hit_terms) /
+                                  (sum(idf.get(t, 0) for t in p) or 1.0) for p in answerable),
+                                 default=0.0)
+        max_lex = max(lex.values(), default=0.0) or 1.0
+        # vector leg (per-chunk cosine; no routing, no centroids)
         vec_scores: dict[str, float] = {}
-        qv, _ = self.embed([query])
+        qv, model = self.embed([query])
+        w_vec = VECTOR_WEIGHT_OFFLINE if "hash" in str(model).lower() or "offline" in str(model).lower()             else VECTOR_WEIGHT_REAL
         q = np.asarray(qv[0], dtype=np.float32)
         qn = float(np.linalg.norm(q))
         if qn:
             q = q / qn
             for cid, c in cands:
                 if c["vec"] is not None and c["vec"].shape == q.shape:
-                    vec_scores[cid] = float(np.dot(c["vec"], q))
-        # fuse
-        acc: dict[str, float] = {}
-        for r, cid in enumerate(sorted(bm25, key=lambda x: (-bm25[x], x)), start=1):
-            acc[cid] = acc.get(cid, 0.0) + 1.0 / (RRF_K + r)
-        for r, cid in enumerate(sorted(vec_scores, key=lambda x: (-vec_scores[x], x)), start=1):
-            if r > max(4 * k, 40):
-                break
-            acc[cid] = acc.get(cid, 0.0) + 1.0 / (RRF_K + r)
+                    vec_scores[cid] = max(0.0, float(np.dot(c["vec"], q)))
         hits = []
-        for cid, sc in acc.items():
-            c = self._chunks[cid]
-            lexical = cid in bm25 or bool(q_idents & c["idents"])
-            if q_idents & c["idents"]:
-                sc += EXACT_BONUS * len(q_idents & c["idents"])
+        for cid, c in cands:
+            l = lex.get(cid, 0.0) / max_lex
+            v = vec_scores.get(cid, 0.0)
+            exact = q_idents & c["idents"]
+            if not l and not exact and v < 0.2:
+                continue
+            sc = l + w_vec * v + EXACT_BONUS * len(exact)
             if window is not None:
                 d = self._docs[c["doc_id"]]
                 if overlaps(window, datetime.fromisoformat(d["created_at"]),
                             datetime.fromisoformat(d["updated_at"])):
                     sc += WINDOW_BONUS
-            hits.append(Hit(cid, c["doc_id"], c["text"], sc, lexical))
+            cov = cover.get(cid, 0.0)
+            relevant = bool(exact) or (cov >= MIN_COVERAGE)
+            hits.append(Hit(cid, c["doc_id"], c["text"], sc, relevant, cov))
         hits.sort(key=lambda h: (-h.score, h.chunk_id))
         return hits[:k]
