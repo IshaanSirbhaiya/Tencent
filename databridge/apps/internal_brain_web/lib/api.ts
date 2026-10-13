@@ -81,7 +81,11 @@ export function groupByRequest(rows: LedgerRow[]): AuditEvent[] {
 }
 
 export const api = {
-  login: (persona: string) => call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', { method: 'POST', body: { persona } }),
+  login: (persona: string, passcode?: string) =>
+    call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
+      method: 'POST',
+      body: passcode ? { persona, passcode } : { persona },
+    }),
   logout: () => call<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {} }),
   whoami: () => call<WhoAmI>('/auth/whoami'),
   ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question } }),

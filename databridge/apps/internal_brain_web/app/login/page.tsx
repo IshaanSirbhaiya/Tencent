@@ -11,17 +11,20 @@ export default function LoginPage() {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [passcode, setPasscode] = useState('');
 
   async function signIn(p: Persona) {
     setBusy(p.id);
     setError(null);
     try {
-      const r = await api.login(p.id);
+      const r = await api.login(p.id, passcode.trim() || undefined);
       router.replace(r.roles.includes('admin_it') && !r.roles.includes('compliance_officer') ? '/sim' : '/');
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
       setError(
-        status === 404
+        status === 401
+          ? 'This demo needs the passcode you were given. Check it and try again.'
+          : status === 404
           ? 'Demo sign-in is not enabled on this server.'
           : status === 400
             ? 'That persona is not in the directory.'
@@ -85,6 +88,19 @@ export default function LoginPage() {
             </p>
           </div>
           <div className="space-y-5 px-5 py-4">
+            <div>
+              <label htmlFor="demo-passcode" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">
+                Demo passcode <span className="font-normal normal-case">(only if you were given one)</span>
+              </label>
+              <input
+                id="demo-passcode"
+                type="password"
+                autoComplete="off"
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                className="w-full max-w-xs rounded-md border border-line-strong bg-raised px-3 py-2 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            </div>
             <div>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">People at Company A</h2>
               <ul className="grid gap-2 sm:grid-cols-2">
