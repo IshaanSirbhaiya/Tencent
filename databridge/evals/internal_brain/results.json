@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-13T17:52:51+00:00",
+ "generated_at": "2026-10-13T18:00:14+00:00",
  "config": {
   "world": "E:\\Tenecent Hack_Walnut\\Tencent\\databridge\\fixtures\\enterprise\\world.json",
   "world_sha256": "359938e34c0006dba6a2e56b2b565340f1842bf290f640a66b20fdaaedb7a5af",
@@ -40,12 +40,12 @@
    "p2_n": 100,
    "no_p2": false,
    "out": "E:\\Tenecent Hack_Walnut\\Tencent\\databridge\\evals\\internal_brain",
-   "work": "C:\\Users\\<user>\\AppData\\Local\\Temp\\ibeval-2slsc6o2"
+   "work": "C:\\Users\\<user>\\AppData\\Local\\Temp\\ibeval-qlq50qjr"
   },
   "shards": {
    "A0": {
-    "build_s": 25.6,
-    "run_s": 81.4,
+    "build_s": 19.7,
+    "run_s": 57.8,
     "n_records": 1986,
     "indexed_docs": 1140,
     "indexed_by_platform": {
@@ -62,8 +62,8 @@
     ]
    },
    "A1": {
-    "build_s": 34.5,
-    "run_s": 76.0,
+    "build_s": 20.0,
+    "run_s": 56.9,
     "n_records": 1986,
     "indexed_docs": 1140,
     "indexed_by_platform": {
@@ -80,8 +80,8 @@
     ]
    },
    "A2": {
-    "build_s": 25.4,
-    "run_s": 76.3,
+    "build_s": 20.5,
+    "run_s": 53.6,
     "n_records": 1986,
     "indexed_docs": 1140,
     "indexed_by_platform": {
@@ -98,8 +98,8 @@
     ]
    },
    "A_control": {
-    "build_s": 25.4,
-    "run_s": 10.9,
+    "build_s": 19.9,
+    "run_s": 11.6,
     "n_records": 400,
     "indexed_docs": 1140,
     "indexed_by_platform": {
@@ -116,8 +116,8 @@
     ]
    },
    "B_jdoe": {
-    "build_s": 28.1,
-    "run_s": 7.7,
+    "build_s": 14.8,
+    "run_s": 7.5,
     "n_records": 200,
     "indexed_docs": 867,
     "indexed_by_platform": {
@@ -134,8 +134,8 @@
     ]
    },
    "B_ken.ext": {
-    "build_s": 4.3,
-    "run_s": 0.8,
+    "build_s": 2.2,
+    "run_s": 0.3,
     "n_records": 200,
     "indexed_docs": 24,
     "indexed_by_platform": {
@@ -174,7 +174,7 @@
    "extractive": 1.0
   },
   "canaries_valid": true,
-  "runtime_s": 113.2,
+  "runtime_s": 78.9,
   "shards_failed": 0
  },
  "per_mode": {
@@ -189,7 +189,7 @@
    "served_by_model": 681,
    "model_called_but_grounding_fell_back": 2,
    "errors": 0,
-   "latency_ms_mean": 34.4
+   "latency_ms_mean": 23.2
   },
   "extractive": {
    "requests": 2979,
@@ -202,7 +202,7 @@
    "served_by_model": 0,
    "model_called_but_grounding_fell_back": 0,
    "errors": 0,
-   "latency_ms_mean": 36.0
+   "latency_ms_mean": 28.4
   }
  },
  "taxonomy": {
@@ -379,7 +379,7 @@
  "errors": [],
  "expected_refusal_failures": [
   {
-   "req_id": "527b6fdc5e1e44c780a683e2ab250525",
+   "req_id": "b85886aade46490e8eb0cdea1b89c4df",
    "persona": "maya.compliance",
    "probe": "W-P-maya.compliance-34",
    "type": "world:direct",
@@ -389,7 +389,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "c1840d65d7e5403c8d66d4f2bf7c6f50",
+   "req_id": "4cf7613f2ab34291acbbaca9584e8d3c",
    "persona": "maya.compliance",
    "probe": "W-P-maya.compliance-34",
    "type": "world:direct",
@@ -399,7 +399,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "83e1cb0a9a5e4509a06d25d0cda7a9ed",
+   "req_id": "8ee78a1d75804ddaa360229f71a52ba9",
    "persona": "admin.it",
    "probe": "W-P-admin.it-34",
    "type": "world:direct",
@@ -409,7 +409,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "ccf87bcdb4284681bf904c4e1e1e766d",
+   "req_id": "ee1330316cbe4c09865911de0ad039aa",
    "persona": "amy.am",
    "probe": "W-P-amy.am-13",
    "type": "world:direct",
@@ -419,7 +419,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "e4aece58585d45b09de3d4a1f7141874",
+   "req_id": "4c1635e9d52c463aad21a5a456f9d549",
    "persona": "amy.am",
    "probe": "W-P-amy.am-34",
    "type": "world:direct",
@@ -429,7 +429,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "f251b4da82b64109a37a7ad2aff8203a",
+   "req_id": "3f47114523c4461b8496d48bd0601a3b",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-13",
    "type": "world:direct",
@@ -439,7 +439,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "916675bcbf72417d9283da884c299afa",
+   "req_id": "21cbef329ee74138acd1650921adbef8",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-34",
    "type": "world:direct",
@@ -449,7 +449,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "4342271dfba3428fae94507fd5bcbbe8",
+   "req_id": "be46e3fa4c6c4458b5ff64d00afca61c",
    "persona": "admin.it",
    "probe": "W-P-admin.it-34",
    "type": "world:direct",
@@ -459,7 +459,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "aa211c1262a64a2fa64876d1448ccdfc",
+   "req_id": "06e08ae56f124120b65c40be10f8456f",
    "persona": "amy.am",
    "probe": "W-P-amy.am-13",
    "type": "world:direct",
@@ -469,7 +469,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "a7c455039eae4df5a1efc20096e7351f",
+   "req_id": "76f4f1b07ab2436eafbcf3fab4328db8",
    "persona": "amy.am",
    "probe": "W-P-amy.am-34",
    "type": "world:direct",
@@ -479,7 +479,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "0995e7494d024a9b94f39bf3d6456407",
+   "req_id": "3048f4fd4c5143d2b873564bc7ed0f76",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-13",
    "type": "world:direct",
@@ -489,7 +489,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "c336eddf92324009a6af74a93b95cdce",
+   "req_id": "35044cf420d942c68204582e181ce68f",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-34",
    "type": "world:direct",
@@ -499,7 +499,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "2f27af5b1fd646e284ddadac36c03ddb",
+   "req_id": "8780b9f7887a40ceab352ecd7f1c2e76",
    "persona": "leo.ops",
    "probe": "W-P-leo.ops-34",
    "type": "world:direct",
@@ -509,7 +509,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "9c508196e33a4044a626fcbbeda66759",
+   "req_id": "313c51733945449ba4c54badc6438a5b",
    "persona": "leo.ops",
    "probe": "W-P-leo.ops-34",
    "type": "world:direct",
@@ -532,7 +532,7 @@
   },
   "examples": [
    {
-    "req_id": "527b6fdc5e1e44c780a683e2ab250525",
+    "req_id": "b85886aade46490e8eb0cdea1b89c4df",
     "persona": "maya.compliance",
     "probe": "W-P-maya.compliance-34",
     "type": "world:direct",
@@ -542,7 +542,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "c1840d65d7e5403c8d66d4f2bf7c6f50",
+    "req_id": "4cf7613f2ab34291acbbaca9584e8d3c",
     "persona": "maya.compliance",
     "probe": "W-P-maya.compliance-34",
     "type": "world:direct",
@@ -552,7 +552,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "83e1cb0a9a5e4509a06d25d0cda7a9ed",
+    "req_id": "8ee78a1d75804ddaa360229f71a52ba9",
     "persona": "admin.it",
     "probe": "W-P-admin.it-34",
     "type": "world:direct",
@@ -562,7 +562,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "ccf87bcdb4284681bf904c4e1e1e766d",
+    "req_id": "ee1330316cbe4c09865911de0ad039aa",
     "persona": "amy.am",
     "probe": "W-P-amy.am-13",
     "type": "world:direct",
@@ -572,7 +572,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "e4aece58585d45b09de3d4a1f7141874",
+    "req_id": "4c1635e9d52c463aad21a5a456f9d549",
     "persona": "amy.am",
     "probe": "W-P-amy.am-34",
     "type": "world:direct",
@@ -582,7 +582,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "f251b4da82b64109a37a7ad2aff8203a",
+    "req_id": "3f47114523c4461b8496d48bd0601a3b",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-13",
     "type": "world:direct",
@@ -592,7 +592,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "916675bcbf72417d9283da884c299afa",
+    "req_id": "21cbef329ee74138acd1650921adbef8",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-34",
     "type": "world:direct",
@@ -602,7 +602,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "4342271dfba3428fae94507fd5bcbbe8",
+    "req_id": "be46e3fa4c6c4458b5ff64d00afca61c",
     "persona": "admin.it",
     "probe": "W-P-admin.it-34",
     "type": "world:direct",
@@ -612,7 +612,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "aa211c1262a64a2fa64876d1448ccdfc",
+    "req_id": "06e08ae56f124120b65c40be10f8456f",
     "persona": "amy.am",
     "probe": "W-P-amy.am-13",
     "type": "world:direct",
@@ -622,7 +622,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "a7c455039eae4df5a1efc20096e7351f",
+    "req_id": "76f4f1b07ab2436eafbcf3fab4328db8",
     "persona": "amy.am",
     "probe": "W-P-amy.am-34",
     "type": "world:direct",
@@ -632,7 +632,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "0995e7494d024a9b94f39bf3d6456407",
+    "req_id": "3048f4fd4c5143d2b873564bc7ed0f76",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-13",
     "type": "world:direct",
@@ -642,7 +642,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "c336eddf92324009a6af74a93b95cdce",
+    "req_id": "35044cf420d942c68204582e181ce68f",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-34",
     "type": "world:direct",
@@ -652,7 +652,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "2f27af5b1fd646e284ddadac36c03ddb",
+    "req_id": "8780b9f7887a40ceab352ecd7f1c2e76",
     "persona": "leo.ops",
     "probe": "W-P-leo.ops-34",
     "type": "world:direct",
@@ -662,7 +662,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "9c508196e33a4044a626fcbbeda66759",
+    "req_id": "313c51733945449ba4c54badc6438a5b",
     "persona": "leo.ops",
     "probe": "W-P-leo.ops-34",
     "type": "world:direct",
@@ -862,16 +862,16 @@
     "jdoe": {
      "n": 10,
      "released": 10,
-     "cited": 9,
+     "cited": 10,
      "released_recall": 1.0,
-     "cited_recall": 0.9
+     "cited_recall": 1.0
     },
     "ALL": {
      "n": 48,
      "released": 48,
-     "cited": 45,
+     "cited": 47,
      "released_recall": 1.0,
-     "cited_recall": 0.9375
+     "cited_recall": 0.9791666666666666
     },
     "priya.sre": {
      "n": 7,
@@ -890,9 +890,9 @@
     "mlro.tan": {
      "n": 7,
      "released": 7,
-     "cited": 6,
+     "cited": 7,
      "released_recall": 1.0,
-     "cited_recall": 0.8571428571428571
+     "cited_recall": 1.0
     },
     "leo.ops": {
      "n": 13,

@@ -237,3 +237,18 @@ def test_model_answer_that_is_only_injection_falls_back_to_extractive(tmp_path):
     r = p.ask(p.directory.get("jdoe"), "when is the database migration cutover?")
     assert "audit_verify" not in r.answer
     assert r.model.model == "extractive-v1"
+
+
+def test_extractive_answer_spans_platforms_before_filling_by_score():
+    from databridge_ib.narrate import Passage, extractive_answer
+
+    def p(tag, platform, text):
+        return Passage(tag=tag, doc_id=f"{platform}:{tag}", platform=platform, container_name="c",
+                       title="t", version="1", updated="2026-10-13", text=text)
+
+    passages = [p("C1", "slack", "Migration blocker: replication lag paused the migration copy job. "
+                  "Migration status is amber after the migration backfill pause. "
+                  "Migration owners will meet on Monday about the migration."),
+                p("C2", "confluence", "The migration cutover is planned for 24 October.")]
+    ans = extractive_answer(passages, "migration status and blockers", max_sentences=2)
+    assert "[C1]" in ans and "[C2]" in ans

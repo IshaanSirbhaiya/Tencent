@@ -158,12 +158,20 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
             overlap = len(q & stoks)
             if overlap:
                 # sentences naming the question's specifics (a market, an id) rank first
-                scored.append((-(overlap + 2 * len(anc & stoks)), order, j, s, p.tag))
+                scored.append((-(overlap + 2 * len(anc & stoks)), order, j, s, p.tag, p.platform))
     if not scored:
         return REFUSAL_TEXT
     scored.sort()
+    # cross-platform first: the best sentence of each platform whose best match is at least half as
+    # strong as the overall best, then the remaining slots by score
+    best = -scored[0][0]
+    lead, platforms = [], set()
+    for row in scored:
+        if row[5] not in platforms and -row[0] * 2 >= best:
+            platforms.add(row[5])
+            lead.append(row)
     picked, seen = [], set()
-    for _, order, j, s, tag in scored:
+    for score, order, j, s, tag, _pl in lead + scored:
         if s in seen:
             continue
         seen.add(s)
