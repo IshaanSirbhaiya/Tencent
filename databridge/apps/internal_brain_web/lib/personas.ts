@@ -89,9 +89,9 @@ export const PERSONAS: Persona[] = [
     role: 'Account manager',
     note: 'Customer & product spaces; no FinCrime case access',
     suggestions: [
-      "Why has Harbourline Trading's account been restricted, and what should I tell the customer?",
+      "Why has Velquarry Trading's account been restricted, and what should I tell the customer?",
       "Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?",
-      'Has a suspicious transaction report been filed on Harbourline Trading?',
+      'Has a suspicious transaction report been filed on Velquarry Trading?',
       'Can we offer multi-currency accounts to a Singapore SME?',
     ],
   },
@@ -101,7 +101,7 @@ export const PERSONAS: Persona[] = [
     role: 'MLRO (FinCrime)',
     note: 'FinCrime space, #fincrime-cases, case files — need-to-know only',
     suggestions: [
-      'What did the review of Harbourline Trading Pte Ltd find, and has a suspicious transaction report been filed?',
+      'What did the review of Velquarry Trading Pte Ltd find, and has a suspicious transaction report been filed?',
       'What does the tipping-off handling guidance say?',
       'Show me the security incident report from the Q3 breach.',
       "What's the status of the database migration project?",

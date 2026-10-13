@@ -116,7 +116,7 @@ def test_fincrime_compartment_is_sealed_by_source_acls(world, ref, texts):
     for f in fc:
         assert f["canary"] and f["permitted"] == ["mlro.tan"], f["id"]
     # the customer's name occurs ONLY in documents the FinCrime team alone can read
-    named = [d for d, t in texts.items() if "harbourline" in t.lower()]
+    named = [d for d, t in texts.items() if "velquarry" in t.lower()]
     assert len(named) >= 4
     for d in named:
         readers = ref.can_read(d)
@@ -127,7 +127,7 @@ def test_fincrime_compartment_is_sealed_by_source_acls(world, ref, texts):
 def test_customer_review_script_is_readable_by_account_managers_not_fincrime_only(world):
     f = _fact(world, "CX-review-script")
     assert {"amy.am", "leo.ops"} <= set(f["permitted"]) and "mlro.tan" not in f["permitted"]
-    assert "harbourline" not in f["statement"].lower()
+    assert "velquarry" not in f["statement"].lower()
 
 
 def _stem(t: str) -> str:

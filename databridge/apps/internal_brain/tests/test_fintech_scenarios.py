@@ -126,7 +126,7 @@ def test_fc_account_manager_gets_only_the_approved_script(env):
         assert f["doc"] not in decided.considered
         assert f["statement"][:50] not in resp.answer and f["canary"] not in resp.answer
     # nothing the account manager can read names the customer, so the answer cannot either
-    assert "harbourline" not in resp.answer.lower()
+    assert "velquarry" not in resp.answer.lower()
 
 
 def test_fc_direct_str_question_is_refused(env):
