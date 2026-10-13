@@ -97,6 +97,11 @@ class IbGroundedNarrator(GroundedNarrator):
 
 
 _SENT = re.compile(r"(?<=[.!?])\s+")
+#: field-header lines of tickets/pages that are metadata, not answers
+_METADATA = re.compile(r"^(status|reporter|assignee|linked issues|labels|priority|ref|see the)\b[^.]*:",
+                       re.I)
+_URL_ONLY = re.compile(r"^\(?https?://\S+\)?\.?$")
+_URL = re.compile(r"\s*\(?https?://\S+\)?")
 
 
 def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentences: int = 4) -> str:
@@ -105,9 +110,15 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
     q = set(tokens(question)) - STOPWORDS
     scored = []
     for order, p in enumerate(passages):
-        for j, s in enumerate(_SENT.split(" ".join(p.text.split()))):
-            s = s.strip()
-            if len(s) < 12:
+        sentences = []
+        for line in (p.text or "").splitlines():           # lines first: tickets are field-per-line
+            line = line.strip()
+            if not line or _METADATA.match(line) or _URL_ONLY.match(line):
+                continue
+            sentences.extend(_SENT.split(" ".join(line.split())))
+        for j, s in enumerate(sentences):
+            s = _URL.sub("", s).strip()
+            if len(s) < 12 or len(s) > 400:
                 continue
             overlap = len(q & set(tokens(s)))
             if overlap:
