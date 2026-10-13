@@ -28,6 +28,7 @@ from .models import (REFUSAL_TEXT, AccessCheck, AnswerReleased, AskResponse, Cit
                      DirectoryUser, Gate2Decision, ModelInfo, RequestAccepted, RetrievalDecided)
 from .timewin import parse as parse_window
 from .timewin import strip as strip_window
+from .sensitive import mask_doc
 
 EXTRACTIVE = ModelInfo(provider="deterministic", model="extractive-v1")
 MAX_PASSAGES = 14
@@ -217,7 +218,7 @@ class Pipeline:
                         self.index.delete(d)
                         continue
                     fresh_acl = conn.acl(d)
-                    self.index.upsert(fresh, fresh_acl)
+                    self.index.upsert(mask_doc(fresh), fresh_acl)    # masked like any ingest (F4)
                     if not aclmod.allows(fresh_acl, user):
                         continue            # the new version is no longer readable by this user
                     if fresh.version != c.current_version:

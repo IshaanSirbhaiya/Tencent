@@ -76,10 +76,35 @@ export const PERSONAS: Persona[] = [
     role: 'Product & ops',
     note: 'Product space, Drive "Pricing & Offers"',
     suggestions: [
-      'Can we offer multi-currency accounts to an Indonesian SME customer?',
-      'What are the pricing tiers for corporate cards?',
-      'What did customers say about plan limits?',
+      'Can we offer multi-currency accounts to a Singapore SME?',
+      'Can we offer multi-currency accounts to an Indonesian SME?',
+      'What is the SG FX conversion fee?',
+      'What card details did the merchant paste into the duplicate charge dispute?',
       'What was the root cause of the payment outage last quarter, and what follow-up tickets were created?',
+    ],
+  },
+  {
+    id: 'amy.am',
+    name: 'Amy',
+    role: 'Account manager',
+    note: 'Customer & product spaces; no FinCrime case access',
+    suggestions: [
+      "Why has Harbourline Trading's account been restricted, and what should I tell the customer?",
+      "Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?",
+      'Has a suspicious transaction report been filed on Harbourline Trading?',
+      'Can we offer multi-currency accounts to a Singapore SME?',
+    ],
+  },
+  {
+    id: 'mlro.tan',
+    name: 'Rachel',
+    role: 'MLRO (FinCrime)',
+    note: 'FinCrime space, #fincrime-cases, case files — need-to-know only',
+    suggestions: [
+      'What did the review of Harbourline Trading Pte Ltd find, and has a suspicious transaction report been filed?',
+      'What does the tipping-off handling guidance say?',
+      'Show me the security incident report from the Q3 breach.',
+      "What's the status of the database migration project?",
     ],
   },
   {

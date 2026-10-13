@@ -16,6 +16,7 @@ from typing import Mapping, Optional
 from .connectors.base import SourceConnector
 from .index import Index
 from .models import ChangeEvent
+from .sensitive import mask_doc
 
 log = logging.getLogger("databridge_ib.ingest")
 
@@ -59,8 +60,8 @@ class Ingestor:
                 for d in [x for x in self.index.doc_ids() if x.startswith(platform + ":")]:
                     if d not in seen:
                         self.index.delete(d)
-            for doc in batch.docs:
-                self.index.upsert(doc, conn.acl(doc.doc_id))
+            for doc in batch.docs:              # card / IBAN / NRIC masked BEFORE indexing (F4)
+                self.index.upsert(mask_doc(doc), conn.acl(doc.doc_id))
             for d in batch.deleted:
                 self.index.delete(d)
             for d in batch.acl_changed:
@@ -98,7 +99,7 @@ class Ingestor:
                     if doc is None:
                         self.index.delete(d)
                     else:
-                        self.index.upsert(doc, conn.acl(doc.doc_id))
+                        self.index.upsert(mask_doc(doc), conn.acl(doc.doc_id))
             elif ev.type == "content.deleted":
                 for d in ev.object_ids:
                     self.index.delete(d)

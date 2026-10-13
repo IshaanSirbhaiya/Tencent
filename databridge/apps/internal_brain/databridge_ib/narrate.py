@@ -122,8 +122,8 @@ class IbGroundedNarrator(GroundedNarrator):
 
 _SENT = re.compile(r"(?<=[.!?])\s+")
 #: field-header lines of tickets/pages that are metadata, not answers
-_METADATA = re.compile(r"^(status|reporter|assignee|linked issues|labels|priority|ref|see the)\b[^.]*:",
-                       re.I)
+_METADATA = re.compile(r"^(status|reporter|assignee|linked issues|labels|priority|ref|see the)\b[^.]*:"
+                       r"|^\[applies to:", re.I)
 _URL_ONLY = re.compile(r"^\(?https?://\S+\)?\.?$")
 _URL = re.compile(r"\s*\(?https?://\S+\)?")
 
@@ -132,6 +132,8 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
     """Deterministic answer: the passage sentences sharing the most question terms, each tagged.
     Every sentence is verbatim evidence, so it is grounded by construction (offline + fallback)."""
     q = set(tokens(question)) - STOPWORDS
+    from .index import anchors as _anchors
+    anc = _anchors(question)                 # e.g. "singapore", "q3" — the question's specifics
     scored = []
     for order, p in enumerate(passages):
         sentences = []
@@ -144,9 +146,11 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
             s = _URL.sub("", s).strip()
             if len(s) < 12 or len(s) > 400 or _ADDRESSED_TO_AI.search(s):
                 continue
-            overlap = len(q & set(tokens(s)))
+            stoks = set(tokens(s))
+            overlap = len(q & stoks)
             if overlap:
-                scored.append((-overlap, order, j, s, p.tag))
+                # sentences naming the question's specifics (a market, an id) rank first
+                scored.append((-(overlap + 2 * len(anc & stoks)), order, j, s, p.tag))
     if not scored:
         return REFUSAL_TEXT
     scored.sort()

@@ -78,7 +78,9 @@ def test_crawl_confluence(env):
         got += b["results"]
         nxt = b["_links"].get("next")
         url = "/confluence" + nxt if nxt else None
-    live = {p for p, x in w.pages.items() if x.get("status", "current") != "trashed"}
+    # the default listing returns what Confluence's does: current + archived (not trashed, not draft)
+    from mock_platforms.confluence import DEFAULT_STATUSES
+    live = {p for p, x in w.pages.items() if x.get("status", "current") in DEFAULT_STATUSES}
     assert {p["id"] for p in got} == live
     for pid in live:
         _ok(c.get(f"/confluence/wiki/api/v2/pages/{pid}/ancestors", headers=S))

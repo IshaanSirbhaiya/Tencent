@@ -24,7 +24,8 @@ sys.path.insert(0, str(HERE))
 import generate as G  # noqa: E402
 
 ARGS = dict(seed=7, now="2026-10-13T09:00:00+08:00", scale="demo")
-PERSONAS = ("jdoe", "priya.sre", "ken.ext", "sara.sec", "maya.compliance", "leo.ops", "admin.it")
+PERSONAS = ("jdoe", "priya.sre", "ken.ext", "sara.sec", "maya.compliance", "leo.ops", "admin.it",
+            "amy.am", "mlro.tan")
 CANARY_RE = re.compile(r"CNRY-[0-9a-f]{6}")
 
 
@@ -238,7 +239,7 @@ def test_schema_shape(world):
         assert set(s["read"]) == {"users", "groups"} and s["anonymous"] is False
     for p in world["confluence"]["pages"]:
         _has(p, "page")
-        assert p["status"] in ("current", "archived", "trashed")
+        assert p["status"] in ("current", "archived", "trashed", "draft")
         assert p["read_restriction"] is None or set(p["read_restriction"]) == {"users", "groups"}
         for h in p["history"]:
             assert set(h) == {"version", "updated", "body"} and h["version"] < p["version"]
@@ -447,12 +448,13 @@ def test_user_groups_are_the_expanded_membership(world, ref):
 def test_estate_has_the_planned_shape(world, ref):
     pages = world["confluence"]["pages"]
     assert {s["key"] for s in world["confluence"]["spaces"]} == {
-        "payment-gateway", "runbooks", "SEC", "product", "compliance"}
+        "payment-gateway", "runbooks", "SEC", "product", "compliance", "fincrime", "cx"}
     sec = next(s for s in world["confluence"]["spaces"] if s["key"] == "SEC")
     assert sec["read"] == {"users": [], "groups": ["grp-security"]}
     assert 180 <= len(pages) <= 220
     assert [p["status"] for p in pages].count("trashed") == 1
     assert [p["status"] for p in pages].count("archived") == 1
+    assert [p["status"] for p in pages].count("draft") == 1
     by_id = {p["id"]: p for p in pages}
 
     def restricted(p):
@@ -482,8 +484,8 @@ def test_estate_has_the_planned_shape(world, ref):
     assert 10 <= sum(1 for i in world["jira"]["issues"] if i["security_level"]) <= 20
     assert all(f"PAY-{n}" in {i["key"] for i in world["jira"]["issues"]} for n in range(201, 206))
     chans = world["slack"]["channels"]
-    assert len(chans) == 14
-    assert sum(c["type"] == "private" for c in chans) == 4
+    assert len(chans) == 15
+    assert sum(c["type"] == "private" for c in chans) == 5
     assert [c["name"] for c in chans if c["type"] == "connect"] == ["vendor-acme"]
     assert 550 <= len(world["slack"]["threads"]) <= 650
     assert all(2 <= len(t["messages"]) <= 8 for t in world["slack"]["threads"])
@@ -491,7 +493,7 @@ def test_estate_has_the_planned_shape(world, ref):
     assert {d["name"] for d in world["drive"]["drives"]} == {"Engineering", "Company"}
     names = {f["name"] for f in world["drive"]["folders"]}
     assert {"Postmortems", "Pricing & Offers", "Vendor share"} <= names
-    assert sum(f["inherited_permissions_disabled"] for f in world["drive"]["folders"]) == 1
+    assert sum(f["inherited_permissions_disabled"] for f in world["drive"]["folders"]) == 2
     anyone = [f for f in world["drive"]["files"]
               if any(p["type"] == "anyone" for p in f["permissions"])]
     assert len(anyone) == 1 and ref.can_read(f"drive:{anyone[0]['id']}") == set()

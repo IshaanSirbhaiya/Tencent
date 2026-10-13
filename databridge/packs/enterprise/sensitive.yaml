@@ -1,0 +1,81 @@
+# packs/enterprise/sensitive.yaml — sensitive-value masking applied by the Internal Brain at ingest,
+# BEFORE text reaches the index, the embeddings, the narrator prompt or an answer.
+#
+# DATA ONLY. Read by apps/internal_brain/databridge_ib/sensitive.py (pure function, no network, no
+# model). If this file is missing the module falls back to built-in rules equal to these; if it is
+# present but malformed, loading FAILS LOUDLY (a silently skipped mask is worse than a crash).
+#
+# What it is for (and what it is not):
+#   - Format-preserving display masks, so an answer can still say "the card ending 1111":
+#       PAN   → first 6 + "••••••" + last 4          (PCI DSS v4.0.1 req. 3.4.1: BIN + last 4 at most)
+#       CVV   → "CVV: •••"                           (sensitive authentication data is never shown)
+#       NRIC  → "•••••" + last 3 digits + letter      (PDPC NRIC advisory guidelines: partial NRIC)
+#       IBAN  → country + check digits + "••••" + last 4
+#   - It reduces what the Brain copies out of the source systems. It is NOT a PCI or PDPA
+#     certification, and it does not redact the source: findings are reported so the data owner can.
+#
+# ─── SCHEMA (version 1) ───────────────────────────────────────────────────────────────────────
+#
+#   version: 1
+#   pack: enterprise
+#   rules:                       evaluated IN ORDER over the ORIGINAL text; a span claimed by an
+#                                earlier rule is never re-examined by a later one (IBAN before PAN)
+#     - id: <snake_case>         stable rule id, reported in findings
+#       kind: <word>             pan | iban | card_security_code | sg_nric | ...
+#       pattern: <Python re>     inline flags at the start, e.g. (?i)
+#       group: <int>             optional; mask only this capture group (default: whole match)
+#       separators: <chars>      optional; the match is split into groups on these characters and
+#                                the earliest, longest run of whole groups whose compact length is
+#                                in [min_len, max_len] and that passes `prefix` and `validate` is
+#                                masked (so "4111 1111 1111 1111 12/28" masks just the PAN)
+#       min_len, max_len: <int>  optional; compact length bounds (separators removed)
+#       prefix: <Python re>      optional; must match the START of the compact value (card IIN)
+#       validate: none | luhn | mod97 | nric
+#                                SHAPE IS NOT ENOUGH for cards and IBANs: a Luhn/mod-97 failure is
+#                                left untouched (order ids, timestamps, phone numbers)
+#       mask:
+#         keep_head: <int>       compact characters kept at the start
+#         fill: <text>           the fixed filler (fixed width: it does not leak the length)
+#         keep_tail: <int>       compact characters kept at the end
+#
+# Unknown keys are an error, not a shrug.
+
+version: 1
+pack: enterprise
+
+rules:
+  - id: iban
+    kind: iban
+    pattern: '\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}\b'
+    separators: " "
+    min_len: 15
+    max_len: 34
+    prefix: '^[A-Z]{2}\d{2}'          # the run must start at the country code + check digits
+    validate: mod97
+    mask: {keep_head: 4, fill: "••••", keep_tail: 4}
+
+  - id: pan
+    kind: pan
+    # a run of digits with single space/dash separators, not glued to letters, digits or dashes
+    pattern: '(?<![\w-])\d(?:[ -]?\d)+(?![\w-])'
+    separators: " -"
+    min_len: 13
+    max_len: 19
+    # issuer identification prefixes: Visa 4, Mastercard 51-55 and 2221-2720, Amex 34/37,
+    # Diners 30/36/38/39, JCB 35, Discover/UnionPay/RuPay 6
+    prefix: '^(?:4|5[1-5]|2[2-7]|3[0456789]|6)'
+    validate: luhn
+    mask: {keep_head: 6, fill: "••••••", keep_tail: 4}
+
+  - id: card_security_code
+    kind: card_security_code
+    pattern: '(?i)\b(?:CVV2?|CVC2?|CID|CSC)\b\s*[:#=]?\s*(\d{3,4})\b'
+    group: 1
+    validate: none
+    mask: {keep_head: 0, fill: "•••", keep_tail: 0}
+
+  - id: sg_nric
+    kind: sg_nric
+    pattern: '\b[STFGM]\d{7}[A-Z]\b'
+    validate: none
+    mask: {keep_head: 0, fill: "•••••", keep_tail: 4}
