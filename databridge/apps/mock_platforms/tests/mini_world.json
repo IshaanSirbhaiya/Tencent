@@ -1,0 +1,196 @@
+{
+  "meta": {"seed": 0, "now": "2026-10-13T09:00:00+08:00", "tenant": "companya",
+           "domain": "companya.example", "scale": "mini", "generator_version": "test"},
+  "directory": {
+    "users": [
+      {"id": "jdoe", "name": "Jordan Doe", "email": "jdoe@companya.example", "employment": "employee",
+       "kind": "member", "active": true, "roles": ["employee"], "groups": ["grp-payments-eng"],
+       "platform_ids": {"slack": "U0JDOE", "confluence": "acc-jdoe", "jira": "acc-jdoe",
+                        "drive": "jdoe@companya.example"}},
+      {"id": "priya.sre", "name": "Priya Raman", "email": "priya.sre@companya.example",
+       "employment": "employee", "kind": "member", "active": true, "roles": ["employee"],
+       "groups": ["grp-eng"],
+       "platform_ids": {"slack": "U0PRIYA", "confluence": "acc-priya", "jira": "acc-priya",
+                        "drive": "priya.sre@companya.example"}},
+      {"id": "sara.sec", "name": "Sara Lim", "email": "sara.sec@companya.example",
+       "employment": "employee", "kind": "member", "active": true, "roles": ["employee"],
+       "groups": ["grp-security"],
+       "platform_ids": {"slack": "U0SARA", "confluence": "acc-sara", "jira": "acc-sara",
+                        "drive": "sara.sec@companya.example"}},
+      {"id": "leo.ops", "name": "Leo Tan", "email": "leo.ops@companya.example",
+       "employment": "employee", "kind": "member", "active": true, "roles": ["employee"],
+       "groups": ["grp-ops"],
+       "platform_ids": {"slack": "U0LEO", "confluence": "acc-leo", "jira": "acc-leo",
+                        "drive": "leo.ops@companya.example"}},
+      {"id": "ken.ext", "name": "Ken Okafor", "email": "ken@acme-vendor.example",
+       "employment": "contractor", "kind": "connect", "active": true, "roles": [], "groups": [],
+       "platform_ids": {"slack": "U0KEN", "drive": "ken@acme-vendor.example"}},
+      {"id": "gina.guest", "name": "Gina Guest", "email": "gina@companya.example",
+       "employment": "contractor", "kind": "guest", "active": true, "roles": [], "groups": [],
+       "platform_ids": {"slack": "U0GINA", "confluence": "acc-gina", "jira": "acc-gina",
+                        "drive": "gina@companya.example"}},
+      {"id": "old.timer", "name": "Olu Timer", "email": "old.timer@companya.example",
+       "employment": "employee", "kind": "member", "active": false, "roles": ["employee"],
+       "groups": ["grp-payments-eng"],
+       "platform_ids": {"slack": "U0OLD", "confluence": "acc-old", "jira": "acc-old",
+                        "drive": "old.timer@companya.example"}}
+    ],
+    "groups": [
+      {"id": "grp-eng", "name": "engineering", "members": ["priya.sre"],
+       "member_groups": ["grp-payments-eng"]},
+      {"id": "grp-payments-eng", "name": "payments-eng", "members": ["jdoe", "old.timer"],
+       "member_groups": []},
+      {"id": "grp-security", "name": "security", "members": ["sara.sec"], "member_groups": []},
+      {"id": "grp-ops", "name": "ops", "members": ["leo.ops"], "member_groups": []}
+    ]
+  },
+  "confluence": {
+    "spaces": [
+      {"id": "sp-1", "key": "payment-gateway", "name": "Payment Gateway",
+       "read": {"users": ["sara.sec"], "groups": ["grp-eng"]}, "anonymous": false},
+      {"id": "sp-2", "key": "SEC", "name": "Security",
+       "read": {"users": [], "groups": ["grp-security"]}, "anonymous": false}
+    ],
+    "pages": [
+      {"id": "cf-1001", "space": "payment-gateway", "parent": null, "title": "Gateway overview",
+       "version": 2, "status": "current", "created": "2026-09-01T10:00:00+08:00",
+       "updated": "2026-09-10T10:00:00+08:00", "author": "jdoe",
+       "body": "The gateway routes card payments.", "read_restriction": null,
+       "history": [{"version": 1, "updated": "2026-09-01T10:00:00+08:00",
+                    "body": "Draft gateway overview."}]},
+      {"id": "cf-1002", "space": "payment-gateway", "parent": "cf-1001", "title": "Key ceremony",
+       "version": 1, "status": "current", "created": "2026-09-02T10:00:00+08:00",
+       "updated": "2026-09-02T10:00:00+08:00", "author": "priya.sre",
+       "body": "Key ceremony steps.", "read_restriction": {"users": ["priya.sre"],
+                                                            "groups": ["grp-security"]},
+       "history": []},
+      {"id": "cf-1003", "space": "payment-gateway", "parent": "cf-1002", "title": "Settlement keys",
+       "version": 1, "status": "current", "created": "2026-09-03T10:00:00+08:00",
+       "updated": "2026-09-03T10:00:00+08:00", "author": "priya.sre",
+       "body": "Settlement key rotation CNRY-0000aa.",
+       "read_restriction": {"users": ["jdoe", "priya.sre"], "groups": []}, "history": []},
+      {"id": "cf-1004", "space": "payment-gateway", "parent": "cf-1001", "title": "Old notes",
+       "version": 1, "status": "trashed", "created": "2026-08-01T10:00:00+08:00",
+       "updated": "2026-08-01T10:00:00+08:00", "author": "jdoe", "body": "obsolete",
+       "read_restriction": null, "history": []},
+      {"id": "cf-1005", "space": "payment-gateway", "parent": null, "title": "Archived plan",
+       "version": 1, "status": "archived", "created": "2026-07-01T10:00:00+08:00",
+       "updated": "2026-07-01T10:00:00+08:00", "author": "jdoe", "body": "old plan",
+       "read_restriction": null, "history": []},
+      {"id": "cf-2001", "space": "SEC", "parent": null, "title": "Q3 breach report",
+       "version": 1, "status": "current", "created": "2026-09-20T10:00:00+08:00",
+       "updated": "2026-09-20T10:00:00+08:00", "author": "sara.sec", "body": "Breach summary.",
+       "read_restriction": null, "history": []}
+    ]
+  },
+  "jira": {
+    "projects": [
+      {"id": "10001", "key": "PAY", "name": "Payments",
+       "roles": {"Developers": {"users": [], "groups": ["grp-payments-eng"]},
+                 "Viewers": {"users": ["leo.ops"], "groups": []}},
+       "browse": {"roles": ["Developers", "Viewers"], "users": [], "groups": [],
+                  "reporter": true, "assignee": true}},
+      {"id": "10002", "key": "SEC", "name": "Security",
+       "roles": {"Security": {"users": [], "groups": ["grp-security"]}},
+       "browse": {"roles": ["Security"], "users": [], "groups": [],
+                  "reporter": false, "assignee": false}}
+    ],
+    "security_levels": [
+      {"id": "10100", "project": "PAY", "name": "Security only",
+       "members": {"users": [], "groups": ["grp-security"], "roles": [], "reporter": true,
+                   "assignee": false}}
+    ],
+    "issues": [
+      {"id": "20001", "key": "PAY-1", "project": "PAY", "summary": "Migrate ledger DB",
+       "description": "Move the ledger to the new cluster.\n\nCutover planned.",
+       "status": "In Progress", "reporter": "jdoe", "assignee": "priya.sre", "security_level": null,
+       "created": "2026-09-25T10:00:00+08:00", "updated": "2026-10-01T10:00:00+08:00",
+       "comments": [{"author": "priya.sre", "created": "2026-10-01T10:00:00+08:00",
+                     "body": "Replica lag is fine."}], "links": ["PAY-3"]},
+      {"id": "20002", "key": "PAY-2", "project": "PAY", "summary": "Card data exposure review",
+       "description": "Security review.", "status": "To Do", "reporter": "jdoe",
+       "assignee": "leo.ops", "security_level": "10100",
+       "created": "2026-09-26T10:00:00+08:00", "updated": "2026-10-05T10:00:00+08:00",
+       "comments": [], "links": []},
+      {"id": "20003", "key": "PAY-3", "project": "PAY", "summary": "Pricing page copy",
+       "description": "Update copy.", "status": "Done", "reporter": "leo.ops", "assignee": null,
+       "security_level": null, "created": "2026-09-27T10:00:00+08:00",
+       "updated": "2026-10-10T10:00:00+08:00", "comments": [], "links": []},
+      {"id": "20004", "key": "SEC-1", "project": "SEC", "summary": "Q3 breach follow-up",
+       "description": "Rotate creds.", "status": "In Progress", "reporter": "sara.sec",
+       "assignee": "sara.sec", "security_level": null, "created": "2026-09-28T10:00:00+08:00",
+       "updated": "2026-10-07T10:00:00+08:00", "comments": [], "links": []}
+    ]
+  },
+  "slack": {
+    "workspace": {"id": "T0COMPA", "domain": "companya"},
+    "channels": [
+      {"id": "C0GEN", "name": "general", "type": "public",
+       "members": ["jdoe", "priya.sre", "sara.sec", "leo.ops", "gina.guest"], "archived": false,
+       "created": "2026-01-01T09:00:00+08:00"},
+      {"id": "C0DBMIG", "name": "db-migration", "type": "private",
+       "members": ["jdoe", "priya.sre"], "archived": false, "created": "2026-09-01T09:00:00+08:00"},
+      {"id": "C0VEND", "name": "vendor-acme", "type": "connect", "members": ["jdoe", "ken.ext"],
+       "archived": false, "created": "2026-05-01T09:00:00+08:00"},
+      {"id": "C0OLD", "name": "old-archive", "type": "public", "members": ["jdoe"],
+       "archived": true, "created": "2025-01-01T09:00:00+08:00"}
+    ],
+    "threads": [
+      {"channel": "C0GEN", "ts": "1728370000.000100", "messages": [
+        {"ts": "1728370000.000100", "user": "jdoe", "text": "Deploy at 3pm", "edited": false},
+        {"ts": "1728370010.000100", "user": "priya.sre", "text": "ack", "edited": false},
+        {"ts": "1728370020.000100", "user": "gina.guest", "text": "thanks", "edited": false}]},
+      {"channel": "C0GEN", "ts": "1728370100.000100", "messages": [
+        {"ts": "1728370100.000100", "user": "leo.ops", "text": "Pricing update", "edited": false}]},
+      {"channel": "C0GEN", "ts": "1728370200.000100", "messages": [
+        {"ts": "1728370200.000100", "user": "sara.sec", "text": "Phishing alert", "edited": false}]},
+      {"channel": "C0DBMIG", "ts": "1728370500.000200", "messages": [
+        {"ts": "1728370500.000200", "user": "jdoe", "text": "Blocker: replica lag CNRY-1111bb",
+         "edited": false},
+        {"ts": "1728370600.000200", "user": "priya.sre", "text": "Investigating", "edited": true}]},
+      {"channel": "C0VEND", "ts": "1728370700.000100", "messages": [
+        {"ts": "1728370700.000100", "user": "ken.ext", "text": "Invoice sent", "edited": false}]}
+    ]
+  },
+  "drive": {
+    "drives": [{"id": "0AEng", "name": "Engineering", "members": {"users": [], "groups": ["grp-eng"]}}],
+    "folders": [
+      {"id": "fd-1", "drive": "0AEng", "parent": null, "name": "Postmortems",
+       "permissions": [{"id": "p1", "type": "group", "principal": "grp-security", "role": "reader"}],
+       "inherited_permissions_disabled": false},
+      {"id": "fd-2", "drive": "0AEng", "parent": "fd-1", "name": "Restricted",
+       "permissions": [{"id": "p2", "type": "user", "principal": "sara.sec", "role": "writer"}],
+       "inherited_permissions_disabled": true},
+      {"id": "fd-3", "drive": "0AEng", "parent": "fd-2", "name": "Sub",
+       "permissions": [{"id": "p3", "type": "user", "principal": "leo.ops", "role": "reader"}],
+       "inherited_permissions_disabled": false}
+    ],
+    "files": [
+      {"id": "df-1", "drive": "0AEng", "folder": "fd-1", "name": "Outage RCA", "mimeType": "text/plain",
+       "version": 3, "created": "2026-09-01T10:00:00+08:00", "modified": "2026-09-05T10:00:00+08:00",
+       "content": "Root cause: config drift.",
+       "permissions": [{"id": "p9", "type": "user", "principal": "leo.ops", "role": "reader"}]},
+      {"id": "df-2", "drive": "0AEng", "folder": "fd-3", "name": "Breach evidence",
+       "mimeType": "text/plain", "version": 1, "created": "2026-09-21T10:00:00+08:00",
+       "modified": "2026-09-21T10:00:00+08:00", "content": "Evidence CNRY-2222cc.",
+       "permissions": []},
+      {"id": "df-3", "drive": "0AEng", "folder": "fd-1", "name": "Public summary",
+       "mimeType": "text/plain", "version": 1, "created": "2026-09-22T10:00:00+08:00",
+       "modified": "2026-09-22T10:00:00+08:00", "content": "Summary.",
+       "permissions": [{"id": "p10", "type": "anyone", "principal": null, "role": "reader"}]},
+      {"id": "df-4", "drive": "0AEng", "folder": null, "name": "Company handbook",
+       "mimeType": "text/plain", "version": 2, "created": "2026-01-02T10:00:00+08:00",
+       "modified": "2026-10-02T10:00:00+08:00", "content": "Handbook.",
+       "permissions": [{"id": "p11", "type": "domain", "principal": "companya.example",
+                        "role": "reader"}]},
+      {"id": "df-5", "drive": "0AEng", "folder": "fd-1", "name": "Sec notes",
+       "mimeType": "text/plain", "version": 1, "created": "2026-09-23T10:00:00+08:00",
+       "modified": "2026-09-23T10:00:00+08:00", "content": "Notes.",
+       "permissions": [{"id": "p12", "type": "group", "principal": "grp-security",
+                        "role": "writer"}]}
+    ]
+  },
+  "facts": [],
+  "questions": [],
+  "audit_replay": []
+}
