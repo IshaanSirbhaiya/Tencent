@@ -13,8 +13,9 @@ edit, a deleted record or a truncated log made by anyone WITHOUT the sealing key
 Both leave a log that verifies internally. Only a head published somewhere the attacker cannot rewrite
 — a separate git repo pushed elsewhere, a compliance-only Slack channel — exposes them: any rewrite of
 history BEFORE the last publication no longer matches it, and a rollback leaves the log shorter than it.
-Changes after the last publication are not covered until the next one (publish every 15 min and on
-demand, plan §4.7).
+Records appended after the last publication are NOT covered: rolling them back is undetectable, and a
+later publication anchors the surviving branch — it does not recover or reveal what was erased.
+Publishing every 15 min and on demand (plan §4.7) bounds that window; it does not close it.
 
 Sinks:
 * `FileSink(path)` — an append-only JSONL file, intended to live in a separate git repository that is
@@ -64,21 +65,32 @@ class FileSink:
             os.fsync(fh.fileno())
 
     def heads(self, log_id: str) -> list[dict]:
+        """Every head published for ``log_id``. A line that is not a JSON object raises
+        `ValueError`: a corrupted external record must fail verification, never be skipped
+        (skipping it could silently fall back to an older head; Codex sec r1 #20)."""
         if not self.path.is_file():
             return []
         out = []
-        for line in self.path.read_text(encoding="utf-8").splitlines():
+        for n, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
             try:
                 rec = json.loads(line)
             except ValueError:
-                continue
-            if isinstance(rec, dict) and rec.get("log_id") == log_id:
+                raise ValueError(f"{self.name}: line {n} is not JSON") from None
+            if not isinstance(rec, dict):
+                raise ValueError(f"{self.name}: line {n} is not a head record")
+            if rec.get("log_id") == log_id:
                 out.append(rec)
         return out
 
     def latest(self, log_id: str) -> Optional[dict]:
         heads = self.heads(log_id)
-        return max(heads, key=lambda h: int(h.get("seq") or 0)) if heads else None
+        for h in heads:
+            seq = h.get("seq")
+            if isinstance(seq, bool) or not isinstance(seq, int):
+                raise ValueError(f"{self.name}: a head for {log_id} has a malformed seq")
+        return max(heads, key=lambda h: h["seq"]) if heads else None
 
 
 class SlackWebhookSink:
@@ -149,36 +161,12 @@ def publish_head(ledger: AccessLedger, sink: AnchorSink, *,
 
 
 def verify(ledger: AccessLedger, sink: Optional[AnchorSink]) -> VerifyReport:
-    """The ledger's verification against ``sink``'s latest published head."""
+    """The ledger's verification against ``sink``'s latest published head (one code path with
+    `AccessLedger.verify`: a sink that raises, a missing, stale, malformed or foreign head is
+    ``ok=False``). Never raises."""
     if sink is None:
         return ledger.verify(use_sink=False)
-    try:
-        ext = sink.latest(ledger.log_id)
-    except Exception:                                                # noqa: BLE001
-        rep = ledger.verify(use_sink=False)
-        rep.problems.append(f"the external head could not be read from {sink.name}")
-        rep.external_head_match = False
-        rep.ok = False
-        return rep
-    if ext is None:
-        # no head published (or the sink lost it): verify still flags a log that says it published
-        rep = ledger.verify(use_sink=False)
-        published = _published_in_log(ledger)
-        if published:
-            rep.external_head_match = False
-            rep.ok = False
-            rep.problems.append(f"the log records an external publication of seq {published}, but "
-                                f"{sink.name} holds no head for it")
-        return rep
-    return ledger.verify(external_head=ext)
-
-
-def _published_in_log(ledger: AccessLedger) -> int:
-    try:
-        evs = list(ledger.events(strict=False))
-    except Exception:                                                # noqa: BLE001
-        return 0
-    return max((int(e.data.get("seq") or 0) for e in evs if e.kind == "anchor.published"), default=0)
+    return ledger.verify(sink=sink)
 
 
 __all__ = ["AnchorSink", "FileSink", "SlackWebhookSink", "AnchorPublishFailed", "publish_head",

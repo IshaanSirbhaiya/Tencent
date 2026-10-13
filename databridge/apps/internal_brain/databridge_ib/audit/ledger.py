@@ -27,6 +27,7 @@ and twice the whole anchor ledger under the lock, so an append costs O(records).
 from __future__ import annotations
 
 import datetime as dt
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterator, Optional, Protocol
 
@@ -120,36 +121,79 @@ def parse_event(data: dict[str, Any]) -> Optional[EventBase]:
         return None
 
 
+_HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _strict_seq(v: Any) -> Optional[int]:
+    """A positive int sequence number, or None (bools, floats, strings and <= 0 are malformed)."""
+    if isinstance(v, bool) or not isinstance(v, int) or v <= 0:
+        return None
+    return v
+
+
+def published_seq(records: list[dict]) -> tuple[int, list[str]]:
+    """The highest seq the log says was published externally (its ``anchor.published`` events),
+    and a problem for every malformed publication marker. Never raises."""
+    published, problems = 0, []
+    for r in records:
+        ev = r.get(IB_EVENT) if isinstance(r, dict) else None
+        if not (isinstance(ev, dict) and ev.get("kind") == "anchor.published"):
+            continue
+        seq = _strict_seq(ev.get("seq"))
+        if seq is None:
+            problems.append(f"malformed anchor.published marker at record {r.get('seq')}")
+            continue
+        published = max(published, seq)
+    return published, problems
+
+
 def compare_external(records: list[dict], ext: Optional[dict], *, chain_ok: bool,
                      published_in_log: Optional[int] = None,
-                     digest_field: str = "hash") -> tuple[Optional[bool], list[str]]:
-    """Compare the (verified) records of a log with its latest external head.
+                     digest_field: str = "hash",
+                     log_id: Optional[str] = LOG_ID) -> tuple[Optional[bool], list[str]]:
+    """Compare the (verified) records of a log with its latest external head. Never raises.
 
     ``records`` are the raw ledger records that verified (a prefix when the chain is broken).
     ``published_in_log`` is the highest seq the log itself says was published (from its
-    ``anchor.published`` events) — an external head that is missing although the log records a
-    publication means the external record was lost or withheld."""
+    ``anchor.published`` events). An external head that is MISSING, or OLDER than that seq, means
+    the external record was lost or withheld: a stale checkpoint never passes (Codex sec r1 #5).
+    The external head must be a dict ``{log_id, seq, head, at}`` with ``log_id`` equal to
+    ``log_id`` (when given), a positive int ``seq`` and a 64-hex ``head`` (#20)."""
     if ext is None:
         if published_in_log:
-            return False, [f"the log records an external publication of seq {published_in_log}, "
-                           f"but the external sink holds no head for it"]
+            return False, [f"external head missing: the log records an external publication of "
+                           f"seq {published_in_log}, but the external sink holds no head for it"]
         return None, []
-    try:
-        seq, head = int(ext["seq"]), str(ext["head"])
-    except (KeyError, TypeError, ValueError):
-        return False, ["the external head is malformed"]
-    by_seq = {int(r["seq"]): str(r.get(digest_field)) for r in records if "seq" in r}
+    if not isinstance(ext, dict):
+        return False, ["the external head is malformed (not a record)"]
+    if log_id is not None and ext.get("log_id") != log_id:
+        return False, [f"the external head belongs to another log "
+                       f"({str(ext.get('log_id'))[:80]!r}, expected {log_id!r})"]
+    seq, head = _strict_seq(ext.get("seq")), ext.get("head")
+    if seq is None or not isinstance(head, str) or not _HEX64.match(head):
+        return False, ["the external head is malformed (seq must be a positive integer and head "
+                       "a 64-character hex digest)"]
+    problems: list[str] = []
+    if published_in_log and seq < published_in_log:
+        problems.append(f"external head stale: the log records an external publication of seq "
+                        f"{published_in_log}, but the latest head the sink holds is seq {seq}")
+    by_seq: dict[int, str] = {}
+    for r in records:
+        rs = _strict_seq(r.get("seq")) if isinstance(r, dict) else None
+        if rs is not None:
+            by_seq[rs] = str(r.get(digest_field))
     last = max(by_seq) if by_seq else 0
     if seq in by_seq:
         if by_seq[seq] == head:
-            return True, []
-        return False, [f"history rewritten at or before seq {seq}: the log no longer matches the "
-                       f"head published externally at {ext.get('at')}"]
+            return (False, problems) if problems else (True, [])
+        return False, problems + [f"history rewritten at or before seq {seq}: the log no longer "
+                                  f"matches the head published externally at {ext.get('at')}"]
     if chain_ok:
-        return False, [f"rollback detected vs external head: the log holds {last} record(s), but "
-                       f"seq {seq} was published externally at {ext.get('at')}"]
-    return False, [f"the external head (seq {seq}) cannot be confirmed: the chain is broken at or "
-                   f"before record {last + 1}"]
+        return False, problems + [f"rollback detected vs external head: the log holds {last} "
+                                  f"record(s), but seq {seq} was published externally at "
+                                  f"{ext.get('at')}"]
+    return False, problems + [f"the external head (seq {seq}) cannot be confirmed: the chain is "
+                              f"broken at or before record {last + 1}"]
 
 
 class AccessLedger:
@@ -258,10 +302,22 @@ class AccessLedger:
         return int(recs[-1]["seq"]), str(recs[-1]["hash"])
 
     # --- verification -----------------------------------------------------------------------------
-    def verify(self, *, external_head: Optional[dict] = None, use_sink: bool = True) -> VerifyReport:
+    def verify(self, *, external_head: Optional[dict] = None, use_sink: bool = True,
+               sink: Optional[ExternalHeadSource] = None) -> VerifyReport:
         """Verify the chain, the seals and the internal anchor ledger, then compare with the latest
-        external head (``external_head`` if given, else ``self.external.latest(LOG_ID)``). Never
-        raises."""
+        external head: ``external_head`` if given, else ``sink.latest(LOG_ID)`` (``sink`` defaults
+        to ``self.external`` when ``use_sink``). Never raises, and never fails open: a sink that
+        raises, an external head that is malformed, belongs to another log, is missing or is older
+        than a publication the log records is ``ok=False`` with a problem (Codex sec r1 #5/#6/#20)."""
+        try:
+            return self._verify(external_head, use_sink, sink)
+        except Exception:                                            # noqa: BLE001 — never raises
+            return VerifyReport(ok=False, records=0, head=None, internal_ok=False,
+                                external_head_match=False,
+                                problems=["the access ledger verification could not complete"])
+
+    def _verify(self, external_head: Optional[dict], use_sink: bool,
+                sink: Optional[ExternalHeadSource]) -> VerifyReport:
         problems: list[str] = []
         try:
             recs, why = self.records(strict=False)
@@ -270,28 +326,34 @@ class AccessLedger:
         internal_ok = not why
         if why:
             problems.append(why)
-        ext = external_head
-        if ext is None and use_sink and self.external is not None:
+        source = sink if sink is not None else (self.external if use_sink else None)
+        sink_configured = external_head is not None or source is not None
+        ext, read_failed = external_head, False
+        if external_head is None and source is not None:
             try:
-                ext = self.external.latest(LOG_ID)
-            except Exception:                                        # noqa: BLE001
-                ext = None
+                ext = source.latest(LOG_ID)
+            except Exception:                                        # noqa: BLE001 — fail closed
+                ext, read_failed = None, True
                 problems.append(f"the external head could not be read from "
-                                f"{getattr(self.external, 'name', 'the sink')}")
-        published = 0
-        for r in recs:
-            ev = r.get(IB_EVENT)
-            if isinstance(ev, dict) and ev.get("kind") == "anchor.published":
-                published = max(published, int(ev.get("seq") or 0))
-        sink_configured = external_head is not None or (use_sink and self.external is not None)
-        match, ext_problems = compare_external(recs, ext, chain_ok=internal_ok,
-                                               published_in_log=published if sink_configured else None)
-        problems.extend(ext_problems)
+                                f"{getattr(source, 'name', 'the sink')}")
+        published, marker_problems = published_seq(recs)
+        problems.extend(marker_problems)
+        if read_failed:
+            match: Optional[bool] = False
+        else:
+            match, ext_problems = compare_external(
+                recs, ext, chain_ok=internal_ok,
+                published_in_log=published if sink_configured else None)
+            problems.extend(ext_problems)
+        if marker_problems:
+            internal_ok = False
         head = str(recs[-1]["hash"]) if recs else None
         ok = internal_ok and match is not False
         return VerifyReport(ok=ok, records=len(recs), head=head, problems=problems,
-                            external_head_match=match, external_head=ext, internal_ok=internal_ok)
+                            external_head_match=match,
+                            external_head=ext if isinstance(ext, dict) else None,
+                            internal_ok=internal_ok)
 
 
 __all__ = ["LOG_ID", "LedgerUnavailable", "LedgerEvent", "VerifyReport", "AccessLedger",
-           "ExternalHeadSource", "compare_external", "parse_event"]
+           "ExternalHeadSource", "compare_external", "parse_event", "published_seq"]

@@ -194,3 +194,67 @@ def test_tamper_demo_script_scenarios(tmp_path):
     by = {r["scenario"]: r for r in results}
     for only_external in ("directory-rollback", "key-holder-rewrite"):
         assert by[only_external]["internal_ok"] and by[only_external]["external_head_match"] is False
+
+
+# --- Codex security review r1, track 2 ---------------------------------------------------------
+def test_stale_external_head_fails_despite_later_publication(source, tmp_path):
+    # #5: the log records a publication at seq S, the sink's latest is older than S
+    cfg, ext, ledger = _copy(source, tmp_path)
+    older = ext.path.read_text(encoding="utf-8")
+    second = publish_head(ledger, ext)
+    assert verify(ledger, ext).ok
+    ext.path.write_text(older, encoding="utf-8")                      # the newer head withheld
+    assert ext.latest(LOG_ID)["seq"] < second.seq
+    for rep in (ledger.verify(), verify(ledger, ext)):
+        assert not rep.ok and rep.internal_ok and rep.external_head_match is False
+        assert any("external head stale" in p for p in rep.problems)
+
+
+class _RaisingSink:
+    name = "raising"
+
+    def latest(self, log_id):
+        raise OSError("sink unreachable")
+
+
+def test_sink_exception_fails_closed_even_without_a_publication(tmp_path):
+    # #6: no anchor.published in the log, sink raises -> still not ok; verify never raises
+    cfg = make_cfg(tmp_path)
+    ledger = AccessLedger(cfg, external=_RaisingSink())
+    ledger.append(_ev(1))
+    for rep in (ledger.verify(), verify(AccessLedger(cfg), _RaisingSink())):
+        assert not rep.ok and rep.internal_ok and rep.external_head_match is False
+        assert any("could not be read" in p for p in rep.problems)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda h: {**h, "log_id": "another-log"},
+    lambda h: {**h, "seq": str(h["seq"])},
+    lambda h: {**h, "seq": True},
+    lambda h: {**h, "seq": -1},
+    lambda h: {**h, "head": "not-a-digest"},
+    lambda h: {k: v for k, v in h.items() if k != "head"},
+    lambda h: ["not", "a", "record"],
+])
+def test_malformed_or_foreign_external_head_fails(source, tmp_path, mutate):
+    # #20: strict shape and log identity; malformed input is a failed report, never an exception
+    cfg, ext, ledger = _copy(source, tmp_path)
+    bad = mutate(ext.latest(LOG_ID))
+
+    class Reader:
+        name = "reader"
+
+        def latest(self, log_id):
+            return bad
+    for rep in (AccessLedger(cfg, external=Reader()).verify(), verify(ledger, Reader())):
+        assert not rep.ok and rep.external_head_match is False and rep.problems
+
+
+def test_corrupt_external_file_fails_closed(source, tmp_path):
+    # #20: a garbled newest line must not silently fall back to an older head
+    cfg, ext, ledger = _copy(source, tmp_path)
+    with open(ext.path, "a", encoding="utf-8") as fh:
+        fh.write('{"log_id": "ib-access", "seq": \n')
+    for rep in (ledger.verify(), verify(ledger, ext)):
+        assert not rep.ok and rep.external_head_match is False
+        assert any("could not be read" in p for p in rep.problems)

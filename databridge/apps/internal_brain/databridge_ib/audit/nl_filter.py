@@ -16,7 +16,13 @@ Examples (``now`` = the estate clock):
 Time phrases: "last|past N hours|days|weeks|months|years", "last week|month" (previous calendar
 week/month in the clock's timezone), "this week|month", "today", "yesterday", "since <date>",
 "before|until <date>", "between <date> and <date>", "on <date>". No time phrase -> the last 365
-days. Every range is capped at 365 days (the earlier end moves; the note says so).
+days. Every range is capped at 365 days (the earlier end moves; the note says so). Ranges are
+half-open, ``since <= event_time < until``: "yesterday" ends at today's midnight, exclusive.
+
+Fail closed (Codex sec r1 #16/#17). A constraint the question names but that does not validate (a
+title with characters outside the closed vocabulary, an impossible date such as 2026-02-30) raises
+`NlFilterError` carrying the unparsed constraint; it is never dropped to run a broader query. A
+configured model whose output does not validate, or that fails, is an `NlFilterError` too.
 """
 from __future__ import annotations
 
@@ -87,6 +93,16 @@ _UNITS = {"hour": dt.timedelta(hours=1), "day": dt.timedelta(days=1), "week": dt
           "month": dt.timedelta(days=30), "year": dt.timedelta(days=365)}
 
 
+class NlFilterError(ValueError):
+    """The question names a constraint that cannot become a valid filter value (the route answers
+    422 with ``unparsed``; nothing broader is run in its place)."""
+
+    def __init__(self, message: str, unparsed: Optional[dict[str, Any]] = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.unparsed = dict(unparsed or {})
+
+
 @dataclass
 class NlParse:
     filter: AuditFilter
@@ -104,7 +120,10 @@ def _clean_id(s: str) -> str:
 
 
 def _day(s: str, tz: dt.tzinfo) -> dt.datetime:
-    d = dt.date.fromisoformat(s)
+    try:
+        d = dt.date.fromisoformat(s)
+    except ValueError:
+        raise NlFilterError(f"{s} is not a valid date", {"date": s}) from None
     return dt.datetime(d.year, d.month, d.day, tzinfo=tz)
 
 
@@ -119,10 +138,13 @@ def parse_time(q: str, now: dt.datetime) -> tuple[Optional[dt.datetime], Optiona
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     m = re.search(r"\b(?:last|past|previous)\s+(\d{1,4})\s+(hour|day|week|month|year)s?\b", q, re.I)
     if m:
-        return now - int(m.group(1)) * _UNITS[m.group(2).lower()], now, m.group(0)
+        # clamp before subtracting (9999 years would leave datetime's range); _cap notes the cap
+        span = min(int(m.group(1)) * _UNITS[m.group(2).lower()], 2 * MAX_RANGE)
+        return now - span, now, m.group(0)
     m = re.search(rf"\bbetween\s+{_DATE}\s+and\s+{_DATE}\b", q, re.I)
     if m:
-        return _day(m.group(1), tz), _day(m.group(2), tz) + dt.timedelta(days=1), m.group(0)
+        a, b = sorted((_day(m.group(1), tz), _day(m.group(2), tz)))   # order before capping
+        return a, b + dt.timedelta(days=1), m.group(0)
     m = re.search(rf"\bon\s+{_DATE}\b", q, re.I)
     if m:
         d = _day(m.group(1), tz)
@@ -165,11 +187,12 @@ def _cap(since: Optional[dt.datetime], until: Optional[dt.datetime], now: dt.dat
     if since is None:
         since = until - MAX_RANGE
         notes.append("no time range named: the last 365 days")
+    if since > until:                                    # order first, then cap (Codex sec r1 #17)
+        since, until = until, since
+        notes.append("the range was given in reverse; its ends were swapped")
     if until - since > MAX_RANGE:
         since = until - MAX_RANGE
         notes.append("range capped at 365 days")
-    if since > until:
-        since, until = until, since
     return since, until
 
 
@@ -247,12 +270,17 @@ def parse_deterministic(question: str, now: dt.datetime, *, limit: int = 100) ->
         f = AuditFilter(user=user, container=container, doc=doc, since=since, until=until,
                         decision=decision, kind=kind, limit=limit)
     except ValidationError:
-        # an identifier outside the closed vocabulary: drop the free-text parts, keep the rest
-        notes.append("an identifier in the question is not a valid filter value; it was dropped")
-        f = AuditFilter(since=since, until=until, decision=decision, kind=kind, limit=limit,
-                        user=user if user and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._@-]*", user)
-                        else None)
-        rec = [r for r in rec if r not in ("doc", "container")]
+        # Never drop a named scope to run a broader query (Codex sec r1 #16): name what failed.
+        unparsed = {}
+        for name, val in (("user", user), ("container", container), ("doc", doc)):
+            if val is None:
+                continue
+            try:
+                AuditFilter.model_validate({name: val})
+            except ValidationError:
+                unparsed[name] = val[:300]
+        raise NlFilterError("the question names a constraint that is not a valid filter value; "
+                            "nothing was searched", unparsed or {"question": q[:300]}) from None
     return NlParse(filter=f, source="deterministic", notes=notes, recognised=rec)
 
 
@@ -267,17 +295,29 @@ def _validate_llm(out: Any, now: dt.datetime, limit: int) -> AuditFilter:
 def parse_audit_question(question: str, now: dt.datetime, *, llm: Optional[LlmParser] = None,
                          limit: int = 100) -> NlParse:
     """The closed filter for ``question``. Deterministic rules first; ``llm`` (optional) is asked
-    only when they recognise nothing, and its output is validated against the closed schema."""
-    det = parse_deterministic(question, now, limit=limit)
+    only when they recognise nothing, and its output is validated against the closed schema.
+
+    Raises `NlFilterError` (never anything else) when the question cannot become a valid filter:
+    a named constraint that does not validate, an impossible date, or a configured model whose
+    output does not validate or that fails. Nothing broader is substituted."""
+    try:
+        det = parse_deterministic(question, now, limit=limit)
+    except NlFilterError:
+        raise
+    except Exception:                                                # noqa: BLE001 — 422, not 500
+        raise NlFilterError("the question could not be parsed into a filter",
+                            {"question": str(question)[:300]}) from None
     if det.recognised or llm is None:
         return det
     try:
         f = _validate_llm(llm(str(question), now), now, limit)
     except Exception:                                                # noqa: BLE001 — any failure
-        det.notes.append("the model's filter did not validate; the deterministic parse was used")
-        return det
+        raise NlFilterError("the rules recognised nothing and the model's filter did not "
+                            "validate; nothing was searched",
+                            {"question": str(question)[:300]}) from None
     return NlParse(filter=f, source="llm", notes=["filter proposed by the model and validated"],
                    recognised=["llm"])
 
 
-__all__ = ["NlParse", "LlmParser", "parse_audit_question", "parse_deterministic", "parse_time"]
+__all__ = ["NlParse", "NlFilterError", "LlmParser", "parse_audit_question", "parse_deterministic",
+           "parse_time"]

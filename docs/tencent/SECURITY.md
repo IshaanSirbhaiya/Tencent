@@ -60,31 +60,77 @@ a **separate directory**), wrapped by `audit/ledger.py`. The head is published o
 | Delete the internal anchor file | No | Anchor mismatch | `::test_internal_anchor_removed` |
 | Restore log and anchors together from an earlier backup (before the last publication) | No | **Only** the external head | `::test_directory_rollback_detected_only_via_external_head` |
 | Rewrite a record, re-seal the chain, rebuild the anchors | **Yes** | **Only** the external head | `::test_anchor_mismatch_key_holder_rewrite` |
-| Roll back to a point **after** the last publication | Either | **Not detected** until the next publication: the stated window | `::test_rollback_after_last_publication_is_the_stated_window` |
+| Roll back to a point **after** the last publication | Either | **Not detected.** A later publication anchors the surviving branch; it does not recover or reveal the erased records | `::test_rollback_after_last_publication_is_the_stated_window` |
 | Tamper with the external head copy | Either | Mismatch reported | `::test_external_head_tampered` |
-| Delete the external head while the log says it published | Either | "the log records a publication the sink does not hold" | `::test_external_head_missing` |
-| Publish the head of an already-tampered log (laundering) | Either | `publish_head` refuses a ledger that does not verify | `::test_publish_refuses_broken_ledger` |
+| Delete the external head while the log says it published | Either | "external head missing" | `::test_external_head_missing` |
+| Withhold the newest external head (the sink returns an older, authentic one) | Either | "external head stale": the log records a later `anchor.published` | `::test_stale_external_head_fails_despite_later_publication` |
+| Make the sink unreadable, or plant a malformed or foreign-log head | Either | `ok=false`, never an exception, with or without a publication marker in the log | `::test_sink_exception_fails_closed_even_without_a_publication`, `::test_malformed_or_foreign_external_head_fails`, `::test_corrupt_external_file_fails_closed` |
+| Publish the head of an already-tampered log (laundering) | Either | `publish_head` refuses a ledger that does not verify internally (a key holder's re-sealed log does verify: see disposition #1) | `::test_publish_refuses_broken_ledger` |
 | Short, missing or wrong key | — | Every append refuses (fail closed) | `tests/test_audit_ledger.py::test_missing_key_fails_closed`, `::test_short_key_fails_closed`, `::test_wrong_key_cannot_read_or_extend` |
 
 All scenarios can be replayed with `python scripts/tamper_demo.py` from `databridge/`
 (`databridge/scripts/tamper_demo.py:1-23`; `tests/test_audit_tamper.py::test_tamper_demo_script_scenarios`).
 
 **What makes the head "external".** `publish_head` writes `{log_id, seq, head, at}` to a sink and then ledgers
-`anchor.published` (`audit/anchor.py:129-148`). The sinks are `FileSink`, an append-only JSONL meant to live in
-a **separate git repo that is pushed**, and `SlackWebhookSink`, a compliance-only channel with a file mirror
-for reading back. Publication runs at startup and every `IB_ANCHOR_INTERVAL_S`, default 900 s
-(`bootstrap.py:100-137`, `config.py:46`).
+`anchor.published` (`audit/anchor.py`, `publish_head`). The sinks are `FileSink`, an append-only JSONL meant to
+live in a **separate git repo that is pushed**, and `SlackWebhookSink`, a compliance-only channel with a file
+mirror for reading back. Publication runs at startup and every `IB_ANCHOR_INTERVAL_S`, default 900 s
+(`bootstrap.py:100-137`, `config.py:46`). Verification (`audit/ledger.py`, `AccessLedger.verify` and
+`compare_external`; `audit/anchor.py::verify` is the same code path) accepts an external head only if it is a
+record for this log (`log_id == "ib-access"`) with a positive integer `seq` and a 64-hex `head`, and is not older
+than the newest `anchor.published` in the log. A sink that raises, a missing, stale, malformed or foreign head is
+`ok: false` with a problem; `verify` never raises.
 
 **Limits.**
 - The default sink is `<var>/external_anchor/heads.jsonl` on the same host (`bootstrap.py:85-91`). That is
   **not** off-host. The guarantee holds only when `IB_ANCHOR_FILE` points into a separately pushed repo, or
-  `IB_ANCHOR_SLACK_WEBHOOK` is set.
-- The window between publications is unprotected against a key holder.
-- The answer content store is not sealed. The ledger seals `answer_sha256`, so a reveal reports
-  `content_matches_ledger` (`audit/routes.py:158-161`).
+  `IB_ANCHOR_SLACK_WEBHOOK` is set (and even then see dispositions #1, #4).
+- With no sink configured, `external_head_match` is `null` and `ok` reflects internal verification only.
+- Records appended after the last publication are unprotected against a rollback or a key holder (#21).
+- The answer content store is not sealed. The ledger seals `answer_sha256`; a reveal re-hashes the stored text
+  against the digest in the **verified ledger** and returns **409 with no text** on a mismatch (#7).
 - WORM storage (COS Object Lock) is roadmap (plan §3).
-- Every audit call is itself ledgered before it returns (`audit/routes.py:79-90, 145-149`;
-  `tests/test_audit_routes.py::test_events_query_is_ledgered`, `::test_reveal_requires_reason_and_is_ledgered`).
+- Every audit call is ledgered before it returns, including failed ones: an invalid filter, a blank question
+  or reason, an unparseable question, an unknown reveal target or a query failure appends `audit.query` with
+  `outcome` `rejected`/`error` (a 503 if that append fails) (`audit/routes.py`, `_refuse`;
+  `tests/test_audit_routes.py::test_events_query_is_ledgered`, `::test_reveal_requires_reason_and_is_ledgered`,
+  `::test_failed_audit_calls_are_ledgered`, `::test_rejection_on_a_broken_ledger_is_503`). Requests rejected
+  before a handler runs (401/403 from the auth dependency, a body that is not JSON or exceeds a length cap) are
+  **not** ledgered.
+- **Deliberate exception: `GET /audit/verify`.** When the ledger refuses its `audit.query` append, the route
+  still returns the report, with `"ledgered": false` (`tests/test_audit_routes.py::test_broken_ledger_fails_closed`).
+  The report holds counts, digests and problem strings only (no content, no subjects), and a broken ledger is
+  exactly when the compliance officer needs it. Production would also write such calls to an independent
+  durable channel (the SIEM) (#10).
+
+**Codex security review r1, track 2 disposition** (23 findings on `audit/{ledger,content,query,nl_filter,anchor,routes}.py`;
+tests are in `tests/test_audit_*.py`). "Residual" means accepted for the demo, with the production remedy named.
+
+| # | Sev | Finding | Disposition | Evidence / production remedy |
+|---|---|---|---|---|
+| 1 | High | A key holder can rewrite published history, extend past the last published seq and publish a new head that supersedes the old one (`latest()` takes the highest seq) | **Residual** | Earlier heads stay in the sink and contradict the rewrite, but `verify` compares only the newest. Production: before publishing and when verifying, check that the log still contains **every** previously published `(seq, head)`, not just the latest; keep the sink in a separately administered repo with signed commits and no force-push, or an RFC 3161 timestamp authority, so earlier checkpoints cannot be removed |
+| 2 | High | Projection rows are trusted without authenticating them against the ledger | **Mitigated / residual** | Reveal no longer trusts the projection: `answer_ref` and `answer_sha256` come from the verified ledger (`routes.py`, `audit_reveal`). Search/accessor rows still come from the projection, which `bootstrap.py` keeps **in process memory** (`AuditProjection(cfg, ledger)`, no file). Production: the projection is a cache rebuilt from the verified ledger at start and on any seq/hash disagreement, never a shared writable file (or each row carries a MAC under a key the projection writer does not hold) |
+| 3 | High | External rollback detection is not enforced on appends, projection sync or publication | **Residual** | Only `/audit/verify` compares with the external head. Production: verify against the trusted external checkpoint at startup and before each publication, refuse appends and audit reads (503) when the log does not extend it, and re-check per verified snapshot |
+| 4 | High | The supplied sinks are not an independently protected authority (`FileSink` is a local append; Slack verification reads a local mirror) | **Residual / limit** | Stated above. Production: push `FileSink` to a separate repo with signed commits and branch protection administered by another team, or COS Object Lock (WORM), or an RFC 3161 TSA; verify against the remote copy and treat local files as caches; read Slack back through its API, not a mirror |
+| 5 | High | A stale external checkpoint passed despite a later recorded publication | **Fixed** | `compare_external` fails when the sink's latest seq is older than the newest `anchor.published`; `tests/test_audit_tamper.py::test_stale_external_head_fails_despite_later_publication` |
+| 6 | High | External verification could fail open (sink exception with no publication marker gave `ok: true`; two code paths differed) | **Fixed** | A sink exception is `ok: false` regardless of markers; `anchor.verify` delegates to `AccessLedger.verify(sink=...)`; `verify` catches everything; `::test_sink_exception_fails_closed_even_without_a_publication`, `tests/test_audit_routes.py::test_verify_route_fails_closed_on_sink_error`. Residual: with no sink configured the match is `null` (limit above) |
+| 7 | High | Reveal returned text even when its hash differed from the ledger digest; no request binding | **Fixed** | Text is released only if the stored row's `req_id` is the target and its SHA-256 equals the ledger's `answer_sha256`; otherwise 409 `{"error":"content does not match the sealed ledger digest"}`, no text, and an `audit.query` with `outcome: mismatch` after the write-ahead `audit.reveal`; `tests/test_audit_routes.py::test_reveal_refuses_content_that_does_not_match_the_ledger` |
+| 8 | High | Each audit call re-verifies the whole ledger and appends (O(records)); repeated calls are a shared-ledger DoS | **Residual** | Bounded today only by `lock_timeout` (10 s, then 503 fail closed). Production: incremental verification from an in-memory checkpoint `(seq, hash)` verified once, so each call verifies only new records; per-officer rate limit and a concurrency cap on `/audit/*`; append cost mitigated by the same checkpoint inside `DecisionLedger` |
+| 9 | Medium | Failed audit calls were not ledgered | **Fixed (handlers)** | `_refuse` ledgers `audit.query` with `outcome` `rejected`/`error`; query parameters now arrive as text so malformed dates/limits reach the handler; `::test_failed_audit_calls_are_ledgered`, `::test_rejection_on_a_broken_ledger_is_503`. Residual: framework-level rejections (above) |
+| 10 | Medium | `/audit/verify` returns 200 without ledgering when the append fails | **Deliberate exception** | See "Deliberate exception" above |
+| 11 | Medium | A failed projection update could persist as a partial record | **Fixed** | `apply`, `sync` and `rebuild` run in one transaction and roll back on any exception; `tests/test_audit_query.py::test_failed_apply_leaves_no_partial_record` |
+| 12 | Medium | Concurrent subscriber callbacks could apply events out of ledger order | **Fixed (in process)** | `apply` ignores an event older than the newest applied; `sync` rebuilds in ledger order when a missing event is older than one it holds; `::test_out_of_order_apply_is_repaired_in_ledger_order` |
+| 13 | Medium | Structured `/audit/events` filters were not closed or range-capped | **Fixed** | `AuditFilter.windowed`: no dates = last 365 days, until-only = 365 days before it, since-only = until now; both ends validated and capped; the response states the `window`; `::test_structured_window_is_always_closed_and_capped`, `tests/test_audit_routes.py::test_events_window_is_capped_and_stated` |
+| 14 | Medium | Limits do not bound document expansion, reconstruction or accessor history | **Residual** | Each retrieval row's doc list is the post-Gate-1 top-K plus depth-1 links (`pipeline.py:146`), small by construction; accessors are now capped and disclose truncation (#22); reveal no longer calls `reconstruct`. Production: bound doc expansion and response bytes, paginate reconstruction and accessor history |
+| 15 | Medium | `doc_events` keyed by `(req_id, doc_id)` loses distinctions if a request has several retrieval decisions | **Residual** | The pipeline writes one `retrieval.decided` per request (its single append, `pipeline.py:149`), but nothing in the ledger enforces it. Production: key document decisions by retrieval-event seq, or refuse a second `retrieval.decided` for a request before append |
+| 16 | Medium | Invalid NL constraints silently broadened the query; an invalid model filter fell back to a broad one | **Fixed** | `NlFilterError` carries the unparsed constraint; the route answers 422 `{"error", "unparsed"}` and ledgers the rejection; a configured model that fails or does not validate is also 422; `tests/test_audit_nl_filter.py::test_invalid_constraint_is_not_dropped`, `::test_llm_output_is_validated_and_fails_closed`, `tests/test_audit_routes.py::test_ask_invalid_constraint_is_422_with_the_constraint`. Residual: a question in which the rules recognise nothing, with no model configured, runs the default 365-day query; the returned `filter`, `window` and `notes` show this |
+| 17 | Medium | Impossible dates and huge periods raised uncaught exceptions (500) | **Fixed** | Dates are validated, periods are clamped before subtraction, reversed ranges are ordered before capping, and any parser exception is a ledgered 422; `::test_parser_errors_are_nl_filter_errors`, `::test_huge_and_reversed_periods_are_capped_not_crashing` |
+| 18 | Medium | Calendar upper bounds were inclusive | **Fixed** | Every range is half-open, `since <= event_time < until`, in `nl_filter.parse_time` and `AuditProjection.search`; `::test_calendar_bounds_are_half_open`, `tests/test_audit_query.py::test_search_upper_bound_is_exclusive` |
+| 19 | Medium | Publication can succeed remotely while the local `anchor.published` append fails | **Residual** | The sink being ahead of the log is tolerated by verification (#5 checks only the opposite direction). Production: stable publication ids (`log_id`+`seq`), idempotent remote writes, and startup reconciliation that records a receipt for any remote head the log does not mention |
+| 20 | Medium | External-head validation was incomplete; "never raises" was not guaranteed | **Fixed** | Strict `log_id`, positive-int `seq` and 64-hex `head`; malformed publication markers are problems, not exceptions; a corrupt `FileSink` line fails verification instead of being skipped; `::test_malformed_or_foreign_external_head_fails`, `::test_corrupt_external_file_fails_closed` |
+| 21 | Medium | Rollback after the last publication is undetectable and a later publication does not reveal it | **Limit stated** | Wording corrected here and in `audit/anchor.py`. Production: obtain an external receipt before an answer is released where zero loss is required, or enforce a maximum publication age (alert when the newest head is older than the interval) |
+| 22 | Low | Accessor results did not disclose truncation | **Fixed** | `truncated` and `limit` in the response and in the ledgered query; `tests/test_audit_query.py::test_accessors_limit_clamped_and_truncation_disclosed` |
+| 23 | Low | A negative accessor limit disabled the SQL limit | **Fixed** | Clamped to `[1, 500]`; same test |
 
 ## 4. Prompt injection
 

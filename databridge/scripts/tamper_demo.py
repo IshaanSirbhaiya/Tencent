@@ -188,7 +188,7 @@ def run_scenarios(src_var: Path, external: Path, key: str, *, work: Optional[Pat
     if pub_seq + 1 < n:
         scenario("rollback-after-publication", False,
                  f"restored to seq {n - 1}, after the last publication (seq {pub_seq}): the "
-                 f"stated window, not detectable until the next publication",
+                 f"stated window, not detectable — records appended after the last external publication can be rolled back undetected (stated window)",
                  lambda v, e: restore_prefix(v, n - 1))
 
     def no_anchors(v: Path, e: Path) -> None:

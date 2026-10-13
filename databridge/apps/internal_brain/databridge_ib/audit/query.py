@@ -68,11 +68,28 @@ class AuditFilter(BaseModel):
                 raise ValueError("the time range is capped at 365 days")
         return self
 
+    def windowed(self, now: dt.datetime) -> tuple["AuditFilter", str]:
+        """This filter with BOTH bounds materialised, and how the window was chosen (Codex sec r1
+        #13). No dates -> the last 365 days; ``until`` only -> ``since = until - 365 d``;
+        ``since`` only -> ``until = now``. The result passes the same order and 365-day checks
+        (a ``ValidationError``, which is a ``ValueError``, when it does not). ``until`` is
+        exclusive (``since <= event_time < until``)."""
+        now = _aware(now)
+        since, until = self.since, self.until
+        if since is None and until is None:
+            since, until, how = now - MAX_RANGE, now, "no dates given: the last 365 days"
+        elif since is None:
+            since, how = until - MAX_RANGE, "until only: the 365 days before until"
+        elif until is None:
+            until, how = now, "since only: from since to now"
+        else:
+            how = "as given"
+        f = AuditFilter.model_validate({**self.model_dump(), "since": since, "until": until})
+        return f, how
+
     def bounded(self, now: dt.datetime) -> "AuditFilter":
-        """Refuse an open range that reaches further back than 365 days from ``now``."""
-        if self.since and not self.until and _aware(now) - self.since > MAX_RANGE:
-            raise ValueError("the time range is capped at 365 days")
-        return self
+        """`windowed` without the explanation (kept for callers of the earlier name)."""
+        return self.windowed(now)[0]
 
     def criteria(self) -> dict[str, Any]:
         """The filter without its defaults (what was actually asked for)."""
@@ -176,38 +193,60 @@ class AuditProjection:
             events = list(self.ledger.events(strict=True))
         n = 0
         with self._lock:
-            self._clear()
-            for le in events:
-                self._apply_locked(le)
-                n += 1
-            self._db.commit()
+            try:
+                self._clear()
+                for le in events:
+                    self._apply_locked(le)
+                    n += 1
+                self._db.commit()
+            except BaseException:
+                self._db.rollback()
+                raise
         return n
 
-    def sync(self) -> int:
+    def sync(self, events: Optional[Iterable[LedgerEvent]] = None) -> int:
         """Bring the projection level with the verified ledger (raises `LedgerUnavailable` if the
-        ledger does not verify). Rebuilds when the projection holds an event the ledger does not
-        (a rollback or a rewrite). Returns the number of events applied."""
-        if self.ledger is None:
-            return 0
-        evs = list(self.ledger.events(strict=True))
+        ledger does not verify). ``events`` lets a caller that already read the verified ledger
+        pass its events instead of reading it twice. Rebuilds when the projection holds an event
+        the ledger does not (a rollback or a rewrite), or when a missing event is OLDER than one
+        it holds (an out-of-order gap: replaying it late would differ from chronological replay,
+        Codex sec r1 #12). Returns the number of events applied."""
+        if events is None:
+            if self.ledger is None:
+                return 0
+            events = self.ledger.events(strict=True)
+        evs = sorted(events, key=lambda le: le.seq)
         with self._lock:
             mine = {r[0]: r[1] for r in self._db.execute("SELECT seq, hash FROM events")}
             theirs = {le.seq: le.hash for le in evs}
             if any(theirs.get(s) != h for s, h in mine.items()):
                 return self.rebuild(evs)
-            n = 0
-            for le in evs:
-                if le.seq not in mine:
+            top = max(mine, default=0)
+            missing = [le for le in evs if le.seq not in mine]
+            if missing and missing[0].seq < top:
+                return self.rebuild(evs)
+            try:
+                for le in missing:
                     self._apply_locked(le)
-                    n += 1
-            self._db.commit()
-            return n
+                self._db.commit()
+            except BaseException:
+                self._db.rollback()
+                raise
+            return len(missing)
 
     def apply(self, le: LedgerEvent) -> None:
-        """Apply one appended event (idempotent by seq)."""
+        """Apply one appended event in one transaction: all of its rows or none (Codex sec r1
+        #11). An event older than the newest one applied is left for `sync`, which then rebuilds
+        in ledger order (#12). Idempotent by seq."""
         with self._lock:
-            self._apply_locked(le)
-            self._db.commit()
+            if le.seq <= self.last_seq:
+                return
+            try:
+                self._apply_locked(le)
+                self._db.commit()
+            except BaseException:
+                self._db.rollback()
+                raise
 
     def _apply_locked(self, le: LedgerEvent) -> None:
         d = le.data
@@ -318,7 +357,7 @@ class AuditProjection:
             where.append("e.event_time_n >= :since")
             p["since"] = norm_time(f.since)
         if f.until:
-            where.append("e.event_time_n <= :until")
+            where.append("e.event_time_n < :until")           # half-open (Codex sec r1 #18)
             p["until"] = norm_time(f.until)
         scoped = f.doc or f.container
         if scoped:
@@ -378,13 +417,18 @@ class AuditProjection:
 
     def accessors(self, doc_id: str, *, limit: int = MAX_LIMIT) -> dict[str, Any]:
         """Who had ``doc_id`` considered, released, cited or denied — per subject, with the
-        requests (ids, times) behind each count."""
+        requests (ids, times) behind each count. ``limit`` is clamped to ``[1, MAX_LIMIT]``
+        (Codex sec r1 #23). ``truncated`` is true when more rows matched than ``limit``: the
+        per-person counts then cover only the newest ``limit`` rows (#22)."""
+        lim = max(1, min(int(limit), MAX_LIMIT))
         with self._lock:
             rows = self._db.execute(
                 "SELECT d.*, e.event_time AS et, e.recorded_at AS rec FROM doc_events d "
                 "LEFT JOIN events e ON e.seq = d.seq WHERE " + self._doc_match("d") +
                 " ORDER BY d.event_time_n DESC, d.seq DESC LIMIT :limit",
-                {"doc": doc_id, "limit": int(min(limit, MAX_LIMIT))}).fetchall()
+                {"doc": doc_id, "limit": lim + 1}).fetchall()
+        truncated = len(rows) > lim
+        rows = rows[:lim]
         people: dict[str, dict[str, Any]] = {}
         reqs = []
         for r in rows:
@@ -411,7 +455,8 @@ class AuditProjection:
         accessors = sorted(people.values(), key=lambda a: (-a["released"], a["sub"]))
         for a in accessors:
             a["accessed"] = a["released"] > 0
-        return {"doc_id": doc_id, "accessors": accessors, "requests": reqs}
+        return {"doc_id": doc_id, "accessors": accessors, "requests": reqs,
+                "truncated": truncated, "limit": lim}
 
     def reconstruct(self, req_id: str) -> Optional[dict[str, Any]]:
         """Everything the ledger says about one request: who asked what, when, through which

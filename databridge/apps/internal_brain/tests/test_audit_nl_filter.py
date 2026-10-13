@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import datetime as dt
 
-from databridge_ib.audit.nl_filter import parse_audit_question
+import pytest
+from databridge_ib.audit.nl_filter import NlFilterError, parse_audit_question
 from databridge_ib.audit.query import MAX_RANGE, AuditFilter
 
 from test_audit_support import NOW
@@ -74,23 +75,63 @@ def test_llm_only_when_rules_recognise_nothing():
     assert r.source == "llm" and r.filter.user == "zed" and calls
 
 
-def test_llm_output_is_validated_and_falls_back():
+def test_llm_output_is_validated_and_fails_closed():
+    # Codex sec r1 #16: a model filter that does not validate (or a model that fails) is an error,
+    # never a silent fallback to the broad deterministic query
     def bad(q, now):
         return {"user": "zed", "where": "1=1"}           # outside the closed schema
 
-    r = parse_audit_question("anything odd lately?", NOW, llm=bad)
-    assert r.source == "deterministic" and r.filter.user is None
+    with pytest.raises(NlFilterError):
+        parse_audit_question("anything odd lately?", NOW, llm=bad)
 
     def boom(q, now):
         raise RuntimeError("model down")
 
-    assert parse_audit_question("anything odd lately?", NOW, llm=boom).source == "deterministic"
+    with pytest.raises(NlFilterError):
+        parse_audit_question("anything odd lately?", NOW, llm=boom)
 
     def wide(q, now):
         return {"user": "zed", "limit": 500}             # no range -> capped to 365 days
 
     f = parse_audit_question("anything odd lately?", NOW, llm=wide).filter
     assert f.until - f.since <= MAX_RANGE
+
+
+def test_invalid_constraint_is_not_dropped():
+    # Codex sec r1 #16: "R&D plan" is outside the doc vocabulary; it must not become "everything"
+    with pytest.raises(NlFilterError) as ei:
+        parse_audit_question("who accessed the R&D plan last week", NOW)
+    assert ei.value.unparsed == {"doc": "R&D plan"}
+
+
+@pytest.mark.parametrize("q", ["what did jdoe ask on 2026-02-30",
+                               "events for jdoe between 2026-13-01 and 2026-09-30",
+                               "events for jdoe until 9999-12-31"])
+def test_parser_errors_are_nl_filter_errors(q):
+    # Codex sec r1 #17: impossible dates and datetime overflow are a 422-able error, never a crash
+    with pytest.raises(NlFilterError):
+        parse_audit_question(q, NOW)
+
+
+def test_huge_and_reversed_periods_are_capped_not_crashing():
+    r = parse_audit_question("failed requests in the last 9999 years", NOW)
+    assert r.filter.until - r.filter.since == MAX_RANGE and any("capped" in n for n in r.notes)
+    r = parse_audit_question("events for jdoe between 2026-09-30 and 2024-01-01", NOW)
+    f = r.filter
+    assert f.since < f.until and f.until - f.since == MAX_RANGE
+    assert f.until == dt.datetime(2026, 10, 1, tzinfo=NOW.tzinfo)          # ordered, then capped
+    assert any("capped" in n for n in r.notes)
+
+
+def test_calendar_bounds_are_half_open():
+    # Codex sec r1 #18: the upper bound is the next interval's midnight, used exclusively
+    midnight = NOW.replace(hour=0, minute=0, second=0, microsecond=0)
+    f = parse_audit_question("what did jdoe ask yesterday", NOW).filter
+    assert (f.since, f.until) == (midnight - dt.timedelta(days=1), midnight)
+    f = parse_audit_question("events for jdoe on 2026-09-01", NOW).filter
+    assert f.until - f.since == dt.timedelta(days=1) and f.until.time() == dt.time(0)
+    f = parse_audit_question("events for jdoe before 2026-09-01", NOW).filter
+    assert f.until == dt.datetime(2026, 9, 1, tzinfo=NOW.tzinfo)
 
 
 def test_model_receives_only_question_and_clock():

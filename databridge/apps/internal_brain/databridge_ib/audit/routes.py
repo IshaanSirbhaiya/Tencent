@@ -8,7 +8,13 @@
 * ``GET  /audit/verify``                   chain + anchors + external head
 
 Write-ahead and fail-closed: the audit event is appended before the response is returned; an append
-failure is a 503 and nothing is returned. The one exception is ``/audit/verify``: its report carries
+failure is a 503 and nothing is returned. Failed calls are ledgered too (Codex sec r1 #9): an invalid
+filter, a blank question or reason, an unparseable question, an unknown reveal target or a query
+failure appends ``audit.query`` with ``outcome`` ``rejected``/``error`` before the 4xx/5xx (and is a
+503 if that append fails). A reveal whose stored text does not hash to the sealed ``answer_sha256``
+returns 409 with no text and is ledgered with ``outcome: mismatch`` (#7). Requests the framework
+rejects before a handler runs (no/invalid token, a body that is not JSON or exceeds a length cap) are
+not ledgered — they never reach the audit code. The one exception is ``/audit/verify``: its report carries
 no content (counts and hashes only) and is exactly what an officer needs when the ledger is broken,
 so it is returned with ``"ledgered": false`` when the ledger refuses the ``audit.query`` append.
 
@@ -19,10 +25,11 @@ answers 401/403 itself.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Callable, Optional
+from typing import Any, Callable, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import params as fa_params
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..models import AuditQueryEvent, AuditReveal
@@ -30,21 +37,22 @@ from .anchor import AnchorSink
 from .anchor import verify as verify_with_sink
 from .content import AnswerStore, ContentStoreUnavailable, sha256_text
 from .ledger import AccessLedger, LedgerUnavailable
-from .nl_filter import LlmParser, parse_audit_question
+from .nl_filter import LlmParser, NlFilterError, parse_audit_question
 from .query import AuditFilter, AuditProjection
 
 COMPLIANCE_ROLE = "compliance_officer"
+REVEAL_MISMATCH = "content does not match the sealed ledger digest"
 
 
 class AuditAskBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    question: str = Field(min_length=1, max_length=1000)
+    question: str = Field(max_length=1000)          # blank -> a ledgered 422 in the handler
 
 
 class RevealBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    req_id: str = Field(min_length=1, max_length=200)
-    reason: str = Field(min_length=1, max_length=1000)
+    req_id: str = Field(max_length=200)             # empty -> a ledgered 404 (unknown target)
+    reason: str = Field(max_length=1000)            # blank -> a ledgered 422 in the handler
 
 
 def _sub_of(principal: Any) -> str:
@@ -76,12 +84,23 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
     now = clock or (lambda: dt.datetime.now(dt.timezone.utc))
     router = APIRouter(prefix="/audit", tags=["audit"])
 
-    def _ledger_query(sub: str, filt: dict, count: int) -> None:
+    def _append_query(sub: str, filt: dict, count: int) -> None:
         try:
             ledger.append(AuditQueryEvent(sub=sub, filter=filt, result_count=count,
                                           event_time=now()))
         except LedgerUnavailable:
             raise _unavailable() from None
+
+    def _ledger_query(sub: str, filt: dict, count: int) -> None:
+        _append_query(sub, {**filt, "outcome": "ok"}, count)
+
+    def _refuse(sub: str, op: str, outcome: str, status: int, error: str,
+                info: Optional[dict] = None, detail: Any = None) -> NoReturn:
+        """Ledger a failed audit call as ``audit.query`` with ``outcome`` (``rejected`` for a bad
+        request, ``error`` for a server-side failure), then answer ``status`` (Codex sec r1 #9).
+        When the ledger refuses this append the answer is 503 instead: fail closed."""
+        _append_query(sub, {"op": op, "outcome": outcome, **(info or {}), "error": error[:300]}, 0)
+        raise HTTPException(status_code=status, detail=error if detail is None else detail)
 
     def _sync() -> None:
         try:
@@ -92,81 +111,123 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
     @router.get("/events")
     def audit_events(principal=dep,
                      user: Optional[str] = Query(None), container: Optional[str] = Query(None),
-                     doc: Optional[str] = Query(None), since: Optional[dt.datetime] = Query(None),
-                     until: Optional[dt.datetime] = Query(None),
+                     doc: Optional[str] = Query(None), since: Optional[str] = Query(None),
+                     until: Optional[str] = Query(None),
                      decision: Optional[str] = Query(None), kind: Optional[str] = Query(None),
-                     limit: int = Query(100)) -> dict:
+                     limit: Optional[str] = Query(None)) -> dict:
+        # every parameter arrives as text and is validated here, so a malformed one is a
+        # ledgered rejection rather than a framework 422 that never reaches the ledger
         sub = _sub_of(principal)
+        raw = {k: v for k, v in dict(user=user, container=container, doc=doc, since=since,
+                                     until=until, decision=decision, kind=kind,
+                                     limit=limit).items() if v is not None}
         try:
-            f = AuditFilter.model_validate(
-                {k: v for k, v in dict(user=user, container=container, doc=doc, since=since,
-                                       until=until, decision=decision, kind=kind,
-                                       limit=limit).items() if v is not None}).bounded(now())
+            f, how = AuditFilter.model_validate(raw).windowed(now())
         except (ValidationError, ValueError) as exc:
-            raise HTTPException(status_code=422, detail=f"invalid audit filter: "
-                                                        f"{_brief(exc)}") from None
+            _refuse(sub, "events", "rejected", 422, f"invalid audit filter: {_brief(exc)}",
+                    {"params": _clip(raw)})
         _sync()
-        rows = projection.search(f)
-        _ledger_query(sub, {"op": "events", **f.model_dump(mode="json", exclude_none=True)},
-                      len(rows))
-        return {"filter": f.model_dump(mode="json", exclude_none=True), "events": rows}
+        try:
+            rows = projection.search(f)
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "events", "error", 500, "the audit query failed", {"params": _clip(raw)})
+        dumped = f.model_dump(mode="json", exclude_none=True)
+        _ledger_query(sub, {"op": "events", **dumped, "window": how}, len(rows))
+        return {"filter": dumped, "window": _window(dumped, how), "events": rows}
 
     @router.get("/doc/{doc_id:path}/accessors")
     def audit_accessors(doc_id: str, principal=dep) -> dict:
         sub = _sub_of(principal)
         if not doc_id or len(doc_id) > 300:
-            raise HTTPException(status_code=422, detail="invalid doc id")
+            _refuse(sub, "accessors", "rejected", 422, "invalid doc id", {"doc": doc_id[:300]})
         _sync()
-        res = projection.accessors(doc_id)
-        _ledger_query(sub, {"op": "accessors", "doc": doc_id}, len(res["requests"]))
+        try:
+            res = projection.accessors(doc_id)
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "accessors", "error", 500, "the audit query failed", {"doc": doc_id})
+        _ledger_query(sub, {"op": "accessors", "doc": doc_id, "truncated": res["truncated"]},
+                      len(res["requests"]))
         return res
 
     @router.post("/ask")
     def audit_ask(body: AuditAskBody, principal=dep) -> dict:
         sub = _sub_of(principal)
-        parsed = parse_audit_question(body.question, now(), llm=llm)
+        question = body.question.strip()
+        if not question:
+            _refuse(sub, "ask", "rejected", 422, "a question is required", {"question": ""})
+        try:
+            parsed = parse_audit_question(question, now(), llm=llm)
+        except NlFilterError as exc:
+            _refuse(sub, "ask", "rejected", 422, exc.message,
+                    {"question": question, "unparsed": exc.unparsed},
+                    detail={"error": exc.message, "unparsed": exc.unparsed})
+        except Exception:                                            # noqa: BLE001 — 422, not 500
+            msg = "the question could not be parsed into a filter"
+            _refuse(sub, "ask", "rejected", 422, msg, {"question": question},
+                    detail={"error": msg, "unparsed": {"question": question[:300]}})
         _sync()
-        rows = projection.search(parsed.filter)
-        _ledger_query(sub, {"op": "ask", "question": body.question, "parser": parsed.source,
-                            **parsed.filter.model_dump(mode="json", exclude_none=True)}, len(rows))
-        return {"filter": parsed.filter.model_dump(mode="json", exclude_none=True),
-                "parser": parsed.source, "notes": parsed.notes, "events": rows}
+        try:
+            rows = projection.search(parsed.filter)
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "ask", "error", 500, "the audit query failed", {"question": question})
+        dumped = parsed.filter.model_dump(mode="json", exclude_none=True)
+        how = "; ".join(parsed.notes) or "as asked"
+        _ledger_query(sub, {"op": "ask", "question": question, "parser": parsed.source, **dumped},
+                      len(rows))
+        return {"filter": dumped, "window": _window(dumped, how), "parser": parsed.source,
+                "notes": parsed.notes, "events": rows}
 
     @router.post("/reveal")
-    def audit_reveal(body: RevealBody, principal=dep) -> dict:
+    def audit_reveal(body: RevealBody, principal=dep) -> Any:
         sub = _sub_of(principal)
         reason = body.reason.strip()
+        info = {"target_req_id": body.req_id}
         if not reason:
-            raise HTTPException(status_code=422, detail="a reveal needs a reason")
-        _sync()
-        rec = projection.reconstruct(body.req_id)
-        if rec is None or not rec.get("answer_ref"):
-            raise HTTPException(status_code=404, detail="no released answer for that request")
+            _refuse(sub, "reveal", "rejected", 422, "a reveal needs a reason", info)
+        # the reference and the sealed digest come from the VERIFIED ledger, not the projection
+        try:
+            evs = list(ledger.events(strict=True))
+        except LedgerUnavailable:
+            raise _unavailable() from None
+        released = None
+        for le in evs:
+            if le.kind == "answer.released" and le.data.get("req_id") == body.req_id:
+                released = le.data
+        if released is None or not released.get("answer_ref"):
+            _refuse(sub, "reveal", "rejected", 404, "no released answer for that request", info)
+        ref, sealed = str(released["answer_ref"]), released.get("answer_sha256")
         try:                                                  # write-ahead: ledger, then read
             ledger.append(AuditReveal(sub=sub, target_req_id=body.req_id, reason=reason,
                                       event_time=now()))
         except LedgerUnavailable:
             raise _unavailable() from None
         try:
-            stored = store.get(rec["answer_ref"])
+            stored = store.get(ref)
         except ContentStoreUnavailable:
-            raise HTTPException(status_code=503, detail="the answer content store is "
-                                                        "unavailable") from None
+            _refuse(sub, "reveal", "error", 503, "the answer content store is unavailable", info)
         if stored is None:
-            raise HTTPException(status_code=404, detail="the answer content is missing from the "
-                                                        "content store")
-        matches = sha256_text(stored.answer) == rec.get("answer_sha256")
-        return {"req_id": body.req_id, "answer": stored.answer, "answer_ref": stored.answer_ref,
-                "answer_sha256": rec.get("answer_sha256"), "content_matches_ledger": matches,
+            _refuse(sub, "reveal", "error", 404,
+                    "the answer content is missing from the content store", info)
+        if (stored.req_id != body.req_id or not isinstance(sealed, str)
+                or sha256_text(stored.answer) != sealed):
+            # never release text the sealed digest does not vouch for (Codex sec r1 #7)
+            _append_query(sub, {"op": "reveal", "outcome": "mismatch", **info,
+                                "answer_ref": ref, "error": REVEAL_MISMATCH}, 0)
+            return JSONResponse(status_code=409, content={"error": REVEAL_MISMATCH})
+        return {"req_id": body.req_id, "answer": stored.answer, "answer_ref": ref,
+                "answer_sha256": sealed, "content_matches_ledger": True,
                 "revealed_by": sub, "reason": reason}
 
     @router.get("/verify")
     def audit_verify(principal=dep) -> dict:
+        # Deliberate exception to write-ahead (Codex sec r1 #10, SECURITY.md §3): the report holds
+        # counts and digests only, and a broken ledger is exactly when the officer needs it.
         sub = _sub_of(principal)
         rep = verify_with_sink(ledger, sink) if sink is not None else ledger.verify()
         out = rep.as_dict()
         try:
-            ledger.append(AuditQueryEvent(sub=sub, filter={"op": "verify"},
+            ledger.append(AuditQueryEvent(sub=sub, filter={"op": "verify", "outcome": "ok",
+                                                           "verify_ok": rep.ok},
                                           result_count=rep.records, event_time=now()))
             out["ledgered"] = True
         except LedgerUnavailable:
@@ -174,6 +235,16 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         return out
 
     return router
+
+
+def _clip(d: dict) -> dict:
+    return {k: str(v)[:300] for k, v in d.items()}
+
+
+def _window(dumped: dict, how: str) -> dict:
+    """The time window actually searched (both ends; ``until`` is exclusive)."""
+    return {"since": dumped.get("since"), "until": dumped.get("until"), "until_exclusive": True,
+            "applied": how}
 
 
 def _brief(exc: Exception) -> str:

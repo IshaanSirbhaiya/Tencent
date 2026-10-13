@@ -6,7 +6,7 @@ import datetime as dt
 
 import pytest
 from databridge_ib.audit.ledger import AccessLedger
-from databridge_ib.audit.query import AuditFilter, AuditProjection
+from databridge_ib.audit.query import MAX_RANGE, AuditFilter, AuditProjection
 from databridge_ib.audit.content import AnswerStore
 from pydantic import ValidationError
 
@@ -185,3 +185,94 @@ def test_bootstrap_form_and_history_shape(seeded):
     rows = p.search(p.filter_type(user="jdoe", kind="request.accepted", limit=50))
     want = {sp.req_id: sp.question for sp in SPECS if sp.sub == "jdoe"}
     assert {r["req_id"]: r["question"] for r in rows} == want and want
+
+
+# --- Codex security review r1, track 2 ---------------------------------------------------------
+def test_structured_window_is_always_closed_and_capped():
+    # #13: no dates, until-only and since-only all materialise both ends within 365 days
+    f, how = AuditFilter(user="jdoe").windowed(NOW)
+    assert (f.since, f.until) == (NOW - MAX_RANGE, NOW) and "365" in how
+    until = NOW - dt.timedelta(days=500)
+    f, _ = AuditFilter(until=until).windowed(NOW)
+    assert (f.since, f.until) == (until - MAX_RANGE, until)
+    since = NOW - dt.timedelta(days=10)
+    f, _ = AuditFilter(since=since).windowed(NOW)
+    assert (f.since, f.until) == (since, NOW)
+    with pytest.raises(ValueError):                                   # since in the future
+        AuditFilter(since=NOW + dt.timedelta(days=1)).windowed(NOW)
+    with pytest.raises(ValueError):                                   # since-only beyond the cap
+        AuditFilter(since=NOW - dt.timedelta(days=366)).windowed(NOW)
+
+
+def test_search_upper_bound_is_exclusive(seeded):
+    # #18: an event exactly at `until` belongs to the next interval
+    _, _, _, proj = seeded
+    sp = SPECS[0]
+    t = sp.event_time                                                 # its request.accepted
+    base = dict(user=sp.sub, kind="request.accepted")
+    at = proj.search(AuditFilter(**base, since=t - dt.timedelta(hours=1), until=t))
+    assert sp.req_id not in {r["req_id"] for r in at}
+    after = proj.search(AuditFilter(**base, since=t, until=t + dt.timedelta(microseconds=1)))
+    assert sp.req_id in {r["req_id"] for r in after}                  # since stays inclusive
+
+
+def test_accessors_limit_clamped_and_truncation_disclosed(seeded):
+    # #22 / #23
+    _, _, _, proj = seeded
+    doc = "jira:PAY-201"
+    n = sum(1 for sp in SPECS if doc in sp.docs)
+    assert n >= 2
+    full = proj.accessors(doc)
+    assert full["truncated"] is False and len(full["requests"]) == n
+    one = proj.accessors(doc, limit=1)
+    assert one["truncated"] is True and len(one["requests"]) == 1
+    neg = proj.accessors(doc, limit=-1)                               # never "unlimited"
+    assert neg["limit"] == 1 and len(neg["requests"]) == 1 and neg["truncated"] is True
+    assert proj.accessors(doc, limit=10_000)["limit"] == 500
+
+
+def test_failed_apply_leaves_no_partial_record(tmp_path, monkeypatch):
+    # #11: an event whose derived rows fail is rolled back entirely; a later commit cannot
+    # persist half of it; sync repairs it (and, being older than what is held, rebuilds: #12)
+    cfg = make_cfg(tmp_path)
+    ledger = AccessLedger(cfg)
+    store = AnswerStore(cfg)
+    write_request(ledger, store, SPECS[0])
+    evs = list(ledger.events())
+    acc, dec, rel = evs[0], evs[1], evs[2]
+    assert dec.kind == "retrieval.decided"
+    proj = AuditProjection(ledger, attach=False, catch_up=False)
+    proj.apply(acc)
+    real = proj._doc_info
+
+    def boom(*a, **kw):
+        raise RuntimeError("disk full")
+    monkeypatch.setattr(proj, "_doc_info", boom)
+    with pytest.raises(RuntimeError):
+        proj.apply(dec)                     # the events row was inserted before the failure
+    monkeypatch.setattr(proj, "_doc_info", real)
+    proj.apply(rel)                         # commits: must not carry dec's partial rows
+    snap = proj.snapshot()
+    assert dec.seq not in {r[0] for r in snap["events"]}
+    assert not [r for r in snap["doc_events"] if r[0] == dec.seq]
+    proj.sync()
+    ref = AuditProjection(ledger, attach=False, catch_up=False)
+    ref.rebuild()
+    assert proj.snapshot() == ref.snapshot()
+
+
+def test_out_of_order_apply_is_repaired_in_ledger_order(tmp_path):
+    # #12: an earlier event delivered after a later one is not applied late; sync rebuilds
+    cfg = make_cfg(tmp_path)
+    ledger = AccessLedger(cfg)
+    store = AnswerStore(cfg)
+    write_request(ledger, store, SPECS[0])
+    evs = list(ledger.events())
+    proj = AuditProjection(ledger, attach=False, catch_up=False)
+    proj.apply(evs[2])                      # answer.released first
+    proj.apply(evs[1])                      # retrieval.decided late: left for sync
+    assert evs[1].seq not in {r[0] for r in proj.snapshot()["events"]}
+    proj.sync()
+    ref = AuditProjection(ledger, attach=False, catch_up=False)
+    ref.rebuild()
+    assert proj.snapshot() == ref.snapshot()
