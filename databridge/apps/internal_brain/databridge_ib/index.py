@@ -37,6 +37,7 @@ TITLE_WEIGHT = 0.6
 #: a passage is RELEVANT only if it covers this share of the question's IDF-weighted terms
 #: (IDF from the asker's permitted corpus — P2 holds); below it the passage never reaches a model
 MIN_COVERAGE = 0.4
+MIN_COVERAGE_SINGLE = 0.5
 #: without a matching adjacent term pair (e.g. "key rotation"), a clause of ≥3 terms needs this much
 MIN_COVERAGE_NO_PHRASE = 0.6
 #: weight of the vector leg; the offline hashing embedding is lexical noise, so it barely counts
@@ -371,7 +372,9 @@ class Index:
                             datetime.fromisoformat(d["updated_at"])):
                     sc += WINDOW_BONUS
             cov = cover.get(cid, 0.0)
-            relevant = bool(exact) or (cov >= MIN_COVERAGE)
+            # single-intent questions need half their weighted terms; multi-intent clauses are
+            # shorter, so each needs less (a passage answering one part of a two-part question)
+            relevant = bool(exact) or (cov >= (MIN_COVERAGE if len(parts) > 1 else MIN_COVERAGE_SINGLE))
             hits.append(Hit(cid, c["doc_id"], c["text"], sc, relevant, cov))
         if relevant_only:                    # relevance BEFORE top-k truncation (sec1 #28)
             hits = [h for h in hits if h.lexical]
