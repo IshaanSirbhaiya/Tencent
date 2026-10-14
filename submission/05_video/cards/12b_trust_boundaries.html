@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Trust boundaries</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
+body{background:radial-gradient(1200px 700px at 78% 18%,#1d2b4a 0%,#0b1020 55%,#070a14 100%);color:#e8edf7;
+font-family:'Segoe UI',Inter,system-ui,sans-serif}
+.pad{padding:110px 140px;height:100%;display:flex;flex-direction:column}
+.kicker{color:#8fd3c7;letter-spacing:.18em;text-transform:uppercase;font-size:22px;font-weight:600}
+h1{font-size:84px;line-height:1.05;margin:22px 0 18px;font-weight:700;letter-spacing:-.02em}
+h2{font-size:56px;margin:18px 0;font-weight:700;letter-spacing:-.01em}
+p.lead{font-size:32px;color:#b8c3d9;max-width:1400px;line-height:1.4;margin:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:36px;margin-top:70px}
+.stat{border:1px solid #2a3654;border-radius:22px;padding:34px 36px;background:rgba(17,24,43,.75)}
+.big{font-size:92px;font-weight:700;letter-spacing:-.03em;color:#fff}
+.big.ok{color:#5ee0b0}.lbl{font-size:27px;color:#c9d3e6;margin-top:8px;line-height:1.35}
+.src{font-size:19px;color:#7f8aa3;margin-top:18px;letter-spacing:.04em}
+.foot{margin-top:auto;display:flex;justify-content:space-between;color:#7f8aa3;font-size:21px}
+.logo{display:inline-flex;align-items:center;gap:14px;font-weight:700;color:#e8edf7;font-size:24px}
+.dot{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#6d5dfc,#22c3a6)}
+.pill{display:inline-block;border:1px solid #2f3d5e;border-radius:999px;padding:10px 22px;margin:8px 10px 0 0;
+font-size:24px;color:#cfd8ea;background:rgba(20,28,50,.7)}
+</style><script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script><script>mermaid.initialize({startOnLoad:true,theme:"dark",flowchart:{useMaxWidth:false,nodeSpacing:30,rankSpacing:40}});window.addEventListener("load",()=>setTimeout(()=>{const s=document.querySelector("#d svg");if(!s)return;const b=s.getBBox();const k=Math.min(1640/b.width,760/b.height);s.style.transform=`scale(${k})`;},800));</script></head><body><div class="pad">
+<div class="kicker">Trust boundaries (made with CodeBuddy)</div>
+<div id="d" style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden">
+<pre class="mermaid" style="background:transparent">flowchart TB
+    %% ============================================================
+    %% Walnut Internal Brain — trust-boundary diagram (TB1-TB5)
+    %% Synthetic data only (&quot;Company A&quot;). No real company names.
+    %% ============================================================
+
+    %% ---------- Untrusted clients (outside the Brain) ----------
+    subgraph CLIENTS[&quot;Untrusted clients (outside the Brain)&quot;]
+        EMP[&quot;Employee (web) client&lt;br/&gt;browser, httpOnly ib_session cookie&quot;]
+        WB[&quot;WorkBuddy client + its own model&lt;br/&gt;per-persona MCP bearer token, no identity arg&quot;]
+    end
+
+    %% ---------- Public edge ----------
+    LH[&quot;Lighthouse public edge (Caddy)&lt;br/&gt;TLS + security headers; exposes only the web app and /api/ib/* (same-origin proxy)&lt;br/&gt;synthetic mock platforms only, never real workspaces&quot;]
+
+    %% ---------- Walnut Internal Brain (own process, port 8100) ----------
+    subgraph IB[&quot;Walnut Internal Brain — own process, own state (var/ib/)&quot;]
+        direction TB
+        AUTH[&quot;Auth&lt;br/&gt;HMAC token: sub, roles, exp ≤ 8h, aud=ib, jti&lt;br/&gt;revocation list (fails closed)&quot;]
+        LEDGER[&quot;Write-ahead access ledger&lt;br/&gt;request.accepted → retrieval.decided → answer.released&lt;br/&gt;sealed, hash-chained, anchor directory&quot;]
+        GATE1[&quot;Gate 1: index pre-filter&lt;br/&gt;readable(sub) over stored ACL policy expressions&lt;br/&gt;only permitted chunks are ranked&quot;]
+        GATE2[&quot;Gate 2: live source check&lt;br/&gt;ask source (user, doc) now, per doc, in parallel&lt;br/&gt;hard deny on error / timeout / 429&quot;]
+        GROUND[&quot;Grounding wall&lt;br/&gt;GroundedNarrator; on violation serve extractive&quot;]
+        WH[&quot;Webhook receiver&lt;br/&gt;verifies signed webhooks, then re-fetches&quot;]
+        AUDIT[&quot;Compliance audit console&lt;br/&gt;/audit/* (compliance_officer only)&quot;]
+    end
+
+    %% ---------- Tencent model + embeddings ----------
+    TH[&quot;Tencent TokenHub&lt;br/&gt;hy3 → fallback deepseek-v4.1-flash → extractive&quot;]
+    EMB[&quot;Embedder (ingest)&lt;br/&gt;default offline hashing; optional TokenHub alias&quot;]
+
+    %% ---------- Source platforms ----------
+    subgraph SRC[&quot;Source platforms (mock or live, same connector code)&quot;]
+        CON[&quot;Confluence&quot;]
+        JIR[&quot;Jira&quot;]
+        SLA[&quot;Slack&quot;]
+        DRI[&quot;Drive&quot;]
+    end
+
+    %% ---------- External sinks / readers ----------
+    SINK[&quot;External ledger-head sink&lt;br/&gt;separate git repo tag / compliance Slack&lt;br/&gt;off-host, append-only&quot;]
+    OFFICER[&quot;Compliance officer&lt;br/&gt;reads metadata + logged reasoned reveal&quot;]
+
+    %% ============================================================
+    %% Edges and the five trust boundaries
+    %% ============================================================
+
+    %% TB1: client -&gt; IB gateway (through Caddy)
+    EMP --&gt;|&quot;TB1 · identity token + question&quot;| LH
+    WB  --&gt;|&quot;TB1 · MCP bearer token + question&quot;| LH
+    LH  --&gt;|&quot;TB1 · forwarded cookie/bearer over allowlisted paths&quot;| AUTH
+
+    %% In-gateway pipeline order (no boundary crossings)
+    AUTH  --&gt; LEDGER
+    LEDGER --&gt; GATE1
+    GATE1 --&gt; GATE2
+    GROUND --&gt; LEDGER
+
+    %% TB2: IB -&gt; sources (ingest reads, service token)
+    IB -.-&gt;|&quot;TB2 · service-token reads of ALL content + ACLs&quot;| SRC
+
+    %% TB3: IB -&gt; sources (Gate 2 live permission check)
+    GATE2 ==&gt;|&quot;TB3 · (user, doc) permission question at answer time&quot;| SRC
+
+    %% Platforms -&gt; IB signed webhooks (events only invalidate)
+    SRC ==&gt;|&quot;signed webhook · HMAC-SHA256, ±300s, replay-safe; ids only, re-fetch&quot;| WH
+
+    %% TB4: IB -&gt; TokenHub (generation)
+    GATE2 ==&gt;|&quot;TB4 · released passages only + system prompt + question&quot;| TH
+    TH --&gt;|&quot;TB4 · draft answer (untrusted until grounded)&quot;| GROUND
+
+    %% TB5: IB -&gt; external ledger-head sink
+    LEDGER ==&gt;|&quot;TB5 · ledger head hash {log_id, seq, head, at} (no content)&quot;| SINK
+
+    %% Audit console -&gt; compliance officer
+    AUDIT ==&gt;|&quot;metadata + logged reasoned reveal (itself ledgered)&quot;| OFFICER
+
+    %% Ingest embedding boundary note
+    IB -.-&gt;|&quot;ingest embed: default offline (no chunk leaves host)&quot;| EMB
+
+    classDef outside fill:#fde2e2,stroke:#c0392b,color:#000;
+    classDef edge fill:#e2e8f0,stroke:#2c3e50,color:#000;
+    classDef tencent fill:#fff3cd,stroke:#b8860b,color:#000;
+    class EMP,WB,SINK,OFFICER outside;
+    class LH,TH,EMB tencent;
+</pre></div>
+<div class="foot"><span class="logo"><span class="dot"></span>Walnut Internal Brain</span>
+<span>FinTech Track · Aspire · Tencent Cloud AI CAN DO IT Hackathon Singapore 2026</span></div></div></body></html>
