@@ -154,7 +154,7 @@ An assistant that can read everything can leak everything, so most regulated fir
  <div class="card"><div class="big ok">{inj}</div><div class="lbl">prompt-injection failures, with planted instructions on all four platforms</div><div class="src">INJECTION PROBES</div></div>
 </div>
 <div class="grid3" style="margin-top:28px">
- <div class="card"><div class="big" style="font-size:64px">632</div><div class="lbl">automated tests on the Internal Brain</div></div>
+ <div class="card"><div class="big" style="font-size:64px">634</div><div class="lbl">automated tests on the Internal Brain</div></div>
  <div class="card"><div class="big" style="font-size:64px">7</div><div class="lbl">independent security reviews (6 Codex passes, CodeBuddy on Hy3), every finding fixed or documented</div></div>
  <div class="card"><div class="big" style="font-size:64px">100%</div><div class="lbl">recall on questions people are allowed to answer</div></div>
 </div>""",

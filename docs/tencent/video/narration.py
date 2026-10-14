@@ -9,6 +9,7 @@ SEGMENTS, so the narration always matches the picture. ``--hy3`` picks the "[if 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -53,7 +54,15 @@ def scenes_from_script(hy3: bool) -> dict[str, list[str]]:
 
 
 def timeline() -> dict[str, tuple[float, float]]:
+    """Scene spans from the last assembled video (timeline.json), else from the targets."""
     spans: dict[str, tuple[float, float]] = {}
+    real = OUT / "timeline.json"
+    if real.exists():
+        for seg in json.loads(real.read_text(encoding="utf-8")):
+            scene = seg["label"].split()[0]
+            a, _ = spans.get(scene, (seg["start"], seg["start"]))
+            spans[scene] = (a, seg["end"])
+        return spans
     t = 0.0
     for _, _, secs, label in SEGMENTS:
         scene = label.split()[0]

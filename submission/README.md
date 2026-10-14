@@ -6,13 +6,14 @@ answers themselves are in [docs/tencent/SUBMISSION.md](../docs/tencent/SUBMISSIO
 | Folder | What's in it | Use it for |
 |---|---|---|
 | `01_codebuddy/` | One overview and one full-page screenshot per CodeBuddy session (CB1–CB6), rendered from the saved CLI transcripts (`docs/tencent/evidence/`) | The mandatory CodeBuddy proof (attach at least 3 overviews: CB2, CB5, CB6) |
-| `02_workbuddy/` | WorkBuddy screenshots: the same question asked as two different people, and the compliance audit assistant | The mandatory WorkBuddy proof |
+| `02_workbuddy/` | Tencent WorkBuddy with the three Internal Brain connectors: `workbuddy_mcp_panel.png` (the connectors, all enabled), `workbuddy_compare.png` (one question through Jordan's and Ken's connectors, two different answers), `workbuddy_compliance.png` (Maya's connector lists Jordan's access and verifies the audit chain); `raw/` holds the uncomposed window shots | The mandatory WorkBuddy proof |
 | `03_app_scenes/internal_brain/` | The Internal Brain web app: answer with checks, map, compare, tour, info pop-ups | Extra screenshots, slides |
 | `03_app_scenes/walnut_original/` | The original Walnut screens on Company A: knowledge graph, node provenance, brain time slider, ontology, provenance chain, guided tour | Extra screenshots, slides |
 | `04_evidence/` | Real outputs: the tamper demo run | Proof the audit log catches edits |
 | `05_video/cards/` | The video's still cards (title, why, architecture, trust boundaries, tamper, numbers, closing) | The video, slides |
-| `05_video/clips/` | One screen recording per video scene | The video |
-| `05_video/walnut_internal_brain_demo.mp4` | The assembled demo video, silent, timed to the narration script | Record the voice-over on top, then upload |
+| `05_video/clips/` | One screen recording per video scene, plus `<scene>.marks.json` (on-screen labels and the loading waits the edit trims) | The video |
+| `05_video/narration_cues.md`, `narration.srt` | What to say and when, generated from the finished video's timeline (`timeline.json`) | Recording the voice-over |
+| `05_video/walnut_internal_brain_demo.mp4` | The assembled demo video (about 5:50), silent, timed to the narration script | Record the voice-over on top, then upload |
 | `06_cover/` | The cover image, made in Miora (to be added by Ishaan after the freeze) | The form's cover field |
 | `07_deck/` | The pitch deck: `walnut_internal_brain_deck.pdf` and `.pptx` (13 slides, speaker notes in the .pptx) | Attach to the submission; present at Demo Day |
 

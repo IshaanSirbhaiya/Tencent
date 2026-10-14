@@ -128,7 +128,7 @@ Diagrams: [the request path](docs/tencent/ARCHITECTURE.md) and
 | Recall for what people *are* allowed to see | **100%** of positive probes | same |
 | Map identical with and without restricted documents | test | `tests/test_knowledge_map.py` |
 | Audit log edits, deletions, truncation, rollback, edited stored answers | detected | `tests/test_audit_tamper.py`, `tests/test_audit_verify_content.py` |
-| Automated tests, Internal Brain | **632** passing | `databridge/apps/internal_brain/tests/` |
+| Automated tests, Internal Brain | **634** passing | `databridge/apps/internal_brain/tests/` |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration is caught, and a
 deny-everything configuration scores zero usefulness.

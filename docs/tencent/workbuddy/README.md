@@ -4,6 +4,13 @@
 > `databridge/.venv/Scripts/python.exe databridge/scripts/workbuddy_setup.py`. It writes three ready
 > workspaces (jdoe, ken.ext, compliance) next to the repository, each with its own token, so you don't
 > paste anything. The manual steps below are what that script does.
+>
+> **One chat, three people:** add `--user-config` and the script also writes the three connectors
+> into WorkBuddy's own connector list (`~/.workbuddy-ai/mcp.json`: `ib-as-jdoe`, `ib-as-ken`,
+> `ib-compliance`). Restart WorkBuddy, open **Experts · Skills · Connectors → Custom connectors**, press
+> **Trust** on each, then ask in a new task: *"Ask the Internal Brain the same question with the
+> ib-as-jdoe connector and with the ib-as-ken connector: …"*. This is how the screenshots in
+> `submission/02_workbuddy/` were taken. Other servers already in that file are kept.
 
 
 WorkBuddy (desktop app 5.7.x) can talk to the Internal Brain through its stdio MCP

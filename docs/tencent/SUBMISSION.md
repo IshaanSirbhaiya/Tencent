@@ -134,7 +134,7 @@ to quoted evidence.
 | Restricted content in answers or prompts | **0 leaks in 5,958 requests** (95% upper bound 0.10% per request) | `databridge/evals/internal_brain/RESULTS.md` |
 | "With vs without restricted documents" | **0 / 400** response differences | same file |
 | Recall for what users *are* allowed to see | **100%** of positive probes (both answer paths) | same file |
-| Scenario, fintech and revocation tests | **63 / 63** (`test_scenarios_e2e.py`, `test_fintech_scenarios.py`, `test_revoke_concurrency.py`), within 632 passing | `apps/internal_brain/tests/` |
+| Scenario, fintech and revocation tests | **63 / 63** (`test_scenarios_e2e.py`, `test_fintech_scenarios.py`, `test_revoke_concurrency.py`), within 634 passing | `apps/internal_brain/tests/` |
 | Answer latency, local | mean **32–35 ms** per request in the in-process eval (deterministic and test-model paths; not network or Hy3) | `RESULTS.md` |
 | Freshness | a webhook-delivered edit is answerable **on the next query**; poll fallback every 120 s by default; SLO 5 min (Aspire asked for 30 min) | `test_s2_freshness_via_webhook` |
 | Revocation | denied **on the next query**, even when the webhook is lost | `test_s4_revocation_without_webhook` |
