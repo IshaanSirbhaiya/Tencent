@@ -63,7 +63,7 @@ every source permission-checked, every access written to an audit trail that can
  <div class="stat"><div class="big">1 leak</div><div class="lbl">is enough: an assistant that can read everything can leak everything</div>
   <div class="src">COPILOT OVERSHARING · ECHOLEAK · SLACK AI INJECTION</div></div>
  <div class="stat"><div class="big">Offence</div><div class="lbl">to tip off a customer that a suspicious-transaction report exists</div>
-  <div class="src">CDSA S.57 · MAS NOTICE PSN01 (SINGAPORE)</div></div>
+  <div class="src">CDSA S.48 · MAS NOTICE PSN01 (SINGAPORE)</div></div>
 </div>""")
     flow = [("01", "Who's asking", "Signed token from the web app or WorkBuddy. Never a name typed into a box."),
             ("02", "Gate 1", "Search only what this person may open, using each platform's own permissions."),
