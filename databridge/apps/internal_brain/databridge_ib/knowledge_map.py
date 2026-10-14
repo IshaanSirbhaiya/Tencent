@@ -13,6 +13,7 @@ Same rules as an answer:
 from __future__ import annotations
 
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Callable, Mapping
 
@@ -24,7 +25,9 @@ from .models import SCOPE_NOTE, DirectoryUser, MapViewed
 
 PLATFORM_ORDER = ("confluence", "jira", "slack", "drive")
 MAX_ITEMS_PER_CONTAINER = 200
-MAP_CHECK_TIMEOUT_S = 20.0          # one budget for the whole batch; late = left out
+MAP_CHECK_TIMEOUT_S = 45.0          # one budget for the whole batch; late = left out
+#: the map's own workers: its hundreds of live checks never delay an answer's Gate 2 batch
+_MAP_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ib-map-gate2")
 
 
 def build_map(user: DirectoryUser, *, index: Index, directory: Directory, ledger: Any,
@@ -35,7 +38,8 @@ def build_map(user: DirectoryUser, *, index: Index, directory: Directory, ledger
     rows = {d: (index.doc(d) or {}) for d in candidates}
     checks = gates.check_all(user, candidates, {d: r.get("platform", "") for d, r in rows.items()},
                              connectors, timeout_s=timeout_s,
-                             known_versions={d: r.get("version") for d, r in rows.items()})
+                             known_versions={d: r.get("version") for d, r in rows.items()},
+                             pool=_MAP_POOL)
     readable = [d for d in candidates if checks.get(d) is not None and checks[d].allowed]
     groups: dict[tuple[str, str], dict] = {}
     items: dict[tuple[str, str], list[dict]] = defaultdict(list)

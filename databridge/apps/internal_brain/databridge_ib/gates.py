@@ -27,7 +27,11 @@ def _deny(doc_id: str, reason: str) -> AccessCheck:
 
 def check_all(user: DirectoryUser, doc_ids: Sequence[str], platform_of: Mapping[str, str],
               connectors: Mapping[str, SourceConnector], *, timeout_s: float = 2.0,
-              known_versions: Mapping[str, str] | None = None) -> dict[str, AccessCheck]:
+              known_versions: Mapping[str, str] | None = None,
+              pool: ThreadPoolExecutor | None = None) -> dict[str, AccessCheck]:
+    """``pool``: bulk callers (the knowledge map) pass their own small pool so they can never
+    queue ahead of an answer's checks on the shared one."""
+    pool = pool or _POOL
     futures = {}
     out: dict[str, AccessCheck] = {}
     for d in dict.fromkeys(doc_ids):
@@ -35,7 +39,7 @@ def check_all(user: DirectoryUser, doc_ids: Sequence[str], platform_of: Mapping[
         if conn is None:
             out[d] = _deny(d, "no_connector")
             continue
-        futures[d] = _POOL.submit(conn.check_access, user, d,
+        futures[d] = pool.submit(conn.check_access, user, d,
                                   known_version=(known_versions or {}).get(d))
     deadline = time.monotonic() + timeout_s             # ONE budget for the whole batch
     for d, fut in futures.items():
