@@ -58,7 +58,7 @@ Who it serves:
   For a payments company under MAS supervision, that blocks AI rollout entirely.
 - **Fintech-specific stakes:**
   - **Tipping-off.** Revealing that a suspicious transaction report exists is a criminal offence (CDSA
-    s.57; MAS Notice PSN01). Our refusal is byte-identical for "restricted" and "does not exist".
+    s.48; MAS Notice PSN01). Our refusal is byte-identical for "restricted" and "does not exist".
   - **PCI DSS 3.4.1.** Card numbers pasted into tickets are masked before indexing, so they never reach
     the index or a model.
   - **MAS TRM §9.1 / §12.2.** Least privilege, prompt revocation, contractors restricted like staff,

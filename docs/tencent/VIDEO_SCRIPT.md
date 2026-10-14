@@ -5,7 +5,7 @@
 re-shot on its own). Ishaan records the voice-over on top. Read it like you're showing a friend something
 you built: relaxed, not salesy. Pauses are fine.
 
-Lines marked **[if Hunyuan is on]** depend on Tencent approving the account in time. If it isn't on,
+Lines marked **[if Hy3 is on]** depend on Tencent approving the account in time. If it isn't on,
 read the alternative line instead.
 
 ---
@@ -20,11 +20,10 @@ read the alternative line instead.
 ### 2 · Why this matters (0:20–0:55)
 **On screen:** the problem slide: the search-time number, then three short lines on fintech risks.
 
-> Most of us lose a big part of the week just looking for things: the answer is in a ticket, a Slack
-> thread, a runbook, somewhere. An AI assistant should fix that. But in a regulated fintech there's a
-> catch: an assistant that can read everything can also *leak* everything. Show the wrong person a
-> fraud case and you may have tipped off a customer, which is a criminal offence in Singapore. So we
-> built the assistant around one rule: the model never sees anything the person asking can't see.
+> We all lose hours looking for things: the answer is in a ticket, a Slack thread, a runbook,
+> somewhere. An AI assistant should fix that. But in a fintech, an assistant that can read everything
+> can also *leak* everything, and showing the wrong person a fraud case can be a crime. So we built it
+> around one rule: the model never sees anything the person asking can't see.
 
 ### 3 · One question, three platforms (0:55–1:40)
 **On screen:** signed in as **jdoe** (backend engineer). Ask: *"What's the status of the database migration
@@ -42,11 +41,9 @@ this answer" strip.
 **On screen:** the **Map** page as jdoe (867 items, 4 platforms). Click a channel to open its items. Then
 switch to **ken.ext** (24 items, 2 platforms).
 
-> This is Jordan's knowledge map: everything he's allowed to open, by platform and by space. Eight
-> hundred and sixty-seven items.
-> Now Ken, a contractor. Twenty-four items, two platforms. That's not a filter we added on top; it's
-> what Slack, Jira, Confluence and Drive themselves say Ken can open. And notice there's no "plus 843
-> hidden": for Ken, the rest simply doesn't exist.
+> This is Jordan's map: everything he can open. Eight hundred and sixty-seven items, each checked
+> live with its source. Ken, a contractor, sees twenty-four. And there's no "plus 843 hidden": for Ken,
+> the rest simply doesn't exist.
 
 ### 5 · Same question, two people (2:15–2:50)
 **On screen:** the **Compare** page, jdoe vs ken.ext, the same question, two answers side by side.
@@ -54,6 +51,12 @@ switch to **ken.ext** (24 items, 2 platforms).
 > Here's the same question asked by Jordan and by Ken, side by side. Jordan gets the full picture.
 > Ken gets the polite "I couldn't find that in the sources you can access", with no hint that there's
 > anything more to find.
+
+### 5b · A guided tour for anyone new (about 15 seconds)
+**On screen:** the "Take the tour" button, then the tour's pop-ups stepping across the screens.
+
+> And if you're new, there's a short guided tour that walks you through all of this in about a
+> minute.
 
 ### 6 · Restricted looks exactly like non-existent (2:50–3:15)
 **On screen:** as ken.ext, ask about "the security incident report from the Q3 breach", then the Q7 breach,
@@ -116,9 +119,9 @@ provenance chain of one value, the ontology.
 
 > Two checks before the model sees anything, a grounding check after it answers, and an audit record
 > written before anything is shown.
-> **[if Hunyuan is on]** The answers are written by Tencent Hunyuan through TokenHub.
+> **[if Hy3 is on]** The answers are written by Tencent Hy3 through TokenHub.
 > **[otherwise]** Here the answers are quoted straight from the sources; with a TokenHub key, Tencent
-> Hunyuan writes them instead, through exactly the same checks.
+> Hy3 writes them instead, through exactly the same checks.
 
 ### 13 · The numbers (6:50–7:10)
 **On screen:** the RESULTS.md headline.

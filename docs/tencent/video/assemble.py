@@ -26,21 +26,22 @@ W, H, FPS = 1920, 1080, 30
 SEGMENTS = [
     ("card", "01_title.png", 8, "1 Hello"),
     ("clip", "01_login.webm", 12, "1 Hello: sign-in"),
-    ("card", "02_why.png", 35, "2 Why this matters"),
-    ("clip", "03_ask_jdoe.webm", 45, "3 One question, three platforms"),
-    ("clip", "04_map.webm", 35, "4 The map of what you can see"),
-    ("clip", "05_compare.webm", 35, "5 Same question, two people"),
-    ("clip", "06_restricted_vs_nonexistent.webm", 25, "6 Restricted looks like non-existent"),
-    ("clip", "07_fintech.webm", 30, "7 The fintech part"),
-    ("clip", "08_revocation_freshness.webm", 35, "8 Access changes, answers change"),
-    ("clip", "09_audit.webm", 45, "9 The audit trail"),
+    ("card", "02_why.png", 30, "2 Why this matters"),
+    ("clip", "03_ask_jdoe.webm", 30, "3 One question, three platforms"),
+    ("clip", "04_map.webm", 20, "4 The map of what you can see"),
+    ("clip", "05_compare.webm", 20, "5 Same question, two people"),
+    ("clip", "10_tour.webm", 30, "5b The guided tour"),
+    ("clip", "06_restricted_vs_nonexistent.webm", 22, "6 Restricted looks like non-existent"),
+    ("clip", "07_fintech.webm", 27, "7 The fintech part"),
+    ("clip", "08_revocation_freshness.webm", 45, "8 Access changes, answers change"),
+    ("clip", "09_audit.webm", 42, "9 The audit trail"),
     ("card", "09b_tamper.png", 15, "9 Tamper demo"),
     ("still", "../../02_workbuddy/workbuddy_compare.png", 18, "10 WorkBuddy: two people"),
     ("still", "../../02_workbuddy/workbuddy_compliance.png", 12, "10 WorkBuddy: compliance"),
-    ("clip", "11_walnut_original.webm", 35, "11 What's underneath"),
+    ("clip", "11_walnut_original.webm", 48, "11 What's underneath"),
     ("card", "12_architecture.png", 25, "12 How it fits together"),
-    ("card", "13_numbers.png", 20, "13 The numbers"),
-    ("card", "14_closing.png", 20, "14 Built with, thanks"),
+    ("card", "13_numbers.png", 18, "13 The numbers"),
+    ("card", "14_closing.png", 15, "14 Built with, thanks"),
 ]
 
 
@@ -60,10 +61,19 @@ FIT = (f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/
 
 def segment(kind: str, src: Path, seconds: float, label: str, out: Path) -> str:
     if not src.exists():
-        txt = f"MISSING: {label} ({src.name})".replace(":", r"\:").replace("'", "")
-        run(["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c=0x1a1f2e:s={W}x{H}:d={seconds}:r={FPS}",
-             "-vf", f"drawtext=text='{txt}':fontcolor=white:fontsize=42:x=(w-tw)/2:y=(h-th)/2",
-             "-c:v", "libx264", "-pix_fmt", "yuv420p", str(out)])
+        from PIL import Image, ImageDraw, ImageFont
+        ph = out.with_suffix(".png")
+        img = Image.new("RGB", (W, H), (26, 31, 46))
+        d = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 46)
+        except OSError:
+            font = ImageFont.load_default()
+        msg = f"MISSING: {label} ({src.name})"
+        w = d.textlength(msg, font=font)
+        d.text(((W - w) / 2, H / 2 - 30), msg, fill=(240, 200, 120), font=font)
+        img.save(ph)
+        segment("card", ph, seconds, label, out)
         return f"MISSING {src}"
     if kind in ("card", "still"):
         zoom = "" if kind == "card" else (",zoompan=z='min(zoom+0.0006,1.06)':d=1:s="
@@ -74,10 +84,13 @@ def segment(kind: str, src: Path, seconds: float, label: str, out: Path) -> str:
         return f"{kind:5} {seconds:>4}s  {src.name}"
     have = duration(src)
     pad = max(0.0, seconds - have)
-    vf = FIT + (f",tpad=stop_mode=clone:stop_duration={pad:.2f}" if pad > 0 else "")
+    speed = min(have / seconds, 1.6) if have > seconds * 1.03 else 1.0   # fit long takes, gently
+    vf = (f"setpts=PTS/{speed:.3f}," if speed > 1 else "") + FIT + (
+        f",tpad=stop_mode=clone:stop_duration={pad:.2f}" if pad > 0 else "")
     run(["ffmpeg", "-y", "-i", str(src), "-vf", vf, "-an", "-c:v", "libx264", "-preset", "medium",
          "-crf", "18", "-t", str(seconds), str(out)])
-    return f"clip  {seconds:>4}s  {src.name} (recorded {have:.1f}s{', held ' + format(pad, '.1f') + 's' if pad else ''})"
+    return (f"clip  {seconds:>4}s  {src.name} (recorded {have:.1f}s"
+            + (f", held {pad:.1f}s" if pad else "") + (f", x{speed:.2f}" if speed > 1 else "") + ")")
 
 
 def main() -> int:

@@ -66,7 +66,7 @@ const SCENES = {
   },
   async '05_compare'(page) {
     await login(page, 'jdoe'); await page.goto(`${WEB}/compare`); await pause(page, 3);
-    await page.getByRole('button', { name: /compare/i }).last().click();
+    await page.getByRole('button', { name: 'Ask for both' }).click();
     await page.getByTestId('compare-results').waitFor({ timeout: 90000 }); await pause(page, 6);
     await glide(page, 'compare-why', 5);
   },
@@ -112,6 +112,18 @@ const SCENES = {
     await page.getByRole('button', { name: 'Verify audit chain' }).click(); await pause(page, 5);
     await glide(page, 'verify-panel', 4);
   },
+  async '10_tour'(page) {
+    await login(page, 'jdoe'); await page.goto(WEB); await pause(page, 2);
+    await page.getByRole('button', { name: /tour/i }).first().click(); await pause(page, 4);
+    for (let i = 0; i < 6; i++) {                       // press the tour's main button each step
+      const tour = page.getByTestId('tour');
+      if (!(await tour.count())) break;
+      await pause(page, 3.5);
+      await tour.getByRole('button').last().click().catch(() => {});
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await pause(page, 3);
+    }
+  },
   async '11_walnut_original'(page) {
     await page.goto(`${WALNUT}/login`).catch(() => {}); await pause(page, 1);
     const pick = page.getByText('Jordan Doe').first();
@@ -156,6 +168,8 @@ const SCENES = {
   for (const name of want) {
     const ctx = await browser.newContext({ viewport: SIZE, recordVideo: { dir: OUT, size: SIZE },
                                            colorScheme: 'dark', deviceScaleFactor: 1 });
+    // the one-time tour offer is shown in its own scene (the tour), not in every clip
+    await ctx.addInitScript(() => { try { localStorage.setItem('ib-tour-offer', 'dismissed'); } catch (e) {} });
     if (!name.startsWith('11_')) await reset(ctx);
     const page = await ctx.newPage();
     const t0 = Date.now();

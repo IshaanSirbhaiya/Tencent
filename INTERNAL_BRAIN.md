@@ -31,7 +31,7 @@ issues, 602 Slack threads, 81 Drive files). No real company or customer data is 
   through retrieved documents (EchoLeak, Slack AI) and permission sync lags of 30 minutes to a day are
   all on record. For a payments company supervised by MAS, that blocks rollout entirely.
 - **In fintech a leak can be a crime.** Telling a customer that a suspicious-transaction report exists is
-  tipping-off (CDSA s.57, MAS Notice PSN01). Card numbers pasted into a ticket must never reach an
+  tipping-off (CDSA s.48, MAS Notice PSN01). Card numbers pasted into a ticket must never reach an
   index or a model (PCI DSS 3.4.1).
 
 **What the Brain changes:** people get cited answers in seconds; the model never sees what the asker
