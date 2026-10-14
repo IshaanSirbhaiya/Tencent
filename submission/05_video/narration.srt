@@ -3,16 +3,16 @@
 Hi!
 
 2
-00:00:02,299 --> 00:00:06,601
+00:00:02,299 --> 00:00:06,681
 This is the Walnut Internal Brain, our entry for Aspire's FinTech challenge.
 
 3
-00:00:06,601 --> 00:00:15,564
-It's one place to ask questions across Confluence, Jira, Slack and Google Drive, and it only ever answers from what you are allowed to open.
+00:00:06,681 --> 00:00:16,903
+Ask one question across Confluence, Jira, Slack and Google Drive, and it answers only from what you are allowed to open, with every step on an audit trail.
 
 4
-00:00:15,564 --> 00:00:19,800
-Every question it handles is written to an audit trail that can't be quietly edited.
+00:00:16,903 --> 00:00:20,150
+We built it with Tencent CodeBuddy, and it plugs into Tencent WorkBuddy.
 
 5
 00:00:20,500 --> 00:00:27,807
@@ -31,181 +31,193 @@ But in a fintech, an assistant that can read everything can also leak everything
 So we built it around one rule: the model never sees anything the person asking can't see.
 
 9
-00:00:50,500 --> 00:00:52,358
+00:00:49,149 --> 00:00:51,073
 Meet Jordan, a backend engineer.
 
 10
-00:00:52,358 --> 00:01:00,910
+00:00:51,073 --> 00:00:59,919
 He asks one plain question, and gets one answer, stitched together from Slack, Jira and Confluence, with every sentence linked to its source.
 
 11
-00:01:00,910 --> 00:01:11,692
+00:00:59,919 --> 00:01:11,073
 Look at the strip under the answer: only sources Jordan can open, each one re-checked with the source system just before it was used, and the whole thing logged.
 
 12
-00:01:11,692 --> 00:01:16,153
+00:01:11,073 --> 00:01:15,688
 There's also a blocker discussed in a leads-only channel Jordan isn't in.
 
 13
-00:01:16,153 --> 00:01:17,953
+00:01:15,688 --> 00:01:17,488
 It's not here.
 
 14
-00:01:17,953 --> 00:01:19,799
+00:01:17,488 --> 00:01:19,796
 It never even reached the model.
 
 15
-00:01:20,500 --> 00:01:23,576
+00:01:24,959 --> 00:01:28,036
 This is Jordan's map: everything he can open.
 
 16
-00:01:23,576 --> 00:01:27,807
+00:01:28,036 --> 00:01:32,267
 Eight hundred and sixty-seven items, each checked live with its source.
 
 17
-00:01:27,807 --> 00:01:29,730
+00:01:32,267 --> 00:01:34,190
 Ken, a contractor, sees twenty-four.
 
 18
-00:01:29,730 --> 00:01:34,730
+00:01:34,190 --> 00:01:39,190
 And there's no "plus 843 hidden": for Ken, the rest simply doesn't exist.
 
 19
-00:01:40,500 --> 00:01:45,500
+00:01:40,810 --> 00:01:45,810
 Here's the same question asked by Jordan and by Ken, side by side.
 
 20
-00:01:45,500 --> 00:01:47,423
+00:01:45,810 --> 00:01:47,733
 Jordan gets the full picture.
 
 21
-00:01:47,423 --> 00:01:56,269
+00:01:47,733 --> 00:01:56,579
 Ken gets the polite "I couldn't find that in the sources you can access", with no hint that there's anything more to find.
 
 22
-00:02:00,500 --> 00:02:08,192
+00:01:58,579 --> 00:02:06,272
 And if you're new, there's a short guided tour that walks you through all of this in about a minute.
 
 23
-00:02:30,500 --> 00:02:32,300
+00:02:12,180 --> 00:02:13,980
 One more test.
 
 24
-00:02:32,300 --> 00:02:37,684
+00:02:13,980 --> 00:02:19,364
 Ken asks about a real, restricted incident report, then about one we made up.
 
 25
-00:02:37,684 --> 00:02:39,992
+00:02:19,364 --> 00:02:21,672
 The two answers are byte-for-byte identical.
 
 26
-00:02:39,992 --> 00:02:46,530
+00:02:21,672 --> 00:02:28,210
 We test this on four hundred pairs of questions, and there's no difference in any of them.
 
 27
-00:02:52,500 --> 00:02:58,269
-Aspire's team told us the big use case is "what can we offer this customer?".
+00:02:29,030 --> 00:02:33,260
+The big fintech case is "what can I tell this customer?".
 
 28
-00:02:58,269 --> 00:03:09,807
-Amy, an account manager, gets the approved script for a customer under review, never the case notes, and it reads exactly like the answer for a company that doesn't exist.
+00:02:33,260 --> 00:02:37,491
+Amy, an account manager, asks why a customer's account is restricted.
 
 29
-00:03:09,807 --> 00:03:17,500
-And the offer question gets a different, correct answer per market, always from the approved policy, never from the draft.
+00:02:37,491 --> 00:02:45,953
+She gets the approved script, never the case notes, and it reads exactly like the answer for a company that doesn't exist.
 
 30
-00:03:19,500 --> 00:03:21,423
-Permissions change all the time.
+00:02:45,953 --> 00:02:48,645
+And "what can we offer this business?"
 
 31
-00:03:21,423 --> 00:03:24,500
-Here we remove Jordan from a Slack channel.
+00:02:48,645 --> 00:02:54,029
+gets the answer for its own market, from the approved policy, never a draft.
 
 32
-00:03:24,500 --> 00:03:34,115
-His very next question no longer uses that channel, even if Slack's notification about it gets lost, because we check with the source every time.
+00:02:55,680 --> 00:02:57,603
+Permissions change all the time.
 
 33
-00:03:34,115 --> 00:03:40,269
-And when the runbook owner adds a new step, Priya's next question shows version 8, live.
+00:02:57,603 --> 00:03:00,680
+Here we remove Jordan from a Slack channel.
 
 34
-00:03:40,269 --> 00:03:42,069
-Nothing stale.
+00:03:00,680 --> 00:03:10,295
+His very next question no longer uses that channel, even if Slack's notification about it gets lost, because we check with the source every time.
 
 35
-00:04:04,500 --> 00:04:06,300
-Now the compliance view.
+00:03:10,295 --> 00:03:16,449
+And when the runbook owner adds a new step, Priya's next question shows version 8, live.
 
 36
-00:04:06,300 --> 00:04:12,453
-Maya asks in plain English: everything Jordan accessed in the payment gateway space, last thirty days.
+00:03:16,449 --> 00:03:18,249
+Nothing stale.
 
 37
-00:04:12,453 --> 00:04:19,376
-She sees each question, what was considered, what was allowed or denied and why, and which model answered.
+00:03:25,229 --> 00:03:27,030
+Now the compliance view.
 
 38
-00:04:19,376 --> 00:04:21,684
-She can't read answers by default.
+00:03:27,030 --> 00:03:33,183
+Maya asks in plain English: everything Jordan accessed in the payment gateway space, last thirty days.
 
 39
-00:04:21,684 --> 00:04:27,453
-To see one, she has to give a reason, and that reveal is logged too.
+00:03:33,183 --> 00:03:40,106
+She sees each question, what was considered, what was allowed or denied and why, and which model answered.
 
 40
-00:04:27,453 --> 00:04:29,761
-The log is chained and sealed.
+00:03:40,106 --> 00:03:42,414
+She can't read answers by default.
 
 41
-00:04:29,761 --> 00:04:33,607
-"Verify audit chain" checks every record and every stored answer.
+00:03:42,414 --> 00:03:48,183
+To see one, she has to give a reason, and that reveal is logged too.
 
 42
-00:04:33,607 --> 00:04:39,376
-And if someone edits a single line on disk, or deletes one, verification catches it.
+00:03:48,183 --> 00:03:50,491
+The log is chained and sealed.
 
 43
-00:05:01,500 --> 00:05:06,500
-People don't want another app, so the Brain also lives inside Tencent WorkBuddy.
+00:03:50,491 --> 00:03:54,337
+"Verify audit chain" checks every record and every stored answer.
 
 44
-00:05:06,500 --> 00:05:12,653
-Each person's connection carries their own signed token, so the model can't decide who you are.
+00:03:54,337 --> 00:04:00,106
+And if someone edits a single line on disk, or deletes one, verification catches it.
 
 45
-00:05:12,653 --> 00:05:16,884
-And Maya can run her audit checks right from WorkBuddy too.
+00:04:08,569 --> 00:04:13,569
+People don't want another app, so the Brain also lives inside Tencent WorkBuddy.
 
 46
-00:05:31,500 --> 00:05:36,500
-Under the hood is Walnut, the evidence engine we built before this hackathon.
+00:04:13,569 --> 00:04:23,569
+Each connector carries its own signed token, so the AI in the middle can't decide who you are: Jordan's connector gets Jordan's answer, Ken's gets Ken's.
 
 47
-00:05:36,500 --> 00:05:47,269
-Every value it touches carries a pointer back to where it came from, and you can follow that pointer, like here, from a fact to the exact document.
+00:04:23,569 --> 00:04:27,800
+And Maya can run her audit checks right from WorkBuddy too.
 
 48
-00:05:47,269 --> 00:05:50,730
-The Internal Brain reuses that engine as it is.
+00:04:31,519 --> 00:04:36,519
+Under the hood is Walnut, the evidence engine we built before this hackathon.
 
 49
-00:06:19,500 --> 00:06:27,961
-Two checks before the model sees anything, a grounding check after it answers, and an audit record written before anything is shown.
+00:04:36,519 --> 00:04:47,289
+Every value it touches carries a pointer back to where it came from, and you can follow that pointer, like here, from a fact to the exact document.
 
 50
-00:06:27,961 --> 00:06:36,807
-Here the answers are quoted straight from the sources; with a TokenHub key, Tencent Hy3 writes them instead, through exactly the same checks.
+00:04:47,289 --> 00:04:50,750
+The Internal Brain reuses that engine as it is.
 
 51
-00:06:44,500 --> 00:06:54,115
-We attacked it on purpose: nearly six thousand adversarial requests, zero leaks; four hundred paired questions, zero differences; and every scenario covered by automated tests.
+00:05:07,970 --> 00:05:16,431
+Two checks before the model sees anything, a grounding check after it answers, and an audit record written before anything is shown.
 
 52
-00:07:02,500 --> 00:07:11,730
-We used CodeBuddy to plan the trust boundaries, build the WorkBuddy connector, write tests and review our security, and we kept every session's log.
+00:05:16,431 --> 00:05:25,277
+Here the answers are quoted straight from the sources; with a TokenHub key, Tencent Hy3 writes them instead, through exactly the same checks.
 
 53
-00:07:11,730 --> 00:07:13,530
+00:05:29,620 --> 00:05:39,235
+We attacked it on purpose: nearly six thousand adversarial requests, zero leaks; four hundred paired questions, zero differences; and every scenario covered by automated tests.
+
+54
+00:05:40,269 --> 00:05:50,654
+We used CodeBuddy to plan the trust boundaries, build the WorkBuddy connector, write tests and review our security, and it found real bugs in our own code.
+
+55
+00:05:50,654 --> 00:05:53,731
+Six sessions, every transcript kept in the repository.
+
+56
+00:05:53,731 --> 00:05:55,531
 Thanks for watching!

@@ -95,6 +95,8 @@ services:
     environment:
       IB_API_URL: http://ib:8100
       NEXT_PUBLIC_IB_MOCK: "0"
+      # the browser's Origin behind Caddy's TLS; the proxy's cross-site check compares against it
+      IB_PUBLIC_ORIGIN: "https://${DOMAIN:?set DOMAIN}"
     read_only: true
     tmpfs: ["/tmp", "/app/.next/cache:uid=1000,gid=1000"]
     networks: [backend, edge]

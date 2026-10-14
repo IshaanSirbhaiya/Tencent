@@ -88,7 +88,7 @@ Key points:
 > **Compliance officer persona:** If the persona has the `compliance_officer`
 > role (e.g. `maya.compliance`), use `databridge_ib.audit_mcp_server` in
 > `args` instead. That server exposes the audit tools
-> (`audit_events`, `audit_reveal`) in addition to `ask_internal_brain`.
+> (`audit_events`, `audit_doc_accessors`, `audit_verify`) in addition to `ask_internal_brain`.
 
 ## Minting a token
 

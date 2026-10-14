@@ -349,3 +349,27 @@ app; no backend change. Tests: `tests/e2e/proxy.spec.ts` (new) and `tests/e2e/co
 | 8 | Upstream 5xx bodies reached the browser verbatim | **Fixed.** Replaced by a fixed message; only the IB's own short 503 message (e.g. "sign-out could not be recorded") passes through. |
 | 9 (low) | An unknown `x-ib-slot` value fell back to the main session | **Fixed.** 400. |
 | 10 (low) | Tour persona changes ignored the demo passcode | **Fixed.** They send the passcode remembered at sign-in. |
+
+
+## 14. Final review round 2 (15 Oct): Codex fix verification, Opus security, Sonnet accuracy, Haiku first-run, Sonnet judging
+
+Codex re-checked the §13 fixes ([codex_track7_fix_verification.md](reviews/security-r1/codex_track7_fix_verification.md)).
+Opus re-read the backend for side channels a contractor's token could use and found none.
+
+| # | Finding | Disposition |
+|---|---|---|
+| C7-11 / Opus-4 | Compare ran without its cross-tab lock where the Web Locks API is missing | **Fixed.** Compare refuses to run without the lock (it needs https or localhost) and shows its normal error. |
+| C7-12 / Opus-6 | The cross-site check compared hosts only, and trusted `X-Forwarded-Host` | **Fixed.** The full `Origin` must equal this site's own origin (its scheme plus the `Host` the browser used), or `IB_PUBLIC_ORIGIN` behind a TLS proxy (set by the Lighthouse compose file). Forwarded headers are not used. |
+| C7-13 | Any one-field `{"error": …}` 503 body passed through, with its content type | **Fixed.** Only the IB's two known 503 messages pass, re-sent as fresh JSON; everything else gets the fixed message. |
+| C7-14 | The `Partitioned` cookie attribute was dropped | **Fixed.** Kept (the IB does not set it today). |
+| C7-15 | No browser timeout where `AbortSignal.timeout` is missing | **Fixed.** A manual 95 s abort timer. |
+| C7-16 | Duplicate slot names could self-deadlock the lock helper | **Fixed.** Slots are de-duplicated before locking. |
+| C7-6 (mock) | The mock branch has no deadline | **Accepted.** Mock mode serves in-process fixtures only. |
+| Opus-1 | `--user-config` puts three identities in one WorkBuddy connector list | **Accepted, documented.** It exists to show two people side by side in one chat; each connector only ever answers as its own person (the IB enforces the token). The script says so and tokens expire within 8 h. |
+| Opus-2/3 | Token files written before being restricted; config rewritten in place | **Fixed.** Written to a private temporary file, restricted, then swapped in; a failed restriction is reported; a malformed config is refused. |
+| Opus-5 | `/ib/history` and `/ib/sources` skipped the employee-role check | **Fixed.** Same check as ask and map. |
+
+The accuracy, first-run and judging reviews led to document fixes: latency (19–20 ms), tamper count
+(6 of 6 attacks; the 7th is the stated window), the WorkBuddy audit tool names, the architecture status
+lines, the CDSA edition note, what is real and simulated, how to tell when the stack is ready, and the
+"honest limit" and break-even paragraphs in SUBMISSION.md.

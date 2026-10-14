@@ -17,8 +17,8 @@ further down is the earlier Walnut record, kept as history.
 | CodeBuddy sessions (6) with saved transcripts | Done | `docs/tencent/evidence/`, `submission/01_codebuddy/` |
 | Leak evaluation | 0 leaks in 5,958 adversarial requests; 0 differences in 400 pairs; 0 injection failures; 100% recall | `databridge/evals/internal_brain/RESULTS.md` |
 | Automated tests (Internal Brain) | 634 passing | `databridge/apps/internal_brain/tests/` |
-| Reviews | Codex tracks 1–6, CodeBuddy security review, Claude Opus/Sonnet/Haiku rounds; every finding fixed or explained | `docs/tencent/SECURITY.md` §9–§13, `docs/tencent/reviews/` |
-| Original-code share | 93.2% of today's code lines are unchanged Walnut | `python databridge/scripts/measure_original_share.py` |
+| Reviews | Codex tracks 1–7, CodeBuddy security review, two Claude Opus/Sonnet/Haiku rounds; every finding fixed or explained | `docs/tencent/SECURITY.md` §9–§14, `docs/tencent/reviews/` |
+| Original-code share | 93% of today's code lines are unchanged Walnut (93.0% at the final commit) | `python databridge/scripts/measure_original_share.py` |
 | Deck (13 slides, PDF + PPTX) | Done | `submission/07_deck/` |
 | Demo video (silent, ~5:50) + voice-over cue sheet and subtitles | Done | `submission/05_video/` |
 

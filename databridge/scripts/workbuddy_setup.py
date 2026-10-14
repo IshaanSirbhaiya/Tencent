@@ -52,14 +52,31 @@ def _python() -> Path:
 
 
 def _owner_only(path: Path) -> None:
-    """Best effort: only the current user may read a file holding a token."""
+    """Only the current user may read a file holding a token; says so if that could not be set."""
     if os.name == "nt":
         user = os.environ.get("USERNAME", "")
-        if user:
-            subprocess.run(["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
-                           capture_output=True, check=False)
+        domain = os.environ.get("USERDOMAIN", "")
+        who = f"{domain}\\{user}" if domain and user else user
+        ok = bool(who) and subprocess.run(["icacls", str(path), "/inheritance:r", "/grant:r", f"{who}:F"],
+                                          capture_output=True, check=False).returncode == 0
+        if not ok:
+            print(f"WARNING: could not restrict {path} to your account; it holds tokens, keep it private")
     else:
         os.chmod(path, 0o600)
+
+
+def _write_private(path: Path, text: str) -> None:
+    """Write via a temporary file in the same folder, restrict it, then swap it in, so a crash never
+    leaves a half-written config and the file is never readable by others, even briefly."""
+    tmp = path.with_name(path.name + ".tmp")
+    if os.name == "nt":
+        tmp.write_text(text, encoding="utf-8")
+    else:
+        fd = os.open(tmp, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+    _owner_only(tmp)
+    os.replace(tmp, path)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -89,8 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         }}}
         user_servers[USER_NAMES[persona]] = cfg["mcpServers"][name]
         cfg_path = ws / ".workbuddy" / "mcp.json"
-        cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-        _owner_only(cfg_path)
+        _write_private(cfg_path, json.dumps(cfg, indent=2))
         (ws / "DEMO_QUESTION.txt").write_text(
             f"This WorkBuddy workspace talks to the Walnut Internal Brain as '{persona}'.\n"
             f"Ask:\n{question}\n", encoding="utf-8")
@@ -99,10 +115,13 @@ def main(argv: list[str] | None = None) -> int:
         user_cfg = Path.home() / ".workbuddy-ai" / "mcp.json"
         user_cfg.parent.mkdir(parents=True, exist_ok=True)
         current = json.loads(user_cfg.read_text(encoding="utf-8")) if user_cfg.exists() else {}
+        if not isinstance(current, dict) or not isinstance(current.get("mcpServers", {}), dict):
+            ap.error(f"{user_cfg} is not a WorkBuddy MCP config; fix or move it first")
         current.setdefault("mcpServers", {}).update(user_servers)
-        user_cfg.write_text(json.dumps(current, indent=2), encoding="utf-8")
-        _owner_only(user_cfg)
+        _write_private(user_cfg, json.dumps(current, indent=2))
         print(f"wrote {user_cfg}  ({', '.join(user_servers)}); restart WorkBuddy and press Trust on each")
+        print("note: these connectors are visible in every WorkBuddy chat for up to 8 h. Each one only ever "
+              "answers as its own person, but pick the connector you mean, and remove them after the demo.")
     print(f"tokens expire in {min(args.hours, 8)} h; re-run this script to refresh them")
     return 0
 

@@ -1,0 +1,97 @@
+[
+ {
+  "label": "1 Hello",
+  "start": 0.0,
+  "end": 9.0
+ },
+ {
+  "label": "1 Hello: sign-in",
+  "start": 8.65,
+  "end": 20.35
+ },
+ {
+  "label": "2 Why this matters",
+  "start": 20.0,
+  "end": 49.0
+ },
+ {
+  "label": "3 One question, three platforms",
+  "start": 48.65,
+  "end": 84.81
+ },
+ {
+  "label": "4 The map of what you can see",
+  "start": 84.46,
+  "end": 100.66
+ },
+ {
+  "label": "5 Same question, two people",
+  "start": 100.31,
+  "end": 118.43
+ },
+ {
+  "label": "5b The guided tour",
+  "start": 118.08,
+  "end": 132.03
+ },
+ {
+  "label": "6 Restricted looks like non-existent",
+  "start": 131.68,
+  "end": 148.88
+ },
+ {
+  "label": "7 The fintech part",
+  "start": 148.53,
+  "end": 175.53
+ },
+ {
+  "label": "8 Access changes, answers change",
+  "start": 175.18,
+  "end": 205.08
+ },
+ {
+  "label": "9 The audit trail",
+  "start": 204.73,
+  "end": 239.77
+ },
+ {
+  "label": "9 Tamper demo",
+  "start": 239.42,
+  "end": 248.42
+ },
+ {
+  "label": "10 WorkBuddy: the connectors",
+  "start": 248.07,
+  "end": 253.07
+ },
+ {
+  "label": "10 WorkBuddy: two people",
+  "start": 252.72,
+  "end": 263.72
+ },
+ {
+  "label": "10 WorkBuddy: compliance",
+  "start": 263.37,
+  "end": 271.37
+ },
+ {
+  "label": "11 What's underneath",
+  "start": 271.02,
+  "end": 307.82
+ },
+ {
+  "label": "12 How it fits together",
+  "start": 307.47,
+  "end": 329.47
+ },
+ {
+  "label": "13 The numbers",
+  "start": 329.12,
+  "end": 340.12
+ },
+ {
+  "label": "14 Built with, thanks",
+  "start": 339.77,
+  "end": 355.77
+ }
+]

@@ -140,7 +140,7 @@ An assistant that can read everything can leak everything, so most regulated fir
 <div class="row"><div class="col" style="flex:1.35"><div class="shot"><img src="{img('internal_brain/17_audit_verify.png')}"></div>
 <div class="cap">Compliance asks in plain English; it becomes a visible filter. Every allow/deny decision per document. "Verify audit chain" re-checks every record and every stored answer.</div></div>
 <div class="col" style="flex:.65;gap:22px">
- <div class="card"><div class="big ok" style="font-size:64px">7 / 7</div><div class="lbl">tamper attacks detected: edits, deletions, rollback, a key-holder rewrite. The 8th case, a rollback after the last off-host head, is our stated limit</div><div class="src">SCRIPTS/TAMPER_DEMO.PY · REAL OUTPUT</div></div>
+ <div class="card"><div class="big ok" style="font-size:64px">6 / 6</div><div class="lbl">tamper attacks detected: edits, deletions, rollback, a key-holder rewrite. A 7th, a rollback after the last off-host head, is our stated limit</div><div class="src">SCRIPTS/TAMPER_DEMO.PY · REAL OUTPUT</div></div>
  <div class="card"><div class="t" style="font-size:26px">Reasoned reveal</div><div class="d">Compliance sees metadata by default. Reading an answer needs a reason, and the reveal is logged too.</div></div>
 </div></div>""",
               "For compliance: a plain-English audit search that turns into a visible filter, every allow and deny "
@@ -202,7 +202,7 @@ An assistant that can read everything can leak everything, so most regulated fir
  <li>All numbers come from a test model and the deterministic path; the Hy3 run waits on Tencent account verification.</li>
 </ul></div><div class="col" style="flex:.75;gap:18px">
  <div class="card"><div class="t" style="font-size:26px">Next</div><div class="d">Real-tenant connector runs · SSO · ledger key in a managed key store · Hy3 evaluation · relation checks in the grounding wall</div></div>
- <div class="card"><div class="t" style="font-size:26px">Why say this?</div><div class="d">A compliance tool that overclaims is worse than none. Every claim on these slides links to a test or a file.</div></div>
+ <div class="card"><div class="t" style="font-size:26px">Why say this?</div><div class="d">A compliance tool that overclaims is worse than none. Every claim here is backed by a test or a file in the repository.</div></div>
 </div></div>""",
               "We're explicit about limits: mocked platforms, demo sign-in, grounding that checks values but not "
               "relations, the sealing-key window, and a Hy3 evaluation run that's still pending."))
@@ -210,7 +210,7 @@ An assistant that can read everything can leak everything, so most regulated fir
 <div style="margin-top:110px"><div class="k">Thank you</div><h1>Walnut Internal Brain</h1>
 <p class="lead">The repository's INTERNAL_BRAIN.md shows what to look at first, how to run it in two commands,
 and the evidence behind every claim on these slides.</p>
-<div style="margin-top:40px"><span class="pill">github.com/IshaanSirbhaiya/Tencent</span><span class="pill">Start at INTERNAL_BRAIN.md</span><span class="pill">7-minute demo video</span></div></div>""",
+<div style="margin-top:40px"><span class="pill">github.com/IshaanSirbhaiya/Tencent</span><span class="pill">Start at INTERNAL_BRAIN.md</span><span class="pill">6-minute demo video</span></div></div>""",
               "Thank you. Everything here is in the repository, starting from INTERNAL_BRAIN.md, with the evidence "
               "behind every claim."))
     return S

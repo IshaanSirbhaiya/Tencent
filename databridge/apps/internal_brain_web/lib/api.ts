@@ -35,8 +35,12 @@ export type Slot = 'a' | 'b' | 'c';
 // A little longer than the proxy's own 90 s deadline, so the proxy's 503 normally arrives first.
 const CLIENT_TIMEOUT_MS = 95_000;
 
-function deadline(): AbortSignal | undefined {
-  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(CLIENT_TIMEOUT_MS) : undefined;
+function deadline(): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(CLIENT_TIMEOUT_MS);
+  // older browsers: the same deadline by hand, so a stalled request can never hang the UI
+  const c = new AbortController();
+  setTimeout(() => c.abort(), CLIENT_TIMEOUT_MS);
+  return c.signal;
 }
 
 async function call<T>(path: string, init?: { method?: 'GET' | 'POST'; body?: unknown; slot?: Slot }): Promise<T> {
@@ -186,14 +190,18 @@ export function slotApi(slot: Exclude<Slot, 'a'>) {
 /**
  * Run `fn` while holding the compare-slot locks, so two Compare tabs (which share the slot
  * cookies) cannot sign a slot in as someone else halfway through the other's login → ask → map.
- * Locks are taken in a fixed order, so two tabs cannot deadlock. Without the Web Locks API (e.g. a
- * non-secure context) it simply runs; the compare page still checks who each answer belongs to.
+ * Locks are taken in a fixed order (and each once), so two tabs cannot deadlock. Without the Web
+ * Locks API (a non-secure context, i.e. plain http on a non-localhost address) it refuses to run:
+ * comparing safely needs the lock, so the page shows its normal error instead.
  */
 export async function withSlotLocks<T>(slots: Exclude<Slot, 'a'>[], fn: () => Promise<T>): Promise<T> {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
-  const [first, ...rest] = [...slots].sort();
-  if (!first || !locks || typeof locks.request !== 'function') return fn();
-  return locks.request(`ib-compare-slot-${first}`, () => withSlotLocks(rest, fn));
+  if (!locks || typeof locks.request !== 'function') throw new ApiError(0, 'no-locks');
+  const take = async (rest: Exclude<Slot, 'a'>[]): Promise<T> => {
+    const [first, ...more] = rest;
+    return first ? locks.request(`ib-compare-slot-${first}`, () => take(more)) : fn();
+  };
+  return take([...new Set(slots)].sort());
 }
 
 export type SimAction = 'runbook-update' | 'revoke-channel' | 'restrict-page' | 'reset';

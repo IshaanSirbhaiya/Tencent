@@ -39,15 +39,15 @@ XFADE = 0.35
 
 # (kind, file, target seconds, label) — the label's first word is the VIDEO_SCRIPT.md scene number
 SEGMENTS = [
-    ("card", "01_title.png", 6, "1 Hello"),
+    ("card", "01_title.png", 9, "1 Hello"),
     ("clip", "01_login.webm", 13, "1 Hello: sign-in"),
-    ("card", "02_why.png", 27, "2 Why this matters"),
+    ("card", "02_why.png", 29, "2 Why this matters"),
     ("clip", "03_ask_jdoe.webm", 32, "3 One question, three platforms"),
     ("clip", "04_map.webm", 18, "4 The map of what you can see"),
     ("clip", "05_compare.webm", 18, "5 Same question, two people"),
     ("clip", "10_tour.webm", 15.5, "5b The guided tour"),
     ("clip", "06_restricted_vs_nonexistent.webm", 18, "6 Restricted looks like non-existent"),
-    ("clip", "07_fintech.webm", 28, "7 The fintech part"),
+    ("clip", "07_fintech.webm", 30, "7 The fintech part"),
     ("clip", "08_revocation_freshness.webm", 26, "8 Access changes, answers change"),
     ("clip", "09_audit.webm", 36, "9 The audit trail"),
     ("card", "09b_tamper.png", 9, "9 Tamper demo"),
@@ -57,7 +57,7 @@ SEGMENTS = [
     ("clip", "11_walnut_original.webm", 32, "11 What's underneath"),
     ("card", "12_architecture.png", 22, "12 How it fits together"),
     ("card", "13_numbers.png", 11, "13 The numbers"),
-    ("card", "14_closing.png", 12, "14 Built with, thanks"),
+    ("card", "14_closing.png", 16, "14 Built with, thanks"),
 ]
 
 

@@ -1,6 +1,6 @@
 # Demo video: script and shot list
 
-**Length:** about 5:40 (the limit is 8:00). **Format:** 1920×1080, dark theme.
+**Length:** about 5:55 (the limit is 8:00). **Format:** 1920×1080, dark theme.
 **How it's made:** the screen recording is produced automatically (one clip per scene, so a scene can be
 re-shot on its own). Ishaan records the voice-over on top. Read it like you're showing a friend something
 you built: relaxed, not salesy. Pauses are fine.
@@ -28,15 +28,16 @@ Exact scene times are in `submission/05_video/narration_cues.md`, generated from
 
 ---
 
-### 1 · Hello (0:00–0:19)
+### 1 · Hello (0:00–0:20)
 **On screen:** title card, then the sign-in page with the people at Company A. The pointer passes over
 Jordan, Ken and Maya, then picks Jordan.
 
-> Hi! This is the Walnut Internal Brain, our entry for Aspire's FinTech challenge. It's one place to ask
-> questions across Confluence, Jira, Slack and Google Drive, and it only ever answers from what *you* are
-> allowed to open. Every question it handles is written to an audit trail that can't be quietly edited.
+> Hi! This is the Walnut Internal Brain, our entry for Aspire's FinTech challenge. Ask one question
+> across Confluence, Jira, Slack and Google Drive, and it answers only from what *you* are allowed to
+> open, with every step on an audit trail. We built it with Tencent CodeBuddy, and it plugs into
+> Tencent WorkBuddy.
 
-### 2 · Why this matters (0:19–0:45)
+### 2 · Why this matters (0:20–0:49)
 **On screen:** the problem card: the search-time number, then three short lines on fintech risks.
 
 > We all lose hours looking for things: the answer is in a ticket, a Slack thread, a runbook,
@@ -44,7 +45,7 @@ Jordan, Ken and Maya, then picks Jordan.
 > can also *leak* everything, and showing the wrong person a fraud case can be a crime. So we built it
 > around one rule: the model never sees anything the person asking can't see.
 
-### 3 · One question, three platforms (0:45–1:17)
+### 3 · One question, three platforms (0:48–1:24)
 **On screen:** signed in as **jdoe** (backend engineer). He types *"What's the status of the database
 migration project and were there any blockers raised in Slack last week?"*. The pointer reads along the
 answer, touches the citations, then the "How this was checked" strip and the sources panel.
@@ -56,7 +57,7 @@ answer, touches the citations, then the "How this was checked" strip and the sou
 > There's also a blocker discussed in a leads-only channel Jordan isn't in. It's not here. It never even
 > reached the model.
 
-### 4 · The map of what you can see (1:17–1:35)
+### 4 · The map of what you can see (1:24–1:40)
 **On screen:** the **Map** page as jdoe (867 items, 4 platforms); a click opens one channel's items. Then
 the same page as **ken.ext** (24 items, 2 platforms).
 
@@ -64,20 +65,20 @@ the same page as **ken.ext** (24 items, 2 platforms).
 > live with its source. Ken, a contractor, sees twenty-four. And there's no "plus 843 hidden": for Ken,
 > the rest simply doesn't exist.
 
-### 5 · Same question, two people (1:35–1:53)
+### 5 · Same question, two people (1:40–1:58)
 **On screen:** the **Compare** page, jdoe and ken.ext, "Ask for both", two answers side by side.
 
 > Here's the same question asked by Jordan and by Ken, side by side. Jordan gets the full picture.
 > Ken gets the polite "I couldn't find that in the sources you can access", with no hint that there's
 > anything more to find.
 
-### 5b · A guided tour for anyone new (1:53–2:06)
+### 5b · A guided tour for anyone new (1:58–2:12)
 **On screen:** the "Take the tour" button, then the first two pop-ups of the tour.
 
 > And if you're new, there's a short guided tour that walks you through all of this in about a
 > minute.
 
-### 6 · Restricted looks exactly like non-existent (2:06–2:24)
+### 6 · Restricted looks exactly like non-existent (2:11–2:28)
 **On screen:** as ken.ext, ask about "the security incident report from the Q3 breach" (real, restricted),
 then the Q7 breach (made up).
 
@@ -85,18 +86,17 @@ then the Q7 breach (made up).
 > answers are byte-for-byte identical. We test this on four hundred pairs of questions, and there's no
 > difference in any of them.
 
-### 7 · The fintech part (2:24–2:52)
+### 7 · The fintech part (2:28–2:55)
 **On screen:** as **amy.am** (account manager), two suggested questions: why Velquarry Trading's account is
 restricted (a real customer under review), then the same for Bayfront Spice Traders (a company that does
 not exist). Then, as **leo.ops**, "Can we offer multi-currency accounts to an Indonesian SME?".
 
 > The big fintech case is "what can I tell this customer?". Amy, an account manager, asks why a
 > customer's account is restricted. She gets the approved script, never the case notes, and it reads
-> exactly like the answer for a company that doesn't exist, so nothing tips the customer off. And
-> "what can we offer this business?" gets the answer for its own market, from the approved policy,
-> never from a draft.
+> exactly like the answer for a company that doesn't exist. And "what can we offer this business?"
+> gets the answer for its own market, from the approved policy, never a draft.
 
-### 8 · Access changes, answers change (2:52–3:18)
+### 8 · Access changes, answers change (2:55–3:25)
 **On screen:** as **admin.it** on the Sim page: "Remove jdoe from #db-migration". Back as jdoe, ask again.
 Then "Edit failover runbook (new version)" and, as priya.sre, ask for the latest runbook (version 8).
 
@@ -106,7 +106,7 @@ Then "Edit failover runbook (new version)" and, as priya.sre, ask for the latest
 > And when the runbook owner adds a new step, Priya's next question shows version 8, live. Nothing
 > stale.
 
-### 9 · The audit trail (3:18–4:03)
+### 9 · The audit trail (3:24–4:08)
 **On screen:** as **maya.compliance** on the Audit page. She types *"Everything jdoe accessed in the
 payment-gateway space, last 30 days"*. The filter chips and rows appear. She opens one request and reveals
 its answer with a reason. Then **Verify audit chain**. Then the tamper card.
@@ -119,7 +119,7 @@ its answer with a reason. Then **Verify audit chain**. Then the tamper card.
 > The log is chained and sealed. "Verify audit chain" checks every record and every stored answer.
 > And if someone edits a single line on disk, or deletes one, verification catches it.
 
-### 10 · Ask from WorkBuddy (4:03–4:26)
+### 10 · Ask from WorkBuddy (4:08–4:31)
 **On screen:** WorkBuddy's connector list with three Internal Brain connectors (as Jordan, as Ken, and for
 compliance). Then one WorkBuddy chat asking the same question through Jordan's and Ken's connectors, two
 different answers. Then the compliance connector listing Jordan's access and verifying the chain.
@@ -128,7 +128,7 @@ different answers. Then the compliance connector listing Jordan's access and ver
 > carries its own signed token, so the AI in the middle can't decide who you are: Jordan's connector gets
 > Jordan's answer, Ken's gets Ken's. And Maya can run her audit checks right from WorkBuddy too.
 
-### 11 · What's underneath (4:26–4:50)
+### 11 · What's underneath (4:31–5:07)
 **On screen:** the original Walnut screens on Company A's data: the knowledge graph (a node opens), the
 brain view, the provenance chain of one value, the ontology.
 
@@ -136,7 +136,7 @@ brain view, the provenance chain of one value, the ontology.
 > carries a pointer back to where it came from, and you can follow that pointer, like here, from a
 > fact to the exact document. The Internal Brain reuses that engine as it is.
 
-### 12 · How it fits together (4:50–5:11)
+### 12 · How it fits together (5:07–5:29)
 **On screen:** the trust-boundary card.
 
 > Two checks before the model sees anything, a grounding check after it answers, and an audit record
@@ -145,17 +145,18 @@ brain view, the provenance chain of one value, the ontology.
 > **[otherwise]** Here the answers are quoted straight from the sources; with a TokenHub key, Tencent
 > Hy3 writes them instead, through exactly the same checks.
 
-### 13 · The numbers (5:11–5:22)
+### 13 · The numbers (5:29–5:40)
 **On screen:** the results card.
 
 > We attacked it on purpose: nearly six thousand adversarial requests, zero leaks; four hundred paired
 > questions, zero differences; and every scenario covered by automated tests.
 
-### 14 · How we built it, and thanks (5:22–5:34)
+### 14 · How we built it, and thanks (5:39–5:55)
 **On screen:** the closing card.
 
 > We used CodeBuddy to plan the trust boundaries, build the WorkBuddy connector, write tests and review
-> our security, and we kept every session's log. Thanks for watching!
+> our security, and it found real bugs in our own code. Six sessions, every transcript kept in the
+> repository. Thanks for watching!
 
 ---
 

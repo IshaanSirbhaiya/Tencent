@@ -4,7 +4,9 @@
 > Deadline **Fri 16 Oct 2026, 23:59 SGT**. All three team members must confirm.
 >
 > Numbers below are measured, and each is linked to its evidence. Eval numbers are from the final run (2026-10-14).
-> **Re-check the bracketed [TBD] items after the hy3 run.**
+> Hy3: our TokenHub access is waiting on Tencent's account verification. Until it lands, every number
+> here comes from the deterministic path (same checks), and the text says so. If Hy3 is switched on
+> before submitting, update item 8 of section 3 and the Tencent stack list.
 
 ---
 
@@ -58,7 +60,8 @@ Who it serves:
   For a payments company under MAS supervision, that blocks AI rollout entirely.
 - **Fintech-specific stakes:**
   - **Tipping-off.** Revealing that a suspicious transaction report exists is a criminal offence (CDSA
-    s.57; MAS Notice PSN01). Our refusal is byte-identical for "restricted" and "does not exist".
+    s.57, s.48 before the 2020 Revised Edition; MAS Notice PSN01). Our refusal is byte-identical for
+    "restricted" and "does not exist".
   - **PCI DSS 3.4.1.** Card numbers pasted into tickets are masked before indexing, so they never reach
     the index or a model.
   - **MAS TRM §9.1 / §12.2.** Least privilege, prompt revocation, contractors restricted like staff,
@@ -69,8 +72,13 @@ Who it serves:
 
 ### 3. Solution design: business and technical architecture, and how prompts drive the AI
 
-**Architecture.** A new service built on the Walnut evidence engine, which is reused unchanged. About
-93% of the code is the original Walnut base.
+**Architecture.** A new service built on the Walnut evidence engine, which is reused unchanged.
+- **Built for this hackathon:** the four permission compilers, the two gates, the audit ledger and
+  audit console, the web app (ask, map, compare, tour), the fintech compartments and the WorkBuddy
+  connectors.
+- **Reused unchanged:** Walnut's evidence and grounding engine and its original screens. The engine is
+  large, so by line count 93% of today's code is still the original base
+  (`databridge/scripts/measure_original_share.py`).
 - **Connectors** for Confluence, Jira, Slack and Drive compile each platform's own permission model:
   - Confluence page restrictions narrow access through ancestors.
   - Jira combines project roles with issue security levels.
@@ -88,8 +96,9 @@ Who it serves:
    rate-limit is a deny; changed content is re-read and re-checked.
 6. **Cross-platform links** are followed only to readable objects.
 7. **Audit record written.** `retrieval.decided` is ledgered before any model call.
-8. **Tencent Hunyuan** (`hy3` via TokenHub Singapore) writes the answer from the permitted passages
-   only, when a key is configured; today every reported number comes from the deterministic path.
+8. **Tencent Hunyuan** (`hy3` via TokenHub Singapore) is wired in to write the answer from the
+   permitted passages only. Our TokenHub access is waiting on Tencent's account verification, so every
+   number reported here comes from the deterministic path, which runs exactly the same checks.
 9. **Grounding wall.** Walnut's grounding check drops any value or name not in the evidence, with a
    deterministic quoted fallback.
 10. **Audit record written.** `answer.released` is ledgered before the response.
@@ -131,13 +140,23 @@ to quoted evidence.
 
 | Measure | Result | Evidence |
 |---|---|---|
-| Restricted content in answers or prompts | **0 leaks in 5,958 requests** (95% upper bound 0.10% per request) | `databridge/evals/internal_brain/RESULTS.md` |
+| Restricted content in answers or prompts | **0 leaks in 5,958 requests** (2,979 probes, each run on two answer paths; 95% upper bound 0.10% per request) | `databridge/evals/internal_brain/RESULTS.md` |
 | "With vs without restricted documents" | **0 / 400** response differences | same file |
-| Recall for what users *are* allowed to see | **100%** of positive probes (both answer paths) | same file |
+| Recall for what users *are* allowed to see | **100%** of allowed documents reach the answer step (both paths); cited recall 87.8–96.4% | same file |
 | Scenario, fintech and revocation tests | **63 / 63** (`test_scenarios_e2e.py`, `test_fintech_scenarios.py`, `test_revoke_concurrency.py`), within 634 passing | `apps/internal_brain/tests/` |
-| Answer latency, local | mean **32–35 ms** per request in the in-process eval (deterministic and test-model paths; not network or Hy3) | `RESULTS.md` |
+| Answer latency, local | mean **19–20 ms** per request in the in-process eval (deterministic and test-model paths; not network or Hy3) | `RESULTS.md` |
 | Freshness | a webhook-delivered edit is answerable **on the next query**; poll fallback every 120 s by default; SLO 5 min (Aspire asked for 30 min) | `test_s2_freshness_via_webhook` |
 | Revocation | denied **on the next query**, even when the webhook is lost | `test_s4_revocation_without_webhook` |
+
+**Honest limit.** We wrote the estate, the attacks and the pass rules ourselves. So the evaluation also
+proves it *can* fail: a deliberately leaky configuration is caught, and a deny-everything configuration
+scores zero usefulness. The harness ships with the code, so Aspire can re-run it against its own
+permissions in the first weeks of a pilot. The 0.10% bound is per answer path (2,979 requests each,
+rule of three). The four platforms are mock servers with the real APIs' shapes; we have not run against
+a live tenant, so real-world latency and rate limits are not measured yet.
+
+**Break-even.** At US$31 an hour loaded, a US$100k deployment for 600 people pays for itself if each
+person saves about **7 minutes a week** (100,000 ÷ (600 × 46 × 31) ≈ 0.12 hours).
 
 **Projected value for a ~600-person fintech.** A projection, not a measurement. Value = staff × hours
 saved per person per week × 46 working weeks × loaded hourly cost:
@@ -160,7 +179,9 @@ Attach from `submission/` (no keys appear in any of them):
 - `01_codebuddy/cb5_session_overview.png`: CodeBuddy's security review on Hunyuan `hy3`
 - `01_codebuddy/cb6_session_overview.png`: CodeBuddy hardening its own code after the Codex review
 - `01_codebuddy/cb1_session_overview.png`: CodeBuddy drawing the trust boundaries
-- `02_workbuddy/`: the two-person comparison and the compliance audit assistant in WorkBuddy
+- `02_workbuddy/workbuddy_compare.png`: one WorkBuddy chat, the same question through Jordan's and Ken's connectors
+- `02_workbuddy/workbuddy_compliance.png`: the compliance connector listing Jordan's access and verifying the audit chain
+- `02_workbuddy/workbuddy_mcp_panel.png`: the three Internal Brain connectors in WorkBuddy
 
 Also mention: "Full CodeBuddy session transcripts (API logs) are in the repository under
 `docs/tencent/evidence/`, and `docs/tencent/DEV_PROCESS.md` describes who built what."
@@ -173,9 +194,11 @@ gates, a padlock and a chain-link ledger beneath, calm navy and teal palette, no
 
 ## Demo video (5–8 min)
 
+`submission/05_video/walnut_internal_brain_demo.mp4` (about 6 minutes), script in
 `docs/tencent/VIDEO_SCRIPT.md`.
 
 ## Project link
 
 The GitHub repository (https://github.com/IshaanSirbhaiya/Tencent, branch `Tencent`). Start at
-`INTERNAL_BRAIN.md`. [If the Lighthouse trial becomes available: the live URL and demo passcode.]
+`INTERNAL_BRAIN.md`. No live URL: Tencent Lighthouse was sold out during the event, so the documented
+path is the local run (about five minutes to set up).

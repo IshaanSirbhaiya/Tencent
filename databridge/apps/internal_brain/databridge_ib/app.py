@@ -164,6 +164,8 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
 
     @app.get("/ib/history")
     def history(user: DirectoryUser = Depends(current)):
+        if not (set(user.roles) & EMPLOYEE_ROLES):          # same rule as ask and map
+            raise HTTPException(403, "forbidden")
         if svc.projection is None:
             return {"items": []}
         rows = svc.projection.search(svc.projection.filter_type(user=user.id, kind="request.accepted",
@@ -173,6 +175,8 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
 
     @app.get("/ib/sources")
     def sources(user: DirectoryUser = Depends(current)):
+        if not (set(user.roles) & EMPLOYEE_ROLES):          # same rule as ask and map
+            raise HTTPException(403, "forbidden")
         now = datetime.now(timezone.utc)
         out = []
         for p, st in svc.ingestor.status.items():

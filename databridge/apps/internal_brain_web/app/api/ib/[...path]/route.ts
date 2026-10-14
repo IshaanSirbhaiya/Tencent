@@ -82,16 +82,19 @@ function sameOrigin(req: NextRequest): boolean {
   if (site !== null && site !== 'same-origin' && site !== 'none') return false;
   const origin = req.headers.get('origin');
   if (origin === null) return true;
-  let host: string;
+  let given: string;
   try {
-    host = new URL(origin).host.toLowerCase();
+    given = new URL(origin).origin.toLowerCase();
   } catch {
     return false; // includes "null"
   }
-  const own = [req.headers.get('x-forwarded-host'), req.headers.get('host'), req.nextUrl.host]
-    .flatMap((h) => (h ? h.split(',') : []))
-    .map((h) => h.trim().toLowerCase());
-  return own.includes(host);
+  // This site's own origin: the scheme it is served on plus the Host the browser used. Behind a TLS
+  // proxy set IB_PUBLIC_ORIGIN (e.g. https://brain.example.com). Forwarded headers are never used.
+  const host = req.headers.get('host');
+  const own = (process.env.IB_PUBLIC_ORIGIN || (host ? `${req.nextUrl.protocol}//${host}` : ''))
+    .replace(/\/+$/, '')
+    .toLowerCase();
+  return own !== '' && given === own;
 }
 
 class TooLarge extends Error {}
@@ -129,7 +132,7 @@ async function readBody(req: NextRequest, signal: AbortSignal): Promise<Uint8Arr
   return out;
 }
 
-const KEEP_ATTR = /^(httponly|secure|samesite|max-age|expires)$/i;
+const KEEP_ATTR = /^(httponly|secure|samesite|max-age|expires|partitioned)$/i;
 
 /**
  * Re-emit only the IB session cookie, renamed for the slot. Any other cookie name is dropped;
@@ -145,13 +148,16 @@ function relayCookies(from: string[], to: NextResponse, slot: Slot) {
   }
 }
 
-/** The IB's own fail-closed 503 is `{"error": "<short message>"}`; anything else is replaced. */
-function knownUnavailable(body: ArrayBuffer): boolean {
+/** The IB's own fail-closed 503 messages, the only 5xx texts the browser may see. */
+const KNOWN_503 = new Set(['temporarily unavailable', 'sign-out could not be recorded; try again']);
+
+/** The known message, if the body is exactly one of them; it is re-sent as fresh JSON, never relayed. */
+function knownUnavailable(body: ArrayBuffer): string | null {
   try {
     const j = JSON.parse(new TextDecoder().decode(body));
-    return !!j && typeof j === 'object' && !Array.isArray(j) && Object.keys(j).length === 1 && typeof j.error === 'string' && j.error.length <= 200;
+    return j && typeof j.error === 'string' && Object.keys(j).length === 1 && KNOWN_503.has(j.error) ? j.error : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -230,8 +236,9 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   }
 
   let out: NextResponse;
-  if (upstream.status >= 500 && !(upstream.status === 503 && knownUnavailable(payload))) {
-    out = NextResponse.json({ error: UNAVAILABLE }, { status: upstream.status });
+  if (upstream.status >= 500) {
+    const known = upstream.status === 503 ? knownUnavailable(payload) : null;
+    out = NextResponse.json({ error: known ?? UNAVAILABLE }, { status: upstream.status });
   } else {
     out = new NextResponse(payload, { status: upstream.status });
     const uct = upstream.headers.get('content-type');

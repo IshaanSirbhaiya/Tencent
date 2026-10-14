@@ -1,7 +1,7 @@
 # Walnut Internal Brain: architecture
 
-> FinTech Track (Aspire), "The Internal Brain". Status as of 13 Oct 2026; `file:line` references are to
-> commit `4d1887e`. Paths are relative to `databridge/apps/internal_brain/databridge_ib/` unless they start
+> FinTech Track (Aspire), "The Internal Brain". Status as of 15 Oct 2026; `file:line` references were
+> taken at commit `4d1887e` and may have drifted by a few lines since. Paths are relative to `databridge/apps/internal_brain/databridge_ib/` unless they start
 > with `databridge/`, `tests/` (= `databridge/apps/internal_brain/tests/`) or `docs/`. Where a component is
 > planned but not yet in the repo, this page says so.
 
@@ -11,7 +11,7 @@
 |---|---|---|---|
 | Internal Brain API | `databridge/apps/internal_brain/databridge_ib/` (`python -m databridge_ib`) | 8100 | Auth, ask pipeline, ingest, webhooks, audit, demo simulator |
 | Mock platforms | `databridge/apps/mock_platforms/mock_platforms/` (`python -m mock_platforms`) | 8200 | Slack, Confluence, Jira and Drive APIs for a supported subset, with native permission semantics and signed webhooks |
-| Web UI | `databridge/apps/internal_brain_web/` (Next.js) | 3100 | Login, Ask, Audit console, Admin simulator; a same-origin proxy with a closed path allowlist (`app/api/ib/[...path]/route.ts:1-24`) |
+| Web UI | `databridge/apps/internal_brain_web/` (Next.js) | 3100 | Login, Ask, Map, Compare, Audit console, Admin simulator, guided tour; a same-origin proxy with a closed path allowlist (`app/api/ib/[...path]/route.ts:1-24`) |
 
 The Brain is a **separate app with its own state** under `var/ib/` (`config.py:33, 61-91`). It reuses Walnut
 by import only and never imports the legacy gateway's routes: `grounding.py:1-33` loads the grounding wall
@@ -93,8 +93,8 @@ flowchart LR
 - **Freshness status** per platform is served at `GET /ib/sources` with `lag_s` (time since the last
   successful sync) and `within_slo` (`app.py:150-161`). The SLO is 300 s on mock and 900 s live
   (`config.py:16-17`).
-- **Sensitive-value masking at ingest (feature F4)** is being built in `sensitive.py` (uncommitted at the time
-  of writing; not yet called by `ingest.py`).
+- **Sensitive-value masking at ingest (feature F4)** runs in `ingest.py` through `sensitive.py:mask_doc`
+  before indexing (`tests/test_sensitive.py`).
 
 ## 4. Audit path
 
@@ -107,10 +107,10 @@ flowchart LR
 | NL filter | `audit/nl_filter.py` | Deterministic parser to a closed `AuditFilter`; an optional model sees only the question and the clock |
 | Routes | `audit/routes.py` | `compliance_officer` only; every call is ledgered (`audit.query`, `audit.reveal`) before the response |
 
-## 5. Trust-boundary diagram — see docs/tencent/diagrams/trust_boundaries.mmd (produced in CodeBuddy Plan mode)
+## 5. Trust boundaries
 
-> **Placeholder.** The diagram file is produced in a CodeBuddy Plan-mode session and is not yet in the repo.
-> Until it lands, the table below is the authoritative text version.
+The diagram is `docs/tencent/diagrams/trust_boundaries.mmd` (drawn in a CodeBuddy Plan-mode session). The
+table is the same content as text.
 
 | ID | Boundary | What crosses it | Control | Evidence | Limit |
 |---|---|---|---|---|---|
@@ -120,9 +120,9 @@ flowchart LR
 | TB4 | IB → TokenHub (generation) | System prompt + released passages + question, per request | Only Gate-2-released passages are sent; the model has no tools | `pipeline.py:155-161`; `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt` | Provider-side retention not verified by us (DATA_FLOWS.md). |
 | TB5 | IB → external anchor sink | `{log_id, seq, head, at}` only (no content) | Publish only a verified ledger; a sink failure records nothing | `audit/anchor.py`; `tests/test_audit_tamper.py::test_publish_refuses_broken_ledger`, `::test_slack_sink_posts_and_failure_records_nothing` | Default sink is a local file (`bootstrap.py:85-91`); off-host only if `IB_ANCHOR_FILE` sits in a separately pushed repo or `IB_ANCHOR_SLACK_WEBHOOK` is set. |
 | TB6 | Platforms → IB webhooks | Change notifications (ids only) | HMAC-SHA256 over `ts.body`, ±300 s window, replayed delivery id rejected, 256 KiB cap; events only invalidate | `connectors/_http.py:160-197`; `app.py:164-181`; `tests/test_connector_slack.py::test_webhook_rejects_bad_signature_stale_and_replay` | The replay cache is in memory (lost on restart; the ±300 s window still applies). |
-| TB7 | WorkBuddy and its model provider → IB (MCP) | A WorkBuddy agent's tool call carrying a per-persona token | Planned: a thin MCP client of `/ib/*` with no identity argument; one WorkBuddy project per persona (plan §4.9) | **Not built yet** (`mcp_server.py` absent) | WorkBuddy's own model and memory see Walnut's answer and sit **outside** our ledger. |
+| TB7 | WorkBuddy and its model provider → IB (MCP) | A WorkBuddy agent's tool call carrying a per-persona token | A thin stdio MCP client of `/ib/*` with no identity argument; one connector per persona | `mcp_server.py`, `audit_mcp_server.py`; `tests/test_mcp_server.py`; screenshots in `submission/02_workbuddy/` | WorkBuddy's own model and memory see Walnut's answer and sit **outside** our ledger. |
 | TB8 | TokenHub embeddings at ingest | Would be ALL chunks of ALL documents | Not enabled: the offline hashing embedder is used | `bootstrap.py:63`, `index.py:158-167` | If enabled, every chunk goes to the provider regardless of ACL, and query embedding would happen before `retrieval.decided` (Codex security review r1, finding 11). |
-| TB9 | Public internet → Lighthouse edge | HTTPS to the web UI and API | Planned: Caddy exposing only the allowlisted paths, rate limits, demo reset (plan §4.1, §6 B8) | **Not deployed yet** (`deploy/lighthouse/` absent) | The public URL never connects to real workspaces (plan §5.3). |
+| TB9 | Public internet → Lighthouse edge | HTTPS to the web UI and API | Caddy exposing only the allowlisted paths, rate limits, demo reset | Deploy kit in `deploy/lighthouse/`; no live instance (Lighthouse was sold out) | The public URL never connects to real workspaces (plan §5.3). |
 
 ## 6. Model chain and prompt
 
