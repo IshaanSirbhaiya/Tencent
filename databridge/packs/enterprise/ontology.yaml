@@ -72,3 +72,33 @@ edge_kinds:
     src: [knowledge_page, tracked_issue, chat_thread, shared_file]
     dst: [knowledge_page, tracked_issue, chat_thread, shared_file]
     description: One item links to another by key or URL (a thread naming DBMIG-14, an issue linking a page).
+
+  # --- Structure and access, added as DATA for the original Walnut screens (/graph, /brain) ------
+  # These four let the graph built by `scripts/build_enterprise_graph.py` show how Company A is
+  # organised and who is granted which container. They are plain relations: none is a claim or a
+  # determination, and the graph stays permission-blind (it shows the grants; it does not enforce
+  # them — the Internal Brain does that at query time).
+
+  - name: assigned_item
+    binds_to: role_of
+    src: [colleague]
+    dst: [tracked_issue]
+    description: The colleague an issue is currently assigned to.
+
+  - name: includes_team
+    binds_to: part_of
+    src: [org_team]
+    dst: [org_team]
+    description: Group nesting, WHOLE → PART — a directory group that contains another group.
+
+  - name: has_subpage
+    binds_to: part_of
+    src: [knowledge_page]
+    dst: [knowledge_page]
+    description: Page tree, WHOLE → PART — a wiki page and the child page filed under it.
+
+  - name: reads_space
+    binds_to: role_of
+    src: [org_team, colleague]
+    dst: [knowledge_space]
+    description: A team or colleague is granted read access to a container (space read, project browse role, channel membership, drive membership).

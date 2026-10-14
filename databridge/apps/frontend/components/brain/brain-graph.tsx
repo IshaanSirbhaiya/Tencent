@@ -61,7 +61,7 @@ import { cn } from "@/lib/utils";
 const HUB_DEGREE = 8;
 
 const HIGHLIGHT = "#f59e0b";
-const EDGE_REST = "rgba(255,255,255,0.14)";
+const EDGE_REST = "rgba(148,163,184,0.35)";   // slate: visible on light and dark canvases
 
 interface NodeData {
   label: string;

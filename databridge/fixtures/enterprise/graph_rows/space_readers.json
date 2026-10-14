@@ -1,0 +1,1110 @@
+{
+ "data": [
+  {
+   "principal": "grp-eng",
+   "principal_type": "team",
+   "row": "confluence-payment-gateway/team/grp-eng",
+   "space": "confluence-payment-gateway",
+   "via": "Confluence space read"
+  },
+  {
+   "principal": "grp-eng",
+   "principal_type": "team",
+   "row": "confluence-runbooks/team/grp-eng",
+   "space": "confluence-runbooks",
+   "via": "Confluence space read"
+  },
+  {
+   "principal": "grp-exec",
+   "principal_type": "team",
+   "row": "drive-0ACompany/team/grp-exec",
+   "space": "drive-0ACompany",
+   "via": "Shared drive member"
+  },
+  {
+   "principal": "grp-eng",
+   "principal_type": "team",
+   "row": "drive-0AEng/team/grp-eng",
+   "space": "drive-0AEng",
+   "via": "Shared drive member"
+  },
+  {
+   "principal": "grp-eng",
+   "principal_type": "team",
+   "row": "jira-AUTH/team/grp-eng",
+   "space": "jira-AUTH",
+   "via": "Jira browse via role Developers"
+  },
+  {
+   "principal": "grp-product",
+   "principal_type": "team",
+   "row": "jira-AUTH/team/grp-product",
+   "space": "jira-AUTH",
+   "via": "Jira browse via role Viewers"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "jira-DBMIG/colleague/elena.v",
+   "space": "jira-DBMIG",
+   "via": "Jira browse via role Viewers"
+  },
+  {
+   "principal": "grp-data",
+   "principal_type": "team",
+   "row": "jira-DBMIG/team/grp-data",
+   "space": "jira-DBMIG",
+   "via": "Jira browse via role Viewers"
+  },
+  {
+   "principal": "grp-payments-eng",
+   "principal_type": "team",
+   "row": "jira-DBMIG/team/grp-payments-eng",
+   "space": "jira-DBMIG",
+   "via": "Jira browse via role Developers"
+  },
+  {
+   "principal": "grp-sre",
+   "principal_type": "team",
+   "row": "jira-DBMIG/team/grp-sre",
+   "space": "jira-DBMIG",
+   "via": "Jira browse via role Developers"
+  },
+  {
+   "principal": "grp-payments-eng",
+   "principal_type": "team",
+   "row": "jira-PAY/team/grp-payments-eng",
+   "space": "jira-PAY",
+   "via": "Jira browse via role Developers"
+  },
+  {
+   "principal": "grp-product",
+   "principal_type": "team",
+   "row": "jira-PAY/team/grp-product",
+   "space": "jira-PAY",
+   "via": "Jira browse via role Viewers"
+  },
+  {
+   "principal": "grp-security",
+   "principal_type": "team",
+   "row": "jira-PAY/team/grp-security",
+   "space": "jira-PAY",
+   "via": "Jira browse via role Viewers"
+  },
+  {
+   "principal": "grp-sre",
+   "principal_type": "team",
+   "row": "jira-PAY/team/grp-sre",
+   "space": "jira-PAY",
+   "via": "Jira browse via role Viewers"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/elena.v",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/jdoe",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "kai.w",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/kai.w",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/nina.k",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/omar.f",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sara.sec",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/sara.sec",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sophie.t",
+   "principal_type": "colleague",
+   "row": "slack-C0AUTHSD/colleague/sophie.t",
+   "space": "slack-C0AUTHSD",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/aisha.r",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/jdoe",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/nina.k",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/priya.sre",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/raj.m",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/wei.l",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "yuki.s",
+   "principal_type": "colleague",
+   "row": "slack-C0DBMIG/colleague/yuki.s",
+   "space": "slack-C0DBMIG",
+   "via": "Slack private channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/aisha.r",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "dev.p",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/dev.p",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/elena.v",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/jdoe",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "kai.w",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/kai.w",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "lena.h",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/lena.h",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/nina.k",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/omar.f",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/priya.sre",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/raj.m",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sam.old",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/sam.old",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sara.sec",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/sara.sec",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sophie.t",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/sophie.t",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "tom.b",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/tom.b",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/wei.l",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "yuki.s",
+   "principal_type": "colleague",
+   "row": "slack-C0ENG/colleague/yuki.s",
+   "space": "slack-C0ENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "admin.it",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/admin.it",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/aisha.r",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "amy.am",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/amy.am",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "ben.c",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/ben.c",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "daniel.g",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/daniel.g",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "dev.p",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/dev.p",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/elena.v",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "farah.n",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/farah.n",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "grace.o",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/grace.o",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "hana.y",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/hana.y",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/jdoe",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "joel.s",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/joel.s",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "kai.w",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/kai.w",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "lena.h",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/lena.h",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "leo.ops",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/leo.ops",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "marcus.l",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/marcus.l",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "maya.compliance",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/maya.compliance",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "mlro.tan",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/mlro.tan",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/nina.k",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "noor.a",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/noor.a",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/omar.f",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/priya.sre",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/raj.m",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sam.old",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/sam.old",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sara.sec",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/sara.sec",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sophie.t",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/sophie.t",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "tom.b",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/tom.b",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/wei.l",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "yuki.s",
+   "principal_type": "colleague",
+   "row": "slack-C0GENERAL/colleague/yuki.s",
+   "space": "slack-C0GENERAL",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/aisha.r",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "dev.p",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/dev.p",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/elena.v",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "farah.n",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/farah.n",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/jdoe",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "kai.w",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/kai.w",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "lena.h",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/lena.h",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "leo.ops",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/leo.ops",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/nina.k",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/omar.f",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/priya.sre",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/raj.m",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sam.old",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/sam.old",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sara.sec",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/sara.sec",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sophie.t",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/sophie.t",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "tom.b",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/tom.b",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/wei.l",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "yuki.s",
+   "principal_type": "colleague",
+   "row": "slack-C0INCID/colleague/yuki.s",
+   "space": "slack-C0INCID",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/jdoe",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "leo.ops",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/leo.ops",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/nina.k",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/priya.sre",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/raj.m",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sam.old",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/sam.old",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "tom.b",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/tom.b",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0PAYENG/colleague/wei.l",
+   "space": "slack-C0PAYENG",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0PRODUCT/colleague/elena.v",
+   "space": "slack-C0PRODUCT",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "farah.n",
+   "principal_type": "colleague",
+   "row": "slack-C0PRODUCT/colleague/farah.n",
+   "space": "slack-C0PRODUCT",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "hana.y",
+   "principal_type": "colleague",
+   "row": "slack-C0PRODUCT/colleague/hana.y",
+   "space": "slack-C0PRODUCT",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "ivy.guest",
+   "principal_type": "colleague",
+   "row": "slack-C0PRODUCT/colleague/ivy.guest",
+   "space": "slack-C0PRODUCT",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "leo.ops",
+   "principal_type": "colleague",
+   "row": "slack-C0PRODUCT/colleague/leo.ops",
+   "space": "slack-C0PRODUCT",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "marcus.l",
+   "principal_type": "colleague",
+   "row": "slack-C0PRODUCT/colleague/marcus.l",
+   "space": "slack-C0PRODUCT",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "admin.it",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/admin.it",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/aisha.r",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "amy.am",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/amy.am",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "ben.c",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/ben.c",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "daniel.g",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/daniel.g",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "dev.p",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/dev.p",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/elena.v",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "farah.n",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/farah.n",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "grace.o",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/grace.o",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "hana.y",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/hana.y",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/jdoe",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "joel.s",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/joel.s",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "kai.w",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/kai.w",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "lena.h",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/lena.h",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "leo.ops",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/leo.ops",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "marcus.l",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/marcus.l",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "maya.compliance",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/maya.compliance",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "mlro.tan",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/mlro.tan",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/nina.k",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "noor.a",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/noor.a",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/omar.f",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/priya.sre",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/raj.m",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sam.old",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/sam.old",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sara.sec",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/sara.sec",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sophie.t",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/sophie.t",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "tom.b",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/tom.b",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/wei.l",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "yuki.s",
+   "principal_type": "colleague",
+   "row": "slack-C0RANDOM/colleague/yuki.s",
+   "space": "slack-C0RANDOM",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/aisha.r",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "dev.p",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/dev.p",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "elena.v",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/elena.v",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "hana.y",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/hana.y",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/jdoe",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "kai.w",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/kai.w",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "lena.h",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/lena.h",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "leo.ops",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/leo.ops",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/nina.k",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/omar.f",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/priya.sre",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "raj.m",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/raj.m",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sam.old",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/sam.old",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sara.sec",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/sara.sec",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "sophie.t",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/sophie.t",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "tom.b",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/tom.b",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "wei.l",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/wei.l",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "yuki.s",
+   "principal_type": "colleague",
+   "row": "slack-C0RELEAS/colleague/yuki.s",
+   "space": "slack-C0RELEAS",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "aisha.r",
+   "principal_type": "colleague",
+   "row": "slack-C0SREOC/colleague/aisha.r",
+   "space": "slack-C0SREOC",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "dev.p",
+   "principal_type": "colleague",
+   "row": "slack-C0SREOC/colleague/dev.p",
+   "space": "slack-C0SREOC",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "jdoe",
+   "principal_type": "colleague",
+   "row": "slack-C0SREOC/colleague/jdoe",
+   "space": "slack-C0SREOC",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "nina.k",
+   "principal_type": "colleague",
+   "row": "slack-C0SREOC/colleague/nina.k",
+   "space": "slack-C0SREOC",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "omar.f",
+   "principal_type": "colleague",
+   "row": "slack-C0SREOC/colleague/omar.f",
+   "space": "slack-C0SREOC",
+   "via": "Slack public channel member"
+  },
+  {
+   "principal": "priya.sre",
+   "principal_type": "colleague",
+   "row": "slack-C0SREOC/colleague/priya.sre",
+   "space": "slack-C0SREOC",
+   "via": "Slack public channel member"
+  }
+ ]
+}

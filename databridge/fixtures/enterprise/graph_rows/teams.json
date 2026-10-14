@@ -1,0 +1,84 @@
+{
+ "data": [
+  {
+   "direct_members": 2,
+   "id": "grp-accounts",
+   "name": "account management"
+  },
+  {
+   "direct_members": 2,
+   "id": "grp-compliance",
+   "name": "compliance"
+  },
+  {
+   "direct_members": 1,
+   "id": "grp-data",
+   "name": "data platform"
+  },
+  {
+   "direct_members": 1,
+   "id": "grp-eng",
+   "name": "engineering"
+  },
+  {
+   "direct_members": 1,
+   "id": "grp-exec",
+   "name": "leadership"
+  },
+  {
+   "direct_members": 1,
+   "id": "grp-finance",
+   "name": "finance"
+  },
+  {
+   "direct_members": 3,
+   "id": "grp-fincrime",
+   "name": "financial crime review"
+  },
+  {
+   "direct_members": 1,
+   "id": "grp-it",
+   "name": "IT"
+  },
+  {
+   "direct_members": 6,
+   "id": "grp-payments-eng",
+   "name": "payments engineering"
+  },
+  {
+   "direct_members": 2,
+   "id": "grp-payments-leads",
+   "name": "payments leads"
+  },
+  {
+   "direct_members": 3,
+   "id": "grp-platform-eng",
+   "name": "platform engineering"
+  },
+  {
+   "direct_members": 3,
+   "id": "grp-product",
+   "name": "product and operations"
+  },
+  {
+   "direct_members": 2,
+   "id": "grp-security",
+   "name": "security"
+  },
+  {
+   "direct_members": 3,
+   "id": "grp-sre",
+   "name": "site reliability"
+  },
+  {
+   "direct_members": 0,
+   "id": "grp-staff",
+   "name": "all staff"
+  },
+  {
+   "direct_members": 1,
+   "id": "grp-support",
+   "name": "customer support"
+  }
+ ]
+}

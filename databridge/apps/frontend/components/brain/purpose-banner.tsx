@@ -11,8 +11,8 @@ export function PurposeBanner() {
     <div className="flex items-start gap-3 border-b border-accent/30 bg-accent/[0.06] px-5 py-2.5">
       <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
       <p className="flex-1 text-xs leading-relaxed text-fg">
-        DataBridge built this knowledge graph from <strong>3 documents</strong> — an email, a meeting
-        transcript, and a contract. Every connection is cited.{" "}
+        DataBridge built this knowledge graph from the sources connected to this workspace. Every
+        connection is cited back to the record it came from.{" "}
         <span className="font-medium text-accent">Nothing is made up.</span>
       </p>
       <button

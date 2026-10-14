@@ -1,0 +1,74 @@
+{
+ "data": [
+  {
+   "child": "grp-data",
+   "parent": "grp-eng",
+   "row": "grp-eng/grp-data"
+  },
+  {
+   "child": "grp-payments-eng",
+   "parent": "grp-eng",
+   "row": "grp-eng/grp-payments-eng"
+  },
+  {
+   "child": "grp-platform-eng",
+   "parent": "grp-eng",
+   "row": "grp-eng/grp-platform-eng"
+  },
+  {
+   "child": "grp-security",
+   "parent": "grp-eng",
+   "row": "grp-eng/grp-security"
+  },
+  {
+   "child": "grp-sre",
+   "parent": "grp-eng",
+   "row": "grp-eng/grp-sre"
+  },
+  {
+   "child": "grp-accounts",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-accounts"
+  },
+  {
+   "child": "grp-compliance",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-compliance"
+  },
+  {
+   "child": "grp-eng",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-eng"
+  },
+  {
+   "child": "grp-exec",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-exec"
+  },
+  {
+   "child": "grp-finance",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-finance"
+  },
+  {
+   "child": "grp-fincrime",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-fincrime"
+  },
+  {
+   "child": "grp-it",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-it"
+  },
+  {
+   "child": "grp-product",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-product"
+  },
+  {
+   "child": "grp-support",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-support"
+  }
+ ]
+}

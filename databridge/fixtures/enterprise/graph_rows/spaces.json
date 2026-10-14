@@ -1,0 +1,174 @@
+{
+ "data": [
+  {
+   "container": "Confluence space",
+   "created": null,
+   "id": "confluence-payment-gateway",
+   "key": "payment-gateway",
+   "label": "Payment Gateway (Confluence space)",
+   "name": "Payment Gateway",
+   "platform": "Confluence",
+   "visibility": "restricted"
+  },
+  {
+   "container": "Confluence space",
+   "created": null,
+   "id": "confluence-runbooks",
+   "key": "runbooks",
+   "label": "SRE Runbooks (Confluence space)",
+   "name": "SRE Runbooks",
+   "platform": "Confluence",
+   "visibility": "restricted"
+  },
+  {
+   "container": "Shared drive",
+   "created": null,
+   "id": "drive-0ACompany",
+   "key": "0ACompany",
+   "label": "Company (shared drive)",
+   "name": "Company",
+   "platform": "Google Drive",
+   "visibility": "drive members"
+  },
+  {
+   "container": "Shared drive",
+   "created": null,
+   "id": "drive-0AEng",
+   "key": "0AEng",
+   "label": "Engineering (shared drive)",
+   "name": "Engineering",
+   "platform": "Google Drive",
+   "visibility": "drive members"
+  },
+  {
+   "container": "Jira project",
+   "created": null,
+   "id": "jira-AUTH",
+   "key": "AUTH",
+   "label": "Auth Service (Jira AUTH)",
+   "name": "Auth Service",
+   "platform": "Jira",
+   "visibility": "project roles"
+  },
+  {
+   "container": "Jira project",
+   "created": null,
+   "id": "jira-DBMIG",
+   "key": "DBMIG",
+   "label": "Database Migration (Jira DBMIG)",
+   "name": "Database Migration",
+   "platform": "Jira",
+   "visibility": "project roles"
+  },
+  {
+   "container": "Jira project",
+   "created": null,
+   "id": "jira-PAY",
+   "key": "PAY",
+   "label": "Payments (Jira PAY)",
+   "name": "Payments",
+   "platform": "Jira",
+   "visibility": "project roles"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2026-06-15T09:00:00+08:00",
+   "id": "slack-C0AUTHSD",
+   "key": "C0AUTHSD",
+   "label": "#auth-service-design",
+   "name": "#auth-service-design",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2026-06-05T09:00:00+08:00",
+   "id": "slack-C0DBMIG",
+   "key": "C0DBMIG",
+   "label": "#db-migration",
+   "name": "#db-migration",
+   "platform": "Slack",
+   "visibility": "private"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2024-05-16T09:00:00+08:00",
+   "id": "slack-C0ENG",
+   "key": "C0ENG",
+   "label": "#engineering",
+   "name": "#engineering",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2024-04-26T09:00:00+08:00",
+   "id": "slack-C0GENERAL",
+   "key": "C0GENERAL",
+   "label": "#general",
+   "name": "#general",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2025-01-01T09:00:00+08:00",
+   "id": "slack-C0INCID",
+   "key": "C0INCID",
+   "label": "#incidents",
+   "name": "#incidents",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2024-11-12T09:00:00+08:00",
+   "id": "slack-C0PAYENG",
+   "key": "C0PAYENG",
+   "label": "#payments-eng",
+   "name": "#payments-eng",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2025-02-20T09:00:00+08:00",
+   "id": "slack-C0PRODUCT",
+   "key": "C0PRODUCT",
+   "label": "#product",
+   "name": "#product",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2024-04-26T09:00:00+08:00",
+   "id": "slack-C0RANDOM",
+   "key": "C0RANDOM",
+   "label": "#random",
+   "name": "#random",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2025-07-20T09:00:00+08:00",
+   "id": "slack-C0RELEAS",
+   "key": "C0RELEAS",
+   "label": "#releases",
+   "name": "#releases",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2025-05-31T09:00:00+08:00",
+   "id": "slack-C0SREOC",
+   "key": "C0SREOC",
+   "label": "#sre-oncall",
+   "name": "#sre-oncall",
+   "platform": "Slack",
+   "visibility": "public"
+  }
+ ]
+}

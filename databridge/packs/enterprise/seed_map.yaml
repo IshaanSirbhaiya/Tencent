@@ -1,0 +1,292 @@
+# packs/enterprise/seed_map.yaml — Company A's estate, bound to packs/enterprise/ontology.yaml.
+#
+# Executed by the stock engine builder `databridge_graph.estate_seed.load_pack_graph`, exactly like
+# packs/government and packs/finance. The rows it reads are produced by
+# `scripts/build_enterprise_graph.py`, which flattens fixtures/enterprise/world.json (the Internal
+# Brain's synthetic world) into one `{"data": [...]}` page per shape, because the json_pages reader
+# reads records and does not explode nested lists.
+#
+# A BINDING, not a lookup table: every node and edge below is computed from a row the builder
+# actually reads, and every value cites the cell it came from. Delete a row and the graph is
+# smaller; change a title and the label changes.
+#
+# Trust: directory and container metadata come from the platforms' admin APIs (`trusted`). Item
+# titles and chat text are written by people (`untrusted`): they may be shown and cited, never used
+# to decide anything.
+#
+# The graph is PERMISSION-BLIND. It records who is granted each container (`reads_space`) but
+# does not filter what a viewer sees. The Internal Brain (apps/internal_brain) is the
+# permission-aware product; this graph is the estate seen from above, for the original screens.
+
+pack: enterprise
+fixtures_root: "../../fixtures/enterprise/graph_rows"
+# `meta.now` of the demo world: the instant the estate was captured.
+system_time: "2026-10-13T09:00:00+08:00"
+# For things the export carries no date for (people, teams, spaces, projects, drives).
+default_valid_from: "2024-01-01T00:00:00+08:00"
+
+datasets:
+  # ==============================================================================================
+  # Directory
+  # ==============================================================================================
+  - id: people
+    reader: json_pages
+    table: directory.users
+    trust: trusted
+    row_key: "{id}"
+    path: people.json
+    nodes:
+      - kind: colleague
+        key: "{id}"
+        label: "{name}"
+        canonical_id: email
+        sources: [id, name]
+        attrs:
+          email: email
+          account_kind: account_kind
+          employment: employment
+          status: active
+          roles: roles
+
+  - id: teams
+    reader: json_pages
+    table: directory.groups
+    trust: trusted
+    row_key: "{id}"
+    path: teams.json
+    nodes:
+      - kind: org_team
+        key: "{id}"
+        label: "{name}"
+        canonical_id: id
+        sources: [id, name]
+        attrs:
+          direct_members: direct_members
+
+  - id: team_members
+    reader: json_pages
+    table: directory.group_members
+    trust: trusted
+    row_key: "{row}"
+    path: team_members.json
+    edges:
+      - kind: on_team
+        src: "colleague:{person}"
+        dst: "org_team:{team}"
+        evidence: [team, person]
+
+  - id: team_nesting
+    reader: json_pages
+    table: directory.group_member_groups
+    trust: trusted
+    row_key: "{row}"
+    path: team_nesting.json
+    edges:
+      - kind: includes_team
+        src: "org_team:{parent}"
+        dst: "org_team:{child}"
+        evidence: [parent, child]
+
+  # ==============================================================================================
+  # Containers — Confluence spaces, Jira projects, Slack channels, shared drives
+  # ==============================================================================================
+  - id: spaces
+    reader: json_pages
+    table: platform.containers
+    trust: trusted
+    row_key: "{id}"
+    path: spaces.json
+    nodes:
+      - kind: knowledge_space
+        key: "{id}"
+        label: "{label}"
+        canonical_id: id
+        sources: [id, name]
+        valid_from: created
+        attrs:
+          platform: platform
+          container: container
+          key: key
+          name: name
+          visibility: visibility
+          created: created
+
+  - id: space_readers
+    reader: json_pages
+    table: platform.container_grants
+    trust: trusted
+    row_key: "{row}"
+    path: space_readers.json
+    edges:
+      - kind: reads_space
+        src: "org_team:{principal}"
+        dst: "knowledge_space:{space}"
+        evidence: [space, principal, via]
+        attrs:
+          via: via
+        when: {principal_type: team}
+      - kind: reads_space
+        src: "colleague:{principal}"
+        dst: "knowledge_space:{space}"
+        evidence: [space, principal, via]
+        attrs:
+          via: via
+        when: {principal_type: colleague}
+
+  # ==============================================================================================
+  # Items — pages, issues, threads, files
+  # ==============================================================================================
+  - id: pages
+    reader: json_pages
+    table: confluence.pages
+    trust: untrusted
+    row_key: "{id}"
+    path: pages.json
+    nodes:
+      - kind: knowledge_page
+        key: "{id}"
+        label: "{title}"
+        canonical_id: doc_id
+        sources: [id, title]
+        valid_from: created
+        attrs:
+          status: status
+          version: version
+          created: created
+          updated: updated
+          page_restriction: page_restriction
+    edges:
+      - kind: held_in
+        src: "knowledge_space:{space}"
+        dst: "knowledge_page:{id}"
+        evidence: [space]
+      - kind: wrote_item
+        src: "colleague:{author}"
+        dst: "knowledge_page:{id}"
+        evidence: [author]
+      - kind: has_subpage
+        src: "knowledge_page:{parent}"
+        dst: "knowledge_page:{id}"
+        evidence: [parent]
+
+  - id: issues
+    reader: json_pages
+    table: jira.issues
+    trust: untrusted
+    row_key: "{id}"
+    path: issues.json
+    nodes:
+      - kind: tracked_issue
+        key: "{id}"
+        label: "{title}"
+        canonical_id: doc_id
+        sources: [id, title]
+        valid_from: created
+        attrs:
+          status: status
+          security_level: security_level
+          comments: comments
+          created: created
+          updated: updated
+    edges:
+      - kind: held_in
+        src: "knowledge_space:{space}"
+        dst: "tracked_issue:{id}"
+        evidence: [space]
+      - kind: wrote_item
+        src: "colleague:{reporter}"
+        dst: "tracked_issue:{id}"
+        evidence: [reporter]
+      - kind: assigned_item
+        src: "colleague:{assignee}"
+        dst: "tracked_issue:{id}"
+        evidence: [assignee]
+
+  - id: threads
+    reader: json_pages
+    table: slack.threads
+    trust: untrusted
+    row_key: "{id}"
+    path: threads.json
+    nodes:
+      - kind: chat_thread
+        key: "{id}"
+        label: "{title}"
+        canonical_id: doc_id
+        sources: [id, title]
+        valid_from: created
+        attrs:
+          messages: messages
+          participants: participants
+          created: created
+          last_reply: last_reply
+    edges:
+      - kind: held_in
+        src: "knowledge_space:{space}"
+        dst: "chat_thread:{id}"
+        evidence: [space]
+      - kind: wrote_item
+        src: "colleague:{starter}"
+        dst: "chat_thread:{id}"
+        evidence: [starter]
+
+  - id: files
+    reader: json_pages
+    table: drive.files
+    trust: untrusted
+    row_key: "{id}"
+    path: files.json
+    nodes:
+      - kind: shared_file
+        key: "{id}"
+        label: "{title}"
+        canonical_id: doc_id
+        sources: [id, title]
+        valid_from: created
+        attrs:
+          folder: folder
+          file_type: file_type
+          version: version
+          own_permissions: own_permissions
+          created: created
+          modified: modified
+    edges:
+      - kind: held_in
+        src: "knowledge_space:{space}"
+        dst: "shared_file:{id}"
+        evidence: [space]
+
+  # ==============================================================================================
+  # Cross-links — an issue key named in a page, thread, file or issue, and Jira issue links
+  # ==============================================================================================
+  - id: citations
+    reader: json_pages
+    table: estate.issue_key_mentions
+    trust: untrusted
+    row_key: "{row}"
+    path: citations.json
+    edges:
+      - kind: cites_item
+        src: "knowledge_page:{src}"
+        dst: "tracked_issue:{dst}"
+        evidence: [src, dst, via]
+        attrs: {via: via}
+        when: {src_type: page}
+      - kind: cites_item
+        src: "tracked_issue:{src}"
+        dst: "tracked_issue:{dst}"
+        evidence: [src, dst, via]
+        attrs: {via: via}
+        when: {src_type: issue}
+      - kind: cites_item
+        src: "chat_thread:{src}"
+        dst: "tracked_issue:{dst}"
+        evidence: [src, dst, via]
+        attrs: {via: via}
+        when: {src_type: thread}
+      - kind: cites_item
+        src: "shared_file:{src}"
+        dst: "tracked_issue:{dst}"
+        evidence: [src, dst, via]
+        attrs: {via: via}
+        when: {src_type: file}
