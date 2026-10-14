@@ -1,0 +1,85 @@
+flowchart TB
+    %% ============================================================
+    %% Walnut Internal Brain — trust-boundary diagram (TB1-TB5)
+    %% Synthetic data only ("Company A"). No real company names.
+    %% ============================================================
+
+    %% ---------- Untrusted clients (outside the Brain) ----------
+    subgraph CLIENTS["Untrusted clients (outside the Brain)"]
+        EMP["Employee (web) client<br/>browser, httpOnly ib_session cookie"]
+        WB["WorkBuddy client + its own model<br/>per-persona MCP bearer token, no identity arg"]
+    end
+
+    %% ---------- Public edge ----------
+    LH["Lighthouse public edge (Caddy)<br/>TLS + security headers; exposes only the web app and /api/ib/* (same-origin proxy)<br/>synthetic mock platforms only, never real workspaces"]
+
+    %% ---------- Walnut Internal Brain (own process, port 8100) ----------
+    subgraph IB["Walnut Internal Brain — own process, own state (var/ib/)"]
+        direction TB
+        AUTH["Auth<br/>HMAC token: sub, roles, exp ≤ 8h, aud=ib, jti<br/>revocation list (fails closed)"]
+        LEDGER["Write-ahead access ledger<br/>request.accepted → retrieval.decided → answer.released<br/>sealed, hash-chained, anchor directory"]
+        GATE1["Gate 1: index pre-filter<br/>readable(sub) over stored ACL policy expressions<br/>only permitted chunks are ranked"]
+        GATE2["Gate 2: live source check<br/>ask source (user, doc) now, per doc, in parallel<br/>hard deny on error / timeout / 429"]
+        GROUND["Grounding wall<br/>GroundedNarrator; on violation serve extractive"]
+        WH["Webhook receiver<br/>verifies signed webhooks, then re-fetches"]
+        AUDIT["Compliance audit console<br/>/audit/* (compliance_officer only)"]
+    end
+
+    %% ---------- Tencent model + embeddings ----------
+    TH["Tencent TokenHub<br/>hy3 → fallback deepseek-v4.1-flash → extractive"]
+    EMB["Embedder (ingest)<br/>default offline hashing; optional TokenHub alias"]
+
+    %% ---------- Source platforms ----------
+    subgraph SRC["Source platforms (mock or live, same connector code)"]
+        CON["Confluence"]
+        JIR["Jira"]
+        SLA["Slack"]
+        DRI["Drive"]
+    end
+
+    %% ---------- External sinks / readers ----------
+    SINK["External ledger-head sink<br/>separate git repo tag / compliance Slack<br/>off-host, append-only"]
+    OFFICER["Compliance officer<br/>reads metadata + logged reasoned reveal"]
+
+    %% ============================================================
+    %% Edges and the five trust boundaries
+    %% ============================================================
+
+    %% TB1: client -> IB gateway (through Caddy)
+    EMP -->|"TB1 · identity token + question"| LH
+    WB  -->|"TB1 · MCP bearer token + question"| LH
+    LH  -->|"TB1 · forwarded cookie/bearer over allowlisted paths"| AUTH
+
+    %% In-gateway pipeline order (no boundary crossings)
+    AUTH  --> LEDGER
+    LEDGER --> GATE1
+    GATE1 --> GATE2
+    GROUND --> LEDGER
+
+    %% TB2: IB -> sources (ingest reads, service token)
+    IB -.->|"TB2 · service-token reads of ALL content + ACLs"| SRC
+
+    %% TB3: IB -> sources (Gate 2 live permission check)
+    GATE2 ==>|"TB3 · (user, doc) permission question at answer time"| SRC
+
+    %% Platforms -> IB signed webhooks (events only invalidate)
+    SRC ==>|"signed webhook · HMAC-SHA256, ±300s, replay-safe; ids only, re-fetch"| WH
+
+    %% TB4: IB -> TokenHub (generation)
+    GATE2 ==>|"TB4 · released passages only + system prompt + question"| TH
+    TH -->|"TB4 · draft answer (untrusted until grounded)"| GROUND
+
+    %% TB5: IB -> external ledger-head sink
+    LEDGER ==>|"TB5 · ledger head hash {log_id, seq, head, at} (no content)"| SINK
+
+    %% Audit console -> compliance officer
+    AUDIT ==>|"metadata + logged reasoned reveal (itself ledgered)"| OFFICER
+
+    %% Ingest embedding boundary note
+    IB -.->|"ingest embed: default offline (no chunk leaves host)"| EMB
+
+    classDef outside fill:#fde2e2,stroke:#c0392b,color:#000;
+    classDef edge fill:#e2e8f0,stroke:#2c3e50,color:#000;
+    classDef tencent fill:#fff3cd,stroke:#b8860b,color:#000;
+    class EMP,WB,SINK,OFFICER outside;
+    class LH,TH,EMB tencent;
