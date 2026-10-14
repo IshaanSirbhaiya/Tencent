@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 DATABRIDGE = Path(__file__).resolve().parents[1]
 REPO = DATABRIDGE.parent
+sys.path.insert(0, str(DATABRIDGE / "scripts"))
+from ib_mint_token import mint_for  # noqa: E402  (tokens never pass through stdout)
+
 WORKSPACES = (
     # folder, persona, server module, what to ask in the demo
     ("IB as jdoe", "jdoe", "databridge_ib.mcp_server",
@@ -38,18 +42,30 @@ def _python() -> Path:
     return Path(sys.executable)
 
 
+def _owner_only(path: Path) -> None:
+    """Best effort: only the current user may read a file holding a token."""
+    if os.name == "nt":
+        user = os.environ.get("USERNAME", "")
+        if user:
+            subprocess.run(["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
+                           capture_output=True, check=False)
+    else:
+        os.chmod(path, 0o600)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", type=Path, default=REPO.parent / "workbuddy-demo")
     ap.add_argument("--hours", type=int, default=8)
     ap.add_argument("--ib-url", default="http://127.0.0.1:8100")
     args = ap.parse_args(argv)
+    out = args.out.resolve()
+    if out == REPO or REPO in out.parents:          # tokens are secrets: never inside the repo
+        ap.error(f"--out must be outside the repository ({REPO})")
     py = _python()
     for folder, persona, module, question in WORKSPACES:
-        token = subprocess.run([str(py), str(DATABRIDGE / "scripts" / "ib_mint_token.py"), persona,
-                                "--hours", str(args.hours)], capture_output=True, text=True,
-                               check=True).stdout.strip()
-        ws = args.out / folder
+        token = mint_for(persona, args.hours)
+        ws = out / folder
         (ws / ".workbuddy").mkdir(parents=True, exist_ok=True)
         name = "internal-brain-audit" if module.endswith("audit_mcp_server") else "internal-brain"
         cfg = {"mcpServers": {name: {
@@ -59,7 +75,9 @@ def main(argv: list[str] | None = None) -> int:
             "env": {"PYTHONPATH": (DATABRIDGE / "apps" / "internal_brain").as_posix(),
                     "IB_URL": args.ib_url, "IB_TOKEN": token},
         }}}
-        (ws / ".workbuddy" / "mcp.json").write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        cfg_path = ws / ".workbuddy" / "mcp.json"
+        cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        _owner_only(cfg_path)
         (ws / "DEMO_QUESTION.txt").write_text(
             f"This WorkBuddy workspace talks to the Walnut Internal Brain as '{persona}'.\n"
             f"Ask:\n{question}\n", encoding="utf-8")
