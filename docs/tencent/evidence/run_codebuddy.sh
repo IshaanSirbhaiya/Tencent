@@ -6,6 +6,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EV="$ROOT/docs/tencent/evidence"
 cd "$ROOT"
+# CodeBuddy must never be able to read the secrets file (CB3 read it despite being told not to and
+# its transcript captured the keys; they were redacted and rotated). Park the file OUTSIDE the
+# repository for the whole run and always put it back.
+SECRETS="$ROOT/databridge/.env.ib.local"; PARKED="$ROOT/../.env.ib.local.parked-during-codebuddy"
+if [ -f "$SECRETS" ]; then mv "$SECRETS" "$PARKED"; trap 'mv "$PARKED" "$SECRETS"' EXIT; fi
 for s in "$@"; do
   case "$s" in
     cb1|cb5) model="hy3" ;;

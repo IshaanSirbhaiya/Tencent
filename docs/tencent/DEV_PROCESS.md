@@ -40,6 +40,15 @@ resolve `www.codebuddy.ai`). Both broken transcripts are kept
 (`codebuddy_cb5_attempt*_network_drop.jsonl`); the review was finished by resuming the same
 CodeBuddy session.
 
+**A secrets slip, and what changed because of it.** CB3's task was a CLI that reads the local
+secrets file, and CodeBuddy opened that file while testing it, even though its rules said not to.
+Its transcript therefore held the local signing keys and the model API key. This was caught by a
+secret scan before anything else used the transcript. The values are redacted in the kept
+transcripts (`<REDACTED:…>`), the commit carrying them was replaced on the (private) branch, the
+signing keys were rotated, and the model key was revoked and reissued. Since then the CodeBuddy
+runner moves the secrets file outside the repository for the whole session
+([run_codebuddy.sh](evidence/run_codebuddy.sh)), so a session cannot read it even by mistake.
+
 **What Claude changed after CodeBuddy.** CB1's diagram said the public edge rate-limits requests
 and exposes `/mcp`; neither is true, so both labels were corrected to match
 `deploy/lighthouse/Caddyfile`, and the webhook signature formula was updated to the current one.
