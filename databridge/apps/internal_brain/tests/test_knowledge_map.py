@@ -32,6 +32,7 @@ def _app(tmp_path, docs, readers, ledger=None):
                    ledger=led, answers=MemAnswers(), pipeline=pipe,
                    ingestor=Ingestor(idx, {"slack": conn}, tmp_path / "c.json",
                                      directory=base.directory))
+    svc.conn = conn
     return create_app(svc), svc
 
 
@@ -79,3 +80,19 @@ def test_ledger_down_means_no_map(tmp_path):
     app, svc = _app(tmp_path, [PUBLIC, PRIVATE], READERS, ledger=Down())
     r = _map(app, svc, "jdoe")
     assert r.status_code == 503 and "t1" not in r.text
+
+
+def test_revocation_with_a_lost_webhook_is_honoured_by_the_map(tmp_path):
+    """The index still says jdoe may read t1, but the SOURCE no longer does: the live check wins."""
+    app, svc = _app(tmp_path, [PUBLIC, PRIVATE], READERS)
+    svc.conn.readers["slack:t1"].discard("jdoe")          # revoked at the source, index not told
+    body = _map(app, svc, "jdoe").json()
+    assert body["totals"] == {"items": 0, "containers": 0, "platforms": 0}
+    assert "t1" not in json.dumps(body) and "migration status" not in json.dumps(body)
+
+
+def test_map_event_records_items_actually_returned(tmp_path):
+    app, svc = _app(tmp_path, [PUBLIC, PRIVATE], READERS)
+    _map(app, svc, "priya")
+    ev = [e for e in svc.ledger.events if getattr(e, "kind", "") == "map.viewed"][-1]
+    assert ev.docs_listed == 2 and ev.items_returned == 2

@@ -260,7 +260,8 @@ class MapViewed(EventBase):
     like every other access)."""
     kind: Literal["map.viewed"] = "map.viewed"
     sub: str
-    docs_listed: int
+    docs_listed: int                                # items counted (each confirmed live)
+    items_returned: int = 0                         # item entries actually sent (capped per space)
     containers_listed: int
     policy_version: str
 

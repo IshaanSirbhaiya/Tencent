@@ -3,6 +3,7 @@ answer nobody has revealed is still detected (CodeBuddy security review CB5 find
 from __future__ import annotations
 
 import datetime as dt
+import json
 import sqlite3
 
 from fastapi.testclient import TestClient
@@ -41,3 +42,18 @@ def test_edited_answer_is_detected_without_a_reveal(tmp_path):
     v = c.get("/audit/verify").json()
     assert v["content"]["intact"] is False and v["ok"] is False
     assert "does not match the sealed digest" in v["content"]["problems"][0]
+    # counts only: no answer reference ever appears in the verify report
+    with sqlite3.connect(store.path) as db:
+        refs = [r[0] for r in db.execute("SELECT answer_ref FROM answers")]
+    assert refs and not any(r in json.dumps(v) for r in refs)
+
+
+def test_missing_answers_are_counted_not_listed(tmp_path):
+    c, svc, store = _officer(tmp_path)
+    for _ in range(3):
+        assert c.post("/ib/ask", json={"question": "database migration status"}).status_code == 200
+    with sqlite3.connect(store.path) as db:
+        db.execute("DELETE FROM answers")
+    v = c.get("/audit/verify").json()
+    assert v["ok"] is False and v["content"]["problem_count"] == 3
+    assert v["content"]["problems"] == ["3 answer(s) missing from the content store"]

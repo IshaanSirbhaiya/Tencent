@@ -87,7 +87,7 @@ def _http_get(client: httpx.Client, path: str,
     headers = {"Authorization": f"Bearer {token}"}
     try:
         resp = client.get(f"{_base_url()}{path}", params=params or None, headers=headers,
-                          follow_redirects=True)
+                          follow_redirects=False)
     except httpx.HTTPError as exc:
         return None, f"Internal Brain API is unreachable ({exc.__class__.__name__})."
     if resp.status_code >= 400:

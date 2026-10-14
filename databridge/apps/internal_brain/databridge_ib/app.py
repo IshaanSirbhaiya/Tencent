@@ -149,7 +149,7 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             raise HTTPException(403, "forbidden")
         try:
             return build_map(user, index=svc.index, directory=svc.directory, ledger=svc.ledger,
-                             clock=lambda: datetime.now(timezone.utc))
+                             connectors=svc.connectors, clock=lambda: datetime.now(timezone.utc))
         except Exception as exc:                                    # noqa: BLE001
             log.error("map failed: %s", type(exc).__name__)       # incl. ledger down: fail closed
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})

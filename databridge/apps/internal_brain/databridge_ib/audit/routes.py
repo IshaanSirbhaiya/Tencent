@@ -243,24 +243,40 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
     return router
 
 
-def _verify_content(ledger: AccessLedger, store: AnswerStore, *, max_problems: int = 20) -> dict:
-    """Every ``answer.released`` digest vs the text in the content store (missing = a problem)."""
-    checked, problems = 0, []
+def _verify_content(ledger: AccessLedger, store: AnswerStore) -> dict:
+    """Every ``answer.released`` digest vs the text in the content store. Reports COUNTS only (no
+    answer references), so the report discloses nothing beyond integrity even on the documented
+    write-ahead exception of /audit/verify (Codex review track 5 #2). A release without a reference,
+    a missing answer, a mismatch or an unreadable record is a problem; never a silent skip (#3, #6)."""
+    checked = missing = mismatched = unreadable = 0
     try:
         for ev in ledger.events(strict=False):
-            if ev.kind != "answer.released" or not ev.data.get("answer_ref"):
+            if ev.kind != "answer.released":
                 continue
             checked += 1
-            ref, sealed = str(ev.data["answer_ref"]), ev.data.get("answer_sha256")
-            stored = store.get(ref)
-            if stored is None:
-                problems.append(f"answer {ref}: missing from the content store")
-            elif stored.req_id != ev.data.get("req_id") or sha256_text(stored.answer) != sealed:
-                problems.append(f"answer {ref}: text does not match the sealed digest")
+            ref, sealed = ev.data.get("answer_ref"), ev.data.get("answer_sha256")
+            if not ref or not isinstance(sealed, str):
+                unreadable += 1
+                continue
+            try:
+                stored = store.get(str(ref))
+                if stored is None:
+                    missing += 1
+                elif stored.req_id != ev.data.get("req_id") or sha256_text(stored.answer) != sealed:
+                    mismatched += 1
+            except ContentStoreUnavailable:
+                raise
+            except Exception:                                       # noqa: BLE001 — corrupt record
+                unreadable += 1
     except (ContentStoreUnavailable, LedgerUnavailable):
-        return {"checked": checked, "intact": False, "problems": ["content check unavailable"]}
-    return {"checked": checked, "intact": not problems, "problems": problems[:max_problems],
-            "problem_count": len(problems)}
+        return {"checked": checked, "intact": False, "problems": ["content check unavailable"],
+                "problem_count": 1}
+    problems = [msg for n, msg in ((missing, "answer(s) missing from the content store"),
+                                   (mismatched, "answer(s) whose text does not match the sealed digest"),
+                                   (unreadable, "release record(s) or stored answer(s) that cannot be read"))
+                if n for msg in [f"{n} {msg}"]]
+    total = missing + mismatched + unreadable
+    return {"checked": checked, "intact": total == 0, "problems": problems, "problem_count": total}
 
 
 def _clip(d: dict) -> dict:

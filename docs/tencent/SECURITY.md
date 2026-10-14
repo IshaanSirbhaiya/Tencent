@@ -294,3 +294,20 @@ fix has a regression test; tests are in `databridge/apps/internal_brain/tests/`.
 401, because the routes read the user's id from `sub` while the app's user object carries `id`. Fixed, with
 a test through the real app (`test_audit_routes_real_principal.py`).
 
+
+## 11. Codex track 5: the knowledge map and audit content check
+
+`reviews/security-r1/codex_track5_map_audit.md` (15 Oct, 9 findings + 1 out-of-bundle note).
+
+| # | Finding | Disposition | Where / regression test |
+|---|---|---|---|
+| 1 | Map listed items from synced permissions; a revocation with a lost webhook showed until the next poll | **Fixed.** Every map item is now confirmed live with its source (Gate 2, one batch budget, error/timeout = left out) before it is listed or counted. | `databridge_ib/knowledge_map.py`; `test_knowledge_map.py::test_revocation_with_a_lost_webhook_is_honoured_by_the_map` |
+| 2 | `/audit/verify` returned answer references even when its own audit append failed | **Fixed.** The content report carries counts only, never references. The documented write-ahead exception for verify (§3) now discloses only integrity counts and digests. | `audit/routes.py` `_verify_content`; `test_audit_verify_content.py` (asserts no reference appears) |
+| 3 | A release without a reference was silently skipped | **Fixed.** Counted as an unreadable record (a problem). | same |
+| 4 | Chain check and content check are separate passes | **Documented.** Both run in one request against an append-only log; a release appended between the two passes is checked by the content pass and reported next time by the chain pass. | |
+| 5 | Problem list not bounded | **Fixed.** Three counters; the report is constant-size. | same |
+| 6 | A corrupt stored record could crash verify | **Fixed.** Any error reading one record counts as a problem; only an unavailable store stops the check (reported, not raised). | same |
+| 7 | MCP clients followed redirects | **Fixed.** Redirects are not followed; a 3xx is a sanitised error. | `mcp_server.py`, `audit_mcp_server.py` |
+| 8 | Map audit event conflated counted and returned items | **Fixed.** `map.viewed` records `docs_listed` and `items_returned`. | `test_knowledge_map.py::test_map_event_records_items_actually_returned` |
+| 9 | Test gaps | **Partly fixed** with the tests above; an ASGI send-order probe and large-ledger load tests are not written. | |
+| 10 | Channel rule, revocation lock and passcode guard were outside the bundle | Covered by §10 (T4-8, CB5-1, CB5-5) and their tests. | |

@@ -83,7 +83,7 @@ def _http_get(client: httpx.Client, path: str) -> tuple[httpx.Response | None, s
         return None, url_err
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = client.get(f"{_base_url()}{path}", headers=headers, follow_redirects=True)
+        resp = client.get(f"{_base_url()}{path}", headers=headers, follow_redirects=False)
     except httpx.HTTPError as exc:
         return None, f"Internal Brain API is unreachable ({exc.__class__.__name__})."
     if resp.status_code >= 400:
@@ -103,7 +103,7 @@ def _http_post(client: httpx.Client, path: str,
     headers = {"Authorization": f"Bearer {token}", "x-ib-channel": CHANNEL}
     try:
         resp = client.post(f"{_base_url()}{path}", json=json_body, headers=headers,
-                           follow_redirects=True)
+                           follow_redirects=False)
     except httpx.HTTPError as exc:
         return None, f"Internal Brain API is unreachable ({exc.__class__.__name__})."
     if resp.status_code >= 400:
