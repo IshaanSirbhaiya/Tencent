@@ -152,7 +152,8 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
             sentences.extend(_SENT.split(neutralise_tags(" ".join(line.split()))))
         for j, s in enumerate(sentences):
             s = _URL.sub("", s).strip()
-            if len(s) < 12 or len(s) > 400 or _ADDRESSED_TO_AI.search(s):
+            if (len(s) < 12 or len(s) > 400 or _ADDRESSED_TO_AI.search(s)
+                    or (len(s.split()) < 5 and not s.endswith((".", "!", "?")))):   # headings
                 continue
             stoks = set(tokens(s))
             overlap = len(q & stoks)
@@ -161,6 +162,14 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
                 scored.append((-(overlap + 2 * len(anc & stoks)), order, j, s, p.tag, p.platform))
     if not scored:
         return REFUSAL_TEXT
+    # focus on the question's most specific term: when the rarest anchor (e.g. "indonesian" in an
+    # Indonesia question) is in at least two candidate sentences but not all of them, keep only those,
+    # so an answer about one market does not drift into another market's policy
+    if anc:
+        have = {a: [r for r in scored if a in set(tokens(r[3]))] for a in anc}
+        useful = {a: rows for a, rows in have.items() if 2 <= len(rows) < len(scored)}
+        if useful:
+            scored = min(useful.values(), key=len)
     scored.sort()
     # cross-platform first: the best sentence of each platform whose best match is at least half as
     # strong as the overall best, then the remaining slots by score
