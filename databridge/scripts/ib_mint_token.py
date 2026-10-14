@@ -75,7 +75,14 @@ def mint_for(persona: str, hours: int = DEFAULT_HOURS, *,
         world_path = WORLD_FILE
     hours = max(1, min(hours, MAX_HOURS))
     ttl_s = hours * 3600
-    key = _load_env_value(env_path, "IB_TOKEN_KEY")
+    if env_path.exists():
+        key = _load_env_value(env_path, "IB_TOKEN_KEY")
+    else:                       # no secrets file: match the local Brain, which then runs on its dev key
+        import os
+        from databridge_ib.config import DEV_TOKEN_KEY
+        key = os.environ.get("IB_TOKEN_KEY") or DEV_TOKEN_KEY
+        print(f"note: {env_path.name} not found; using IB_TOKEN_KEY from the environment or the "
+              "local development key", file=sys.stderr)
     user = _load_persona(world_path, persona)
     sub = user["id"]
     roles = list(user.get("roles", ["employee"]))

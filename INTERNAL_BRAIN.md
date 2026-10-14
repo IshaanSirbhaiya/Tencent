@@ -52,11 +52,20 @@ can't see; and compliance can reconstruct any access, with proof the record hasn
 
 ## Run it
 
-One-time setup, from `databridge/` (Windows, Python 3.13, Node 20):
+**You need:** Python 3.13, Node 20 and, on Windows, Git for Windows (for Git Bash).
+
+One-time setup, from `databridge/`:
 
 ```powershell
+# Windows (PowerShell)
 py -3.13 -m venv .venv; .venv\Scripts\python -m pip install -r requirements-lock.txt
 cd apps\internal_brain_web; npm install; cd ..\..
+```
+
+```bash
+# macOS / Linux
+python3.13 -m venv .venv && .venv/bin/python -m pip install -r requirements-lock.txt
+(cd apps/internal_brain_web && npm install)
 ```
 
 Then two terminals (Git Bash):
@@ -72,15 +81,18 @@ cd databridge/apps/internal_brain_web && npm run dev
 ```
 
 - The Brain indexes the whole world on start (about a minute), then serves.
-- Answers are deterministic quotes from the sources unless a TokenHub key is set in
-  `databridge/.env.ib.local` and `IB_FORCE_OFFLINE=0`; then Tencent Hunyuan `hy3` writes them, with
-  `deepseek-v4.1-flash` as backup, through exactly the same checks.
+- Answers are deterministic quotes from the sources by default. To use Tencent Hy3, create
+  `databridge/.env.ib.local` with `TOKENHUB_API_KEY=<your key>` and `IB_FORCE_OFFLINE=0` (the launcher
+  reads that file); Hy3 then writes the answers, with `deepseek-v4.1-flash` as backup, through exactly
+  the same checks. The same file holds `IB_TOKEN_KEY` / `IB_LEDGER_KEY` (32+ random characters each) if
+  you want your own signing keys; without them the local demo uses built-in development keys.
 - **Original Walnut screens** on Company A: `bash databridge/scripts/run_walnut_original.sh`, then open
   http://localhost:3300 (details in `databridge/apps/frontend/README.md`).
 - **WorkBuddy:** `databridge/.venv/Scripts/python.exe databridge/scripts/workbuddy_setup.py` writes three
   workspaces next to the repository; open one in WorkBuddy (guide: `docs/tencent/workbuddy/README.md`).
 - **Tests:** `.venv\Scripts\python -m pytest apps/internal_brain/tests -q`
-- **Leak evaluation:** `.venv\Scripts\python -m evals.internal_brain.run` (about 2 minutes)
+- **Leak evaluation:** `.venv\Scripts\python -m evals.internal_brain.run` (about 2–10 minutes depending on
+  the machine; add `--limit 60` for a one-minute check)
 - **Tamper demo:** `.venv\Scripts\python scripts/tamper_demo.py`
 
 Demo people (all fictional): `jdoe` backend engineer · `priya.sre` on-call SRE · `ken.ext` contractor

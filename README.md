@@ -184,7 +184,9 @@ line-by-line version of this list — it moves faster than this file and is the 
 
 ---
 
-## Running it
+## Running it (the original Walnut platform)
+
+> For the hackathon's **Internal Brain** (ports 8100/8200/3100), use [INTERNAL_BRAIN.md → Run it](INTERNAL_BRAIN.md#run-it) instead. This section starts the original Walnut gateway and frontend on ports 8000/3000.
 
 ```powershell
 cd databridge
@@ -198,12 +200,12 @@ cd databridge
 
 ```powershell
 cd databridge
-python -m pytest -m "not integration"
+.venv\Scripts\python -m pytest -m "not integration"
 ```
 
 The marker is required — a plain `python -m pytest` hangs on a test that expects a local Ollama
-instance. No API key is needed: with `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, a real model runs
-the classification and extraction steps; without one, a deterministic backend runs the same code
+instance. No API key is needed: in the original platform, with `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, a real model runs
+the classification and extraction steps (the Internal Brain uses `TOKENHUB_API_KEY` instead); without one, a deterministic backend runs the same code
 paths offline, and no test in the suite depends on a live model.
 
 LLM access goes through `packages/harness` only — nothing else in the repository imports a vendor

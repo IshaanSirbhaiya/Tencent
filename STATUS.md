@@ -1,3 +1,6 @@
+> **Historical note (written before the Tencent hackathon).** For the hackathon's Internal Brain, start at
+> [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). This file describes the earlier Walnut work and may be out of date.
+
 # STATUS — where the build is
 
 > Read `CLAUDE.md` first (working rules), then this, then `PHASE_PLAN.md`.

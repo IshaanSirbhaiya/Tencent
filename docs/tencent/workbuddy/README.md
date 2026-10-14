@@ -1,5 +1,11 @@
 # Connecting WorkBuddy to the Internal Brain
 
+> **Quickest path:** from the repository root run
+> `databridge/.venv/Scripts/python.exe databridge/scripts/workbuddy_setup.py`. It writes three ready
+> workspaces (jdoe, ken.ext, compliance) next to the repository, each with its own token, so you don't
+> paste anything. The manual steps below are what that script does.
+
+
 WorkBuddy (desktop app 5.7.x) can talk to the Internal Brain through its stdio MCP
 server. This guide shows how to wire one WorkBuddy project per **persona** — each
 project gets its own short-lived bearer token so the Internal Brain always knows
@@ -34,7 +40,7 @@ WorkBuddy project  ──stdio──>  databridge_ib.mcp_server  ──HTTP─�
 3. **A minted token** for the persona. From the `databridge/` folder:
 
    ```bash
-   .venv/Scripts/python.exe scripts/ib_mint_token.py jdoe --hours 8
+   .venv/Scripts/python.exe scripts/ib_mint_token.py jdoe --hours 8 --print
    ```
 
    This prints only the token. Copy it — you will not be able to see it again.
@@ -83,10 +89,10 @@ From the `databridge/` folder:
 
 ```bash
 # Default 8 h lifetime (the maximum):
-.venv/Scripts/python.exe scripts/ib_mint_token.py jdoe
+.venv/Scripts/python.exe scripts/ib_mint_token.py jdoe --print
 
 # Shorter, 2 h:
-.venv/Scripts/python.exe scripts/ib_mint_token.py jdoe --hours 2
+.venv/Scripts/python.exe scripts/ib_mint_token.py jdoe --hours 2 --print
 ```
 
 - The script reads `IB_TOKEN_KEY` from `databridge/.env.ib.local` (parsed in

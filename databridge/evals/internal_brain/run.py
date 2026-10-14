@@ -1,7 +1,7 @@
 """Run the Internal Brain leak eval end to end and write RESULTS.md + results.json.
 
     cd databridge
-    .venv\\Scripts\\python.exe -m evals.internal_brain.run                 # full run (~10 min)
+    .venv\\Scripts\\python.exe -m evals.internal_brain.run                 # full run (~2-10 min, machine-dependent)
     .venv\\Scripts\\python.exe -m evals.internal_brain.run --limit 60      # quick subset
     .venv\\Scripts\\python.exe -m evals.internal_brain.run --workers 1     # one world-A build
 

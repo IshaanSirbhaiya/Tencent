@@ -36,7 +36,7 @@ only labels the session; this app does not filter anything by persona.
 
 | Screen | What it shows on Company A |
 |---|---|
-| `/graph` | The knowledge graph: 1,219 nodes and 2,919 links (people, teams, Confluence spaces, Jira projects, Slack channels, shared drives, and the pages, tickets, threads and files in them). It opens on the best-connected nodes. Search for a node, double-click to expand it, and click any node or link to see the pointer behind each value. |
+| `/graph` | The knowledge graph: 932 nodes and 2,246 links (jdoe's view; 1,219 / 2,919 unrestricted) (people, teams, Confluence spaces, Jira projects, Slack channels, shared drives, and the pages, tickets, threads and files in them). It opens on the best-connected nodes. Search for a node, double-click to expand it, and click any node or link to see the pointer behind each value. |
 | `/brain` | The same graph as a company brain, all at once, with a colour legend, counts and a time slider. Drag the slider back and everything created after that date disappears (every Slack thread in the export is from June 2026 or later). Click a node for its evidence sheet: each value next to the file, table, column and row it came from. |
 | `/ontology` | The `enterprise` pack: 7 node kinds and 8 link kinds, how they connect, and how many of each are in the graph. |
 | `/evidence` | Provenance for one node or link, step by step. Try `/evidence?entity=knowledge_page%3Acf-1001` (the DB Migration Plan page) or the chips on the page. |
@@ -59,7 +59,7 @@ only labels the session; this app does not filter anything by persona.
 - **Local only.** The web build contains the development token `dev-local-only`, and the gateway
   accepts it only because the launcher sets `WALNUT_DEV_AUTH=1`. Do not expose these ports.
 - **The graph is built as one person sees it** (default `jdoe`; rebuild with
-  `python scripts/build_enterprise_graph.py --as <persona>`). Only items that person may open, and
+  `.venv/Scripts/python.exe scripts/build_enterprise_graph.py --as <persona>`). Only items that person may open, and
   spaces where they can open something, are in it, so restricted items such as the FinCrime case
   notes never appear here either. The original screens don't check access per request themselves;
   the Internal Brain is the product that does.
@@ -70,7 +70,7 @@ only labels the session; this app does not filter anything by persona.
 
 ## Screenshots
 
-`tests/showcase/capture_company_a.cjs` signs in, checks that each screen shows Company A data, and
+`tests/showcase/capture_company_a.cjs` (start the original screens first with `bash scripts/run_walnut_original.sh`) signs in, checks that each screen shows Company A data, and
 saves screenshots (1600x1000) to `submission/03_app_scenes/walnut_original/`:
 
 ```bash
