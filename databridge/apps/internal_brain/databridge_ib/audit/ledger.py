@@ -36,8 +36,8 @@ from pydantic import ValidationError
 
 from ..config import IbConfig
 from ..models import (EVENT_KINDS, IB_EVENT, AnchorPublished, AnswerReleased, AuditQueryEvent,
-                      AuditReveal, EventBase, RequestAccepted, RequestFailed, RetrievalDecided,
-                      SourceChangeEvent)
+                      AuditReveal, EventBase, MapViewed, RequestAccepted, RequestFailed,
+                      RetrievalDecided, SourceChangeEvent)
 
 #: The log's id in the anchor ledger and in every external head. Fixed (not the resolved path), so a
 #: copied or restored var directory is still recognised as the same log.
@@ -55,6 +55,7 @@ _MODELS: dict[str, type[EventBase]] = {
     "membership.changed": SourceChangeEvent,
     "directory.changed": SourceChangeEvent,
     "ingest.sync": SourceChangeEvent,
+    "map.viewed": MapViewed,
 }
 
 

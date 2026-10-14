@@ -191,7 +191,7 @@ class AskResponse(_Frozen):
 IB_EVENT = "ib_event"
 EVENT_KINDS = ("request.accepted", "retrieval.decided", "answer.released", "request.failed",
                "audit.query", "audit.reveal", "acl.changed", "membership.changed",
-               "directory.changed", "ingest.sync", "anchor.published")
+               "directory.changed", "ingest.sync", "anchor.published", "map.viewed")
 
 
 class Gate2Decision(_Frozen):
@@ -253,6 +253,16 @@ class AuditQueryEvent(EventBase):
     sub: str
     filter: dict[str, Any]
     result_count: int
+
+
+class MapViewed(EventBase):
+    """A person opened their knowledge map: the titles of documents THEY may read (write-ahead,
+    like every other access)."""
+    kind: Literal["map.viewed"] = "map.viewed"
+    sub: str
+    docs_listed: int
+    containers_listed: int
+    policy_version: str
 
 
 class AuditReveal(EventBase):

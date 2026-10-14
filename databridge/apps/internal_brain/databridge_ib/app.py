@@ -23,6 +23,7 @@ from .connectors.base import SourceConnector, WebhookRejected
 from .directory import Directory
 from .index import Index
 from .ingest import Ingestor
+from .knowledge_map import build_map
 from .llm import ModelChain
 from .models import AskRequest, DirectoryUser
 from .pipeline import Pipeline
@@ -141,6 +142,17 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             log.error("ask failed: %s", type(exc).__name__)
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         return json.loads(resp.model_dump_json())
+
+    @app.get("/ib/map")
+    def knowledge_map(user: DirectoryUser = Depends(current)):
+        if not (set(user.roles) & EMPLOYEE_ROLES):
+            raise HTTPException(403, "forbidden")
+        try:
+            return build_map(user, index=svc.index, directory=svc.directory, ledger=svc.ledger,
+                             clock=lambda: datetime.now(timezone.utc))
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("map failed: %s", type(exc).__name__)       # incl. ledger down: fail closed
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
 
     @app.get("/ib/history")
     def history(user: DirectoryUser = Depends(current)):
