@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "internal-brain-audit": {
+      "command": "C:/path/to/databridge/.venv/Scripts/python.exe",
+      "args": ["-m", "databridge_ib.audit_mcp_server"],
+      "cwd": "C:/path/to/databridge",
+      "env": {
+        "PYTHONPATH": "apps/internal_brain",
+        "IB_URL": "http://127.0.0.1:8100",
+        "IB_TOKEN": "<paste token from ib_mint_token.py>"
+      }
+    }
+  }
+}
