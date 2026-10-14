@@ -1,151 +1,195 @@
-# Walnut Internal Brain: judge's guide
+# Walnut Internal Brain
 
-**Case study: FinTech Track — Aspire: "The Internal Brain"** (Building a Context-Aware Enterprise
-Knowledge System with RBAC, Security Logging & Audit Trail). Tencent Cloud AI CAN DO IT Hackathon
-Singapore 2026.
+**Ask your whole company a question, and get an answer built only from what you're allowed to open.**
 
-## What it is
+Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech Track · Aspire: *"The Internal Brain:
+a context-aware enterprise knowledge system with RBAC, security logging and an audit trail."*
 
-Walnut Internal Brain answers natural-language questions across Confluence, Jira, Slack and Google Drive using
-**only the content the asker may open in each source system**. Before any model call, every candidate passage
-passes two checks: a pre-rank filter on source permissions (Gate 1), then a live check against the source itself
-(Gate 2), where any error, timeout or rate limit means deny. The answer goes through Walnut's grounding wall and
-cites each source with its deep link, version and check times. If the model's answer fails grounding, a
-deterministic extractive answer is served instead. Every request is written to a sealed, hash-chained ledger
-**before** anything is released, and a compliance officer can query, verify and reconstruct it. The Brain runs on
-the Walnut engine, reused by import, against a fully synthetic fintech called "Company A".
+---
 
-> **Status, 13 Oct 2026** (`file:line` references are to commit `4d1887e`). Built and tested: the API, both gates,
-> four connectors over four mock platforms, freshness by webhook and poll, the write-ahead ledger with external
-> head and tamper suite, the audit console, the web UI and a leak eval. **Not yet built:** the WorkBuddy MCP front
-> door, the Lighthouse deployment, the live (real Slack and Confluence) track and a real-model (hy3) eval run.
-> **In progress, uncommitted:** fintech features F1 (FinCrime compartment) and F4 (card masking). Anything not yet
-> measured says **TBD (measured in RESULTS.md)**.
+## In two minutes
 
-## Run it in 3 commands
+The Internal Brain answers plain-English questions across **Confluence, Jira, Slack and Google Drive**.
+Before anything reaches the AI model, every source is checked twice: once against the permissions copied
+from each platform, and again live with the platform itself. The answer cites every source with its
+version and the time access was checked. Every question, every allow/deny decision and every answer is
+written to an audit log that is chained and sealed, so an edit or a deletion is detectable.
 
-From `databridge/`, after `py -3.13 -m venv .venv; .venv\Scripts\python -m pip install -r requirements-lock.txt`
-(PowerShell; each command in its own shell):
+**Start here:** sign in, open **Compare**, and ask the same question as Jordan (engineer) and Ken
+(contractor). Jordan gets the answer. Ken gets a polite "I couldn't find that", with no hint that more
+exists. That one screen shows the three things Aspire asked for: knowledge across platforms,
+restrictions per person, and an audit trail of both.
+
+Everything runs on a synthetic fintech called **Company A** (32 people, 209 Confluence pages, 251 Jira
+issues, 602 Slack threads, 81 Drive files). No real company or customer data is used anywhere.
+
+## Why it matters
+
+- **Search costs real time.** Aspire's brief puts it at about 30% of the work week, and their Head of AI
+  told us the "what can we offer this customer?" question in particular "takes time right now".
+- **An assistant that can read everything can leak everything.** Copilot oversharing, prompt injection
+  through retrieved documents (EchoLeak, Slack AI) and permission sync lags of 30 minutes to a day are
+  all on record. For a payments company supervised by MAS, that blocks rollout entirely.
+- **In fintech a leak can be a crime.** Telling a customer that a suspicious-transaction report exists is
+  tipping-off (CDSA s.57, MAS Notice PSN01). Card numbers pasted into a ticket must never reach an
+  index or a model (PCI DSS 3.4.1).
+
+**What the Brain changes:** people get cited answers in seconds; the model never sees what the asker
+can't see; and compliance can reconstruct any access, with proof the record hasn't been altered.
+
+## What you can see
+
+| Screen | Who to sign in as | What it shows |
+|---|---|---|
+| **Ask** | anyone (try `jdoe`) | One cited answer from several platforms, a sources panel with each source's version and freshness, and a "Checks on this answer" strip |
+| **Map** | anyone | Everything *you* can open, by platform and space. `jdoe` sees 867 items on 4 platforms; `ken.ext` sees 24 on 2 |
+| **Compare** | anyone | The same question asked by two people, side by side |
+| **Audit** | `maya.compliance` | Plain-English audit search, every allow/deny decision, a reasoned reveal of an answer, and **Verify audit chain** |
+| **Sim** | `admin.it` | Change access live (remove someone from a channel, restrict a page, edit a runbook) and watch the next answer change |
+| **Tour** | button in the header | A short guided walk through the screens above |
+| **WorkBuddy** | three ready-made workspaces | Ask the Brain from Tencent WorkBuddy, as an engineer, a contractor, or the compliance officer |
+| **Original Walnut screens** | separate launcher (below) | The Walnut engine's own views on Company A: the knowledge graph, the company brain with a time slider, the ontology and the provenance chain of a value, with Walnut's guided demo |
+
+## Run it
+
+One-time setup, from `databridge/` (Windows, Python 3.13, Node 20):
 
 ```powershell
-# 1. Mock Slack / Confluence / Jira / Drive on :8200 (webhooks delivered to the Brain)
-$env:PYTHONPATH="apps/mock_platforms"; $env:MOCK_WEBHOOK_URL="http://127.0.0.1:8100"; .venv\Scripts\python -m mock_platforms
-
-# 2. The Internal Brain API on :8100 (indexes the world on start; demo login on)
-$env:PYTHONPATH="apps/internal_brain;packages/core;packages/harness;packages/adapter;packages/retrieval"; $env:IB_DEMO_LOGIN="1"; .venv\Scripts\python -m databridge_ib
-
-# 3. The web UI on http://localhost:3100
-cd apps/internal_brain_web; npm install; npm run dev
+py -3.13 -m venv .venv; .venv\Scripts\python -m pip install -r requirements-lock.txt
+cd apps\internal_brain_web; npm install; cd ..\..
 ```
 
-- Start the mock first: on start the Brain crawls all four platforms and indexes the whole world before it serves
-  (about a minute on our dev box; not benchmarked). Ports 8100, 8200 and 3100 must be free.
-- Without a TokenHub key every answer comes from the deterministic extractive answerer, so the demo works offline.
-  With `TOKENHUB_API_KEY` set, the chain is `hy3` → `deepseek-v4.1-flash` → extractive
-  (`databridge/apps/internal_brain/databridge_ib/llm.py:24-25, 55-81`).
-- On a shared URL, also set `IB_DEMO_PASSCODE` so only people given the passcode can pick a persona.
-- UI-only preview with no backend: `npm run dev:mock` (fixtures; `apps/internal_brain_web/package.json`).
-- Tests: `.venv\Scripts\python -m pytest apps/internal_brain/tests apps/mock_platforms/tests fixtures/enterprise/tests -q`.
-- Leak eval: `.venv\Scripts\python -m evals.internal_brain.run` (writes `evals/internal_brain/RESULTS.md`).
-- Tamper demo: `.venv\Scripts\python scripts/tamper_demo.py`.
+Then two terminals (Git Bash):
 
-Personas (all synthetic): `jdoe` backend engineer, `priya.sre` on-call SRE, `ken.ext` contractor (Slack Connect
-guest), `sara.sec` security, `leo.ops` product/ops, `maya.compliance` compliance officer, `admin.it` platform admin
-(simulator only).
+```bash
+# 1 · mock Slack/Confluence/Jira/Drive (:8200) + the Brain (:8100)
+cd databridge && bash scripts/run_local_demo.sh
+```
 
-## The five scenarios: where to see them, and what proves them
+```bash
+# 2 · the web app on http://localhost:3100
+cd databridge/apps/internal_brain_web && npm run dev
+```
 
-Test paths are relative to `databridge/apps/internal_brain/tests/`. The e2e tests run the **real** mock platforms
-app, the **real** connectors (with signed webhooks) and the pipeline over the generated world, and derive every
-expectation from the world's fact manifest.
+- The Brain indexes the whole world on start (about a minute), then serves.
+- Answers are deterministic quotes from the sources unless a TokenHub key is set in
+  `databridge/.env.ib.local` and `IB_FORCE_OFFLINE=0`; then Tencent Hunyuan `hy3` writes them, with
+  `deepseek-v4.1-flash` as backup, through exactly the same checks.
+- **Original Walnut screens** on Company A: `bash databridge/scripts/run_walnut_original.sh`, then open
+  http://localhost:3300 (details in `databridge/apps/frontend/README.md`).
+- **WorkBuddy:** `databridge/.venv/Scripts/python.exe databridge/scripts/workbuddy_setup.py` writes three
+  workspaces next to the repository; open one in WorkBuddy (guide: `docs/tencent/workbuddy/README.md`).
+- **Tests:** `.venv\Scripts\python -m pytest apps/internal_brain/tests -q`
+- **Leak evaluation:** `.venv\Scripts\python -m evals.internal_brain.run` (about 2 minutes)
+- **Tamper demo:** `.venv\Scripts\python scripts/tamper_demo.py`
 
-| # | Scenario | Where it is demonstrated | Tests that prove it |
+Demo people (all fictional): `jdoe` backend engineer · `priya.sre` on-call SRE · `ken.ext` contractor
+(Slack Connect guest) · `sara.sec` security · `leo.ops` product/ops · `amy.am` account manager ·
+`mlro.tan` money-laundering reporting officer · `maya.compliance` compliance officer · `admin.it` IT admin.
+
+## How it works
+
+1. **Who's asking.** A signed token from the web app or WorkBuddy. No request body, tool argument or
+   model output can name a person.
+2. **Gate 1.** Search only documents this person may open, using each platform's own permission model
+   (Confluence page restrictions, Jira project roles and issue security, Slack private and Connect
+   channels, Drive inheritance). Ranking statistics come from those documents only, so restricted
+   content can't even shift the results.
+3. **Gate 2.** Ask the platform again, live, for every passage about to be used. An error, timeout or
+   rate limit means no. A document that changed is re-read and re-checked.
+4. **Answer.** The model sees only the passages that passed, and must cite one for every sentence.
+   Walnut's grounding check drops any number or name that isn't in the evidence; if the answer fails, the
+   Brain quotes the evidence instead.
+5. **Record.** The audit log is written before retrieval, before the model call and before the answer is
+   shown. If it can't be written, nothing is answered.
+
+Diagrams: [the request path](docs/tencent/ARCHITECTURE.md) and
+[trust boundaries](docs/tencent/diagrams/trust_boundaries.mmd) (drawn with CodeBuddy).
+
+## Proof
+
+| What | Result | Where |
+|---|---|---|
+| Restricted content in any answer, prompt or response | **0 leaks** in 5,958 adversarial requests (95% upper bound 0.10% per request) | `databridge/evals/internal_brain/RESULTS.md` |
+| "Restricted" vs "doesn't exist" | **0 differences** across 400 paired questions | same |
+| Prompt injection planted on all four platforms | **0 failures** | same |
+| Recall for what people *are* allowed to see | **100%** of positive probes | same |
+| Map identical with and without restricted documents | test | `tests/test_knowledge_map.py` |
+| Audit log edits, deletions, truncation, rollback, edited stored answers | detected | `tests/test_audit_tamper.py`, `tests/test_audit_verify_content.py` |
+| Automated tests, Internal Brain | **630** passing | `databridge/apps/internal_brain/tests/` |
+
+The evaluation's own canaries prove it can fail: a deliberately leaky configuration is caught, and a
+deny-everything configuration scores zero usefulness.
+
+## Aspire's five scenarios
+
+| # | Scenario | Try it | Proven by |
 |---|---|---|---|
-| 1 | **Unified query** with citations; the private-channel blocker is omitted | UI → Ask, as `jdoe`: "What's the status of the database migration project and were there any blockers raised in Slack last week?" | `test_scenarios_e2e.py::test_canonical` (S1 questions: the denied fact is never considered and never in the answer; must-cite facts are released); `test_pipeline_core.py::test_s1_permitted_answer_cites_only_permitted` |
-| 2 | **Freshness**: an edit is answerable within the SLO, citing the new version | UI → Admin simulator (as `admin.it`) "runbook update" (`/sim/runbook-update`), then Ask as `priya.sre`; `GET /ib/sources` shows `lag_s` and `within_slo` | `test_scenarios_e2e.py::test_s2_freshness_via_webhook`; `test_pipeline_core.py::test_drift_read_through`; connector crawl suites (e.g. `test_connector_slack.py::test_full_crawl_then_incremental`, `test_connector_jira.py::test_crawl_jql_uses_overlap_window`). Measured lag against the 5-minute mock SLO (`databridge_ib/config.py:16`): **TBD (measured in RESULTS.md)** |
-| 3 | **Negative case**: the contractor gets the constant refusal; restricted looks exactly like nonexistent | UI → Ask as `ken.ext`: the Q3 breach report vs a report that never existed | `test_scenarios_e2e.py::test_s3_existing_vs_nonexistent_identical`; `test_pipeline_core.py::test_s3_contractor_refusal_is_the_constant`, `::test_p2_differential_world_with_and_without_restricted` |
-| 4 | **Live revocation**: removed from a private channel, or a page restricted ⇒ the next query excludes it, even if the webhook is lost | UI → Admin simulator "revoke channel" / "restrict page", then Ask again | `test_scenarios_e2e.py::test_s4_revocation_live` (both actions), `::test_s4_revocation_without_webhook`; `test_pipeline_core.py::test_s4_revocation_at_source_wins_over_stale_index`; `test_connector_slack.py::test_gate2_revocation_is_immediate` |
-| 5 | **Audit inquiry**: "everything `jdoe` accessed related to `payment-gateway` in the last 30 days", with decisions, timestamps and a reasoned reveal | UI → Audit console as `maya.compliance` (natural-language box, events table, reveal drawer, verify panel) | `test_audit_nl_filter.py::test_s5_question`; `test_audit_query.py::test_s5_jdoe_payment_gateway_last_30_days`, `::test_s5_reconstruction`; `test_audit_routes.py::test_reveal_requires_reason_and_is_ledgered`, `::test_events_query_is_ledgered`; tamper: `test_audit_tamper.py`, `databridge/scripts/tamper_demo.py` |
+| 1 | One question, answered from several platforms, private channel omitted | Ask as `jdoe`: "What's the status of the database migration project and were there any blockers raised in Slack last week?" | `test_scenarios_e2e.py::test_canonical` |
+| 2 | Fresh content is answerable quickly, citing the new version | Sim → "Edit failover runbook", then ask as `priya.sre` | `test_scenarios_e2e.py::test_s2_freshness_via_webhook` |
+| 3 | A contractor gets the same refusal for a restricted report and an invented one | Ask as `ken.ext` about the Q3 breach report, then the Q7 one | `test_scenarios_e2e.py::test_s3_existing_vs_nonexistent_identical` |
+| 4 | Access removed at the source is honoured on the very next question, even if the webhook is lost | Sim → "Remove jdoe from #db-migration", then ask again | `test_scenarios_e2e.py::test_s4_revocation_live`, `::test_s4_revocation_without_webhook` |
+| 5 | Compliance reconstructs everything one person accessed in a space over 30 days | Audit as `maya.compliance`: "Show me everything jdoe accessed related to the payment-gateway space in the last 30 days" | `test_audit_query.py::test_s5_reconstruction` |
 
-S5 note: the audit tests use a synthetic history written through the real ledger (`test_audit_support.py`).
-Seeding the demo's 30-day history by replaying the world's `audit_replay` questions through the pipeline
-(supported by `Pipeline.ask(..., replay=True)`, labelled `synthetic_replay`) has **no script yet**.
+Test paths are under `databridge/apps/internal_brain/tests/`. The end-to-end tests run the real mock
+platforms, the real connectors with signed webhooks, and the full pipeline over the generated world.
 
-## What we claim, and the evidence
+## The fintech layer
 
-Claim wording is from the plan (`docs/tencent/INTERNAL_BRAIN_PLAN.md` §2). Paths are relative to
-`databridge/apps/internal_brain/`. "RESULTS.md" is `databridge/evals/internal_brain/RESULTS.md`, first run,
-generated 2026-10-13T13:39Z with a capturing fake model and the extractive path (no real model), before the fixes
-in commits `b4d72cf` and `4d1887e`.
+Added as data and configuration on top of the general system:
 
-| ID | Claim | Evidence | Limits / not yet measured |
-|---|---|---|---|
-| **P1** | No passage the asker cannot access is placed in any LLM request made while answering their question. | `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt`; `tests/test_eval_smoke.py::test_no_leak_through_the_capturing_model_path`, `::test_eval_canary_detects_a_leaky_pipeline`; RESULTS.md: **0 leaks in 4,100 requests** (2,050 probes × 2 paths; 95% upper bound 0.146% per request per path), 0 payload leaks in 526 model calls; mechanism `databridge_ib/pipeline.py:113-161` | Real hy3 run: **TBD**. Re-run after `4d1887e`: **TBD (measured in RESULTS.md)**. Ingest embeddings are local today; a remote embedder would be a separate boundary (docs/tencent/DATA_FLOWS.md). |
-| **P2** | Restricted content does not change the caller-visible response. | `tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted`; `tests/test_scenarios_e2e.py::test_s3_existing_vs_nonexistent_identical`; RESULTS.md: **400 differential comparisons, 0 mismatches**; mechanism: ranking statistics over the permitted corpus only (`databridge_ib/index.py:1-14, 300-321`) | Timing is excluded (TRADEOFFS R1). `/ib/sources` is global status (SECURITY.md §5). |
-| **P3** | Access revoked in the source system is honoured on the next query. | The S4 tests above; uncached Gate 2 (`databridge_ib/gates.py:1-50`); per-connector `test_gate2_*` suites | Content delivered before a revocation cannot be retracted. Relies on the source's own permission API. |
-| **P4** | Content created or updated is answerable within ≤ 5 min (mock, webhook) and ≤ 15 min (live, poll); each citation states its as-of. | `tests/test_scenarios_e2e.py::test_s2_freshness_via_webhook`; citations carry `version`, `updated_at`, `content_checked_at` and `authz_checked_at` (`databridge_ib/models.py:158-171`); poll fallback `databridge_ib/freshness/poller.py` (default 120 s, `databridge_ib/bootstrap.py:145`) | Measured lag: **TBD (measured in RESULTS.md)**. The live track is not built, so the 15-minute live figure is untested. |
-| **P5** | Every answered, refused or failed request has a ledger record written before release. The chain detects edits, deletions, truncation and rollback by anyone who does not hold the sealing key. The chain head is published off-host. | `tests/test_pipeline_core.py::test_write_ahead_fail_closed`, `::test_ledger_events_order`; `tests/test_app_routes.py::test_ledger_failure_is_503`; `tests/test_audit_tamper.py` (edit, suffix delete, directory rollback, key-holder rewrite, external head tampered or missing); `tests/test_audit_ledger.py::test_missing_key_fails_closed`; failures append `request.failed` (`databridge_ib/pipeline.py:84-96`) | Off-host only when `IB_ANCHOR_FILE` (a separately pushed repo) or `IB_ANCHOR_SLACK_WEBHOOK` is configured; the default is a local file (`databridge_ib/bootstrap.py:85-91`). Unprotected window after the last publication (`test_rollback_after_last_publication_is_the_stated_window`). `request.failed` is best effort and has no end-to-end test yet. Append cost: **TBD**. |
-| **P6** | A compliance officer can reconstruct who asked what, what was considered and released, the decisions, and (via a logged, reasoned reveal) what was answered. | `tests/test_audit_query.py::test_s5_reconstruction`, `::test_doc_filter_and_accessors`; `tests/test_audit_routes.py::test_reveal_requires_reason_and_is_ledgered`, `::test_non_compliance_roles_forbidden` | One officer can reveal (no dual control). |
-| **P7** | The answer text the user sees contains no number, date or named term absent from cited permitted evidence. **Relations between evidenced facts are not verified.** | Walnut's grounding wall, reused unchanged (`databridge_ib/grounding.py`, `databridge_ib/narrate.py:99-120`), with its existing tests (`databridge/apps/gateway/tests/test_llm_codex_f2.py`, `test_llm_codex_f1_r2.py`, `test_fin08_values_compared_by_value.py`); the extractive answer is built from released sentences (`databridge_ib/narrate.py:131-162`) | IB-specific relation, negation and date negatives (`test_grounding_negatives`): **not written yet**. A model answer citing at least one released passage is accepted (Codex security review r1 finding 15). The first eval run found 102 model-path answers without citations (RESULTS.md finding 2). hy3 grounding acceptance: **TBD**. |
-| **P8** | Identity is never taken from a model or a tool argument. | `tests/test_contracts.py::test_no_identity_in_request_shapes`; `tests/test_app_routes.py::test_identity_from_token_only`, `::test_bad_and_expired_tokens`, `::test_every_non_public_route_requires_auth` | MCP tool-schema test: **TBD** (MCP server not built). Demo login lets a caller pick a persona when `IB_DEMO_LOGIN=1` (passcode-gated if `IB_DEMO_PASSCODE` is set). |
+- **FinCrime compartment.** Suspicious-transaction case notes are readable only by the money-laundering
+  reporting officer. An account manager asking about that customer gets the approved customer script,
+  and the answer reads exactly like the answer for a company that doesn't exist (anti-tipping-off).
+- **Market-specific answers.** "What can we offer this SME?" is answered per market (Singapore,
+  Indonesia), each citing that market's approved policy.
+- **Approved policies only.** A draft fee schedule with different numbers is never cited.
+- **Card and ID masking.** Card numbers, CVVs, IBANs and NRICs are masked before indexing, so they never
+  reach the index or a model.
 
-Other review evidence: the plan was reviewed by four models (`docs/tencent/PLAN_REVIEW_DISPOSITION.md`), and the
-security-relevant code by Codex (`docs/tencent/reviews/security-r1/codex_track1.md`; SECURITY.md §7).
+Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, with limits:
+[docs/tencent/MAS_TRM_MAPPING.md](docs/tencent/MAS_TRM_MAPPING.md).
 
-## Synthetic, mocked, or real?
+## Built with Tencent
 
-| Component | What it is |
-|---|---|
-| Company A: its people, documents and customers | **Synthetic.** Deterministic generator `databridge/fixtures/enterprise/generate.py --seed 7`. At commit `4d1887e`: 27 users, 200 Confluence pages, 250 Jira issues, 600 Slack threads, 80 Drive files, 34 planted facts (`databridge/fixtures/enterprise/manifest.json`, `counts`). The F1/F4 work in progress adds to these. |
-| Slack, Confluence, Jira, Drive | **Mocked**: real API paths and response shapes for a documented supported subset, native permission semantics, cursor paging, 429s and signed webhooks (`databridge/apps/mock_platforms/`). "A supported semantic subset, not a replica." |
-| Connectors | **Real code**, on the same path a real tenant would use (base URL swap, `databridge_ib/bootstrap.py:39-51`). Real-tenant runs are **not done yet**. |
-| Permission checks (Gate 2) | Real connector calls against the mock's permission endpoints, which follow the real APIs' shapes |
-| Language model | **Real** TokenHub `hy3` / `deepseek-v4.1-flash` when a key is set; otherwise the deterministic extractive answerer. Tests and the first eval run use a capturing fake model and never call the network. |
-| Embeddings | **Local offline hashing embedder**, which is not semantic; lexical BM25 carries ranking (`databridge_ib/index.py:43, 158-160`) |
-| Ledger, tamper detection, audit | **Real** (Walnut `DecisionLedger`) on local disk; the external head sink is a local file unless configured |
-| Identity | Signed HMAC tokens; a **demo login** instead of SSO |
-| WorkBuddy, Lighthouse, live track | **Not built yet** |
+- **CodeBuddy** built the WorkBuddy connector, the token tool and the model-chain tests, drew the trust
+  boundaries, and ran a security review on Tencent Hunyuan `hy3`; then it fixed its own code after a Codex
+  review. Every session's transcript is kept: [docs/tencent/DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md).
+- **WorkBuddy** is the second front door, including an audit assistant for compliance.
+- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with `deepseek-v4.1-flash` as backup.
+- **Lighthouse:** a hardened deploy kit (Docker, HTTPS, passcode-gated demo) is in `deploy/lighthouse/`.
+- **Miora** made the cover.
 
-## Pre-existing vs built during the hackathon (13–16 Oct 2026)
+## Honest limits
 
-Base: Walnut commit **`4ab54d4`** (2026-10-11). Everything after it on branch `Tencent` was built during the
-hackathon: 16 commits up to `4d1887e`, all dated 2026-10-13 at the time of writing (`git log 4ab54d4..HEAD`).
+- The platforms are **mocked** with their real API shapes and permission rules. The connectors are real
+  code on the same path a real tenant would use, but have not been run against a real tenant.
+- Sign-in is a **demo login** standing in for SSO. A deployed build refuses to start without a passcode.
+- The grounding check verifies values and names, **not the relations between them**.
+- The ledger detects tampering by anyone who doesn't hold its sealing key; beyond the last off-host
+  published head, a key holder could rewrite records (see [SECURITY.md](docs/tencent/SECURITY.md) §3).
+- The knowledge map uses the synced permissions; answers additionally re-check each source live.
+- A real-model (`hy3`) evaluation run is pending Tencent account verification. All numbers above come
+  from a capturing test model and the deterministic path.
 
-**The Walnut engine is reused by import, not modified.** `git diff --stat 4ab54d4 HEAD` shows no change to the
-packages the Brain imports (`databridge/packages/core`, `harness`, `retrieval`, `adapter`) or to
-`databridge/apps/gateway`. The only changes under `databridge/packages/` are in the healthcare intake package:
-`packages/intake/databridge_intake/paths.py` (where the synthetic source CSVs live) and two of its tests, made when
-the prior competition's folders were removed (commits `81a16a3`, `b4d72cf`). The Brain loads the gateway's
-grounding functions by file path (`databridge_ib/grounding.py`), so no legacy route is imported.
+## What was built here, and what was already there
 
-| Path | Status | Commits after `4ab54d4` | Size |
-|---|---|---|---|
-| `databridge/apps/internal_brain/` (`databridge_ib` + tests) | **New** | 10, from `b9f58c5` to `4d1887e` | 53 files, ~10.8k lines added |
-| `databridge/apps/mock_platforms/` | **New** | `b9f58c5`, `77f83a3` | 21 files, ~3.6k |
-| `databridge/apps/internal_brain_web/` | **New** | `28e54c6`, `967f6c2` | 52 files, ~5.8k (including lockfile and screenshots) |
-| `databridge/fixtures/enterprise/` | **New** | `d3f49e9`, `967f6c2` | 6 files (mostly the generated `world.json`) |
-| `databridge/evals/internal_brain/` | **New** | `b4d72cf` | 9 files, ~3.7k (including `results.json`) |
-| `databridge/packs/enterprise/ontology.yaml` | **New** | `d3f49e9` | 1 file |
-| `databridge/scripts/tamper_demo.py` | **New** | `28e54c6` | 1 file |
-| `databridge/requirements-lock.txt` | **New** | `f7ba478` | 1 file |
-| `databridge/pyproject.toml` | Changed: `requires-python` `>=3.11` → `>=3.13` | `f7ba478` | 1 line |
-| `docs/tencent/` | **New** | from `86ae46d` | plan, contracts, reviews, checklist, these docs |
-| Root `CLAUDE.md`; `Hack4Health/`, `GOA Submission/`, `docs/hackathon/`, old video scripts | Rewritten / **removed** (prior competition's material); the healthcare CSVs moved to `databridge/fixtures/hackathon/source_data/` | `81a16a3` | — |
-| `databridge/packages/intake/` | Path fix + 2 tests (see above) | `81a16a3`, `b4d72cf` | 3 files |
-| All other `databridge/packages/**`, `apps/gateway`, `apps/frontend`, `apps/mcp_server`, `apps/cli`, `config/` | **Pre-existing, unchanged** | none | — |
+The Walnut engine (provenance pointers, the sealed ledger, the grounding wall, the model harness) existed
+before the event (base commit `4ab54d4`) and is **reused unchanged**. The Internal Brain, the mock
+platforms, the web app, the Company A world, the evaluation and the original-screen configuration were
+built during the hackathon, beside it. Measured on 14 Oct, **94% of the code is the original Walnut base**.
 
-## Documentation
+## Everything else
 
 | Doc | What it covers |
 |---|---|
-| [docs/tencent/ARCHITECTURE.md](docs/tencent/ARCHITECTURE.md) | Components, the 12-step request path and the ingestion path (Mermaid), trust boundaries |
-| [docs/tencent/SECURITY.md](docs/tencent/SECURITY.md) | Threat model, identity, the ledger attacker model, prompt injection, side channels, secrets, security review |
-| [docs/tencent/TRADEOFFS.md](docs/tencent/TRADEOFFS.md) | Design trade-offs and stated residual risks |
-| [docs/tencent/MAS_TRM_MAPPING.md](docs/tencent/MAS_TRM_MAPPING.md) | MAS TRM, MAS AI Risk Management Guidelines, PDPA, PCI DSS and AML tipping-off: mechanism, evidence, limits |
-| [docs/tencent/RESPONSIBLE_AI.md](docs/tencent/RESPONSIBLE_AI.md) | Grounding, abstention, citations, oversight, evaluation |
-| [docs/tencent/DATA_FLOWS.md](docs/tencent/DATA_FLOWS.md) | What leaves the system, where state is kept, synthetic data |
-| [databridge/evals/internal_brain/RESULTS.md](databridge/evals/internal_brain/RESULTS.md) | Leak and injection eval results |
-| [docs/tencent/INTERNAL_BRAIN_PLAN.md](docs/tencent/INTERNAL_BRAIN_PLAN.md) | The build plan and claims P1–P8 |
-| [docs/tencent/CONTRACTS.md](docs/tencent/CONTRACTS.md) | API, world and ledger contracts |
-| [docs/tencent/PLAN_REVIEW_DISPOSITION.md](docs/tencent/PLAN_REVIEW_DISPOSITION.md) | The 4-model plan review and how each finding was handled |
+| [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md) | How it was built: CodeBuddy sessions, reviews, what went wrong |
+| [ARCHITECTURE.md](docs/tencent/ARCHITECTURE.md) | Components and the request path |
+| [SECURITY.md](docs/tencent/SECURITY.md) | Threat model, ledger attacker model, injection, every review finding and its fix |
+| [RESPONSIBLE_AI.md](docs/tencent/RESPONSIBLE_AI.md) | Grounding, abstention, citations, oversight, evaluation |
+| [MAS_TRM_MAPPING.md](docs/tencent/MAS_TRM_MAPPING.md) | Regulatory mapping, with limits |
+| [TRADEOFFS.md](docs/tencent/TRADEOFFS.md) | Design trade-offs and residual risks |
+| [DATA_FLOWS.md](docs/tencent/DATA_FLOWS.md) | What leaves the system and where state lives |
+| [RESULTS.md](databridge/evals/internal_brain/RESULTS.md) | The leak and injection evaluation |
+| [SUBMISSION.md](docs/tencent/SUBMISSION.md) | The submission form answers |
 | [README.md](README.md) | Walnut, the engine underneath |

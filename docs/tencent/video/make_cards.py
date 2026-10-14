@@ -94,6 +94,18 @@ answer is shown · hash-chained and sealed · if it can't be written, nothing is
               '<script>mermaid.initialize({startOnLoad:true,theme:"dark",flowchart:{useMaxWidth:false,nodeSpacing:30,rankSpacing:40}});'
               'window.addEventListener("load",()=>setTimeout(()=>{const s=document.querySelector("#d svg");if(!s)return;'
               'const b=s.getBBox();const k=Math.min(1640/b.width,760/b.height);s.style.transform=`scale(${k})`;},800));</script>')
+    tamper = REPO / "submission" / "04_evidence" / "tamper_demo_output.txt"
+    if tamper.exists():
+        lines = []
+        for ln in tamper.read_text(encoding="utf-8", errors="replace").splitlines():
+            cls = "ok" if "DETECTED" in ln else ("warn" if "not detected" in ln and "baseline" not in ln else "")
+            lines.append(f'<div class="{cls}">{html.escape(ln) or "&nbsp;"}</div>')
+        card("09b_tamper", "Tamper demo", f"""
+<div class="kicker">python scripts/tamper_demo.py · real output</div>
+<h2 style="margin:8px 0 12px;font-size:46px">Edit one line, delete one, roll it back: each is caught.</h2>
+<div class="term">{''.join(lines)}</div>""", head="""<style>.term{flex:1;overflow:hidden;background:#05070d;border:1px solid #23304d;
+border-radius:16px;padding:22px 26px;font-family:Consolas,'Cascadia Mono',monospace;font-size:13.5px;line-height:1.3;color:#b9c4da}
+.term .ok{color:#5ee0b0;font-weight:600}.term .warn{color:#f0c36b}</style>""")
     card("13_numbers", "The numbers", f"""
 <div class="kicker">We attacked it on purpose</div>
 <h2>Measured, not promised.</h2>

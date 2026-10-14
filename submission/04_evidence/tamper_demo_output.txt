@@ -1,0 +1,34 @@
+built a synthetic demo ledger in %TEMP%\ib-tamper-x9xbiylz\source\var
+
+[baseline] untouched copy
+  not detected: ok=True internal_ok=True external_head_match=True records=20
+
+[edit-record] record 8: ib_event.sub changed, not re-sealed
+  DETECTED: ok=False internal_ok=False external_head_match=False records=7
+   - record 8: its seal or digest does not verify
+   - the external head (seq 16) cannot be confirmed: the chain is broken at or before record 8
+
+[suffix-delete] last 2 records deleted
+  DETECTED: ok=False internal_ok=False external_head_match=True records=18
+   - the log holds 18 record(s), the anchor ledger anchors 20: it was rolled back
+
+[directory-rollback] log + internal anchors restored to a backup at seq 13 (external head published at seq 16)
+  DETECTED: ok=False internal_ok=True external_head_match=False records=13
+   - rollback detected vs external head: the log holds 13 record(s), but seq 16 was published externally at 2026-10-14T17:15:48.998101+00:00
+
+[rollback-after-publication] restored to seq 19, after the last publication (seq 16): the stated window, not detectable - records appended after the last external publication can be rolled back undetected (stated window)
+  not detected: ok=True internal_ok=True external_head_match=True records=19
+
+[remove-internal-anchors] the internal anchor ledger file deleted
+  DETECTED: ok=False internal_ok=False external_head_match=True records=20
+   - the log holds 20 record(s), the anchor ledger anchors 0 with another head: it was rewritten, or records were added outside the ledger
+
+[external-head-missing] the external head file lost
+  DETECTED: ok=False internal_ok=True external_head_match=False records=20
+   - external head missing: the log records an external publication of seq 16, but the external sink holds no head for it
+
+[key-holder-rewrite] record 8 edited by a key holder, chain re-sealed, anchors regenerated
+  DETECTED: ok=False internal_ok=True external_head_match=False records=20
+   - history rewritten at or before seq 16: the log no longer matches the head published externally at 2026-10-14T17:15:48.998101+00:00
+
+8 scenarios, 0 unexpected

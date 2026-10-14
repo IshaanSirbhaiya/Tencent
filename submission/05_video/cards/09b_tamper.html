@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tamper demo</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
+body{background:radial-gradient(1200px 700px at 78% 18%,#1d2b4a 0%,#0b1020 55%,#070a14 100%);color:#e8edf7;
+font-family:'Segoe UI',Inter,system-ui,sans-serif}
+.pad{padding:110px 140px;height:100%;display:flex;flex-direction:column}
+.kicker{color:#8fd3c7;letter-spacing:.18em;text-transform:uppercase;font-size:22px;font-weight:600}
+h1{font-size:84px;line-height:1.05;margin:22px 0 18px;font-weight:700;letter-spacing:-.02em}
+h2{font-size:56px;margin:18px 0;font-weight:700;letter-spacing:-.01em}
+p.lead{font-size:32px;color:#b8c3d9;max-width:1400px;line-height:1.4;margin:0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:36px;margin-top:70px}
+.stat{border:1px solid #2a3654;border-radius:22px;padding:34px 36px;background:rgba(17,24,43,.75)}
+.big{font-size:92px;font-weight:700;letter-spacing:-.03em;color:#fff}
+.big.ok{color:#5ee0b0}.lbl{font-size:27px;color:#c9d3e6;margin-top:8px;line-height:1.35}
+.src{font-size:19px;color:#7f8aa3;margin-top:18px;letter-spacing:.04em}
+.foot{margin-top:auto;display:flex;justify-content:space-between;color:#7f8aa3;font-size:21px}
+.logo{display:inline-flex;align-items:center;gap:14px;font-weight:700;color:#e8edf7;font-size:24px}
+.dot{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#6d5dfc,#22c3a6)}
+.pill{display:inline-block;border:1px solid #2f3d5e;border-radius:999px;padding:10px 22px;margin:8px 10px 0 0;
+font-size:24px;color:#cfd8ea;background:rgba(20,28,50,.7)}
+</style><style>.term{flex:1;overflow:hidden;background:#05070d;border:1px solid #23304d;
+border-radius:16px;padding:22px 26px;font-family:Consolas,'Cascadia Mono',monospace;font-size:13.5px;line-height:1.3;color:#b9c4da}
+.term .ok{color:#5ee0b0;font-weight:600}.term .warn{color:#f0c36b}</style></head><body><div class="pad">
+<div class="kicker">python scripts/tamper_demo.py · real output</div>
+<h2 style="margin:8px 0 12px;font-size:46px">Edit one line, delete one, roll it back: each is caught.</h2>
+<div class="term"><div class="">built a synthetic demo ledger in %TEMP%\ib-tamper-x9xbiylz\source\var</div><div class="">&nbsp;</div><div class="">[baseline] untouched copy</div><div class="warn">  not detected: ok=True internal_ok=True external_head_match=True records=20</div><div class="">&nbsp;</div><div class="">[edit-record] record 8: ib_event.sub changed, not re-sealed</div><div class="ok">  DETECTED: ok=False internal_ok=False external_head_match=False records=7</div><div class="">   - record 8: its seal or digest does not verify</div><div class="">   - the external head (seq 16) cannot be confirmed: the chain is broken at or before record 8</div><div class="">&nbsp;</div><div class="">[suffix-delete] last 2 records deleted</div><div class="ok">  DETECTED: ok=False internal_ok=False external_head_match=True records=18</div><div class="">   - the log holds 18 record(s), the anchor ledger anchors 20: it was rolled back</div><div class="">&nbsp;</div><div class="">[directory-rollback] log + internal anchors restored to a backup at seq 13 (external head published at seq 16)</div><div class="ok">  DETECTED: ok=False internal_ok=True external_head_match=False records=13</div><div class="">   - rollback detected vs external head: the log holds 13 record(s), but seq 16 was published externally at 2026-10-14T17:15:48.998101+00:00</div><div class="">&nbsp;</div><div class="">[rollback-after-publication] restored to seq 19, after the last publication (seq 16): the stated window, not detectable - records appended after the last external publication can be rolled back undetected (stated window)</div><div class="warn">  not detected: ok=True internal_ok=True external_head_match=True records=19</div><div class="">&nbsp;</div><div class="">[remove-internal-anchors] the internal anchor ledger file deleted</div><div class="ok">  DETECTED: ok=False internal_ok=False external_head_match=True records=20</div><div class="">   - the log holds 20 record(s), the anchor ledger anchors 0 with another head: it was rewritten, or records were added outside the ledger</div><div class="">&nbsp;</div><div class="">[external-head-missing] the external head file lost</div><div class="ok">  DETECTED: ok=False internal_ok=True external_head_match=False records=20</div><div class="">   - external head missing: the log records an external publication of seq 16, but the external sink holds no head for it</div><div class="">&nbsp;</div><div class="">[key-holder-rewrite] record 8 edited by a key holder, chain re-sealed, anchors regenerated</div><div class="ok">  DETECTED: ok=False internal_ok=True external_head_match=False records=20</div><div class="">   - history rewritten at or before seq 16: the log no longer matches the head published externally at 2026-10-14T17:15:48.998101+00:00</div><div class="">&nbsp;</div><div class="">8 scenarios, 0 unexpected</div></div>
+<div class="foot"><span class="logo"><span class="dot"></span>Walnut Internal Brain</span>
+<span>FinTech Track · Aspire · Tencent Cloud AI CAN DO IT Hackathon Singapore 2026</span></div></div></body></html>

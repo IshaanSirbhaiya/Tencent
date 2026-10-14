@@ -1,6 +1,27 @@
-> **Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 — FinTech Track (Aspire): "The Internal Brain".**
-> Judges: start with **[INTERNAL_BRAIN.md](INTERNAL_BRAIN.md)** — what it is, how to run it, the five scenarios and the
-> evidence for every claim. The Internal Brain is built as a new app on top of the Walnut engine described below.
+# Walnut Internal Brain
+
+**Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech Track (Aspire): "The Internal Brain".**
+
+Ask one question across Confluence, Jira, Slack and Google Drive, and get a cited answer built **only
+from what you're allowed to open**. Every source is permission-checked twice before the AI sees it, and
+every access is written to an audit log that can't be quietly edited.
+
+- **0 leaks** of restricted content in 5,958 adversarial requests; **0 differences** between
+  "restricted" and "doesn't exist" across 400 paired questions ([results](databridge/evals/internal_brain/RESULTS.md)).
+- Built on the **Walnut evidence engine** below, reused unchanged (94% of the code is the original base).
+- Built **with CodeBuddy**, reachable **from WorkBuddy**, and wired to **Tencent Hunyuan** via TokenHub (answers fall back to direct quotes without a key).
+
+**Judges: start with [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md)**: what to look at first, how to run it in
+two commands, how it works, and the evidence for every claim.
+
+| Look at | Why |
+|---|---|
+| **Compare** (same question, two people) | Restrictions you can see at a glance |
+| **Map** | Knowledge across four platforms, shaped by each person's permissions |
+| **Audit → Verify audit chain** | Who asked what, every allow/deny decision, tamper detection |
+| **Original Walnut screens** | The engine's knowledge graph, time slider and provenance chain on the same data |
+
+---
 
 # Walnut
 
