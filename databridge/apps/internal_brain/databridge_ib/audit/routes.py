@@ -60,8 +60,8 @@ def _sub_of(principal: Any) -> str:
         return principal
     if isinstance(principal, dict):
         sub = principal.get("sub")
-    else:
-        sub = getattr(principal, "sub", None)
+    else:                       # the app's DirectoryUser carries the subject as ``id``
+        sub = getattr(principal, "sub", None) or getattr(principal, "id", None)
     if not sub:
         raise HTTPException(status_code=401, detail="not authenticated")
     return str(sub)
