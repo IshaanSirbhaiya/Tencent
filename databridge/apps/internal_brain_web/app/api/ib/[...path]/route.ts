@@ -1,21 +1,29 @@
 // Same-origin gateway for the browser: `/api/ib/<path>` → IB API `<IB_API_URL>/<path>`.
 //
 // - IB_API_URL is read at runtime on the server; it is never exposed to the browser bundle.
-// - Only the IB session cookie is forwarded upstream, and Set-Cookie (httpOnly) is relayed back,
-//   so no token is ever visible to JavaScript.
+// - Only the IB session cookie is forwarded upstream, and only that cookie is relayed back
+//   (httpOnly, Path=/, no Domain), so no token is ever visible to JavaScript.
 // - A closed path allowlist: the browser can reach only the routes the UI uses (no /webhooks).
+//   Segments must be plain names (no "", ".", "..", "/" or "\"), and the outbound URL is checked
+//   again after the URL parser has had its say, so normalisation cannot reach another route.
+// - POSTs must come from this site: a browser-sent Origin must match our own host, and
+//   Sec-Fetch-Site (when sent) must be same-origin. A body must be JSON and at most 64 KiB.
+// - Upstream 5xx bodies are replaced by a small fixed envelope (the IB's own 503 JSON is kept).
 // - In mock mode (NEXT_PUBLIC_IB_MOCK=1 or IB_MOCK=1) fixtures are served instead.
 // - Compare slots: the "Same question, two people" page signs two personas in side by side without
 //   touching the main session. A request with `x-ib-slot: b` (or `c`) forwards cookie
 //   `ib_session_b` (or `ib_session_c`) INSTEAD of `ib_session`, and a demo-login made in that slot
-//   has its Set-Cookie renamed to the slot cookie (same attributes). The header only chooses which
-//   signed cookie to forward; identity still comes solely from the token the IB minted. Slots reach
-//   only the few routes the compare page needs, never /audit or /sim.
-import { type NextRequest, NextResponse } from 'next/server';
+//   has its Set-Cookie renamed to the slot cookie. The header only chooses which signed cookie to
+//   forward; identity still comes solely from the token the IB minted. Slots reach only the few
+//   routes the compare page needs, never /audit or /sim. Any other header value is a 400.
+import { NextRequest, NextResponse } from 'next/server';
 import { handleMock } from '@/lib/mock/server';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+// Document ids look like `confluence:123`, `jira:DBMIG-7`, `slack:C0123:1712345678.000100`.
+const DOC_ID = '[A-Za-z0-9._:-]+';
 
 const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: /^health$/ },
@@ -24,12 +32,15 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^ib\/ask$/ },
   { method: 'GET', re: /^ib\/(history|sources|map)$/ },
   { method: 'GET', re: /^audit\/(events|verify)$/ },
-  { method: 'GET', re: /^audit\/doc\/[^/]+\/accessors$/ },
+  { method: 'GET', re: new RegExp(`^audit\\/doc\\/${DOC_ID}\\/accessors$`) },
   { method: 'POST', re: /^audit\/(ask|reveal)$/ },
   { method: 'POST', re: /^sim\/[a-z][a-z-]*$/ },
 ];
 
 const COOKIE = 'ib_session';
+const MAX_BODY = 64 * 1024;
+const DEADLINE_MS = 90_000;
+const UNAVAILABLE = 'The service is unavailable. Please try again.';
 
 type Slot = 'a' | 'b' | 'c';
 const SLOT_COOKIE: Record<Slot, string> = { a: COOKIE, b: `${COOKIE}_b`, c: `${COOKIE}_c` };
@@ -40,19 +51,107 @@ const SLOT_ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: /^ib\/map$/ },
 ];
 
-function slotOf(req: NextRequest): Slot {
-  const v = (req.headers.get('x-ib-slot') ?? '').trim().toLowerCase();
-  return v === 'b' || v === 'c' ? v : 'a';
+const fail = (status: number, detail: string) => NextResponse.json({ detail }, { status, headers: { 'cache-control': 'no-store' } });
+
+function allowed(list: typeof ALLOWED, method: string, path: string): boolean {
+  return list.some((a) => a.method === method && a.re.test(path));
 }
 
-/** Re-emit only the session cookie, renamed for the slot; attributes are kept byte-for-byte. */
+/** Plain path names only: nothing the URL parser would fold away or split. */
+function cleanSegments(segments: string[]): boolean {
+  return segments.length > 0 && segments.every((s) => s !== '' && s !== '.' && s !== '..' && !/[/\\]/.test(s));
+}
+
+/** Absent header → the main session. Anything but a, b or c is refused rather than guessed. */
+function slotOf(req: NextRequest): Slot | null {
+  const raw = req.headers.get('x-ib-slot');
+  if (raw === null) return 'a';
+  const v = raw.trim().toLowerCase();
+  return v === 'a' || v === 'b' || v === 'c' ? v : null;
+}
+
+/**
+ * CSRF guard for POSTs. Browsers always send Origin on a cross-origin POST and Sec-Fetch-Site on
+ * every request, so a different Origin or a cross-site / same-site fetch is refused. Tools that
+ * send neither (curl, Playwright's request API) are not browsers carrying someone's cookies.
+ * The host is compared rather than the full origin so a TLS-terminating proxy cannot cause a
+ * scheme mismatch for real users.
+ */
+function sameOrigin(req: NextRequest): boolean {
+  const site = req.headers.get('sec-fetch-site');
+  if (site !== null && site !== 'same-origin' && site !== 'none') return false;
+  const origin = req.headers.get('origin');
+  if (origin === null) return true;
+  let host: string;
+  try {
+    host = new URL(origin).host.toLowerCase();
+  } catch {
+    return false; // includes "null"
+  }
+  const own = [req.headers.get('x-forwarded-host'), req.headers.get('host'), req.nextUrl.host]
+    .flatMap((h) => (h ? h.split(',') : []))
+    .map((h) => h.trim().toLowerCase());
+  return own.includes(host);
+}
+
+class TooLarge extends Error {}
+
+/** Read the request body, at most MAX_BODY bytes, giving up when the deadline fires. */
+async function readBody(req: NextRequest, signal: AbortSignal): Promise<Uint8Array> {
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY) throw new TooLarge();
+  if (!req.body) return new Uint8Array(0);
+  const reader = req.body.getReader();
+  const stop = () => void reader.cancel().catch(() => undefined);
+  signal.addEventListener('abort', stop, { once: true });
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY) {
+        stop();
+        throw new TooLarge();
+      }
+      parts.push(value);
+    }
+  } finally {
+    signal.removeEventListener('abort', stop);
+  }
+  if (signal.aborted) throw new Error('deadline');
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.byteLength;
+  }
+  return out;
+}
+
+const KEEP_ATTR = /^(httponly|secure|samesite|max-age|expires)$/i;
+
+/**
+ * Re-emit only the IB session cookie, renamed for the slot. Any other cookie name is dropped;
+ * Domain and Path are replaced by this site's `Path=/`; expiry and security flags are kept.
+ */
 function relayCookies(from: string[], to: NextResponse, slot: Slot) {
   for (const c of from) {
-    if (slot === 'a') {
-      to.headers.append('set-cookie', c);
-      continue;
-    }
-    if (c.startsWith(`${COOKIE}=`)) to.headers.append('set-cookie', `${SLOT_COOKIE[slot]}=${c.slice(COOKIE.length + 1)}`);
+    const [pair, ...attrs] = c.split(';');
+    const eq = pair.indexOf('=');
+    if (eq < 0 || pair.slice(0, eq).trim() !== COOKIE) continue;
+    const kept = attrs.map((a) => a.trim()).filter((a) => KEEP_ATTR.test(a.split('=')[0].trim()) && !/^httponly$/i.test(a));
+    to.headers.append('set-cookie', [`${SLOT_COOKIE[slot]}=${pair.slice(eq + 1).trim()}`, 'Path=/', 'HttpOnly', ...kept].join('; '));
+  }
+}
+
+/** The IB's own fail-closed 503 is `{"error": "<short message>"}`; anything else is replaced. */
+function knownUnavailable(body: ArrayBuffer): boolean {
+  try {
+    const j = JSON.parse(new TextDecoder().decode(body));
+    return !!j && typeof j === 'object' && !Array.isArray(j) && Object.keys(j).length === 1 && typeof j.error === 'string' && j.error.length <= 200;
+  } catch {
+    return false;
   }
 }
 
@@ -61,21 +160,35 @@ function isMock(): boolean {
 }
 
 async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Promise<NextResponse> {
+  // One deadline for the whole exchange, started before the incoming body is read.
+  const signal = AbortSignal.timeout(DEADLINE_MS);
   const segments = ctx.params.path ?? [];
   const path = segments.join('/');
   const method = req.method.toUpperCase();
-  if (!ALLOWED.some((a) => a.method === method && a.re.test(path))) {
-    return NextResponse.json({ detail: 'not found' }, { status: 404 });
-  }
+  if (!cleanSegments(segments)) return fail(400, 'bad request');
+  if (!allowed(ALLOWED, method, path)) return fail(404, 'not found');
   const slot = slotOf(req);
-  if (slot !== 'a' && !SLOT_ALLOWED.some((a) => a.method === method && a.re.test(path))) {
-    return NextResponse.json({ detail: 'not found' }, { status: 404 });
+  if (slot === null) return fail(400, 'bad request');
+  if (slot !== 'a' && !allowed(SLOT_ALLOWED, method, path)) return fail(404, 'not found');
+
+  let body: Uint8Array | undefined;
+  if (method === 'POST') {
+    if (!sameOrigin(req)) return fail(403, 'forbidden');
+    try {
+      body = await readBody(req, signal);
+    } catch (e) {
+      if (e instanceof TooLarge) return fail(413, 'too large');
+      return NextResponse.json({ error: 'temporarily unavailable' }, { status: 503 });
+    }
+    const ct = (req.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    if ((body.byteLength > 0 || ct) && ct !== 'application/json') return fail(415, 'unsupported media type');
   }
   const session = req.cookies.get(SLOT_COOKIE[slot])?.value;
 
   if (isMock()) {
-    const mock = await handleMock(req, path, session);
-    if (slot === 'a') return mock;
+    // The body has been read already, so the mock gets a fresh request carrying the same bytes.
+    const mreq = body ? new NextRequest(req.url, { method, headers: req.headers, body }) : req;
+    const mock = await handleMock(mreq, path, session);
     const out = new NextResponse(mock.body, { status: mock.status });
     mock.headers.forEach((v, k) => {
       if (k !== 'set-cookie') out.headers.set(k, v);
@@ -84,32 +197,46 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
     return out;
   }
 
-  const base = (process.env.IB_API_URL || 'http://127.0.0.1:8100').replace(/\/+$/, '');
-  const url = `${base}/${segments.map(encodeURIComponent).join('/')}${req.nextUrl.search}`;
+  const base = new URL((process.env.IB_API_URL || 'http://127.0.0.1:8100').replace(/\/+$/, ''));
+  const basePath = base.pathname.replace(/\/+$/, '');
+  const encoded = segments.map(encodeURIComponent).join('/');
+  const target = new URL(`${base.origin}${basePath}/${encoded}${req.nextUrl.search}`);
+  // Check what will actually be fetched: same host, same path we validated, still allowlisted.
+  const outPath = target.pathname.startsWith(`${basePath}/`) ? target.pathname.slice(basePath.length + 1) : '';
+  if (target.origin !== base.origin || outPath !== encoded || !allowed(ALLOWED, method, outPath.split('/').map(decodeURIComponent).join('/'))) {
+    return fail(404, 'not found');
+  }
   const headers = new Headers({ accept: 'application/json' });
-  const ct = req.headers.get('content-type');
-  if (ct) headers.set('content-type', ct);
+  if (body?.byteLength) headers.set('content-type', 'application/json');
   // Upstream always sees the IB's own cookie name; which browser cookie fills it depends on the slot.
   if (session) headers.set('cookie', `${COOKIE}=${session}`);
 
   let upstream: Response;
+  let payload: ArrayBuffer;
   try {
-    upstream = await fetch(url, {
+    upstream = await fetch(target, {
       method,
       headers,
-      body: method === 'GET' ? undefined : await req.arrayBuffer(),
+      body: body?.byteLength ? body : undefined,
       cache: 'no-store',
       redirect: 'manual',
-      signal: AbortSignal.timeout(90_000),
+      signal,
     });
+    payload = await upstream.arrayBuffer();
   } catch {
-    // Upstream unreachable: the same envelope the IB itself uses for a fail-closed 503.
+    // Upstream unreachable, too slow, or cut off mid-body: the same envelope the IB itself uses
+    // for a fail-closed 503.
     return NextResponse.json({ error: 'temporarily unavailable' }, { status: 503 });
   }
 
-  const out = new NextResponse(await upstream.arrayBuffer(), { status: upstream.status });
-  const uct = upstream.headers.get('content-type');
-  if (uct) out.headers.set('content-type', uct);
+  let out: NextResponse;
+  if (upstream.status >= 500 && !(upstream.status === 503 && knownUnavailable(payload))) {
+    out = NextResponse.json({ error: UNAVAILABLE }, { status: upstream.status });
+  } else {
+    out = new NextResponse(payload, { status: upstream.status });
+    const uct = upstream.headers.get('content-type');
+    if (uct) out.headers.set('content-type', uct);
+  }
   out.headers.set('cache-control', 'no-store');
   relayCookies(upstream.headers.getSetCookie(), out, slot);
   return out;

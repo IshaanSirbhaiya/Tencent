@@ -47,6 +47,10 @@ export function TourOverlay() {
   const anchorEl = useRef<HTMLElement | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
+  // The sign-in a step started, if it is still in flight. Only one runs at a time: moving on waits
+  // for it, so a slow earlier sign-in can never land after (and overwrite) a later one.
+  const pendingLogin = useRef<Promise<unknown> | null>(null);
+  const [switching, setSwitching] = useState(false);
   const step = TOUR_STEPS[tour.step];
 
   // Remember where focus was when the tour opened; give it back when the tour closes.
@@ -70,6 +74,8 @@ export function TourOverlay() {
     anchorEl.current = null;
     (async () => {
       if (step.persona) {
+        if (pendingLogin.current) await pendingLogin.current.catch(() => undefined);
+        if (!alive) return;
         let sub: string | null = null;
         try {
           sub = (await api.whoami()).sub;
@@ -78,13 +84,21 @@ export function TourOverlay() {
         }
         if (!alive) return;
         if (sub !== step.persona) {
+          const p = api.switchTo(step.persona);
+          pendingLogin.current = p;
+          setSwitching(true);
           try {
-            await api.login(step.persona);
+            await p;
           } catch {
             if (!alive) return;
             setError('Sign-in for this step did not work. You can sign in from the sign-in page and carry on.');
             setPhase('missing');
             return;
+          } finally {
+            if (pendingLogin.current === p) {
+              pendingLogin.current = null;
+              setSwitching(false);
+            }
           }
           if (!alive) return;
           if (pathRef.current === step.route) {
@@ -176,8 +190,19 @@ export function TourOverlay() {
     if (tour.open && phase !== 'preparing') dialog.current?.focus({ preventScroll: true });
   }, [tour.open, phase, tour.step]);
 
-  const next = useCallback(() => goToStep(tour.step + 1), [tour.step]);
-  const back = useCallback(() => goToStep(tour.step - 1), [tour.step]);
+  // Steps do not move while a sign-in is in flight, and closing waits for it to finish, so the
+  // session always ends up as the last person the tour asked for.
+  const next = useCallback(() => {
+    if (!pendingLogin.current) goToStep(tour.step + 1);
+  }, [tour.step]);
+  const back = useCallback(() => {
+    if (!pendingLogin.current) goToStep(tour.step - 1);
+  }, [tour.step]);
+  const close = useCallback(() => {
+    const p = pendingLogin.current;
+    if (p) void p.catch(() => undefined).then(closeTour);
+    else closeTour();
+  }, []);
 
   // Keyboard: Esc closes; arrows move (but never while typing in a field).
   useEffect(() => {
@@ -189,7 +214,7 @@ export function TourOverlay() {
       if (e.key === 'Escape') {
         if (document.querySelector('[role="dialog"][data-state="open"]')) return; // a drawer handles its own Esc
         e.preventDefault();
-        closeTour();
+        close();
       } else if (!typing && e.key === 'ArrowRight') {
         e.preventDefault();
         next();
@@ -200,7 +225,7 @@ export function TourOverlay() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [tour.open, next, back]);
+  }, [tour.open, next, back, close]);
 
   if (!tour.open || !step) return null;
   const total = TOUR_STEPS.length;
@@ -240,7 +265,7 @@ export function TourOverlay() {
           </p>
           <button
             type="button"
-            onClick={closeTour}
+            onClick={close}
             className="-mr-1 inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-raised hover:text-fg"
             aria-label="Close tour"
           >
@@ -266,22 +291,23 @@ export function TourOverlay() {
           <div className={clsx('h-full rounded-full bg-accent', motion)} style={{ width: `${((tour.step + 1) / total) * 100}%` }} />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <button type="button" onClick={closeTour} className="h-8 rounded-md px-2 text-xs text-muted hover:bg-raised hover:text-fg">
+          <button type="button" onClick={close} className="h-8 rounded-md px-2 text-xs text-muted hover:bg-raised hover:text-fg">
             Skip tour
           </button>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={back}
-              disabled={tour.step === 0}
+              disabled={tour.step === 0 || switching}
               className="inline-flex h-8 items-center gap-1 rounded-md border border-line-strong px-2.5 text-xs font-medium text-fg hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ArrowLeft aria-hidden className="h-3.5 w-3.5" /> Back
             </button>
             <button
               type="button"
-              onClick={last ? closeTour : next}
-              className="inline-flex h-8 items-center gap-1 rounded-md bg-accent-solid px-3 text-xs font-medium text-accent-fg hover:bg-accent-solid/90"
+              onClick={last ? close : next}
+              disabled={switching}
+              className="inline-flex h-8 items-center gap-1 rounded-md bg-accent-solid px-3 text-xs font-medium text-accent-fg hover:bg-accent-solid/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {step.next ?? (last ? 'Finish' : 'Next')}
               {last ? null : <ArrowRight aria-hidden className="h-3.5 w-3.5" />}

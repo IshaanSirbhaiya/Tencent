@@ -3,6 +3,7 @@ import { AlertCircle, Check, Copy, Cpu, ExternalLink, Info, Lock, RefreshCw, Scr
 import { forwardRef, useState } from 'react';
 import { fmtDate, fmtDateTime, fmtTime, modelLabel } from '@/lib/format';
 import type { AskResponse, Citation } from '@/lib/types';
+import { safeHref } from '@/lib/url';
 import { InfoTip } from './InfoTip';
 import { PlatformIcon } from './PlatformIcon';
 import { Badge, Button } from './ui';
@@ -67,6 +68,24 @@ function versionLabel(v: string): string {
   return `Revision ${v.length > 18 ? `${v.slice(0, 18)}…` : v}`;
 }
 
+/** The source title, as a link only when the link is plain http(s). */
+function CitationTitle({ c }: { c: Citation }) {
+  const href = safeHref(c.deep_link);
+  if (!href) return <p className="mt-1 text-sm font-medium text-fg">{c.title}</p>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1 inline-flex items-start gap-1 text-sm font-medium text-fg underline decoration-line-strong underline-offset-4 hover:decoration-accent"
+    >
+      <span>{c.title}</span>
+      <ExternalLink aria-hidden className="mt-1 h-3 w-3 shrink-0 text-muted" />
+      <span className="sr-only">(opens {c.platform} in a new tab)</span>
+    </a>
+  );
+}
+
 export function CitationList({ citations, idPrefix = '', tour = false }: { citations: Citation[]; idPrefix?: string; tour?: boolean }) {
   if (citations.length === 0) {
     return <p className="text-sm text-muted">No sources were cited for this answer.</p>;
@@ -81,16 +100,7 @@ export function CitationList({ citations, idPrefix = '', tour = false }: { citat
             <span aria-hidden>·</span>
             <span>{c.container_name}</span>
           </div>
-          <a
-            href={c.deep_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1 inline-flex items-start gap-1 text-sm font-medium text-fg underline decoration-line-strong underline-offset-4 hover:decoration-accent"
-          >
-            <span>{c.title}</span>
-            <ExternalLink aria-hidden className="mt-1 h-3 w-3 shrink-0 text-muted" />
-            <span className="sr-only">(opens {c.platform} in a new tab)</span>
-          </a>
+          <CitationTitle c={c} />
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-2xs text-muted">
             <span className="tabular">{versionLabel(c.version)}</span>
             <span aria-hidden>·</span>

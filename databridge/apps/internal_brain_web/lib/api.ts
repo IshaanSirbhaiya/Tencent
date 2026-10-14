@@ -32,6 +32,13 @@ export class ApiError extends Error {
  */
 export type Slot = 'a' | 'b' | 'c';
 
+// A little longer than the proxy's own 90 s deadline, so the proxy's 503 normally arrives first.
+const CLIENT_TIMEOUT_MS = 95_000;
+
+function deadline(): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(CLIENT_TIMEOUT_MS) : undefined;
+}
+
 async function call<T>(path: string, init?: { method?: 'GET' | 'POST'; body?: unknown; slot?: Slot }): Promise<T> {
   let res: Response;
   const headers: Record<string, string> = {};
@@ -44,6 +51,7 @@ async function call<T>(path: string, init?: { method?: 'GET' | 'POST'; body?: un
       cache: 'no-store',
       headers,
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: deadline(),
     });
   } catch {
     throw new ApiError(0, 'network');
@@ -58,7 +66,12 @@ async function call<T>(path: string, init?: { method?: 'GET' | 'POST'; body?: un
     }
     throw new ApiError(res.status, detail || res.statusText);
   }
-  return (await res.json()) as T;
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // The body was cut off (timeout or dropped connection) or was not JSON.
+    throw new ApiError(0, 'network');
+  }
 }
 
 function qs(params: Record<string, string | undefined>): string {
@@ -109,17 +122,25 @@ function rememberPasscode(passcode?: string) {
   }
 }
 
+/** The one demo sign-in call, for the main session or a compare slot. */
+function demoLogin(persona: string, passcode: string | undefined, slot?: Slot) {
+  return call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
+    method: 'POST',
+    body: passcode ? { persona, passcode } : { persona },
+    slot,
+  });
+}
+
 let mapInFlight: Promise<KnowledgeMap> | null = null;
 
 export const api = {
   login: async (persona: string, passcode?: string) => {
-    const r = await call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
-      method: 'POST',
-      body: passcode ? { persona, passcode } : { persona },
-    });
+    const r = await demoLogin(persona, passcode);
     if (passcode) rememberPasscode(passcode);
     return r;
   },
+  /** Switch the main session to another persona with the passcode given at sign-in (the tour). */
+  switchTo: (persona: string) => demoLogin(persona, storedPasscode()),
   logout: () => call<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {} }),
   whoami: () => call<WhoAmI>('/auth/whoami'),
   ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question } }),
@@ -155,18 +176,24 @@ export const api = {
 /** The same calls, bound to a separate compare slot. Never touches the main session cookie. */
 export function slotApi(slot: Exclude<Slot, 'a'>) {
   return {
-    login: (persona: string) => {
-      const passcode = storedPasscode();
-      return call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
-        method: 'POST',
-        body: passcode ? { persona, passcode } : { persona },
-        slot,
-      });
-    },
+    login: (persona: string) => demoLogin(persona, storedPasscode(), slot),
     whoami: () => call<WhoAmI>('/auth/whoami', { slot }),
     ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question }, slot }),
     map: () => call<KnowledgeMap>('/ib/map', { slot }),
   };
+}
+
+/**
+ * Run `fn` while holding the compare-slot locks, so two Compare tabs (which share the slot
+ * cookies) cannot sign a slot in as someone else halfway through the other's login → ask → map.
+ * Locks are taken in a fixed order, so two tabs cannot deadlock. Without the Web Locks API (e.g. a
+ * non-secure context) it simply runs; the compare page still checks who each answer belongs to.
+ */
+export async function withSlotLocks<T>(slots: Exclude<Slot, 'a'>[], fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  const [first, ...rest] = [...slots].sort();
+  if (!first || !locks || typeof locks.request !== 'function') return fn();
+  return locks.request(`ib-compare-slot-${first}`, () => withSlotLocks(rest, fn));
 }
 
 export type SimAction = 'runbook-update' | 'revoke-channel' | 'restrict-page' | 'reset';

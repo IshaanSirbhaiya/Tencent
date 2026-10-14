@@ -3,6 +3,7 @@ import { ArrowLeft, ExternalLink, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { KIND_LABEL, PLACE_NOUN, PLATFORM_LABEL, fmtDate, placeLabel, plural, shortVersion } from '@/lib/format';
 import type { KnowledgeMap, MapContainer, MapItem, MapPlatform } from '@/lib/types';
+import { safeHref } from '@/lib/url';
 import { PlatformIcon } from '../PlatformIcon';
 import { Badge, inputClass } from '../ui';
 import type { MapSelection } from './KnowledgeMapView';
@@ -16,6 +17,7 @@ export function itemMatches(it: MapItem, q: string): boolean {
 function ItemRow({ it, platform, place }: { it: MapItem; platform: string; place?: string }) {
   const v = shortVersion(it.version);
   const plat = PLATFORM_LABEL[platform] ?? platform;
+  const href = safeHref(it.deep_link);
   return (
     <li className="px-3 py-2.5" data-testid="map-item">
       <p className="text-sm leading-5 text-fg">{it.title}</p>
@@ -31,16 +33,22 @@ function ItemRow({ it, platform, place }: { it: MapItem; platform: string; place
           </>
         ) : null}
         <span className="tabular">Updated {fmtDate(it.updated_at)}</span>
-        <a
-          href={it.deep_link}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline"
-          aria-label={`Open “${it.title}” in ${plat} (new tab)`}
-        >
-          Open in {plat}
-          <ExternalLink aria-hidden className="h-3 w-3" />
-        </a>
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline"
+            aria-label={`Open “${it.title}” in ${plat} (new tab)`}
+          >
+            Open in {plat}
+            <ExternalLink aria-hidden className="h-3 w-3" />
+          </a>
+        ) : (
+          <span className="ml-auto" data-testid="map-item-nolink">
+            In {plat}
+          </span>
+        )}
       </div>
     </li>
   );

@@ -72,3 +72,28 @@ test('compare @ 390px: accessible, no horizontal overflow', async ({ page }) => 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('a column whose slot turns out to be someone else shows the error, not their data', async ({ page }) => {
+  // Stand in for a second Compare tab re-signing slot c between the ask and the check, and for a
+  // slot-b map that comes back for the wrong person.
+  await page.route('**/api/ib/auth/whoami', async (route) => {
+    if (route.request().headers()['x-ib-slot'] !== 'c') return route.fallback();
+    await route.fulfill({ json: { sub: 'maya.compliance', name: 'Maya', roles: ['employee'] } });
+  });
+  await page.route('**/api/ib/ib/map', async (route) => {
+    if (route.request().headers()['x-ib-slot'] !== 'b') return route.fallback();
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), sub: 'ken.ext' } });
+  });
+  await login(page, 'jdoe');
+  await page.goto('/compare');
+  await page.getByRole('button', { name: 'Ask for both' }).click();
+
+  const left = page.getByTestId('compare-b');
+  const right = page.getByTestId('compare-c');
+  await expect(right.getByRole('alert')).toContainText('This answer did not come through.');
+  await expect(right.getByTestId('answer')).toHaveCount(0);
+  await expect(left.getByTestId('answer')).toBeVisible();
+  await expect(left).toContainText("Their map didn't load.");
+  await expect(left.getByTestId('map-summary')).toHaveCount(0);
+});

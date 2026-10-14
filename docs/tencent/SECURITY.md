@@ -330,3 +330,22 @@ a test through the real app (`test_audit_routes_real_principal.py`).
 
 Accuracy and first-run findings (stale counts, Hy3 wording, the tamper "8/8" claim, setup steps, macOS
 install) were fixed in the documents themselves.
+
+
+## 13. Codex track 6: the web app (proxy, compare slots, map, tour)
+
+Review: [codex_track6_web.md](reviews/security-r1/codex_track6_web.md). All ten findings fixed in the web
+app; no backend change. Tests: `tests/e2e/proxy.spec.ts` (new) and `tests/e2e/compare.spec.ts`.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | Two Compare tabs share the slot cookies, so one tab could show another person's answer under the wrong name | **Fixed.** Each slot's sign-in → ask → map runs under a cross-tab Web Lock, and every answer and map is checked against the person just signed in; a mismatch shows the normal error, not the data. |
+| 2 | `%2e%2e` path segments slipped past the allowlist | **Fixed.** Empty, `.` and `..` segments are refused (400), document ids have a strict format, and the final outbound URL is re-checked against the allowlist. |
+| 3 | No CSRF check on POSTs | **Fixed.** A POST from another origin or site is refused (403); request bodies must be JSON (415). |
+| 4 | Source links accepted any URL scheme | **Fixed.** Links render as links only when they are http(s); anything else is plain text (map and citations). |
+| 5 | Tour sign-ins could overlap and leave the wrong person signed in | **Fixed.** Tour sign-ins run one at a time; steps cannot move, and closing waits, while one is in flight. |
+| 6 | Unbounded request body; upstream body errors escaped the handler | **Fixed.** Bodies are capped at 64 KiB; the 90 s deadline covers the whole exchange; the browser has a 95 s timeout. |
+| 7 | Any upstream cookie was relayed, with its own Domain/Path | **Fixed.** Only the IB session cookie is relayed, scoped to `Path=/`, no Domain, always HttpOnly. |
+| 8 | Upstream 5xx bodies reached the browser verbatim | **Fixed.** Replaced by a fixed message; only the IB's own short 503 message (e.g. "sign-out could not be recorded") passes through. |
+| 9 (low) | An unknown `x-ib-slot` value fell back to the main session | **Fixed.** 400. |
+| 10 (low) | Tour persona changes ignored the demo passcode | **Fixed.** They send the passcode remembered at sign-in. |

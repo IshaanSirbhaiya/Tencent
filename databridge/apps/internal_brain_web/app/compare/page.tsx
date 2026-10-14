@@ -8,7 +8,7 @@ import { InfoTip } from '@/components/InfoTip';
 import { MapLoading } from '@/components/map/MapLoading';
 import { MapSummary } from '@/components/map/MapSummary';
 import { Button, Field, inputClass } from '@/components/ui';
-import { ApiError, slotApi } from '@/lib/api';
+import { ApiError, slotApi, withSlotLocks } from '@/lib/api';
 import { PERSONAS, SAMPLE_QUESTION, personaById } from '@/lib/personas';
 import { useTourAction } from '@/lib/tour';
 import type { AskResponse, KnowledgeMap } from '@/lib/types';
@@ -94,22 +94,28 @@ function CompareView() {
   // Per side: sign in to that side's slot and ask. The maps are fetched only after BOTH answers are
   // in (the two maps in parallel): the IB checks every map item live with its source, and that work
   // should not compete with the live checks behind the answers. A summary appears only when whole.
+  // Every result is checked against the person just signed in; if the slot turned out to belong to
+  // someone else (another Compare tab), the column shows the normal error instead of their data.
   const askSide = useCallback(async (slot: SlotId, persona: string, question: string, set: React.Dispatch<React.SetStateAction<Side>>) => {
     set({ kind: 'loading', persona });
     const s = slotApi(slot);
     try {
       const who = await s.login(persona);
+      if (who.sub !== persona) throw new ApiError(0, 'identity');
       const res = await s.ask(question);
+      // The answer itself names nobody, so ask the slot who it was signed in as.
+      if ((await s.whoami()).sub !== who.sub) throw new ApiError(0, 'identity');
       set({ kind: 'done', persona, sub: who.sub, name: who.name || label(persona), question, res, map: 'loading' });
-      return { s, id: res.request_id };
+      return { s, id: res.request_id, sub: who.sub };
     } catch (e) {
       set({ kind: 'error', persona, status: e instanceof ApiError ? e.status : 0 });
       return null;
     }
   }, []);
-  const mapSide = useCallback(async (r: { s: ReturnType<typeof slotApi>; id: string } | null, set: React.Dispatch<React.SetStateAction<Side>>) => {
+  const mapSide = useCallback(async (r: { s: ReturnType<typeof slotApi>; id: string; sub: string } | null, set: React.Dispatch<React.SetStateAction<Side>>) => {
     if (!r) return;
-    const map = await r.s.map().catch(() => null);
+    const got = await r.s.map().catch(() => null);
+    const map = got && got.sub === r.sub ? got : null;
     set((cur) => (cur.kind === 'done' && cur.res.request_id === r.id ? { ...cur, map } : cur));
   }, []);
 
@@ -118,8 +124,20 @@ function CompareView() {
     const question = q.trim();
     if (!question || busy) return;
     setAnnounce('Asking for both people…');
-    const [ra, rb] = await Promise.all([askSide('b', a, question, setLeft), askSide('c', b, question, setRight)]);
-    await Promise.all([mapSide(ra, setLeft), mapSide(rb, setRight)]);
+    setLeft({ kind: 'loading', persona: a });
+    setRight({ kind: 'loading', persona: b });
+    // Hold both slots for the whole sign-in → ask → map, so another tab waits its turn.
+    try {
+      await withSlotLocks(['b', 'c'], async () => {
+        const [ra, rb] = await Promise.all([askSide('b', a, question, setLeft), askSide('c', b, question, setRight)]);
+        await Promise.all([mapSide(ra, setLeft), mapSide(rb, setRight)]);
+      });
+    } catch {
+      // Only the lock itself can throw here; each side already handles its own errors.
+      const failed = (cur: Side): Side => (cur.kind === 'loading' ? { kind: 'error', persona: cur.persona, status: 0 } : cur);
+      setLeft(failed);
+      setRight(failed);
+    }
     setAnnounce('Both answers are ready.');
   }, [q, a, b, busy, askSide, mapSide]);
 
