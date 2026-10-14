@@ -130,7 +130,11 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
     def ask(req: AskRequest, request: Request, user: DirectoryUser = Depends(current)):
         if not (set(user.roles) & EMPLOYEE_ROLES):
             raise HTTPException(403, "forbidden")
-        channel = "workbuddy-mcp" if request.headers.get("x-ib-channel") == "workbuddy-mcp" else "ui"
+        # the MCP label is honoured only on bearer-token calls (the MCP client's transport), never
+        # on the browser's cookie session (CodeBuddy security review CB5 finding 5)
+        bearer = request.headers.get("authorization", "").lower().startswith("bearer ")
+        channel = ("workbuddy-mcp" if bearer and request.headers.get("x-ib-channel") == "workbuddy-mcp"
+                   else "ui")
         try:
             resp = svc.pipeline.ask(user, req.question, channel=channel)
         except Exception as exc:                                    # noqa: BLE001

@@ -225,9 +225,15 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         sub = _sub_of(principal)
         rep = verify_with_sink(ledger, sink) if sink is not None else ledger.verify()
         out = rep.as_dict()
+        # the answer text lives outside the sealed chain: re-hash every stored answer against the
+        # digest the ledger sealed for it, so an edit to an answer nobody revealed is visible too
+        # (CodeBuddy security review CB5 finding 3)
+        content = _verify_content(ledger, store)
+        out["content"] = content
+        out["ok"] = bool(out.get("ok")) and content["intact"]
         try:
             ledger.append(AuditQueryEvent(sub=sub, filter={"op": "verify", "outcome": "ok",
-                                                           "verify_ok": rep.ok},
+                                                           "verify_ok": out["ok"]},
                                           result_count=rep.records, event_time=now()))
             out["ledgered"] = True
         except LedgerUnavailable:
@@ -235,6 +241,26 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         return out
 
     return router
+
+
+def _verify_content(ledger: AccessLedger, store: AnswerStore, *, max_problems: int = 20) -> dict:
+    """Every ``answer.released`` digest vs the text in the content store (missing = a problem)."""
+    checked, problems = 0, []
+    try:
+        for ev in ledger.events(strict=False):
+            if ev.kind != "answer.released" or not ev.data.get("answer_ref"):
+                continue
+            checked += 1
+            ref, sealed = str(ev.data["answer_ref"]), ev.data.get("answer_sha256")
+            stored = store.get(ref)
+            if stored is None:
+                problems.append(f"answer {ref}: missing from the content store")
+            elif stored.req_id != ev.data.get("req_id") or sha256_text(stored.answer) != sealed:
+                problems.append(f"answer {ref}: text does not match the sealed digest")
+    except (ContentStoreUnavailable, LedgerUnavailable):
+        return {"checked": checked, "intact": False, "problems": ["content check unavailable"]}
+    return {"checked": checked, "intact": not problems, "problems": problems[:max_problems],
+            "problem_count": len(problems)}
 
 
 def _clip(d: dict) -> dict:

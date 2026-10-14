@@ -24,5 +24,6 @@ PYTHONPATH="apps/mock_platforms" MOCK_WEBHOOK_URL="http://127.0.0.1:8100" \
   "$PY" -m mock_platforms --port 8200 > "$STATE/mock.log" 2>&1 &
 for _ in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:8200/health >/dev/null && break; sleep 1; done
 echo "mock platforms on :8200 (log $STATE/mock.log); Internal Brain on :8100 (Ctrl+C to stop)"
-PYTHONPATH="apps/internal_brain;packages/core;packages/harness;packages/adapter;packages/retrieval" \
+SEP="$("$PY" -c 'import os; print(os.pathsep)')"   # ";" on Windows, ":" elsewhere
+PYTHONPATH="apps/internal_brain${SEP}packages/core${SEP}packages/harness${SEP}packages/adapter${SEP}packages/retrieval" \
   exec "$PY" -m databridge_ib

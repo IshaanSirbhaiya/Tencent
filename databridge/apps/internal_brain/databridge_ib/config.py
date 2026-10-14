@@ -54,6 +54,11 @@ class IbConfig:
                if v == d or len(v) < 32]
         if bad:
             raise RuntimeError(f"refusing to start: set strong values for {', '.join(bad)}")
+        # demo sign-in lets the caller pick a persona; on a reachable deployment only holders of
+        # the passcode may use it (CodeBuddy security review CB5 finding 1)
+        if self.demo_login and len(_env("IB_DEMO_PASSCODE")) < 8:
+            raise RuntimeError("refusing to start: IB_DEMO_LOGIN=1 on a deployment needs "
+                               "IB_DEMO_PASSCODE of at least 8 characters")
     demo_login: bool = field(default_factory=lambda: _env("IB_DEMO_LOGIN") == "1")
     live: bool = field(default_factory=lambda: _env("IB_LIVE") == "1")
 

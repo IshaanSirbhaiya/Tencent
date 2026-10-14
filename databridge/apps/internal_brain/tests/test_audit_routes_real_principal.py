@@ -3,15 +3,26 @@
 through ``create_app`` answered 401 "not authenticated" for a valid compliance-officer token."""
 from __future__ import annotations
 
+import datetime as dt
+
 from fastapi.testclient import TestClient
 
 from databridge_ib import auth as authmod
+from databridge_ib.app import create_app
+from databridge_ib.audit.content import AnswerStore
+from databridge_ib.audit.routes import make_audit_router
 
-from test_mcp_server import _build_app
+from test_mcp_server import _svc
 
 
 def _client(tmp_path, sub, roles):
-    app, svc = _build_app(tmp_path)
+    svc = _svc(tmp_path)
+    store = AnswerStore(svc.cfg)                      # the production content store
+    svc.answers = store
+    svc.pipeline.answers = store
+    app = create_app(svc, audit_router_factory=lambda current, require_role: make_audit_router(
+        svc.ledger, store, svc.projection, require_role,
+        clock=lambda: dt.datetime.now(dt.timezone.utc)))
     tok = authmod.mint(svc.cfg.token_key, sub, list(roles))
     return TestClient(app, headers={"Authorization": f"Bearer {tok}"}), svc
 

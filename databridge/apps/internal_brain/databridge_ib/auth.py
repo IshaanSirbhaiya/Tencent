@@ -100,13 +100,58 @@ def load_revoked(path: Path) -> frozenset[str]:
 _REVOKE_LOCK = __import__("threading").Lock()
 
 
+class _FileLock:
+    """Cross-process exclusive lock: a lock file created with O_EXCL. A lock older than
+    ``stale_s`` (a crashed holder) is broken. Used around the revocation list's
+    read-modify-replace so two processes cannot lose each other's entries (Codex sec r1 track 4 #8)."""
+
+    def __init__(self, path: Path, *, timeout_s: float = 5.0, stale_s: float = 30.0):
+        self.path, self.timeout_s, self.stale_s = Path(path), timeout_s, stale_s
+
+    def __enter__(self):
+        import os
+        deadline = time.monotonic() + self.timeout_s
+        while True:
+            try:
+                os.close(os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                return self
+            except (FileExistsError, PermissionError):   # Windows: a lock file mid-delete
+                try:
+                    if time.time() - self.path.stat().st_mtime > self.stale_s:
+                        self.path.unlink(missing_ok=True)
+                        continue
+                except FileNotFoundError:
+                    continue
+                if time.monotonic() > deadline:
+                    raise RevocationUnavailable("revocation list is locked")
+                time.sleep(0.02)
+
+    def __exit__(self, *exc):
+        self.path.unlink(missing_ok=True)
+        return False
+
+
 def revoke(path: Path, jti: str) -> None:
-    """Atomic (temp file + replace) and serialised within the process."""
+    """Atomic (unique temp file + replace) and serialised across threads AND processes."""
+    import os
+    import tempfile
     p = Path(path)
-    with _REVOKE_LOCK:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with _REVOKE_LOCK, _FileLock(p.with_suffix(p.suffix + ".lock")):
         current = set(load_revoked(p))
         current.add(jti)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(p.suffix + ".tmp")
-        tmp.write_text(json.dumps(sorted(current)), encoding="utf-8")
-        tmp.replace(p)
+        fd, tmp = tempfile.mkstemp(prefix=p.name + ".", suffix=".tmp", dir=p.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(sorted(current)))
+            for attempt in range(50):        # Windows: a reader may hold the file briefly
+                try:
+                    os.replace(tmp, p)
+                    break
+                except PermissionError:
+                    if attempt == 49:
+                        raise
+                    time.sleep(0.02)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
