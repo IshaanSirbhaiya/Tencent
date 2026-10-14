@@ -14,11 +14,14 @@ answers themselves are in [docs/tencent/SUBMISSION.md](../docs/tencent/SUBMISSIO
 | `05_video/clips/` | One screen recording per video scene | The video |
 | `05_video/walnut_internal_brain_demo.mp4` | The assembled demo video, silent, timed to the narration script | Record the voice-over on top, then upload |
 | `06_cover/` | The cover image (made in Miora) | The form's cover field |
+| `07_deck/` | The pitch deck: `walnut_internal_brain_deck.pdf` and `.pptx` (13 slides, speaker notes in the .pptx) | Attach to the submission; present at Demo Day |
 
 Re-create any of it:
 - CodeBuddy pages: `python docs/tencent/evidence/render_transcripts.py`, then `node docs/tencent/evidence/shoot_sessions.cjs`
 - Video cards: `python docs/tencent/video/make_cards.py`, then `node docs/tencent/video/shoot_cards.cjs`
 - Video clips (stack running): `node docs/tencent/video/record_scenes.cjs [scene ...]`
 - Video: `python docs/tencent/video/assemble.py [--voice narration.m4a]`
+- Narration cue sheet + subtitles: `python docs/tencent/video/narration.py`
+- Deck: `python docs/tencent/deck/make_deck.py html`, `node docs/tencent/deck/shoot_deck.cjs`, `python docs/tencent/deck/make_deck.py pack`
 
 Nothing in this folder contains a key, token or real person's data.

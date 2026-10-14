@@ -1,0 +1,38 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'><title>Slide 4</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
+body{background:radial-gradient(1300px 760px at 80% 12%,#1c2a49 0%,#0b1020 55%,#070a14 100%);color:#e8edf7;
+font-family:'Segoe UI',Inter,system-ui,sans-serif}
+.s{position:relative;height:100%;padding:96px 120px 90px;display:flex;flex-direction:column}
+.k{color:#8fd3c7;letter-spacing:.18em;text-transform:uppercase;font-size:21px;font-weight:600}
+h1{font-size:82px;line-height:1.04;margin:18px 0 16px;font-weight:700;letter-spacing:-.02em}
+h2{font-size:54px;line-height:1.1;margin:14px 0 26px;font-weight:700;letter-spacing:-.01em}
+.lead{font-size:30px;color:#b8c3d9;line-height:1.42;max-width:1500px;margin:0}
+.row{display:flex;gap:40px;flex:1;min-height:0}.col{flex:1;min-width:0;display:flex;flex-direction:column}
+.card{border:1px solid #2a3654;border-radius:20px;background:rgba(17,24,43,.78);padding:26px 30px}
+.big{font-size:84px;font-weight:700;letter-spacing:-.03em;line-height:1}.ok{color:#5ee0b0}
+.lbl{font-size:25px;color:#c9d3e6;margin-top:10px;line-height:1.35}.src{font-size:17px;color:#7f8aa3;margin-top:14px;letter-spacing:.03em}
+.shot{border:1px solid #2a3654;border-radius:16px;overflow:hidden;background:#05070d;flex:1;min-height:0;display:flex}
+.shot img{width:100%;height:100%;object-fit:cover;object-position:top left}
+.cap{font-size:20px;color:#8a96ae;margin-top:12px}
+ul.b{margin:0;padding-left:28px;font-size:26px;line-height:1.5;color:#d3dbea}ul.b li{margin:6px 0}
+.n{color:#8fd3c7;font-weight:700;font-size:20px;letter-spacing:.1em}.t{font-size:30px;font-weight:700;margin:6px 0 8px}
+.d{font-size:21px;color:#b8c3d9;line-height:1.4}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.pill{display:inline-block;border:1px solid #2f3d5e;border-radius:999px;padding:9px 20px;margin:8px 10px 0 0;font-size:22px;color:#cfd8ea;background:rgba(20,28,50,.7)}
+.foot{position:absolute;left:120px;right:120px;bottom:34px;display:flex;justify-content:space-between;color:#6f7a93;font-size:18px}
+.logo{display:inline-flex;align-items:center;gap:12px;color:#c9d3e6;font-weight:600}.dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#6d5dfc,#22c3a6)}
+</style></head><body><div class='s'>
+<div class="k">How it works</div><h2>Two checks before the model. One after. A record before anything is shown.</h2>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:22px">
+ <div class="card"><div class="n">01</div><div class="t">Who's asking</div><div class="d">A signed token from the web app or WorkBuddy. Never a name typed into a box.</div></div>
+ <div class="card"><div class="n">02</div><div class="t">Gate 1</div><div class="d">Search only what this person may open, using each platform's own permission model.</div></div>
+ <div class="card"><div class="n">03</div><div class="t">Gate 2</div><div class="d">Ask the source again, live, for every passage. Error or timeout means no.</div></div>
+ <div class="card"><div class="n">04</div><div class="t">Answer</div><div class="d">Tencent Hy3 via TokenHub writes from those passages only, or we quote them directly.</div></div>
+ <div class="card"><div class="n">05</div><div class="t">Grounding</div><div class="d">Every sentence cites a passage; unsupported numbers and names are dropped.</div></div>
+</div>
+<div class="card" style="margin-top:28px;border-color:#3b5b4f;background:rgba(20,48,40,.55)"><div class="d" style="font-size:24px;color:#d7f5ea"><b>Audit log</b>: written before retrieval, before the model, before the answer is shown. Hash-chained and sealed. If it can't be written, nothing is answered.</div></div>
+<div class="grid3" style="margin-top:28px">
+ <div class="card"><div class="t" style="font-size:27px">Restricted = doesn't exist</div><div class="d">The same refusal, byte for byte, whether a document is restricted or was never written.</div></div>
+ <div class="card"><div class="t" style="font-size:27px">Revoked = gone next question</div><div class="d">Remove someone from a channel and their very next answer no longer uses it, even if the notification is lost.</div></div>
+ <div class="card"><div class="t" style="font-size:27px">Changed = re-read first</div><div class="d">An edited document is re-read and re-checked before use, and the citation shows the new version.</div></div>
+</div><div class='foot'><span class='logo'><span class='dot'></span>Walnut Internal Brain</span><span>FinTech Track · Aspire · Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · 4/13</span></div></div></body></html>

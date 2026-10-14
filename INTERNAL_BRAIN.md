@@ -183,7 +183,10 @@ built during the hackathon, beside it. Measured on 14 Oct, **94% of the code is 
 
 | Doc | What it covers |
 |---|---|
+| [Pitch deck](submission/07_deck/walnut_internal_brain_deck.pdf) | 13 slides: the problem, the idea, how it works, proof, the fintech layer, the rollout path |
+| [Submission pack](submission/README.md) | Screenshots, CodeBuddy evidence, video, cards and deck in one folder |
 | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md) | How it was built: CodeBuddy sessions, reviews, what went wrong |
+| [QA_PREP.md](docs/tencent/QA_PREP.md) | The hard questions judges ask, with short answers and the evidence |
 | [ARCHITECTURE.md](docs/tencent/ARCHITECTURE.md) | Components and the request path |
 | [SECURITY.md](docs/tencent/SECURITY.md) | Threat model, ledger attacker model, injection, every review finding and its fix |
 | [RESPONSIBLE_AI.md](docs/tencent/RESPONSIBLE_AI.md) | Grounding, abstention, citations, oversight, evaluation |
