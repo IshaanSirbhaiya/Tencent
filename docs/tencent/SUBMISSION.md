@@ -117,8 +117,11 @@ to quoted evidence.
 - Hunyuan `hy3` / DeepSeek via **TokenHub**, as the reasoning model.
 - **WorkBuddy** as a front door, through an MCP connector carrying a per-user token. The compliance
   officer uses WorkBuddy as an audit assistant.
-- **CodeBuddy** used to build [TBD: list CodeBuddy slices from DEV_PROCESS.md].
-- A **Lighthouse** live demo [TBD URL].
+- **CodeBuddy** built the WorkBuddy MCP connector and the compliance audit connector, the token tool
+  and WorkBuddy setup guide, and the model-chain tests; drew the trust-boundary diagram and ran a
+  security review on Hunyuan `hy3`; then hardened its own code after a Codex review (six sessions,
+  every transcript kept: `docs/tencent/DEV_PROCESS.md`).
+- A hardened **Lighthouse** deploy kit (Docker, HTTPS, passcode-gated demo) in `deploy/lighthouse/`.
 - **Miora** for the cover.
 
 ### 4. Business value: quantifiable metrics
@@ -143,17 +146,15 @@ internal AI assistant cannot be rolled out under MAS supervision at all.
 
 ## CodeBuddy / WorkBuddy conversation history (≥ 3 screenshots, MANDATORY)
 
-Attach the screenshots listed in `docs/tencent/HUMAN_CHECKLIST.md` §B and §C:
-- CB1 trust-boundary diagram (Plan mode)
-- CB2 MCP server
-- CB3 token CLI and WorkBuddy configs
-- CB4 model-chain tests (CLI stream-json log)
-- CB5 security review
-- the WorkBuddy two-persona comparison
-- the WorkBuddy compliance audit assistant
-- the WorkBuddy MCP panel
+Attach from `submission/` (no keys appear in any of them):
+- `01_codebuddy/cb2_session_overview.png`: CodeBuddy building the WorkBuddy MCP connector
+- `01_codebuddy/cb5_session_overview.png`: CodeBuddy's security review on Hunyuan `hy3`
+- `01_codebuddy/cb6_session_overview.png`: CodeBuddy hardening its own code after the Codex review
+- `01_codebuddy/cb1_session_overview.png`: CodeBuddy drawing the trust boundaries
+- `02_workbuddy/`: the two-person comparison and the compliance audit assistant in WorkBuddy
 
-Blur all keys.
+Also mention: "Full CodeBuddy session transcripts (API logs) are in the repository under
+`docs/tencent/evidence/`, and `docs/tencent/DEV_PROCESS.md` describes who built what."
 
 ## Cover image
 
@@ -167,4 +168,5 @@ gates, a padlock and a chain-link ledger beneath, calm navy and teal palette, no
 
 ## Project link
 
-[TBD: Lighthouse URL + demo passcode], and the GitHub repo (public after history clean-up).
+The GitHub repository (https://github.com/IshaanSirbhaiya/Tencent, branch `Tencent`). Start at
+`INTERNAL_BRAIN.md`. [If the Lighthouse trial becomes available: the live URL and demo passcode.]
