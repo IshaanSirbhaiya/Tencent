@@ -48,7 +48,7 @@ can't see; and compliance can reconstruct any access, with proof the record hasn
 | **Sim** | `admin.it` | Change access live (remove someone from a channel, restrict a page, edit a runbook) and watch the next answer change |
 | **Tour** | button in the header | A short guided walk through the screens above |
 | **WorkBuddy** | three ready-made workspaces | Ask the Brain from Tencent WorkBuddy, as an engineer, a contractor, or the compliance officer |
-| **Original Walnut screens** | separate launcher (below) | The Walnut engine's own views on Company A: the knowledge graph, the company brain with a time slider, the ontology and the provenance chain of a value, with Walnut's guided demo |
+| **Original Walnut screens** | separate launcher (below) | The Walnut engine's own views on Company A, built as `jdoe` sees it: the knowledge graph (932 items and people), the company brain with a time slider, the ontology and the provenance chain of every value, with Walnut's guided demo |
 
 ## Run it
 

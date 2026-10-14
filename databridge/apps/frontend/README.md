@@ -58,9 +58,11 @@ only labels the session; this app does not filter anything by persona.
 
 - **Local only.** The web build contains the development token `dev-local-only`, and the gateway
   accepts it only because the launcher sets `WALNUT_DEV_AUTH=1`. Do not expose these ports.
-- **The graph does not check permissions.** It records who has access to each space (the
-  `reads_space` links) but shows every item's title to whoever opens it. The Internal Brain is the
-  permission-aware product; this is the estate seen from above.
+- **The graph is built as one person sees it** (default `jdoe`; rebuild with
+  `python scripts/build_enterprise_graph.py --as <persona>`). Only items that person may open, and
+  spaces where they can open something, are in it, so restricted items such as the FinCrime case
+  notes never appear here either. The original screens don't check access per request themselves;
+  the Internal Brain is the product that does.
 - Provenance points at rows in the generated JSON files (`table_cell` pointers). There are no
   captured bytes to re-read, so `/evidence` says "shown as recorded" rather than "re-verified".
 - Asking questions on `/brain` uses the gateway's own model setting. Without a model key it falls
