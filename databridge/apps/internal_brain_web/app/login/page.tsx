@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BrandMark, MockBanner, PRODUCT, SUBTITLE } from '@/components/Brand';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { TourButton } from '@/components/tour/Tour';
 import { ApiError, api } from '@/lib/api';
 import { PERSONAS, type Persona } from '@/lib/personas';
 
@@ -72,10 +73,13 @@ export default function LoginPage() {
               <p className="text-sm text-muted">{SUBTITLE}</p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-2">
+            <TourButton />
+            <ThemeToggle />
+          </div>
         </div>
 
-        <section aria-labelledby="signin-heading" className="rounded-lg border border-line bg-surface">
+        <section aria-labelledby="signin-heading" className="rounded-lg border border-line bg-surface" data-tour="personas">
           <div className="border-b border-line px-5 py-4">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-line-strong bg-raised px-2 py-0.5 text-2xs font-medium text-muted" data-testid="synthetic-label">
               <Database aria-hidden className="h-3 w-3" /> Synthetic demo data — Company A
@@ -103,7 +107,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">People at Company A</h2>
-              <ul className="grid gap-2 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {people.map((p) => (
                   <li key={p.id}>
                     <PersonaButton p={p} />
@@ -113,7 +117,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Platform operator</h2>
-              <ul className="grid gap-2 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <li>
                   <PersonaButton p={admin} />
                 </li>

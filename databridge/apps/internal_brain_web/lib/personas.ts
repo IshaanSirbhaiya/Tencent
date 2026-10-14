@@ -121,6 +121,9 @@ export const PERSONAS: Persona[] = [
   },
 ];
 
+/** The demo's headline question (used by the tour and the compare page). */
+export const SAMPLE_QUESTION = "What's the status of the database migration project and were there any blockers raised in Slack last week?";
+
 export const AUDIT_SUGGESTIONS = [
   'What did jdoe access in the payment-gateway space over the last 30 days?',
   'Who retrieved the Q3 breach report?',

@@ -2,8 +2,10 @@
 import { CheckCircle2, CircleDashed, ShieldCheck, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { useTourAction } from '@/lib/tour';
 import { fmtTime, truncHash } from '@/lib/format';
 import type { VerifyResult } from '@/lib/types';
+import { InfoTip } from '../InfoTip';
 import { Badge, Button } from '../ui';
 
 export function VerifyPanel() {
@@ -26,13 +28,20 @@ export function VerifyPanel() {
     }
   }
 
+  useTourAction('verify', () => void run());
+
   return (
-    <section aria-labelledby="verify-heading" className="rounded-lg border border-line bg-surface" data-testid="verify-panel">
+    <section aria-labelledby="verify-heading" className="rounded-lg border border-line bg-surface" data-testid="verify-panel" data-tour="verify-panel">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
         <div>
-          <h2 id="verify-heading" className="text-sm font-semibold">
-            Ledger integrity
-          </h2>
+          <div className="flex items-center gap-1">
+            <h2 id="verify-heading" className="text-sm font-semibold">
+              Ledger integrity
+            </h2>
+            <InfoTip title="Audit chain" testId="infotip-verify">
+              The audit log is a chain: each entry carries the previous entry&apos;s fingerprint, so an edit or deletion anywhere breaks the chain. Verify re-checks every link and compares the latest one with the copy published outside this system.
+            </InfoTip>
+          </div>
           <p className="text-2xs text-muted">Re-checks every hash link, the seal, the anchor directory and the last externally published head.</p>
         </div>
         <Button onClick={run} busy={busy} icon={ShieldCheck}>

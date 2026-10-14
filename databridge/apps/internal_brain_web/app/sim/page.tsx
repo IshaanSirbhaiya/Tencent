@@ -87,7 +87,7 @@ function SimView() {
 
       <ul className="grid gap-4 md:grid-cols-2">
         {ACTIONS.map((a) => (
-          <li key={a.id} className="flex flex-col rounded-lg border border-line bg-surface p-4">
+          <li key={a.id} className="flex flex-col rounded-lg border border-line bg-surface p-4" data-tour={a.id === 'revoke-channel' ? 'sim-revoke' : undefined}>
             <div className="flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-sm font-semibold">
                 <a.icon aria-hidden className="h-4 w-4 text-muted" /> {a.label}

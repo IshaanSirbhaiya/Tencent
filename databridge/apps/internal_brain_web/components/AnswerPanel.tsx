@@ -1,15 +1,16 @@
 'use client';
-import { AlertCircle, Check, Copy, Cpu, ExternalLink, Info, RefreshCw, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { AlertCircle, Check, Copy, Cpu, ExternalLink, Info, Lock, RefreshCw, ScrollText, ShieldCheck, TriangleAlert, UserCheck } from 'lucide-react';
 import { forwardRef, useState } from 'react';
 import { fmtDate, fmtDateTime, fmtTime, modelLabel } from '@/lib/format';
 import type { AskResponse, Citation } from '@/lib/types';
+import { InfoTip } from './InfoTip';
 import { PlatformIcon } from './PlatformIcon';
 import { Badge, Button } from './ui';
 
 const TAG_RE = /\[(C\d+(?:\s*,\s*C\d+)*)\]/g;
 
-function jumpTo(tag: string) {
-  const el = document.getElementById(`cite-${tag}`);
+function jumpTo(tag: string, prefix = '') {
+  const el = document.getElementById(`${prefix}cite-${tag}`);
   if (!el) return;
   document.querySelectorAll('[data-active="true"]').forEach((n) => n.removeAttribute('data-active'));
   el.setAttribute('data-active', 'true');
@@ -19,7 +20,7 @@ function jumpTo(tag: string) {
 }
 
 /** Renders answer text verbatim; each [C<n>] tag becomes an accessible chip linked to its citation. */
-export function AnswerText({ text, citations }: { text: string; citations: Citation[] }) {
+export function AnswerText({ text, citations, idPrefix = '' }: { text: string; citations: Citation[]; idPrefix?: string }) {
   const byTag = new Map(citations.map((c) => [c.tag, c]));
   const parts: React.ReactNode[] = [];
   let last = 0;
@@ -36,10 +37,10 @@ export function AnswerText({ text, citations }: { text: string; citations: Citat
             return (
               <a
                 key={t}
-                href={`#cite-${t}`}
+                href={`#${idPrefix}cite-${t}`}
                 onClick={(e) => {
                   e.preventDefault();
-                  jumpTo(t);
+                  jumpTo(t, idPrefix);
                 }}
                 aria-label={`${t}: ${c.title}, ${c.container_name}`}
                 className="mx-0.5 inline-flex h-5 items-center rounded border border-accent/50 bg-accent/10 px-1 align-[1px] font-mono text-2xs font-semibold text-accent hover:bg-accent/20"
@@ -66,14 +67,14 @@ function versionLabel(v: string): string {
   return `Revision ${v.length > 18 ? `${v.slice(0, 18)}…` : v}`;
 }
 
-export function CitationList({ citations }: { citations: Citation[] }) {
+export function CitationList({ citations, idPrefix = '', tour = false }: { citations: Citation[]; idPrefix?: string; tour?: boolean }) {
   if (citations.length === 0) {
     return <p className="text-sm text-muted">No sources were cited for this answer.</p>;
   }
   return (
-    <ol className="divide-y divide-line rounded-md border border-line" data-testid="citations">
+    <ol className="divide-y divide-line rounded-md border border-line" data-testid="citations" data-tour={tour ? 'citations' : undefined}>
       {citations.map((c) => (
-        <li key={c.tag} id={`cite-${c.tag}`} tabIndex={-1} className="cite-target px-3 py-3 focus:outline-none focus-visible:outline-2">
+        <li key={c.tag} id={`${idPrefix}cite-${c.tag}`} tabIndex={-1} className="cite-target px-3 py-3 focus:outline-none focus-visible:outline-2">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
             <span className="font-mono font-semibold text-accent">{c.tag}</span>
             <PlatformIcon platform={c.platform} />
@@ -144,13 +145,40 @@ function CopyId({ id }: { id: string }) {
   );
 }
 
-export const AnswerCard = forwardRef<HTMLHeadingElement, { res: AskResponse; question: string }>(function AnswerCard({ res, question }, ref) {
+interface AnswerCardProps {
+  res: AskResponse;
+  question: string;
+  /** Prefix for element ids, so two answers can sit on one page (compare). */
+  idPrefix?: string;
+  /** The signed-in identity this answer was produced for (from whoami or the slot's login). */
+  signedInAs?: string;
+  /** Mark this card's parts as guided-tour anchors (the Ask page only). */
+  tour?: boolean;
+  headingLevel?: 'h2' | 'h3';
+}
+
+export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(function AnswerCard(
+  { res, question, idPrefix = '', signedInAs, tour = false, headingLevel = 'h2' },
+  ref,
+) {
+  const H = headingLevel;
+  const Sub = headingLevel === 'h2' ? 'h3' : 'h4';
   return (
-    <article className="rounded-lg border border-line bg-surface" aria-labelledby="answer-heading" data-testid="answer">
+    <article
+      className="rounded-lg border border-line bg-surface"
+      aria-labelledby={`${idPrefix}answer-heading`}
+      data-testid="answer"
+      data-tour={tour ? 'answer' : undefined}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
-        <h2 id="answer-heading" ref={ref} tabIndex={-1} className="text-sm font-semibold focus:outline-none focus-visible:outline-2">
-          Answer
-        </h2>
+        <div className="flex items-center gap-1">
+          <H id={`${idPrefix}answer-heading`} ref={ref} tabIndex={-1} className="text-sm font-semibold focus:outline-none focus-visible:outline-2">
+            Answer
+          </H>
+          <InfoTip title="The answer" testId="infotip-answer">
+            Written only from sources this person can open right now. Each tag like C1 jumps to the page, ticket, thread or file the sentence came from.
+          </InfoTip>
+        </div>
         <ModelBadge model={res.model} />
       </header>
       <div className="space-y-5 px-4 py-4">
@@ -159,12 +187,17 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, { res: AskResponse; que
           <span aria-hidden>Q · </span>
           {question}
         </p>
-        <AnswerText text={res.answer} citations={res.citations} />
-        <section aria-labelledby="sources-cited-heading">
-          <h3 id="sources-cited-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Sources cited
-          </h3>
-          <CitationList citations={res.citations} />
+        <AnswerText text={res.answer} citations={res.citations} idPrefix={idPrefix} />
+        <section aria-labelledby={`${idPrefix}sources-cited-heading`}>
+          <div className="mb-2 flex items-center gap-1">
+            <Sub id={`${idPrefix}sources-cited-heading`} className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Sources cited
+            </Sub>
+            <InfoTip title="Sources cited">
+              Every source behind this answer, with its version and a link to the original. &ldquo;Access re-checked&rdquo; is when we asked the platform itself, just before use, whether this person can still open it.
+            </InfoTip>
+          </div>
+          <CitationList citations={res.citations} idPrefix={idPrefix} tour={tour} />
         </section>
       </div>
       <footer className="space-y-2 border-t border-line px-4 py-3">
@@ -180,9 +213,72 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, { res: AskResponse; que
           <span className="tabular">As of {fmtDateTime(res.as_of)}</span>
         </div>
       </footer>
+      <ChecksStrip res={res} signedInAs={signedInAs} tour={tour} />
     </article>
   );
 });
+
+/**
+ * "Checks on this answer": the core guarantees, stated with the data that backs them for THIS
+ * answer: who it was for, that every cited source was re-checked live (count and latest check time
+ * come from the citations), and the request id under which it sits in the audit ledger.
+ */
+export function ChecksStrip({ res, signedInAs, tour = false }: { res: AskResponse; signedInAs?: string; tour?: boolean }) {
+  const cited = res.citations.length;
+  const checked = res.citations.filter((c) => !!c.authz_checked_at);
+  const latest = checked.map((c) => c.authz_checked_at).sort().at(-1);
+  return (
+    <section
+      aria-label="Checks on this answer"
+      className="rounded-b-lg border-t border-line bg-raised/40 px-4 py-2.5"
+      data-testid="checks-strip"
+      data-tour={tour ? 'checks' : undefined}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs text-fg">
+        <span className="inline-flex items-center gap-0.5 font-semibold uppercase tracking-wide text-muted">
+          Checks on this answer
+          <InfoTip title="Checks on this answer">
+            The safeguards that ran for this answer. Access was checked before anything reached the model, and the question was recorded in the audit log before the answer was shown.
+          </InfoTip>
+        </span>
+        <ul className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1.5">
+          {signedInAs ? (
+            <li className="inline-flex items-center gap-1.5">
+              <UserCheck aria-hidden className="h-3.5 w-3.5 text-muted" />
+              <span>
+                Signed in as <span className="font-mono">{signedInAs}</span>
+              </span>
+            </li>
+          ) : null}
+          <li className="inline-flex items-center gap-1.5">
+            <Lock aria-hidden className="h-3.5 w-3.5 text-muted" />
+            Only sources you can open
+          </li>
+          <li className="inline-flex items-center gap-1.5">
+            <ShieldCheck aria-hidden className="h-3.5 w-3.5 text-ok" />
+            {cited === 0 ? (
+              'No sources were used'
+            ) : (
+              <span>
+                Every source checked live just before use{' '}
+                <span className="tabular text-muted">
+                  ({checked.length} of {cited}
+                  {latest ? `, latest ${fmtTime(latest)}` : ''})
+                </span>
+              </span>
+            )}
+          </li>
+          <li className="inline-flex min-w-0 items-center gap-1.5">
+            <ScrollText aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted" />
+            <span className="min-w-0 break-all">
+              Recorded in the audit log <span className="text-muted">(request <span className="font-mono">{res.request_id}</span>)</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </section>
+  );
+}
 
 export function AnswerError({ status, onRetry }: { status: number; onRetry: () => void }) {
   const msg =

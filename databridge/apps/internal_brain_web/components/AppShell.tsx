@@ -9,6 +9,7 @@ import { personaById } from '@/lib/personas';
 import type { WhoAmI } from '@/lib/types';
 import { BrandMark, MockBanner, PRODUCT } from './Brand';
 import { ThemeToggle } from './ThemeToggle';
+import { TourButton, TourOffer } from './tour/Tour';
 
 const MeContext = createContext<WhoAmI | null>(null);
 export const useMe = () => useContext(MeContext);
@@ -18,6 +19,9 @@ export const ROLE_LABEL: Record<string, string> = {
   compliance_officer: 'Compliance officer',
   admin_it: 'IT admin',
 };
+
+/** "Same question, two people" needs demo sign-in, which is always on in this demo build. */
+export const DEMO_COMPARE = process.env.NEXT_PUBLIC_IB_DEMO_COMPARE !== '0';
 
 export function AppShell({ children, requireRole }: { children: React.ReactNode; requireRole?: 'compliance_officer' | 'admin_it' }) {
   const router = useRouter();
@@ -53,6 +57,8 @@ export function AppShell({ children, requireRole }: { children: React.ReactNode;
 
   const nav = [
     { href: '/', label: 'Ask', show: true },
+    { href: '/map', label: 'Map', show: true },
+    { href: '/compare', label: 'Compare', show: DEMO_COMPARE },
     { href: '/audit', label: 'Audit', show: !!me?.roles.includes('compliance_officer') },
     { href: '/sim', label: 'Simulator', show: !!me?.roles.includes('admin_it') },
   ].filter((n) => n.show);
@@ -71,7 +77,7 @@ export function AppShell({ children, requireRole }: { children: React.ReactNode;
           </Link>
           {me ? (
             <nav aria-label="Primary" className="order-3 w-full sm:order-none sm:w-auto">
-              <ul className="flex items-center gap-1">
+              <ul className="flex flex-wrap items-center gap-1">
                 {nav.map((n) => {
                   const active = n.href === '/' ? pathname === '/' : pathname.startsWith(n.href);
                   return (
@@ -101,6 +107,7 @@ export function AppShell({ children, requireRole }: { children: React.ReactNode;
                 </div>
               </div>
             ) : null}
+            <TourButton />
             <ThemeToggle />
             {me ? (
               <button
@@ -144,7 +151,10 @@ export function AppShell({ children, requireRole }: { children: React.ReactNode;
             </div>
           </div>
         ) : (
-          children
+          <>
+            <TourOffer className="mb-6" />
+            {children}
+          </>
         )}
       </main>
     </MeContext.Provider>

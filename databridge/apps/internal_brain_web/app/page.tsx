@@ -9,7 +9,8 @@ import { SourcesPanel } from '@/components/SourcesPanel';
 import { Button } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
-import { PERSONAS, personaById } from '@/lib/personas';
+import { PERSONAS, SAMPLE_QUESTION, personaById } from '@/lib/personas';
+import { useTourAction } from '@/lib/tour';
 import type { AskResponse, HistoryItem } from '@/lib/types';
 
 const MAX = 2000;
@@ -64,6 +65,8 @@ function AskView() {
     if (phase.kind === 'done') answerHeading.current?.focus();
   }, [phase]);
 
+  useTourAction('ask-sample', () => void ask(SAMPLE_QUESTION));
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0 space-y-6">
@@ -79,6 +82,7 @@ function AskView() {
           }}
           className="rounded-lg border border-line bg-surface p-3"
           aria-label="Ask a question"
+          data-tour="ask-form"
         >
           <label htmlFor="question" className="mb-2 block text-sm font-medium">
             Your question
@@ -141,7 +145,7 @@ function AskView() {
               <AnswerLoading />
             </div>
           ) : phase.kind === 'done' ? (
-            <AnswerCard ref={answerHeading} res={phase.res} question={phase.q} />
+            <AnswerCard ref={answerHeading} res={phase.res} question={phase.q} signedInAs={me?.sub} tour />
           ) : phase.kind === 'error' ? (
             <AnswerError status={phase.status} onRetry={() => void ask(phase.q)} />
           ) : null}

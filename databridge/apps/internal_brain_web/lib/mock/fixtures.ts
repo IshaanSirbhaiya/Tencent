@@ -14,6 +14,8 @@ export const ROLES: Record<string, { name: string; roles: string[]; employment: 
   'sara.sec': { name: 'Sara Lim', roles: ['employee'], employment: 'employee' },
   'maya.compliance': { name: 'Maya Tan', roles: ['employee', 'compliance_officer'], employment: 'employee' },
   'leo.ops': { name: 'Leo Kumar', roles: ['employee'], employment: 'employee' },
+  'amy.am': { name: 'Amy Lim', roles: ['employee'], employment: 'employee' },
+  'mlro.tan': { name: 'Rachel Tan', roles: ['employee'], employment: 'employee' },
   'admin.it': { name: 'Alex Mercer', roles: ['employee', 'admin_it'], employment: 'employee' },
 };
 

@@ -19,6 +19,8 @@
   --warn: 232 184 88;
   --bad: 244 124 114;
   --focus: 128 172 255;
+  --tour-scrim: 0 0 0;
+  --tour-scrim-alpha: 0.6;
   color-scheme: dark;
 }
 
@@ -37,6 +39,8 @@
   --warn: 128 84 0;
   --bad: 176 34 24;
   --focus: 29 86 196;
+  --tour-scrim: 17 20 24;
+  --tour-scrim-alpha: 0.42;
   color-scheme: light;
 }
 
@@ -92,4 +96,26 @@ body {
 .cite-target:target,
 .cite-target[data-active='true'] {
   box-shadow: inset 3px 0 0 rgb(var(--accent));
+}
+
+/* Knowledge map nodes are SVG <g role="button">: draw the focus ring on the shape itself. */
+.map-node:focus {
+  outline: none;
+}
+.map-node:focus-visible .node-ring {
+  stroke: rgb(var(--focus)) !important;
+  stroke-width: 3px !important;
+}
+
+/* Calm indeterminate progress (map loading). Reduced motion: the global rule above stills it. */
+@keyframes ib-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+.ib-indeterminate {
+  animation: ib-indeterminate 1.6s ease-in-out infinite;
 }

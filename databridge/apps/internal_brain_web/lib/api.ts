@@ -6,6 +6,7 @@ import type {
   AuditEvent,
   AuditFilter,
   HistoryItem,
+  KnowledgeMap,
   RevealResult,
   SimResult,
   SourceStatus,
@@ -23,14 +24,25 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, init?: { method?: 'GET' | 'POST'; body?: unknown }): Promise<T> {
+/**
+ * Session slots for the "Same question, two people" page. Slot `a` is the main session
+ * (cookie `ib_session`). Slots `b` and `c` are separate signed sessions (`ib_session_b`,
+ * `ib_session_c`) that the proxy selects from the `x-ib-slot` header. Identity still comes only
+ * from a signed token minted by /auth/demo-login; the header only picks WHICH cookie to forward.
+ */
+export type Slot = 'a' | 'b' | 'c';
+
+async function call<T>(path: string, init?: { method?: 'GET' | 'POST'; body?: unknown; slot?: Slot }): Promise<T> {
   let res: Response;
+  const headers: Record<string, string> = {};
+  if (init?.body !== undefined) headers['content-type'] = 'application/json';
+  if (init?.slot && init.slot !== 'a') headers['x-ib-slot'] = init.slot;
   try {
     res = await fetch(`${BASE}${path}`, {
       method: init?.method ?? 'GET',
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: init?.body !== undefined ? { 'content-type': 'application/json' } : undefined,
+      headers,
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
   } catch {
@@ -80,6 +92,8 @@ export function groupByRequest(rows: LedgerRow[]): AuditEvent[] {
   return order.map((id) => byReq.get(id)!) as unknown as AuditEvent[];
 }
 
+let mapInFlight: Promise<KnowledgeMap> | null = null;
+
 export const api = {
   login: (persona: string, passcode?: string) =>
     call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
@@ -90,6 +104,12 @@ export const api = {
   whoami: () => call<WhoAmI>('/auth/whoami'),
   ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question } }),
   history: () => call<{ items: HistoryItem[] }>('/ib/history'),
+  // The IB checks every item live before listing it (several seconds for a big map), so concurrent
+  // callers (e.g. a remount) share one in-flight request instead of starting another.
+  map: (): Promise<KnowledgeMap> => {
+    if (!mapInFlight) mapInFlight = call<KnowledgeMap>('/ib/map').finally(() => (mapInFlight = null));
+    return mapInFlight;
+  },
   sources: async (): Promise<SourceStatus[]> => {
     const r = await call<{ sources: SourceStatus[] } | SourceStatus[]>('/ib/sources');
     return Array.isArray(r) ? r : r.sources ?? [];
@@ -111,5 +131,16 @@ export const api = {
   verify: () => call<VerifyResult>('/audit/verify'),
   sim: (action: SimAction) => call<SimResult>(`/sim/${action}`, { method: 'POST', body: {} }),
 };
+
+/** The same calls, bound to a separate compare slot. Never touches the main session cookie. */
+export function slotApi(slot: Exclude<Slot, 'a'>) {
+  return {
+    login: (persona: string) =>
+      call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', { method: 'POST', body: { persona }, slot }),
+    whoami: () => call<WhoAmI>('/auth/whoami', { slot }),
+    ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question }, slot }),
+    map: () => call<KnowledgeMap>('/ib/map', { slot }),
+  };
+}
 
 export type SimAction = 'runbook-update' | 'revoke-channel' | 'restrict-page' | 'reset';

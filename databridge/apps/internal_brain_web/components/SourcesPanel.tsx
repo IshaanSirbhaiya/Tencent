@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { PLATFORM_LABEL, fmtAgo, fmtDateTime, fmtDuration } from '@/lib/format';
 import type { SourceStatus } from '@/lib/types';
+import { InfoTip } from './InfoTip';
 import { PlatformIcon } from './PlatformIcon';
 import { Badge } from './ui';
 
@@ -39,11 +40,16 @@ export function SourcesPanel({ refreshKey }: { refreshKey?: number }) {
   }, [load, refreshKey]);
 
   return (
-    <section aria-labelledby="sources-heading" className="rounded-lg border border-line bg-surface" data-testid="sources-panel">
+    <section aria-labelledby="sources-heading" className="rounded-lg border border-line bg-surface" data-testid="sources-panel" data-tour="sources-panel">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <h2 id="sources-heading" className="text-sm font-semibold">
-          Source sync status
-        </h2>
+        <div className="flex items-center gap-1">
+          <h2 id="sources-heading" className="text-sm font-semibold">
+            Source sync status
+          </h2>
+          <InfoTip title="Source sync status">
+            How up to date our copy of each platform is. Changes arrive within minutes; if a platform falls behind its target, answers mark its sources as stale.
+          </InfoTip>
+        </div>
         <button
           type="button"
           onClick={load}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AuditDrawer } from '@/components/audit/AuditDrawer';
 import { AuditTable } from '@/components/audit/AuditTable';
+import { InfoTip } from '@/components/InfoTip';
 import { VerifyPanel } from '@/components/audit/VerifyPanel';
 import { Button, Field, inputClass } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -234,11 +235,16 @@ function AuditView() {
         </form>
       </section>
 
-      <section aria-labelledby="results-heading" className="space-y-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 id="results-heading" className="text-sm font-semibold">
-            Requests
-          </h2>
+      <section aria-labelledby="results-heading" className="space-y-2" data-tour="audit-table">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <h2 id="results-heading" className="text-sm font-semibold">
+              Requests
+            </h2>
+            <InfoTip title="Requests in the audit log" testId="infotip-audit">
+              One row per question: who asked, which sources were considered, whether each one was allowed, and what the answer used. The answer text itself stays hidden unless you give a reason, and that reveal is logged too.
+            </InfoTip>
+          </div>
           {events ? (
             <span className="text-xs text-muted tabular" data-testid="result-count">
               {events.length} shown

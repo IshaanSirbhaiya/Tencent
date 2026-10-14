@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { TourOverlay } from '@/components/tour/Tour';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to main content
         </a>
         {children}
+        <TourOverlay />
       </body>
     </html>
   );

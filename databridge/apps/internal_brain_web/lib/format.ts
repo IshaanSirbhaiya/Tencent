@@ -75,3 +75,32 @@ export function truncHash(h: string, n = 12): string {
   const s = h.replace(/^sha256:/, '');
   return s.length <= n * 2 ? s : `${s.slice(0, n)}…${s.slice(-6)}`;
 }
+
+/** How a container is named on screen: Slack channels get their '#'. The name itself is the IB's. */
+export function placeLabel(platform: string, name: string): string {
+  if (platform === 'slack' && name && !name.startsWith('#')) return `#${name}`;
+  return name;
+}
+
+export const PLACE_NOUN: Record<string, [string, string]> = {
+  confluence: ['space', 'spaces'],
+  jira: ['project', 'projects'],
+  slack: ['channel', 'channels'],
+  drive: ['shared drive', 'shared drives'],
+};
+
+export const KIND_LABEL: Record<string, string> = { page: 'Page', issue: 'Issue', thread: 'Thread', file: 'File' };
+
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n.toLocaleString()} ${n === 1 ? one : many}`;
+}
+
+/** Short, honest version text: a number is a version, an ISO time is a revision date, else an opaque revision id. */
+export function shortVersion(v: string): { text: string; full: string } {
+  if (!v) return { text: '—', full: '' };
+  if (/^\d+$/.test(v)) return { text: `v${v}`, full: `Version ${v}` };
+  // Jira's version is its last-updated time, already shown as "Updated …".
+  if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return { text: '', full: `Revision of ${v}` };
+  const head = v.split('|')[0];
+  return { text: `rev ${head.length > 10 ? `${head.slice(0, 10)}…` : head}`, full: `Revision ${v}` };
+}

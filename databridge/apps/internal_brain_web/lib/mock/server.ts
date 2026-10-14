@@ -17,6 +17,7 @@ import {
   EXTRACTIVE,
   citation,
 } from './fixtures';
+import { buildMap } from './map';
 
 const COOKIE = 'ib_session';
 const SLO_S = 300;
@@ -96,8 +97,7 @@ function event(
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const err = (status: number, detail: string) => json({ detail }, status);
 
-function principal(req: NextRequest): string | null {
-  const v = req.cookies.get(COOKIE)?.value;
+function principal(v: string | undefined): string | null {
   if (!v || !v.startsWith('mock.')) return null;
   const sub = v.slice(5);
   return ROLES[sub] ? sub : null;
@@ -149,7 +149,8 @@ function parseAuditQuestion(q: string): Record<string, string> {
   return f;
 }
 
-export async function handleMock(req: NextRequest, path: string): Promise<NextResponse> {
+/** `session` is the value of whichever session cookie the route picked for this request's slot. */
+export async function handleMock(req: NextRequest, path: string, session?: string): Promise<NextResponse> {
   const s = store();
   const method = req.method.toUpperCase();
 
@@ -164,7 +165,7 @@ export async function handleMock(req: NextRequest, path: string): Promise<NextRe
     return res;
   }
 
-  const sub = principal(req);
+  const sub = principal(session);
   if (!sub) return err(401, 'authentication required');
   const me = ROLES[sub];
 
@@ -208,6 +209,12 @@ export async function handleMock(req: NextRequest, path: string): Promise<NextRe
       .slice(0, 50)
       .map((e) => ({ req_id: e.req_id, question: e.question ?? '', event_time: e.event_time }));
     return json({ items });
+  }
+
+  if (path === 'ib/map') {
+    // The real route confirms every item live with its source; simulate that wait.
+    await new Promise((r) => setTimeout(r, 1500));
+    return json(buildMap(sub, s.state, SCOPE_NOTE));
   }
 
   if (path === 'ib/sources') {

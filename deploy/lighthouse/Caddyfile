@@ -44,8 +44,8 @@
 		-X-Powered-By
 	}
 
-	# The only public routes: the four pages, Next's static assets, and the same-origin API proxy.
-	@web path / /login /audit /sim /_next/static/* /api/ib/*
+	# The only public routes: the six pages, Next's static assets, and the same-origin API proxy.
+	@web path / /login /audit /sim /map /compare /_next/static/* /api/ib/*
 	handle @web {
 		reverse_proxy web:3100
 	}

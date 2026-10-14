@@ -116,3 +116,36 @@ export interface SimResult {
 }
 
 export const ALLOW_VERDICTS = new Set(['verified', 'drift_material']);
+
+/** GET /ib/map: everything the signed-in person may open, grouped platform → container → item.
+ *  Restricted items are never listed or counted, so nothing here can hint that more exists. */
+export interface MapItem {
+  doc_id: string;
+  title: string;
+  kind: 'page' | 'issue' | 'thread' | 'file' | string;
+  version: string;
+  updated_at: string;
+  deep_link: string;
+}
+
+export interface MapContainer {
+  container: string;
+  name: string;
+  count: number;
+  items: MapItem[];
+}
+
+export interface MapPlatform {
+  platform: Platform;
+  count: number;
+  containers: MapContainer[];
+}
+
+export interface KnowledgeMap {
+  as_of: string;
+  scope_note: string;
+  sub: string;
+  totals: { items: number; containers: number; platforms: number };
+  platforms: MapPlatform[];
+  freshness_note: string;
+}
