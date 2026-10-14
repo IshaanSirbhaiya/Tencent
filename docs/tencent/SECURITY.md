@@ -225,7 +225,7 @@ Tests are in `tests/` (internal brain) or `databridge/apps/mock_platforms/tests/
   it. Unknown values are no longer passed through.
 - **Webhook MAC.** The signature is now `HMAC-SHA256(secret, f"{timestamp}.{delivery_id}.{body}")`, on
   the receiver (`_http.py:204`, `WebhookVerifier.verify`) and on the sender (`databridge/apps/mock_platforms/mock_platforms/webhooks.py`, `sign`).
-  `docs/tencent/CONTRACTS.md` §2 still states the old formula `f"{ts}.{body}"` and must be updated to match.
+  `docs/tencent/CONTRACTS.md` §2 states the same formula.
 
 | # | Finding | Disposition | Where / regression test |
 |---|---|---|---|
@@ -261,3 +261,36 @@ Tests are in `tests/` (internal brain) or `databridge/apps/mock_platforms/tests/
 Two behaviour changes follow from 3b-8 and 3b-17. `ORD-4111111111111111` (a Luhn-valid card number
 behind an id prefix) is now masked, and so is a lowercase NRIC such as `s1234567d`. The negative cases in
 `test_sensitive.py::test_no_false_positives` were updated to match.
+
+## 10. Reviews of the WorkBuddy connectors: Codex track 4 and CodeBuddy (CB5)
+
+Two more independent reviews ran on 14 Oct: **Codex track 4** on the MCP connectors, the token CLI and the
+setup scripts (`reviews/security-r1/codex_track4_mcp_tokens.md`, 10 findings) and **CodeBuddy on Tencent
+Hunyuan `hy3`** on the app, auth, pipeline, gates and audit (`reviews/codebuddy_security_review.md`,
+7 findings). CodeBuddy fixed its own connector code in session CB6; the rest was fixed by Claude. Each
+fix has a regression test; tests are in `databridge/apps/internal_brain/tests/`.
+
+| # | Finding | Disposition | Where / regression test |
+|---|---|---|---|
+| T4-1 | Token CLI prints a usable token | **Fixed (CB6).** Prints only with `--print`; `--out FILE` writes an owner-only file; setup imports `mint_for` so no token passes through stdout. | `databridge/scripts/ib_mint_token.py`; `test_mint_token_cli.py` |
+| T4-2 | Token files can land inside the repo, readable by others | **Fixed.** `workbuddy_setup.py` refuses an output folder inside the repository and restricts each `mcp.json` to the current user (icacls / chmod 600). | `databridge/scripts/workbuddy_setup.py` |
+| T4-3 | Non-JSON or malformed responses crash a tool | **Fixed (CB6).** Shape-validated, fixed sanitised error; a bad `whoami` keeps the answer. | `mcp_server.py`, `audit_mcp_server.py`; `test_mcp_server.py` |
+| T4-4 | `doc_id` can redirect the audit request (`../verify#`) | **Fixed (CB6).** Percent-encoded single path segment; `.`/`..`/empty rejected. | `audit_mcp_server.py`; `test_mcp_server.py` |
+| T4-5 | Huge `since_days` crashes | **Fixed (CB6).** Accepted only in 1..3650. | `test_mcp_server.py` |
+| T4-6 | Errors echo URLs and queries | **Fixed (CB6).** Errors carry only the operation and status; credentials/query/fragment in `IB_URL` rejected. | `test_mcp_server.py` |
+| T4-7 | Bearer token over plain HTTP to a remote host | **Fixed (CB6).** Plain HTTP allowed only to loopback. | `test_mcp_server.py` |
+| T4-8 | Concurrent processes lose revocations | **Fixed.** Cross-process lock file + unique temp file around the read-modify-replace. | `databridge_ib/auth.py` `revoke`; `test_revoke_concurrency.py` |
+| T4-9 | Tests bypassed the real HTTP helpers; no audit authorisation tests | **Fixed (CB6).** Tests patch only the client factory; employee-forbidden and officer-allowed on every audit tool; the officer stays the acting subject when filtering another user. | `test_mcp_server.py` |
+| T4-10 | Launcher's `PYTHONPATH` separator was Windows-only | **Fixed.** Uses `os.pathsep`. | `databridge/scripts/run_local_demo.sh` |
+| CB5-1 | Demo sign-in without a passcode lets anyone pick any persona | **Fixed for deployments.** A deployed build refuses to start with demo sign-in on and no passcode of 8+ characters. Locally it stays open by design (synthetic data, one user). | `databridge_ib/config.py` `assert_deployable`; `test_config_deployable.py` |
+| CB5-2 | A holder of the ledger key can rewrite records after the last published head | **Documented (residual),** as in §3: detection beyond the last off-host head needs the key kept away from the app (KMS/HSM) and a shorter anchor interval. | §3 |
+| CB5-3 | The answer store sits outside the sealed chain; `verify` didn't check it | **Fixed.** `/audit/verify` re-hashes every stored answer against the digest sealed in `answer.released` and fails on any mismatch or missing answer, without needing a reveal. | `databridge_ib/audit/routes.py` `_verify_content`; `test_audit_verify_content.py` |
+| CB5-4 | Webhook route relies on the signature alone; replay cache is per process; no rate limit | **Documented.** The signature (with delivery id and ±300 s window) is the control by design; the demo runs one Brain process; stock Caddy has no rate limiter. Events only trigger a re-fetch through both gates, so a replay costs work, not access. | `connectors/_http.py` `WebhookVerifier` |
+| CB5-5 | A browser user could label their question as coming from WorkBuddy | **Fixed.** The `workbuddy-mcp` label is honoured only on bearer-token calls. | `databridge_ib/app.py` `ask`; `test_channel_label.py` |
+| CB5-6 | `/ib/sources` shows platform freshness to any employee | **Accepted.** Operational metadata only; it is what makes the freshness promise checkable. | |
+| CB5-7 | Session cookie is `Secure` only when deployed | **Accepted.** Deployed builds set `Secure`; local runs use plain `http://localhost`. | `app.py` `demo_login` |
+
+**Found while wiring the connector, not by a reviewer:** every `/audit/*` call through the real app answered
+401, because the routes read the user's id from `sub` while the app's user object carries `id`. Fixed, with
+a test through the real app (`test_audit_routes_real_principal.py`).
+
