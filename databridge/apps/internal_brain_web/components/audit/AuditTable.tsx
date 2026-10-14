@@ -8,6 +8,19 @@ export function titleFor(e: AuditEvent, docId: string): string {
   return e.considered_meta?.find((m) => m.doc_id === docId)?.title ?? docId;
 }
 
+const REASON_LABEL: Record<string, string> = {
+  verified: 'checked',
+  drift_material: 'changed, re-read',
+  forbidden: 'not allowed',
+  not_member: 'not allowed',
+  timeout: 'source too slow',
+  source_error: 'source error',
+};
+
+function plainReason(code: string): string {
+  return REASON_LABEL[code] ?? code;
+}
+
 export function Decisions({ e, limit }: { e: AuditEvent; limit?: number }) {
   const g = e.gate2 ?? [];
   if (g.length === 0) return <span className="text-muted">None</span>;
@@ -27,7 +40,9 @@ export function Decisions({ e, limit }: { e: AuditEvent; limit?: number }) {
                 Deny
               </Badge>
             )}
-            <span className="font-mono text-2xs text-muted">{allow ? d.verdict : d.reason_code || d.verdict}</span>
+            <span className="text-2xs text-muted" title={allow ? d.verdict : d.reason_code || d.verdict}>
+              {plainReason(allow ? d.verdict : d.reason_code || d.verdict)}
+            </span>
           </li>
         );
       })}

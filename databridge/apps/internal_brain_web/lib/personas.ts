@@ -43,7 +43,6 @@ export const PERSONAS: Persona[] = [
       'When will the OCR model update reach production?',
       'What is the support SLA for the KYC OCR service?',
       'Show me the security incident report from the Q3 breach.',
-      'Show me the security incident report from the Q7 breach.',
     ],
   },
   {

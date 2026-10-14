@@ -40,7 +40,7 @@ for (const vp of [
 
       await login(page, 'admin.it');
       await page.goto('/sim');
-      await page.getByRole('button', { name: 'Edit failover runbook (v7→v8)' }).click();
+      await page.getByRole('button', { name: 'Edit failover runbook (new version)' }).click();
       await expect(page.getByTestId('sim-log')).toContainText('Done');
       await page.screenshot({ path: shot(`06-sim-${vp.name}`), fullPage: true });
 

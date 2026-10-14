@@ -38,7 +38,7 @@ test('audit: NL question shows the parsed filter before results; manual filter; 
   await rows.first().getByRole('button', { name: /Details for request/ }).click();
   const drawer = page.getByTestId('audit-drawer');
   await expect(drawer).toBeVisible();
-  await expect(drawer).toContainText('the reveal itself is recorded in the ledger');
+  await expect(drawer).toContainText('Your reveal is logged under your name');
   await drawer.getByRole('button', { name: 'Reveal answer' }).click();
   await expect(drawer.getByText('Please give a fuller reason.')).toBeVisible();
   await expect(drawer.getByTestId('revealed-answer')).toHaveCount(0);

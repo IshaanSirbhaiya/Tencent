@@ -18,7 +18,7 @@ test('login → ask → citations visible → scope note visible', async ({ page
   await expect(chips.first()).toBeVisible();
   const items = answer.getByTestId('citations').locator('li');
   await expect(items).toHaveCount(await chips.count());
-  await expect(items.first()).toContainText('Access re-checked');
+  await expect(items.first()).toContainText('Checked live');
   await expect(items.first().getByRole('link')).toHaveAttribute('target', '_blank');
   await expect(answer.getByTestId('scope-note')).toHaveText(SCOPE_NOTE);
   await expect(answer.getByTestId('model-badge')).toHaveText('Tencent Hunyuan hy3');
@@ -51,14 +51,14 @@ test('refusal renders calmly with the same layout and the same scope note', asyn
 test('503 shows the "nothing was answered" state', async ({ page }) => {
   await login(page, 'jdoe');
   await ask(page, '[mock:503] anything');
-  await expect(page.getByTestId('answer-error')).toContainText('The Internal Brain is temporarily unavailable — nothing was answered.');
+  await expect(page.getByTestId('answer-error')).toContainText('The Internal Brain is unavailable right now. Nothing was answered. Try again in a moment.');
   await expect(page.getByTestId('answer')).toHaveCount(0);
 });
 
 test('model badges: fallback, extractive, live re-read and stale cues are text, not colour', async ({ page }) => {
   await login(page, 'leo.ops');
   await ask(page, 'Can we offer multi-currency accounts to an Indonesian SME customer?');
-  await expect(page.getByTestId('answer')).toContainText('Stale');
+  await expect(page.getByTestId('answer')).toContainText('May be out of date');
   await ask(page, 'What was the root cause of the payment outage last quarter, and what follow-up tickets were created?');
   await expect(page.getByTestId('model-badge')).toHaveText('DeepSeek (fallback)');
   await login(page, 'sara.sec');
@@ -77,7 +77,7 @@ test('simulator: revocation and v8 runbook are reflected on the next question', 
   await login(page, 'admin.it');
   await page.goto('/sim');
   await page.getByRole('button', { name: 'Remove jdoe from #db-migration' }).click();
-  await page.getByRole('button', { name: 'Edit failover runbook (v7→v8)' }).click();
+  await page.getByRole('button', { name: 'Edit failover runbook (new version)' }).click();
   await expect(page.getByTestId('sim-log').locator('li')).toHaveCount(2);
   await expect(page.getByTestId('sim-log')).toContainText('Done');
 

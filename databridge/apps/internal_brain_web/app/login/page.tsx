@@ -28,7 +28,7 @@ export default function LoginPage() {
           : status === 404
           ? 'Demo sign-in is not enabled on this server.'
           : status === 400
-            ? 'That persona is not in the directory.'
+            ? "We couldn't find that person. Pick one from the list."
             : 'The Internal Brain is temporarily unavailable. Try again in a moment.',
       );
       setBusy(null);
@@ -47,10 +47,13 @@ export default function LoginPage() {
       className="group flex w-full items-center gap-3 rounded-md border border-line-strong bg-surface px-3 py-2.5 text-left hover:border-accent/60 hover:bg-raised disabled:opacity-60"
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium text-fg">
-          {p.id === 'admin.it' ? 'IT admin (simulator)' : `${p.name} — ${p.role}`}
+        <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-fg">
+          {p.id === 'admin.it' ? "IT admin: change someone's access" : `${p.name} — ${p.role}`}
+          {p.id === 'jdoe' ? (
+            <span className="rounded border border-accent/50 bg-accent/10 px-1.5 py-0.5 text-2xs font-semibold text-accent">Start here</span>
+          ) : null}
         </span>
-        <span className="block truncate text-2xs text-muted">{p.note}</span>
+        <span className="block truncate text-xs text-muted">{p.note}</span>
         <span className="block font-mono text-2xs text-muted">{p.id}</span>
       </span>
       {busy === p.id ? (
@@ -82,13 +85,13 @@ export default function LoginPage() {
         <section aria-labelledby="signin-heading" className="rounded-lg border border-line bg-surface" data-tour="personas">
           <div className="border-b border-line px-5 py-4">
             <div className="mb-2 inline-flex items-center gap-1.5 rounded border border-line-strong bg-raised px-2 py-0.5 text-2xs font-medium text-muted" data-testid="synthetic-label">
-              <Database aria-hidden className="h-3 w-3" /> Synthetic demo data — Company A
+              <Database aria-hidden className="h-3 w-3" /> Made-up demo data for Company A
             </div>
             <h1 id="signin-heading" className="text-lg font-semibold">
-              Demo sign-in
+              Try it as someone at Company A
             </h1>
             <p className="mt-1 text-sm text-muted">
-              Choose a persona. Each one sees only what they can open in Confluence, Jira, Slack and Google Drive, and every question is recorded in the audit ledger.
+              Pick a person. Each one can open different things in Confluence, Jira, Slack and Google Drive. Ask the same question as two of them and compare the answers.
             </p>
           </div>
           <div className="space-y-5 px-5 py-4">
@@ -116,7 +119,7 @@ export default function LoginPage() {
               </ul>
             </div>
             <div>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Platform operator</h2>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Change access (IT admin)</h2>
               <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <li>
                   <PersonaButton p={admin} />
@@ -130,7 +133,7 @@ export default function LoginPage() {
             ) : null}
           </div>
           <p className="border-t border-line px-5 py-3 text-2xs text-muted">
-            Demo sign-in stands in for single sign-on. Your session is an httpOnly cookie; the browser never holds a token.
+            Demo sign-in stands in for your company's single sign-on.
           </p>
         </section>
       </main>

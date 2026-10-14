@@ -92,14 +92,34 @@ export function groupByRequest(rows: LedgerRow[]): AuditEvent[] {
   return order.map((id) => byReq.get(id)!) as unknown as AuditEvent[];
 }
 
+const PASSCODE_KEY = 'ib-demo-passcode';
+function storedPasscode(): string | undefined {
+  try {
+    return window.sessionStorage.getItem(PASSCODE_KEY) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+function rememberPasscode(passcode?: string) {
+  try {
+    if (passcode) window.sessionStorage.setItem(PASSCODE_KEY, passcode);
+    else window.sessionStorage.removeItem(PASSCODE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 let mapInFlight: Promise<KnowledgeMap> | null = null;
 
 export const api = {
-  login: (persona: string, passcode?: string) =>
-    call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
+  login: async (persona: string, passcode?: string) => {
+    const r = await call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
       method: 'POST',
       body: passcode ? { persona, passcode } : { persona },
-    }),
+    });
+    if (passcode) rememberPasscode(passcode);
+    return r;
+  },
   logout: () => call<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {} }),
   whoami: () => call<WhoAmI>('/auth/whoami'),
   ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question } }),
@@ -135,8 +155,14 @@ export const api = {
 /** The same calls, bound to a separate compare slot. Never touches the main session cookie. */
 export function slotApi(slot: Exclude<Slot, 'a'>) {
   return {
-    login: (persona: string) =>
-      call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', { method: 'POST', body: { persona }, slot }),
+    login: (persona: string) => {
+      const passcode = storedPasscode();
+      return call<{ sub: string; roles: string[]; name: string }>('/auth/demo-login', {
+        method: 'POST',
+        body: passcode ? { persona, passcode } : { persona },
+        slot,
+      });
+    },
     whoami: () => call<WhoAmI>('/auth/whoami', { slot }),
     ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question }, slot }),
     map: () => call<KnowledgeMap>('/ib/map', { slot }),

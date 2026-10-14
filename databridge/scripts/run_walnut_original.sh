@@ -158,5 +158,5 @@ Walnut (original screens) on Company A is running. Local only.
   Provenance        http://localhost:$WEB_PORT/evidence?entity=knowledge_page%3Acf-1001
   Guided tour       http://localhost:$WEB_PORT/demo
   Gateway health    $GW_URL/health
-Pick any persona on the first screen. Stop with: bash scripts/run_walnut_original.sh stop
+Sign in as Jordan Doe (the graph is his view). Stop with: bash scripts/run_walnut_original.sh stop
 EOF

@@ -36,13 +36,13 @@ export function VerifyPanel() {
         <div>
           <div className="flex items-center gap-1">
             <h2 id="verify-heading" className="text-sm font-semibold">
-              Ledger integrity
+              Audit log check
             </h2>
             <InfoTip title="Audit chain" testId="infotip-verify">
               The audit log is a chain: each entry carries the previous entry&apos;s fingerprint, so an edit or deletion anywhere breaks the chain. Verify re-checks every link and compares the latest one with the copy published outside this system.
             </InfoTip>
           </div>
-          <p className="text-2xs text-muted">Re-checks every hash link, the seal, the anchor directory and the last externally published head.</p>
+          <p className="text-2xs text-muted">Checks that no entry was changed or removed, and that every stored answer still matches its fingerprint.</p>
         </div>
         <Button onClick={run} busy={busy} icon={ShieldCheck}>
           Verify audit chain

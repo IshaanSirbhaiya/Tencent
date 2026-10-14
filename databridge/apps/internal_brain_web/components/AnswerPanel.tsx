@@ -96,7 +96,7 @@ export function CitationList({ citations, idPrefix = '', tour = false }: { citat
             <span aria-hidden>·</span>
             <span className="tabular">Updated {fmtDate(c.updated_at)}</span>
             <Badge tone="ok" icon={ShieldCheck} title={`Access re-checked against ${c.platform} at ${c.authz_checked_at}`}>
-              Access re-checked {fmtTime(c.authz_checked_at)}
+              Checked live {fmtTime(c.authz_checked_at)}
             </Badge>
             {c.live_read ? (
               <Badge tone="accent" icon={RefreshCw} title={`Content re-read from ${c.platform} at ${c.content_checked_at}`}>
@@ -105,7 +105,7 @@ export function CitationList({ citations, idPrefix = '', tour = false }: { citat
             ) : null}
             {c.stale ? (
               <Badge tone="warn" icon={TriangleAlert} title="This source is syncing behind its freshness target; newer edits may not be reflected">
-                Stale: source sync behind target
+                May be out of date
               </Badge>
             ) : null}
           </div>
@@ -194,7 +194,7 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
               Sources cited
             </Sub>
             <InfoTip title="Sources cited">
-              Every source behind this answer, with its version and a link to the original. &ldquo;Access re-checked&rdquo; is when we asked the platform itself, just before use, whether this person can still open it.
+              Every source behind this answer, with its version and a link to the original. &ldquo;Checked live&rdquo; is when we asked the platform itself, just before use, whether this person can still open it.
             </InfoTip>
           </div>
           <CitationList citations={res.citations} idPrefix={idPrefix} tour={tour} />
@@ -219,7 +219,7 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
 });
 
 /**
- * "Checks on this answer": the core guarantees, stated with the data that backs them for THIS
+ * "How this was checked": the core guarantees, stated with the data that backs them for THIS
  * answer: who it was for, that every cited source was re-checked live (count and latest check time
  * come from the citations), and the request id under which it sits in the audit ledger.
  */
@@ -229,15 +229,15 @@ export function ChecksStrip({ res, signedInAs, tour = false }: { res: AskRespons
   const latest = checked.map((c) => c.authz_checked_at).sort().at(-1);
   return (
     <section
-      aria-label="Checks on this answer"
+      aria-label="How this was checked"
       className="rounded-b-lg border-t border-line bg-raised/40 px-4 py-2.5"
       data-testid="checks-strip"
       data-tour={tour ? 'checks' : undefined}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs text-fg">
         <span className="inline-flex items-center gap-0.5 font-semibold uppercase tracking-wide text-muted">
-          Checks on this answer
-          <InfoTip title="Checks on this answer">
+          How this was checked
+          <InfoTip title="How this was checked">
             The safeguards that ran for this answer. Access was checked before anything reached the model, and the question was recorded in the audit log before the answer was shown.
           </InfoTip>
         </span>
@@ -283,7 +283,7 @@ export function ChecksStrip({ res, signedInAs, tour = false }: { res: AskRespons
 export function AnswerError({ status, onRetry }: { status: number; onRetry: () => void }) {
   const msg =
     status === 503 || status === 0 || status >= 500
-      ? 'The Internal Brain is temporarily unavailable — nothing was answered.'
+      ? 'The Internal Brain is unavailable right now. Nothing was answered. Try again in a moment.'
       : status === 403
         ? 'Your account is not permitted to ask questions — nothing was answered.'
         : status === 422

@@ -19,7 +19,7 @@ interface Action {
 const ACTIONS: Action[] = [
   {
     id: 'runbook-update',
-    label: 'Edit failover runbook (v7→v8)',
+    label: 'Edit failover runbook (new version)',
     platform: 'confluence',
     icon: FilePenLine,
     what: 'Adds step 4b to "Payment service failover runbook" in Confluence. The platform fires a signed webhook; the Internal Brain re-reads the page.',
@@ -31,7 +31,7 @@ const ACTIONS: Action[] = [
     platform: 'slack',
     icon: UserMinus,
     what: 'Removes Jordan Doe from the private Slack channel. Access is re-checked live on the next question.',
-    then: 'Then, as Jordan: "What backfill throttle are we using for the ledger copy job?" — the answer is now refused.',
+    then: 'Then, as Jordan: "What backfill throttle are we using for the ledger copy job?" — the answer no longer uses that channel.',
   },
   {
     id: 'restrict-page',
@@ -39,14 +39,14 @@ const ACTIONS: Action[] = [
     platform: 'confluence',
     icon: Lock,
     what: 'Adds a read restriction (payments leads only) to the Confluence page.',
-    then: 'Then, as Jordan: "When is the next settlement key rotation window?" — the answer is now refused.',
+    then: 'Then, as Jordan: "When is the next settlement key rotation window?" — the answer no longer uses that channel.',
   },
   {
     id: 'reset',
     label: 'Reset demo',
     platform: '',
     icon: RotateCcw,
-    what: 'Reloads the synthetic Company A estate on every mock platform. The audit ledger is append-only and is not reset.',
+    what: 'Restores the demo data on every demo platform. The audit log is never reset.',
     then: 'Use before each demo run.',
   },
 ];

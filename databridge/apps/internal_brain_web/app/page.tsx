@@ -102,7 +102,7 @@ function AskView() {
             maxLength={MAX}
             aria-describedby="question-hint"
             placeholder="e.g. What's the status of the database migration project?"
-            className="block w-full resize-y rounded-md border border-line-strong bg-bg px-3 py-2.5 text-[15px] leading-6 text-fg placeholder:text-muted/80"
+            className="block w-full resize-y rounded-md border border-line-strong bg-bg px-3 py-2.5 text-[15px] leading-6 text-fg placeholder:text-muted"
           />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <p id="question-hint" className="text-2xs text-muted">
@@ -132,6 +132,7 @@ function AskView() {
               </li>
             ))}
           </ul>
+          <p className="mt-2 text-2xs text-muted">Tip: open Compare to see the same question answered for Ken, an outside contractor.</p>
         </section>
 
         <div role="status" aria-live="polite" className="sr-only">
@@ -141,7 +142,7 @@ function AskView() {
         <div aria-busy={phase.kind === 'loading'}>
           {phase.kind === 'loading' ? (
             <div className="space-y-2">
-              <p className="text-xs text-muted">Checking your access in each source, then searching only what you can open…</p>
+              <p className="text-xs text-muted">Checking what you can open, then searching…</p>
               <AnswerLoading />
             </div>
           ) : phase.kind === 'done' ? (
@@ -162,7 +163,7 @@ function AskView() {
             {!history ? (
               <p className="px-2 py-1 text-xs text-muted">Loading…</p>
             ) : history.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-muted">No questions yet. Only you can see your history.</p>
+              <p className="px-2 py-1 text-xs text-muted">No questions yet. Ask one above. Only you can see this list.</p>
             ) : (
               <ul>
                 {history.slice(0, 6).map((h) => (

@@ -112,7 +112,7 @@ function AuditView() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Audit console</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted">
-          Every request is written to the hash-chained ledger before an answer is released. This view shows metadata: who asked, what was considered, every access decision and what was released. Answer text needs a reasoned, logged reveal.
+          Every question is logged before the answer is shown. This list shows who asked, which sources were checked and what the answer used. Answer text stays hidden unless you give a reason, and that is logged too.
         </p>
       </div>
 

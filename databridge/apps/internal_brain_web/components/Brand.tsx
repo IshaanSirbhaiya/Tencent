@@ -10,7 +10,7 @@ export function BrandMark() {
 }
 
 export const PRODUCT = 'Walnut Internal Brain';
-export const SUBTITLE = "Answers only from what you're allowed to see — every access audited";
+export const SUBTITLE = 'Ask a work question. Get an answer with its sources, using only what you can open.';
 
 export function MockBanner() {
   if (process.env.NEXT_PUBLIC_IB_MOCK !== '1') return null;

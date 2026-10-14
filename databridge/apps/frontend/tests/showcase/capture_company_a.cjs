@@ -24,7 +24,7 @@ async function signIn(page) {
   await page.goto(`${BASE}/graph`);
   const roster = page.locator("[data-testid=roster-jdoe]");
   await roster.waitFor({ timeout: 30000 });
-  check("sign-in screen lists the Company A roster", (await page.locator("[data-testid^=roster-]").count()) === 9);
+  check("sign-in offers only Jordan (the graph is his view)", (await page.locator("[data-testid^=roster-]").count()) === 1);
   await roster.click();
 }
 

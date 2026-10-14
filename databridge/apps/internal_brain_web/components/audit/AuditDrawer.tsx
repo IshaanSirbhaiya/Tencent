@@ -115,17 +115,17 @@ export function AuditDrawer({ event, onClose }: { event: AuditEvent | null; onCl
 
                 <section aria-labelledby="decisions-h">
                   <h3 id="decisions-h" className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                    Live access decisions (Gate 2)
+                    Checked with each source just now
                   </h3>
                   <Decisions e={event} />
                 </section>
 
                 <section aria-labelledby="released-h">
                   <h3 id="released-h" className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                    Released to the model
+                    Sources the answer used
                   </h3>
                   {event.refused ? (
-                    <p className="text-xs">Refused — the constant refusal was returned.</p>
+                    <p className="text-xs">No answer was given.</p>
                   ) : (event.released ?? []).length === 0 ? (
                     <p className="text-xs text-muted">None</p>
                   ) : (
@@ -144,7 +144,7 @@ export function AuditDrawer({ event, onClose }: { event: AuditEvent | null; onCl
                     <Lock aria-hidden className="h-4 w-4 text-muted" /> Answer text
                   </h3>
                   <p className="mt-1 text-xs text-muted">
-                    The ledger holds only a hash of the answer. Revealing the text needs a reason, and the reveal itself is recorded in the ledger (audit.reveal) under your name.
+                    The log keeps only a fingerprint of the answer. To read the text, give a reason. Your reveal is logged under your name.
                   </p>
                   {revealed ? (
                     <div className="mt-3 space-y-1" data-testid="revealed-answer">
