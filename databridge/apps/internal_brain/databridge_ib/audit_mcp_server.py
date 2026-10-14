@@ -15,12 +15,17 @@ from __future__ import annotations
 import datetime as dt
 import os
 from typing import Any
+from urllib.parse import quote, urlparse
 
 import httpx
 from mcp.server.fastmcp import FastMCP
 
 DEFAULT_URL = "http://127.0.0.1:8100"
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+
+_SANITIZED_ERR = "Internal Brain API returned a malformed response."
+_SINCE_DAYS_MIN = 1
+_SINCE_DAYS_MAX = 3650
 
 
 def _base_url() -> str:
@@ -38,19 +43,51 @@ def _missing_token_error() -> str:
 
 
 def _api_error(resp: httpx.Response, what: str) -> str:
-    return f"Internal Brain API error ({what}): HTTP {resp.status_code} from {resp.url}."
+    return f"Internal Brain API error ({what}): HTTP {resp.status_code}."
 
 
-def _http_get(path: str, params: dict[str, Any] | None = None) -> tuple[httpx.Response | None,
-                                                                       str | None]:
+def _client() -> httpx.Client:
+    """Return an httpx.Client used for all HTTP calls. Tests patch this to route to an in-process app."""
+    return httpx.Client(timeout=_TIMEOUT)
+
+
+def _validate_base_url(url: str) -> str | None:
+    """Return an error string if *url* is unsafe, or None if it is acceptable.
+
+    An empty URL is allowed (tests route through a TestClient that ignores the base URL).
+    """
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return (f"IB_URL must use http or https (got '{parsed.scheme}'). "
+                "Set IB_URL to the Internal Brain base URL and retry.")
+    if parsed.username or parsed.password:
+        return "IB_URL must not contain credentials. Remove the user:pass@ portion and retry."
+    if parsed.query:
+        return "IB_URL must not contain a query string. Remove the '?...' portion and retry."
+    if parsed.fragment:
+        return "IB_URL must not contain a fragment. Remove the '#...' portion and retry."
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "http" and host not in ("127.0.0.1", "localhost", "::1"):
+        return ("IB_URL uses plain HTTP for a non-loopback host. "
+                "Use https:// for any non-local destination, or set IB_URL to a loopback address.")
+    return None
+
+
+def _http_get(client: httpx.Client, path: str,
+              params: dict[str, Any] | None = None) -> tuple[httpx.Response | None, str | None]:
     """GET ``path`` with the bearer token. Returns (response, error_message)."""
     token = _token()
     if not token:
         return None, _missing_token_error()
+    url_err = _validate_base_url(_base_url())
+    if url_err:
+        return None, url_err
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = httpx.get(f"{_base_url()}{path}", params=params or None, headers=headers,
-                         timeout=_TIMEOUT)
+        resp = client.get(f"{_base_url()}{path}", params=params or None, headers=headers,
+                          follow_redirects=True)
     except httpx.HTTPError as exc:
         return None, f"Internal Brain API is unreachable ({exc.__class__.__name__})."
     if resp.status_code >= 400:
@@ -58,8 +95,22 @@ def _http_get(path: str, params: dict[str, Any] | None = None) -> tuple[httpx.Re
     return resp, None
 
 
+def _safe_json(resp: httpx.Response) -> tuple[dict[str, Any] | None, str | None]:
+    """Parse JSON from *resp*; return (data, None) or (None, sanitized_error)."""
+    try:
+        data = resp.json()
+    except Exception:                                              # noqa: BLE001
+        return None, _SANITIZED_ERR
+    if not isinstance(data, dict):
+        return None, _SANITIZED_ERR
+    return data, None
+
+
 def _format_events(payload: dict[str, Any]) -> str:
     events = payload.get("events") or []
+    if not isinstance(events, list):
+        events = []
+    events = [e for e in events if isinstance(e, dict)]
     if not events:
         filt = payload.get("filter") or {}
         return f"No audit events matched the filter ({filt})."
@@ -75,7 +126,14 @@ def _format_events(payload: dict[str, Any]) -> str:
 
 def _format_accessors(payload: dict[str, Any]) -> str:
     doc_id = payload.get("doc_id") or "?"
-    accessors = payload.get("accessors") or []
+    accessors_raw = payload.get("accessors") or []
+    # The API returns accessors as a dict keyed by sub; accept both dict and list.
+    if isinstance(accessors_raw, dict):
+        accessors = [a for a in accessors_raw.values() if isinstance(a, dict)]
+    elif isinstance(accessors_raw, list):
+        accessors = [a for a in accessors_raw if isinstance(a, dict)]
+    else:
+        accessors = []
     truncated = payload.get("truncated")
     if not accessors:
         return f"No accessors found for document {doc_id}."
@@ -95,6 +153,8 @@ def _format_verify(payload: dict[str, Any]) -> str:
     head = payload.get("head")
     ledgered = payload.get("ledgered")
     problems = payload.get("problems") or []
+    if not isinstance(problems, list):
+        problems = []
     status = "OK" if ok else "FAILED"
     lines = [f"Audit ledger verification: {status}",
              f"  records: {records}",
@@ -123,9 +183,12 @@ def build_server() -> FastMCP:
         Args:
             user: Filter by the subject whose activity is logged (e.g. \"jdoe\"). Empty = no filter.
             container: Filter by container/space/project/channel id or name. Empty = no filter.
-            since_days: Only events from the last N days (default 30).
+            since_days: Only events from the last N days (1..3650, default 30).
             doc: Filter by document id or title. Empty = no filter.
         """
+        if not (_SINCE_DAYS_MIN <= since_days <= _SINCE_DAYS_MAX):
+            return (f"since_days must be between {_SINCE_DAYS_MIN} and "
+                    f"{_SINCE_DAYS_MAX} (got {since_days}).")
         params: dict[str, Any] = {}
         if user:
             params["user"] = user
@@ -133,13 +196,19 @@ def build_server() -> FastMCP:
             params["container"] = container
         if doc:
             params["doc"] = doc
-        if since_days and since_days > 0:
-            since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=since_days))
-            params["since"] = since.isoformat()
-        resp, err = _http_get("/audit/events", params=params)
-        if err:
-            return err
-        return _format_events(resp.json())
+        since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=since_days))
+        params["since"] = since.isoformat()
+        client = _client()
+        try:
+            resp, err = _http_get(client, "/audit/events", params=params)
+            if err:
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            return _format_events(data)
+        finally:
+            client.close()
 
     @mcp.tool()
     def audit_doc_accessors(doc_id: str) -> str:
@@ -150,19 +219,36 @@ def build_server() -> FastMCP:
         """
         if not doc_id or not doc_id.strip():
             return "A non-empty doc_id is required."
-        resp, err = _http_get(f"/audit/doc/{doc_id}/accessors")
-        if err:
-            return err
-        return _format_accessors(resp.json())
+        if doc_id in (".", ".."):
+            return "A valid doc_id is required ('.' and '..' are not allowed)."
+        encoded = quote(doc_id, safe="")
+        client = _client()
+        try:
+            resp, err = _http_get(client, f"/audit/doc/{encoded}/accessors")
+            if err:
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            return _format_accessors(data)
+        finally:
+            client.close()
 
     @mcp.tool()
     def audit_verify() -> str:
         """Verify the integrity of the access ledger (chain, seals, external head). The caller is
         identified by IB_TOKEN."""
-        resp, err = _http_get("/audit/verify")
-        if err:
-            return err
-        return _format_verify(resp.json())
+        client = _client()
+        try:
+            resp, err = _http_get(client, "/audit/verify")
+            if err:
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            return _format_verify(data)
+        finally:
+            client.close()
 
     return mcp
 

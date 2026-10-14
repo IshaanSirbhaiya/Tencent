@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -19,6 +20,8 @@ from mcp.server.fastmcp import FastMCP
 DEFAULT_URL = "http://127.0.0.1:8100"
 CHANNEL = "workbuddy-mcp"
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+
+_SANITIZED_ERR = "Internal Brain API returned a malformed response."
 
 
 def _base_url() -> str:
@@ -36,17 +39,51 @@ def _missing_token_error() -> str:
 
 
 def _api_error(resp: httpx.Response, what: str) -> str:
-    return f"Internal Brain API error ({what}): HTTP {resp.status_code} from {resp.url}."
+    return f"Internal Brain API error ({what}): HTTP {resp.status_code}."
 
 
-def _http_get(path: str) -> tuple[httpx.Response | None, str | None]:
+def _client() -> httpx.Client:
+    """Return an httpx.Client used for all HTTP calls. Tests patch this to route to an in-process app."""
+    return httpx.Client(timeout=_TIMEOUT)
+
+
+def _validate_base_url(url: str) -> str | None:
+    """Return an error string if *url* is unsafe, or None if it is acceptable.
+
+    An empty URL is allowed (tests route through a TestClient that ignores the base URL).
+    """
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return (f"IB_URL must use http or https (got '{parsed.scheme}'). "
+                "Set IB_URL to the Internal Brain base URL and retry.")
+    # Reject URLs with embedded credentials, query, or fragment (finding 6).
+    if parsed.username or parsed.password:
+        return "IB_URL must not contain credentials. Remove the user:pass@ portion and retry."
+    if parsed.query:
+        return "IB_URL must not contain a query string. Remove the '?...' portion and retry."
+    if parsed.fragment:
+        return "IB_URL must not contain a fragment. Remove the '#...' portion and retry."
+    # Plain HTTP is only allowed for loopback (finding 7).
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme == "http" and host not in ("127.0.0.1", "localhost", "::1"):
+        return ("IB_URL uses plain HTTP for a non-loopback host. "
+                "Use https:// for any non-local destination, or set IB_URL to a loopback address.")
+    return None
+
+
+def _http_get(client: httpx.Client, path: str) -> tuple[httpx.Response | None, str | None]:
     """GET ``path`` with the bearer token. Returns (response, error_message)."""
     token = _token()
     if not token:
         return None, _missing_token_error()
+    url_err = _validate_base_url(_base_url())
+    if url_err:
+        return None, url_err
     headers = {"Authorization": f"Bearer {token}"}
     try:
-        resp = httpx.get(f"{_base_url()}{path}", headers=headers, timeout=_TIMEOUT)
+        resp = client.get(f"{_base_url()}{path}", headers=headers, follow_redirects=True)
     except httpx.HTTPError as exc:
         return None, f"Internal Brain API is unreachable ({exc.__class__.__name__})."
     if resp.status_code >= 400:
@@ -54,19 +91,35 @@ def _http_get(path: str) -> tuple[httpx.Response | None, str | None]:
     return resp, None
 
 
-def _http_post(path: str, json_body: dict[str, Any]) -> tuple[httpx.Response | None, str | None]:
+def _http_post(client: httpx.Client, path: str,
+               json_body: dict[str, Any]) -> tuple[httpx.Response | None, str | None]:
     """POST ``path`` with the bearer token. Returns (response, error_message)."""
     token = _token()
     if not token:
         return None, _missing_token_error()
+    url_err = _validate_base_url(_base_url())
+    if url_err:
+        return None, url_err
     headers = {"Authorization": f"Bearer {token}", "x-ib-channel": CHANNEL}
     try:
-        resp = httpx.post(f"{_base_url()}{path}", json=json_body, headers=headers, timeout=_TIMEOUT)
+        resp = client.post(f"{_base_url()}{path}", json=json_body, headers=headers,
+                           follow_redirects=True)
     except httpx.HTTPError as exc:
         return None, f"Internal Brain API is unreachable ({exc.__class__.__name__})."
     if resp.status_code >= 400:
         return resp, _api_error(resp, f"POST {path}")
     return resp, None
+
+
+def _safe_json(resp: httpx.Response) -> tuple[dict[str, Any] | None, str | None]:
+    """Parse JSON from *resp*; return (data, None) or (None, sanitized_error)."""
+    try:
+        data = resp.json()
+    except Exception:                                              # noqa: BLE001
+        return None, _SANITIZED_ERR
+    if not isinstance(data, dict):
+        return None, _SANITIZED_ERR
+    return data, None
 
 
 def _format_citations(citations: list[dict[str, Any]]) -> str:
@@ -110,38 +163,57 @@ def build_server() -> FastMCP:
         """
         if not question or not question.strip():
             return "A non-empty question is required."
-        resp, err = _http_post("/ib/ask", {"question": question})
-        if err:
-            return err
-        data = resp.json()
-        answer = data.get("answer") or ""
-        citations = data.get("citations") or []
-        # whoami: identity comes from the token, never from the caller
-        who_resp, who_err = _http_get("/auth/whoami")
-        sub = "?"
-        if who_err is None and who_resp is not None:
-            sub = who_resp.json().get("sub", "?")
-        elif who_err:
+        client = _client()
+        try:
+            resp, err = _http_post(client, "/ib/ask", {"question": question})
+            if err:
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            answer = data.get("answer") or ""
+            citations_raw = data.get("citations") or []
+            if not isinstance(citations_raw, list):
+                citations_raw = []
+            citations = [c for c in citations_raw if isinstance(c, dict)]
+            # whoami: identity comes from the token, never from the caller
+            who_resp, who_err = _http_get(client, "/auth/whoami")
             sub = "(unavailable)"
-        parts = [
-            answer.strip() or "(no answer text)",
-            "",
-            "Citations:",
-            _format_citations(citations),
-            "",
-            f"answered as {sub}",
-        ]
-        return "\n".join(parts)
+            if who_err is None and who_resp is not None:
+                who_data, who_json_err = _safe_json(who_resp)
+                if who_json_err is None and isinstance(who_data, dict):
+                    sub = who_data.get("sub") or "(unavailable)"
+            parts = [
+                answer.strip() or "(no answer text)",
+                "",
+                "Citations:",
+                _format_citations(citations),
+                "",
+                f"answered as {sub}",
+            ]
+            return "\n".join(parts)
+        finally:
+            client.close()
 
     @mcp.tool()
     def my_recent_questions() -> str:
         """Return the caller's recent questions (from /ib/history), as a short readable list.
         Identity comes only from IB_TOKEN."""
-        resp, err = _http_get("/ib/history")
-        if err:
-            return err
-        items = resp.json().get("items") or []
-        return _format_history(items)
+        client = _client()
+        try:
+            resp, err = _http_get(client, "/ib/history")
+            if err:
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            items = data.get("items") or []
+            if not isinstance(items, list):
+                items = []
+            items = [it for it in items if isinstance(it, dict)]
+            return _format_history(items)
+        finally:
+            client.close()
 
     return mcp
 

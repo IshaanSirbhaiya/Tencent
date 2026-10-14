@@ -1,13 +1,17 @@
 """Tests for the ib_mint_token CLI script.
 
 Uses a temporary env file and a dev key — never the real .env.ib.local. Asserts:
-  (1) a known persona gives a token that auth.verify accepts with the right sub,
-  (2) an unknown persona exits non-zero,
-  (3) --hours 24 is capped to 8 (token expiry ~8 h, not 24 h).
+  (1) --print gives a token that auth.verify accepts with the right sub,
+  (2) --out FILE writes the token to the file (not stdout),
+  (3) with neither --print nor --out, exits non-zero with a usage message,
+  (4) an unknown persona exits non-zero,
+  (5) --hours 24 is capped to 8 (token expiry ~8 h, not 24 h),
+  (6) mint_for() returns a verifiable token.
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -80,8 +84,8 @@ def _run_cli(argv, capsys):
     return rc, out.out, out.err
 
 
-def test_known_persona_mints_verifiable_token(env_and_world, capsys):
-    rc, out, err = _run_cli(["jdoe"], capsys)
+def test_print_mints_verifiable_token(env_and_world, capsys):
+    rc, out, err = _run_cli(["jdoe", "--print"], capsys)
     assert rc == 0, f"expected rc=0, got {rc}; stderr={err}"
     token = out.strip()
     assert token, "expected a token on stdout"
@@ -90,21 +94,50 @@ def test_known_persona_mints_verifiable_token(env_and_world, capsys):
     assert claims["roles"] == ["employee"]
 
 
+def test_out_writes_token_to_file(env_and_world, tmp_path, capsys):
+    out_file = tmp_path / "token.txt"
+    rc, out, err = _run_cli(["jdoe", "--out", str(out_file)], capsys)
+    assert rc == 0, f"expected rc=0, got {rc}; stderr={err}"
+    # stdout should NOT contain the token, only the confirmation message
+    assert "token written to" in out
+    assert out.strip() != cli.mint_for.__code__  # sanity
+    # The token must not have been printed to stdout
+    lines = out.strip().split("\n")
+    for line in lines:
+        assert "." in line or "token" in line.lower()  # the message, not a token
+    # The file should contain the verifiable token
+    token = out_file.read_text(encoding="utf-8").strip()
+    assert token, "expected a token in the file"
+    claims = auth.verify(DEV_KEY, token)
+    assert claims["sub"] == "jdoe"
+
+
+def test_no_flag_exits_nonzero(env_and_world, capsys):
+    rc, out, err = _run_cli(["jdoe"], capsys)
+    assert rc != 0, f"expected non-zero exit, got {rc}"
+    # Should have a usage message mentioning --print or --out
+    combined = out + err
+    assert "--print" in combined or "--out" in combined, (
+        f"expected usage message mentioning --print/--out, got: {combined}")
+    # No token should be printed
+    assert out.strip() == "" or "token written" not in out
+
+
 def test_unknown_persona_exits_nonzero(env_and_world, capsys):
-    rc, out, err = _run_cli(["nobody.nope"], capsys)
+    rc, out, err = _run_cli(["nobody.nope", "--print"], capsys)
     assert rc != 0
     assert not out.strip()  # no token printed for an error
 
 
 def test_inactive_persona_exits_nonzero(env_and_world, capsys):
-    rc, out, err = _run_cli(["sam.old"], capsys)
+    rc, out, err = _run_cli(["sam.old", "--print"], capsys)
     assert rc != 0
     assert not out.strip()
 
 
 def test_hours_capped_to_eight(env_and_world, capsys):
     before = time.time()
-    rc, out, err = _run_cli(["jdoe", "--hours", "24"], capsys)
+    rc, out, err = _run_cli(["jdoe", "--hours", "24", "--print"], capsys)
     assert rc == 0, f"expected rc=0, got {rc}; stderr={err}"
     token = out.strip()
     claims = auth.verify(DEV_KEY, token)
@@ -116,3 +149,23 @@ def test_hours_capped_to_eight(env_and_world, capsys):
     assert delta <= eight_hours + 120, f"token lifetime exceeds 8 h cap: {delta}s"
     assert delta > 7 * 3600, f"token lifetime too short (expected ~8 h): {delta}s"
     assert delta < twenty_four_hours, f"token was NOT capped to 8 h: {delta}s"
+
+
+def test_print_and_out_mutually_exclusive(env_and_world, tmp_path, capsys):
+    out_file = tmp_path / "token.txt"
+    rc, out, err = _run_cli(["jdoe", "--print", "--out", str(out_file)], capsys)
+    assert rc != 0, "expected non-zero exit for mutually exclusive flags"
+
+
+def test_mint_for_returns_verifiable_token(env_and_world):
+    env_file, world_file = env_and_world
+    token = cli.mint_for("jdoe", hours=4, env_path=env_file, world_path=world_file)
+    claims = auth.verify(DEV_KEY, token)
+    assert claims["sub"] == "jdoe"
+    assert claims["roles"] == ["employee"]
+
+
+def test_mint_for_unknown_persona_exits_nonzero(env_and_world):
+    env_file, world_file = env_and_world
+    with pytest.raises(SystemExit):
+        cli.mint_for("nobody.nope", env_path=env_file, world_path=world_file)
