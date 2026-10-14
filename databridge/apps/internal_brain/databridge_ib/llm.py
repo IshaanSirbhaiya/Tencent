@@ -5,7 +5,7 @@ OpenAI-compatible, so LiteLLM reaches it with ``openai/<model>`` plus ``OPENAI_A
 ``https://tokenhub-intl.tencentcloudmaas.com/v1`` and ``OPENAI_API_KEY`` = the TokenHub key.
 
 The chain is explicit and runtime-level (independent of the harness's key-based fallback):
-hy3 → deepseek-v4-flash → deterministic extractive answer. Any error, timeout, 429 or grounding
+hy3 → deepseek-v4.1-flash → deterministic extractive answer. Any error, timeout, 429 or grounding
 violation moves down the chain; the answer always says which model produced it.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ from .narrate import IB_SYSTEM_PROMPT, TASK, IbGroundedNarrator, user_message
 log = logging.getLogger("databridge_ib.llm")
 
 TOKENHUB_BASE = "https://tokenhub-intl.tencentcloudmaas.com/v1"
-DEFAULT_CHAIN = ("hy3", "deepseek-v4-flash")
+DEFAULT_CHAIN = ("hy3", "deepseek-v4.1-flash")
 
 
 def tokenhub_configured() -> bool:

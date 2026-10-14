@@ -210,7 +210,7 @@ summary() {
 ------------------------------------------------------------------------------
  Walnut Internal Brain demo is up:  https://$(env_get DOMAIN)
  Demo passcode:                     $(env_get IB_DEMO_PASSCODE)
- Model:                             $([ -n "$(env_get TOKENHUB_API_KEY)" ] && echo "TokenHub (hy3 -> deepseek-v4-flash -> extractive)" || echo "extractive only (no TOKENHUB_API_KEY)")
+ Model:                             $([ -n "$(env_get TOKENHUB_API_KEY)" ] && echo "TokenHub (hy3 -> deepseek-v4.1-flash -> extractive)" || echo "extractive only (no TOKENHUB_API_KEY)")
  Env file (secrets, mode 600):      $ENV_FILE
  Status / logs:                     sudo bash $SRC/deploy/lighthouse/deploy.sh status | logs ib
  Reset the demo:                    sudo bash $SRC/deploy/lighthouse/deploy.sh reset

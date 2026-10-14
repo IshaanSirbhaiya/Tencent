@@ -20,7 +20,7 @@ export interface Citation {
 
 export interface ModelInfo {
   provider: string; // "tencent-tokenhub" | "deterministic"
-  model: string; // "hy3" | "deepseek-v4-flash" | "extractive-v1"
+  model: string; // "hy3" | "deepseek-v4.1-flash" | "extractive-v1"
   fallback_used?: boolean;
 }
 

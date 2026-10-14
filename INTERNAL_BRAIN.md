@@ -41,7 +41,7 @@ cd apps/internal_brain_web; npm install; npm run dev
 - Start the mock first: on start the Brain crawls all four platforms and indexes the whole world before it serves
   (about a minute on our dev box; not benchmarked). Ports 8100, 8200 and 3100 must be free.
 - Without a TokenHub key every answer comes from the deterministic extractive answerer, so the demo works offline.
-  With `TOKENHUB_API_KEY` set, the chain is `hy3` → `deepseek-v4-flash` → extractive
+  With `TOKENHUB_API_KEY` set, the chain is `hy3` → `deepseek-v4.1-flash` → extractive
   (`databridge/apps/internal_brain/databridge_ib/llm.py:24-25, 55-81`).
 - On a shared URL, also set `IB_DEMO_PASSCODE` so only people given the passcode can pick a persona.
 - UI-only preview with no backend: `npm run dev:mock` (fixtures; `apps/internal_brain_web/package.json`).
@@ -100,7 +100,7 @@ security-relevant code by Codex (`docs/tencent/reviews/security-r1/codex_track1.
 | Slack, Confluence, Jira, Drive | **Mocked**: real API paths and response shapes for a documented supported subset, native permission semantics, cursor paging, 429s and signed webhooks (`databridge/apps/mock_platforms/`). "A supported semantic subset, not a replica." |
 | Connectors | **Real code**, on the same path a real tenant would use (base URL swap, `databridge_ib/bootstrap.py:39-51`). Real-tenant runs are **not done yet**. |
 | Permission checks (Gate 2) | Real connector calls against the mock's permission endpoints, which follow the real APIs' shapes |
-| Language model | **Real** TokenHub `hy3` / `deepseek-v4-flash` when a key is set; otherwise the deterministic extractive answerer. Tests and the first eval run use a capturing fake model and never call the network. |
+| Language model | **Real** TokenHub `hy3` / `deepseek-v4.1-flash` when a key is set; otherwise the deterministic extractive answerer. Tests and the first eval run use a capturing fake model and never call the network. |
 | Embeddings | **Local offline hashing embedder**, which is not semantic; lexical BM25 carries ranking (`databridge_ib/index.py:43, 158-160`) |
 | Ledger, tamper detection, audit | **Real** (Walnut `DecisionLedger`) on local disk; the external head sink is a local file unless configured |
 | Identity | Signed HMAC tokens; a **demo login** instead of SSO |

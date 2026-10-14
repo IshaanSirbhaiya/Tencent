@@ -92,7 +92,7 @@ ssh ubuntu@<IP> 'sudo DOMAIN=brain.example.com bash /opt/walnut/repo/deploy/ligh
 ## 3. Turn on Hunyuan (TokenHub)
 
 Without a key every answer comes from the deterministic extractive answerer, and the demo still works. With a
-key, the chain is `hy3` → `deepseek-v4-flash` → extractive, and only permitted, released passages are sent.
+key, the chain is `hy3` → `deepseek-v4.1-flash` → extractive, and only permitted, released passages are sent.
 
 1. Get an API key from TokenHub (Tencent Cloud MaaS, international endpoint
    `https://tokenhub-intl.tencentcloudmaas.com/v1`).

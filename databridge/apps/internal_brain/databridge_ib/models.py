@@ -172,7 +172,7 @@ class Citation(_Frozen):
 
 class ModelInfo(_Frozen):
     provider: str               # "tencent-tokenhub" | "deterministic"
-    model: str                  # "hy3" | "deepseek-v4-flash" | "extractive-v1"
+    model: str                  # "hy3" | "deepseek-v4.1-flash" | "extractive-v1"
     fallback_used: bool = False
 
 

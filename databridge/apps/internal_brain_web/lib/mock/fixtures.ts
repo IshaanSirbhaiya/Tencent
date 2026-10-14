@@ -100,7 +100,7 @@ export const DOCS = {
 export type DocKey = keyof typeof DOCS;
 
 export const HY3: ModelInfo = { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false };
-export const DEEPSEEK: ModelInfo = { provider: 'tencent-tokenhub', model: 'deepseek-v4-flash', fallback_used: true };
+export const DEEPSEEK: ModelInfo = { provider: 'tencent-tokenhub', model: 'deepseek-v4.1-flash', fallback_used: true };
 export const EXTRACTIVE: ModelInfo = { provider: 'deterministic', model: 'extractive-v1', fallback_used: false };
 
 export interface MockState {

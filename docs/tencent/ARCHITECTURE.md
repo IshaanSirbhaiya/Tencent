@@ -41,7 +41,7 @@ flowchart TD
     G2["6 GATE 2<br/>ask the SOURCE now, per doc, in parallel<br/>2 s batch budget; error/timeout/429 ⇒ deny<br/>gates.py; read-through on version drift"] --> K7
     K7["7 Linked objects<br/>supported id shapes on tenant hosts,<br/>resolved only within the readable set<br/>re-enter Gate 2, depth 1<br/>pipeline.py:137-143, 260-281"] --> L8
     L8["8 LEDGER retrieval.decided<br/>considered, gate2 verdicts, released<br/>pipeline.py:147-154"] --> M9
-    M9["9 GENERATE over released passages only<br/>hy3 → deepseek-v4-flash → extractive<br/>llm.py, narrate.py"] --> W10
+    M9["9 GENERATE over released passages only<br/>hy3 → deepseek-v4.1-flash → extractive<br/>llm.py, narrate.py"] --> W10
     W10["10 GROUND<br/>markdown strip + Walnut grounding wall;<br/>answer must cite a released passage<br/>else extractive"] --> L11
     L11["11 LEDGER answer.released<br/>model, prompt_version, answer_sha256, citations<br/>answer text → separate content store<br/>pipeline.py:176-185"] --> R12
     R12["12 RESPOND<br/>one shape for every outcome<br/>answer, citations, scope_note, model, as_of"]
@@ -126,7 +126,7 @@ flowchart LR
 
 ## 6. Model chain and prompt
 
-- **Chain:** TokenHub `hy3` → `deepseek-v4-flash` → deterministic extractive answer (`llm.py:24-25, 65-81`).
+- **Chain:** TokenHub `hy3` → `deepseek-v4.1-flash` → deterministic extractive answer (`llm.py:24-25, 65-81`).
   Any error, timeout, 429, empty answer or grounding violation moves down the chain. A model answer that cites
   no released passage is replaced by the extractive answer with `fallback_used=true` (`pipeline.py:162-171`).
   Without a TokenHub key, or with `IB_FORCE_OFFLINE=1`, the chain is off and every answer is extractive
