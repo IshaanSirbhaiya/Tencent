@@ -4,8 +4,9 @@
 # and the guided /demo tour — run on the same synthetic world the Internal Brain uses.
 #
 # The graph behind these screens is built by `scripts/build_enterprise_graph.py` from
-# fixtures/enterprise/world.json and is PERMISSION-BLIND: it shows the estate from above. The
-# permission-aware product is the Internal Brain (apps/internal_brain, apps/internal_brain_web).
+# fixtures/enterprise/world.json AS ONE PERSON SEES IT (default jdoe, `--as <persona>`), at build
+# time. It is a snapshot: it does not re-check access per request. The permission-aware product, with
+# live checks, is the Internal Brain (apps/internal_brain, apps/internal_brain_web).
 #
 # Icons are keys of SURFACE_ICONS in apps/frontend/components/sidebar.tsx. Node ids named below
 # (`demo_focus_node`, the evidence chips) are `kind:key` ids the build computes from world.json.
@@ -39,20 +40,11 @@ nouns:
   pitch: >
     Company A is a fictional fintech. Its Confluence, Jira, Slack and Google Drive export is
     loaded here as one graph, and every node and link points back to the row it came from.
-    Pick a persona below to look around.
-# The nine Internal Brain demo personas (apps/internal_brain_web/lib/personas.ts). Names are the
-# directory names in world.json. Here they only label who is at the terminal: this graph does not
-# filter by persona.
+    This is Jordan Doe's view (backend engineer) at build time: only what Jordan can open.
+# One person only: the graph is built as jdoe sees it, so the roster offers jdoe and nobody else
+# (offering other people here would show them Jordan's items). Rebuild with --as <persona> to change.
 roster:
-  - {staffId: jdoe, name: Jordan Doe, role: Backend engineer}
-  - {staffId: priya.sre, name: Priya Raman, role: On-call SRE}
-  - {staffId: ken.ext, name: Ken Adeyemi, role: External contractor}
-  - {staffId: sara.sec, name: Sara Lindqvist, role: Security}
-  - {staffId: maya.compliance, name: Maya Fernandes, role: Compliance officer}
-  - {staffId: leo.ops, name: Leo Hartono, role: Product & ops}
-  - {staffId: amy.am, name: Amy Lim, role: Account manager}
-  - {staffId: mlro.tan, name: Rachel Tan, role: MLRO (FinCrime)}
-  - {staffId: admin.it, name: Alex Mercer, role: IT admin (platform simulator)}
+  - {staffId: jdoe, name: Jordan Doe, role: Backend engineer (this graph is Jordan's view)}
 surfaces:
   - href: /graph
     label: Knowledge graph

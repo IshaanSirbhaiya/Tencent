@@ -58,7 +58,7 @@ Who it serves:
   For a payments company under MAS supervision, that blocks AI rollout entirely.
 - **Fintech-specific stakes:**
   - **Tipping-off.** Revealing that a suspicious transaction report exists is a criminal offence (CDSA
-    s.48; MAS Notice PSN01). Our refusal is byte-identical for "restricted" and "does not exist".
+    s.57; MAS Notice PSN01). Our refusal is byte-identical for "restricted" and "does not exist".
   - **PCI DSS 3.4.1.** Card numbers pasted into tickets are masked before indexing, so they never reach
     the index or a model.
   - **MAS TRM §9.1 / §12.2.** Least privilege, prompt revocation, contractors restricted like staff,
@@ -70,7 +70,7 @@ Who it serves:
 ### 3. Solution design: business and technical architecture, and how prompts drive the AI
 
 **Architecture.** A new service built on the Walnut evidence engine, which is reused unchanged. About
-94% of the code is the original Walnut base.
+93% of the code is the original Walnut base.
 - **Connectors** for Confluence, Jira, Slack and Drive compile each platform's own permission model:
   - Confluence page restrictions narrow access through ancestors.
   - Jira combines project roles with issue security levels.
@@ -89,7 +89,7 @@ Who it serves:
 6. **Cross-platform links** are followed only to readable objects.
 7. **Audit record written.** `retrieval.decided` is ledgered before any model call.
 8. **Tencent Hunyuan** (`hy3` via TokenHub Singapore) writes the answer from the permitted passages
-   only.
+   only, when a key is configured; today every reported number comes from the deterministic path.
 9. **Grounding wall.** Walnut's grounding check drops any value or name not in the evidence, with a
    deterministic quoted fallback.
 10. **Audit record written.** `answer.released` is ledgered before the response.
@@ -114,7 +114,7 @@ checked deterministically: unsupported values and names are dropped, and an unci
 to quoted evidence.
 
 **Tencent stack:**
-- Hunyuan `hy3` / DeepSeek via **TokenHub**, as the reasoning model.
+- Hunyuan `hy3` / DeepSeek via **TokenHub**, as the reasoning model (configured; the Hy3 evaluation run is pending).
 - **WorkBuddy** as a front door, through an MCP connector carrying a per-user token. The compliance
   officer uses WorkBuddy as an audit assistant.
 - **CodeBuddy** built the WorkBuddy MCP connector and the compliance audit connector, the token tool
@@ -126,23 +126,32 @@ to quoted evidence.
 
 ### 4. Business value: quantifiable metrics
 
-**Measured on the synthetic estate.** The world is 27+ people, about 1,150 documents across the four
-platforms, and 34+ planted facts.
+**Measured on the synthetic estate.** The world is 32 people, 1,143 documents across the four platforms
+(209 Confluence pages, 251 Jira issues, 602 Slack threads, 81 Drive files) and 49 planted facts.
 
 | Measure | Result | Evidence |
 |---|---|---|
 | Restricted content in answers or prompts | **0 leaks in 5,958 requests** (95% upper bound 0.10% per request) | `databridge/evals/internal_brain/RESULTS.md` |
 | "With vs without restricted documents" | **0 / 400** response differences | same file |
 | Recall for what users *are* allowed to see | **100%** of positive probes (both answer paths) | same file |
-| Scenario tests (S1–S5, revocation, freshness, fintech) | **61 / 61** | `apps/internal_brain/tests/` |
-| Answer latency, local | **about 0.4–0.6 s** per question (deterministic path) | [TBD: hy3 latency] |
-| Freshness | a webhook-delivered edit is answerable **on the next query**; poll fallback ≤ 2 min; SLO 5 min (Aspire asked for 30 min) | `test_s2_freshness_via_webhook` |
+| Scenario, fintech and revocation tests | **63 / 63** (`test_scenarios_e2e.py`, `test_fintech_scenarios.py`, `test_revoke_concurrency.py`), within 632 passing | `apps/internal_brain/tests/` |
+| Answer latency, local | mean **32–35 ms** per request in the in-process eval (deterministic and test-model paths; not network or Hy3) | `RESULTS.md` |
+| Freshness | a webhook-delivered edit is answerable **on the next query**; poll fallback every 120 s by default; SLO 5 min (Aspire asked for 30 min) | `test_s2_freshness_via_webhook` |
 | Revocation | denied **on the next query**, even when the webhook is lost | `test_s4_revocation_without_webhook` |
 
-**Projected value for a ~600-person fintech.** This is a projection, not a measurement; all assumptions
-are in `docs/tencent/`. Base case about US$1.3M a year in recaptured search time, within a range of
-US$0.44M to 4.1M. The larger point: without permission-aware retrieval and an audit trail, an
-internal AI assistant cannot be rolled out under MAS supervision at all.
+**Projected value for a ~600-person fintech.** A projection, not a measurement. Value = staff × hours
+saved per person per week × 46 working weeks × loaded hourly cost:
+
+| Case | Hours saved / person / week | Loaded cost / hour | Per year |
+|---|---|---|---|
+| Low | 0.5 | US$32 | 600 × 0.5 × 46 × 32 ≈ **US$0.44M** |
+| Base | 1.5 | US$31 | 600 × 1.5 × 46 × 31 ≈ **US$1.3M** |
+| High | 4.0 | US$37 | 600 × 4.0 × 46 × 37 ≈ **US$4.1M** |
+
+The hours saved are a small slice of the ~30% of the week the challenge brief says goes to searching
+(about 12 hours of a 40-hour week). Model cost is small next to this: an answer is about 4,000 tokens in
+and 300 out. The larger point: without permission-aware retrieval and an audit trail, an internal AI
+assistant cannot be rolled out under MAS supervision at all.
 
 ## CodeBuddy / WorkBuddy conversation history (≥ 3 screenshots, MANDATORY)
 

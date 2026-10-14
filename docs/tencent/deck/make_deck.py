@@ -80,7 +80,7 @@ permission-checked twice, every access written to an audit log that can't be qui
  <div class="card"><div class="big">9.3</div><div class="lbl">CVSS of EchoLeak (CVE-2025-32711): a zero-click prompt injection that leaked Copilot data</div><div class="src">REPORTED BY THE HACKER NEWS, JUNE 2025</div></div>
 </div>
 <div class="card" style="margin-top:28px"><div class="t" style="font-size:28px">In a fintech, one leak can be a crime</div>
-<div class="d" style="font-size:23px">Telling a customer that a suspicious-transaction report exists is tipping-off (Singapore CDSA s.48; MAS Notice PSN01).
+<div class="d" style="font-size:23px">Telling a customer that a suspicious-transaction report exists is tipping-off (Singapore CDSA s.57, s.48 before the 2020 Revised Edition; MAS Notice PSN01).
 An assistant that can read everything can leak everything, so most regulated firms simply don't roll one out.</div></div>
 <div class="grid3" style="margin-top:28px">
  <div class="card"><div class="big" style="font-size:60px">50,000+</div><div class="lbl">businesses run their finances on Aspire</div><div class="src">TECHNODE · APRIL 2026</div></div>
@@ -104,7 +104,7 @@ An assistant that can read everything can leak everything, so most regulated fir
  <div class="card"><div class="n">01</div><div class="t">Who's asking</div><div class="d">A signed token from the web app or WorkBuddy. Never a name typed into a box.</div></div>
  <div class="card"><div class="n">02</div><div class="t">Gate 1</div><div class="d">Search only what this person may open, using each platform's own permission model.</div></div>
  <div class="card"><div class="n">03</div><div class="t">Gate 2</div><div class="d">Ask the source again, live, for every passage. Error or timeout means no.</div></div>
- <div class="card"><div class="n">04</div><div class="t">Answer</div><div class="d">Tencent Hy3 via TokenHub writes from those passages only, or we quote them directly.</div></div>
+ <div class="card"><div class="n">04</div><div class="t">Answer</div><div class="d">With a TokenHub key, Tencent Hy3 writes from those passages only; without one we quote them directly.</div></div>
  <div class="card"><div class="n">05</div><div class="t">Grounding</div><div class="d">Every sentence cites a passage; unsupported numbers and names are dropped.</div></div>
 </div>
 <div class="card" style="margin-top:28px;border-color:#3b5b4f;background:rgba(20,48,40,.55)"><div class="d" style="font-size:24px;color:#d7f5ea"><b>Audit log</b>: written before retrieval, before the model, before the answer is shown. Hash-chained and sealed. If it can't be written, nothing is answered.</div></div>
@@ -140,7 +140,7 @@ An assistant that can read everything can leak everything, so most regulated fir
 <div class="row"><div class="col" style="flex:1.35"><div class="shot"><img src="{img('internal_brain/17_audit_verify.png')}"></div>
 <div class="cap">Compliance asks in plain English; it becomes a visible filter. Every allow/deny decision per document. "Verify audit chain" re-checks every record and every stored answer.</div></div>
 <div class="col" style="flex:.65;gap:22px">
- <div class="card"><div class="big ok" style="font-size:64px">8 / 8</div><div class="lbl">tamper scenarios behave as stated: edits, deletions, rollback and key-holder rewrites are caught</div><div class="src">SCRIPTS/TAMPER_DEMO.PY · REAL OUTPUT</div></div>
+ <div class="card"><div class="big ok" style="font-size:64px">7 / 7</div><div class="lbl">tamper attacks detected: edits, deletions, rollback, a key-holder rewrite. The 8th case, a rollback after the last off-host head, is our stated limit</div><div class="src">SCRIPTS/TAMPER_DEMO.PY · REAL OUTPUT</div></div>
  <div class="card"><div class="t" style="font-size:26px">Reasoned reveal</div><div class="d">Compliance sees metadata by default. Reading an answer needs a reason, and the reveal is logged too.</div></div>
 </div></div>""",
               "For compliance: a plain-English audit search that turns into a visible filter, every allow and deny "
@@ -154,7 +154,7 @@ An assistant that can read everything can leak everything, so most regulated fir
  <div class="card"><div class="big ok">{inj}</div><div class="lbl">prompt-injection failures, with planted instructions on all four platforms</div><div class="src">INJECTION PROBES</div></div>
 </div>
 <div class="grid3" style="margin-top:28px">
- <div class="card"><div class="big" style="font-size:64px">630+</div><div class="lbl">automated tests on the Internal Brain</div></div>
+ <div class="card"><div class="big" style="font-size:64px">632</div><div class="lbl">automated tests on the Internal Brain</div></div>
  <div class="card"><div class="big" style="font-size:64px">7</div><div class="lbl">independent security reviews (6 Codex passes, CodeBuddy on Hy3), every finding fixed or documented</div></div>
  <div class="card"><div class="big" style="font-size:64px">100%</div><div class="lbl">recall on questions people are allowed to answer</div></div>
 </div>""",
@@ -168,7 +168,7 @@ An assistant that can read everything can leak everything, so most regulated fir
 <div class="col" style="flex:.8;gap:18px">
  <div class="card"><div class="t" style="font-size:26px">CodeBuddy · 6 sessions</div><div class="d">Trust-boundary diagram, WorkBuddy connector, token tool, model-chain tests, a security review on Hy3, then hardening its own code.</div></div>
  <div class="card"><div class="t" style="font-size:26px">WorkBuddy · 3 workspaces</div><div class="d">Ask as an engineer or a contractor, or audit as compliance. Each carries its own signed token.</div></div>
- <div class="card"><div class="t" style="font-size:26px">TokenHub · Hy3 · Lighthouse · Miora</div><div class="d">Hy3 with DeepSeek fallback; a hardened Lighthouse deploy kit; the cover made in Miora.</div></div>
+ <div class="card"><div class="t" style="font-size:26px">TokenHub · Hy3 · Lighthouse · Miora</div><div class="d">Hy3 with DeepSeek fallback (configured; the Hy3 run is pending); a hardened Lighthouse deploy kit; the cover made in Miora.</div></div>
 </div></div>""",
               "Tencent tools are in the build, not bolted on. CodeBuddy ran six sessions, including a security "
               "review on Hy3 that found real issues we then fixed. WorkBuddy is a second front door, where each "
@@ -178,7 +178,7 @@ An assistant that can read everything can leak everything, so most regulated fir
 <div class="row"><div class="col"><div class="shot"><img src="{img('walnut_original/02_graph_node_panel.png')}"></div><div class="cap">Knowledge graph: every attribute points to the record it came from.</div></div>
 <div class="col"><div class="shot"><img src="{img('walnut_original/03_brain_time_slider.png')}"></div><div class="cap">Company brain with a time slider: what the company knew on any date.</div></div></div>""",
               "Underneath is Walnut, the evidence engine we built before this event. Every value carries a pointer "
-              "to its source, and the sealed ledger and grounding wall come from it. Ninety-four percent of the "
+              "to its source, and the sealed ledger and grounding wall come from it. Ninety-three percent of the "
               "code is that original base, reused unchanged."))
     S.append(("""
 <div class="k">For Aspire</div><h2>From demo to pilot in four weeks</h2>

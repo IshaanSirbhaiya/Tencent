@@ -13,7 +13,7 @@ can check.
 | WorkBuddy front door | The two MCP connectors, the token tool, the WorkBuddy setup guide | **CodeBuddy** (sessions CB2, CB3, CB6) |
 | Trust-boundary diagram | `docs/tencent/diagrams/trust_boundaries.mmd` | **CodeBuddy** on Tencent Hunyuan `hy3` (CB1) |
 | Model-chain tests | hy3 → DeepSeek → deterministic fallback, grounding wall | **CodeBuddy** (CB4) |
-| Security reviews | Five independent reviews, every finding dispositioned | **CodeBuddy** on `hy3` (CB5), Codex (four tracks), a four-model plan review |
+| Security reviews | Seven, every finding dispositioned | **CodeBuddy** on `hy3` (CB5) and six Codex passes (tracks 1, 2, 3a, 3b, 4, 5); plus a four-model plan review |
 
 ## CodeBuddy sessions
 
@@ -56,10 +56,10 @@ The changes are in the CB1 commit message.
 
 ## What CodeBuddy's work caught
 
-- **CB5 found four real issues**, now fixed with tests: a deployed build could run demo sign-in
-  without a passcode; an edit to a stored answer that nobody revealed went unnoticed by
-  "verify audit chain"; a browser user could label their own question as coming from WorkBuddy;
-  and three lower-risk items that are documented as design limits.
+- **CB5 raised seven findings.** Three are fixed with tests: a deployed build could run demo sign-in
+  without a passcode; an edit to a stored answer that nobody revealed went unnoticed by "verify audit
+  chain"; a browser user could label their own question as coming from WorkBuddy. Two are documented
+  as residual risks and two accepted (SECURITY.md §10).
 - **Wiring CB2's connector to the real app exposed a bug in our audit console**: every audit call
   through the real app returned "not authenticated", because the audit routes read the user's id
   from the wrong field. Unit tests had missed it. Fixed, with a test that goes through the real
@@ -80,6 +80,7 @@ compliance officer (`maya.compliance`) who uses WorkBuddy as an audit assistant.
 | Four-model plan review | The build plan | [reviews/plan-v1/](reviews/plan-v1/), dispositions in [PLAN_REVIEW_DISPOSITION.md](PLAN_REVIEW_DISPOSITION.md) |
 | Codex, tracks 1–3 | Core, audit, connectors and masking | [reviews/security-r1/](reviews/security-r1/) |
 | Codex, track 4 | CodeBuddy's connectors, the token tool, setup scripts | [codex_track4_mcp_tokens.md](reviews/security-r1/codex_track4_mcp_tokens.md) |
+| Codex, track 5 | The knowledge map and the audit content check | [codex_track5_map_audit.md](reviews/security-r1/codex_track5_map_audit.md) |
 | CodeBuddy (`hy3`) | App, auth, pipeline, gates, audit | [codebuddy_security_review.md](reviews/codebuddy_security_review.md) |
 
 Every finding has a disposition (fixed with a test, or documented as a limit) in

@@ -30,3 +30,11 @@ def test_bearer_call_keeps_the_mcp_channel(tmp_path):
     c = TestClient(app, headers={"Authorization": f"Bearer {tok}", **MCP})
     assert c.post("/ib/ask", json=Q).status_code == 200
     assert _channels(svc) == ["workbuddy-mcp"]
+
+
+def test_sign_in_is_recorded_before_the_session_is_issued(tmp_path):
+    app, svc = _build_app(tmp_path)
+    c = TestClient(app)
+    assert c.post("/auth/demo-login", json={"persona": "jdoe"}).status_code == 200
+    logins = [e for e in svc.ledger.events() if e.kind == "auth.login"]
+    assert len(logins) == 1 and logins[0].data.get("sub") == "jdoe"

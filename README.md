@@ -8,8 +8,8 @@ every access is written to an audit log that can't be quietly edited.
 
 - **0 leaks** of restricted content in 5,958 adversarial requests; **0 differences** between
   "restricted" and "doesn't exist" across 400 paired questions ([results](databridge/evals/internal_brain/RESULTS.md)).
-- Built on the **Walnut evidence engine** below, reused unchanged (94% of the code is the original base).
-- Built **with CodeBuddy**, reachable **from WorkBuddy**, and wired to **Tencent Hunyuan** via TokenHub (answers fall back to direct quotes without a key).
+- Built on the **Walnut evidence engine** below, reused unchanged (93% of the code is the original base).
+- Built **with CodeBuddy**, reachable **from WorkBuddy**, and configured for **Tencent Hy3** via TokenHub (not yet run live; answers are direct quotes without a key).
 
 **Judges: start with [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md)**: what to look at first, how to run it in
 two commands, how it works, and the evidence for every claim.

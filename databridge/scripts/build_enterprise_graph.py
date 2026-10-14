@@ -16,8 +16,9 @@ Two steps, both deterministic:
     .venv/Scripts/python.exe scripts/build_enterprise_graph.py --rows-only
     .venv/Scripts/python.exe scripts/build_enterprise_graph.py --out var/graph/other.db
 
-The graph is permission-blind: it records who is GRANTED each container (`reads_space`) but shows
-every item's title to whoever opens the screen. Use it as a local, admin-eye view of the estate.
+The graph is built AS ONE PERSON SEES IT (default jdoe; --as <persona>, or --as all for the
+unrestricted estate): only items that person may open, per the world generator's own permission
+rules. It is a build-time snapshot; packs/enterprise/ui.yaml offers only that one person.
 Synthetic data only (`companya.example`).
 """
 from __future__ import annotations

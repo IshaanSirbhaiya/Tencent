@@ -161,12 +161,13 @@ class Pipeline:
             text, info, _notes = (self.chain.answer(context, question) if self.chain
                                   else (None, None, []))
             valid = {p.tag for p in passages}
+            removed = 0
             if text and text.strip() != REFUSAL_TEXT:
-                text = narrate.drop_addressed_to_ai(text)
+                text, removed = narrate.drop_addressed_to_ai_counted(text)
             if text and info and (text.strip() == REFUSAL_TEXT
                                   or set(narrate.cited_tags(text)) & valid):
                 answer, model = text, info
-                dropped = 0
+                dropped = removed
             else:                           # no model, or an answer citing no permitted passage
                 answer = narrate.extractive_answer(passages, question)
                 if self.chain is not None:      # the model was tried and did not produce a usable answer

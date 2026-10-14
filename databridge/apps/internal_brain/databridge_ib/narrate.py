@@ -56,9 +56,15 @@ def neutralise_tags(text: str) -> str:
 def drop_addressed_to_ai(text: str) -> str:
     """Remove model-answer sentences that repeat text addressed to an AI system (an injection the
     model quoted rather than followed); the extractive answerer already skips them at the source."""
+    return drop_addressed_to_ai_counted(text)[0]
+
+
+def drop_addressed_to_ai_counted(text: str) -> tuple[str, int]:
+    """``drop_addressed_to_ai`` plus how many sentences were removed (recorded in the ledger)."""
     parts = re.split(r"(?<=[.!?\]])\s+", text or "")
     kept = [s for s in parts if not _ADDRESSED_TO_AI.search(s)]
-    return text if len(kept) == len(parts) else " ".join(kept).strip()
+    removed = len(parts) - len(kept)
+    return (text if not removed else " ".join(kept).strip()), removed
 
 
 def move_trailing_tags(text: str) -> str:

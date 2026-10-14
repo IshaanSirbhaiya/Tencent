@@ -228,13 +228,16 @@ def main(argv=None) -> int:
     from .report import build, write
     results = build(world=world, oracle=oracle, probes=probes, all_probes=all_probes, outs=outs,
                     p2=p2, p2_meta=p2_meta, failed=failed, runtime_s=time.perf_counter() - t_start,
-                    args=vars(args) | {"out": str(args.out), "work": str(work)})
+                    args=vars(args) | {"out": str(args.out), "work": "<temp>/" + work.name})   # no home path
     write(results, args.out)
     h = results["headline"]
     print(f"[ibeval] leaks={h['leaks']} violations={h['violations']} p2_mismatches={h['p2_mismatches']} "
           f"N={h['n_requests']} upper95={h['leak_rate_upper95']:.4f} utility={h['utility_recall']} "
           f"runtime={h['runtime_s']}s -> {args.out / 'RESULTS.md'}", flush=True)
-    return 1 if failed else 0
+    # a finding is a failure: the command must not exit 0 when it found a leak (Opus review #2)
+    bad = (h["leaks"] or h["violations"] or h["p2_mismatches"]
+           or not h.get("canaries_valid", False))
+    return 1 if (failed or bad) else 0
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ from .index import Index
 from .ingest import Ingestor
 from .knowledge_map import build_map
 from .llm import ModelChain
-from .models import AskRequest, DirectoryUser
+from .models import AskRequest, DirectoryUser, SessionStarted
 from .pipeline import Pipeline
 
 log = logging.getLogger("databridge_ib.app")
@@ -101,6 +101,12 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         user = svc.directory.get(str(body.get("persona", "")))
         if user is None or not user.active:
             raise HTTPException(400, "unknown persona")
+        try:                                  # write-ahead: the sign-in is on record before it works
+            svc.ledger.append(SessionStarted(sub=user.id, method="demo", roles=tuple(user.roles),
+                                             event_time=datetime.now(timezone.utc)))
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("sign-in not recorded: %s", type(exc).__name__)
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         tok = authmod.mint(svc.cfg.token_key, user.id, list(user.roles), ttl_s=8 * 3600)
         response.set_cookie(COOKIE, tok, httponly=True, samesite="lax", max_age=8 * 3600,
                             secure=svc.cfg.deployed)
@@ -116,6 +122,8 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             claims = authmod.verify(svc.cfg.token_key, token or "",
                                     revoked=authmod.load_revoked(svc.cfg.revoked_path))
             authmod.revoke(svc.cfg.revoked_path, claims["jti"])
+        except authmod.RevocationUnavailable:     # do not report success for a still-valid token
+            return JSONResponse(status_code=503, content={"error": "sign-out could not be recorded; try again"})
         except authmod.TokenError:
             pass
         response.delete_cookie(COOKIE)

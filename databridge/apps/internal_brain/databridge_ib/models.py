@@ -191,7 +191,7 @@ class AskResponse(_Frozen):
 IB_EVENT = "ib_event"
 EVENT_KINDS = ("request.accepted", "retrieval.decided", "answer.released", "request.failed",
                "audit.query", "audit.reveal", "acl.changed", "membership.changed",
-               "directory.changed", "ingest.sync", "anchor.published", "map.viewed")
+               "directory.changed", "ingest.sync", "anchor.published", "map.viewed", "auth.login")
 
 
 class Gate2Decision(_Frozen):
@@ -253,6 +253,15 @@ class AuditQueryEvent(EventBase):
     sub: str
     filter: dict[str, Any]
     result_count: int
+
+
+class SessionStarted(EventBase):
+    """Someone signed in (demo sign-in stands in for SSO). Written before the session is issued, so
+    who could act as whom is part of the audited record (Opus review #8)."""
+    kind: Literal["auth.login"] = "auth.login"
+    sub: str
+    method: Literal["demo", "sso"] = "demo"
+    roles: tuple[str, ...] = ()
 
 
 class MapViewed(EventBase):

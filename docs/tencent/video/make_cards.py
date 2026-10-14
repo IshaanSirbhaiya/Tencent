@@ -63,12 +63,12 @@ every source permission-checked, every access written to an audit trail that can
  <div class="stat"><div class="big">1 leak</div><div class="lbl">is enough: an assistant that can read everything can leak everything</div>
   <div class="src">COPILOT OVERSHARING · ECHOLEAK · SLACK AI INJECTION</div></div>
  <div class="stat"><div class="big">Offence</div><div class="lbl">to tip off a customer that a suspicious-transaction report exists</div>
-  <div class="src">CDSA S.48 · MAS NOTICE PSN01 (SINGAPORE)</div></div>
+  <div class="src">CDSA S.57 · MAS NOTICE PSN01 (SINGAPORE)</div></div>
 </div>""")
     flow = [("01", "Who's asking", "Signed token from the web app or WorkBuddy. Never a name typed into a box."),
             ("02", "Gate 1", "Search only what this person may open, using each platform's own permissions."),
             ("03", "Gate 2", "Ask the source again, live, for every passage. Error or timeout means no."),
-            ("04", "Answer", "Tencent Hunyuan writes it from those passages only, or we quote them directly."),
+            ("04", "Answer", "With a TokenHub key, Tencent Hy3 writes it from those passages only; without one we quote them."),
             ("05", "Grounding check", "Every sentence must cite a passage. Unsupported numbers and names are dropped.")]
     steps = "".join(f'<div class="st"><div class="n">{n}</div><div class="t">{html.escape(t)}</div>'
                     f'<div class="d">{html.escape(d)}</div></div>' for n, t, d in flow)
@@ -102,7 +102,7 @@ answer is shown · hash-chained and sealed · if it can't be written, nothing is
             lines.append(f'<div class="{cls}">{html.escape(ln) or "&nbsp;"}</div>')
         card("09b_tamper", "Tamper demo", f"""
 <div class="kicker">python scripts/tamper_demo.py · real output</div>
-<h2 style="margin:8px 0 12px;font-size:46px">Edit one line, delete one, roll it back: each is caught.</h2>
+<h2 style="margin:8px 0 12px;font-size:46px">Edit a line, delete one, roll it back: each is caught, up to the last published head.</h2>
 <div class="term">{''.join(lines)}</div>""", head="""<style>.term{flex:1;overflow:hidden;background:#05070d;border:1px solid #23304d;
 border-radius:16px;padding:22px 26px;font-family:Consolas,'Cascadia Mono',monospace;font-size:13.5px;line-height:1.3;color:#b9c4da}
 .term .ok{color:#5ee0b0;font-weight:600}.term .warn{color:#f0c36b}</style>""")

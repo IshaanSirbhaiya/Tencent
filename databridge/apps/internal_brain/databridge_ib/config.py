@@ -52,6 +52,11 @@ class IbConfig:
         bad = [n for n, v, d in (("IB_TOKEN_KEY", self.token_key, DEV_TOKEN_KEY),
                                  ("IB_LEDGER_KEY", self.ledger_key, DEV_LEDGER_KEY))
                if v == d or len(v) < 32]
+        bad += [n for n, v, d in (("MOCK_SVC_TOKEN", self.svc_token, "svc-dev"),
+                                  ("MOCK_ADMIN_TOKEN", self.admin_token, "admin-dev"),
+                                  ("MOCK_WEBHOOK_SECRET", self.webhook_secret, "whsec-dev")) if v == d]
+        if self.token_key == self.ledger_key:
+            bad.append("IB_LEDGER_KEY (must differ from IB_TOKEN_KEY)")
         if bad:
             raise RuntimeError(f"refusing to start: set strong values for {', '.join(bad)}")
         # demo sign-in lets the caller pick a persona; on a reachable deployment only holders of

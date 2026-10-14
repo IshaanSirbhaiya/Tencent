@@ -143,7 +143,7 @@ if port_busy "$WEB_PORT"; then
 else
   echo "      starting the web app on http://localhost:$WEB_PORT (log: $LOGS/web.log)"
   (exec </dev/null >/dev/null 2>&1
-   cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 nohup npx next start -p "$WEB_PORT" >"$LOGS/web.log" 2>&1 &)
+   cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 nohup npx next start -H 127.0.0.1 -p "$WEB_PORT" >"$LOGS/web.log" 2>&1 &)
 fi
 if ! wait_http "http://localhost:$WEB_PORT/" 90; then
   echo "web app did not answer on :$WEB_PORT in 90s; see $LOGS/web.log" >&2; exit 1

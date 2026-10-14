@@ -202,7 +202,7 @@ source status) and 15 (one valid citation accepts a model answer).
 
 Real SSO; envelope-encrypted content and crypto-shredding (described only; plan review disposition); COS Object
 Lock WORM for the ledger; monitoring of connector service-account use (TRM §9.2.2); rate limits and the Caddy
-allowlist on the public edge (deploy not yet in the repo); timing parity.
+allowlist on the public edge (deploy kit in `deploy/lighthouse/`, not deployed); timing parity.
 
 ## 9. Codex security review r1 track 3 disposition
 
@@ -311,3 +311,22 @@ a test through the real app (`test_audit_routes_real_principal.py`).
 | 8 | Map audit event conflated counted and returned items | **Fixed.** `map.viewed` records `docs_listed` and `items_returned`. | `test_knowledge_map.py::test_map_event_records_items_actually_returned` |
 | 9 | Test gaps | **Partly fixed** with the tests above; an ASGI send-order probe and large-ledger load tests are not written. | |
 | 10 | Channel rule, revocation lock and passcode guard were outside the bundle | Covered by §10 (T4-8, CB5-1, CB5-5) and their tests. | |
+
+
+## 12. Final review round (15 Oct): Opus security, Sonnet accuracy, Haiku first-run, Sonnet UX
+
+| # | Finding | Disposition |
+|---|---|---|
+| O-1 | The original-screens app offered nine people but showed jdoe's graph to all of them | **Fixed.** Its sign-in offers only Jordan and says the graph is Jordan's view at build time; the web server binds to 127.0.0.1. Rebuild `--as <persona>` for another view. |
+| O-2 | The eval command exited 0 even with leaks | **Fixed.** It exits 1 on any leak, violation, P2 mismatch or invalid canary. |
+| O-3 | Logout could report success when the revocation list was unavailable | **Fixed.** 503, the session is not reported as ended. |
+| O-4 | Compare's second-person sign-in ignored the demo passcode | **Fixed** in the web app (the passcode entered at sign-in is reused for the comparison slots). |
+| O-5 | A deployed build accepted the mock platforms' public dev secrets and a shared signing key | **Fixed.** `assert_deployable` refuses both (`test_config_deployable.py`). |
+| O-6 | Map and citations show a shared drive's name to someone given one file directly | **Accepted.** The drive name is what the platform shows that person too. |
+| O-7 | The map's check pool is shared, so a heavy map can make another person's map leave items out | **Accepted.** Fail-closed (never shows extra); the pool exists so answers are never starved. |
+| O-8 | Sentences removed as addressed-to-an-AI were recorded as 0; sign-ins were not in the ledger | **Fixed.** The exact count is recorded; demo sign-in writes `auth.login` before the session is issued (ledger down = no sign-in). |
+| O-9 | Breaking a stale revocation lock can race | **Accepted, low.** Needs a 30 s stale lock plus two simultaneous waiters; the worst case is one lost revocation write, and the next logout retries. |
+| O-10 | A Windows user name and a personal email in tracked files | **Fixed** in the current files; history is cleaned before the repository goes public. |
+
+Accuracy and first-run findings (stale counts, Hy3 wording, the tamper "8/8" claim, setup steps, macOS
+install) were fixed in the documents themselves.

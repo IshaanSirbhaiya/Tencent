@@ -1463,7 +1463,7 @@ class Builder:
             "fincrime", "Case handling: tipping-off safeguards",
             "Rule\n\nDisclosing that a suspicious transaction report has been filed, or that a "
             "review is under way, can itself be a criminal offence (tipping-off; Singapore "
-            "CDSA section 48, referenced by MAS Notice PSN01).\n\nPractice\n\nCase notes live only "
+            "CDSA section 57, referenced by MAS Notice PSN01).\n\nPractice\n\nCase notes live only "
             "in this space, the private case channel and the FinCrime case files folder. Customer-"
             "facing staff use the approved customer account review script, whatever the reason "
             "for a review.",
