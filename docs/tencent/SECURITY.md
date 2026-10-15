@@ -179,7 +179,8 @@ They are exercised by the canonical questions `INJ-q1` to `INJ-q4` (`tests/test_
 and by the leak eval's injection probes. The first eval run (RESULTS.md, before the `8b5eb57`/`d69ab97` fixes)
 recorded **0 leaks** and **6 injection hard failures**, all forged citations: a literal `[C9]` in a source bound
 to a real passage tag (an integrity failure, not a disclosure). The tag neutralisation above is the fix;
-injection results after it: **TBD (measured in RESULTS.md)**.
+the final run (`databridge/evals/internal_brain/RESULTS.md`, 976 injection-relevant requests) records
+**0 injection hard failures**.
 
 ## 5. Side channels
 

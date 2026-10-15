@@ -18,6 +18,7 @@ Public repo: https://github.com/IshaanSirbhaiya/Tencent. Start at [INTERNAL_BRAI
 | Leak evaluation | 0 leaks in 5,958 requests (2,979 probes on 2 paths); 0 of 400 pairs differ | `databridge/evals/internal_brain/RESULTS.md` |
 | Original code share | 93% of code lines are unchanged Walnut | `python databridge/scripts/measure_original_share.py` |
 | Deck (13 slides, PDF and PPTX) | Done | `submission/07_deck/` |
+| Cover image (made with Miora; 380×216 and 1920×1080) | Done | `submission/06_cover/` |
 | Demo video, 5:55, silent, with a narration cue sheet and subtitles | Done | `submission/05_video/` |
 | Lighthouse deploy kit | Written; no live instance | `deploy/lighthouse/` |
 
@@ -31,7 +32,6 @@ Public repo: https://github.com/IshaanSirbhaiya/Tencent. Start at [INTERNAL_BRAI
 ## Next
 
 1. Record the voice-over on the video, using `submission/05_video/narration_cues.md`.
-2. Make the cover image and put it in `submission/06_cover/`.
-3. Fill in the submission form ([answers](docs/tencent/SUBMISSION.md)) and attach the pack ([index](submission/README.md)).
-4. Get the teammates' confirmation.
-5. When Hy3 is approved, run it once and record the result here.
+2. Fill in the submission form ([answers](docs/tencent/SUBMISSION.md)) and attach the pack ([index](submission/README.md)).
+3. Get the teammates' confirmation.
+4. When Hy3 is approved, run it once and record the result here.
