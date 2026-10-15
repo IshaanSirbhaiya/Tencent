@@ -1,6 +1,6 @@
 # Data flows: what leaves the system, and what is kept
 
-> Status as of 13 Oct 2026; `file:line` references are to commit `4d1887e`. Paths are relative to
+> Status as of 13 Oct 2026; `file:line` references are to commit `d69ab97`. Paths are relative to
 > `databridge/apps/internal_brain/databridge_ib/` unless they start with `tests/` or `databridge/`.
 > **All data in this repo is synthetic** ("Company A", `databridge/fixtures/enterprise/`). No real company,
 > customer or personal data is used, and the public demo never connects to real workspaces (plan §5.3).

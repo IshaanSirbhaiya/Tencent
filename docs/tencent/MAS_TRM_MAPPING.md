@@ -5,7 +5,7 @@
 > compliance assessment, a legal opinion or a certification, and the Internal Brain runs on synthetic data only.
 > Every row names its evidence (a test, an eval or a `file:line`) and its limits.
 >
-> `file:line` references are to commit `4d1887e`; paths are relative to
+> `file:line` references are to commit `d69ab97`; paths are relative to
 > `databridge/apps/internal_brain/databridge_ib/` unless they start with `tests/`
 > (= `databridge/apps/internal_brain/tests/`) or `databridge/`. Regulatory paragraph numbers were checked against
 > the official documents during research on 13 Oct 2026 (sources at the end). Wording is paraphrased.
