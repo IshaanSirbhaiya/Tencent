@@ -1,6 +1,6 @@
 """How much of today's code is the original Walnut base?
 
-    python databridge/scripts/measure_original_share.py [base-commit]     (default 4ab54d4)
+    python databridge/scripts/measure_original_share.py [base-commit]     (default 078572e)
 
 Counts code lines (py, ts/tsx/js, css, sh/ps1, yaml, sql, toml; not lockfiles, node_modules, build
 output or generated JSON) at the base commit and at HEAD, and reports the share of HEAD's code lines
@@ -29,7 +29,7 @@ def lines(rev: str, path: str) -> int:
 
 
 def main() -> int:
-    base = sys.argv[1] if len(sys.argv) > 1 else "4ab54d4"
+    base = sys.argv[1] if len(sys.argv) > 1 else "078572e"
     head_files = [f for f in git("ls-tree", "-r", "--name-only", "HEAD").splitlines() if is_code(f)]
     head_total = sum(lines("HEAD", f) for f in head_files)
     added = 0

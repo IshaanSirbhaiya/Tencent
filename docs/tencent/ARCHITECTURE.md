@@ -1,7 +1,7 @@
 # Walnut Internal Brain: architecture
 
 > FinTech Track (Aspire), "The Internal Brain". Status as of 15 Oct 2026; `file:line` references were
-> taken at commit `4d1887e` and may have drifted by a few lines since. Paths are relative to `databridge/apps/internal_brain/databridge_ib/` unless they start
+> taken at commit `d69ab97` and may have drifted by a few lines since. Paths are relative to `databridge/apps/internal_brain/databridge_ib/` unless they start
 > with `databridge/`, `tests/` (= `databridge/apps/internal_brain/tests/`) or `docs/`. Where a component is
 > planned but not yet in the repo, this page says so.
 
@@ -143,7 +143,7 @@ table is the same content as text.
 The Internal Brain imports `databridge_core` (`DecisionLedger`), `databridge_harness` (`Harness`,
 `LiteLLMBackend`, `hashing_embed`) and the grounding functions in `databridge/apps/gateway/databridge_gateway/llm.py`
 (`GroundedNarrator`, `ground_narration`, `bind_sentences`, `unsupported_named_terms`). The last are loaded by
-file path, so the legacy gateway's routes are never imported. `git diff --stat 4ab54d4 HEAD` shows no change to
+file path, so the legacy gateway's routes are never imported. `git diff --stat 078572e HEAD` shows no change to
 `packages/core`, `packages/harness`, `packages/retrieval`, `packages/adapter` or `apps/gateway`. The only
 changes under `databridge/packages/` are in the healthcare intake package (`packages/intake`): a source-data
 path fix and two tests, made when the prior competition's folders were removed (commits `81a16a3`, `b4d72cf`).

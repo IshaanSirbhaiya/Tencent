@@ -207,7 +207,7 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 ## What was built here, and what was already there
 
 The Walnut engine (provenance pointers, the sealed ledger, the grounding wall, the model harness) existed
-before the event (base commit `4ab54d4`) and is **reused unchanged**. The Internal Brain, the mock
+before the event (base commit `078572e`) and is **reused unchanged**. The Internal Brain, the mock
 platforms, the web app, the Company A world, the evaluation and the original-screen configuration were
 built during the hackathon, beside it. **93% of the code is the original Walnut base**
 (`python databridge/scripts/measure_original_share.py`: unchanged original lines / all code lines, 15 Oct).
