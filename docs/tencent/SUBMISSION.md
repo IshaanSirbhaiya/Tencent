@@ -241,10 +241,10 @@ If the form allows more images, these show the product itself (`submission/03_ap
 
 ## Cover image
 
-Miora, made as a 1920×1080 master and exported at 380×216, saved to `submission/06_cover/`. Suggested
-prompt: *"Minimal enterprise illustration: four app tiles (wiki, tickets, chat, drive) feeding a
-walnut-shaped core through two gates, a padlock and a chain-link ledger beneath, calm navy and teal
-palette, no text."*
+Upload `submission/06_cover/cover_380x216.png` (the recommended 380×216). A full-size
+`cover_1920x1080.png` is next to it. The art was made in **Miora** from our written brief (the prompts and
+results are in `miora_session1.png` and `miora_session2.png`); the title and tagline were added afterwards
+so the text stays sharp.
 
 ## Demo video (5–8 min)
 

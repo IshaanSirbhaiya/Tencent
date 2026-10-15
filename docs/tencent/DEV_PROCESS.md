@@ -29,7 +29,7 @@ verification, so `hy3` has not answered live inside the Brain yet.
 | **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1 and CB5; first in the Brain's answer chain | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py` |
 | **TokenHub** | The Brain's model gateway (Hy3, then DeepSeek as backup). Wired in and tested; live calls wait on Tencent's account verification | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
 | **Lighthouse** | A hardened one-command deploy kit (HTTPS, passcode-gated demo, only ports 80/443 open); no live instance because Lighthouse was unavailable during the event | [deploy/lighthouse/](../../deploy/lighthouse/README.md) |
-| **Miora** | The cover image | `submission/06_cover/` |
+| **Miora** | Tencent's AI design agent made the cover art from our written brief (two rounds of prompts, four variations each); we added the title | `submission/06_cover/`: the Miora screenshots, its raw image and the final cover |
 
 ## CodeBuddy sessions
 
