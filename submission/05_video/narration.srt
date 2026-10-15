@@ -83,8 +83,8 @@ Here's the same question from Jordan and from Ken, side by side.
 Jordan gets the full picture.
 
 22
-00:01:47,348 --> 00:01:56,194
-Ken gets a polite "I couldn't find that in the sources you can access", with no hint that there's anything more to find.
+00:01:47,348 --> 00:01:57,348
+Ken gets a polite "I couldn't find an answer to that in the sources you can access", with no hint that there's anything more to find.
 
 23
 00:01:58,579 --> 00:02:06,656
@@ -191,37 +191,49 @@ And Maya can run her audit checks from WorkBuddy too.
 Underneath it all is Walnut, the evidence engine we built before this hackathon.
 
 49
-00:04:36,519 --> 00:04:47,289
-Every value it touches carries a pointer back to where it came from, and you can follow that pointer, like this, from a fact to the exact document.
+00:04:36,519 --> 00:04:41,904
+This is Company A as a knowledge graph, built from what Jordan can see.
 
 50
-00:04:47,289 --> 00:04:51,135
-The Internal Brain reuses that engine just as it is.
+00:04:41,904 --> 00:04:46,904
+Open the database migration plan, and every fact on it has a source.
 
 51
+00:04:46,904 --> 00:04:51,904
+Drag the time slider, and the company's knowledge rewinds to any past date.
+
+52
+00:04:51,904 --> 00:05:01,904
+Every value carries a pointer back to where it came from, and you can follow it, like this, to the exact row in the exact file.
+
+53
+00:05:01,904 --> 00:05:05,750
+The Internal Brain reuses that engine just as it is.
+
+54
 00:05:07,970 --> 00:05:16,431
 Two checks before the model sees anything, a grounding check after it answers, and an audit record written before anything is shown.
 
-52
+55
 00:05:16,431 --> 00:05:20,662
 In this demo the answers are quoted straight from the sources.
 
-53
+56
 00:05:20,662 --> 00:05:26,431
 Add a TokenHub key, and Tencent Hy3 writes them instead, through exactly the same checks.
 
-54
+57
 00:05:29,620 --> 00:05:39,235
 We attacked it on purpose: nearly six thousand adversarial requests, zero leaks; four hundred paired answers, zero differences; and every scenario covered by automated tests.
 
-55
+58
 00:05:40,269 --> 00:05:50,654
 We used Tencent CodeBuddy to map the trust boundaries, build the WorkBuddy connector, write tests and review our security, and it found real bugs in our code.
 
-56
+59
 00:05:50,654 --> 00:05:53,731
 Six sessions, every transcript kept in the repository.
 
-57
+60
 00:05:53,731 --> 00:05:55,531
 Thanks for watching!

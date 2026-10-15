@@ -69,7 +69,7 @@ the same page as **ken.ext** (24 items, 2 platforms).
 **On screen:** the **Compare** page, jdoe and ken.ext, "Ask for both", two answers side by side.
 
 > Here's the same question from Jordan and from Ken, side by side. Jordan gets the full picture. Ken
-> gets a polite "I couldn't find that in the sources you can access", with no hint that there's anything
+> gets a polite "I couldn't find an answer to that in the sources you can access", with no hint that there's anything
 > more to find.
 
 ### 5b · A guided tour for anyone new (1:58–2:12)
@@ -132,9 +132,11 @@ different answers. Then the compliance connector listing Jordan's access and ver
 **On screen:** the original Walnut screens on Company A's data: the knowledge graph (a node opens), the
 brain view, the provenance chain of one value, the ontology.
 
-> Underneath it all is Walnut, the evidence engine we built before this hackathon. Every value it
-> touches carries a pointer back to where it came from, and you can follow that pointer, like this, from
-> a fact to the exact document. The Internal Brain reuses that engine just as it is.
+> Underneath it all is Walnut, the evidence engine we built before this hackathon. This is Company A as
+> a knowledge graph, built from what Jordan can see. Open the database migration plan, and every fact
+> on it has a source. Drag the time slider, and the company's knowledge rewinds to any past date. Every
+> value carries a pointer back to where it came from, and you can follow it, like this, to the exact row
+> in the exact file. The Internal Brain reuses that engine just as it is.
 
 ### 12 · How it fits together (5:07–5:29)
 **On screen:** the trust-boundary card.

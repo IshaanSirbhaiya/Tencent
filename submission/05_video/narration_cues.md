@@ -37,7 +37,7 @@ Play `walnut_internal_brain_demo.mp4` with `narration.srt` loaded as subtitles a
 
 - **1:40** Here's the same question from Jordan and from Ken, side by side.
 - **1:45** Jordan gets the full picture.
-- **1:47** Ken gets a polite "I couldn't find that in the sources you can access", with no hint that there's anything more to find.
+- **1:47** Ken gets a polite "I couldn't find an answer to that in the sources you can access", with no hint that there's anything more to find.
 
 ## 1:58–2:12 · scene 5b
 
@@ -85,8 +85,11 @@ Play `walnut_internal_brain_demo.mp4` with `narration.srt` loaded as subtitles a
 ## 4:31–5:07 · scene 11
 
 - **4:31** Underneath it all is Walnut, the evidence engine we built before this hackathon.
-- **4:36** Every value it touches carries a pointer back to where it came from, and you can follow that pointer, like this, from a fact to the exact document.
-- **4:47** The Internal Brain reuses that engine just as it is.
+- **4:36** This is Company A as a knowledge graph, built from what Jordan can see.
+- **4:41** Open the database migration plan, and every fact on it has a source.
+- **4:46** Drag the time slider, and the company's knowledge rewinds to any past date.
+- **4:51** Every value carries a pointer back to where it came from, and you can follow it, like this, to the exact row in the exact file.
+- **5:01** The Internal Brain reuses that engine just as it is.
 
 ## 5:07–5:29 · scene 12
 
