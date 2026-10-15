@@ -146,4 +146,4 @@ The Internal Brain imports `databridge_core` (`DecisionLedger`), `databridge_har
 file path, so the legacy gateway's routes are never imported. `git diff --stat 078572e HEAD` shows no change to
 `packages/core`, `packages/harness`, `packages/retrieval`, `packages/adapter` or `apps/gateway`. The only
 changes under `databridge/packages/` are in the healthcare intake package (`packages/intake`): a source-data
-path fix and two tests, made when the prior competition's folders were removed (commits `81a16a3`, `b4d72cf`).
+path fix and two tests, made when the prior competition's folders were removed (commits `67808db`, `8b5eb57`).

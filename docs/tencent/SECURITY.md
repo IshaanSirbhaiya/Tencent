@@ -2,7 +2,7 @@
 
 > Scope: the Internal Brain service (`databridge/apps/internal_brain/databridge_ib/`), the web proxy
 > (`databridge/apps/internal_brain_web/app/api/ib/[...path]/route.ts`) and the mock platforms. `file:line`
-> references are to commit `4d1887e`; paths are relative to `databridge/apps/internal_brain/databridge_ib/`
+> references are to commit `d69ab97`; paths are relative to `databridge/apps/internal_brain/databridge_ib/`
 > unless they start with `tests/` (= `databridge/apps/internal_brain/tests/`) or `databridge/`. Anything not
 > built is marked so.
 
@@ -43,7 +43,7 @@
   caller must also present it (`app.py:91-107`). It is a demo stand-in for SSO over synthetic data and returns
   404 when off (`tests/test_app_routes.py::test_demo_login_cookie_and_disabled`). The Codex security review
   rated an enabled demo login **Critical** (finding 1). There is no real SSO/IdP (plan §3, roadmap).
-- The logout revocation, fail-closed revocation list, `Secure` cookie and passcode came with commit `4d1887e`.
+- The logout revocation, fail-closed revocation list, `Secure` cookie and passcode came with commit `d69ab97`.
   They have **no dedicated regression tests yet**.
 - MCP tokens for WorkBuddy and the MCP server's "no identity argument" schema test are **not built yet**
   (`mcp_server.py` and `databridge/scripts/ib_mint_token.py` are absent).
@@ -158,7 +158,7 @@ Retrieved content is untrusted. Our position is **containment**, not detection.
 | `INJ-drive-audit-tools` | Drive | Text asking the assistant to call audit tools |
 
 They are exercised by the canonical questions `INJ-q1` to `INJ-q4` (`tests/test_scenarios_e2e.py::test_canonical`)
-and by the leak eval's injection probes. The first eval run (RESULTS.md, before the `b4d72cf`/`4d1887e` fixes)
+and by the leak eval's injection probes. The first eval run (RESULTS.md, before the `8b5eb57`/`d69ab97` fixes)
 recorded **0 leaks** and **6 injection hard failures**, all forged citations: a literal `[C9]` in a source bound
 to a real passage tag (an integrity failure, not a disclosure). The tag neutralisation above is the fix;
 injection results after it: **TBD (measured in RESULTS.md)**.
@@ -168,7 +168,7 @@ injection results after it: **TBD (measured in RESULTS.md)**.
 | Channel | Control | Evidence | Residual |
 |---|---|---|---|
 | Existence via refusal wording | One constant refusal text, no counts, no reasons, constant `scope_note` | `models.py:21, 179-185`; `tests/test_scenarios_e2e.py::test_s3_existing_vs_nonexistent_identical` | — |
-| Existence via ranking statistics | BM25 statistics over the asker's permitted corpus only; anchor terms judged on permitted df only; Gate-2-denied docs removed from the ranking pool | `index.py:1-14, 311-321`; `pipeline.py:134-136`; `tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted`; RESULTS.md: 0 of 400 differential comparisons mismatched | Eval figure predates `4d1887e` |
+| Existence via ranking statistics | BM25 statistics over the asker's permitted corpus only; anchor terms judged on permitted df only; Gate-2-denied docs removed from the ranking pool | `index.py:1-14, 311-321`; `pipeline.py:134-136`; `tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted`; RESULTS.md: 0 of 400 differential comparisons mismatched | Eval figure predates `d69ab97` |
 | Existence via linked titles or keys | Links resolve only within the readable set and then pass Gate 2 before anything about them is rendered | `pipeline.py:260-281` | A raw key written inside a permitted text is shown as written, never resolved (plan §4.6) |
 | Per-query source contribution | `/ib/sources` reports per-platform sync status only (time since last successful sync) | `app.py:150-161` | It is global, not caller-scoped (Codex security review r1 finding 12) |
 | Error envelopes | Any pipeline failure returns the same 503 body | `app.py:134-138` | — |
@@ -190,7 +190,7 @@ injection results after it: **TBD (measured in RESULTS.md)**.
 
 A Codex security review of the gates, pipeline, ledger and identity code is recorded in
 `docs/tencent/reviews/security-r1/codex_track1.md`: 35 findings (1 Critical, 10 High, 19 Medium, 5 Low). Commit
-`4d1887e` changed the code for several of them (from its message and diff: read-through re-checks, denied docs
+`d69ab97` changed the code for several of them (from its message and diff: read-through re-checks, denied docs
 leaving ranking, relevance before top-k, readable-only link resolution, fail-closed and atomic revocation, logout
 revocation, `Secure` cookie, demo passcode, enforced allowlist, webhook size cap and threadpool, time-phrase
 stripping, `request.failed`, sanitised logs). A written disposition of all 35 findings, and regression tests for
