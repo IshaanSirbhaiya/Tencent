@@ -21,6 +21,40 @@ two commands, how it works, and the evidence for every claim.
 | **Audit → Verify audit chain** | Who asked what, every allow/deny decision, tamper detection |
 | **Original Walnut screens** | The engine's knowledge graph, time slider and provenance chain on the same data |
 
+## Why this exists
+
+The data a company needs already exists. Getting to it is the problem.
+
+| | |
+|---|---|
+| **"The biggest obstacle to using advanced data analysis isn't skill base or technology; it's plain old access to the data."** | Harvard Business Review |
+| **25%** of a team's time goes to searching for answers | Atlassian, *State of Teams 2025* (12,000 knowledge workers) |
+| **5.3 hours** a week, per person, spent waiting on colleagues for information or recreating work that already exists | Panopto with YouGov, 2018 (1,001 employees) |
+| **42%** of an organisation's know-how is held only by individual employees | same |
+| **60%** of AI projects unsupported by AI-ready data will be abandoned through 2026 | Gartner, Feb 2025 |
+
+In a fintech the problem has a second edge: an assistant that can read everything can leak everything,
+and telling the wrong person that a suspicious-transaction report exists is a criminal offence. So the
+answer has to be **useful and permission-safe at the same time**. That is what the Internal Brain is.
+
+## One connected record, whatever the source or format
+
+Underneath the Internal Brain is the **Walnut / DataBridge** engine: it turns an organisation's scattered
+data into one connected, checkable record that every team can use.
+
+| Step | What it does |
+|---|---|
+| **Connect** | Reads data where it sits: work tools (Confluence, Jira, Slack, Google Drive in this entry), SQL databases (PostgreSQL connector), data-lake and warehouse exports in open formats (Parquet, Arrow, CSV, JSON / JSONL), spreadsheets (Excel), documents (PDF, including scanned pages through OCR, Word, PowerPoint, HTML, Markdown, plain text, XML, YAML), email and mailboxes, and any system that offers an MCP server |
+| **Understand** | Recognises the same customer, supplier, project or person across every source and links them into one knowledge graph |
+| **Convert** | Serves that record in the shape each job needs: answers, reports, analytics tables, AI context and datasets |
+| **Prove** | Every value points to the cell, line or page it came from; a value without that proof is refused |
+| **Protect** | Runs inside your own environment with the model you choose. Each person sees only what their role allows, and every access is logged |
+
+The Internal Brain is the permission-aware **answer layer** on that record, specialised for a fintech:
+it adds live permission checks at the source, a tamper-evident audit log, the FinCrime compartment and
+market-specific answers. Warehouses such as Snowflake or BigQuery connect through their MCP servers or
+their open-format exports; a dedicated warehouse connector is on the roadmap, not in this repository.
+
 ---
 
 # Walnut
