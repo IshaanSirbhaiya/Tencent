@@ -2,24 +2,45 @@
 
 **Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech Track (Aspire): "The Internal Brain".**
 
-Ask one question across Confluence, Jira, Slack and Google Drive, and get a cited answer built **only
-from what you're allowed to open**. Every source is permission-checked twice before the AI sees it, and
-every access is written to an audit log that can't be quietly edited.
+Ask one question across Confluence, Jira, Slack and Google Drive. Get a cited answer built **only from
+what you are allowed to open**. Every source is permission-checked twice before the AI sees it, and every
+access is written to an audit log that cannot be quietly edited.
 
-- **0 leaks** of restricted content in 5,958 adversarial requests; **0 differences** between
-  "restricted" and "doesn't exist" across 400 paired questions ([results](databridge/evals/internal_brain/RESULTS.md)).
-- Built on the **Walnut evidence engine** below, reused unchanged (93% of the code is the original base).
-- Built **with CodeBuddy**, reachable **from WorkBuddy**, and configured for **Tencent Hy3** via TokenHub (not yet run live; answers are direct quotes without a key).
+## The proof
 
-**Judges: start with [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md)**: what to look at first, how to run it in
-two commands, how it works, and the evidence for every claim.
+- **0 leaks** of restricted content in 5,958 adversarial requests.
+- **0 differences** between "restricted" and "does not exist" across 400 paired questions.
+  Both results are in [the eval results](databridge/evals/internal_brain/RESULTS.md).
+- **93%** of the code is the original Walnut base, reused unchanged. The Internal Brain is a new app on top of it.
+- Built **with CodeBuddy** and reachable **from WorkBuddy**.
+- Configured for **Tencent Hy3** through TokenHub. It has not yet been run live. Without a key, answers
+  are direct quotes from the permitted sources.
+
+## Where to click
+
+Start with [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). It says what to look at first, how to run the app, how
+it works, and gives the evidence for every claim.
 
 | Look at | Why |
 |---|---|
-| **Compare** (same question, two people) | Restrictions you can see at a glance |
+| **Compare** (same question, two people) | The restrictions are visible at a glance |
 | **Map** | Knowledge across four platforms, shaped by each person's permissions |
-| **Audit → Verify audit chain** | Who asked what, every allow/deny decision, tamper detection |
+| **Audit → Verify audit chain** | Who asked what, every allow and deny decision, and tamper detection |
 | **Original Walnut screens** | The engine's knowledge graph, time slider and provenance chain on the same data |
+
+## Quick start
+
+The run commands live in one place: [INTERNAL_BRAIN.md → Run it](INTERNAL_BRAIN.md#run-it). The app uses
+ports 8100 (service), 8200 (mock platforms) and 3100 (web).
+
+## Repository map
+
+| Path | What is in it |
+|---|---|
+| `databridge/` | The code: the Internal Brain app, the web app, the mock platforms, and the Walnut engine packages |
+| [`docs/tencent/`](docs/tencent/) | Architecture, security, responsible AI, and the MAS mapping |
+| `submission/` | Screenshots, video and deck |
+| `deploy/lighthouse/` | The cloud deploy kit |
 
 ## Why this exists
 
@@ -33,13 +54,13 @@ The data a company needs already exists. Getting to it is the problem.
 | **42%** of an organisation's know-how is held only by individual employees | same |
 | **60%** of AI projects unsupported by AI-ready data will be abandoned through 2026 | Gartner, Feb 2025 |
 
-In a fintech the problem has a second edge: an assistant that can read everything can leak everything,
+In a fintech the problem has a second edge. An assistant that can read everything can leak everything,
 and telling the wrong person that a suspicious-transaction report exists is a criminal offence. So the
-answer has to be **useful and permission-safe at the same time**. That is what the Internal Brain is.
+answer has to be **useful and permission-safe at the same time**. That is what the Internal Brain does.
 
 ## One connected record, whatever the source or format
 
-Underneath the Internal Brain is the **Walnut / DataBridge** engine: it turns an organisation's scattered
+Underneath the Internal Brain is the **Walnut / DataBridge** engine. It turns an organisation's scattered
 data into one connected, checkable record that every team can use.
 
 | Step | What it does |
@@ -57,93 +78,78 @@ their open-format exports; a dedicated warehouse connector is on the roadmap, no
 
 ---
 
-# Walnut
+# The Walnut engine
 
-Walnut is an evidence substrate for AI systems: every value it emits carries a re-executable proof
-of where it came from, and a value with no such proof is refused when it is constructed — not
-logged as a warning, not flagged for later review, refused.
+Walnut is an evidence layer for AI systems. Every value it emits carries a proof of where it came from,
+and anyone can re-run that proof. A value with no proof is refused when it is created. It is not logged
+as a warning or flagged for later review.
 
-Most "provenance" in AI infrastructure today is lineage: dataset-level, computed after the fact,
-and trusted because the vendor says so. Walnut's claim is narrower and checkable: provenance as a
-property of the individual value, verifiable by an outsider re-running the pointer, independent of
-whether anyone trusts the system that produced it.
+Most provenance in AI infrastructure today is lineage. It works at dataset level, is computed after the
+fact, and is trusted because the vendor says so. Walnut's claim is narrower and checkable: provenance is
+a property of each individual value, and an outsider can verify it by re-running the pointer.
 
-This repository was built as a single vertical product (a healthcare intake flow) and then
-generalised. The engine now knows no domain — healthcare, finance and government are peer
-**packs**, YAML-declared, sitting on top of the same core. Everything below describes the general
-system; where a claim is demonstrated in one pack rather than built into the engine, that is said
-explicitly.
+The repository began as one product, a healthcare intake flow, and was then generalised. The engine now
+knows no domain. Healthcare, finance and government are **packs**, declared in YAML, on top of the same
+core. Where a claim is shown in one pack rather than built into the engine, the text says so.
 
----
+## How it works
 
-## The mechanism
+Each point below is a type or a test in this repository, and names the file that enforces it.
 
-These are not design goals. Each one is a type or a test in this repository, and each claim below
-names the file that enforces it.
-
-**A value is a `GroundedValue` carrying a `SourcePointer`, or it does not exist.**
+**Every value is a `GroundedValue` with a `SourcePointer`, or it does not exist.**
 `packages/core/databridge_core/provenance.py` defines the pointer as a sealed Pydantic model
-(`frozen=True`, `extra="forbid"`, `revalidate_instances="always"`) with ten closed kinds
-(`table_cell`, `doc_span`, `email_part`, `ocr_bbox`, `generated_claim`, …), each with its own
-required locator fields, checked by a validator that runs at construction. A pointer missing its
-required fields — or a caller adding a field the type doesn't declare — fails at the call site,
-not three layers downstream as an `AttributeError`.
+(`frozen=True`, `extra="forbid"`, `revalidate_instances="always"`). It has ten closed kinds, such as
+`table_cell`, `doc_span`, `email_part`, `ocr_bbox` and `generated_claim`. Each kind has its own required
+locator fields, checked when the object is built. A pointer with a missing field, or an extra field the
+type does not declare, fails at the call site. It does not fail three layers later.
 
 **A cell is one of four states, never a bare value.**
-`Cell = Union[GroundedValue, Transformed, Withheld, Absent]`. Two states disclose a value and carry
-proof of the source; two are non-answers and carry proof of what produced the non-answer instead —
-a policy decision (`Withheld.record: WithholdingRecord`, naming the policy, the principal, the
-purpose and the decision event) or a snapshot (`Absent.snapshot`, naming the source and the instant
-asked). Nothing is ungrounded; what differs is which kind of proof is the right one. A `Withheld`
-cell cannot carry a `SourcePointer` — that would vouch for something the consumer was never shown —
-and `assert_withheld_disjoint` enforces that no field is both disclosed and withheld, and that a
-withheld field never leaks into an `unresolved` list by accident.
+`Cell = Union[GroundedValue, Transformed, Withheld, Absent]`. Two states disclose a value and carry proof
+of the source. Two are non-answers and carry proof of what produced the non-answer: a policy decision
+(`Withheld.record`, naming the policy, the principal, the purpose and the decision event) or a snapshot
+(`Absent.snapshot`, naming the source and the moment asked). A `Withheld` cell cannot carry a
+`SourcePointer`, because that would vouch for something the reader never saw. `assert_withheld_disjoint`
+checks that no field is both disclosed and withheld, and that a withheld field never leaks into an
+`unresolved` list.
 
 **Trust is a label on where a value came from, not a confidence score.**
-`SourcePointer.trust: Trust.TRUSTED | Trust.UNTRUSTED` is stamped by the adapter that reads the
-source, from that source's own contract — an operator-controlled config table is `TRUSTED`; an
-email body, a chat message, an OCR'd document or anything a model wrote is `UNTRUSTED`, regardless
-of how accurate it is. Trust propagates by least-upper-bound (`trust_from_parents`): a value derived
-from ten trusted facts and one untrusted one is untrusted, and a `generated_claim` — model output —
-is untrusted by construction and can never be laundered into `TRUSTED` by wrapping it in an
-aggregation. `effective_trust` re-derives the label from ancestry at *read* time, so a label written
-by code that bypassed validation does not survive being used.
+`SourcePointer.trust` is `TRUSTED` or `UNTRUSTED`. The adapter that reads the source sets it from that
+source's own contract. An operator-controlled config table is `TRUSTED`. An email body, a chat message,
+an OCR'd page or anything a model wrote is `UNTRUSTED`, however accurate it is. Trust combines by
+least-upper-bound (`trust_from_parents`): a value derived from ten trusted facts and one untrusted fact
+is untrusted. A `generated_claim` (model output) is untrusted by construction and cannot be turned into
+`TRUSTED` by wrapping it in an aggregation. `effective_trust` re-derives the label from ancestry at read
+time, so a label written by code that skipped validation does not survive use.
 
-**Verification returns an eight-state lattice, never a boolean.**
-`packages/adapter/databridge_adapter/verdicts.py`: `VERIFIED`, `VERIFIED_AS_OF_CAPTURE`,
-`DRIFT_BENIGN`, `DRIFT_MATERIAL`, `EXPIRED`, `VANISHED`, `FORBIDDEN`, `UNVERIFIABLE`. A source is
-classified into a pinning tier (T0 native snapshot, T1 monotonic cursor, T2 current-addressable, T3
-unversioned), and `DRIFT_BENIGN` is a capability an adapter must *advertise* before it can claim it
-— `assert_verdict_advertised` refuses a source reporting a verdict it has no signal to compute.
+**Verification returns one of eight states, never a boolean.**
+In `packages/adapter/databridge_adapter/verdicts.py`: `VERIFIED`, `VERIFIED_AS_OF_CAPTURE`,
+`DRIFT_BENIGN`, `DRIFT_MATERIAL`, `EXPIRED`, `VANISHED`, `FORBIDDEN`, `UNVERIFIABLE`. Each source falls
+into a pinning tier: T0 native snapshot, T1 monotonic cursor, T2 current-addressable, T3 unversioned.
+`DRIFT_BENIGN` is a capability an adapter must advertise before it can claim it.
+`assert_verdict_advertised` refuses a source that reports a verdict it has no signal to compute.
 
-**The graph invalidates; it never deletes.** State is bi-temporal — every fact carries both when it
-was true in the world and when the system learned it — and a correction is a new row with the old
-one closed out, not an overwrite. `GraphStore` exposes only `current()` and `as_of()`; no temporal
-predicate appears in application code.
+**The graph closes facts; it never deletes them.**
+State is bi-temporal. Every fact records when it was true in the world and when the system learned it.
+A correction is a new row, and the old row is closed out, not overwritten. `GraphStore` exposes only
+`current()` and `as_of()`, so no temporal predicate appears in application code.
 
-**Identity resolution produces candidates. A named human attests.** No pack's resolver can construct
-a result that treats identity as settled. In `packages/graph/databridge_graph/merge.py`,
-`requires_human_selection` is computed from each enabled pack's declared `subject_kinds` (which
-entity kind may never be auto-merged, and what attestation a human must perform) rather than a
-hardcoded entity name — the healthcare pack's patient resolver
-(`packages/intake/databridge_intake/resolve.py`) is the concrete demonstration: candidates are
-ranked and flagged, never merged, and a name-only match without a corroborating identifier is
-returned with a note rather than silently trusted.
+**Identity resolution proposes candidates. A named human confirms.**
+No pack's resolver can return a result that treats identity as settled. In
+`packages/graph/databridge_graph/merge.py`, `requires_human_selection` is computed from each enabled
+pack's declared `subject_kinds`, not from a hardcoded entity name. The healthcare pack's patient resolver
+(`packages/intake/databridge_intake/resolve.py`) shows it: candidates are ranked and flagged, never
+merged, and a name-only match with no matching identifier comes back with a note instead of being trusted.
 
 **An adapter is five verbs, and natural language never crosses the boundary.**
-`packages/adapter/databridge_adapter/port.py` defines `describe / snapshot / plan / resolve /
-verify` as a runtime-checked `Protocol`; `assert_conforms` checks the full signature of every verb,
-not just that the name exists, because a Protocol only checking attribute presence lets an unusable
-adapter register. A model may propose a request (`CapabilityRequest`) that a deterministic validator
-then accepts or rejects; it may never assign trust, decide a policy outcome, or select an identity
-candidate.
-
----
+`packages/adapter/databridge_adapter/port.py` defines `describe`, `snapshot`, `plan`, `resolve` and
+`verify` as a runtime-checked `Protocol`. `assert_conforms` checks the full signature of every verb, not
+only the name, because a name-only check lets an unusable adapter register. A model may propose a
+request (`CapabilityRequest`) that a deterministic validator then accepts or rejects. A model may never
+assign trust, decide a policy outcome or pick an identity candidate.
 
 ## Architecture
 
-Four planes, each with one job and one failure mode, plus an evidence plane that cuts through all
-of them:
+Four planes, each with one job and one failure mode. An evidence plane cuts through all of them.
 
 ```
 BUSINESS PLANE       objects · actions · measures — actions are the only write path
@@ -155,137 +161,125 @@ EVIDENCE PLANE       GroundedValue · SourcePointer(+trust) · verdict lattice �
                       (cuts vertically through all four)
 ```
 
-Each adapter is three processes, not one: a **Core** that owns the driver, auth, pagination and
-provenance emission (never a model); a **Policy** layer that runs the capability, grant, purpose and
-budget checks in-process (never a model, never a per-cell network round trip); and a thin **Shell**
-that turns an orchestrator's task into a validated request or an escalation, holding no credentials
-and no driver handle — the only place a model runs inside the adapter fleet.
+Each adapter has three parts:
 
-Full reasoning for these decisions — including which of the individually-commoditised pieces
-(bi-temporal graphs, ontology-as-control-plane, connector fleets) Walnut is *not* trying to win on,
-and why the per-value proof is the piece nobody else ships — is the reasoning behind the
-architecture above.
+- **Core** owns the driver, auth, pagination and provenance emission. It never runs a model.
+- **Policy** runs the capability, grant, purpose and budget checks in-process. It never runs a model and
+  never makes a per-cell network call.
+- **Shell** turns an orchestrator's task into a validated request or an escalation. It holds no
+  credentials and no driver handle. It is the only place a model runs inside the adapter fleet.
 
----
+The design documents in [`docs/tencent/`](docs/tencent/) give the full reasoning, including which parts
+(bi-temporal graphs, connector fleets) Walnut does not try to win on, and why per-value proof is the part
+it does.
 
 ## Domain packs
 
-`packs/healthcare/`, `packs/finance/` and `packs/government/` each declare their own node/edge
-vocabulary, subject kinds and business rules in YAML. The engine (`packages/core`, `graph`,
-`harness`, `convert`, `adapter`) contains no reference to any of them — `test_no_domain_branching`
-(`packages/graph/tests/test_no_domain_branching.py`) fails the build on an `if pack == "..."` in
-engine code. Adding a fourth pack is a YAML change plus fixtures, not a code change to the packages
-above it.
+`packs/healthcare/`, `packs/finance/` and `packs/government/` each declare their own node and edge
+vocabulary, subject kinds and business rules in YAML. The engine (`packages/core`, `graph`, `harness`,
+`convert`, `adapter`) refers to none of them. `test_no_domain_branching`
+(`packages/graph/tests/test_no_domain_branching.py`) fails the build on any `if pack == "..."` in engine
+code. A fourth pack is a YAML change plus fixtures, not a code change.
 
----
+## What is built
 
-## What's built
+This list is checked against the code. [`STATUS.md`](STATUS.md) is the current, line-by-line version and
+is the source of truth.
 
-This section is checked against the code, not aspirational. See `STATUS.md` for the current,
-line-by-line version of this list — it moves faster than this file and is the source of truth.
+**Working:**
+- The provenance primitives (`packages/core`) and the four-cell-state model, with property tests for
+  every pointer kind and every laundering path the reviews found.
+- Four adapters: Postgres (T0/T1); a mailbox adapter over raw `.eml` files (T1/T3, everything it returns
+  is `untrusted`); a document and OCR adapter (T3, no past to return to); and one adapter that wraps a
+  pinned, sandboxed MCP server (everything `untrusted`, digest-pinned, quarantined if its description
+  changes). A content-addressed, write-once capture store sits behind them, and `email_part` and
+  `ocr_bbox` pointers resolve against it instead of the live source.
+- A bi-temporal graph loaded from realistic synthetic estates: one finance, one government, each with tens
+  of thousands of rows or nodes. Injection payloads are planted in both and contained. They can be cited
+  and quoted, and they never reach a control-flow sink.
+- A gateway (`/evidence`, `/trace`, `/ontology`, `/builder`, `/materialise`, plus the healthcare pack's
+  `/intake` surface) and a frontend with a pointer inspector, an adapter communication graph and an
+  ontology library.
+- A data agent and plan compiler that produce a tabular dataset (Receipt, Parquet and Croissant 1.1) from
+  a request over the finance graph. The compiler refuses plans on the wrong temporal axis or with a
+  missing pointer for any cell.
 
-**Solid:**
-- The provenance primitives above (`packages/core`) and the four-cell-state model, with property
-  tests exercising every pointer kind and every laundering path the reviews found.
-- An adapter fleet with four working adapters — Postgres (T0/T1), a mailbox adapter over raw
-  `.eml` (T1/T3, everything it returns `untrusted`), a document/OCR adapter (T3, no past to return
-  to), and one adapter wrapping a pinned, sandboxed MCP server (everything `untrusted`, digest-pinned,
-  quarantined on a description change) — plus a content-addressed, write-once capture store that
-  `email_part` and `ocr_bbox` pointers resolve against instead of the live source.
-- A bi-temporal graph loaded from real-shaped synthetic estates (a finance estate and a government
-  estate, each tens of thousands of rows/nodes), with injection payloads planted in both and
-  demonstrably contained — cited and quotable, never reaching a control-flow sink.
-- A gateway (`/evidence`, `/trace`, `/ontology`, `/builder`, `/materialise`, plus the healthcare
-  pack's own `/intake` surface) and a frontend exposing the pointer inspector, the adapter
-  communication graph, and the ontology library.
-- A data agent and plan compiler that produce a tabular dataset (Receipt + Parquet + Croissant 1.1)
-  from a request over the finance graph, with the compiler refusing plans on the wrong temporal axis
-  or missing a pointer for any cell.
+**Not built:**
+- **Incremental join.** The claim that a ninth source can join an eight-source graph with no rebuild has
+  no test yet. It is the largest untested architectural bet in the repository.
+- **Actions as the only write path.** The rule is declared but not enforced. No invocation path runs an
+  action yet, and there is no `automation.mode` gate. Writes today go through pack-specific code. The
+  healthcare pack's append-only ledger (`packages/intake/databridge_intake/ledger.py`) does enforce
+  insert-only with database triggers and a staff-attestation gate, but that is one pack showing the
+  pattern, not the engine enforcing it.
+- **Postgres 19 with SQL/PGQ**, the intended production graph store. Everything runs on SQLite today.
+- **Conformal risk certificates.** The `unresolved` list exists but has no error bound attached.
 
-**Not built — named rather than hidden:**
-- **Incremental join.** The decentralisation claim — a ninth source joining an eight-source graph
-  with no rebuild — has no test coverage yet. This is the single largest untested architectural bet
-  in the repository.
-- **Actions as the only write path.** The business plane's write discipline is declared, not
-  enforced: there is no invocation path yet that runs an action and no `automation.mode` gate.
-  Writes today happen through pack-specific code (e.g. the healthcare pack's append-only ledger,
-  `packages/intake/databridge_intake/ledger.py`, which does enforce insert-only via database
-  triggers and a staff-attestation gate — but that is a pack demonstrating the pattern, not the
-  engine enforcing it generically).
-- **Postgres 19 + SQL/PGQ**, the intended production graph substrate. Everything above runs on
-  SQLite today; the Postgres path is designed, not scheduled.
-- **Conformal risk certificates.** The `unresolved` list exists; it has no attached error bound yet.
+## Run the original Walnut platform
 
----
-
-## Running it (the original Walnut platform)
-
-> For the hackathon's **Internal Brain** (ports 8100/8200/3100), use [INTERNAL_BRAIN.md → Run it](INTERNAL_BRAIN.md#run-it) instead. This section starts the original Walnut gateway and frontend on ports 8000/3000.
+For the hackathon's Internal Brain, use [INTERNAL_BRAIN.md → Run it](INTERNAL_BRAIN.md#run-it). This
+section starts the original Walnut gateway and frontend on ports 8000 and 3000.
 
 ```powershell
 cd databridge
 .\start-databridge.ps1        # frees ports 8000/3000, starts the gateway and the frontend
 ```
 
-| | |
+| URL | What it is |
 |---|---|
-| `http://127.0.0.1:8000/health` | gateway health, and which LLM backend is in use |
-| `http://localhost:3000` | the frontend — pack surfaces plus the platform surfaces above |
+| `http://127.0.0.1:8000/health` | Gateway health, and which LLM backend is in use |
+| `http://localhost:3000` | The frontend: pack screens plus the platform screens |
 
 ```powershell
 cd databridge
 .venv\Scripts\python -m pytest -m "not integration"
 ```
 
-The marker is required — a plain `python -m pytest` hangs on a test that expects a local Ollama
-instance. No API key is needed: in the original platform, with `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` set, a real model runs
-the classification and extraction steps (the Internal Brain uses `TOKENHUB_API_KEY` instead); without one, a deterministic backend runs the same code
-paths offline, and no test in the suite depends on a live model.
+Keep the marker. A plain `python -m pytest` hangs on a test that expects a local Ollama instance.
 
-LLM access goes through `packages/harness` only — nothing else in the repository imports a vendor
-SDK directly — and routing is a config file (`databridge/config/models.yaml`), so pointing the whole
-system at a different provider, or air-gapping it onto local models, is a config change.
+No API key is needed. In the original platform, setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` makes a
+real model run the classification and extraction steps. The Internal Brain uses `TOKENHUB_API_KEY`
+instead. Without a key, a deterministic backend runs the same code paths offline, and no test in the suite
+needs a live model.
 
----
+LLM access goes through `packages/harness` only. Nothing else in the repository imports a vendor SDK.
+Routing is a config file, [`databridge/config/models.yaml`](databridge/config/models.yaml), so pointing
+the system at another provider, or onto local models with no network, is a config change.
 
-## Repository layout
+## Engine layout
 
 ```
 databridge/
   packages/
-    core/          GroundedValue / SourcePointer — the provenance primitives
+    core/          GroundedValue / SourcePointer: the provenance primitives
     harness/       model-agnostic LLM layer; call sites name a task class, never a model
     convert/       document IR + the grounding wall (drops any extraction not verbatim in its source)
     graph/         the bi-temporal knowledge graph, pack loading, identity merge rules
-    adapter/       the five-verb port, the three-layer adapter fleet, the capture store
+    adapter/       the five-verb port, the three-part adapter fleet, the capture store
     agentdef/      agent declaration → compiled capability grant set
-    materialise/   materialisation plan compiler, receipts, Croissant emission
+    materialise/   materialisation plan compiler, receipts, Croissant output
     agent/         a read-only agent loop over sealed adapters (screen → plan → read → compose → screen)
-    intake/        the healthcare pack's product logic — classify → extract → ground → resolve →
+    intake/        the healthcare pack's product logic: classify → extract → ground → resolve →
                    eligibility → prefill → billing → ledger
     outbox, evals, ingest, semantic   supporting packages
   apps/
-    gateway/       FastAPI backend — the platform surfaces plus each pack's own routes  (:8000)
-    frontend/      Next.js — the platform surfaces plus each pack's own screens          (:3000)
+    gateway/       FastAPI backend: platform routes plus each pack's own routes   (:8000)
+    frontend/      Next.js: platform screens plus each pack's own screens         (:3000)
     mcp_server/    the graph exposed to agents over MCP
     cli/           headless commands
   packs/
-    healthcare/, finance/, government/    domain vocabulary + rules, YAML, no engine code
-  fixtures/        synthetic estates and documents backing the packs above (no real data — see below)
+    healthcare/, finance/, government/    domain vocabulary and rules, YAML, no engine code
+  fixtures/        synthetic estates and documents behind the packs (no real data)
 ```
-
----
 
 ## Where to look next
 
-- **[`INTERNAL_BRAIN.md`](INTERNAL_BRAIN.md)** — the hackathon entry: what it is, how to run it, and
-  the evidence for every claim.
-- **[`STATUS.md`](STATUS.md)** — the current state of the build.
-- **[`docs/tencent/`](docs/tencent/)** — architecture, security, responsible AI and the MAS mapping.
-
----
+- [`INTERNAL_BRAIN.md`](INTERNAL_BRAIN.md): the hackathon entry. What it is, how to run it, and the
+  evidence for every claim.
+- [`STATUS.md`](STATUS.md): the current state of the build.
+- [`docs/tencent/`](docs/tencent/): architecture, security, responsible AI and the MAS mapping.
 
 ## Data
 
-Every dataset in this repository — patients, insurers, account holders, case files, correspondence —
-is synthetic. No real personal data is used to build, test or demonstrate this system.
+Every dataset in this repository (patients, insurers, account holders, case files, correspondence) is
+synthetic. No real personal data is used to build, test or demonstrate this system.

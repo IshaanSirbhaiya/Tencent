@@ -1,5 +1,16 @@
 # Deploy the Internal Brain demo on Tencent Cloud Lighthouse
 
+**Status:** this kit is written, but there is no live instance (Lighthouse capacity was sold out).
+The documented way to judge the project is the local run in [INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
+
+**Short version:**
+
+1. Create a VM: Singapore, Ubuntu 22.04, 2 vCPU and 2 to 4 GB, SSH key.
+2. Firewall: TCP 22, 80 and 443 only.
+3. Deploy: `bash deploy/lighthouse/upload.sh ubuntu@<IP>` (Option A below).
+4. Smoke test: `deploy.sh smoke` on the VM, or `smoke.sh` from your laptop (section 5).
+5. Delete the instance after judging.
+
 One small VM in Singapore serves the public demo over HTTPS. Everything in it is synthetic ("Company A"):
 the Brain talks only to the in-stack mock Slack, Confluence, Jira and Drive. There is no setting for a real
 workspace, and none must be added.
@@ -26,6 +37,9 @@ Docker network with no route to the internet. `ib` can reach the internet only f
 | `requirements-ib.txt` | The 65 pinned packages the two Python services need (pins equal `databridge/requirements-lock.txt`) |
 | `.env.example` | Every setting, with no real secrets |
 
+`docker-compose.yml` sets `IB_PUBLIC_ORIGIN` to `https://$DOMAIN` for the `ib` service, so the Brain accepts
+browser requests only from the address you deploy to. `deploy.sh` sets `DOMAIN` (the sslip.io name by default).
+
 ## 1. Create the VM (Lighthouse console, about 5 minutes)
 
 1. Open the Tencent Cloud console (international site) → **Lighthouse** → **Create**.
@@ -51,11 +65,11 @@ TokenHub model calls are billed separately per token. Delete the instance after 
 
 ## 2. Deploy
 
-The repo is **private**, so the VM cannot `git clone` it without a credential. The simplest path keeps all
-credentials off the VM.
+The repo is **public** (https://github.com/IshaanSirbhaiya/Tencent), so the VM can clone it with no
+credential. There are two ways to deploy.
 
-**Option A (recommended): upload from your laptop.** Commit `deploy/lighthouse/` first (only committed files
-are sent). From the repo root, in Git Bash, macOS or Linux:
+**Option A (recommended): upload from your laptop.** It sends exactly the files you have committed, so the VM
+runs the version you tested. Commit `deploy/lighthouse/` first. From the repo root, in Git Bash, macOS or Linux:
 
 ```bash
 bash deploy/lighthouse/upload.sh ubuntu@<IP>
@@ -63,17 +77,14 @@ bash deploy/lighthouse/upload.sh ubuntu@<IP>
 
 That copies the source to `/opt/walnut/repo` and runs `deploy.sh` there. Re-run it after every new commit.
 
-**Option B: pipe `deploy.sh` and let the VM clone.** Works once the VM can read the repo: either the repo is
-public (run the gitleaks history check first, docs/tencent/SECURITY.md §6), or the VM has a read-only deploy key:
+**Option B: let the VM clone the public repo.** No key or token is needed. Pipe `deploy.sh` to the VM:
 
 ```bash
-ssh ubuntu@<IP> 'sudo ssh-keygen -t ed25519 -N "" -f /root/.ssh/id_ed25519 && sudo cat /root/.ssh/id_ed25519.pub'
-# GitHub → IshaanSirbhaiya/Tencent → Settings → Deploy keys → Add (read-only) → paste the key
-ssh ubuntu@<IP> 'sudo ssh -o StrictHostKeyChecking=accept-new -T git@github.com; true'
-ssh ubuntu@<IP> 'sudo REPO_URL=git@github.com:IshaanSirbhaiya/Tencent.git bash -s' < deploy/lighthouse/deploy.sh
+ssh ubuntu@<IP> 'sudo bash -s' < deploy/lighthouse/deploy.sh
 ```
 
-(With a public repo, the last line is just `ssh ubuntu@<IP> 'sudo bash -s' < deploy/lighthouse/deploy.sh`.)
+It clones `https://github.com/IshaanSirbhaiya/Tencent` into `/opt/walnut/repo`. To use a fork or another
+URL, add `REPO_URL=<url>` after `sudo`. Update later with the same command, which pulls the latest commit.
 
 **What `deploy.sh` does** (safe to re-run): installs Docker Engine, compose and buildx from Docker's apt repo
 if missing; adds swap on small VMs; gets the source; writes `/opt/walnut/walnut.env` (mode 600) **only if it
@@ -112,11 +123,9 @@ Open the URL, enter the passcode and pick a persona (all synthetic): `jdoe` engi
 `ken.ext` contractor, `sara.sec` security, `leo.ops` ops, `maya.compliance` compliance officer, `admin.it`
 simulator. The scenario script is in `INTERNAL_BRAIN.md` ("The five scenarios").
 
-> **Known gap (web app, not this kit).** The demo API requires `IB_DEMO_PASSCODE` here, but the current sign-in
-> page (`databridge/apps/internal_brain_web/app/login/page.tsx`, `lib/api.ts` `login`) does not send a passcode,
-> so a UI sign-in gets 401 and shows "temporarily unavailable". `smoke.sh` signs in through the API with the
-> passcode and passes. The web app needs a passcode field that sends `{"persona", "passcode"}` before the UI
-> is usable on the public URL.
+> **Signing in on the public URL.** The demo API requires `IB_DEMO_PASSCODE`. The sign-in page has a
+> **Demo passcode** field: enter the passcode `deploy.sh` printed, then pick a person. Compare reuses it
+> for its second person, so it is asked for once.
 
 Show the passcode again: `ssh ubuntu@<IP> 'sudo grep IB_DEMO_PASSCODE /opt/walnut/walnut.env'`.
 Rotate it: `ssh ubuntu@<IP> 'sudo IB_DEMO_PASSCODE=<new> bash /opt/walnut/repo/deploy/lighthouse/deploy.sh'`.
@@ -128,7 +137,7 @@ Rotate it: `ssh ubuntu@<IP> 'sudo IB_DEMO_PASSCODE=<new> bash /opt/walnut/repo/d
 | Reset the demo (fresh synthetic world, empty ledger, index and answer store; certificates kept) | `sudo bash /opt/walnut/repo/deploy/lighthouse/deploy.sh reset` |
 | Run the smoke test again | `sudo bash /opt/walnut/repo/deploy/lighthouse/deploy.sh smoke` |
 | Status / logs | `sudo bash /opt/walnut/repo/deploy/lighthouse/deploy.sh status` / `... logs ib` |
-| Deploy new commits | `bash deploy/lighthouse/upload.sh ubuntu@<IP>` from your laptop (or re-pipe `deploy.sh` for Option B) |
+| Deploy new commits | `bash deploy/lighthouse/upload.sh ubuntu@<IP>` from your laptop (or re-run the Option B command) |
 | Stop (keeps data) | `sudo bash /opt/walnut/repo/deploy/lighthouse/deploy.sh down` |
 | Stop billing | Lighthouse console → instance → **Terminate** |
 

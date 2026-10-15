@@ -10,7 +10,7 @@
 #   1. installs git/curl/openssl and Docker Engine + compose + buildx (official Docker apt repo) if missing
 #   2. adds a 2 GB swap file on small VMs (the Next.js build needs it on 2 GB RAM)
 #   3. gets the source into /opt/walnut/repo: git pull if it is a clone; uses it as-is if it was
-#      uploaded (upload.sh); otherwise clones REPO_URL (the repo is private: see README)
+#      uploaded (upload.sh); otherwise clones REPO_URL (the public repo by default)
 #   4. writes /opt/walnut/walnut.env (mode 600) if missing, with freshly generated keys and passcode
 #   5. docker compose up -d --build, waits for health and HTTPS, then runs smoke.sh
 #

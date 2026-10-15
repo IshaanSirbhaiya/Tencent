@@ -27,7 +27,7 @@ flowchart TB
 
     %% ---------- Tencent model + embeddings ----------
     TH["Tencent TokenHub<br/>hy3 → fallback deepseek-v4.1-flash → extractive"]
-    EMB["Embedder (ingest)<br/>default offline hashing; optional TokenHub alias"]
+    EMB["Embedder (ingest)<br/>offline hashing, computed locally<br/>TokenHub alias defined, not wired"]
 
     %% ---------- Source platforms ----------
     subgraph SRC["Source platforms (mock or live, same connector code)"]
@@ -38,7 +38,7 @@ flowchart TB
     end
 
     %% ---------- External sinks / readers ----------
-    SINK["External ledger-head sink<br/>separate git repo tag / compliance Slack<br/>off-host, append-only"]
+    SINK["External ledger-head sink<br/>file in a separately pushed git repo / compliance Slack<br/>off-host once configured (default: local file)"]
     OFFICER["Compliance officer<br/>reads metadata + logged reasoned reveal"]
 
     %% ============================================================
@@ -47,8 +47,8 @@ flowchart TB
 
     %% TB1: client -> IB gateway (through Caddy)
     EMP -->|"TB1 · identity token + question"| LH
-    WB  -->|"TB1 · MCP bearer token + question"| LH
-    LH  -->|"TB1 · forwarded cookie/bearer over allowlisted paths"| AUTH
+    WB  -->|"TB1 · MCP bearer token + question (stdio server beside the IB, not via the public edge)"| AUTH
+    LH  -->|"TB1 · web proxy relays only the ib_session cookie over allowlisted paths"| AUTH
 
     %% In-gateway pipeline order (no boundary crossings)
     AUTH  --> LEDGER

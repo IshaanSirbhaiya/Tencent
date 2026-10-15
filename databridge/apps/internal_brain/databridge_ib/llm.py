@@ -7,6 +7,11 @@ OpenAI-compatible, so LiteLLM reaches it with ``openai/<model>`` plus ``OPENAI_A
 The chain is explicit and runtime-level (independent of the harness's key-based fallback):
 hy3 → deepseek-v4.1-flash → deterministic extractive answer. Any error, timeout, 429 or grounding
 violation moves down the chain; the answer always says which model produced it.
+
+Bring your own model: any other OpenAI-compatible endpoint (OpenAI, a local Ollama or vLLM server)
+works the same way. Set ``OPENAI_API_BASE`` and ``OPENAI_API_KEY`` and name the models, in order, in
+``IB_MODELS`` (comma-separated). The model still sees only passages that passed both checks, and
+the grounding wall still applies; only the provider changes.
 """
 from __future__ import annotations
 
@@ -28,6 +33,21 @@ DEFAULT_CHAIN = ("hy3", "deepseek-v4.1-flash")
 def tokenhub_configured() -> bool:
     return bool(os.environ.get("TOKENHUB_API_KEY") or
                 (os.environ.get("OPENAI_API_KEY") and "tencentcloudmaas" in os.environ.get("OPENAI_API_BASE", "")))
+
+
+def model_configured() -> bool:
+    """TokenHub, or any OpenAI-compatible endpoint given by ``OPENAI_API_BASE`` + ``OPENAI_API_KEY``."""
+    return tokenhub_configured() or bool(os.environ.get("OPENAI_API_KEY") and os.environ.get("OPENAI_API_BASE"))
+
+
+def configured_models(default: Sequence[str] = DEFAULT_CHAIN) -> list[str]:
+    """The chain from ``IB_MODELS`` (comma-separated, tried in order), else the TokenHub default."""
+    names = [m.strip() for m in os.environ.get("IB_MODELS", "").split(",") if m.strip()]
+    return names or list(default)
+
+
+def provider_label() -> str:
+    return "tencent-tokenhub" if tokenhub_configured() else "openai-compatible"
 
 
 def _config_for(model: str) -> dict:
@@ -52,15 +72,18 @@ class ModelChain:
     provider: str = "tencent-tokenhub"
 
     @classmethod
-    def tokenhub(cls, models: Sequence[str] = DEFAULT_CHAIN) -> Optional["ModelChain"]:
-        if not tokenhub_configured() or os.environ.get("IB_FORCE_OFFLINE") == "1":
+    def tokenhub(cls, models: Optional[Sequence[str]] = None) -> Optional["ModelChain"]:
+        """The configured chain (TokenHub by default, or ``IB_MODELS`` on any OpenAI-compatible
+        endpoint), or None for the deterministic quoting path."""
+        if not model_configured() or os.environ.get("IB_FORCE_OFFLINE") == "1":
             return None
         _prepare_env()
         from databridge_harness import Harness, LiteLLMBackend
 
         def factory(model: str):
             return Harness(LiteLLMBackend(), config=copy.deepcopy(_config_for(model)), profile="cloud")
-        return cls(models=list(models), harness_factory=factory)
+        return cls(models=list(models) if models else configured_models(), harness_factory=factory,
+                   provider=provider_label())
 
     def answer(self, context: str, question: str) -> tuple[Optional[str], Optional[ModelInfo], list[str]]:
         """``(grounded_text | None, model_info | None, notes)``. None ⇒ caller serves extractive."""

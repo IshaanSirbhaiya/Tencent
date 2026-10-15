@@ -6,6 +6,24 @@
 > unless they start with `tests/` (= `databridge/apps/internal_brain/tests/`) or `databridge/`. Anything not
 > built is marked so.
 
+## At a glance
+
+Seven guarantees, each with one test or eval that backs it. Details and limits are in the sections below.
+
+| # | Guarantee | Evidence |
+|---|---|---|
+| 1 | Restricted content never reaches the model. | `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt` |
+| 2 | "Restricted" looks the same as "does not exist". The leak eval found 0 mismatches in 400 comparisons. | `tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted`; `databridge/evals/internal_brain/RESULTS.md` |
+| 3 | Identity comes only from the signed token. A body that names a user is rejected. | `tests/test_app_routes.py::test_identity_from_token_only` |
+| 4 | Every answer is logged before it is returned. If the ledger is down, the answer is a 503. | `tests/test_app_routes.py::test_ledger_failure_is_503` |
+| 5 | Edits, deletions and rollbacks of the audit log are detected, and so are edited answer texts. | `tests/test_audit_tamper.py::test_edit_detected`; `tests/test_audit_verify_content.py::test_edited_answer_is_detected_without_a_reveal` |
+| 6 | A revocation in the source is honoured on the next question, even if the webhook was lost. | `tests/test_scenarios_e2e.py::test_s4_revocation_without_webhook` |
+| 7 | Text planted in a document is treated as data. The final eval run had 0 injection hard failures in 976 injection-relevant requests. | `databridge/evals/internal_brain/RESULTS.md` (section "Injection") |
+| 8 | The web proxy refuses cross-origin POSTs, non-JSON bodies and path tricks. | `databridge/apps/internal_brain_web/tests/e2e/proxy.spec.ts` |
+
+Reviewed by Codex (tracks 1-7), a CodeBuddy security review, and two Claude review rounds (Opus, Sonnet,
+Haiku). See sections 9-14.
+
 ## 1. Assets and adversaries
 
 | Asset | Why it matters |
