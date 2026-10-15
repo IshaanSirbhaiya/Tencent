@@ -10,7 +10,7 @@ https://github.com/IshaanSirbhaiya/Tencent.
 | `02_workbuddy/` | `workbuddy_mcp_panel.png` (the three connectors, enabled), `workbuddy_compare.png` (one question through two people's connectors, two different answers), `workbuddy_compliance.png` (the compliance connector lists one person's access and verifies the audit chain). `raw/` holds the uncomposed window shots. | The WorkBuddy proof. |
 | `03_app_scenes/` | `internal_brain/`: the web app (answer with checks, map, compare, tour, audit). `walnut_original/`: the original Walnut screens on Company A. | Extra screenshots and slides. |
 | `04_evidence/` | `tamper_demo_output.txt`: the output of the tamper demo. | Shows the audit log catches edits. |
-| `05_video/` | `walnut_internal_brain_demo.mp4` (5:55, silent), `narration_cues.md`, `narration.srt`, `timeline.json`, `cards/` (still cards), `clips/` (one recording per scene, with `.marks.json`). | The video. Record the voice-over from the cue sheet, then upload. |
+| `05_video/` | `walnut_internal_brain_demo.mp4` (5:55, with narration), `narration_cues.md`, `narration.srt`, `timeline.json`, `cards/` (still cards), `clips/` (one recording per scene, with `.marks.json`). | The video to upload. |
 | `06_cover/` | `cover_380x216.png` (the form's size) and `cover_1920x1080.png`; `cover_master_miora.png` is Miora's raw art, and `miora_session1.png` / `miora_session2.png` show the Miora prompts and results | The form's cover field; proof of Miora use |
 | `07_deck/` | `walnut_internal_brain_deck.pdf` and `.pptx` (13 slides, speaker notes in the PPTX), plus `html/` and `png/`. | The submission and Demo Day. |
 
