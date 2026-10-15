@@ -5,8 +5,8 @@ The engine and product code for Walnut. `uv`-managed Python 3.11+ workspace (`pa
 see the root [`../README.md`](../README.md) for what the system is, the layout of every package,
 and how to run it.
 
-Read [`../CLAUDE.md`](../CLAUDE.md) before any session — it holds the hard constraints this code
-must never violate — then [`../STATUS.md`](../STATUS.md) for where the build currently stands.
+For the hackathon entry built on this code, start at [`../INTERNAL_BRAIN.md`](../INTERNAL_BRAIN.md);
+[`../STATUS.md`](../STATUS.md) says where the build stands.
 
 ## Running the tests
 
@@ -22,7 +22,7 @@ The marker is required: a plain run hangs on a test that expects a local Ollama 
 .\start-databridge.ps1        # frees ports 8000/3000, starts the gateway and the frontend
 ```
 
-## Invariants (enforced, see `../CLAUDE.md` for the full list)
+## Invariants (enforced by tests)
 - No vendor SDK imports (`import anthropic` / `import openai`) outside `packages/harness`.
 - Every emitted value is a `GroundedValue` carrying a `SourcePointer`
   (`packages/core/databridge_core/provenance.py`) — refused at construction otherwise.

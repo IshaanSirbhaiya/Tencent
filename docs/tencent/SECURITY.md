@@ -172,7 +172,7 @@ injection results after it: **TBD (measured in RESULTS.md)**.
 | Existence via linked titles or keys | Links resolve only within the readable set and then pass Gate 2 before anything about them is rendered | `pipeline.py:260-281` | A raw key written inside a permitted text is shown as written, never resolved (plan §4.6) |
 | Per-query source contribution | `/ib/sources` reports per-platform sync status only (time since last successful sync) | `app.py:150-161` | It is global, not caller-scoped (Codex security review r1 finding 12) |
 | Error envelopes | Any pipeline failure returns the same 503 body | `app.py:134-138` | — |
-| Timing | **Not controlled** | — | TRADEOFFS.md R1 |
+| Timing | **Not controlled** | — | stated limit |
 
 ## 6. Secrets handling
 
@@ -225,7 +225,6 @@ Tests are in `tests/` (internal brain) or `databridge/apps/mock_platforms/tests/
   it. Unknown values are no longer passed through.
 - **Webhook MAC.** The signature is now `HMAC-SHA256(secret, f"{timestamp}.{delivery_id}.{body}")`, on
   the receiver (`_http.py:204`, `WebhookVerifier.verify`) and on the sender (`databridge/apps/mock_platforms/mock_platforms/webhooks.py`, `sign`).
-  `docs/tencent/CONTRACTS.md` §2 states the same formula.
 
 | # | Finding | Disposition | Where / regression test |
 |---|---|---|---|

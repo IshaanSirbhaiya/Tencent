@@ -77,7 +77,6 @@ compliance officer (`maya.compliance`) who uses WorkBuddy as an audit assistant.
 
 | Review | Scope | Output |
 |---|---|---|
-| Four-model plan review | The build plan | [reviews/plan-v1/](reviews/plan-v1/), dispositions in [PLAN_REVIEW_DISPOSITION.md](PLAN_REVIEW_DISPOSITION.md) |
 | Codex, tracks 1–3 | Core, audit, connectors and masking | [reviews/security-r1/](reviews/security-r1/) |
 | Codex, track 4 | CodeBuddy's connectors, the token tool, setup scripts | [codex_track4_mcp_tokens.md](reviews/security-r1/codex_track4_mcp_tokens.md) |
 | Codex, track 5 | The knowledge map and the audit content check | [codex_track5_map_audit.md](reviews/security-r1/codex_track5_map_audit.md) |

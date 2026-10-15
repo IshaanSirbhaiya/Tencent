@@ -1,6 +1,6 @@
 # Internal Brain leak eval
 
-Proves, with published numbers, the claims of `docs/tencent/INTERNAL_BRAIN_PLAN.md` §2: **P1** (no
+Proves, with published numbers, the claims in `INTERNAL_BRAIN.md` (Proof): **P1** (no
 passage the asker cannot access is placed in any LLM request), **P2** (restricted content does not
 change the caller-visible response), and the injection and utility evals of §8. It runs the real
 mock platforms in-process, the real connectors and the real pipeline over

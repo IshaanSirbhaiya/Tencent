@@ -129,8 +129,8 @@ and no driver handle — the only place a model runs inside the adapter fleet.
 
 Full reasoning for these decisions — including which of the individually-commoditised pieces
 (bi-temporal graphs, ontology-as-control-plane, connector fleets) Walnut is *not* trying to win on,
-and why the per-value proof is the piece nobody else ships — is in
-[`Foundational Research/design/00_SPINE.md`](Foundational%20Research/design/00_SPINE.md).
+and why the per-value proof is the piece nobody else ships — is the reasoning behind the
+architecture above.
 
 ---
 
@@ -244,14 +244,10 @@ databridge/
 
 ## Where to look next
 
-- **`CLAUDE.md`** — the operating rules for this repository, including the hard constraints
-  (identity is never auto-confirmed, no value without a pointer, no per-domain branching in the
-  engine, a human confirms before anything is written).
-- **`PHASE_PLAN.md`** — the build organised into phases, with a "done when" for each.
-- **`STATUS.md`** — the current, honest state of the build: what's landed, what's in flight, what
-  reviews found and what was done about it.
-- **`Foundational Research/design/00_SPINE.md`** — the design authority: the decisions everything
-  else follows from, and the evidence behind each one.
+- **[`INTERNAL_BRAIN.md`](INTERNAL_BRAIN.md)** — the hackathon entry: what it is, how to run it, and
+  the evidence for every claim.
+- **[`STATUS.md`](STATUS.md)** — the current state of the build.
+- **[`docs/tencent/`](docs/tencent/)** — architecture, security, responsible AI and the MAS mapping.
 
 ---
 
