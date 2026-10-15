@@ -20,6 +20,17 @@ Hunyuan `hy3` ran in CodeBuddy sessions CB1 and CB5, through CodeBuddy's own mod
 itself is configured for `hy3` through TokenHub, but that account is still waiting on Tencent's
 verification, so `hy3` has not answered live inside the Brain yet.
 
+## Tencent tools at a glance
+
+| Tencent tool | How we used it | Evidence |
+|---|---|---|
+| **CodeBuddy** | Six build sessions: drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests, ran a security review, then fixed its own code after a Codex review | [DEV_PROCESS.md](#codebuddy-sessions), transcripts in `docs/tencent/evidence/`, screenshots in `submission/01_codebuddy/` |
+| **WorkBuddy** | The Brain's second front door: three connectors (ask as Jordan, ask as Ken, compliance audit), each carrying its own signed token | [WorkBuddy guide](workbuddy/README.md), screenshots in `submission/02_workbuddy/` |
+| **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1 and CB5; first in the Brain's answer chain | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py` |
+| **TokenHub** | The Brain's model gateway (Hy3, then DeepSeek as backup). Wired in and tested; live calls wait on Tencent's account verification | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
+| **Lighthouse** | A hardened one-command deploy kit (HTTPS, passcode-gated demo, only ports 80/443 open); no live instance because Lighthouse was unavailable during the event | [deploy/lighthouse/](../../deploy/lighthouse/README.md) |
+| **Miora** | The cover image | `submission/06_cover/` |
+
 ## CodeBuddy sessions
 
 1. Each session ran in the CodeBuddy CLI against this repository, one at a time.
