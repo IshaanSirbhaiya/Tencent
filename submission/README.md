@@ -6,7 +6,7 @@ https://github.com/IshaanSirbhaiya/Tencent.
 
 | Folder | What is in it | Use it for |
 |---|---|---|
-| `01_codebuddy/` | An overview and a full-page screenshot for each of the six CodeBuddy sessions (CB1 to CB6), plus `html/` sources. Rendered from the saved transcripts in `docs/tencent/evidence/`. | The CodeBuddy proof. Attach at least three overviews (CB2, CB5, CB6). |
+| `01_codebuddy/` | `conversation_history_codebuddy_workbuddy_miora.pdf` (one 12-page file for the form: CB1-CB6, the three WorkBuddy shots and the two Miora sessions). An overview and a full-page screenshot for each of the six CodeBuddy sessions (CB1 to CB6), plus `html/` sources. Rendered from the saved transcripts in `docs/tencent/evidence/`. | The CodeBuddy proof. Attach at least three overviews (CB2, CB5, CB6). |
 | `02_workbuddy/` | `workbuddy_mcp_panel.png` (the three connectors, enabled), `workbuddy_compare.png` (one question through two people's connectors, two different answers), `workbuddy_compliance.png` (the compliance connector lists one person's access and verifies the audit chain). `raw/` holds the uncomposed window shots. | The WorkBuddy proof. |
 | `03_app_scenes/` | `internal_brain/`: the web app (answer with checks, map, compare, tour, audit). `walnut_original/`: the original Walnut screens on Company A. | Extra screenshots and slides. |
 | `04_evidence/` | `tamper_demo_output.txt`: the output of the tamper demo. | Shows the audit log catches edits. |
