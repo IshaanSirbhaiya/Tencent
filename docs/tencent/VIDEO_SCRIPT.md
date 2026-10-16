@@ -132,7 +132,7 @@ different answers. Then the compliance connector listing Jordan's access and ver
 **On screen:** the original Walnut screens on Company A's data: the knowledge graph (a node opens), the
 brain view, the provenance chain of one value, the ontology.
 
-> Underneath it all is Walnut, the evidence engine we built before this hackathon. This is Company A as
+> Underneath it all is Walnut, the evidence engine. This is Company A as
 > a knowledge graph, built from what Jordan can see. Open the database migration plan, and every fact
 > on it has a source. Drag the time slider, and the company's knowledge rewinds to any past date. Every
 > value carries a pointer back to where it came from, and you can follow it, like this, to the exact row

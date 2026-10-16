@@ -22,8 +22,8 @@ web app. The Internal Brain is built on top of the engine without changing it.
 | `packages/retrieval/` | Retrieval used by the Brain |
 | `packages/adapter/` | Source adapters the connectors build on |
 
-Other folders under `apps/` (`cli`, `dispatcher`, `gateway`, `mcp_server`) and `packages/` are the original
-Walnut engine. They are reused by import and are not modified for the Internal Brain.
+Other folders under `apps/` (`cli`, `dispatcher`, `gateway`, `mcp_server`) and `packages/` are the Walnut
+engine. The Internal Brain uses them by import and does not modify them.
 
 ## Set up
 

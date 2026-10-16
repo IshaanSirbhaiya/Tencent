@@ -196,7 +196,7 @@ that answers each person only from what they are allowed to open, with every ste
   {card('Source snapshots', 'A write-once copy of what each source said when read, so figures stay checkable.')}
   {card('Change tracking', 'When a source value changes, every answer built on it is flagged.')}</div></div>
 """, "This is the company brain itself: a relationship map, full history you can rewind, source snapshots and "
-         "change tracking. It is Walnut's original engine, reused unchanged."))
+         "change tracking. This is the Walnut engine the Internal Brain runs on."))
 
     flow = [("Who's asking", "A signed token. No prompt or tool argument can name a person."),
             ("Check 1 · index", "Search only what this person may open, with ranking statistics from those documents only."),
@@ -272,7 +272,7 @@ that answers each person only from what they are allowed to open, with every ste
     tl = "".join(card(t, d, f"{i:02d}") for i, (t, d) in enumerate(tools, 1))
     S.append((f"""{head('Built with Tencent', 'Tencent tools, used for real', 'Every claim here has a transcript, screenshot or test in the repository.')}
 <div class="grid g5" style="margin-top:10px">{tl}</div>
-<div class="card navy" style="margin-top:34px"><div class="t" style="color:#fff">93% of the code is the original Walnut engine, reused unchanged.</div><div class="d">The Internal Brain, its two checks, the audit console, the web app, the fintech rules and the WorkBuddy connectors were built during the hackathon.</div></div>
+<div class="card navy" style="margin-top:34px"><div class="t" style="color:#fff">Built on the Walnut evidence engine.</div><div class="d">The Internal Brain adds the two permission checks, the audit console, the web app, the fintech rules and the WorkBuddy connectors on top of it.</div></div>
 """, "Built with Tencent tools throughout: CodeBuddy for the build, WorkBuddy as a front door, Hy3 through "
          "TokenHub for answers, a Lighthouse deploy kit and Miora for the cover."))
 

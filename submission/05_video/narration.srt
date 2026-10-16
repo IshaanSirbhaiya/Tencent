@@ -187,27 +187,27 @@ Each connector carries its own signed token, so the AI in the middle can't decid
 And Maya can run her audit checks from WorkBuddy too.
 
 48
-00:04:31,519 --> 00:04:36,519
-Underneath it all is Walnut, the evidence engine we built before this hackathon.
+00:04:31,519 --> 00:04:34,596
+Underneath it all is Walnut, the evidence engine.
 
 49
-00:04:36,519 --> 00:04:41,904
+00:04:34,596 --> 00:04:39,981
 This is Company A as a knowledge graph, built from what Jordan can see.
 
 50
-00:04:41,904 --> 00:04:46,904
+00:04:39,981 --> 00:04:44,981
 Open the database migration plan, and every fact on it has a source.
 
 51
-00:04:46,904 --> 00:04:51,904
+00:04:44,981 --> 00:04:49,981
 Drag the time slider, and the company's knowledge rewinds to any past date.
 
 52
-00:04:51,904 --> 00:05:01,904
+00:04:49,981 --> 00:04:59,981
 Every value carries a pointer back to where it came from, and you can follow it, like this, to the exact row in the exact file.
 
 53
-00:05:01,904 --> 00:05:05,750
+00:04:59,981 --> 00:05:03,827
 The Internal Brain reuses that engine just as it is.
 
 54

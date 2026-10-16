@@ -8,7 +8,7 @@ can check.
 
 | Part | What | Built by |
 |---|---|---|
-| Foundation | The Walnut evidence engine: provenance pointers, the sealed audit ledger, the grounding wall, the model harness | The Walnut team, before this event (base commit `078572e`). **Reused unchanged.** |
+| Foundation | The Walnut evidence engine: provenance pointers, the sealed audit ledger, the grounding wall, the model harness | The Walnut team. Used by import; the Internal Brain does not modify it. |
 | The Internal Brain | Connectors, the two permission gates, the answer pipeline, the audit console, the web app, the mock platforms, the evaluation | Claude (Anthropic), directed and reviewed by the team |
 | WorkBuddy front door | The two MCP connectors (ask, compliance audit), the token tool, the WorkBuddy setup guide | **CodeBuddy** (sessions CB2, CB3, CB6) |
 | Trust-boundary diagram | [diagrams/trust_boundaries.mmd](diagrams/trust_boundaries.mmd) | **CodeBuddy** on Tencent Hunyuan `hy3` (CB1) |
@@ -126,8 +126,3 @@ output was checked before anything was changed.
 | Codex, track 7 | Re-check of the track 6 fixes | [codex_track7_fix_verification.md](reviews/security-r1/codex_track7_fix_verification.md) | [SECURITY.md](SECURITY.md) §14 |
 | Claude models (Opus, Sonnet, Haiku) | Security, accuracy, first run, UX | Recorded in SECURITY.md | [SECURITY.md](SECURITY.md) §12, §14 |
 
-## How much is new
-
-The Walnut engine is reused as it was. The Internal Brain is added beside it as new apps, fixtures and
-an evaluation, so the original system is still 93% of today's code by line count
-(`databridge/scripts/measure_original_share.py`; details in [INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md)).

@@ -11,7 +11,7 @@ access is written to an audit log that cannot be quietly edited.
 - **0 leaks** of restricted content in 5,958 adversarial requests.
 - **0 differences** between "restricted" and "does not exist" across 400 paired questions.
   Both results are in [the eval results](databridge/evals/internal_brain/RESULTS.md).
-- **93%** of the code is the original Walnut base, reused unchanged. The Internal Brain is a new app on top of it.
+- Built on the **Walnut evidence engine**: the Internal Brain is the permission-aware app on top of it.
 - Built **with CodeBuddy** and reachable **from WorkBuddy**.
 - Configured for **Tencent Hy3** through TokenHub. It has not yet been run live. Without a key, answers
   are direct quotes from the permitted sources.

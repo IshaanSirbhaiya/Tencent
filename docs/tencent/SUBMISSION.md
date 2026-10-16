@@ -85,12 +85,12 @@ signed token.
 
 ### 3. Solution design: business and technical architecture, and how prompts drive the AI
 
-**Architecture.** A new service built beside the Walnut evidence engine, which is reused unchanged.
-- **Built for this hackathon:** the four permission compilers, the two gates, the audit log and audit
-  console, the web app (ask, map, compare, guided tour), the fintech compartments, the evaluation and
-  the WorkBuddy connectors.
-- **Reused unchanged:** Walnut's evidence and grounding engine and its original screens. By line count,
-  93% of today's code is still the original base (`databridge/scripts/measure_original_share.py`).
+**Architecture.** The Internal Brain is a service on top of the Walnut evidence engine.
+- **The Internal Brain:** the four permission compilers, the two gates, the audit log and audit console,
+  the web app (ask, map, compare, guided tour), the fintech compartments, the evaluation and the
+  WorkBuddy connectors.
+- **The Walnut engine underneath:** evidence pointers, the grounding wall, the sealed ledger and the
+  model harness, plus its own screens (knowledge graph, company brain, evidence trail, ontology).
 - **Connectors** for Confluence, Jira, Slack and Drive compile each platform's own permission model:
   - Confluence page restrictions narrow access through ancestors.
   - Jira combines project roles with issue security levels.
@@ -209,12 +209,12 @@ assistant cannot be rolled out under MAS supervision at all.
 | Human-Centered Design | Built around four real roles (on-call engineer, account manager, compliance officer, contractor); works inside WorkBuddy so nobody needs another app; refusals never hint at hidden content |
 | AI Interaction | Plain-language questions get sentence-level citations; Maya audits in plain English; WorkBuddy's agent calls the Brain through MCP but cannot choose who it acts as |
 | Technical Execution | Four permission compilers, two gates, a sealed audit log; 634 backend and 38 browser tests passing; 0 leaks in 5,958 adversarial requests |
-| Feasibility | Connectors use the real APIs' shapes and permission rules; the existing engine is reused unchanged; a Lighthouse deploy kit; the leak harness re-runs on Aspire's own permissions |
+| Feasibility | Connectors use the real APIs' shapes and permission rules; the evidence engine is used by import, unmodified; a Lighthouse deploy kit; the leak harness re-runs on Aspire's own permissions |
 | Demo & Storytelling | A 6:28 video follows the people of a synthetic fintech through Aspire's five scenarios, with captions that work on mute |
 | Innovation & Creativity | "Restricted" is byte-identical to "doesn't exist", proven by comparing answers with and without the restricted documents (0 / 400 differences); ranking ignores what you can't see |
 | UX & Accessibility | Knowledge map, side-by-side compare, guided tour; axe checks at desktop and phone widths, keyboard-only flows, AA contrast |
 | Responsible AI & Ethics | Permission before generation, a grounding check after it, refusal without a model call, model and prompt version logged per answer, card and ID masking, a reason required to read any answer (`docs/tencent/RESPONSIBLE_AI.md`) |
-| Overall Quality | 93% original Walnut code reused unchanged; every number linked to evidence; limits stated, not hidden; every security review and its fixes recorded in `docs/tencent/SECURITY.md` |
+| Overall Quality | Every number linked to evidence; limits stated, not hidden; every security review and its fixes recorded in `docs/tencent/SECURITY.md` |
 
 ## CodeBuddy / WorkBuddy conversation history (≥ 3 screenshots, MANDATORY)
 

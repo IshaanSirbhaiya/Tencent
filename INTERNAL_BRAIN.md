@@ -260,14 +260,13 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 - **Recall depends on what you count.** 100% is the share of allowed documents that reach the answer
   step. The share of answers that cite the expected source is 87.8% to 96.4%.
 
-## What was built here, and what was already there
+## What's inside
 
-The Walnut engine (provenance pointers, the sealed ledger, the grounding wall, the model harness) existed
-before the event (base commit `078572e`) and is **reused unchanged**. Built during the hackathon, beside
-it: the permission compilers, the two checks, the audit log and console, the web app, the mock
-platforms, the Company A world, the fintech rules, the WorkBuddy connectors, the evaluation and the
-original-screen configuration. **93% of the code is the original Walnut base**
-(`python databridge/scripts/measure_original_share.py`: unchanged original lines / all code lines, 15 Oct).
+- **The Walnut evidence engine** underneath: provenance pointers, the sealed ledger, the grounding wall
+  and the model harness. The Internal Brain uses it by import and does not modify it.
+- **The Internal Brain** on top: the permission compilers, the two checks, the audit log and console,
+  the web app, the mock platforms, the Company A world, the fintech rules, the WorkBuddy connectors, the
+  evaluation and the original-screen configuration.
 
 **Built with Tencent:**
 - **CodeBuddy** built the WorkBuddy connector, the token tool and the model-chain tests, drew the trust

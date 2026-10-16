@@ -10,7 +10,7 @@
  "slide09": "Today knowledge sits in a dozen places, each with its own permission model. That is what makes a safe assistant hard.",
  "slide10": "Walnut pulls those pieces into one record. Here, a database migration: the plan from Confluence, the ticket from Jira, the blocker from Slack, each linked to its source.",
  "slide11": "Five steps: connect, understand, convert, prove and protect. The last two are what a fintech needs most.",
- "slide12": "This is the company brain itself: a relationship map, full history you can rewind, source snapshots and change tracking. It is Walnut's original engine, reused unchanged.",
+ "slide12": "This is the company brain itself: a relationship map, full history you can rewind, source snapshots and change tracking. This is the Walnut engine the Internal Brain runs on.",
  "slide13": "Every question goes through the same five steps. The key property: a restricted answer looks exactly like an answer about something that does not exist.",
  "slide14": "This is the real app. Same question, two people. Jordan gets the answer; Ken gets a polite no, with no hint that anything is hidden.",
  "slide15": "For compliance: plain-English audit search, a reasoned reveal, and a sealed log. Our tamper demo edits, deletes and rolls back the log, and verification catches all six attacks.",
