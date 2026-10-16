@@ -11,7 +11,7 @@ https://github.com/IshaanSirbhaiya/Tencent.
 | `03_app_scenes/` | `internal_brain/`: the web app (answer with checks, map, compare, tour, audit). `walnut_original/`: the original Walnut screens on Company A. | Extra screenshots and slides. |
 | `04_evidence/` | `tamper_demo_output.txt`: the output of the tamper demo. | Shows the audit log catches edits. |
 | `05_video/` | `walnut_internal_brain_demo.mp4` (6:28: camera intro, then the narrated demo), `narration_cues.md`, `narration.srt`, `timeline.json`, `cards/` (still cards), `clips/` (one recording per scene, with `.marks.json`). | The video to upload. |
-| `06_cover/` | `cover_380x216.png` (the form's size) and `cover_1920x1080.png`; `cover_master_miora.png` is Miora's raw art, and `miora_session1.png` / `miora_session2.png` show the Miora prompts and results | The form's cover field; proof of Miora use |
+| `06_cover/` | `cover_380x216.png` (the form's size) and `cover_1920x1080.png`; `cover_master_miora.png` is Miora's raw art, `miora_session1.png` / `miora_session2.png` show the Miora prompts and results; `youtube_thumbnail_miora.png` (and a 1280-wide copy) is the YouTube thumbnail, also made in Miora | The form's cover field; proof of Miora use |
 | `07_deck/` | `walnut_internal_brain_deck.pdf` and `.pptx` (23 slides, speaker notes in the PPTX), plus `html/` and `png/`. | The submission and Demo Day. |
 
 ## Regenerate
