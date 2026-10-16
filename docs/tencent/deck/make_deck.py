@@ -4,12 +4,13 @@
     node   docs/tencent/deck/shoot_deck.cjs         # render PNGs
     python docs/tencent/deck/make_deck.py pack      # PDF + PPTX from the PNGs
 
-Numbers come from the repository (the eval's results.json); outside numbers name their source on the
-slide. Screens are real screenshots of the running app.
+The look and much of the story follow the Walnut customer deck (the company brain, how it works, the
+business value, why Walnut wins); the hackathon slides add the fintech risk, how the Internal Brain answers
+safely, the audit trail, the measured results and the Tencent tools. Outside numbers name their source on
+the slide; our own numbers come from the repository; screens are real screenshots of the running app.
 """
 from __future__ import annotations
 
-import html
 import json
 import sys
 from pathlib import Path
@@ -18,213 +19,329 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 OUT = REPO / "submission" / "07_deck"
 SHOTS = REPO / "submission" / "03_app_scenes"
+ASSETS = HERE / "assets"
 RESULTS = REPO / "databridge" / "evals" / "internal_brain" / "results.json"
 
 CSS = """
 *{box-sizing:border-box}html,body{margin:0;width:1920px;height:1080px;overflow:hidden}
-body{background:radial-gradient(1300px 760px at 80% 12%,#1c2a49 0%,#0b1020 55%,#070a14 100%);color:#e8edf7;
-font-family:'Segoe UI',Inter,system-ui,sans-serif}
-.s{position:relative;height:100%;padding:96px 120px 90px;display:flex;flex-direction:column}
-.k{color:#8fd3c7;letter-spacing:.18em;text-transform:uppercase;font-size:21px;font-weight:600}
-h1{font-size:82px;line-height:1.04;margin:18px 0 16px;font-weight:700;letter-spacing:-.02em}
-h2{font-size:54px;line-height:1.1;margin:14px 0 26px;font-weight:700;letter-spacing:-.01em}
-.lead{font-size:30px;color:#b8c3d9;line-height:1.42;max-width:1500px;margin:0}
-.row{display:flex;gap:40px;flex:1;min-height:0}.col{flex:1;min-width:0;display:flex;flex-direction:column}
-.card{border:1px solid #2a3654;border-radius:20px;background:rgba(17,24,43,.78);padding:26px 30px}
-.big{font-size:84px;font-weight:700;letter-spacing:-.03em;line-height:1}.ok{color:#5ee0b0}
-.lbl{font-size:25px;color:#c9d3e6;margin-top:10px;line-height:1.35}.src{font-size:17px;color:#7f8aa3;margin-top:14px;letter-spacing:.03em}
-.shot{border:1px solid #2a3654;border-radius:16px;overflow:hidden;background:#05070d;flex:1;min-height:0;display:flex}
-.shot img{width:100%;height:100%;object-fit:cover;object-position:top left}
-.cap{font-size:20px;color:#8a96ae;margin-top:12px}
-ul.b{margin:0;padding-left:28px;font-size:26px;line-height:1.5;color:#d3dbea}ul.b li{margin:6px 0}
-.n{color:#8fd3c7;font-weight:700;font-size:20px;letter-spacing:.1em}.t{font-size:30px;font-weight:700;margin:6px 0 8px}
-.d{font-size:21px;color:#b8c3d9;line-height:1.4}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px}
-.pill{display:inline-block;border:1px solid #2f3d5e;border-radius:999px;padding:9px 20px;margin:8px 10px 0 0;font-size:22px;color:#cfd8ea;background:rgba(20,28,50,.7)}
-.foot{position:absolute;left:120px;right:120px;bottom:34px;display:flex;justify-content:space-between;color:#6f7a93;font-size:18px}
-.logo{display:inline-flex;align-items:center;gap:12px;color:#c9d3e6;font-weight:600}.dot{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#6d5dfc,#22c3a6)}
+body{background:#F4F1EA;color:#16191F;font-family:Inter,'Segoe UI',system-ui,sans-serif}
+.s{position:relative;height:100%;padding:76px 128px 110px;display:flex;flex-direction:column}
+.k{color:#A8760C;letter-spacing:.22em;text-transform:uppercase;font-size:21px;font-weight:700}
+h1{font-size:66px;line-height:1.06;margin:14px 0 14px;font-weight:800;letter-spacing:-.03em}
+.sub{font-size:27px;color:#5E6470;line-height:1.45;margin:0 0 30px;max-width:1500px}
+.card{background:#fff;border:1px solid #E6E1D6;border-radius:22px;padding:28px 30px;box-shadow:0 2px 0 rgba(0,0,0,.02)}
+.navy{background:#212A45;color:#fff;border-color:#212A45}.navy .d{color:#C9CFDD}
+.t{font-size:28px;font-weight:700;margin:0 0 10px;letter-spacing:-.01em}.d{font-size:21px;color:#5E6470;line-height:1.5}
+.num{color:#A8760C;font-weight:700;font-size:18px;letter-spacing:.12em}
+.big{font-size:118px;font-weight:800;letter-spacing:-.05em;line-height:1}.red{color:#E2583E}.ink{color:#212A45}
+.src{font-size:16px;color:#8C919B;letter-spacing:.14em;text-transform:uppercase;margin-top:14px;font-weight:600}
+.row{display:flex;gap:30px}.grid{display:grid;gap:26px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(5,1fr)}
+.pill{display:inline-block;border:1px solid #DDD7CA;border-radius:999px;padding:12px 26px;margin:0 14px 0 0;font-size:22px;color:#3B414D;background:#FBFAF6;font-weight:500}
+.shot{border:1px solid #E6E1D6;border-radius:18px;overflow:hidden;background:#0b1020;box-shadow:0 18px 40px rgba(33,42,69,.12)}
+.shot img{width:100%;display:block}
+.foot{position:absolute;left:128px;right:128px;bottom:40px;display:flex;justify-content:space-between;align-items:center;color:#8C919B;font-size:19px}
+.brand{display:flex;align-items:center;gap:12px;color:#3B414D;font-weight:600;font-size:21px}.brand img{height:30px}
+.hl{background:linear-gradient(transparent 62%,#F2DFA9 62%)}
+.icon{width:46px;height:46px;border-radius:12px;background:#F6EAD0;display:flex;align-items:center;justify-content:center;color:#A8760C;font-size:22px;font-weight:700}
+table{border-collapse:collapse;width:100%;font-size:21px}th{text-align:left;color:#5E6470;font-weight:600;padding:16px 14px;border-bottom:2px solid #DDD7CA}
+td{padding:17px 14px;border-bottom:1px solid #E6E1D6;color:#3B414D}td.w{font-weight:700;color:#16191F}
+td.us,th.us{background:#212A45;color:#fff;text-align:center;font-weight:700}
+.tag{display:inline-block;font-size:16px;padding:6px 12px;border-radius:8px;background:#F6EAD0;color:#8A6110;font-weight:600;margin:3px 6px 3px 0}
 """
 
 
-def page(n: int, total: int, body: str) -> str:
-    return (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>Slide {n}</title>"
-            f"<style>{CSS}</style></head><body><div class='s'>{body}"
-            f"<div class='foot'><span class='logo'><span class='dot'></span>Walnut Internal Brain</span>"
-            f"<span>FinTech Track · Aspire · Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · {n}/{total}</span>"
-            f"</div></div></body></html>")
+def page(n: int, total: int, body: str, foot: bool = True) -> str:
+    footer = (f"<div class='foot'><span class='brand'><img src='{asset('walnut_icon.png')}'>Walnut Internal Brain</span>"
+              f"<span>{n:02d} / {total}</span></div>") if foot else ""
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'><title>Slide</title>"
+            "<link rel='preconnect' href='https://fonts.googleapis.com'>"
+            "<link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap' rel='stylesheet'>"
+            f"<style>{CSS}</style></head><body><div class='s'>{body}{footer}</div></body></html>")
 
 
-def img(rel: str) -> str:
+def asset(name: str) -> str:
+    return (ASSETS / name).resolve().as_uri()
+
+
+def shot(rel: str) -> str:
     return (SHOTS / rel).resolve().as_uri()
+
+
+def head(kicker: str, title: str, sub: str = "") -> str:
+    return (f"<div class='k'>{kicker}</div><h1>{title}</h1>" + (f"<p class='sub'>{sub}</p>" if sub else ""))
+
+
+def card(title: str, text: str, num: str = "", cls: str = "card") -> str:
+    n = f"<div class='num'>{num}</div>" if num else ""
+    return f"<div class='{cls}'>{n}<div class='t'>{title}</div><div class='d'>{text}</div></div>"
 
 
 def slides() -> list[tuple[str, str]]:
     h = json.loads(RESULTS.read_text(encoding="utf-8"))["headline"]
-    leaks, n_req, p2c, p2m, inj = (h["leaks"], h["n_requests_all_modes"], h["p2_compared"],
-                                   h["p2_mismatches"], h["injection_hard_failures"])
+    n_req = f"{h['n_requests_all_modes']:,}"
     S: list[tuple[str, str]] = []
+
     S.append((f"""
-<div class="row" style="align-items:center"><div class="col" style="flex:1.05"><div class="k">FinTech Track · Aspire · "The Internal Brain"</div>
-<h1 style="font-size:66px">Ask your whole company.<br>See only what you're allowed to.</h1>
-<p class="lead" style="font-size:27px">One assistant across Confluence, Jira, Slack and Google Drive. Every answer cited, every source
-permission-checked twice, every access written to an audit log that can't be quietly edited.</p>
-<div style="margin-top:34px"><span class="pill">Knowledge across 4 platforms</span><span class="pill">Restrictions per person</span><span class="pill">Tamper-evident audit</span><span class="pill">Built with CodeBuddy · WorkBuddy</span></div></div>
-<div class="col" style="flex:.95;height:760px"><div class="shot"><img src="{img('internal_brain/19_answer_jdoe.png')}"></div><div class="cap">A real answer: one question, three platforms, every source re-checked.</div></div></div>""",
-              "Hi, we're team Walnut. This is the Internal Brain: one place to ask questions across Aspire's four "
-              "tools, answered only from what the person asking is allowed to open, with every access audited."))
-    S.append(("""
-<div class="k">The problem</div><h2>The answer exists. Finding it safely is the hard part.</h2>
-<div class="grid3">
- <div class="card"><div class="big">~30%</div><div class="lbl">of the work week goes to looking for information</div><div class="src">ASPIRE · INTERNAL BRAIN CHALLENGE BRIEF</div></div>
- <div class="card"><div class="big">~3M</div><div class="lbl">sensitive records per organisation accessed by Microsoft Copilot in H1 2025</div><div class="src">CONCENTRIC AI · DATA RISK REPORT 2H 2025</div></div>
- <div class="card"><div class="big">9.3</div><div class="lbl">CVSS of EchoLeak (CVE-2025-32711): a zero-click prompt injection that leaked Copilot data</div><div class="src">REPORTED BY THE HACKER NEWS, JUNE 2025</div></div>
-</div>
-<div class="card" style="margin-top:28px"><div class="t" style="font-size:28px">In a fintech, one leak can be a crime</div>
-<div class="d" style="font-size:23px">Telling a customer that a suspicious-transaction report exists is tipping-off (Singapore CDSA s.57, s.48 before the 2020 Revised Edition; MAS Notice PSN01).
-An assistant that can read everything can leak everything, so most regulated firms simply don't roll one out.</div></div>
-<div class="grid3" style="margin-top:28px">
- <div class="card"><div class="big" style="font-size:60px">50,000+</div><div class="lbl">businesses run their finances on Aspire</div><div class="src">TECHNODE · APRIL 2026</div></div>
- <div class="card"><div class="big" style="font-size:60px">10+</div><div class="lbl">licences across SG, HK, AU, EU, US and CA: many regulators, many policies, many audiences</div><div class="src">TECHNODE · APRIL 2026</div></div>
- <div class="card"><div class="big" style="font-size:60px">Oct 2026</div><div class="lbl">MAS issued its Guidelines on AI Risk Management, covering payment institutions</div><div class="src">MAS MEDIA RELEASE</div></div>
-</div>""",
-              "Everyone loses time searching. The obvious fix is an AI assistant, but assistants that can read "
-              "everything have leaked: Copilot oversharing, EchoLeak, prompt injection in Slack AI. In a fintech "
-              "that is not just embarrassing; tipping off a customer about a suspicious-transaction report is an "
-              "offence. That is why Aspire set this problem."))
-    S.append((f"""
-<div class="k">The idea, on one screen</div><h2>Same question. Two people. Two honest answers.</h2>
-<div class="row"><div class="col"><div class="shot"><img src="{img('internal_brain/12_compare.png')}"></div>
-<div class="cap">Live app: Jordan (engineer) gets the cited answer. Ken (contractor) gets the standard refusal, with no hint that more exists.</div></div></div>""",
-              "This is the whole idea on one screen. The same question from an engineer and a contractor. The "
-              "engineer gets a cited answer from three platforms. The contractor gets the same polite refusal "
-              "he'd get for something that doesn't exist. Restricted looks exactly like non-existent."))
-    S.append(("""
-<div class="k">How it works</div><h2>Two checks before the model. One after. A record before anything is shown.</h2>
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:22px">
- <div class="card"><div class="n">01</div><div class="t">Who's asking</div><div class="d">A signed token from the web app or WorkBuddy. Never a name typed into a box.</div></div>
- <div class="card"><div class="n">02</div><div class="t">Gate 1</div><div class="d">Search only what this person may open, using each platform's own permission model.</div></div>
- <div class="card"><div class="n">03</div><div class="t">Gate 2</div><div class="d">Ask the source again, live, for every passage. Error or timeout means no.</div></div>
- <div class="card"><div class="n">04</div><div class="t">Answer</div><div class="d">With a TokenHub key, Tencent Hy3 writes from those passages only; without one we quote them directly.</div></div>
- <div class="card"><div class="n">05</div><div class="t">Grounding</div><div class="d">Every sentence cites a passage; unsupported numbers and names are dropped.</div></div>
-</div>
-<div class="card" style="margin-top:28px;border-color:#3b5b4f;background:rgba(20,48,40,.55)"><div class="d" style="font-size:24px;color:#d7f5ea"><b>Audit log</b>: written before retrieval, before the model, before the answer is shown. Hash-chained and sealed. If it can't be written, nothing is answered.</div></div>
-<div class="grid3" style="margin-top:28px">
- <div class="card"><div class="t" style="font-size:27px">Restricted = doesn't exist</div><div class="d">The same refusal, byte for byte, whether a document is restricted or was never written.</div></div>
- <div class="card"><div class="t" style="font-size:27px">Revoked = gone next question</div><div class="d">Remove someone from a channel and their very next answer no longer uses it, even if the notification is lost.</div></div>
- <div class="card"><div class="t" style="font-size:27px">Changed = re-read first</div><div class="d">An edited document is re-read and re-checked before use, and the citation shows the new version.</div></div>
-</div>""",
-              "How it works, in five steps. Identity only from a signed token. Gate one searches only what you can "
-              "open, using each platform's own rules. Gate two asks the platform again, live, for every passage. "
-              "The model sees only what passed, and a grounding check drops anything unsupported. And the audit "
-              "record is written before anything is shown."))
-    S.append((f"""
-<div class="k">Knowledge, shaped by permissions</div><h2>Everything you can open. Nothing you can't.</h2>
-<div class="row"><div class="col"><div class="shot"><img src="{img('internal_brain/10_map_jdoe.png')}"></div><div class="cap">Jordan, engineer: 867 items in 17 places on 4 platforms.</div></div>
-<div class="col"><div class="shot"><img src="{img('internal_brain/11_map_kenext.png')}"></div><div class="cap">Ken, contractor: 24 items in 2 places. No "+843 hidden". Each item checked live with its source.</div></div></div>""",
-              "The knowledge map shows what each person can open, checked live with each source. Jordan sees 867 "
-              "items; Ken sees 24. The map never hints that anything else exists."))
-    S.append((f"""
-<div class="k">Built for a fintech</div><h2>Four things a payments company needs on day one</h2>
-<div class="row"><div class="col" style="flex:1.1"><div class="grid2" style="grid-template-columns:1fr">
- <div class="card"><div class="t">FinCrime compartment</div><div class="d">Suspicious-transaction case notes are readable only by the MLRO. An account manager asking about that customer gets the approved script, word for word the same as for a company that doesn't exist.</div></div>
- <div class="card"><div class="t">Answers per market</div><div class="d">"What can we offer this SME?" gets a different, correct answer for Singapore and Indonesia, each citing that market's approved policy.</div></div>
- <div class="card"><div class="t">Approved policies only</div><div class="d">A draft fee schedule with different numbers is never cited. Only the approved version counts.</div></div>
- <div class="card"><div class="t">Card and ID masking</div><div class="d">Card numbers, CVVs, IBANs and NRICs are masked before indexing, so they never reach the index or a model.</div></div>
-</div></div><div class="col" style="flex:.9"><div class="shot"><img src="{img('internal_brain/21_fintech_market_answer.png')}" style="object-position:0 45%"></div>
-<div class="cap">Ops asks about an Indonesian SME: the answer cites only the Indonesia policy and pricing.</div></div></div>""",
-              "On top of the general system we added four fintech pieces as data and configuration: a FinCrime "
-              "compartment against tipping-off, market-specific answers to Aspire's 'what can we offer this "
-              "customer' question, approved-only policies, and masking of card numbers and national IDs."))
-    S.append((f"""
-<div class="k">The audit trail</div><h2>Who asked what, what was allowed, and proof nobody edited it</h2>
-<div class="row"><div class="col" style="flex:1.35"><div class="shot"><img src="{img('internal_brain/17_audit_verify.png')}"></div>
-<div class="cap">Compliance asks in plain English; it becomes a visible filter. Every allow/deny decision per document. "Verify audit chain" re-checks every record and every stored answer.</div></div>
-<div class="col" style="flex:.65;gap:22px">
- <div class="card"><div class="big ok" style="font-size:64px">6 / 6</div><div class="lbl">tamper attacks detected: edits, deletions, rollback, a key-holder rewrite. A 7th, a rollback after the last off-host head, is our stated limit</div><div class="src">SCRIPTS/TAMPER_DEMO.PY · REAL OUTPUT</div></div>
- <div class="card"><div class="t" style="font-size:26px">Reasoned reveal</div><div class="d">Compliance sees metadata by default. Reading an answer needs a reason, and the reveal is logged too.</div></div>
-</div></div>""",
-              "For compliance: a plain-English audit search that turns into a visible filter, every allow and deny "
-              "decision, and a reveal of answer text that needs a reason and is itself logged. Verify audit chain "
-              "re-checks every record; our tamper demo shows edits, deletions and rollbacks being caught."))
-    S.append((f"""
-<div class="k">Measured, not promised</div><h2>We attacked it on purpose</h2>
-<div class="grid3">
- <div class="card"><div class="big ok">{leaks}</div><div class="lbl">leaks of restricted content in {n_req:,} adversarial requests</div><div class="src">EVALS/INTERNAL_BRAIN/RESULTS.MD</div></div>
- <div class="card"><div class="big ok">{p2m} / {p2c}</div><div class="lbl">differences between "restricted" and "doesn't exist"</div><div class="src">P2 DIFFERENTIAL TEST</div></div>
- <div class="card"><div class="big ok">{inj}</div><div class="lbl">prompt-injection failures, with planted instructions on all four platforms</div><div class="src">INJECTION PROBES</div></div>
-</div>
-<div class="grid3" style="margin-top:28px">
- <div class="card"><div class="big" style="font-size:64px">634</div><div class="lbl">automated tests on the Internal Brain</div></div>
- <div class="card"><div class="big" style="font-size:64px">7</div><div class="lbl">independent security reviews (6 Codex passes, CodeBuddy on Hy3), every finding fixed or documented</div></div>
- <div class="card"><div class="big" style="font-size:64px">100%</div><div class="lbl">recall on questions people are allowed to answer</div></div>
-</div>""",
-              "We attacked it on purpose: nearly six thousand adversarial requests with zero leaks, four hundred "
-              "paired questions with zero differences, and zero prompt-injection failures. The evaluation has its "
-              "own canaries, so it can't pass by accident."))
-    S.append((f"""
-<div class="k">Built with Tencent</div><h2>CodeBuddy built it. WorkBuddy is the second front door.</h2>
-<div class="row"><div class="col" style="flex:1.2"><div class="shot"><img src="{(REPO / 'submission/01_codebuddy/cb2_session_overview.png').resolve().as_uri()}"></div>
-<div class="cap">CodeBuddy session CB2 building the WorkBuddy MCP connector (every session's transcript is in the repository).</div></div>
-<div class="col" style="flex:.8;gap:18px">
- <div class="card"><div class="t" style="font-size:26px">CodeBuddy · 6 sessions</div><div class="d">Trust-boundary diagram, WorkBuddy connector, token tool, model-chain tests, a security review on Hy3, then hardening its own code.</div></div>
- <div class="card"><div class="t" style="font-size:26px">WorkBuddy · 3 workspaces</div><div class="d">Ask as an engineer or a contractor, or audit as compliance. Each carries its own signed token.</div></div>
- <div class="card"><div class="t" style="font-size:26px">TokenHub · Hy3 · Lighthouse · Miora</div><div class="d">Hy3 with DeepSeek fallback (configured; the Hy3 run is pending); a hardened Lighthouse deploy kit; the cover made in Miora.</div></div>
-</div></div>""",
-              "Tencent tools are in the build, not bolted on. CodeBuddy ran six sessions, including a security "
-              "review on Hy3 that found real issues we then fixed. WorkBuddy is a second front door, where each "
-              "workspace carries its own signed token, so the model can never choose who you are."))
-    S.append((f"""
-<div class="k">What's underneath</div><h2>The Walnut evidence engine, reused as it was</h2>
-<div class="row"><div class="col"><div class="shot"><img src="{img('walnut_original/02_graph_node_panel.png')}"></div><div class="cap">Knowledge graph: every attribute points to the record it came from.</div></div>
-<div class="col"><div class="shot"><img src="{img('walnut_original/03_brain_time_slider.png')}"></div><div class="cap">Company brain with a time slider: what the company knew on any date.</div></div></div>""",
-              "Underneath is Walnut, the evidence engine we built before this event. Every value carries a pointer "
-              "to its source, and the sealed ledger and grounding wall come from it. Ninety-three percent of the "
-              "code is that original base, reused unchanged."))
-    S.append(("""
-<div class="k">For Aspire</div><h2>From demo to pilot in four weeks</h2>
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
- <div class="card"><div class="n">WEEK 1</div><div class="t">Connect</div><div class="d">Point the four connectors at Aspire's real Confluence, Jira, Slack and Drive (a base-URL change; same code path as the demo).</div></div>
- <div class="card"><div class="n">WEEK 2</div><div class="t">Identity</div><div class="d">Replace demo sign-in with Aspire's SSO; keep the ledger key in a managed key store.</div></div>
- <div class="card"><div class="n">WEEK 3</div><div class="t">Prove it</div><div class="d">Run the leak evaluation on Aspire's own permissions; compliance reviews the audit console.</div></div>
- <div class="card"><div class="n">WEEK 4</div><div class="t">Pilot</div><div class="d">One team (e.g. payments engineering), in the web app and WorkBuddy, with the audit log reviewed weekly.</div></div>
-</div>
-<div class="card" style="margin-top:28px"><div class="d" style="font-size:23px">Ahead of the MAS Guidelines on AI Risk Management (issued Oct 2026): model, prompt version and evidence are already logged for every answer, with human oversight through the audit console.</div></div>""",
-              "For Aspire, this is a four-week path: connect the real tools, swap demo sign-in for SSO, run the "
-              "same leak evaluation on Aspire's own permissions, then pilot with one team. It already logs what "
-              "the new MAS AI risk guidelines ask firms to keep track of."))
-    S.append(("""
-<div class="k">Honest limits, and what's next</div><h2>What we don't claim yet</h2>
-<div class="row"><div class="col" style="flex:1.25"><ul class="b">
- <li>The four platforms are mocked with their real API shapes and permission rules; the connectors haven't run against a real tenant yet.</li>
- <li>Sign-in is a demo login standing in for SSO; a deployed build refuses to start without a passcode.</li>
- <li>The grounding check verifies numbers and names, not the relations between them.</li>
- <li>Someone holding the ledger's sealing key could rewrite records after the last off-host published head; we say so and test it.</li>
- <li>All numbers come from a test model and the deterministic path; the Hy3 run waits on Tencent account verification.</li>
-</ul></div><div class="col" style="flex:.75;gap:18px">
- <div class="card"><div class="t" style="font-size:26px">Next</div><div class="d">Real-tenant connector runs · SSO · ledger key in a managed key store · Hy3 evaluation · relation checks in the grounding wall</div></div>
- <div class="card"><div class="t" style="font-size:26px">Why say this?</div><div class="d">A compliance tool that overclaims is worse than none. Every claim here is backed by a test or a file in the repository.</div></div>
-</div></div>""",
-              "We're explicit about limits: mocked platforms, demo sign-in, grounding that checks values but not "
-              "relations, the sealing-key window, and a Hy3 evaluation run that's still pending."))
-    S.append(("""
-<div style="margin-top:110px"><div class="k">Thank you</div><h1>Walnut Internal Brain</h1>
-<p class="lead">The repository's INTERNAL_BRAIN.md shows what to look at first, how to run it in two commands,
-and the evidence behind every claim on these slides.</p>
-<div style="margin-top:40px"><span class="pill">github.com/IshaanSirbhaiya/Tencent</span><span class="pill">Start at INTERNAL_BRAIN.md</span><span class="pill">6-minute demo video</span></div></div>""",
-              "Thank you. Everything here is in the repository, starting from INTERNAL_BRAIN.md, with the evidence "
-              "behind every claim."))
+<div style="display:flex;justify-content:space-between;align-items:center">
+ <img src="{asset('walnut_wordmark.png')}" style="height:56px">
+ <span style="color:#5E6470;font-size:22px;font-weight:500">Tencent Cloud AI CAN DO IT Hackathon · Singapore 2026</span></div>
+<div style="margin-top:150px" class="k">FinTech Track · Aspire · The Internal Brain</div>
+<div style="font-size:150px;font-weight:800;letter-spacing:-.05em;line-height:1;margin:24px 0 30px">Internal <span style="color:#D4911C">Brain</span></div>
+<p class="sub" style="font-size:34px;max-width:1450px">Ask one question across Confluence, Jira, Slack and Google Drive. Get a cited answer built
+<b>only from what you are allowed to open</b>, with every access on an audit trail nobody can quietly edit.</p>
+<div><span class="pill">Permission-checked twice</span><span class="pill">Tamper-evident audit</span><span class="pill">Built with CodeBuddy · lives in WorkBuddy</span></div>
+""", "Hi, we are Walnut. This is the Internal Brain, our entry for Aspire's FinTech challenge: one place to ask "
+         "questions across the company's tools, answered only from what you are allowed to see, with every access "
+         "on an audit trail.", False))
+
+    S.append((f"""{head('01 · The reality', 'The data already exists')}
+<div class="row" style="flex:1;align-items:center;gap:70px">
+ <div style="flex:1"><div style="font-size:44px;line-height:1.35;font-weight:500"><span class="hl">The biggest obstacle to using advanced
+ data analysis isn't skill base or technology;</span> it's plain old access to the data.</div><div class="src">Source · Harvard Business Review</div></div>
+ <div style="flex:1" class="shot"><img src="{asset('source_hbr.png')}" style="background:#fff"></div></div>
+""", "Every company already has the answers. The problem, as Harvard Business Review puts it, is plain old access."))
+
+    S.append((f"""{head('02 · The cost', 'Searching takes a quarter of the week', 'The answers are somewhere in the organisation. Getting to them is where the time goes.')}
+<div class="grid g3" style="margin-top:40px">
+ <div><div class="big red">25%</div><div class="d" style="font-size:26px;margin-top:14px;color:#16191F">of a team's time goes to searching for answers.</div><div class="src">Atlassian · State of Teams 2025 · 12,000 knowledge workers</div></div>
+ <div><div class="big ink">5.3<span style="font-size:52px"> hours</span></div><div class="d" style="font-size:26px;margin-top:14px;color:#16191F">a week, per person, waiting on colleagues for information or recreating work that already exists.</div><div class="src">Panopto with YouGov · 2018 · 1,001 employees</div></div>
+ <div><div class="big ink">42%</div><div class="d" style="font-size:26px;margin-top:14px;color:#16191F">of an organisation's know-how is held only by individual employees. When they move on, it goes with them.</div><div class="src">Panopto with YouGov · 2018</div></div></div>
+<div style="margin-top:auto;font-size:26px;font-weight:600;color:#212A45">The cost shows up as slower projects, repeated work and decisions made on partial information.</div>
+""", "A quarter of the week goes on searching. Over five hours a week waiting on colleagues. And 42 percent of "
+         "know-how sits in people's heads."))
+
+    S.append((f"""{head('03 · The risk', 'AI projects stall before they start', 'Lack of AI-ready data puts AI projects at risk.')}
+<div class="row" style="flex:1;align-items:center;gap:70px">
+ <div style="flex:1"><div class="big red" style="font-size:190px">60%</div><div class="d" style="font-size:28px;color:#16191F;margin-top:10px">of AI projects unsupported by AI-ready data will be abandoned through 2026, Gartner forecasts.</div><div class="src">Source · Gartner newsroom · Feb 2025</div></div>
+ <div style="flex:1" class="shot"><img src="{asset('source_gartner.png')}" style="background:#fff"></div></div>
+""", "And AI does not fix it on its own: Gartner expects most AI projects without AI-ready data to be abandoned."))
+
+    S.append((f"""{head('04 · The fintech edge', 'In a fintech, a leak can be a crime', 'An assistant that can read everything can also leak everything. For a payments company supervised by MAS, that blocks rollout entirely.')}
+<div class="grid g4" style="margin-top:20px">
+ {card('Tipping-off', 'Telling a customer that a suspicious-transaction report exists is an offence (CDSA s.57; MAS Notice PSN01).', '01')}
+ {card('Card data', 'Card numbers pasted into a ticket must never reach an index or a model (PCI DSS 3.4.1).', '02')}
+ {card('Oversharing and injection', 'Assistants oversharing, and instructions hidden in retrieved documents (EchoLeak, Slack AI), are on record.', '03')}
+ {card('Stale permissions', 'Synced permissions lag the source by 30 minutes to a day. A removed person keeps seeing what they should not.', '04')}</div>
+<div class="card navy" style="margin-top:34px"><div class="t" style="color:#fff">So the answer has to be useful and permission-safe at the same time.</div><div class="d">The model must never see anything the person asking cannot see, and compliance must be able to prove it afterwards.</div></div>
+""", "In a fintech there is a second edge. A careless assistant can tip off a customer, leak card data or "
+         "follow instructions hidden in a document. That is the problem Aspire set."))
+
+    S.append((f"""{head('05 · What we heard', 'Teams told us where the hours go')}
+<div class="grid g4" style="margin-top:16px">
+ {card('Months before a project can start', 'Each new data or AI project spends six to eight months gathering data from scattered systems. The next project starts the hunt again.', '01')}
+ {card('Access that arrives late', 'Data approvals drag on, so interns, new joiners and project teams sit waiting for the data they need.', '02')}
+ {card('Tools chosen by old systems', 'Data held inside one vendor’s ecosystem keeps teams on that vendor’s tools, even when better ones exist.', '03')}
+ {card('Knowledge that leaves with people', 'When a senior person moves on, the handover note holds only part of what they knew.', '04')}</div>
+<div class="row" style="margin-top:34px;gap:26px">
+ <div class="card" style="flex:1.2"><div class="num">ASPIRE · HACKATHON KICK-OFF</div><div style="font-size:30px;font-weight:600;margin-top:10px;line-height:1.35">"What can we offer this customer?" is the question that "takes time right now".</div><div class="src">Aspire's Head of AI</div></div>
+ <div class="card" style="flex:1"><div class="num">OUR INTERVIEWS</div><div class="d" style="font-size:23px;margin-top:10px">Teams in aviation, asset management, IT services, insurance, sovereign wealth and health tech confirmed the same bottleneck.</div></div></div>
+""", "We heard the same thing from teams across finance and beyond, and Aspire said it directly at the kick-off: "
+         "answering 'what can we offer this customer' takes time right now."))
+
+    S.append(("""<div style="margin:auto 0;text-align:center"><div class="k">What we do</div>
+<div style="font-size:66px;font-weight:800;letter-spacing:-.03em;line-height:1.18;margin:30px auto 0;max-width:1500px">We make any organisation's <span style="color:#E2583E">scattered data</span> immediately usable: connected, understood and trusted, and only ever shown to the people <span style="color:#D4911C">allowed to see it.</span></div></div>
+<div style="display:flex;justify-content:space-between;border-top:2px solid #E1DBCE;padding-top:22px;font-size:22px;color:#5E6470"><span>Category · <b style="color:#212A45">Enterprise knowledge, data and AI</b></span><span>The bottleneck is <b style="color:#212A45">safe access to data</b></span></div>
+""", "That is what Walnut does: it makes scattered data usable, and in a fintech, safe to ask."))
+
+    S.append(("""<div style="margin:auto 0"><div class="k">The solution</div>
+<div style="font-size:120px;font-weight:800;letter-spacing:-.04em;line-height:1;margin:24px 0 34px">What is our<br>solution?</div>
+<p class="sub" style="font-size:30px">Two layers on one foundation: a <b>Company Brain</b> that connects your data, and the <b>Internal Brain</b>
+that answers each person only from what they are allowed to open, with every step on the record.</p></div>
+""", "Two layers on one foundation: the company brain underneath, and the Internal Brain on top."))
+
+    groups = [("Work tools", ["Confluence pages", "Jira issues", "Slack threads", "Google Drive files"]),
+              ("Data platforms", ["Databases (SQL)", "Data-lake files (Parquet, Arrow, CSV)", "Warehouse exports", "Spreadsheets"]),
+              ("Documents", ["PDFs, incl. scanned", "Word and PowerPoint", "Email and mailboxes", "Policies and runbooks"]),
+              ("People", ["Meeting notes", "Handover notes", "Who can open what", "Contractors and guests"])]
+    gh = "".join(f"<div class='card'><div class='num'>{g.upper()}</div>" + "".join(f"<div class='tag' style='font-size:19px'>{x}</div>" for x in xs) + "</div>" for g, xs in groups)
+    S.append((f"""{head('Solution · Today', 'Company knowledge lives in a dozen places', 'Each team keeps its own records, in its own systems and formats, each with its own permission rules.')}
+<div class="grid g4" style="margin-top:14px">{gh}</div>
+<div class="card navy" style="margin-top:34px"><div class="t" style="color:#fff">Every system decides who may see what in its own way.</div><div class="d">Confluence page restrictions, Jira project roles and issue security, Slack private and Connect channels, Drive inheritance. An assistant has to respect all of them, live.</div></div>
+""", "Today knowledge sits in a dozen places, each with its own permission model. That is what makes a safe assistant hard."))
+
+    S.append((f"""{head('Solution · With Walnut', 'From scattered information to one record', 'Walnut connects information across your systems and brings it into one record, with every value pointing back to where it came from.')}
+<div class="row" style="flex:1;align-items:center;gap:40px">
+ <div style="flex:1" class="grid">
+  {card('Confluence', 'DB Migration Plan (v6) · payment-gateway space')}
+  {card('Jira', 'DBMIG-12 · Ledger cluster cutover (wave 4)')}
+  {card('Slack', '#db-migration · "Replication lag on ledger-shard-3…"')}</div>
+ <div style="width:150px;height:150px;border-radius:50%;background:#212A45;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px;flex:none"><img src="{asset('walnut_icon.png')}" style="height:62px;filter:invert(1);margin-bottom:6px">Walnut</div>
+ <div style="flex:1.2" class="card"><div class="num">ONE CONNECTED RECORD</div><div class="t" style="margin-top:8px">Database migration project</div>
+  <div class="d"><div>Status · Wave 4: ledger cutover planned for 24 Oct <span class="tag">jira DBMIG-12</span></div>
+  <div>Blocker · Replication lag on ledger-shard-3 <span class="tag">slack #db-migration</span></div>
+  <div>Plan · Postgres 11 → 16, four waves <span class="tag">confluence cf-1001</span></div>
+  <div style="margin-top:10px;color:#8C919B;font-size:18px">Every line opens to the source it came from, checked for the person asking.</div></div></div></div>
+""", "Walnut pulls those pieces into one record. Here, a database migration: the plan from Confluence, the ticket "
+         "from Jira, the blocker from Slack, each linked to its source."))
+
+    steps = [("Connect", "Reads databases, documents, spreadsheets, email and the systems your teams use."),
+             ("Understand", "Recognises the same customer, project or person across every source and links them into one record."),
+             ("Convert", "Serves that record in the shape each job needs: answers, reports, analytics tables, AI context."),
+             ("Prove", "Every figure points to the cell, line or page it came from. A value without proof is refused."),
+             ("Protect", "Runs inside your environment with the model you choose. Each person sees only what they may open.")]
+    st = "".join(f"<div class='card'><div class='num' style='text-align:right'>{i:02d}</div><div class='t'>{t}</div><div class='d'>{d}</div></div>"
+                 for i, (t, d) in enumerate(steps, 1))
+    S.append((f"""{head('Solution · How it works', 'How Walnut makes it usable and trusted')}
+<div style="position:relative;height:40px;margin:30px 0 26px"><div style="position:absolute;top:19px;left:0;right:0;height:3px;background:#212A45"></div></div>
+<div class="grid g5">{st}</div>
+""", "Five steps: connect, understand, convert, prove and protect. The last two are what a fintech needs most."))
+
+    S.append((f"""{head('Solution · Layer 1 · Company Brain', 'Inside the Company Brain', 'Walnut’s original screens, running on our synthetic fintech, Company A.')}
+<div class="row" style="flex:1;gap:34px;min-height:0">
+ <div style="flex:1.25" class="shot"><img src="{shot('walnut_original/03_brain_time_slider.png')}"></div>
+ <div style="flex:1" class="grid">
+  {card('Relationship map', 'How records connect: page to project, ticket to team, person to space.')}
+  {card('Full history', 'When each fact was true and when it was recorded. Drag the time slider to rewind the company.')}
+  {card('Source snapshots', 'A write-once copy of what each source said when read, so figures stay checkable.')}
+  {card('Change tracking', 'When a source value changes, every answer built on it is flagged.')}</div></div>
+""", "This is the company brain itself: a relationship map, full history you can rewind, source snapshots and "
+         "change tracking. It is Walnut's original engine, reused unchanged."))
+
+    flow = [("Who's asking", "A signed token. No prompt or tool argument can name a person."),
+            ("Check 1 · index", "Search only what this person may open, with ranking statistics from those documents only."),
+            ("Check 2 · live", "Ask Confluence, Jira, Slack or Drive again, now. Error or timeout means no."),
+            ("Answer", "The model sees only passages that passed, and must cite one for every sentence."),
+            ("Record", "Written to the sealed audit log before the answer is shown. Log down means no answer.")]
+    fl = "".join(f"<div class='card'><div class='num'>{i:02d}</div><div class='t'>{t}</div><div class='d'>{d}</div></div>" for i, (t, d) in enumerate(flow, 1))
+    S.append((f"""{head('Solution · Layer 2 · Internal Brain', 'How one question is answered safely', 'Two permission checks before the model sees anything, a grounding check after it answers, and an audit record before anything is shown.')}
+<div class="grid g5" style="margin-top:10px">{fl}</div>
+<div class="row" style="margin-top:30px;gap:26px">
+ {card('Restricted looks exactly like non-existent', 'The refusal is the same bytes whether the thing is hidden from you or was never there, so nothing hints that more exists.', '', 'card navy')}
+ {card('Your model, the same checks', 'Tencent Hy3 through TokenHub, or any OpenAI-compatible model. The checks do not depend on the model.')}</div>
+""", "Every question goes through the same five steps. The key property: a restricted answer looks exactly like "
+         "an answer about something that does not exist."))
+
+    S.append((f"""{head('In practice', 'Same question, two people', 'Jordan, a backend engineer, and Ken, an outside contractor, ask the same thing.')}
+<div class="row" style="flex:1;gap:34px;min-height:0">
+ <div style="flex:1.6" class="shot"><img src="{shot('internal_brain/12_compare.png')}"></div>
+ <div style="flex:1" class="grid">
+  {card('Jordan gets the full picture', 'A cited answer from Slack, Jira and Confluence, every source re-checked live.', '1')}
+  {card('Ken gets a polite no', '"I couldn’t find an answer to that in the sources you can access." No hint more exists.', '2')}
+  {card('Both are logged', 'Each question, decision and answer is on the audit trail.', '3')}</div></div>
+""", "This is the real app. Same question, two people. Jordan gets the answer; Ken gets a polite no, with no hint "
+         "that anything is hidden."))
+
+    S.append((f"""{head('In practice · Compliance', 'Who asked what, and proof nobody edited it')}
+<div class="row" style="flex:1;gap:34px;min-height:0">
+ <div style="flex:1.6" class="shot"><img src="{shot('internal_brain/17_audit_verify.png')}"></div>
+ <div style="flex:1" class="grid">
+  {card('Ask the audit log in plain English', '"Everything Jordan accessed in the payment-gateway space, last 30 days" becomes a visible filter.')}
+  {card('A reason to read an answer', 'Compliance sees metadata by default; reading an answer needs a reason, and that is logged too.')}
+  <div class="card navy"><div style="font-size:64px;font-weight:800;color:#F2C46B">6 / 6</div><div class="d">tamper attacks caught by "Verify audit chain": edits, deletions, rollback, a key-holder rewrite.</div></div></div></div>
+""", "For compliance: plain-English audit search, a reasoned reveal, and a sealed log. Our tamper demo edits, "
+         "deletes and rolls back the log, and verification catches all six attacks."))
+
+    S.append((f"""{head('Proof', 'Checked against answers we already knew', 'We built a synthetic fintech, Company A, with 1,143 documents and 49 planted facts, so every right answer was known in advance.')}
+<div class="grid g4" style="margin-top:30px">
+ <div><div class="big red" style="font-size:104px">0</div><div class="t" style="margin-top:10px">leaks in {n_req} attacks</div><div class="d">Restricted content in any answer, prompt or response.</div><div class="src">Leak evaluation · Oct 2026</div></div>
+ <div><div class="big ink" style="font-size:104px">0</div><div class="t" style="margin-top:10px">differences in 400 pairs</div><div class="d">"Restricted" and "doesn't exist" give the same answer.</div><div class="src">Differential test</div></div>
+ <div><div class="big ink" style="font-size:104px">0</div><div class="t" style="margin-top:10px">injection failures</div><div class="d">Instructions planted on all four platforms were treated as content.</div><div class="src">976 injection requests</div></div>
+ <div><div class="big ink" style="font-size:104px">677</div><div class="t" style="margin-top:10px">automated tests</div><div class="d">639 on the Internal Brain, 38 in the browser, all passing.</div><div class="src">Repository test suites</div></div></div>
+<div style="margin-top:auto;font-size:25px;font-weight:600;color:#212A45">The harness ships with the code, so a pilot runs the same checks on your own permissions.</div>
+""", "We attacked it on purpose: almost six thousand adversarial requests with zero leaks, four hundred paired "
+         "answers with zero differences, and every scenario covered by tests."))
+
+    uc = [("“What can we offer this customer?” takes time.", "Approved, market-specific answers for ops and account managers, with sources.", "Faster customer answers"),
+          ("Account managers must not tip off a customer.", "They get the approved script, never the case notes, worded like any other answer.", "No tipping-off risk"),
+          ("Access reviews take weeks of log digging.", "Compliance asks the audit log in plain English, with tamper-proof records.", "Audits in minutes"),
+          ("Contractors and new joiners wait for access.", "Access follows each person's permissions at the source, checked live.", "Safe, faster onboarding"),
+          ("Know-how leaves when people move on.", "Decisions and context stay in the record with the evidence behind them.", "Knowledge that stays")]
+    rows = "".join(f"<tr><td class='w'>{a}</td><td>{b}</td><td class='us'>{c}</td></tr>" for a, b, c in uc)
+    S.append((f"""{head('Use cases', 'Where a fintech gets its time back')}
+<table style="margin-top:10px"><tr><th style="width:36%">What slows teams down today</th><th>What changes with the Internal Brain</th><th class="us" style="width:22%">What you get back</th></tr>{rows}</table>
+""", "Where Aspire gets its time back: faster customer answers, no tipping-off risk, audits in minutes, safe onboarding."))
+
+    S.append((f"""{head('Security and control', 'Your data stays inside your walls')}
+<div class="grid g3" style="margin-top:12px">
+ {card('Runs in your environment', 'On your machines or your cloud. Embeddings are local, so nothing leaves at ingest.')}
+ {card('Your choice of model', 'Tencent Hy3 via TokenHub, any OpenAI-compatible model, or none: the quoted-answer path needs no model.')}
+ {card('Access checked twice, live', 'Each person sees only what the source system lets them open, re-checked at answer time.')}
+ {card('A person stays in control', 'Compliance must give a reason to read an answer, and that reveal is logged.')}
+ {card('Sealed, verifiable log', 'Chained and sealed, with its head published off-host. Edits and deletions are detected.')}
+ {card('Sensitive values masked', 'Card numbers, CVVs, IBANs and NRICs are masked before indexing, so no model ever sees them.')}</div>
+<div style="margin-top:auto;font-size:24px;font-weight:600;color:#212A45">Mapped to MAS TRM, PCI DSS and CDSA, with the limits stated: docs/tencent/MAS_TRM_MAPPING.md.</div>
+""", "Security and control: it runs in your environment, with your choice of model, checks access twice, keeps a "
+         "person in control and masks sensitive values."))
+
+    tools = [("CodeBuddy", "Six build sessions: trust boundaries, the WorkBuddy connectors, the token tool, model-chain tests, a security review, then fixes to its own code."),
+             ("WorkBuddy", "The second front door: connectors that ask as Jordan, as Ken, and for compliance, each with its own signed token."),
+             ("Hunyuan Hy3 · TokenHub", "First in the answer chain, with DeepSeek as backup. Wired in and tested; live calls wait on account verification."),
+             ("Lighthouse", "A hardened one-command deploy kit: HTTPS, passcode-gated demo, only ports 80 and 443 open."),
+             ("Miora", "Made the cover art from our written brief.")]
+    tl = "".join(card(t, d, f"{i:02d}") for i, (t, d) in enumerate(tools, 1))
+    S.append((f"""{head('Built with Tencent', 'Tencent tools, used for real', 'Every claim here has a transcript, screenshot or test in the repository.')}
+<div class="grid g5" style="margin-top:10px">{tl}</div>
+<div class="card navy" style="margin-top:34px"><div class="t" style="color:#fff">93% of the code is the original Walnut engine, reused unchanged.</div><div class="d">The Internal Brain, its two checks, the audit console, the web app, the fintech rules and the WorkBuddy connectors were built during the hackathon.</div></div>
+""", "Built with Tencent tools throughout: CodeBuddy for the build, WorkBuddy as a front door, Hy3 through "
+         "TokenHub for answers, a Lighthouse deploy kit and Miora for the cover."))
+
+    S.append((f"""{head('Business value', 'Measure it in hours saved and risk removed')}
+<div class="row" style="gap:30px;flex:1;min-height:0">
+ <div class="card" style="flex:1"><div class="num">TIME BACK</div>
+  <div class="row" style="gap:14px;margin:20px 0;align-items:center;font-size:21px;font-weight:600"><div class="card" style="padding:16px 20px;background:#F7F4EC">Hours per person per week</div>×<div class="card" style="padding:16px 20px;background:#F7F4EC">People</div>×<div class="card" style="padding:16px 20px;background:#F7F4EC">Loaded hourly cost</div></div>
+  <div style="background:#212A45;color:#fff;border-radius:14px;padding:16px 22px;font-size:22px;font-weight:600">= Weekly cost of searching, waiting and rework</div>
+  <div class="src" style="margin-top:26px">Example · a 600-person fintech</div>
+  <div class="d" style="font-size:23px;color:#16191F;margin-top:8px">Saving 1.5 hours a week at US$31 an hour is about <b class="red">US$1.3M a year</b>. Break-even for a US$100k deployment is <b>7 minutes a week</b> per person.</div>
+  <div class="d" style="font-size:18px;margin-top:10px">A projection, not a measurement. We measure it with you on one workflow, against your own baseline.</div></div>
+ <div class="card navy" style="flex:1"><div class="num" style="color:#F2C46B">RISK REMOVED</div>
+  <div class="t" style="color:#fff;margin-top:18px">An assistant MAS supervision can accept</div><div class="d">Without permission-aware retrieval and an audit trail, an internal AI assistant cannot be rolled out at all.</div>
+  <div class="t" style="color:#fff;margin-top:22px">Prepared customer conversations</div><div class="d">Account history, approved offers and open issues, cited, before every call.</div>
+  <div class="t" style="color:#fff;margin-top:22px">Audits that take minutes</div><div class="d">Every access reconstructable, with proof the record was not altered.</div></div></div>
+""", "The value is time back, about 1.3 million US dollars a year for a 600-person fintech in our base case, and "
+         "risk removed: without this, an internal assistant cannot be rolled out under MAS supervision."))
+
+    cmp_rows = [("Answers only from what each person may open, checked live", "no", "synced ACLs", "no", "synced ACLs"),
+                ("“Restricted” indistinguishable from “doesn't exist”", "no", "no", "no", "no"),
+                ("Tamper-evident audit of every question and answer", "partial", "no", "no", "logs"),
+                ("Connects databases, documents, chat and tickets", "partial", "partial", "no", "✓"),
+                ("Every figure traces to its cell, line or page", "lineage only", "chunks", "features", "platform"),
+                ("Runs in your environment with any model", "cloud-bound", "varies", "✓", "enterprise")]
+    tr = "".join(f"<tr><td class='w'>{r[0]}</td>" + "".join(f"<td style='text-align:center'>{c}</td>" for c in r[1:]) + "<td class='us'>✓</td></tr>" for r in cmp_rows)
+    S.append((f"""{head('Differentiation', 'Why Walnut wins')}
+<table style="margin-top:6px"><tr><th style="width:38%">Capability</th><th style="text-align:center">Data warehouses</th><th style="text-align:center">Search / RAG tools</th><th style="text-align:center">Feature stores</th><th style="text-align:center">Large AI platforms</th><th class="us">Walnut</th></tr>{tr}</table>
+<div style="margin-top:auto;font-size:25px;font-weight:600;color:#212A45">Only Walnut spans the Company Brain, live permission checks and an audit trail you can prove.</div>
+""", "Why Walnut wins: live permission checks, restricted indistinguishable from non-existent, a tamper-evident "
+         "audit, and evidence behind every figure, in one system."))
+
+    team = [("team_dev.png", "Dev", "CS + Business @ NTU CCDS", "AI and Automation at Singlife · AI/ML Engineer at Neurowyzr · AI and Automation at Bajaj Finserv · Researcher, NTU-Schaeffler Lab · Tech Lead, NTU AI&ML Club."),
+            ("team_mehul.png", "Mehul", "CS @ NTU", "Production AI agent over 16,000+ records at Changi's AI/ML Lab · Privacy-aware clinical AI at Neurowyzr · Multi-agent AI research at A*STAR."),
+            ("team_aaruni.png", "Aaruni", "USTEP & ASD @ SUTD", "Research Intern at SEC · Architecture Intern at HighSpan, MAK Designs, TAS · Design Intern at WGS."),
+            ("team_ishaan.png", "Ishaan", "CSD @ SUTD", "Real-time power-grid and industrial cybersecurity research at SUTD's iTrust Centre · Production full-stack systems at Bajaj Finance and client projects.")]
+    tm = "".join(f"""<div style="text-align:center"><div style="width:190px;height:190px;border-radius:50%;overflow:hidden;margin:0 auto 22px;border:6px solid #fff;box-shadow:0 10px 30px rgba(0,0,0,.12)"><img src="{asset(f)}" style="width:100%;height:100%;object-fit:cover"></div>
+<div class="t" style="font-size:34px">{n}</div><div class="num">{r.upper()}</div><div class="d" style="margin-top:12px">{b}</div></div>""" for f, n, r, b in team)
+    S.append((f"""<div style="display:flex;justify-content:space-between"><div class="k">The team</div><div class="k">Backed by BSF · SUTD VIE</div></div>
+<h1>Built by people who live the data problem</h1>
+<div class="grid g4" style="margin-top:40px;gap:44px">{tm}</div>
+""", "We are Dev, Mehul, Aaruni and Ishaan, and we have lived this problem in finance, insurance, design and security work."))
+
+    nx = [("See it on your permissions", "Run our leak harness against Aspire's own permission model in a sandbox."),
+          ("Agree the workflow", "Pick one: the “what can we offer this customer” question, or compliance access reviews."),
+          ("Connect in your environment", "Confluence, Jira, Slack and Drive, with Hy3 through TokenHub."),
+          ("Measure", "Hours saved and audit time against your own baseline."),
+          ("Decide what comes next", "Expand to more teams, with the full record always yours to keep.")]
+    nxt = "".join(f"<div><div style='width:22px;height:22px;border-radius:50%;background:{'#D4911C' if i == 5 else '#212A45'};margin:-11px 0 26px'></div><div class='num'>{i:02d}</div><div class='t' style='font-size:25px{';color:#A8760C' if i == 5 else ''}'>{t}</div><div class='d'>{d}</div></div>" for i, (t, d) in enumerate(nx, 1))
+    S.append((f"""{head('Next step', 'Start with one workflow Aspire repeats', 'Pick one job that costs your team hours every week. We set it up inside your environment, measure the result against your baseline, and you decide what comes next.')}
+<div style="border-top:3px solid #212A45;margin-top:60px;padding-top:0" class="grid g5">{nxt}</div>
+<div style="margin-top:auto;display:flex;justify-content:space-between;border-top:2px solid #E1DBCE;padding-top:22px;font-size:24px"><b>github.com/IshaanSirbhaiya/Tencent</b><span style="color:#5E6470">Start at INTERNAL_BRAIN.md · demo video in the submission</span></div>
+""", "Next step: a pilot on one workflow, starting with our leak harness run against Aspire's own permissions. Thank you."))
     return S
 
 
 def write_html() -> None:
     S = slides()
     (OUT / "html").mkdir(parents=True, exist_ok=True)
+    for old in (OUT / "html").glob("slide*.html"):
+        old.unlink()
     notes = {}
-    for i, (body, note) in enumerate(S, 1):
-        (OUT / "html" / f"slide{i:02d}.html").write_text(page(i, len(S), body), encoding="utf-8")
+    total = len(S)
+    for i, item in enumerate(S, 1):
+        body, note = item[0], item[1]
+        foot = item[2] if len(item) > 2 else True
+        (OUT / "html" / f"slide{i:02d}.html").write_text(page(i, total, body, foot), encoding="utf-8")
         notes[f"slide{i:02d}"] = note
     (OUT / "notes.json").write_text(json.dumps(notes, indent=1, ensure_ascii=False), encoding="utf-8")
-    print(f"{len(S)} slides -> {OUT / 'html'}")
+    print(f"{total} slides -> {OUT / 'html'}")
 
 
 def pack() -> None:

@@ -284,7 +284,7 @@ original-screen configuration. **93% of the code is the original Walnut base**
 
 | Doc | What it covers |
 |---|---|
-| [Pitch deck](submission/07_deck/walnut_internal_brain_deck.pdf) | 13 slides: the problem, the idea, how it works, proof, the fintech layer, the rollout path |
+| [Pitch deck](submission/07_deck/walnut_internal_brain_deck.pdf) | 23 slides: the problem, the idea, how it works, proof, the fintech layer, the rollout path |
 | [Submission pack](submission/README.md) | Screenshots, CodeBuddy evidence, video, cards and deck in one folder |
 | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md) | How it was built: CodeBuddy sessions, reviews, what went wrong |
 | [ARCHITECTURE.md](docs/tencent/ARCHITECTURE.md) | Components and the request path |

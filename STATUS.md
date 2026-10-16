@@ -17,7 +17,7 @@ Public repo: https://github.com/IshaanSirbhaiya/Tencent. Start at [INTERNAL_BRAI
 | Tests | 634 Internal Brain tests and 38 web end-to-end tests pass | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
 | Leak evaluation | 0 leaks in 5,958 requests (2,979 probes on 2 paths); 0 of 400 pairs differ | `databridge/evals/internal_brain/RESULTS.md` |
 | Original code share | 93% of code lines are unchanged Walnut | `python databridge/scripts/measure_original_share.py` |
-| Deck (13 slides, PDF and PPTX) | Done | `submission/07_deck/` |
+| Deck (23 slides, PDF and PPTX) | Done | `submission/07_deck/` |
 | Cover image (made with Miora; 380×216 and 1920×1080) | Done | `submission/06_cover/` |
 | Demo video, 6:28: camera intro by Ishaan, then the narrated demo | Done | `submission/05_video/` |
 | Lighthouse deploy kit | Written; no live instance | `deploy/lighthouse/` |
