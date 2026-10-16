@@ -19,7 +19,7 @@ Public repo: https://github.com/IshaanSirbhaiya/Tencent. Start at [INTERNAL_BRAI
 | Original code share | 93% of code lines are unchanged Walnut | `python databridge/scripts/measure_original_share.py` |
 | Deck (13 slides, PDF and PPTX) | Done | `submission/07_deck/` |
 | Cover image (made with Miora; 380×216 and 1920×1080) | Done | `submission/06_cover/` |
-| Demo video, 5:55, silent, with a narration cue sheet and subtitles | Done | `submission/05_video/` |
+| Demo video, 6:28: camera intro by Ishaan, then the narrated demo | Done | `submission/05_video/` |
 | Lighthouse deploy kit | Written; no live instance | `deploy/lighthouse/` |
 
 ## Waiting on

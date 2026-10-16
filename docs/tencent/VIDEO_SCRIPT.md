@@ -1,6 +1,6 @@
 # Demo video: script and shot list
 
-**Length:** about 5:55 (the limit is 8:00). **Format:** 1920×1080, dark theme.
+**Length:** about 6:28 (the limit is 8:00). **Format:** 1920×1080, dark theme.
 **How it's made:** the screen recording is produced automatically (one clip per scene, so a scene can be
 re-shot on its own). Ishaan records the voice-over on top. Read it like you're showing a friend something
 you built: relaxed, not salesy. Pauses are fine.
@@ -152,7 +152,7 @@ brain view, the provenance chain of one value, the ontology.
 > We attacked it on purpose: nearly six thousand adversarial requests, zero leaks; four hundred paired
 > answers, zero differences; and every scenario covered by automated tests.
 
-### 14 · How we built it, and thanks (5:39–5:55)
+### 14 · How we built it, and thanks (5:39–6:28)
 **On screen:** the closing card.
 
 > We used Tencent CodeBuddy to map the trust boundaries, build the WorkBuddy connector, write tests and

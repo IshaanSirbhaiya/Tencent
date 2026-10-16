@@ -210,7 +210,7 @@ assistant cannot be rolled out under MAS supervision at all.
 | AI Interaction | Plain-language questions get sentence-level citations; Maya audits in plain English; WorkBuddy's agent calls the Brain through MCP but cannot choose who it acts as |
 | Technical Execution | Four permission compilers, two gates, a sealed audit log; 634 backend and 38 browser tests passing; 0 leaks in 5,958 adversarial requests |
 | Feasibility | Connectors use the real APIs' shapes and permission rules; the existing engine is reused unchanged; a Lighthouse deploy kit; the leak harness re-runs on Aspire's own permissions |
-| Demo & Storytelling | A 5:55 video follows the people of a synthetic fintech through Aspire's five scenarios, with captions that work on mute |
+| Demo & Storytelling | A 6:28 video follows the people of a synthetic fintech through Aspire's five scenarios, with captions that work on mute |
 | Innovation & Creativity | "Restricted" is byte-identical to "doesn't exist", proven by comparing answers with and without the restricted documents (0 / 400 differences); ranking ignores what you can't see |
 | UX & Accessibility | Knowledge map, side-by-side compare, guided tour; axe checks at desktop and phone widths, keyboard-only flows, AA contrast |
 | Responsible AI & Ethics | Permission before generation, a grounding check after it, refusal without a model call, model and prompt version logged per answer, card and ID masking, a reason required to read any answer (`docs/tencent/RESPONSIBLE_AI.md`) |
@@ -248,7 +248,7 @@ so the text stays sharp.
 
 ## Demo video (5–8 min)
 
-`submission/05_video/walnut_internal_brain_demo.mp4` (5:55), with the voice-over script in
+`submission/05_video/walnut_internal_brain_demo.mp4` (6:28), with the voice-over script in
 `docs/tencent/VIDEO_SCRIPT.md`.
 
 ## Project link
