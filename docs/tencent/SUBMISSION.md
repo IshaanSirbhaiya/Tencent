@@ -168,7 +168,7 @@ quoted evidence.
 | "With vs without restricted documents" | **0 / 400** response differences | same file |
 | Prompt injection planted on all four platforms | **0** hard failures | same file |
 | Recall for what users *are* allowed to see | **100%** of allowed documents reach the answer step (both paths); cited recall 87.8–96.4% | same file |
-| Scenario, fintech and revocation tests | **63 / 63** (`test_scenarios_e2e.py`, `test_fintech_scenarios.py`, `test_revoke_concurrency.py`), within 634 passing | `databridge/apps/internal_brain/tests/` |
+| Scenario, fintech and revocation tests | **63 / 63** (`test_scenarios_e2e.py`, `test_fintech_scenarios.py`, `test_revoke_concurrency.py`), within 639 passing | `databridge/apps/internal_brain/tests/` |
 | Web app | **38** browser tests passing, including accessibility | `databridge/apps/internal_brain_web/tests/e2e/` |
 | Audit tampering | **6 of 6** attacks caught (edit, deletion, rollback, removed anchors, lost off-host head, key-holder rewrite); records newer than the last off-host publication are the stated window | `submission/04_evidence/tamper_demo_output.txt` |
 | Answer latency, local | mean **19–20 ms** per request in the in-process eval (deterministic and test-model paths; not network or Hy3) | `RESULTS.md` |
@@ -208,7 +208,7 @@ assistant cannot be rolled out under MAS supervision at all.
 | Impact & Relevance | Aspire's own question, "what can we offer this customer?", answered per market from approved policy; all five Aspire scenarios covered by tests; break-even at about 7 minutes a week per person |
 | Human-Centered Design | Built around four real roles (on-call engineer, account manager, compliance officer, contractor); works inside WorkBuddy so nobody needs another app; refusals never hint at hidden content |
 | AI Interaction | Plain-language questions get sentence-level citations; Maya audits in plain English; WorkBuddy's agent calls the Brain through MCP but cannot choose who it acts as |
-| Technical Execution | Four permission compilers, two gates, a sealed audit log; 634 backend and 38 browser tests passing; 0 leaks in 5,958 adversarial requests |
+| Technical Execution | Four permission compilers, two gates, a sealed audit log; 639 backend and 38 browser tests passing; 0 leaks in 5,958 adversarial requests |
 | Feasibility | Connectors use the real APIs' shapes and permission rules; the evidence engine is used by import, unmodified; a Lighthouse deploy kit; the leak harness re-runs on Aspire's own permissions |
 | Demo & Storytelling | A 6:28 video follows the people of a synthetic fintech through Aspire's five scenarios, with captions that work on mute |
 | Innovation & Creativity | "Restricted" is byte-identical to "doesn't exist", proven by comparing answers with and without the restricted documents (0 / 400 differences); ranking ignores what you can't see |

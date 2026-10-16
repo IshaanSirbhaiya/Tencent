@@ -14,7 +14,7 @@ Public repo: https://github.com/IshaanSirbhaiya/Tencent. Start at [INTERNAL_BRAI
 | Original Walnut screens on Company A | Running on the same data | `databridge/apps/frontend/` |
 | WorkBuddy connectors (ask as a person; compliance audit) | Built, shown in WorkBuddy | `docs/tencent/workbuddy/`, `submission/02_workbuddy/` |
 | CodeBuddy sessions (6) with saved transcripts | Done | `docs/tencent/evidence/`, `submission/01_codebuddy/` |
-| Tests | 634 Internal Brain tests and 38 web end-to-end tests pass | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
+| Tests | 639 Internal Brain tests and 38 web end-to-end tests pass | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
 | Leak evaluation | 0 leaks in 5,958 requests (2,979 probes on 2 paths); 0 of 400 pairs differ | `databridge/evals/internal_brain/RESULTS.md` |
 | Deck (23 slides, PDF and PPTX) | Done | `submission/07_deck/` |
 | Cover image (made with Miora; 380×216 and 1920×1080) | Done | `submission/06_cover/` |

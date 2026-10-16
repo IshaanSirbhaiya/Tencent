@@ -206,7 +206,7 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Allowed sources reaching the answer step | **100%** of 196 positive probes; the answer cites the expected source in 87.8% (quoted path) to 96.4% (model path) | `RESULTS.md` |
 | Map identical with and without restricted documents | test | `test_knowledge_map.py::test_map_is_identical_with_and_without_restricted_docs` |
 | Audit log edits, deletions, truncation, rollback, edited stored answers | detected | `test_audit_tamper.py`, `test_audit_verify_content.py` |
-| Automated tests, Internal Brain | **634** passing | `databridge/apps/internal_brain/tests/` |
+| Automated tests, Internal Brain | **639** passing | `databridge/apps/internal_brain/tests/` |
 | Web end-to-end tests (Playwright, including accessibility checks at desktop and phone width) | **38** | `databridge/apps/internal_brain_web/tests/e2e/` |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks

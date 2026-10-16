@@ -230,7 +230,7 @@ Plan-mode session, then corrected against the code). It marks TB1 to TB5; this t
   (`narrate.py` `_StripMarkdown`, `drop_addressed_to_ai_counted`; `pipeline.py:165-170`).
 - **Vendor SDKs** are reached only through Walnut's `databridge_harness` (`llm.py:1-9, 59-62`).
 
-## 7. What is reused from Walnut unchanged
+## 7. What the Internal Brain uses from the Walnut engine
 
 The Internal Brain imports `databridge_core` (`DecisionLedger`), `databridge_harness` (`Harness`,
 `LiteLLMBackend`, `hashing_embed`) and the grounding functions in

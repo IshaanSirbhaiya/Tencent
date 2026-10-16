@@ -202,7 +202,7 @@ the final run (`databridge/evals/internal_brain/RESULTS.md`, 976 injection-relev
 | `IB_DEMO_PASSCODE` | Environment | Constant-time compare (`app.py:97-99`) | Optional; unset means no passcode |
 | TokenHub key | `TOKENHUB_API_KEY`, or `OPENAI_API_KEY` + `OPENAI_API_BASE` | Read from env only (`llm.py:28-45`); model errors are logged by exception type, not message (`llm.py:80`) | — |
 | Real workspace ids (live track) | `.env` only (plan §5.3) | Planned pre-commit check | Live track not built |
-| Git history | — | A gitleaks pass over the full history is a required step before the repo is made public (plan §0 F3, §9.3) | **Not yet run** |
+| Git history | — | A pattern scan of the full public history (16 Oct) for API keys, cloud keys, GitHub and Slack tokens and private-key blocks: the only matches are planted fakes in the masking tests and `$VARIABLE` references in build logs; no real key | gitleaks itself was not run |
 | Logs | — | `LedgerUnavailable` messages are public text, never a key or an OS exception string (`audit/ledger.py:60-68`); ingest and ask failures log the exception class only (`ingest.py:86`, `app.py:137`) | — |
 
 ## 7. Security review
@@ -344,7 +344,7 @@ a test through the real app (`test_audit_routes_real_principal.py`).
 | O-7 | The map's check pool is shared, so a heavy map can make another person's map leave items out | **Accepted.** Fail-closed (never shows extra); the pool exists so answers are never starved. |
 | O-8 | Sentences removed as addressed-to-an-AI were recorded as 0; sign-ins were not in the ledger | **Fixed.** The exact count is recorded; demo sign-in writes `auth.login` before the session is issued (ledger down = no sign-in). |
 | O-9 | Breaking a stale revocation lock can race | **Accepted, low.** Needs a 30 s stale lock plus two simultaneous waiters; the worst case is one lost revocation write, and the next logout retries. |
-| O-10 | A Windows user name and a personal email in tracked files | **Fixed** in the current files; history is cleaned before the repository goes public. |
+| O-10 | A Windows user name and a personal email in tracked files | **Fixed** in the current files. Older commits can still show them; neither is a credential. |
 
 Accuracy and first-run findings (stale counts, Hy3 wording, the tamper "8/8" claim, setup steps, macOS
 install) were fixed in the documents themselves.

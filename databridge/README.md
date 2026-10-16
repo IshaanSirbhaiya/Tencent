@@ -37,7 +37,7 @@ py -3.13 -m venv .venv
 ## Run the tests
 
 ```powershell
-# Internal Brain (634 tests)
+# Internal Brain (639 tests)
 .venv\Scripts\python -m pytest apps\internal_brain\tests -q
 
 # Mock platforms
