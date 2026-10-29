@@ -225,3 +225,241 @@ export async function withSlotLocks<T>(slots: Exclude<Slot, 'a'>[], fn: () => Pr
 }
 
 export type SimAction = 'runbook-update' | 'revoke-channel' | 'restrict-page' | 'reset';
+
+// ---- analytics ----
+// Mission control, request journey, analytics (backend_v1.md shapes). The eval file is read from
+// /eval_summary.json (public/), never through the IB proxy.
+type RawRequestRow = {
+  req_id?: string;
+  sub?: string | null;
+  event_time?: string | null;
+  question?: string | null;
+  channel?: string | null;
+  synthetic_replay?: boolean;
+  event?: Record<string, unknown>;
+};
+const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+
+export const analyticsApi = {
+  /** GET /audit/stats?days= (compliance_officer). */
+  stats: (days: number, replay?: 'include' | 'exclude') =>
+    call<import('./types').AuditStatsV1>(`/audit/stats${qs({ days: String(days), replay })}`),
+  /** GET /audit/journey/{req} (compliance_officer). */
+  journey: (reqId: string) => call<import('./types').JourneyV1>(`/audit/journey/${encodeURIComponent(reqId)}`),
+  /** GET /ib/trace/{req}: the asker's receipt (own requests only; others and unknown: the same 404). */
+  receipt: (reqId: string) => call<import('./types').TraceReceipt>(`/ib/trace/${encodeURIComponent(reqId)}`),
+  /** GET /ib/status (any employee). */
+  status: () => call<import('./types').IbStatus>('/ib/status'),
+  /** GET /ib/history (own requests). */
+  history: () => call<{ items: import('./types').HistoryItemV1[] }>('/ib/history'),
+  /** GET /audit/events?kind=request.accepted (compliance): the most recent requests, one row each. */
+  recentRequests: async (limit = 100): Promise<import('./types').RequestRow[]> => {
+    const r = await call<{ events: RawRequestRow[] } | RawRequestRow[]>(`/audit/events${qs({ kind: 'request.accepted', limit: String(limit) })}`);
+    const rows = Array.isArray(r) ? r : r.events ?? [];
+    return rows
+      .filter((x) => typeof x.req_id === 'string' && x.req_id !== '')
+      .map((x) => {
+        const e = x.event ?? {};
+        return {
+          req_id: x.req_id as string,
+          sub: x.sub ?? str(e.sub),
+          event_time: x.event_time ?? str(e.event_time),
+          question: x.question ?? str(e.question),
+          channel: x.channel ?? str(e.channel),
+          synthetic_replay: !!x.synthetic_replay,
+        };
+      });
+  },
+  /** The evaluation summary shipped with the app (public/eval_summary.json). */
+  evalSummary: async (): Promise<import('./types').EvalSummary> => {
+    let res: Response;
+    try {
+      res = await fetch('/eval_summary.json', { cache: 'no-store' });
+    } catch {
+      throw new ApiError(0, 'network');
+    }
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    return (await res.json()) as import('./types').EvalSummary;
+  },
+};
+
+// ---- user ----
+// POST /ib/ask/stream (SSE, B12). Stage events arrive while the request runs; the answer arrives
+// only after grounding (D-08), with exactly the /ib/ask JSON. EventSource cannot POST, so the
+// stream is read with fetch + ReadableStream. Returns null when streaming is not available here
+// (404/405, or the reply is not text/event-stream): the caller then uses api.ask.
+export type AskStreamStage = 'accepted' | 'gate1' | 'gate2' | 'sealed' | 'composing' | 'grounded' | 'released';
+
+export async function askStream(
+  question: string,
+  opts: { onStage?: (name: AskStreamStage) => void; slot?: Slot; signal?: AbortSignal } = {},
+): Promise<AskResponse | null> {
+  const headers: Record<string, string> = { 'content-type': 'application/json', accept: 'text/event-stream' };
+  if (opts.slot && opts.slot !== 'a') headers['x-ib-slot'] = opts.slot;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/ib/ask/stream`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers,
+      body: JSON.stringify({ question }),
+      signal: opts.signal ?? deadline(),
+    });
+  } catch {
+    throw new ApiError(0, 'network');
+  }
+  if (res.status === 404 || res.status === 405) return null;
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const j = await res.json();
+      detail = typeof j?.detail === 'string' ? j.detail : typeof j?.error === 'string' ? j.error : '';
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, detail || res.statusText);
+  }
+  if (!(res.headers.get('content-type') ?? '').includes('text/event-stream') || !res.body) return null;
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  const out: { answer: AskResponse | null } = { answer: null };
+  const handle = (block: string): 'done' | void => {
+    let event = 'message';
+    const data: string[] = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith(':')) continue;
+      const i = line.indexOf(':');
+      const field = i === -1 ? line : line.slice(0, i);
+      const value = i === -1 ? '' : line.slice(i + 1).replace(/^ /, '');
+      if (field === 'event') event = value;
+      else if (field === 'data') data.push(value);
+    }
+    let payload: unknown = null;
+    try {
+      payload = data.length ? JSON.parse(data.join('\n')) : null;
+    } catch {
+      payload = null;
+    }
+    if (event === 'stage') {
+      const name = (payload as { name?: string } | null)?.name;
+      if (name) opts.onStage?.(name as AskStreamStage);
+    } else if (event === 'answer') {
+      if (!payload || typeof payload !== 'object') throw new ApiError(0, 'network');
+      out.answer = payload as AskResponse;
+    } else if (event === 'error') {
+      throw new ApiError(503, 'temporarily unavailable');
+    } else if (event === 'done') {
+      return 'done';
+    }
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (value) buf += decoder.decode(value, { stream: true });
+      let cut: RegExpExecArray | null;
+      while ((cut = /\r?\n\r?\n/.exec(buf))) {
+        const block = buf.slice(0, cut.index);
+        buf = buf.slice(cut.index + cut[0].length);
+        if (block.trim() && handle(block) === 'done') return finish(out.answer);
+      }
+      if (done) break;
+    }
+    if (buf.trim()) handle(buf);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(0, 'network');
+  } finally {
+    reader.cancel().catch(() => undefined);
+  }
+  return finish(out.answer);
+}
+
+function finish(a: AskResponse | null): AskResponse {
+  if (!a) throw new ApiError(0, 'network');
+  return a;
+}
+
+// ---- audit ----
+import type { AuditAskV2, AuditRecordRef, AuditRow, TamperDemoResult } from './types';
+
+// The audit console keeps each request's sealed records (seq + hash), which `groupByRequest`
+// drops, so it has its own grouping. Rows already in request shape pass through unchanged.
+type AuditLedgerRow = LedgerRow & { seq?: number; hash?: string };
+
+export function groupAuditRows(rows: AuditLedgerRow[]): AuditRow[] {
+  if (!rows.length || !rows.some((r) => typeof r.kind === 'string' && r.event)) return rows as unknown as AuditRow[];
+  const byReq = new Map<string, Record<string, unknown> & { records: AuditRecordRef[] }>();
+  const order: string[] = [];
+  for (const r of rows) {
+    const id = r.req_id;
+    if (!id) continue;
+    if (!byReq.has(id)) {
+      byReq.set(id, { req_id: id, sub: r.sub, event_time: r.event_time, synthetic_replay: r.synthetic_replay, records: [] });
+      order.push(id);
+    }
+    const acc = byReq.get(id)!;
+    const e = (r.event ?? {}) as Record<string, unknown>;
+    if (typeof r.seq === 'number' && typeof r.hash === 'string' && typeof r.kind === 'string') acc.records.push({ seq: r.seq, kind: r.kind, hash: r.hash });
+    if (r.kind === 'request.accepted') Object.assign(acc, { question: e.question ?? r.question, channel: e.channel ?? r.channel, event_time: e.event_time ?? acc.event_time });
+    else if (r.kind === 'retrieval.decided') Object.assign(acc, { considered: e.considered, considered_meta: e.considered_meta, gate2: e.gate2, released: e.released });
+    else if (r.kind === 'answer.released') Object.assign(acc, { model: e.model, refused: e.refused, latency_ms: e.latency_ms });
+    else if (r.kind === 'request.failed') Object.assign(acc, { refused: true });
+  }
+  return order.map((id) => {
+    const acc = byReq.get(id)!;
+    acc.records.sort((a, b) => a.seq - b.seq);
+    return acc as unknown as AuditRow;
+  });
+}
+
+export const auditApi = {
+  events: async (f: AuditFilter): Promise<AuditRow[]> => {
+    const r = await call<{ events: AuditLedgerRow[] } | AuditLedgerRow[]>(`/audit/events${qs(f)}`);
+    return groupAuditRows(Array.isArray(r) ? r : r.events ?? []);
+  },
+  /** POST /audit/ask: the interpreted filter, its rows, and which parser wrote the filter. */
+  ask: async (question: string): Promise<AuditAskV2> => {
+    const r = await call<Omit<AuditAskV2, 'events'> & { events?: AuditLedgerRow[] }>('/audit/ask', { method: 'POST', body: { question } });
+    return { ...r, filter: r.filter ?? {}, events: groupAuditRows(r.events ?? []) };
+  },
+  /** POST /audit/tamper-demo (B11): the tamper scenarios on a sandbox copy. Never edits the real chain. */
+  tamperDemo: () => call<TamperDemoResult>('/audit/tamper-demo', { method: 'POST', body: {} }),
+};
+
+// ---- graph ----
+/** POST /ib/graph/openable response: which of the posted ids the CALLER can open now (request order). */
+export interface OpenableResult {
+  sub: string;
+  as_of: string;
+  openable: string[];
+}
+
+/**
+ * The knowledge-graph calls bound to a session slot. Slot `a` is the main session; `b`/`c` are the
+ * separately signed compare slots (the proxy allows ib/map, ib/graph and POST ib/graph/openable there,
+ * not ib/doc). Identity always comes from the slot's own signed cookie: no call names a person.
+ */
+export function graphApi(slot: Slot = 'a') {
+  const s = slot === 'a' ? undefined : slot;
+  return {
+    login: (persona: string) => demoLogin(persona, storedPasscode(), s),
+    whoami: () => call<WhoAmI>('/auth/whoami', { slot: s }),
+    graph: (query: GraphQuery = {}) =>
+      call<KnowledgeGraph>(`/ib/graph${qs({ focus: query.focus, q: query.q, limit: query.limit ? String(query.limit) : undefined })}`, { slot: s }),
+    map: () => (slot === 'a' ? api.map() : call<KnowledgeMap>('/ib/map', { slot: s })),
+    openable: (docIds: string[]) => call<OpenableResult>('/ib/graph/openable', { method: 'POST', body: { doc_ids: docIds }, slot: s }),
+  };
+}
+
+// ---- presenter ----
+/** Sign one compare slot out (Presenter reset). The proxy renames the cleared cookie for the slot. */
+export function slotLogout(slot: Exclude<Slot, 'a'>) {
+  return call<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {}, slot });
+}
+/** GET /health: is the Internal Brain reachable at all (the Presenter status dot). */
+export function ibHealth() {
+  return call<{ ok: boolean }>('/health');
+}

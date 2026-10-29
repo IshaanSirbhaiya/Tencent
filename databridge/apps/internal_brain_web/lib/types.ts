@@ -54,6 +54,8 @@ export interface HistoryItem {
   req_id: string;
   question: string;
   event_time: string;
+  channel?: string | null;
+  synthetic_replay?: boolean;
 }
 
 export interface Gate2Decision {
@@ -373,4 +375,230 @@ export interface DocView {
   lineage: { connector: string; last_sync_at: string | null; content_checked_at: string; authz_checked_at: string; live_read: boolean };
   scope_note: string;
   as_of: string;
+}
+
+// ---- analytics ----
+// backend_v1.md shapes for Mission control, the request journey, analytics and the receipt. Every
+// field the backend may still be changing is optional: pages render what is present and say
+// "not reported" for the rest.
+
+/** Stages timed in `answer.released.stage_ms` (stats.py STAGES; v1 adds `release`). */
+export type StageV1 = 'accept' | 'gate1' | 'gate2' | 'seal' | 'compose' | 'release';
+export const STAGES_V1: StageV1[] = ['accept', 'gate1', 'gate2', 'seal', 'compose', 'release'];
+
+export type PctMs = { p50: number | null; p95: number | null; count: number };
+
+export interface RequestsFlow {
+  asked: number;
+  answered: number;
+  refused: number;
+  failed: number;
+}
+
+export interface DocumentsFlow {
+  considered: number;
+  gate2_checked: number;
+  gate2_allowed: number;
+  gate2_denied: number;
+  released: number;
+  cited: number;
+}
+
+/** GET /audit/stats (v1): two flows with different units; `funnel` is gone. */
+export interface AuditStatsV1 {
+  window: { since: string; until: string; days: number };
+  ledger: { events: number; first_seq: number | null; last_seq: number | null; head: string | null };
+  totals: Partial<AuditStats['totals']> & {
+    requests: number;
+    answered: number;
+    refused: number;
+    failed: number;
+    answer_rate: number | null;
+    graph_views?: number;
+    doc_views?: number;
+    trace_views?: number;
+  };
+  requests_flow?: RequestsFlow;
+  documents_flow?: DocumentsFlow;
+  /** Legacy (pre-v1) shape, read only when the flows are absent. */
+  funnel?: AuditStats['funnel'];
+  gate2?: { verdicts: Record<string, number>; reasons: Record<string, number> };
+  latency_ms?: { count: number; p50: number | null; p95: number | null; max: number | null; mean: number | null };
+  stages_ms?: Partial<Record<StageV1, PctMs>>;
+  models?: Record<string, number>;
+  channels?: Record<string, number>;
+  platforms?: Partial<Record<Platform | 'other', { considered?: number; released?: number; gate2_checked?: number }>>;
+  people?: { sub: string; asked?: number; answered?: number; refused?: number }[];
+  days?: { day: string; asked?: number; answered?: number; refused?: number; failed?: number }[];
+  kinds?: Record<string, number>;
+}
+
+/** A sealed record in the compliance journey (global seq). */
+export interface JourneyRecord {
+  seq: number;
+  kind: string;
+  hash: string;
+  event_time?: string | null;
+  recorded_at?: string | null;
+}
+
+/** GET /audit/journey/{req} (compliance). Same shape as `Journey`, with the v1 `release` stage. */
+export interface JourneyV1 extends Omit<Journey, 'stage_ms' | 'events'> {
+  stage_ms: Partial<Record<StageV1, number>>;
+  events: JourneyRecord[];
+}
+
+/** A cited document the asker can STILL open (re-authorised live by /ib/trace). */
+export interface ReceiptCitation {
+  doc_id: string;
+  platform?: string | null;
+  kind?: string | null;
+  container?: string | null;
+  container_name?: string | null;
+  title?: string | null;
+  version?: string | null;
+  updated_at?: string | null;
+  deep_link?: string | null;
+  cited_version?: string | null;
+}
+
+/** GET /ib/trace/{req} (v1): the asker's public-safe receipt. No seq, no ms per stage, no denials. */
+export interface TraceReceipt {
+  req_id: string;
+  question: string | null;
+  channel: string | null;
+  event_time: string | null;
+  synthetic_replay?: boolean;
+  status: RequestStatus;
+  policy_version: string | null;
+  model: ModelInfo | null;
+  prompt_version: string | null;
+  latency_ms_rounded: number | null;
+  stages: { name: string; status: string }[];
+  dropped_sentences_count: number | null;
+  citations: ReceiptCitation[];
+  answer_sha256: string | null;
+  records: { ordinal: number; kind: string; hash: string }[];
+}
+
+/** GET /ib/status: model chain and ledger health (no secrets). */
+export interface IbStatus {
+  models: {
+    provider: string | null;
+    chain: string[];
+    active: boolean;
+    active_chain: string[];
+    fallback: { provider: string; model: string };
+  };
+  key_configured: boolean;
+  force_offline: boolean;
+  ledger: { ok: boolean | null };
+}
+
+/** GET /ib/history (v1 adds channel + synthetic_replay). */
+export interface HistoryItemV1 extends HistoryItem {
+  channel?: string | null;
+  synthetic_replay?: boolean;
+}
+
+/** One `request.accepted` row from GET /audit/events?kind=request.accepted (compliance). */
+export interface RequestRow {
+  req_id: string;
+  sub: string | null;
+  event_time: string | null;
+  question: string | null;
+  channel: string | null;
+  synthetic_replay: boolean;
+}
+
+/** /eval_summary.json written by scripts/eval_summary.py (a static file, not the API). */
+export interface EvalSummary {
+  generated_at?: string;
+  source?: string;
+  git_sha?: string;
+  stale?: boolean;
+  note?: string;
+  run_date?: string;
+  full_run?: boolean;
+  limit?: number;
+  leaks?: number;
+  leak_requests?: number;
+  requests?: number;
+  requests_per_mode?: number;
+  upper95?: number;
+  payload_requests?: number;
+  payload_upper95?: number;
+  violations?: number;
+  differential?: { pairs?: number; mismatches?: number; control_mismatches?: number };
+  injection?: { requests?: number; hard_failures?: number };
+  recall?: { released?: Record<string, number>; released_all_modes?: { min?: number; max?: number } };
+  cited_recall?: { per_mode?: Record<string, number>; range?: { min?: number; max?: number } };
+  quality_findings?: number;
+  canaries_valid?: boolean;
+  runtime_s?: number;
+  per_mode?: Record<string, { requests?: number; with_leak?: number; upper95?: number; with_model_payload?: number; refused?: number }>;
+  tests?: { backend?: number; e2e?: number };
+  smoke?: { run_date?: string; leaks?: number; requests?: number } | null;
+}
+
+// ---- audit ----
+/** One sealed ledger record behind an audit row (from /audit/events: seq + hash per ledger event). */
+export interface AuditRecordRef {
+  seq: number;
+  kind: string;
+  hash: string;
+}
+
+/** An audit row (one request) that keeps its sealed records, so the console can show the record hash. */
+export interface AuditRow extends AuditEvent {
+  records?: AuditRecordRef[];
+}
+
+/**
+ * POST /audit/tamper-demo (compliance; backend_v1.md v2). Runs the tamper scenarios on a temporary
+ * COPY of the live ledger and returns one verify report per scenario. The real chain is only read (D-19).
+ */
+export interface TamperScenario {
+  id: string;
+  /** Short name, e.g. "Edit one old record". */
+  title: string;
+  /** What was done to the copy, in plain words. */
+  what_we_did?: string;
+  /** "flagged" or "not flagged". */
+  expected: string;
+  expected_detected: boolean;
+  /** Verification flagged the copy (`verify_ok` false). */
+  detected: boolean;
+  /** The outcome matched the expectation. */
+  ok: boolean;
+  verify_ok?: boolean;
+  internal_ok?: boolean | null;
+  external_head_match?: boolean | null;
+  records?: number | null;
+  problems: string[];
+  /** Only when the chain check names a record: the first record that fails. */
+  first_bad_seq?: number | null;
+  /** The 20 s budget ran out before this scenario started. */
+  skipped?: boolean;
+}
+
+export interface TamperDemoResult {
+  /** false when every byte the live files held at copy time is unchanged after the run. */
+  real_log_modified: boolean;
+  /** First 12 hex characters of the live head that was copied. */
+  head_before?: string | null;
+  records_copied?: number | null;
+  external_head_copied?: boolean | null;
+  elapsed_ms?: number | null;
+  scenarios: TamperScenario[];
+}
+
+/** POST /audit/ask with the v2 parser fields. */
+export interface AuditAskV2 {
+  filter: Record<string, unknown>;
+  events: AuditRow[];
+  parser?: 'llm' | 'deterministic' | string;
+  parser_model?: string | null;
+  parser_fallback?: boolean | null;
+  notes?: string | string[] | null;
 }

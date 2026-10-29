@@ -1,4 +1,6 @@
 'use client';
+
+import * as React from 'react';
 // Dialog (centred) and Sheet (right or left side panel) on Radix Dialog: focus is trapped inside,
 // Esc closes, focus returns to the trigger, and the page behind is inert. Title is required.
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -13,9 +15,9 @@ export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
 export const SheetClose = DialogPrimitive.Close;
 
-function Scrim() {
-  return <DialogPrimitive.Overlay className="ds-scrim fixed inset-0 z-40 bg-black/50" />;
-}
+const Scrim = React.forwardRef<HTMLDivElement, Record<string, never>>(function Scrim(_props, ref) {
+  return <DialogPrimitive.Overlay ref={ref} className="ds-scrim fixed inset-0 z-40 bg-black/50" />;
+});
 
 function CloseX({ label }: { label: string }) {
   return (
