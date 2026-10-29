@@ -155,7 +155,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 87.8% (quoted) to 96.4% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
 | Backend tests (Internal Brain) | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
-| Web end-to-end tests (Playwright, axe checks) | 38 of 38 pre-finals tests passed earlier; the suite is now 23 spec files; full e2e run: see docs/finals/TEST_REPORT.md |
+| Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits
