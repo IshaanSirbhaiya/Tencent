@@ -125,7 +125,7 @@ per view; do not poll.
 ## POST /ib/graph/openable: which of these can the CALLER open now?
 
 For View-as: Jordan's graph is drawn from Jordan's session; the compare slot (Ken's own session)
-posts Jordan's doc ids here and greys out the ones not returned. Never draw a node that is not in
+posts Jordan's doc ids here and marks the ones it returns as shared (nothing is greyed out; D-17). Never draw a node that is not in
 Jordan's own graph; never fetch titles under Ken's session for this.
 
 Request: `{"doc_ids": ["slack:...", "jira:PAY-1"]}`, at most 300 ids, each at most 300 chars, no other
