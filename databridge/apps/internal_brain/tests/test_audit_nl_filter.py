@@ -143,3 +143,60 @@ def test_model_receives_only_question_and_clock():
 
     parse_audit_question("hmm?", NOW, llm=llm)
     assert seen == [(("hmm?", NOW), {})]
+
+
+# --- titles known to the audit projection (QA_LIVE §4.2: "Who retrieved the Q3 breach report?") ---
+def _world_titles() -> list[tuple[str, str]]:
+    """Every document title of the generated world, as the projection would record them."""
+    from e2e_world import load_world
+    w = load_world()
+    return ([(f"confluence:{p['id']}", p["title"]) for p in w["confluence"]["pages"]]
+            + [(f"drive:{f['id']}", f["name"]) for f in w["drive"]["files"]]
+            + [(f"jira:{i['key']}", i["summary"]) for i in w["jira"]["issues"]])
+
+
+def _breach_docs() -> set[str]:
+    from e2e_world import load_world
+    return {f["doc"] for f in load_world()["facts"] if f["id"].startswith("S3-breach-")}
+
+
+def test_who_retrieved_a_title_resolves_to_its_doc_id():
+    titles = _world_titles()
+    breach = _breach_docs()
+    r = parse_audit_question("Who retrieved the Q3 breach report?", NOW, titles=titles)
+    assert r.source == "deterministic" and "doc" in r.recognised
+    assert r.filter.doc in breach and r.filter.user is None
+    # more than one title names "Q3 breach report": the top match is used, the rest are named
+    others = breach - {r.filter.doc}
+    assert others and any(all(o in n for o in others) for n in r.notes), r.notes
+    assert any(r.filter.doc in n for n in r.notes)
+
+
+@pytest.mark.parametrize("verb", ["accessed", "opened", "saw", "viewed", "retrieved", "has seen"])
+def test_who_verb_title_phrases(verb):
+    titles = _world_titles()
+    f = parse_audit_question(f"who {verb} the Q3 breach report last week", NOW, titles=titles).filter
+    assert f.doc in _breach_docs() and f.until - f.since == dt.timedelta(weeks=1)
+
+
+def test_title_resolution_is_deterministic_and_prefers_the_exact_title():
+    from databridge_ib.audit.nl_filter import resolve_title
+    cat = [("x:2", "Payments runbook appendix and notes"), ("x:1", "Payments runbook")]
+    assert resolve_title("the payments runbooks", cat)[:2] == ("x:1", "Payments runbook")
+    assert resolve_title("payments runbook", list(reversed(cat))) == resolve_title(
+        "payments runbook", cat)
+
+
+def test_unknown_title_is_not_dropped_for_a_broader_search():
+    # a nonsense title resolves to nothing: no title's doc id is substituted, a note says so, and
+    # the named phrase stays the filter (matched as an exact id or title: nothing broader is run)
+    r = parse_audit_question("Who retrieved the zebra quantum flamingo memo?", NOW,
+                             titles=_world_titles())
+    assert r.filter.doc == "zebra quantum flamingo memo"
+    assert not any(r.filter.doc == d for d, _ in _world_titles())
+    assert any("no document title" in n for n in r.notes)
+
+
+def test_without_titles_the_phrase_is_kept_as_before():
+    f = parse_audit_question("Who retrieved the Q3 breach report?", NOW).filter
+    assert f.doc == "Q3 breach report"

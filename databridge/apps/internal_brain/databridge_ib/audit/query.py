@@ -77,13 +77,13 @@ class AuditFilter(BaseModel):
         now = _aware(now)
         since, until = self.since, self.until
         if since is None and until is None:
-            since, until, how = now - MAX_RANGE, now, "no dates given: the last 365 days"
+            since, until, how = now - MAX_RANGE, now, "no dates given, so the last 365 days"
         elif since is None:
-            since, how = until - MAX_RANGE, "until only: the 365 days before until"
+            since, how = until - MAX_RANGE, "only an end date given, so the 365 days before it"
         elif until is None:
-            until, how = now, "since only: from since to now"
+            until, how = now, "only a start date given, so from then until now"
         else:
-            how = "as given"
+            how = "the dates as given"
         f = AuditFilter.model_validate({**self.model_dump(), "since": since, "until": until})
         return f, how
 
@@ -337,6 +337,15 @@ class AuditProjection:
             return out
 
     # --- queries ----------------------------------------------------------------------------------
+    def known_titles(self) -> list[tuple[str, str]]:
+        """``(doc_id, title)`` of every document the ledger's ``retrieval.decided`` events named
+        (``considered_meta``): titles the compliance officer already sees in a request's journey.
+        The plain-English audit search resolves "who retrieved <title phrase>" against these."""
+        with self._lock:
+            rows = self._db.execute("SELECT doc_id, title FROM docs WHERE title IS NOT NULL AND "
+                                    "title != '' ORDER BY doc_id").fetchall()
+        return [(str(r["doc_id"]), str(r["title"])) for r in rows]
+
     @staticmethod
     def _doc_match(alias: str = "d") -> str:
         return (f"({alias}.doc_id = :doc OR substr({alias}.doc_id, -length(:doc) - 1) = ':' || :doc "

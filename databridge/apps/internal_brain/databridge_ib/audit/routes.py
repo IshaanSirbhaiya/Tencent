@@ -182,8 +182,16 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         question = body.question.strip()
         if not question:
             _refuse(sub, "ask", "rejected", 422, "a question is required", {"question": ""})
+        # catch up first, so a document named by its title resolves against every title the
+        # ledger has recorded so far (considered_meta, which the officer already sees)
+        _sync()
         try:
-            parsed = parse_audit_question(question, now(), llm=llm, llm_fallback=llm_fallback)
+            titles = projection.known_titles()
+        except Exception:                                            # noqa: BLE001
+            titles = None                                            # rules without titles
+        try:
+            parsed = parse_audit_question(question, now(), llm=llm, llm_fallback=llm_fallback,
+                                          titles=titles)
         except NlFilterError as exc:
             _refuse(sub, "ask", "rejected", 422, exc.message,
                     {"question": question, "unparsed": exc.unparsed},
@@ -192,7 +200,6 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
             msg = "the question could not be parsed into a filter"
             _refuse(sub, "ask", "rejected", 422, msg, {"question": question},
                     detail={"error": msg, "unparsed": {"question": question[:300]}})
-        _sync()
         try:
             rows = projection.search(parsed.filter)
         except Exception:                                            # noqa: BLE001
@@ -204,8 +211,11 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
             model_info["parser_fallback"] = True
         _ledger_query(sub, {"op": "ask", "question": question, "parser": parsed.source,
                             **model_info, **dumped}, len(rows))
-        return {"filter": dumped, "window": _window(dumped, how), "parser": parsed.source,
-                **model_info, "notes": parsed.notes, "events": rows}
+        # the echoed filter is what the officer asked for (the web shows it as chips); the row
+        # cap is a paging detail, returned on its own
+        shown = {k: v for k, v in dumped.items() if k != "limit"}
+        return {"filter": shown, "limit": dumped.get("limit"), "window": _window(dumped, how),
+                "parser": parsed.source, **model_info, "notes": parsed.notes, "events": rows}
 
     @router.post("/reveal")
     def audit_reveal(body: RevealBody, principal=dep) -> Any:

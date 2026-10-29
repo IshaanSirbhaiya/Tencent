@@ -283,3 +283,40 @@ def test_verify_route_fails_closed_on_sink_error(template, tmp_path):
     body = TestClient(app).get("/audit/verify", headers=CO).json()
     assert body["ok"] is False and body["external_head_match"] is False and body["ledgered"]
     store.close()
+
+
+# --- QA_LIVE §4.2 / §4.5: titles resolve offline; the echoed filter carries no paging cap ----------
+def test_ask_resolves_a_document_title_known_to_the_projection(env, monkeypatch):
+    import test_audit_support as sup
+    from test_audit_support import Spec, write_request
+    from e2e_world import load_world
+    w = load_world()
+    breach = {f["doc"] for f in w["facts"] if f["id"].startswith("S3-breach-")}
+    titles = {**{f"confluence:{p['id']}": p["title"] for p in w["confluence"]["pages"]},
+              **{f"drive:{f['id']}": f["name"] for f in w["drive"]["files"]}}
+    client, ledger, store, *_ = env
+    for d in sorted(breach):
+        platform, rest = d.split(":", 1)
+        monkeypatch.setitem(sup.DOCS, d, (platform, "sec", "Security", titles[d]))
+    sp = Spec("r-breach-1", "priya.sre", 2, tuple(sorted(breach)))
+    write_request(ledger, store, sp)
+
+    r = client.post("/audit/ask", json={"question": "Who retrieved the Q3 breach report?"},
+                    headers=CO)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["parser"] == "deterministic" and body["filter"]["doc"] in breach
+    assert {e["req_id"] for e in body["events"]} == {sp.req_id}
+    assert any("matched" in n for n in body["notes"])
+    assert "limit" not in body["filter"] and body["limit"] == 100       # no raw "limit" chip
+
+    r = client.post("/audit/ask", json={"question": "Who retrieved the zebra quantum memo?"},
+                    headers=CO)
+    assert r.status_code == 200 and r.json()["events"] == []            # nothing broader
+    assert any("no document title" in n for n in r.json()["notes"])
+
+
+def test_events_window_note_is_plain_english(env):
+    client, *_ = env
+    applied = client.get("/audit/events", headers=CO).json()["window"]["applied"]
+    assert applied == "no dates given, so the last 365 days"

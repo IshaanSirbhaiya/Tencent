@@ -49,7 +49,7 @@ class Ingestor:
         tmp.replace(self.cursor_path)
 
     # -- full / incremental sync --------------------------------------------------------------
-    def sync(self, platform: str, *, full: bool = False) -> dict:
+    def sync(self, platform: str, *, full: bool = False, reason: Optional[str] = None) -> dict:
         """Incremental from the stored cursor, or ``full`` (cursor None): a full reconciliation that
         also repairs drift between webhook-applied state and the cursor's snapshot."""
         conn = self.connectors[platform]
@@ -74,18 +74,37 @@ class Ingestor:
                       docs=sum(1 for d in self.index.doc_ids() if d.startswith(platform + ":")))
             summary = {"platform": platform, "upserted": len(batch.docs),
                        "deleted": len(batch.deleted), "acl_changed": len(batch.acl_changed)}
+            if full:
+                summary["full"] = True
+            if reason:
+                summary["reason"] = reason
         self._ledger_event("ingest.sync", platform, summary)
         return summary
 
-    def sync_all(self, *, full: bool = False) -> list[dict]:
+    def sync_all(self, *, full: bool = False, reason: Optional[str] = None) -> list[dict]:
         out = []
         for p in self.connectors:
             try:
-                out.append(self.sync(p, full=full))
+                out.append(self.sync(p, full=full, reason=reason))
             except Exception as exc:                                # noqa: BLE001
                 self.status[p]["state"] = f"error: {type(exc).__name__}"
                 log.warning("sync %s failed: %s", p, type(exc).__name__)
         return out
+
+    def reconcile(self, reason: str) -> dict:
+        """A FULL reconciliation of every connector, now: re-read every document, its ACL and the
+        container memberships behind it from the source, re-index what changed and delete what
+        is gone; then invalidate the directory's cached readable sets. For a source that changed
+        WITHOUT telling us (the simulator's world reset reloads silently, so the incremental
+        cursor still holds the pre-reset state and would see no change). Each platform's sync is
+        ledgered as usual (``ingest.sync``, with ``full`` and ``reason``)."""
+        out = self.sync_all(full=True, reason=reason)
+        done = {r["platform"] for r in out}
+        failed = sorted(p for p in self.connectors if p not in done)
+        if self.directory is not None:
+            with self._lock:
+                self.directory.epoch += 1
+        return {"reason": reason, "platforms": out, "failed": failed}
 
     # -- events -------------------------------------------------------------------------------
     def apply_event(self, ev: ChangeEvent) -> None:
@@ -122,7 +141,7 @@ class Ingestor:
                                                     "container": ev.container, "user": ev.user,
                                                     "delivery_id": ev.delivery_id})
 
-    def _ledger_event(self, kind: str, platform: str, detail: dict) -> None:
+    def _ledger_event(self, kind: str, platform: Optional[str], detail: dict) -> None:
         if self.ledger is None:
             return
         from .models import SourceChangeEvent

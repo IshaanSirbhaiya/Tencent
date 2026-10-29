@@ -2,8 +2,14 @@
 actions to the mock platforms so the S2/S4 demo moments can be triggered from the UI.
 
 The actions are a closed list: the simulator cannot be used to issue arbitrary admin calls, and it
-never touches the IB index directly — changes reach the Internal Brain only the way real changes
-do (the platform's signed webhook, or the poller).
+never writes the IB index directly — changes reach the Internal Brain only the way real changes
+do (the platform's signed webhook, or a sync that re-reads the source).
+
+Reset is the one action whose platform change sends no webhook (the mock reloads its world
+silently), and the incremental poll compares the platform with its own cursor, which still holds
+the pre-reset state, so it would never notice (a revoked member stayed revoked). ``/sim/reset``
+therefore runs a FULL reconciliation (``Ingestor.reconcile``) right after the platform reset: every
+document, ACL and membership is re-read from the source and the index is repaired to match.
 """
 from __future__ import annotations
 
@@ -24,7 +30,8 @@ def _manifest(world_path: Path) -> dict:
 
 
 def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
-                    client_factory: Callable[[], httpx.Client] | None = None) -> APIRouter:
+                    client_factory: Callable[[], httpx.Client] | None = None,
+                    ingestor=None) -> APIRouter:
     router = APIRouter(prefix="/sim")
     admin = require_role("admin_it")
 
@@ -65,6 +72,15 @@ def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
 
     @router.post("/reset")
     def reset(_u=Depends(admin)):
-        return _call("/admin/reset", {})
+        out = _call("/admin/reset", {})
+        if ingestor is not None:
+            rec = ingestor.reconcile("sim.reset")
+            out["reconciled"] = [r["platform"] for r in rec["platforms"]]
+            if rec["failed"]:
+                # the platforms are reset but the index could not be repaired for these: say so
+                # (the poller's next full reconciliation retries them)
+                out["ok"] = False
+                out["reconcile_failed"] = rec["failed"]
+        return out
 
     return router

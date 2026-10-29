@@ -31,7 +31,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 from pydantic import ValidationError
 
@@ -72,8 +72,9 @@ _CONTAINER_PATTERNS = [
                re.I),
     re.compile(r"(?:^|\s)(?P<c>#[a-z0-9][a-z0-9._-]*)", re.I),
 ]
-_WHO_ACCESSED = re.compile(r"\bwho\s+(?:has\s+|had\s+)?(?:accessed|viewed|saw|seen|read|opened|"
-                           r"asked\s+about|got)\s+(?P<d>.+)$", re.I)
+_WHO_ACCESSED = re.compile(r"\bwho\s+(?:has\s+|had\s+|was\s+)?(?:accessed|viewed|saw|seen|read|"
+                           r"opened|retrieved|received|pulled|shown|looked\s+at|asked\s+about|got)"
+                           r"\s+(?P<d>.+)$", re.I)
 _RELATED = re.compile(rf"\b(?:related\s+to|about|regarding|concerning)\s+(?:the\s+)?{_Q}"
                       rf"(?P<c>[A-Za-z0-9][A-Za-z0-9._#-]*){_Q}", re.I)
 _TIME_TAIL = re.compile(r"\s+(?:in|over|during|within)\s+the\s+(?:last|past).*$|\s+(?:last|this|"
@@ -91,6 +92,15 @@ _KINDS = [
     (re.compile(r"\bwhat\s+(?:did|has|have)\s+\S+\s+ask", re.I), "request.accepted"),
     (re.compile(r"\bquestions?\s+(?:asked\s+)?(?:by|from|of)\b", re.I), "request.accepted"),
 ]
+#: words that carry no meaning when matching a phrase against document titles
+_TITLE_STOP = {"the", "a", "an", "of", "for", "to", "in", "on", "at", "by", "and", "or", "with",
+               "from", "about", "our", "my", "its", "this", "that", "these", "those"}
+#: a title matches when at least this share of the phrase's words appear in it
+TITLE_MATCH_THRESHOLD = 0.6
+
+#: ``(doc_id, title)`` pairs the audit projection knows (``AuditProjection.known_titles``)
+TitleCatalogue = Iterable[tuple[str, Optional[str]]]
+
 _UNITS = {"hour": dt.timedelta(hours=1), "day": dt.timedelta(days=1), "week": dt.timedelta(weeks=1),
           "month": dt.timedelta(days=30), "year": dt.timedelta(days=365)}
 
@@ -200,7 +210,56 @@ def _cap(since: Optional[dt.datetime], until: Optional[dt.datetime], now: dt.dat
     return since, until
 
 
-def parse_deterministic(question: str, now: dt.datetime, *, limit: int = 100) -> NlParse:
+def _title_tokens(s: str) -> set[str]:
+    out = set()
+    for t in re.findall(r"[a-z0-9]+", str(s or "").lower()):
+        if t in _TITLE_STOP:
+            continue
+        if len(t) > 3 and t.endswith("s") and not t.endswith("ss"):
+            t = t[:-1]                                   # "reports" == "report"
+        out.add(t)
+    return out
+
+
+def resolve_title(phrase: str, titles: TitleCatalogue) -> tuple[Optional[str], Optional[str],
+                                                                list[str]]:
+    """The doc id whose title best matches ``phrase`` by word overlap, its title, and the ids of
+    equally good alternatives. ``(None, None, [])`` when no title reaches the threshold.
+
+    Score: the share of the phrase's words found in the title (coverage, must reach
+    ``TITLE_MATCH_THRESHOLD``), then the share of the title's words the phrase names (precision),
+    so an exact title beats a longer one that merely contains it. Deterministic: ties break on the
+    doc id. Alternatives are the other titles with the same coverage."""
+    want = _title_tokens(phrase)
+    if not want:
+        return None, None, []
+    scored = []
+    for doc_id, title in titles:
+        if not doc_id or not title:
+            continue
+        have = _title_tokens(title)
+        hit = len(want & have)
+        if not hit:
+            continue
+        cover = hit / len(want)
+        if cover < TITLE_MATCH_THRESHOLD:
+            continue
+        scored.append((-cover, -(hit / len(have)), str(doc_id), str(title)))
+    if not scored:
+        return None, None, []
+    scored.sort()
+    best = scored[0]
+    alts = [x[2] for x in scored[1:] if x[0] == best[0]]
+    return best[2], best[3], alts
+
+
+def parse_deterministic(question: str, now: dt.datetime, *, limit: int = 100,
+                        titles: Optional[TitleCatalogue] = None) -> NlParse:
+    """``titles``: the ``(doc_id, title)`` pairs the audit projection knows. When given, a
+    "who retrieved/accessed/opened/saw <phrase>" phrase that is not a document id is resolved to
+    the best-matching title's doc id (`resolve_title`). A phrase no title matches stays as named
+    (the search then matches it as an exact id or title only): a named document is never dropped
+    to run a broader search (Codex sec r1 #16)."""
     q = " ".join(str(question or "").split())
     rec: list[str] = []
     notes: list[str] = []
@@ -222,6 +281,20 @@ def parse_deterministic(question: str, now: dt.datetime, *, limit: int = 100) ->
         target = _clean_id(target)
         if target and not re.search(r"\b(?:space|channel|project|drive)\b", target, re.I):
             doc = target[:300]
+            if titles is not None:
+                hit, title, alts = resolve_title(target, list(titles))
+                if hit:
+                    doc = hit
+                    notes.append(f"document \u201c{target[:120]}\u201d matched "
+                                 f"\u201c{(title or '')[:160]}\u201d ({hit})")
+                    if alts:
+                        shown = ", ".join(alts[:5]) + (f" and {len(alts) - 5} more"
+                                                       if len(alts) > 5 else "")
+                        notes.append(f"other documents match as well: {shown}")
+                else:
+                    notes.append(f"no document title in the audit log matches "
+                                 f"\u201c{target[:120]}\u201d; searched for it as an exact "
+                                 f"document id or title")
     if doc:
         rec.append("doc")
 
@@ -297,7 +370,8 @@ def _validate_llm(out: Any, now: dt.datetime, limit: int) -> AuditFilter:
 
 
 def parse_audit_question(question: str, now: dt.datetime, *, llm: Optional[LlmParser] = None,
-                         limit: int = 100, llm_fallback: bool = False) -> NlParse:
+                         limit: int = 100, llm_fallback: bool = False,
+                         titles: Optional[TitleCatalogue] = None) -> NlParse:
     """The closed filter for ``question``. Deterministic rules first; ``llm`` (optional) is asked
     only when they recognise nothing, and its output is validated against the closed schema.
 
@@ -308,9 +382,12 @@ def parse_audit_question(question: str, now: dt.datetime, *, llm: Optional[LlmPa
     ``llm_fallback=True``: a model that fails or whose output does not validate is NOT an error;
     the rule parser's result is returned (``source == "deterministic"``) with a note, the same
     result as with no model configured. ``llm`` may return a dict, an `AuditFilter`, or an object
-    with ``filter`` and ``model`` (nl_llm.ModelFilter), whose model name is kept."""
+    with ``filter`` and ``model`` (nl_llm.ModelFilter), whose model name is kept.
+
+    ``titles`` (the projection's known ``(doc_id, title)`` pairs) lets the rules resolve a
+    document named by its title (`parse_deterministic`)."""
     try:
-        det = parse_deterministic(question, now, limit=limit)
+        det = parse_deterministic(question, now, limit=limit, titles=titles)
     except NlFilterError:
         raise
     except Exception:                                                # noqa: BLE001 — 422, not 500
@@ -337,5 +414,5 @@ def parse_audit_question(question: str, now: dt.datetime, *, llm: Optional[LlmPa
                    recognised=["llm"], model=model, model_tried=True)
 
 
-__all__ = ["NlParse", "NlFilterError", "LlmParser", "parse_audit_question", "parse_deterministic",
-           "parse_time"]
+__all__ = ["NlParse", "NlFilterError", "LlmParser", "TitleCatalogue", "TITLE_MATCH_THRESHOLD",
+           "parse_audit_question", "parse_deterministic", "parse_time", "resolve_title"]

@@ -135,7 +135,8 @@ def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Opti
                                  llm_fallback=True)
 
     app = create_app(svc, audit_router_factory=audit_factory,
-                     sim_router_factory=lambda cur, rr: make_sim_router(svc.cfg, rr))
+                     sim_router_factory=lambda cur, rr: make_sim_router(svc.cfg, rr,
+                                                                           ingestor=svc.ingestor))
     if sync:
         svc.ingestor.sync_all()
     if poll_s:
