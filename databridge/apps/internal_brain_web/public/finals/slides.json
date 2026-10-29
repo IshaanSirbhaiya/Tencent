@@ -1,0 +1,7 @@
+{
+  "_about": "Editable claim lines for the /present slides, so they can be corrected on the morning of 3 Nov without a rebuild. Say only what the repo proves (RUN_SHEET [CB] and [HY3]).",
+  "codebuddy_line": "CodeBuddy built the WorkBuddy connector, the token tool and the model-chain tests, and ran a security review on Tencent Hunyuan hy3. Every session transcript is kept.",
+  "codebuddy_source": "INTERNAL_BRAIN.md, docs/tencent/DEV_PROCESS.md",
+  "stack_line": "Tencent stack: Hunyuan Hy3 through TokenHub · WorkBuddy · CodeBuddy",
+  "stack_line_check": "[HY3] Drop 'through TokenHub' unless Hy3 has answered live through TokenHub by 3 Nov (STATUS.md)."
+}

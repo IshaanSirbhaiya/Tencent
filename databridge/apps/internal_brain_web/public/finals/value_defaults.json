@@ -1,0 +1,19 @@
+{
+  "_about": "Copied from docs/finals/rubric/impact_feasibility/value_calculator.spec.json (input defaults only). The /present/business slide computes every number from these inputs with the spec's formulas. Change the spec first, then copy the defaults here again.",
+  "source": "docs/finals/rubric/impact_feasibility/value_calculator.spec.json",
+  "spec_version": "1.0",
+  "status_label": "Projection, not a measurement. Hours saved are measured in the pilot.",
+  "inputs": {
+    "staff": 600,
+    "minutes_saved_per_week": 90,
+    "hourly_cost_usd": 31,
+    "working_weeks": 46,
+    "annual_price_usd": 100000,
+    "answers_per_person_per_day": 10,
+    "working_days_per_month": 21,
+    "tokens_in": 4000,
+    "tokens_out": 300,
+    "price_in_per_mtok_usd": 0.132,
+    "price_out_per_mtok_usd": 0.528
+  }
+}

@@ -1,0 +1,91 @@
+'use client';
+// Mount point for Presenter mode. Renders nothing unless presenter mode is armed.
+//
+// Designed to be mounted ONCE in app/layout.tsx (inside <Providers>) so the bar shows on every page.
+// Until then, /compare and /present/* mount it themselves; when several are mounted, only the
+// first one renders (the others stay silent), and the keys live on `window` (controller.ts), so they
+// keep working on pages that do not render the bar.
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useSession } from '@/components/shell';
+import { useLang } from '@/lib/i18n';
+import { ClipOverlay } from './ClipOverlay';
+import { installPresenterKeys, setArmed, setHost, setStage } from './controller';
+import { PresenterBar } from './PresenterBar';
+import { ResetConfirm } from './ResetConfirm';
+import { applyStage } from './stage';
+import { usePresenter } from './store';
+import { WorkBuddyCard } from './WorkBuddyCard';
+import { STEPS } from './script';
+
+/* ---- one renderer at a time ---- */
+let seq = 0;
+const mounted: number[] = [];
+const ownerListeners = new Set<() => void>();
+const notifyOwners = () => ownerListeners.forEach((l) => l());
+
+function useIsOwner(): boolean {
+  const [id] = useState(() => ++seq);
+  useEffect(() => {
+    mounted.push(id);
+    notifyOwners();
+    return () => {
+      const i = mounted.indexOf(id);
+      if (i >= 0) mounted.splice(i, 1);
+      notifyOwners();
+    };
+  }, [id]);
+  return useSyncExternalStore(
+    (l) => {
+      ownerListeners.add(l);
+      return () => ownerListeners.delete(l);
+    },
+    () => mounted[0] === id,
+    () => false,
+  );
+}
+
+export function PresenterRoot() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { refresh } = useSession();
+  const { lang, setLang } = useLang();
+  const s = usePresenter();
+  const owner = useIsOwner();
+  const langRef = useRef(lang);
+  langRef.current = lang;
+
+  // Hand the router, session and language to the module-level controller, and install the keys.
+  useEffect(() => {
+    setHost({
+      push: (url) => router.push(url),
+      refreshSession: refresh,
+      toggleLang: () => setLang(langRef.current === 'en' ? 'zh' : 'en'),
+    });
+    installPresenterKeys();
+  }, [router, refresh, setLang]);
+
+  // ?present=1 arms presenter mode; ?stage=1 turns the Stage theme on.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('present') === '1' && !s.armed) setArmed(true);
+    if (q.get('stage') === '1' && !s.stage) setStage(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  // After a full reload the stored Stage choice is re-applied to <html>.
+  useEffect(() => {
+    if (s.stage) applyStage(true);
+  }, [s.stage]);
+
+  if (!owner || !s.armed) return null;
+  const step = s.started ? STEPS[s.step] : null;
+  return (
+    <>
+      {step?.offApp && !s.hidden ? <WorkBuddyCard /> : null}
+      {!s.hidden ? <PresenterBar /> : null}
+      <ClipOverlay />
+      <ResetConfirm />
+    </>
+  );
+}

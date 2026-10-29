@@ -1,6 +1,7 @@
 import '@fontsource-variable/inter';
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/shell/Providers';
+import { PresenterRoot } from '@/components/presenter/PresenterRoot';
 import { TourOverlay } from '@/components/tour/Tour';
 import { PREFS_INIT_SCRIPT } from '@/lib/prefs';
 import './globals.css';
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           {children}
           <TourOverlay />
+          <PresenterRoot />
         </Providers>
       </body>
     </html>
