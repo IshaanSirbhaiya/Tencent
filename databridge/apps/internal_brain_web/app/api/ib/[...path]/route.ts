@@ -29,7 +29,7 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: /^health$/ },
   { method: 'POST', re: /^auth\/(demo-login|logout)$/ },
   { method: 'GET', re: /^auth\/whoami$/ },
-  { method: 'POST', re: /^ib\/ask$/ },
+  { method: 'POST', re: /^ib\/ask(\/stream)?$/ },
   { method: 'GET', re: /^ib\/(history|sources|map|status)$/ },
   { method: 'GET', re: /^ib\/trace\/[A-Za-z0-9_-]{1,200}$/ },
   { method: 'GET', re: /^ib\/graph$/ },
@@ -52,7 +52,7 @@ const SLOT_COOKIE: Record<Slot, string> = { a: COOKIE, b: `${COOKIE}_b`, c: `${C
 const SLOT_ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^auth\/(demo-login|logout)$/ },
   { method: 'GET', re: /^auth\/whoami$/ },
-  { method: 'POST', re: /^ib\/ask$/ },
+  { method: 'POST', re: /^ib\/ask(\/stream)?$/ },
   { method: 'GET', re: /^ib\/map$/ },
   { method: 'GET', re: /^ib\/graph$/ },
   { method: 'POST', re: /^ib\/graph\/openable$/ },
@@ -224,6 +224,8 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   // Upstream always sees the IB's own cookie name; which browser cookie fills it depends on the slot.
   if (session) headers.set('cookie', `${COOKIE}=${session}`);
 
+  const streaming = path === 'ib/ask/stream';
+  if (streaming) headers.set('accept', 'text/event-stream');
   let upstream: Response;
   let payload: ArrayBuffer;
   try {
@@ -235,6 +237,16 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
       redirect: 'manual',
       signal,
     });
+    // Server-sent stage events: passed through unbuffered. The IB sends only stage names, then the
+    // same grounded answer JSON /ib/ask returns (D-08, rule 4), so nothing needs rewriting here.
+    if (streaming && upstream.ok && (upstream.headers.get('content-type') ?? '').startsWith('text/event-stream') && upstream.body) {
+      const out = new NextResponse(upstream.body as ReadableStream, { status: 200 });
+      out.headers.set('content-type', 'text/event-stream; charset=utf-8');
+      out.headers.set('cache-control', 'no-store');
+      out.headers.set('x-accel-buffering', 'no');
+      relayCookies(upstream.headers.getSetCookie(), out, slot);
+      return out;
+    }
     payload = await upstream.arrayBuffer();
   } catch {
     // Upstream unreachable, too slow, or cut off mid-body: the same envelope the IB itself uses
