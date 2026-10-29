@@ -54,8 +54,18 @@ export function Waterfall({ stageMs, records }: { stageMs: Partial<Record<StageV
     .filter((b) => SEAL_AFTER[b.stage])
     .map((b) => ({ at: b.start + b.dur, rec: byKind.get(SEAL_AFTER[b.stage]!), kind: SEAL_AFTER[b.stage]! }));
   const P = (v: number) => `${(v / total) * 100}%`;
+  // Seals that land within 5% of the axis of each other (e.g. retrieval.decided at 228 ms and
+  // answer.released at 229 ms) share one tick, so their labels never print over each other.
+  const tickGroups: { at: number; items: typeof ticks }[] = [];
+  for (const t of ticks) {
+    const last = tickGroups[tickGroups.length - 1];
+    if (last && t.at - last.at < total * 0.05) {
+      last.items.push(t);
+      last.at = t.at;
+    } else tickGroups.push({ at: t.at, items: [t] });
+  }
   return (
-    <div data-testid="waterfall">
+    <div data-testid="waterfall" data-tour="journey-waterfall">
       {/* axis */}
       <div className="grid grid-cols-[7.5rem_minmax(0,1fr)_4.5rem] gap-x-3 sm:grid-cols-[11rem_minmax(0,1fr)_5rem]" aria-hidden>
         <span className="text-micro font-semibold uppercase tracking-wide text-subtle">Stage</span>
@@ -99,19 +109,24 @@ export function Waterfall({ stageMs, records }: { stageMs: Partial<Record<StageV
             <Database aria-hidden className="h-3.5 w-3.5 text-muted" /> Ledger seals
           </p>
           <div className="relative h-8">
-            {ticks.map((t) => (
+            {tickGroups.map((g) => (
               <span
-                key={t.kind}
+                key={g.items.map((t) => t.kind).join('+')}
                 className={cn(
                   'absolute inset-y-0 flex flex-col',
-                  t.at / total < 0.06 ? 'items-start' : t.at / total > 0.94 ? '-translate-x-full items-end' : '-translate-x-1/2 items-center',
+                  g.at / total < 0.06 ? 'items-start' : g.at / total > 0.94 ? '-translate-x-full items-end' : '-translate-x-1/2 items-center',
                 )}
-                style={{ left: P(t.at) }}
+                style={{ left: P(g.at) }}
               >
                 <span aria-hidden className="h-3 w-0.5 rounded bg-fg" />
                 <span className="mt-0.5 whitespace-nowrap font-mono text-[10px] leading-3 text-muted">
-                  <span className="sr-only">{t.kind} sealed at {ms(t.at)}, </span>
-                  {t.rec ? `#${t.rec.seq}` : t.kind.split('.')[1]}
+                  {g.items.map((t, i) => (
+                    <span key={t.kind}>
+                      <span className="sr-only">{t.kind} sealed at {ms(t.at)}, </span>
+                      {i > 0 ? <span aria-hidden> · </span> : null}
+                      {t.rec ? `#${t.rec.seq}` : t.kind.split('.')[1]}
+                    </span>
+                  ))}
                 </span>
               </span>
             ))}

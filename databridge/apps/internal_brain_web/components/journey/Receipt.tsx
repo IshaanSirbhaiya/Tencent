@@ -49,7 +49,7 @@ function Stepper({ stages }: { stages: TraceReceipt['stages'] }) {
  */
 export function Receipt({ r }: { r: TraceReceipt }) {
   return (
-    <div className="space-y-4" data-testid="journey-receipt">
+    <div className="space-y-4" data-testid="journey-receipt" data-tour="journey-receipt">
       <Card className="px-4 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <RequestStatusBadge status={r.status} />
@@ -87,7 +87,7 @@ export function Receipt({ r }: { r: TraceReceipt }) {
                   <span className="mt-0.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded border border-line-strong bg-raised px-1 text-micro tabular-nums text-muted">{i + 1}</span>
                   <DocLine docId={c.doc_id} title={c.title} platform={c.platform} container={c.container_name ?? c.container} href={c.deep_link} />
                   {c.cited_version && shortVersion(c.cited_version).text ? (
-                    <span className="ml-auto shrink-0 font-mono text-micro text-subtle" title={shortVersion(c.cited_version).full}>
+                    <span className="ml-auto shrink-0 text-micro tabular-nums text-subtle" title={shortVersion(c.cited_version).full}>
                       {shortVersion(c.cited_version).text}
                     </span>
                   ) : null}

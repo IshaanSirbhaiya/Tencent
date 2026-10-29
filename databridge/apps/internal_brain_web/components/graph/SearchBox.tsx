@@ -101,7 +101,7 @@ export const SearchBox = forwardRef<SearchHandle, {
   const showList = open && q.trim().length >= 2;
 
   return (
-    <div className={cn('relative min-w-0 flex-1', compact ? 'max-w-xs' : 'max-w-md')}>
+    <div className={cn('relative min-w-0 flex-1', compact ? 'max-w-xs' : 'max-w-md')} data-tour="graph-search">
       <label htmlFor={`${listId}-input`} className="sr-only">
         {t('search.label')}
       </label>

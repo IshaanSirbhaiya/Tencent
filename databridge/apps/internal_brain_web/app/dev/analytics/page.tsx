@@ -203,7 +203,7 @@ function Body({ stats, win, replayCount, replay, evalSum, evalErr }: { stats: Au
       ) : null}
 
       {/* KPI row */}
-      <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-3" data-testid="analytics-kpis">
+      <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-3" data-testid="analytics-kpis" data-tour="analytics-kpis">
         <KpiTile
           label="Requests"
           icon={Activity}

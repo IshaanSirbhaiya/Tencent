@@ -5,8 +5,8 @@ export type FeedbackKind = 'helpful' | 'wrong' | 'outdated';
 const FEEDBACK_KEY = 'ib-user-feedback';
 
 /** Keys this device may hold for User mode; "Reset my local data" clears them. */
-export const LOCAL_KEYS = [FEEDBACK_KEY, 'ib-tour-offer'] as const;
-export const SESSION_KEYS = ['ib-tour'] as const;
+export const LOCAL_KEYS = [FEEDBACK_KEY, 'ib-tour-offer', 'ib-tour-done', 'ib-tour-checklist'] as const;
+export const SESSION_KEYS = ['ib-tour', 'ib-tour-last-req'] as const;
 
 function readAll(): Record<string, FeedbackKind> {
   try {

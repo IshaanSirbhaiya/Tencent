@@ -89,7 +89,7 @@ export function TrustCentre() {
         {/* 1. Controls */}
         <section aria-labelledby="controls-h">
           <SectionTitle id="controls-h" title={t('trust.controls')} sub={t('trust.controlsSub')} />
-          <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="trust-controls">
+          <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="trust-controls" data-tour="trust-controls">
             {CONTROLS.map((c, i) => {
               const Icon = ICONS[c.icon];
               return (

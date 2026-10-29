@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { MockBanner, Wordmark } from '@/components/Brand';
-import { TourButton, TourOffer } from '@/components/tour/Tour';
+import { TourButton } from '@/components/tour/Tour';
 import { IconButton, SegmentedControl, Sheet, SheetContent } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { useI18n } from '@/lib/i18n';
@@ -95,18 +95,10 @@ function Frame({ children, requireRole, variant = 'app', container = true }: App
     const gated = requireRole ? <RequireRole role={requireRole}>{children}</RequireRole> : children;
     body = container ? (
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        {mode === 'user' ? <TourOffer className="mb-6" /> : null}
         {gated}
       </div>
     ) : (
-      <>
-        {mode === 'user' ? (
-          <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 lg:px-8">
-            <TourOffer />
-          </div>
-        ) : null}
-        {gated}
-      </>
+      gated
     );
   }
 

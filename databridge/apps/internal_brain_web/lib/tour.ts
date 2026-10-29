@@ -1,130 +1,102 @@
 'use client';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
-// The guided tour: a tiny module store (useSyncExternalStore) plus a page-action channel. Pattern
-// ported from the original Walnut frontend (lib/demo.ts), made step-by-step instead of timed: the
-// visitor moves with Next / Back, and each step highlights a real element marked data-tour="…".
+// The guided tours: a tiny module store (useSyncExternalStore) plus a page-action channel.
+//
+// Two tours, one per mode (components/tour/steps.ts holds the steps):
+//   user  "Try it", 4 steps (~45 s): sign in as Jordan, ask, open citation [1], Ken's two refusals;
+//         then a 4-item checklist card.
+//   dev   5 steps: Mission control, the journey of your last answer, the knowledge graph, the Trust
+//         centre, and (compliance) analytics + audit verify.
+//
+// Storage (every access in try/catch; blocked storage still runs the tour, it just forgets):
+//   sessionStorage ib-tour            the running tour (survives a full reload)
+//   sessionStorage ib-tour-last-req   the request the tour asked, for the dev tour's journey step
+//   localStorage   ib-tour-offer      'dismissed' once the first-visit offer is answered
+//   localStorage   ib-tour-done       {"user":true,"dev":false}; the legacy value '1' means both
+//   localStorage   ib-tour-checklist  {"asked":true,...}
 
-export interface TourStep {
-  id: string;
-  /** Page the step lives on. */
-  route: string;
-  /** data-tour value of the element to highlight. */
-  anchor: string;
-  title: string;
-  body: string;
-  /** Sign in as this persona (normal demo login, main session) before showing the step. */
-  persona?: string;
-  /** Page action to run when the anchor is not on screen yet (e.g. ask the sample question). */
-  action?: string;
-  /** data-tour value that shows the page is mounted and listening for `action`. */
-  ready?: string;
-  /** Label for the Next button on this step. */
-  next?: string;
-  /** Shown while waiting for the anchor. */
-  waiting?: string;
-}
+export type TourId = 'user' | 'dev';
 
-// Six steps on purpose: completion drops sharply past five or so. The simulator is a final
-// "more to try" step. Captions: at most two short sentences, the first says what to look at.
-export const TOUR_STEPS: TourStep[] = [
-  {
-    id: 'personas',
-    route: '/login',
-    anchor: 'personas',
-    title: 'Pick a person',
-    body: 'These are people at one made-up company, and each can open different things. We will start as Jordan, a backend engineer.',
-    next: 'Sign in as Jordan',
-  },
-  {
-    id: 'answer',
-    route: '/',
-    persona: 'jdoe',
-    anchor: 'answer',
-    ready: 'ask-form',
-    action: 'ask-sample',
-    waiting: 'Asking about the database migration…',
-    title: 'Ask, and see where the answer came from',
-    body: 'Look at the C-tags and the checks line at the bottom. Every source was checked live for Jordan, and the question is now in the audit log.',
-  },
-  {
-    id: 'map',
-    route: '/map',
-    persona: 'jdoe',
-    anchor: 'map',
-    waiting: 'Checking each item with its source…',
-    title: 'Everything Jordan can open',
-    body: 'Each circle is a space, project, channel or shared drive, sized by how much is in it. Click one to see the items.',
-  },
-  {
-    id: 'compare',
-    route: '/compare',
-    persona: 'jdoe',
-    anchor: 'compare-results',
-    ready: 'compare-form',
-    action: 'compare-run',
-    waiting: 'Asking for both people…',
-    title: 'Same question, two people',
-    body: "Compare Jordan's answer with Ken's, an outside contractor. Ken's answer uses only what Ken can open and gives no hint that more exists.",
-    next: 'Continue as Maya',
-  },
-  {
-    id: 'verify',
-    route: '/audit',
-    persona: 'maya.compliance',
-    anchor: 'verify-panel',
-    ready: 'verify-panel',
-    action: 'verify',
-    title: 'Check the audit log',
-    body: 'Look at the result of Verify audit chain. It re-checks every entry, so an edited or deleted record would show up here.',
-  },
-  {
-    id: 'sim',
-    route: '/sim',
-    persona: 'admin.it',
-    anchor: 'sim-revoke',
-    title: 'More to try: change access live',
-    body: 'As the IT admin, remove Jordan from a Slack channel. Then sign in as Jordan and ask again: that channel no longer appears.',
-    next: 'Done',
-  },
-];
+/** Number of steps per tour (the user tour also has a closing checklist card at index 4). */
+export const TOUR_LENGTH: Record<TourId, number> = { user: 4, dev: 5 };
 
 export interface TourState {
   open: boolean;
+  tour: TourId;
+  /** 0-based step; for the user tour, TOUR_LENGTH.user is the checklist card. */
   step: number;
+  /**
+   * How the tour was entered:
+   *  'signin'  from the sign-in page link: sign in as Jordan straight away;
+   *  'start'   a fresh start: a first step that is already satisfied is skipped;
+   *  null      normal navigation between steps.
+   */
+  entry: 'signin' | 'start' | null;
+  /** Step ids completed in this run. */
+  done: string[];
 }
 
 const KEY = 'ib-tour';
 const OFFER_KEY = 'ib-tour-offer';
-let state: TourState = { open: false, step: 0 };
+const DONE_KEY = 'ib-tour-done';
+const CHECK_KEY = 'ib-tour-checklist';
+const LAST_KEY = 'ib-tour-last-req';
+
+const CLOSED: TourState = { open: false, tour: 'user', step: 0, entry: null, done: [] };
+let state: TourState = CLOSED;
 let loaded = false;
 const listeners = new Set<() => void>();
+const emit = () => listeners.forEach((l) => l());
+
+function store(kind: 'local' | 'session'): Storage | null {
+  try {
+    return kind === 'local' ? window.localStorage : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+function read(kind: 'local' | 'session', key: string): string | null {
+  try {
+    return store(kind)?.getItem(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+function write(kind: 'local' | 'session', key: string, value: string | null) {
+  try {
+    const s = store(kind);
+    if (!s) return;
+    if (value === null) s.removeItem(key);
+    else s.setItem(key, value);
+  } catch {
+    /* storage unavailable: the tour still runs, it just forgets */
+  }
+}
 
 function load() {
   if (loaded || typeof window === 'undefined') return;
   loaded = true;
+  const raw = read('session', KEY);
+  if (!raw) return;
   try {
-    const raw = sessionStorage.getItem(KEY);
-    if (raw) {
-      const s = JSON.parse(raw) as TourState;
-      if (typeof s.step === 'number' && s.step >= 0 && s.step < TOUR_STEPS.length) state = { open: !!s.open, step: s.step };
+    const s = JSON.parse(raw) as Partial<TourState>;
+    const tour: TourId = s.tour === 'dev' ? 'dev' : 'user';
+    const max = TOUR_LENGTH[tour] + (tour === 'user' ? 1 : 0);
+    if (typeof s.step === 'number' && s.step >= 0 && s.step < max) {
+      state = { open: !!s.open, tour, step: s.step, entry: null, done: Array.isArray(s.done) ? s.done.filter((x) => typeof x === 'string') : [] };
     }
   } catch {
-    /* storage unavailable */
+    /* ignore a malformed value */
   }
 }
 
 function set(next: TourState) {
   state = next;
-  try {
-    sessionStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    /* storage unavailable */
-  }
-  listeners.forEach((l) => l());
+  write('session', KEY, JSON.stringify(state));
+  emit();
 }
 
-const SERVER: TourState = { open: false, step: 0 };
 export function useTour(): TourState {
   return useSyncExternalStore(
     (l) => {
@@ -134,42 +106,169 @@ export function useTour(): TourState {
       return () => listeners.delete(l);
     },
     () => state,
-    () => SERVER,
+    () => CLOSED,
   );
 }
 
-export function startTour(step = 0) {
+/** The tour for the page's mode: /dev/* is Developer mode; legacy pages keep the stored mode. */
+function tourForPath(path: string): TourId {
+  if (path === '/dev' || path.startsWith('/dev/')) return 'dev';
+  if (/^\/(compare|history|settings|login)?(\/.*)?$/.test(path)) return 'user';
+  return read('local', 'ib-mode') === 'dev' ? 'dev' : 'user';
+}
+
+/**
+ * Start a tour.
+ *  - startTour('user' | 'dev'): that tour from its first step (the header button passes the mode).
+ *  - startTour(n): the current page's tour at step n (Settings → Replay tour, the sign-in link).
+ *    From the sign-in page, step 0 signs in as Jordan straight away.
+ */
+export function startTour(arg: number | TourId = 0) {
   dismissOffer();
-  set({ open: true, step });
+  if (typeof arg === 'number') {
+    const path = typeof window === 'undefined' ? '/' : window.location.pathname;
+    const tour = tourForPath(path);
+    const step = Math.max(0, Math.min(arg, TOUR_LENGTH[tour] - 1));
+    set({ open: true, tour, step, entry: path === '/login' && tour === 'user' && step === 0 ? 'signin' : 'start', done: [] });
+  } else {
+    set({ open: true, tour: arg, step: 0, entry: 'start', done: [] });
+  }
 }
+
 export function closeTour() {
-  set({ ...state, open: false });
+  set({ ...state, open: false, entry: null });
 }
+
+/** Go to a step (beyond the last closes the tour; the user tour's index 4 is the checklist). */
 export function goToStep(step: number) {
   if (step < 0) return;
-  if (step >= TOUR_STEPS.length) closeTour();
-  else set({ open: true, step });
+  const max = TOUR_LENGTH[state.tour] + (state.tour === 'user' ? 1 : 0);
+  if (step >= max) closeTour();
+  else set({ ...state, open: true, step, entry: null });
 }
 
-// One-time gentle offer, remembered per browser.
+/** Clear the entry flag once the overlay has acted on it. */
+export function consumeEntry() {
+  if (state.entry) set({ ...state, entry: null });
+}
+
+export function markStepDone(id: string) {
+  if (!state.done.includes(id)) set({ ...state, done: [...state.done, id] });
+}
+
+/* ------------------------------------------------------------ completion and the offer */
+
+function doneMap(): Record<TourId, boolean> {
+  const raw = read('local', DONE_KEY);
+  if (raw === '1' || raw === 'true') return { user: true, dev: true };
+  try {
+    const v = raw ? (JSON.parse(raw) as Partial<Record<TourId, boolean>>) : {};
+    return { user: !!v.user, dev: !!v.dev };
+  } catch {
+    return { user: false, dev: false };
+  }
+}
+
+export function isTourDone(t: TourId): boolean {
+  return doneMap()[t];
+}
+
+export function markTourDone(t: TourId) {
+  const m = doneMap();
+  if (m[t]) return;
+  m[t] = true;
+  write('local', DONE_KEY, JSON.stringify(m));
+  emit();
+}
+
+/** One-time gentle offer, remembered per browser. No storage: do not nag on every page. */
 export function offerDismissed(): boolean {
-  try {
-    return localStorage.getItem(OFFER_KEY) === 'dismissed';
-  } catch {
-    return true; // no storage: do not nag on every page
-  }
-}
-export function dismissOffer() {
-  try {
-    localStorage.setItem(OFFER_KEY, 'dismissed');
-  } catch {
-    /* storage unavailable */
-  }
-  listeners.forEach((l) => l());
+  if (!store('local')) return true;
+  return read('local', OFFER_KEY) === 'dismissed';
 }
 
-// Page actions: the tour asks a page to do something (ask the sample question, run the compare,
-// verify the chain); the page performs it exactly as if the visitor had pressed the button.
+export function dismissOffer() {
+  write('local', OFFER_KEY, 'dismissed');
+  emit();
+}
+
+/** Whether the first-visit offer for this tour should show (reactive: "Not now" hides it at once). */
+export function useOfferOpen(t: TourId): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => !offerDismissed() && !isTourDone(t),
+    () => false,
+  );
+}
+
+/* ------------------------------------------------------------ the user tour's checklist */
+
+export type ChecklistItem = 'asked' | 'source' | 'identical' | 'dev';
+export const CHECKLIST: ChecklistItem[] = ['asked', 'source', 'identical', 'dev'];
+export type Checklist = Record<ChecklistItem, boolean>;
+
+const EMPTY_CHECKS: Checklist = { asked: false, source: false, identical: false, dev: false };
+let checks: Checklist | null = null;
+
+function loadChecks(): Checklist {
+  if (checks) return checks;
+  checks = { ...EMPTY_CHECKS };
+  const raw = read('local', CHECK_KEY);
+  if (raw) {
+    try {
+      const v = JSON.parse(raw) as Partial<Checklist>;
+      for (const k of CHECKLIST) checks[k] = !!v[k];
+    } catch {
+      /* ignore */
+    }
+  }
+  return checks;
+}
+
+export function tick(item: ChecklistItem) {
+  const c = loadChecks();
+  if (c[item]) return;
+  checks = { ...c, [item]: true };
+  write('local', CHECK_KEY, JSON.stringify(checks));
+  emit();
+}
+
+export function useChecklist(): Checklist {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => (typeof window === 'undefined' ? EMPTY_CHECKS : loadChecks()),
+    () => EMPTY_CHECKS,
+  );
+}
+
+/* ------------------------------------------------------------ the request the tour asked */
+
+/** Remember the latest answer's request id (and who asked it) for the dev tour's journey step. */
+export function rememberRequest(req: string, sub: string) {
+  write('session', LAST_KEY, JSON.stringify({ req, sub }));
+}
+
+export function lastRequest(): { req: string; sub: string } | null {
+  const raw = read('session', LAST_KEY);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { req?: unknown; sub?: unknown };
+    return typeof v.req === 'string' && typeof v.sub === 'string' ? { req: v.req, sub: v.sub } : null;
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------ page actions */
+
+// The tour asks a page to do something (ask the sample question, run the compare, verify the
+// chain); the page performs it exactly as if the visitor had pressed the button.
 const EVENT = 'ib-tour-action';
 export function emitTourAction(action: string) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EVENT, { detail: action }));

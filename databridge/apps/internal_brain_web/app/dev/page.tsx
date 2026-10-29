@@ -197,7 +197,7 @@ export default function MissionControl() {
           <OrgNumbersLock />
         )}
 
-        <Card aria-labelledby="pipe-h" data-testid="mission-pipeline">
+        <Card aria-labelledby="pipe-h" data-testid="mission-pipeline" data-tour="mission-pipeline">
           <CardHeader actions={<SourceChip>{compliance ? 'stages_ms · p50' : 'static'}</SourceChip>}>
             <CardTitle id="pipe-h">The pipeline</CardTitle>
             <p className="mt-0.5 text-caption text-muted">
