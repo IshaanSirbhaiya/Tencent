@@ -47,6 +47,6 @@ ARCHITECTURE, DATA_FLOWS). Technical evidence: [../technical/](../technical/READ
 | "Explains every decision to the user" | "Explains every answer; never explains a refusal, by design" | Explaining a denial leaks existence ([EXPLAINABILITY.md](EXPLAINABILITY.md) §3) |
 | "Human in the loop" | "Humans stay the authority on access; compliance can reconstruct and reveal; no review queue yet" | No review queue is built |
 | "Production-ready" | "Prototype with a deploy kit; no live deployment" | `docs/tencent/ARCHITECTURE.md:42` |
-| "The graph / doc view is done" | "In progress" | `/ib/graph` and `/ib/doc` are not built or tested yet (`docs/finals/PLAN.md` §5, B5-B6) |
+| "The graph shows the whole company" | "The graph shows only what the signed-in person can open, checked live" | `/ib/graph` and `/ib/doc` build an induced graph of live-authorised documents only (`databridge_ib/graph.py`, `authz.py`; `tests/test_graph_doc.py`, incl. paired-world differential tests) |
 | Current eval numbers without the caveat | "From the 14 Oct run; re-run pending" | They predate the 30 Oct pipeline edits |
 | Any Aspire customer count or licence status | — | Not verified (`../research/D_technical_responsible_ai.md:419`) |
