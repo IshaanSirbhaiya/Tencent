@@ -78,7 +78,7 @@ function Figure({ value, word, of, source, testId }: { value: number | null; wor
           {of ? <p className="mt-3 text-[clamp(1rem,1.6vw,1.5rem)] leading-snug text-muted">{of}</p> : null}
         </>
       )}
-      {source ? <p className="mt-auto pt-4 font-mono text-micro text-subtle">{source}</p> : null}
+      {source ? <p className="mt-auto min-w-0 break-all pt-4 font-mono text-micro text-subtle">{source}</p> : null}
     </div>
   );
 }
