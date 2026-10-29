@@ -53,7 +53,7 @@ function InputRow({ spec, value, onChange, t }: { spec: InputSpec; value: number
           <span className="text-caption text-subtle">
             · {t('value.readonly')} ·{' '}
             {spec.source ? (
-              <a href={spec.source} target="_blank" rel="noreferrer noopener" className="text-accent underline-offset-2 hover:underline">
+              <a href={spec.source} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-6 items-center text-accent underline-offset-2 hover:underline">
                 {t('value.source')}
               </a>
             ) : null}
@@ -341,7 +341,7 @@ export function ValueCalculator() {
                 <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2">
                   <span className="min-w-0 text-body-sm text-fg">
                     {r.source.startsWith('http') ? (
-                      <a href={r.source} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+                      <a href={r.source} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-6 items-center gap-1 underline-offset-2 hover:underline">
                         {t(`value.ref.${r.id}` as AnalyticsKey)}
                         <ExternalLink aria-hidden className="h-3 w-3 text-subtle" />
                       </a>

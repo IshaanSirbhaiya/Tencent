@@ -10,7 +10,7 @@ import { placeLabel } from '@/lib/format';
 import { useLang, useMessages } from '@/lib/i18n';
 import { userMessages } from '@/lib/i18n/user';
 import type { AskResponse, Citation } from '@/lib/types';
-import { MODEL_KEY, TAG_RE, checkedAgoKey, followUpQuestion, followUps, isRefusal, modelKind, plainAnswer, secondsSince, versionText } from './answerText';
+import { MODEL_KEY, TAG_RE, checkedAgoKey, followUpQuestion, followUps, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
 import { CitationChip } from './CitationChip';
 import { getFeedback, setFeedback, type FeedbackKind } from './local';
 import { RefusalCard } from './RefusalCard';
@@ -37,14 +37,27 @@ export interface AnswerCardProps {
 
 /** Plain text with inline [n] chips. Never HTML: every part is a React text node or a chip. */
 export function AnswerText({ response, onCite, className }: { response: AskResponse; onCite: AnswerCardProps['onCite']; className?: string }) {
+  const t = useMessages(userMessages);
   const { citations, answer } = response;
   const byTag = new Map(citations.map((c, i) => [c.tag, { c, i }]));
   const parts: React.ReactNode[] = [];
   let last = 0;
   let key = 0;
+  // Plain text, with a Slack "handle: " prefix shown as a subtle "handle said" label.
+  const pushText = (s: string) => {
+    for (const p of speakerParts(s)) {
+      if (typeof p === 'string') parts.push(p);
+      else
+        parts.push(
+          <span key={`s${key++}`} className="mr-1 rounded bg-raised px-1 py-px text-caption font-medium text-muted" data-testid="answer-speaker">
+            {t('answer.speaker', { handle: p.speaker })}
+          </span>,
+        );
+    }
+  };
   for (const m of answer.matchAll(TAG_RE)) {
     const idx = m.index ?? 0;
-    if (idx > last) parts.push(answer.slice(last, idx));
+    if (idx > last) pushText(answer.slice(last, idx));
     const tags = m[1].split(',').map((t) => t.trim());
     if (tags.every((t) => byTag.has(t))) {
       parts.push(
@@ -60,7 +73,7 @@ export function AnswerText({ response, onCite, className }: { response: AskRespo
     }
     last = idx + m[0].length;
   }
-  if (last < answer.length) parts.push(answer.slice(last));
+  if (last < answer.length) pushText(answer.slice(last));
   return (
     <p className={cn('whitespace-pre-wrap text-fg', className)} data-testid="answer-text">
       {parts}

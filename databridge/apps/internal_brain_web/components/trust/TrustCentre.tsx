@@ -147,9 +147,9 @@ export function TrustCentre() {
         {/* 2. Crosswalk */}
         <section aria-labelledby="crosswalk-h">
           <SectionTitle id="crosswalk-h" title={t('trust.crosswalk')} sub={t('trust.crosswalkSub')} />
-          <div className="relative overflow-x-auto rounded-xl border border-line bg-surface" role="region" aria-labelledby="crosswalk-h" tabIndex={0}>
+          <div className="relative overflow-x-auto rounded-xl border border-line bg-surface" role="region" aria-labelledby="crosswalk-cap" tabIndex={0}>
             <table className="w-full min-w-[40rem] border-collapse text-left text-body-sm" data-testid="crosswalk">
-              <caption className="sr-only">Framework crosswalk: how many items of each framework are met, partial or a gap (self-assessed, 30 Oct 2026).</caption>
+              <caption id="crosswalk-cap" className="sr-only">Framework crosswalk: how many items of each framework are met, partial or a gap (self-assessed, 30 Oct 2026).</caption>
               <thead>
                 <tr className="border-b border-line text-micro uppercase tracking-wide text-subtle">
                   <th scope="col" className="px-4 py-2 font-semibold">
@@ -214,9 +214,9 @@ export function TrustCentre() {
           <div className="mt-8">
             <h3 className="text-heading-sm text-fg">{t('trust.owasp')}</h3>
             <p className="mt-1 text-body-sm text-muted">{t('trust.owaspSub')}</p>
-            <div className="relative mt-3 overflow-x-auto rounded-xl border border-line bg-surface" role="region" aria-label={t('trust.owasp')} tabIndex={0}>
+            <div className="relative mt-3 overflow-x-auto rounded-xl border border-line bg-surface" role="region" aria-labelledby="owasp-cap" tabIndex={0}>
               <table className="w-full min-w-[36rem] border-collapse text-left text-body-sm" data-testid="owasp">
-                <caption className="sr-only">OWASP Top 10 for LLM applications: our main control and the residual risk, from OWASP_LLM_REDTEAM.md.</caption>
+                <caption id="owasp-cap" className="sr-only">OWASP Top 10 for LLM applications: our main control and the residual risk, from OWASP_LLM_REDTEAM.md.</caption>
                 <thead>
                   <tr className="border-b border-line text-micro uppercase tracking-wide text-subtle">
                     <th scope="col" className="px-4 py-2 font-semibold">

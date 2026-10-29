@@ -102,7 +102,8 @@ export function AuditConsole() {
   const [parser, setParser] = useState<{ by: string; model?: string | null; fallback?: boolean | null; notes?: string[] } | null>(null);
   const [nlBusy, setNlBusy] = useState(false);
   const [open, setOpen] = useState<AuditRow | null>(null);
-  const [status, setStatus] = useState('');
+  // Kept as a key + count and rendered with t(), so it follows a language switch (it used to stay English).
+  const [status, setStatus] = useState<{ key: 'audit.status.found' | 'audit.status.interpreted' | 'audit.table.empty'; n: number } | null>(null);
   const verifyRef = useRef<HTMLElement>(null);
   const tamperRef = useRef<HTMLElement>(null);
 
@@ -113,7 +114,7 @@ export function AuditConsole() {
       try {
         const ev = await auditApi.events(filter);
         setRows(ev);
-        setStatus(t('audit.status.found', { n: ev.length }));
+        setStatus({ key: 'audit.status.found', n: ev.length });
       } catch {
         setError(t('audit.table.error'));
       } finally {
@@ -153,7 +154,7 @@ export function AuditConsole() {
         const newest = ev.reduce<AuditRow | null>((m, r) => (!m || (r.event_time ?? '') > (m.event_time ?? '') ? r : m), null);
         setLatestId(newest?.req_id ?? null);
         setLatestTick((n) => n + 1);
-        setStatus(newest ? t('audit.status.found', { n: ev.length }) : t('audit.table.empty'));
+        setStatus({ key: newest ? 'audit.status.found' : 'audit.table.empty', n: ev.length });
       } catch {
         if (live) setError(t('audit.table.error'));
       } finally {
@@ -200,7 +201,7 @@ export function AuditConsole() {
       setParser(r.parser ? { by: r.parser, model: r.parser_model, fallback: r.parser_fallback, notes } : null);
       setForm(formFromFilter(r.filter ?? {}));
       setRows(r.events);
-      setStatus(t('audit.status.interpreted', { n: r.events.length }));
+      setStatus({ key: 'audit.status.interpreted', n: r.events.length });
     } catch {
       setError(t('audit.table.askError'));
     } finally {
@@ -266,8 +267,10 @@ export function AuditConsole() {
             <ul className="mt-3 flex flex-wrap gap-2" aria-label={t('audit.search.examples')}>
               {AUDIT_SUGGESTIONS.map((s) => (
                 <li key={s}>
+                  {/* The examples are English on purpose (the audit parser reads English): tagged lang="en". */}
                   <button
                     type="button"
+                    lang="en"
                     onClick={() => void askAudit(s)}
                     className="min-h-[1.75rem] rounded-full border border-line-strong px-3 py-1 text-left text-xs text-fg hover:border-accent/50 hover:bg-accent/5"
                   >
@@ -397,7 +400,7 @@ export function AuditConsole() {
             ) : null}
           </div>
           <div role="status" aria-live="polite" className="sr-only">
-            {status}
+            {status ? t(status.key, { n: status.n.toLocaleString('en-SG') }) : ''}
           </div>
           {error ? (
             <p role="alert" className="rounded-lg border border-line bg-surface p-4 text-body-sm">

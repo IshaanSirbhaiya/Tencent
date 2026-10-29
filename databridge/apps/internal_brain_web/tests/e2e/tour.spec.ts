@@ -188,7 +188,7 @@ test('developer tour without the compliance role ends on the least-privilege not
   for (let i = 0; i < 4; i++) await next(page);
   await expect(counter(page)).toContainText('Step 5 of 5');
   await expect(card(page).getByRole('heading', { name: 'Analytics and audit are locked for you' })).toBeVisible();
-  await expect(card(page)).toContainText('least privilege working');
+  await expect(card(page)).toContainText('compliance role only');
   await expect(card(page).getByRole('button', { name: /Do it for me: continue as Maya/ })).toBeVisible();
   await expect(card(page).getByTestId('tour-missing')).toHaveCount(0);
 });

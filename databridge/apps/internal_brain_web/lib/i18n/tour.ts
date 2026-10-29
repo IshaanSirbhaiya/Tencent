@@ -114,7 +114,7 @@ const en = {
   'd.comp.spotVerify': 'Verify audit chain',
 
   'd.locked.title': 'Analytics and audit are locked for you',
-  'd.locked.body': 'They need the compliance role, and you do not have it. That is least privilege working, not an error.',
+  'd.locked.body': 'Visible to the compliance role only: each person sees what their role needs.',
   'd.locked.act': 'continue as Maya, the compliance officer',
   'd.locked.spot': 'Locked pages',
 } as const;
@@ -227,7 +227,7 @@ const zh: Record<TourKey, string> = {
   'd.comp.spotVerify': '校验审计链',
 
   'd.locked.title': '分析与审计对你是锁定的',
-  'd.locked.body': '它们需要合规角色，而你没有。这正是最小权限在起作用，不是错误。',
+  'd.locked.body': '仅合规角色可见：每个人只看到其角色所需的内容。',
   'd.locked.act': '以合规官 Maya 的身份继续',
   'd.locked.spot': '锁定的页面',
 };

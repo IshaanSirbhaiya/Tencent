@@ -4,6 +4,7 @@
 import { ArrowDownRight, ArrowUpRight, Check, CircleAlert, CircleCheck, Copy, Lock, Minus, ShieldCheck, ShieldHalf, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { announce } from './announce';
 import { Badge } from './badge';
 
 /* ---------------------------------------------------------------- SectionHeader */
@@ -191,6 +192,8 @@ export function CodeHash({ value, head = 8, tail = 6, label = 'hash', className 
           try {
             await navigator.clipboard.writeText(value);
             setCopied(true);
+            // One shared live region for the whole page (a region per row made /dev/audit carry 53).
+            announce(`Copied ${label}`);
             clearTimeout(timer.current);
             timer.current = setTimeout(() => setCopied(false), 1200);
           } catch {
@@ -203,9 +206,6 @@ export function CodeHash({ value, head = 8, tail = 6, label = 'hash', className 
       >
         {copied ? <Check aria-hidden className="h-3.5 w-3.5 text-ok" /> : <Copy aria-hidden className="h-3.5 w-3.5" />}
       </button>
-      <span className="sr-only" aria-live="polite">
-        {copied ? 'Copied' : ''}
-      </span>
     </span>
   );
 }

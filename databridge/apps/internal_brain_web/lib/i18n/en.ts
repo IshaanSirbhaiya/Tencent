@@ -19,6 +19,13 @@ export const en = {
   'shell.unavailable': 'The service is temporarily unavailable. Try reloading in a moment.',
   'shell.search': 'Search or jump to…',
   'shell.commandPalette': 'Open command palette',
+  'shell.slowSession': 'This is taking longer than usual. Check your connection, then try again.',
+  'shell.retrySession': 'Check again',
+  'shell.moreActions': 'More options',
+  'shell.sidebar': 'Sidebar',
+  'shell.mockNotice': 'Mock mode notice',
+  'shell.devEnglishOnly': 'Developer mode is shown in English',
+  'persona.current': '(current)',
 
   'mode.label': 'Mode',
   'mode.user': 'User',

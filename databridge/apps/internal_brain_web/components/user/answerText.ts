@@ -6,6 +6,31 @@ import type { UserKey } from '@/lib/i18n/user';
 /** "[C1]" or "[C1, C2]" in the answer text. */
 export const TAG_RE = /\[(C\d+(?:\s*,\s*C\d+)*)\]/g;
 
+/**
+ * A quoted Slack passage starts with its author's handle ("mlro.tan: Velquarry Trading …"). On
+ * screen that raw prefix reads like a bug, so the answer renders it as a speaker label instead.
+ * Only a handle-shaped word (lower case, with a dot, underscore or hyphen, as Slack handles are) at
+ * the start of the text, of a line or of a sentence counts; ordinary words ("Note:") never match.
+ * The answer text itself is not changed: copy, highlight and sentence matching use it as returned.
+ */
+const SPEAKER_RE = /(^|\n|[.!?。！？]\s+|^\s+)([a-z][a-z0-9]*(?:[._-][a-z0-9]+)+):[ \t]+/g;
+
+export type SpeakerPart = string | { speaker: string };
+
+/** `text` split into plain strings and `{ speaker }` markers (the "handle: " prefix removed). */
+export function speakerParts(text: string): SpeakerPart[] {
+  const out: SpeakerPart[] = [];
+  let last = 0;
+  for (const m of text.matchAll(SPEAKER_RE)) {
+    const at = (m.index ?? 0) + m[1].length;
+    if (at > last) out.push(text.slice(last, at));
+    out.push({ speaker: m[2] });
+    last = (m.index ?? 0) + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 /** A refusal is the one response shape with no citations (the text is the API's constant). */
 export function isRefusal(r: AskResponse): boolean {
   return r.citations.length === 0;

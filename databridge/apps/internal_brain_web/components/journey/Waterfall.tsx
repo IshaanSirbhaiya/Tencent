@@ -82,8 +82,12 @@ export function Waterfall({ stageMs, records }: { stageMs: Partial<Record<StageV
         {bars.map((b) => (
           <li key={b.stage} className="grid grid-cols-[7.5rem_minmax(0,1fr)_4.5rem] items-center gap-x-3 sm:grid-cols-[11rem_minmax(0,1fr)_5rem]" data-stage={b.stage}>
             <div className="min-w-0">
-              <p className="truncate text-body-sm font-medium text-fg">{STAGE_LABEL[b.stage]}</p>
-              <p className="hidden truncate text-micro text-subtle sm:block">{STAGE_HINT[b.stage]}</p>
+              <p className="truncate text-body-sm font-medium text-fg" title={STAGE_HINT[b.stage]}>
+                {STAGE_LABEL[b.stage]}
+              </p>
+              {/* The one-line hint only on tall windows, so the seals stay in the first fold at 1280 x 720
+                  (every hint is also in "View as table"). */}
+              <p className="hidden truncate text-micro text-subtle [@media(min-width:640px)_and_(min-height:880px)]:block">{STAGE_HINT[b.stage]}</p>
             </div>
             <div aria-hidden className="relative h-6 rounded bg-raised/60">
               {axisTicks(total)
@@ -108,7 +112,7 @@ export function Waterfall({ stageMs, records }: { stageMs: Partial<Record<StageV
           <p className="flex items-center gap-1.5 text-body-sm font-medium text-fg">
             <Database aria-hidden className="h-3.5 w-3.5 text-muted" /> Ledger seals
           </p>
-          <div className="relative h-8">
+          <div className={cn('relative', tickGroups.some((g) => g.items.length > 1) ? 'h-12' : 'h-9')}>
             {tickGroups.map((g) => (
               <span
                 key={g.items.map((t) => t.kind).join('+')}
@@ -119,12 +123,22 @@ export function Waterfall({ stageMs, records }: { stageMs: Partial<Record<StageV
                 style={{ left: P(g.at) }}
               >
                 <span aria-hidden className="h-3 w-0.5 rounded bg-fg" />
-                <span className="mt-0.5 whitespace-nowrap font-mono text-[10px] leading-3 text-muted">
-                  {g.items.map((t, i) => (
-                    <span key={t.kind}>
-                      <span className="sr-only">{t.kind} sealed at {ms(t.at)}, </span>
-                      {i > 0 ? <span aria-hidden> · </span> : null}
-                      {t.rec ? `#${t.rec.seq}` : t.kind.split('.')[1]}
+                {/* Each seal: its ledger ordinal and the first 8 hex of its record hash (11 px). */}
+                <span className={cn('mt-0.5 flex flex-col whitespace-nowrap font-mono text-micro leading-4 text-muted', g.at / total > 0.94 ? 'items-end' : g.at / total < 0.06 ? 'items-start' : 'items-center')}>
+                  {g.items.map((t) => (
+                    <span key={t.kind} data-testid="seal-label">
+                      <span className="sr-only">
+                        {t.kind} sealed at {ms(t.at)}
+                        {t.rec ? `, record ${t.rec.seq}${t.rec.hash ? `, hash starting ${t.rec.hash.slice(0, 8)}` : ''}` : ''}
+                      </span>
+                      {t.rec ? (
+                        <span aria-hidden>
+                          <span className="text-fg">#{t.rec.seq}</span>
+                          {t.rec.hash ? <span> · {t.rec.hash.slice(0, 8)}</span> : null}
+                        </span>
+                      ) : (
+                        t.kind.split('.')[1]
+                      )}
                     </span>
                   ))}
                 </span>

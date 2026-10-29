@@ -30,7 +30,7 @@ test('tamper demo: a broken entry in red on the copy, and the real log was not m
   const panel = page.getByTestId('tamper-panel');
   await page.getByRole('button', { name: 'Run the tamper demo on a copy' }).click();
   await expect(panel.getByTestId('tamper-safe')).toContainText('Your real audit log was not modified.');
-  await expect(panel.getByTestId('tamper-safe')).toContainText(/Head copied: [0-9a-f]{12}/);
+  await expect(panel.getByTestId('tamper-safe')).toContainText(/Copied head hash: [0-9a-f]{12}/);
   // the real log is re-verified right after the sandbox run
   await expect(panel.getByTestId('tamper-real-check')).toContainText('Chain intact');
 

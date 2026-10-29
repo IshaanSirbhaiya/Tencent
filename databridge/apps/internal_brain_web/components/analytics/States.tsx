@@ -44,7 +44,7 @@ export function OrgNumbersLock({ className }: { className?: string }) {
         </span>
         <div className="min-w-0">
           <h2 className="text-heading-sm text-fg">Organisation numbers</h2>
-          <p className="mt-1 text-body-sm text-muted">Organisation numbers are visible to the compliance role. This is least privilege working.</p>
+          <p className="mt-1 text-body-sm text-muted">Visible to the compliance role only: each person sees what their role needs.</p>
           <p className="mt-1 text-caption text-subtle">You still see the pipeline, your own requests and their receipts.</p>
         </div>
       </div>

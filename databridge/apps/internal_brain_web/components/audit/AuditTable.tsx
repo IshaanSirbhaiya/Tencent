@@ -4,11 +4,10 @@
 import { History, PanelRightOpen, Sparkle } from 'lucide-react';
 import { useMemo } from 'react';
 import { Badge, CodeHash, DataTable, type ColumnDef } from '@/components/ui';
-import { fmtDateTime } from '@/lib/format';
 import { auditMessages } from '@/lib/i18n/audit';
 import { useMessages } from '@/lib/i18n';
 import type { AuditRow } from '@/lib/types';
-import { CHANNEL, DecisionBadge, OutcomeBadge, decisionsDenyFirst } from './shared';
+import { CHANNEL, DecisionBadge, OutcomeBadge, decisionsDenyFirst, fmtStamp } from './shared';
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
@@ -23,10 +22,10 @@ export function AuditTable({ rows, onOpen, openId, latestId }: { rows: AuditRow[
         meta: { className: 'whitespace-nowrap' },
         cell: ({ row }) => (
           <div className="tabular-nums">
-            <div>{fmtDateTime(row.original.event_time)}</div>
+            <div>{fmtStamp(row.original.event_time)}</div>
             {latestId && row.original.req_id === latestId ? (
-              <Badge className="mt-1" tone="accent" icon={Sparkle} data-latest="" title="The newest request in the ledger">
-                Newest
+              <Badge className="mt-1" tone="accent" icon={Sparkle} data-latest="" title={t('audit.table.newestTitle')}>
+                {t('audit.table.newest')}
               </Badge>
             ) : null}
             {row.original.synthetic_replay ? (
@@ -140,7 +139,7 @@ export function AuditTable({ rows, onOpen, openId, latestId }: { rows: AuditRow[
       caption={t('audit.table.caption')}
       getRowId={(r) => r.req_id}
       onRowClick={onOpen}
-      rowLabel={(r) => `${fmtDateTime(r.event_time)}, ${r.sub}: ${r.question ?? r.req_id}`}
+      rowLabel={(r) => `${fmtStamp(r.event_time)}, ${r.sub}: ${r.question ?? r.req_id}`}
       isRowSelected={(r) => r.req_id === openId || (!!latestId && r.req_id === latestId)}
       density="compact"
       maxHeightClass="max-h-[34rem]"

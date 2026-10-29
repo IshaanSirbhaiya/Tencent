@@ -3,10 +3,12 @@ import { ExternalLink, History } from 'lucide-react';
 import { Badge, PlatformIcon, StatusBadge } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import type { RequestStatus } from '@/lib/types';
+import { safeHref } from '@/lib/url';
 
 const STATUS: Record<string, { status: 'ok' | 'warn' | 'error' | 'neutral'; label: string }> = {
   released: { status: 'ok', label: 'Released' },
-  refused: { status: 'neutral', label: 'Refused' },
+  // Same plain term as User mode ("No answer"); the technical word stays in brackets.
+  refused: { status: 'neutral', label: 'No answer (refused)' },
   failed: { status: 'error', label: 'Failed' },
   in_progress: { status: 'warn', label: 'In progress' },
 };
@@ -35,7 +37,7 @@ export function DocLine({
   title,
   platform,
   container,
-  href,
+  href: rawHref,
   className,
 }: {
   docId: string;
@@ -46,6 +48,8 @@ export function DocLine({
   className?: string;
 }) {
   const pf = platform ?? docId.split(':', 1)[0];
+  // Only http(s) links are rendered (a javascript: or data: deep link shows as plain text).
+  const href = safeHref(rawHref);
   return (
     <div className={cn('flex min-w-0 items-start gap-2', className)}>
       <PlatformIcon platform={pf} showLabel={false} tone="platform" size="sm" className="mt-0.5" />

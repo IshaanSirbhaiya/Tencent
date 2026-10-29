@@ -1,6 +1,6 @@
 'use client';
 // Top-bar controls: ModeSwitch, LanguageSwitch, ThemeSwitch, PersonaMenu, SearchButton.
-import { Check, Code2, Globe, LogOut, Moon, Search, Settings, Sun, User, UserRoundCog } from 'lucide-react';
+import { Check, Code2, Globe, LogOut, Moon, MoreHorizontal, Search, Settings, Sun, User, UserRoundCog } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import {
@@ -21,13 +21,16 @@ import {
   Kbd,
   SegmentedControl,
 } from '@/components/ui';
+import { cn } from '@/lib/cn';
 import { useI18n, type Lang } from '@/lib/i18n';
-import { PERSONAS, personaById } from '@/lib/personas';
+import { PERSONA_ZH } from '@/lib/i18n/user';
+import { PERSONAS, personaById, type Persona } from '@/lib/personas';
 import type { Mode } from '@/lib/prefs';
+import { loginHref } from './nextPath';
 import { usePrefs, useSession } from './Providers';
 
 /** User / Developer segmented control (radio group). Changing it routes to the mode's home. */
-export function ModeSwitch({ className }: { className?: string }) {
+export function ModeSwitch({ className, iconOnly }: { className?: string; iconOnly?: boolean }) {
   const { mode, switchMode } = usePrefs();
   const { t } = useI18n();
   return (
@@ -38,8 +41,8 @@ export function ModeSwitch({ className }: { className?: string }) {
       testId="mode-switch"
       className={className}
       options={[
-        { value: 'user', label: t('mode.user'), icon: User, title: t('mode.userHint') },
-        { value: 'dev', label: t('mode.dev'), icon: Code2, title: t('mode.devHint') },
+        { value: 'user', label: t('mode.user'), icon: User, title: t('mode.userHint'), iconOnly },
+        { value: 'dev', label: t('mode.dev'), icon: Code2, title: t('mode.devHint'), iconOnly },
       ]}
     />
   );
@@ -92,9 +95,13 @@ export function ThemeSwitch() {
 }
 
 /** Opens the command palette; shows the shortcut. */
-export function SearchButton({ onOpen }: { onOpen: () => void }) {
+export function SearchButton({ onOpen, compact }: { onOpen: () => void; compact?: boolean }) {
   const { t } = useI18n();
   const [mac] = useState(() => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform));
+  if (compact)
+    return (
+      <IconButton icon={Search} label={t('shell.commandPalette')} onClick={onOpen} aria-keyshortcuts="Control+K Meta+K" className="hidden md:inline-flex" />
+    );
   return (
     <button
       type="button"
@@ -113,10 +120,59 @@ export function SearchButton({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+/**
+ * Language and theme folded into one "More options" menu, used by the top bar when it has no room
+ * for them (large text sizes, browser zoom, narrow windows).
+ */
+export function ShellOverflowMenu({ className }: { className?: string }) {
+  const { lang, setLang, t } = useI18n();
+  const { theme, setPref } = usePrefs();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t('shell.moreActions')}
+          title={t('shell.moreActions')}
+          data-testid="shell-overflow"
+          className={cn(
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-raised hover:text-fg data-[state=open]:bg-raised data-[state=open]:text-fg',
+            className,
+          )}
+        >
+          <MoreHorizontal aria-hidden className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[12rem]">
+        <DropdownMenuLabel>{t('lang.label')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)}>
+          <DropdownMenuRadioItem value="en" lang="en">
+            English
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="zh" lang="zh-Hans">
+            简体中文
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>{t('theme.label')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setPref('theme', v as 'dark' | 'light')}>
+          <DropdownMenuRadioItem value="dark">{t('theme.dark')}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="light">{t('theme.light')}</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** The persona's job title in the current language (PERSONA_ZH holds the 简体中文 roles). */
+export function personaRole(p: Persona, lang: Lang): string {
+  return lang === 'zh' ? PERSONA_ZH[p.id]?.role ?? p.role : p.role;
+}
+
 /** Who am I, roles, switch persona, settings, sign out. data-testid="whoami" holds name + sub. */
-export function PersonaMenu() {
+export function PersonaMenu({ compact }: { compact?: boolean }) {
   const { me, signOut, switchPersona } = useSession();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [busy, setBusy] = useState(false);
   if (!me) return null;
   const persona = personaById(me.sub);
@@ -131,8 +187,8 @@ export function PersonaMenu() {
           className="inline-flex h-9 max-w-[16rem] items-center gap-2 rounded-md px-1 text-left hover:bg-raised data-[state=open]:bg-raised md:pr-2"
         >
           <Avatar name={name} />
-          <span data-testid="whoami" className="sr-only min-w-0 leading-tight md:not-sr-only md:block">
-            <span className="block truncate text-xs font-medium text-fg">{persona ? `${persona.name} — ${persona.role}` : me.name}</span>
+          <span data-testid="whoami" className={cn('sr-only min-w-0 leading-tight', !compact && 'md:not-sr-only md:block')}>
+            <span className="block truncate text-xs font-medium text-fg">{persona ? `${persona.name} — ${personaRole(persona, lang)}` : me.name}</span>
             <span className="block truncate font-mono text-micro text-subtle">{me.sub}</span>
           </span>
         </button>
@@ -143,7 +199,7 @@ export function PersonaMenu() {
           <div className="min-w-0">
             <p className="text-micro font-semibold uppercase tracking-wide text-subtle">{t('persona.signedInAs')}</p>
             <p className="truncate text-sm font-medium text-fg">{name}</p>
-            {persona ? <p className="truncate text-caption text-muted">{persona.role}</p> : null}
+            {persona ? <p className="truncate text-caption text-muted">{personaRole(persona, lang)}</p> : null}
             <p className="truncate font-mono text-micro text-subtle">{me.sub}</p>
             <div className="mt-1.5 flex flex-wrap gap-1" aria-label={`${t('persona.roles')}: ${roleText}`}>
               {me.roles.map((r) => (
@@ -171,7 +227,7 @@ export function PersonaMenu() {
                   try {
                     await switchPersona(p.id);
                   } catch {
-                    window.location.assign('/login');
+                    window.location.assign(loginHref(`${window.location.pathname}${window.location.search}`));
                   } finally {
                     setBusy(false);
                   }
@@ -180,12 +236,12 @@ export function PersonaMenu() {
                 <Avatar name={p.name} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{p.name}</span>
-                  <span className="block truncate text-micro text-subtle">{p.role}</span>
+                  <span className="block truncate text-micro text-subtle">{personaRole(p, lang)}</span>
                 </span>
                 {p.id === me.sub ? (
                   <>
                     <Check aria-hidden className="h-3.5 w-3.5 text-accent" />
-                    <span className="sr-only">(current)</span>
+                    <span className="sr-only">{t('persona.current')}</span>
                   </>
                 ) : null}
               </DropdownMenuItem>

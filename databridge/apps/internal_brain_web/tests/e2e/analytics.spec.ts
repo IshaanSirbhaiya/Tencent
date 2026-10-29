@@ -61,7 +61,7 @@ test.describe('mission control', () => {
   test('employee: the pipeline and own requests, org numbers locked', async ({ page }) => {
     await signIn(page, 'jdoe');
     await page.goto('/dev');
-    await expect(page.getByTestId('org-numbers-lock')).toContainText('This is least privilege working.');
+    await expect(page.getByTestId('org-numbers-lock')).toContainText('each person sees what their role needs.');
     await expect(page.getByTestId('mission-kpis')).toHaveCount(0);
     await expect(page.getByTestId('pipeline-diagram').getByRole('button')).toHaveCount(10);
     // no live timings for a non-compliance viewer: the static description instead
@@ -140,7 +140,7 @@ test.describe('analytics', () => {
   test('non-compliance gets the lock card', async ({ page }) => {
     await signIn(page, 'jdoe');
     await page.goto('/dev/analytics');
-    await expect(page.getByTestId('role-lock')).toContainText('least privilege');
+    await expect(page.getByTestId('role-lock')).toContainText('compliance role only');
     await expect(page.getByTestId('analytics-body')).toHaveCount(0);
   });
 

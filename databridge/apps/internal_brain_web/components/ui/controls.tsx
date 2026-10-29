@@ -48,7 +48,7 @@ export function SwitchField({
   return (
     <div className="flex items-center justify-between gap-4 py-2">
       <div className="min-w-0">
-        <label htmlFor={sid} className="text-sm font-medium text-fg">
+        <label id={`${sid}-label`} htmlFor={sid} className="text-sm font-medium text-fg">
           {label}
         </label>
         {hint ? (
@@ -57,7 +57,15 @@ export function SwitchField({
           </p>
         ) : null}
       </div>
-      <Switch id={sid} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} aria-describedby={hint ? `${sid}-hint` : undefined} />
+      {/* aria-labelledby as well as <label for>: axe does not credit <label for> on a role=switch button. */}
+      <Switch
+        id={sid}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+        aria-labelledby={`${sid}-label`}
+        aria-describedby={hint ? `${sid}-hint` : undefined}
+      />
     </div>
   );
 }

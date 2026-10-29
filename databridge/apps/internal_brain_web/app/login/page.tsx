@@ -6,6 +6,7 @@ import { ArrowRight, Compass, Database, KeyRound, Loader2, ShieldCheck } from 'l
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AppShell } from '@/components/shell/AppShell';
+import { safeNextPath } from '@/components/shell/nextPath';
 import { useSession } from '@/components/shell/Providers';
 import { Avatar, Button, Input, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
@@ -44,8 +45,11 @@ export default function LoginPage() {
     setError(null);
     try {
       const r = await api.login(p.id, passcode.trim() || undefined);
-      await session.refresh();
-      router.replace(r.roles.includes('admin_it') && !r.roles.includes('compliance_officer') ? '/sim' : '/');
+      // force: a whoami that started before this sign-in must not answer for it.
+      await session.refresh({ force: true });
+      // Back to the page that sent us here (?next=, a validated same-site path only), else home.
+      const next = safeNextPath(new URLSearchParams(window.location.search).get('next'));
+      router.replace(next ?? (r.roles.includes('admin_it') && !r.roles.includes('compliance_officer') ? '/sim' : '/'));
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
       if (status === 401) {

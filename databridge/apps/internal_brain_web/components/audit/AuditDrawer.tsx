@@ -6,11 +6,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button, CodeHash, PlatformIcon, Sheet, SheetContent } from '@/components/ui';
 import { api } from '@/lib/api';
-import { fmtDateTime, fmtTime, modelLabel } from '@/lib/format';
+import { fmtTime, modelLabel } from '@/lib/format';
 import { useMessages } from '@/lib/i18n';
 import { auditMessages } from '@/lib/i18n/audit';
 import type { AuditRow } from '@/lib/types';
-import { CHANNEL, DecisionBadge, OutcomeBadge, titleFor } from './shared';
+import { CHANNEL, DecisionBadge, OutcomeBadge, fmtStamp, titleFor } from './shared';
 
 const MIN_REASON = 10;
 
@@ -49,7 +49,7 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
       const r = await api.reveal(row.req_id, reason.trim());
       setRevealed({ answer: r.answer, at: new Date().toISOString() });
     } catch {
-      setError('The answer could not be revealed. Nothing was disclosed.');
+      setError(t('audit.drawer.revealError'));
     } finally {
       setBusy(false);
     }
@@ -65,7 +65,7 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
           width="lg"
           title={t('audit.drawer.title')}
           description={<span className="font-mono">{row.req_id}</span>}
-          closeLabel="Close details"
+          closeLabel={t('audit.drawer.close')}
           data-testid="audit-drawer"
           onCloseAutoFocus={(e) => {
             const el = returnFocus?.();
@@ -85,29 +85,30 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
         >
           <div className="space-y-6 text-body-sm">
             <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2">
-              <dt className="text-muted">Time</dt>
+              <dt className="text-muted">{t('audit.drawer.time')}</dt>
               <dd className="tabular-nums">
-                {fmtDateTime(row.event_time)}
-                {row.synthetic_replay ? <span className="text-muted"> · synthetic replay</span> : null}
+                {fmtStamp(row.event_time)}
+                {row.synthetic_replay ? <span className="text-muted"> · {t('audit.drawer.replay')}</span> : null}
               </dd>
-              <dt className="text-muted">Person</dt>
+              <dt className="text-muted">{t('audit.drawer.person')}</dt>
               <dd className="font-mono text-xs">{row.sub}</dd>
-              <dt className="text-muted">Channel</dt>
+              <dt className="text-muted">{t('audit.drawer.channel')}</dt>
               <dd>{CHANNEL[row.channel ?? ''] ?? row.channel ?? '—'}</dd>
-              <dt className="text-muted">Outcome</dt>
+              <dt className="text-muted">{t('audit.drawer.outcome')}</dt>
               <dd>
                 <OutcomeBadge e={row} />
               </dd>
-              <dt className="text-muted">Model</dt>
+              <dt className="text-muted">{t('audit.drawer.model')}</dt>
               <dd>{modelLabel(row.model)}</dd>
               {typeof row.latency_ms === 'number' ? (
                 <>
-                  <dt className="text-muted">Latency</dt>
+                  <dt className="text-muted">{t('audit.drawer.latency')}</dt>
                   <dd className="tabular-nums">{row.latency_ms.toLocaleString('en-SG')} ms</dd>
                 </>
               ) : null}
-              <dt className="text-muted">Question</dt>
-              <dd>{row.question ?? '—'}</dd>
+              <dt className="text-muted">{t('audit.drawer.question')}</dt>
+              {/* The question is data, asked in English: tagged so a 简体中文 screen reader switches voice. */}
+              <dd lang="en">{row.question ?? '—'}</dd>
             </dl>
 
             {row.records?.length ? (
@@ -128,9 +129,9 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
             ) : null}
 
             <section aria-labelledby="decisions-h">
-              <H id="decisions-h">Considered after the index filter, checked live with each source</H>
+              <H id="decisions-h">{t('audit.drawer.considered')}</H>
               {considered.length === 0 ? (
-                <p className="text-muted">None</p>
+                <p className="text-muted">{t('audit.drawer.none')}</p>
               ) : (
                 <ul className="divide-y divide-line rounded-md border border-line">
                   {considered.map((d) => {
@@ -155,11 +156,11 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
             </section>
 
             <section aria-labelledby="released-h">
-              <H id="released-h">Sources the answer used</H>
+              <H id="released-h">{t('audit.drawer.used')}</H>
               {row.refused ? (
-                <p>No answer was given.</p>
+                <p>{t('audit.drawer.noAnswer')}</p>
               ) : (row.released ?? []).length === 0 ? (
-                <p className="text-muted">None</p>
+                <p className="text-muted">{t('audit.drawer.none')}</p>
               ) : (
                 <ul className="space-y-1">
                   {(row.released ?? []).map((d) => (
@@ -173,20 +174,18 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
 
             <section aria-labelledby="reveal-h" className="rounded-lg border border-line bg-raised/50 p-3">
               <h3 id="reveal-h" className="flex items-center gap-2 text-heading-sm">
-                <Lock aria-hidden className="h-4 w-4 text-muted" /> Answer text
+                <Lock aria-hidden className="h-4 w-4 text-muted" /> {t('audit.drawer.answerText')}
               </h3>
-              <p className="mt-1 text-muted">
-                The log keeps only a fingerprint of the answer. To read the text, give a reason. Your reveal is logged under your name.
-              </p>
+              <p className="mt-1 text-muted">{t('audit.drawer.revealIntro')}</p>
               {revealed ? (
                 <div className="mt-3 space-y-1" data-testid="revealed-answer">
                   <p className="whitespace-pre-wrap rounded-md border border-line bg-surface p-3">{revealed.answer}</p>
-                  <p className="text-2xs text-muted">Reveal recorded at {fmtTime(revealed.at)}.</p>
+                  <p className="text-2xs text-muted">{t('audit.drawer.revealedAt', { time: fmtTime(revealed.at) })}</p>
                 </div>
               ) : (
                 <form onSubmit={reveal} className="mt-3 space-y-2" noValidate>
                   <label htmlFor="reveal-reason" className="block text-xs font-medium">
-                    Reason for revealing (required)
+                    {t('audit.drawer.reasonLabel')}
                   </label>
                   <textarea
                     id="reveal-reason"
@@ -196,11 +195,11 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
                     required
                     aria-invalid={touched && tooShort}
                     aria-describedby="reveal-hint"
-                    placeholder="e.g. Investigating ticket GRC-14: confirm what was disclosed to jdoe"
+                    placeholder={t('audit.drawer.reasonPlaceholder')}
                     className="block w-full rounded-md border border-line-strong bg-bg px-2.5 py-2 text-sm placeholder:text-subtle"
                   />
                   <p id="reveal-hint" className={touched && tooShort ? 'text-2xs font-medium text-warn' : 'text-2xs text-muted'}>
-                    At least {MIN_REASON} characters. {touched && tooShort ? 'Please give a fuller reason.' : ''}
+                    {t('audit.drawer.reasonMin', { n: MIN_REASON })} {touched && tooShort ? t('audit.drawer.reasonShort') : ''}
                   </p>
                   {error ? (
                     <p role="alert" className="text-xs">
@@ -208,7 +207,7 @@ export function AuditDrawer({ row, onClose, returnFocus }: { row: AuditRow | nul
                     </p>
                   ) : null}
                   <Button type="submit" size="sm" icon={Eye} busy={busy}>
-                    Reveal answer
+                    {t('audit.drawer.reveal')}
                   </Button>
                 </form>
               )}

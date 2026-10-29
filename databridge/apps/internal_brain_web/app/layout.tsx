@@ -1,6 +1,7 @@
 import '@fontsource-variable/inter';
 import type { Metadata, Viewport } from 'next';
 import { Providers } from '@/components/shell/Providers';
+import { SkipLink } from '@/components/shell/SkipLink';
 import { PresenterRoot } from '@/components/presenter/PresenterRoot';
 import { TourOverlay } from '@/components/tour/Tour';
 import { PREFS_INIT_SCRIPT } from '@/lib/prefs';
@@ -28,10 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: PREFS_INIT_SCRIPT }} />
       </head>
       <body className="min-h-screen bg-bg font-sans text-body text-fg antialiased">
-        <a href="#main" className="skip-link">
-          Skip to main content
-        </a>
         <Providers>
+          {/* First Tab stop; inside Providers so it follows the chosen language. */}
+          <SkipLink />
           {children}
           <TourOverlay />
           <PresenterRoot />

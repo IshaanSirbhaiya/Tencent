@@ -20,6 +20,51 @@ type State =
   | { kind: 'error'; status: number };
 
 const detected = (s: TamperScenario) => !!s.detected;
+
+/**
+ * The progress line while the one POST runs (about 3 s live). It is PROGRESS, not data: the steps
+ * are the three things the endpoint does, in order, advanced on elapsed time; the seconds are real.
+ */
+const RUN_STEPS = ['audit.tamper.run1', 'audit.tamper.run2', 'audit.tamper.run3'] as const;
+const RUN_AT = [0, 700, 1700];
+
+function RunningLine() {
+  const t = useMessages(auditMessages);
+  const [ms, setMs] = useState(0);
+  useEffect(() => {
+    const t0 = Date.now();
+    const id = setInterval(() => setMs(Date.now() - t0), 250);
+    return () => clearInterval(id);
+  }, []);
+  const step = RUN_AT.filter((at) => ms >= at).length - 1;
+  return (
+    <div
+      role="progressbar"
+      aria-label={t('audit.tamper.running')}
+      aria-valuemin={0}
+      aria-valuemax={RUN_STEPS.length}
+      aria-valuenow={step + 1}
+      aria-valuetext={t(RUN_STEPS[step])}
+      data-testid="tamper-progress"
+      data-step={step}
+      className="space-y-2"
+    >
+      <p className="flex items-center gap-2.5 text-body font-medium text-fg">
+        <span aria-hidden className="relative inline-flex h-2.5 w-2.5 shrink-0">
+          <span className="absolute inset-0 rounded-full bg-accent/40 motion-safe:animate-ping" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent" />
+        </span>
+        <span>{t(RUN_STEPS[step])}…</span>
+        <span className="font-mono text-caption tabular-nums text-subtle">{(ms / 1000).toFixed(0)} s</span>
+      </p>
+      <span aria-hidden className="grid w-full max-w-xs grid-cols-3 gap-1">
+        {RUN_STEPS.map((k, i) => (
+          <span key={k} className={cn('h-1 rounded-full', i < step ? 'bg-accent' : i === step ? 'bg-accent/45 motion-safe:animate-pulse' : 'bg-line-strong')} />
+        ))}
+      </span>
+    </div>
+  );
+}
 const asExpected = (s: TamperScenario) => s.ok && !s.skipped;
 
 /** A few records around the break (or the head, when untouched). Decorative: the text says it all. */
@@ -124,10 +169,12 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
   useEffect(() => {
     if (state.kind !== 'done') return;
     const id = requestAnimationFrame(() => setShown(true));
-    // Presenter mode: keep the result on screen
+    // Presenter mode: bring the first "Chain broken" row (the one read aloud) into view, clear of
+    // the presenter bar; the panel itself when nothing broke.
     if (autoRun && panelRef.current) {
       const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduce';
-      panelRef.current.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      const row = panelRef.current.querySelector<HTMLElement>('[data-detected="true"]');
+      (row ?? panelRef.current).scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: row ? 'center' : 'start' });
     }
     return () => cancelAnimationFrame(id);
   }, [state.kind, autoRun]);
@@ -169,7 +216,7 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
       <div aria-live="polite" className="px-4 py-4 sm:px-5">
         {state.kind === 'idle' ? (
           <ol className="grid gap-2 text-body-sm text-muted sm:grid-cols-3">
-            {['Copy the live ledger into a temporary sandbox.', 'Edit, delete and roll back records in the copy.', 'Run Verify on every copy and show what it caught.'].map((s, i) => (
+            {[t('audit.tamper.step1'), t('audit.tamper.step2'), t('audit.tamper.step3')].map((s, i) => (
               <li key={s} className="flex items-start gap-2 rounded-lg border border-dashed border-line-strong px-3 py-2">
                 <span className="font-mono text-2xs text-subtle tabular-nums">0{i + 1}</span>
                 {s}
@@ -177,8 +224,8 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
             ))}
           </ol>
         ) : state.kind === 'running' ? (
-          <div className="space-y-2" role="status">
-            <p className="text-body-sm text-muted">{t('audit.tamper.running')}</p>
+          <div className="space-y-3">
+            <RunningLine />
             <div className="ds-skeleton h-16 rounded-lg bg-raised" />
             <div className="ds-skeleton h-10 rounded-lg bg-raised" />
             <div className="ds-skeleton h-10 rounded-lg bg-raised" />
@@ -217,6 +264,11 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
                     </span>
                   ) : null}
                 </p>
+                {real && typeof res.records_copied === 'number' && real.records > res.records_copied ? (
+                  <p className="text-caption text-muted" data-testid="tamper-counts-differ">
+                    {t('audit.tamper.countsDiffer', { n: (real.records - res.records_copied).toLocaleString('en-SG') })}
+                  </p>
+                ) : null}
                 {real ? (
                   <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm" data-testid="tamper-real-check">
                     <span className="text-muted">{t('audit.tamper.recheck')}</span>
@@ -224,7 +276,7 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
                       {real.ok ? <CheckCircle2 aria-hidden className="h-4 w-4" /> : <XCircle aria-hidden className="h-4 w-4" />}
                       {real.ok ? t('audit.verify.intact') : t('audit.verify.problems')}
                     </span>
-                    <span className="text-muted tabular-nums">· {real.records.toLocaleString('en-SG')} records ·</span>
+                    <span className="text-muted tabular-nums">· {t('audit.tamper.records', { n: real.records.toLocaleString('en-SG') })} ·</span>
                     <CodeHash value={real.head} head={8} tail={4} label="real head hash" />
                   </p>
                 ) : (
@@ -238,7 +290,7 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
                 <span>{t('audit.tamper.scenario')}</span>
                 <span>{t('audit.tamper.expected')}</span>
                 <span>{t('audit.tamper.actual')}</span>
-                <span className="text-right">Copy</span>
+                <span className="text-right">{t('audit.tamper.copyCol')}</span>
               </div>
               <ol aria-label={t('audit.tamper.caption')} className="divide-y divide-line">
                 {res.scenarios.map((s, i) => {
@@ -294,7 +346,7 @@ export const TamperDemo = forwardRef<HTMLElement, { autoRun?: boolean }>(functio
             <p className="text-2xs text-subtle tabular-nums">
               POST /audit/tamper-demo
               {typeof res.elapsed_ms === 'number' ? ` · ${res.elapsed_ms.toLocaleString('en-SG')} ms` : ''}
-              {res.external_head_copied === false ? ' · no external head published yet' : ''}
+              {res.external_head_copied === false ? ` · ${t('audit.tamper.noExternal')}` : ''}
             </p>
           </div>
         ) : null}

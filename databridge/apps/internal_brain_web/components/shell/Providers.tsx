@@ -5,6 +5,7 @@
 //   - the Radix tooltip provider.
 import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { LiveAnnouncer } from '@/components/ui/announce';
 import { TooltipProvider } from '@/components/ui/overlays';
 import { ApiError, api } from '@/lib/api';
 import { LangContext } from '@/lib/i18n';
@@ -45,8 +46,9 @@ export type SessionStatus = 'loading' | 'ready' | 'signed-out' | 'error';
 interface SessionState {
   me: WhoAmI | null;
   status: SessionStatus;
-  /** Re-read /auth/whoami (after sign-in, a persona switch, or on page change). */
-  refresh: () => Promise<WhoAmI | null>;
+  /** Re-read /auth/whoami (after sign-in, a persona switch, or on page change). `force` starts a
+   *  fresh request even while one is pending (the "Check again" button after a slow check). */
+  refresh: (opts?: { force?: boolean }) => Promise<WhoAmI | null>;
   /** Forget the cached identity (sign-out, sign-in page). */
   clear: () => void;
   signOut: () => Promise<void>;
@@ -66,6 +68,32 @@ export function useSession(): SessionState {
 /** The signed-in person, or null while loading / signed out. Same contract as the old useMe(). */
 export function useMe(): WhoAmI | null {
   return useContext(SessionContext)?.me ?? null;
+}
+
+/* ---------------------------------------------------------------- identity caches */
+
+/**
+ * Forget what the previous person's session cached in this tab: the graph layout positions
+ * (`ib-graph-layout:*` in sessionStorage name the nodes that person could see). Listeners such as
+ * components/graph/layout.ts clear their in-memory copies on the `ib:identity-changed` event.
+ */
+function forgetIdentityCaches() {
+  try {
+    const s = window.sessionStorage;
+    const drop: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k && k.startsWith('ib-graph-layout:')) drop.push(k);
+    }
+    drop.forEach((k) => s.removeItem(k));
+  } catch {
+    /* storage unavailable: nothing was cached there */
+  }
+  try {
+    window.dispatchEvent(new Event('ib:identity-changed'));
+  } catch {
+    /* no window (SSR) */
+  }
 }
 
 /* ---------------------------------------------------------------- provider */
@@ -143,16 +171,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<SessionStatus>('loading');
   const inflight = useRef<Promise<WhoAmI | null> | null>(null);
 
-  const refresh = useCallback(() => {
+  const generation = useRef(0);
+
+  const refresh = useCallback((opts?: { force?: boolean }) => {
+    // `force` (the "Check again" button) drops a request that seems stuck and starts a new one;
+    // only the answer to the LATEST request is applied, a late stale answer is ignored.
+    if (opts?.force) inflight.current = null;
     if (!inflight.current) {
-      inflight.current = api
+      const gen = ++generation.current;
+      const p: Promise<WhoAmI | null> = api
         .whoami()
         .then((w) => {
+          if (gen !== generation.current) return w;
           setMe(w);
           setStatus('ready');
           return w;
         })
         .catch((e: unknown) => {
+          if (gen !== generation.current) return null;
           if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
             setMe(null);
             setStatus('signed-out');
@@ -162,8 +198,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           return null;
         })
         .finally(() => {
-          inflight.current = null;
+          if (inflight.current === p) inflight.current = null;
         });
+      inflight.current = p;
     }
     return inflight.current;
   }, []);
@@ -179,6 +216,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     } catch {
       /* the session may already be gone */
     }
+    forgetIdentityCaches();
     setMe(null);
     setStatus('signed-out');
     router.replace('/login');
@@ -187,11 +225,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const switchPersona = useCallback(
     async (id: string) => {
       await api.switchTo(id);
-      await refresh();
+      forgetIdentityCaches();
+      // force: a whoami that started before the switch must not win with the OLD identity.
+      await refresh({ force: true });
       router.refresh();
     },
     [refresh, router],
   );
+
+  // Any change of the signed-in person (including a fresh sign-in on /login) drops per-person caches.
+  const lastSub = useRef<string | null>(null);
+  useEffect(() => {
+    const sub = me?.sub ?? null;
+    if (sub && lastSub.current && sub !== lastSub.current) forgetIdentityCaches();
+    if (sub) lastSub.current = sub;
+  }, [me?.sub]);
 
   const sessionValue = useMemo<SessionState>(
     () => ({ me, status, refresh, clear, signOut, switchPersona, hasRole: (r: string) => !!me?.roles.includes(r) }),
@@ -202,7 +250,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <PrefsContext.Provider value={prefsValue}>
       <LangContext.Provider value={langValue}>
         <SessionContext.Provider value={sessionValue}>
-          <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+          <TooltipProvider delayDuration={300}>
+            {children}
+            <LiveAnnouncer />
+          </TooltipProvider>
         </SessionContext.Provider>
       </LangContext.Provider>
     </PrefsContext.Provider>

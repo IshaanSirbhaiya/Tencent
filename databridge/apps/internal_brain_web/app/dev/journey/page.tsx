@@ -77,10 +77,10 @@ export default function JourneyIndex() {
               className="bg-surface"
             />
           ) : (
-            <RecentRequests rows={rows} showAsker={compliance} caption={compliance ? 'Recent requests in the ledger' : 'Your recent requests'} maxHeightClass="max-h-[70vh]" />
+            <RecentRequests rows={rows} showAsker={compliance} caption={compliance ? 'Recent requests in the ledger' : 'Table of your recent requests'} maxHeightClass="max-h-[70vh]" />
           )}
         </section>
-        <aside className="space-y-4">
+        <aside aria-label="Journey tools" className="space-y-4">
           <Card className="p-4">
             <form onSubmit={open} className="space-y-2" aria-labelledby="open-h">
               <h2 id="open-h" className="text-heading-sm text-fg">

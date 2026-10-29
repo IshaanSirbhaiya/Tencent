@@ -34,7 +34,9 @@ export const CitationChip = forwardRef<
       data-tag={citation.tag}
       data-platform={citation.platform}
       className={cn(
-        'mx-[1px] inline-flex h-[1.375rem] min-w-[1.5rem] items-center justify-center rounded-md border px-1 align-[2px] text-caption font-semibold tabular-nums leading-none transition-colors duration-fast',
+        // 24 x 24 px target (WCAG 2.5.8). The -2px vertical margins keep the chip's margin box at
+        // 20px, so it never makes its line of answer text taller than its neighbours.
+        'mx-[1px] -my-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-md border px-1 align-middle text-caption font-semibold tabular-nums leading-none transition-colors duration-fast',
         TINT[citation.platform] ?? 'border-line-strong bg-raised text-muted hover:bg-line',
         className,
       )}

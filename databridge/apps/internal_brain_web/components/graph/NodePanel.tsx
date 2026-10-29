@@ -15,6 +15,7 @@ import type { DocView } from '@/lib/types';
 import { CopyId } from './bits';
 import { displayLabel, fmtCount, kindLine, placeLabel, platformName, typeName } from './format';
 import type { KGraph } from './model';
+import { safeHref } from '@/lib/url';
 
 type DocState = { kind: 'idle' } | { kind: 'loading' } | { kind: 'ok'; doc: DocView } | { kind: 'gone' } | { kind: 'error' };
 
@@ -155,9 +156,9 @@ export const NodePanel = forwardRef<HTMLHeadingElement, Props>(function NodePane
               ) : null}
               <Field k={t('node.id')} v={<span className="break-all font-mono text-caption text-muted">{id}</span>} />
             </dl>
-            {isDoc && a.deepLink ? (
+            {isDoc && safeHref(a.deepLink) ? (
               <a
-                href={a.deepLink}
+                href={safeHref(a.deepLink) ?? undefined}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="mt-4 inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong px-3 text-body-sm font-medium text-fg hover:bg-raised"

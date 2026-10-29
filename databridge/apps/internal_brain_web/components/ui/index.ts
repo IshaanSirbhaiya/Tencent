@@ -45,3 +45,4 @@ export {
 } from './display';
 export { DataTable, type DataTableProps, type ColumnDef, type SortingState } from './data-table';
 export { PlatformIcon, PLATFORM_TONE } from '../PlatformIcon';
+export { announce, LiveAnnouncer } from './announce';

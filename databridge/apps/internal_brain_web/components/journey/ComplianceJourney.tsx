@@ -1,5 +1,5 @@
 'use client';
-import { CircleCheck, CircleSlash, Eye, Minus, ShieldCheck, ShieldX } from 'lucide-react';
+import { ChevronRight, CircleCheck, CircleSlash, Eye, Minus, ShieldCheck, ShieldX } from 'lucide-react';
 import Link from 'next/link';
 import { ChartCard } from '@/components/analytics/ChartCard';
 import { channelLabel, int, modelInfoName, ms, reasonLabel, VERDICT_ALLOW } from '@/components/analytics/format';
@@ -82,20 +82,31 @@ export function ComplianceJourney({ j }: { j: JourneyV1 }) {
           </Pill>
           <ReplayBadge show={j.synthetic_replay} />
         </div>
-        <h2 className="mt-3 text-heading text-fg">
+        <h2 className="mt-2 text-heading text-fg">
           <span className="sr-only">Question: </span>
           {j.question ? <>“{j.question}”</> :<span className="text-muted">Question not recorded</span>}
         </h2>
-        <StatGrid cols={4} className="mt-4">
+        <StatGrid cols={4} className="mt-3">
           <Stat label="Request" value={<CodeHash value={j.req_id} head={10} tail={4} label="request id" />} />
           <Stat label="Asked by" value={<span className="font-mono text-caption">{j.sub ?? '—'}</span>} />
-          <Stat label="Channel" value={channelLabel(j.channel)} />
           <Stat label="When" value={j.event_time ? `${fmtDate(j.event_time)} · ${fmtTime(j.event_time)}` : '—'} />
           <Stat label="Latency" value={ms(j.latency_ms)} />
-          <Stat label="Policy" value={<span className="font-mono text-caption">{j.policy_version ?? '—'}</span>} />
-          <Stat label="Directory epoch" value={int(j.directory_epoch)} />
-          <Stat label="Gate-1 policy" value={<span className="font-mono text-caption">{j.gate1_policy_version ?? '—'}</span>} />
         </StatGrid>
+        {/* Versions and epochs matter to an auditor, not at first glance: kept one click away so the
+            waterfall is in the first fold at 1280 x 720. */}
+        <details className="group mt-2 border-t border-line pt-1.5" data-testid="journey-technical">
+          <summary className="inline-flex min-h-6 cursor-pointer select-none items-center gap-1 rounded text-caption font-medium text-muted hover:text-fg">
+            <ChevronRight aria-hidden className="h-3.5 w-3.5 transition-transform duration-fast group-open:rotate-90" />
+            Technical details
+          </summary>
+          <StatGrid cols={4} className="mt-2">
+            <Stat label="Channel" value={channelLabel(j.channel)} />
+            <Stat label="Policy" value={<span className="font-mono text-caption">{j.policy_version ?? '—'}</span>} />
+            <Stat label="Directory epoch" value={int(j.directory_epoch)} />
+            <Stat label="Gate-1 policy" value={<span className="font-mono text-caption">{j.gate1_policy_version ?? '—'}</span>} />
+            <Stat label="Prompt" value={<span className="break-all font-mono text-caption">{j.prompt_version ?? '—'}</span>} />
+          </StatGrid>
+        </details>
       </Card>
 
       {hasStages ? (
@@ -131,7 +142,6 @@ export function ComplianceJourney({ j }: { j: JourneyV1 }) {
                 ['Provider', j.model?.provider],
                 ['Model id', j.model?.model],
                 ['Fallback used', j.model ? (j.model.fallback_used ? 'Yes' : 'No') : null],
-                ['Prompt', j.prompt_version],
               ] as const
             ).map(([k, v]) => (
               <div key={k} className="flex items-baseline justify-between gap-3 border-b border-line pb-1.5 last:border-b-0">

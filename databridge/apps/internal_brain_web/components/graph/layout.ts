@@ -5,6 +5,9 @@ import { LAYOUT_VERSION, type Positions, computeLayout } from './layout-core';
 import { datasetHash, type KGraph, layoutInput } from './model';
 
 const memory = new Map<string, Positions>();
+// Cached positions name the nodes one person could see: forget them when the signed-in identity
+// changes (sign-out, persona switch). The shell clears sessionStorage and fires this event.
+if (typeof window !== 'undefined') window.addEventListener('ib:identity-changed', () => memory.clear());
 let worker: Worker | null = null;
 let seq = 0;
 const pending = new Map<number, { resolve: (p: Positions) => void; reject: (e: Error) => void }>();

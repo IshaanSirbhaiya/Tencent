@@ -17,6 +17,13 @@ export const zh: Record<CoreKey, string> = {
   'shell.unavailable': '服务暂时不可用，请稍后刷新重试。',
   'shell.search': '搜索或跳转到…',
   'shell.commandPalette': '打开命令面板',
+  'shell.slowSession': '耗时比平常更长。请检查网络连接，然后重试。',
+  'shell.retrySession': '重新检查',
+  'shell.moreActions': '更多选项',
+  'shell.sidebar': '侧边栏',
+  'shell.mockNotice': '模拟模式提示',
+  'shell.devEnglishOnly': '开发者模式仅提供英文',
+  'persona.current': '（当前）',
 
   'mode.label': '模式',
   'mode.user': '用户',

@@ -514,7 +514,7 @@ export default function AnalyticsPage() {
       role="compliance_officer"
       fallback={
         <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          <LockCard role="compliance_officer" title="Analytics needs the compliance role" body="Organisation numbers are visible to the compliance role. This is least privilege working." />
+          <LockCard role="compliance_officer" title="Analytics needs the compliance role" body="Visible to the compliance role only: each person sees what their role needs." />
         </div>
       }
     >
