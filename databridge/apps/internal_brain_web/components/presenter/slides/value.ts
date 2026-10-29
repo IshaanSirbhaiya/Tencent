@@ -74,3 +74,21 @@ export function usdCompact(v: number): string {
   if (a >= 1e3) return `US$${(v / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
   return `US$${Math.round(v)}`;
 }
+
+/** The spoken figure: one decimal in millions, whole thousands (US$1.3M, US$442K). */
+export function usdRounded(v: number): string {
+  const a = Math.abs(v);
+  if (a >= 1e6) return `US$${(v / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+  if (a >= 1e3) return `US$${Math.round(v / 1e3)}K`;
+  return `US$${Math.round(v)}`;
+}
+
+/** The exact figure in whole dollars (US$1,283,400). */
+export function usdExact(v: number): string {
+  return `US$${Math.round(v).toLocaleString('en-SG')}`;
+}
+
+/** Whole minutes when at least one ("7"), else one decimal ("0.4"). */
+export function minutesRounded(v: number): string {
+  return v >= 1 ? String(Math.round(v)) : v.toFixed(1);
+}

@@ -7,6 +7,7 @@
 import { peopleUrl, personUrl, type CompareSpec } from '@/components/compare/params';
 import { SAMPLE_QUESTION } from '@/lib/personas';
 import type { PresenterKey } from '@/lib/i18n/presenter';
+import type { CallOutcome } from './bus';
 
 export const Q_VELQUARRY = "Why has Velquarry Trading's account been restricted, and what should I tell the customer?";
 export const Q_BAYFRONT = "Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?";
@@ -24,14 +25,23 @@ export const CLIPS = {
 } as const;
 
 export interface StepCtx {
-  /** Client-side navigation; resolves once the route change was requested. */
+  /**
+   * Client-side navigation; resolves once the route change was requested. Every context call
+   * throws instead when its step was superseded (a newer step, P or Reset), so a stale action can
+   * never navigate, change a session or drive a page.
+   */
   go: (url: string) => Promise<void>;
-  /** Call a page handler (components/presenter/bus.ts); false when it never accepted. */
-  call: (name: string, arg?: unknown, timeoutMs?: number) => Promise<boolean>;
+  /** Call a page handler (components/presenter/bus.ts): 'ok' only when it ran and succeeded. */
+  call: (name: string, arg?: unknown, timeoutMs?: number) => Promise<CallOutcome>;
   /** Make the MAIN session this persona (demo sign-in; identity still comes from the signed token). */
   signInMain: (persona: string) => Promise<void>;
   /** The latest request id a Compare column produced for this persona, if any. */
   req: (persona: string) => string | null;
+  /**
+   * Wait (up to `timeoutMs`) for `selector` on the page and scroll it to the top of the view.
+   * Resolves false when it never appeared (the page itself shows why).
+   */
+  reveal: (selector: string, timeoutMs?: number) => Promise<boolean>;
 }
 
 export type StepId =
@@ -92,7 +102,7 @@ export const STEPS: PresenterStep[] = [
     clip: CLIPS.A,
     action: async (ctx) => {
       await ctx.go(peopleUrl(SPEC_PEOPLE.left, SPEC_PEOPLE.right, SPEC_PEOPLE.q1));
-      if (!(await ctx.call('compare-run', SPEC_PEOPLE, 15_000))) fail('compare-run');
+      if ((await ctx.call('compare-run', SPEC_PEOPLE, 15_000)) !== 'ok') fail('compare-run');
     },
   },
   {
@@ -103,7 +113,7 @@ export const STEPS: PresenterStep[] = [
     clip: CLIPS.A,
     action: async (ctx) => {
       await ctx.go(personUrl(SPEC_KEN.left, SPEC_KEN.q1, SPEC_KEN.q2));
-      if (!(await ctx.call('compare-run', SPEC_KEN, 15_000))) fail('compare-run');
+      if ((await ctx.call('compare-run', SPEC_KEN, 15_000)) !== 'ok') fail('compare-run');
     },
   },
   {
@@ -112,9 +122,12 @@ export const STEPS: PresenterStep[] = [
     say: 'Ishaan: "Every sentence points at a passage the asker can open right now." Esc closes the sheet.',
     url: peopleUrl(SPEC_PEOPLE.left, SPEC_PEOPLE.right, SPEC_PEOPLE.q1),
     clip: CLIPS.A,
+    // Rachel's live passage needs the main session to be Rachel: sign her in again (idempotent,
+    // about 100 ms) in case anything changed the main cookie since step 0.
     action: async (ctx) => {
+      await ctx.signInMain('mlro.tan');
       await ctx.go(peopleUrl(SPEC_PEOPLE.left, SPEC_PEOPLE.right, SPEC_PEOPLE.q1));
-      if (!(await ctx.call('compare-open-citation', { spec: SPEC_PEOPLE, slot: 'c', n: 2 }, 15_000))) fail('open-citation');
+      if ((await ctx.call('compare-open-citation', { spec: SPEC_PEOPLE, slot: 'c', n: 2 }, 15_000)) !== 'ok') fail('open-citation');
     },
   },
   {
@@ -123,9 +136,12 @@ export const STEPS: PresenterStep[] = [
     say: 'Ishaan: "Mehul, over to the compliance officer\'s chair." Mehul: "Here is what happened inside, for that one request."',
     url: journeyUrl,
     clip: CLIPS.B,
+    // Opens on the waterfall (the line is about the stages, the model and the three seals).
     action: async (ctx) => {
       await ctx.signInMain('maya.compliance');
-      await ctx.go(journeyUrl(ctx));
+      const url = journeyUrl(ctx);
+      await ctx.go(url);
+      if (url !== '/dev/journey') await ctx.reveal('[data-testid="journey-waterfall"]', 10_000);
     },
   },
   {

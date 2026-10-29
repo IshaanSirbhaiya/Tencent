@@ -68,7 +68,8 @@ export function CompareColumn({
   const t = useMessages(presenterMessages);
   const role = useRole();
   const p = personaById(side.persona);
-  const name = side.kind === 'done' ? side.name : p?.name ?? side.persona;
+  // The full name from the start: the header never changes when the answer lands.
+  const name = p?.fullName ?? (side.kind === 'done' ? side.name : side.persona);
   const headingId = `compare-${slot}-heading`;
 
   return (

@@ -30,7 +30,7 @@ export function ResetConfirm() {
             <DialogClose asChild>
               <Button variant="secondary">{t('pr.reset.cancel')}</Button>
             </DialogClose>
-            <Button ref={confirmRef} variant="primary" icon={RotateCcw} onClick={() => void resetDemo()} data-testid="presenter-reset-confirm">
+            <Button ref={confirmRef} variant="primary" icon={RotateCcw} onClick={() => void resetDemo()} disabled={s.resetting} data-testid="presenter-reset-confirm">
               {t('pr.reset.confirm')}
             </Button>
           </>

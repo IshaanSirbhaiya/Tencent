@@ -7,7 +7,7 @@
 // Ctrl+Shift+P, NEXT_PUBLIC_IB_PRESENTER=1 or localStorage["ib.presenter"]="1"). They are ignored
 // while typing in a field, inside composite widgets for the arrow keys, and with Ctrl/Alt/Meta held.
 import { clearCompareCache } from '@/components/compare/cache';
-import { analyticsApi, api, ibHealth, slotLogout } from '@/lib/api';
+import { ApiError, analyticsApi, api, ibHealth, slotLogout, withSlotLocks } from '@/lib/api';
 import { callPresenter } from './bus';
 import { STEPS, stepUrl, type StepCtx } from './script';
 import { applyStage } from './stage';
@@ -27,60 +27,161 @@ export function setHost(h: Host) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function ctx(): StepCtx {
+/* ---------------------------------------------------------- generations */
+// Every step action runs under a generation number. Starting a step, P and Reset each begin a new
+// generation; an action whose generation is no longer current stops at its next checkpoint (after
+// every await, and before any navigation, session change or page call), so a superseded action can
+// never navigate, sign someone in or drive a page after the presenter moved on.
+
+let generation = 0;
+
+/** Thrown inside a superseded action; never shown (the newer action owns the bar). */
+class Superseded extends Error {
+  constructor() {
+    super('superseded');
+  }
+}
+
+/* ------------------------------------------------- session serialisation */
+// Session-changing work (the main demo sign-in, Reset's sign-outs) runs one at a time, in order,
+// so Reset can never interleave with a sign-in that is halfway through.
+let sessionChain: Promise<unknown> = Promise.resolve();
+function serialSession<T>(fn: () => Promise<T>): Promise<T> {
+  const next = sessionChain.then(fn, fn);
+  sessionChain = next.catch(() => undefined);
+  return next;
+}
+
+function ctx(gen: number): StepCtx {
+  const isLive = () => gen === generation;
+  const live = () => {
+    if (!isLive()) throw new Superseded();
+  };
   return {
     go: async (url) => {
+      live();
       host?.push(url);
       await sleep(30);
+      live();
     },
-    call: callPresenter,
-    signInMain: async (persona) => {
-      let sub: string | null = null;
-      try {
-        sub = (await api.whoami()).sub;
-      } catch {
-        /* signed out */
-      }
-      if (sub !== persona) await api.switchTo(persona);
-      await host?.refreshSession();
+    call: async (name, arg, timeoutMs) => {
+      live();
+      const r = await callPresenter(name, arg, timeoutMs, isLive);
+      live();
+      return r;
     },
+    signInMain: (persona) =>
+      serialSession(async () => {
+        live();
+        let sub: string | null = null;
+        try {
+          sub = (await api.whoami()).sub;
+        } catch {
+          /* signed out */
+        }
+        live();
+        if (sub !== persona) await api.switchTo(persona);
+        live();
+        await host?.refreshSession();
+        live();
+      }),
     req: (persona) => getPresenter().reqs[persona] ?? null,
+    reveal: async (selector, timeoutMs = 8_000) => {
+      const end = Date.now() + timeoutMs;
+      for (;;) {
+        live();
+        const el = document.querySelector<HTMLElement>(selector);
+        if (el) {
+          const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduce';
+          el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+          return true;
+        }
+        if (Date.now() >= end) return false;
+        await sleep(100);
+      }
+    },
   };
 }
 
-let runId = 0;
+/* ------------------------------------------------------------- key legend */
+// In Stage the bar is one row; the key legend shows for 3 s after P, or while toggled with ?.
+let legendTimer: ReturnType<typeof setTimeout> | null = null;
+function flashLegend(ms = 3_000) {
+  if (legendTimer) clearTimeout(legendTimer);
+  setPresenter({ legend: true });
+  legendTimer = setTimeout(() => {
+    legendTimer = null;
+    setPresenter({ legend: false });
+  }, ms);
+}
+function toggleLegend() {
+  if (legendTimer) clearTimeout(legendTimer);
+  legendTimer = null;
+  setPresenter({ legend: !getPresenter().legend });
+}
 
 /** Run step `i`: forward runs its action; back only re-opens its page. */
 export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
   const step = STEPS[i];
   if (!step) return;
-  const id = ++runId;
+  const gen = ++generation;
   setPresenter({ step: i, started: true, busy: true, failed: false, clipOpen: false });
   try {
-    const c = ctx();
+    const c = ctx(gen);
     if (dir === 'back') await c.go(stepUrl(step, c));
     else await step.action(c);
-    if (id === runId) setPresenter({ busy: false });
+    if (gen === generation) setPresenter({ busy: false });
   } catch {
-    if (id === runId) setPresenter({ busy: false, failed: true });
+    // A superseded action says nothing: the newer one owns the bar.
+    if (gen === generation) setPresenter({ busy: false, failed: true });
   }
 }
 
 /** P: Stage on, back to step 0, check the status dots. Does not touch any ledger or sandbox. */
 export function start() {
+  // P while a step (or Reset) is running must not start a second run.
+  const s = getPresenter();
+  if (s.busy || s.resetting) return;
   applyStage(true);
   setPresenter({ armed: true, stage: true, hidden: false });
+  flashLegend();
   void runStep(0, 'forward');
   void refreshHealth();
 }
 
-/** R (after the confirm): sign every demo session out, forget presenter state, back to step 0. */
+/** Sign both compare slots out while holding their locks (never halfway through a Compare run). */
+async function signSlotsOut() {
+  const out = () => Promise.allSettled([slotLogout('b'), slotLogout('c')]);
+  try {
+    await withSlotLocks(['b', 'c'], out);
+  } catch (e) {
+    // No Web Locks (not a secure context): Compare cannot run there at all, so nothing holds them.
+    if (e instanceof ApiError && e.message === 'no-locks') await out();
+  }
+}
+
+let resetting = false;
+
+/**
+ * R (after the confirm): sign every demo session out, forget presenter state, back to step 0.
+ * A step that is still running is superseded first and its pending Compare run is cancelled (its
+ * results are dropped); the sign-outs then wait for the Compare slot locks and for any sign-in in
+ * flight, so the sessions end up consistent with the presenter state. The bar says so meanwhile.
+ */
 export async function resetDemo() {
-  runId++;
-  setPresenter({ resetOpen: false, clipOpen: false, busy: true });
-  await Promise.allSettled([api.logout(), slotLogout('b'), slotLogout('c')]);
-  clearCompareCache();
-  clearPresenter();
+  if (resetting) return;
+  resetting = true;
+  generation++;
+  setPresenter({ resetOpen: false, clipOpen: false, busy: true, failed: false, resetting: true });
+  try {
+    await callPresenter('compare-cancel');
+    await serialSession(() => Promise.allSettled([api.logout(), signSlotsOut()]));
+    clearCompareCache();
+    clearPresenter();
+  } finally {
+    resetting = false;
+    setPresenter({ resetting: false });
+  }
   await runStep(0, 'forward');
   void refreshHealth();
 }
@@ -160,7 +261,9 @@ function onKeyDown(e: KeyboardEvent) {
       const now = Date.now();
       if (now - lastAdvance < 400) return; // debounce a double press
       lastAdvance = now;
-      if (s.step + 1 < STEPS.length) void runStep(s.step + 1, 'forward');
+      // A failed step does not advance on Space: Space tries it again, the right arrow skips it.
+      if (s.failed && key !== 'ArrowRight') void runStep(s.step, 'forward');
+      else if (s.step + 1 < STEPS.length) void runStep(s.step + 1, 'forward');
       return;
     }
     case 'ArrowLeft':
@@ -174,6 +277,7 @@ function onKeyDown(e: KeyboardEvent) {
   switch (key.toLowerCase()) {
     case 'p':
       e.preventDefault();
+      if (s.busy || s.resetting) return; // never a second run on top of the current one
       start();
       return;
     case 'b':
@@ -182,6 +286,7 @@ function onKeyDown(e: KeyboardEvent) {
       return;
     case 'r':
       e.preventDefault();
+      if (s.resetting) return;
       setPresenter({ resetOpen: true });
       return;
     case 'l':
@@ -194,11 +299,16 @@ function onKeyDown(e: KeyboardEvent) {
       return;
     case '2':
       e.preventDefault();
+      if (s.busy) return; // the running step owns the page
       void callPresenter('compare-open-citation', { n: 2 }, 0);
       return;
     case 'escape':
       e.preventDefault();
       setPresenter({ hidden: !s.hidden });
+      return;
+    case '?':
+      e.preventDefault();
+      toggleLegend();
       return;
   }
 }

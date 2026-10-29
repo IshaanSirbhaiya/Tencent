@@ -1,6 +1,11 @@
 export interface Persona {
   id: string;
   name: string;
+  /**
+   * The directory's full name (fixtures/enterprise/generate.py, the synthetic world's people), for
+   * headers that must not change when the signed-in identity comes back (Compare columns).
+   */
+  fullName: string;
   role: string;
   note: string;
   suggestions: string[];
@@ -13,6 +18,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'jdoe',
     name: 'Jordan Doe',
+    fullName: 'Jordan Doe',
     role: 'Backend engineer',
     note: 'Payments engineering, member of private #db-migration',
     suggestions: [
@@ -25,6 +31,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'priya.sre',
     name: 'Priya',
+    fullName: 'Priya Raman',
     role: 'On-call SRE',
     note: 'Runbooks space, #incidents, DB migration leads',
     suggestions: [
@@ -37,6 +44,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'ken.ext',
     name: 'Ken',
+    fullName: 'Ken Adeyemi',
     role: 'External contractor',
     note: 'Slack Connect guest: #vendor-acme and the vendor share only',
     suggestions: [
@@ -48,6 +56,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'sara.sec',
     name: 'Sara',
+    fullName: 'Sara Lindqvist',
     role: 'Security',
     note: 'SEC space, Jira security level, #sec-incident-q3',
     suggestions: [
@@ -60,6 +69,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'maya.compliance',
     name: 'Maya',
+    fullName: 'Maya Fernandes',
     role: 'Compliance officer',
     note: 'Audit console access; reveals are reasoned and logged',
     suggestions: [
@@ -72,6 +82,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'leo.ops',
     name: 'Leo',
+    fullName: 'Leo Hartono',
     role: 'Product & ops',
     note: 'Product space, Drive "Pricing & Offers"',
     suggestions: [
@@ -85,6 +96,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'amy.am',
     name: 'Amy',
+    fullName: 'Amy Lim',
     role: 'Account manager',
     note: 'Customer & product spaces; no FinCrime case access',
     suggestions: [
@@ -97,6 +109,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'mlro.tan',
     name: 'Rachel',
+    fullName: 'Rachel Tan',
     role: 'MLRO (FinCrime)',
     note: 'FinCrime space, #fincrime-cases, case files — need-to-know only',
     suggestions: [
@@ -109,6 +122,7 @@ export const PERSONAS: Persona[] = [
   {
     id: 'admin.it',
     name: 'IT admin',
+    fullName: 'Alex Mercer',
     role: 'Platform simulator',
     note: 'Operates the demo platforms; no audit access',
     suggestions: [

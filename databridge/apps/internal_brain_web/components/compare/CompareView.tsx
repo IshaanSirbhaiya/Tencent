@@ -7,13 +7,18 @@
 // from the token the IB minted at demo sign-in. Both slots are held with Web Locks for the whole
 // sign-in → ask → who-am-I check, so a second Compare tab waits its turn instead of re-signing a
 // slot halfway through; every result is checked against the person just signed in.
+//
+// A run succeeds only when BOTH columns came back verified. Each run has a generation: the
+// Presenter's Reset (handler 'compare-cancel') and unmount invalidate it, abort its asks, and its
+// late results are dropped. At the start of every run the remembered request ids and the cached
+// result for those people are forgotten, so a later Presenter step never reuses an older answer.
 import { Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEMO_COMPARE, Page, useSession } from '@/components/shell';
-import { usePresenterHandler } from '@/components/presenter/bus';
-import { rememberRequest } from '@/components/presenter/store';
+import { usePresenterHandler, type HandlerResult } from '@/components/presenter/bus';
+import { forgetRequests, rememberRequest } from '@/components/presenter/store';
 import { Button, Field, SegmentedControl, inputClass } from '@/components/ui';
 import { ApiError, slotApi, withSlotLocks } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -24,7 +29,7 @@ import { useTourAction } from '@/lib/tour';
 import type { AskResponse } from '@/lib/types';
 import { useAskProgress } from '@/components/user';
 import { SourcesSheet, isRefusal, sameResponse } from './answerAdapter';
-import { cacheResult, cachedResult } from './cache';
+import { cacheResult, cachedResult, forgetResult } from './cache';
 import { CompareColumn, useRole, type Side, type SlotId } from './CompareColumn';
 import { CompareSourceSheet } from './CompareSourceSheet';
 import { EqualityMarker } from './EqualityMarker';
@@ -32,14 +37,31 @@ import { CHOICES, parseSpec, sameSpec, specUrl, type CompareMode, type CompareSp
 
 const MAX_Q = 2000;
 
-async function askSide(slot: SlotId, persona: string, question: string, ask: (q: string) => Promise<AskResponse>): Promise<Side> {
+/**
+ * Sign the slot in, ask, check who answered. `live` is checked after every await: once the run is
+ * superseded nothing more is sent on this slot (the lock is then released quickly).
+ */
+async function askSide(
+  slot: SlotId,
+  persona: string,
+  question: string,
+  ask: (q: string) => Promise<AskResponse>,
+  live: () => boolean,
+): Promise<Side> {
   const s = slotApi(slot);
+  const check = () => {
+    if (!live()) throw new ApiError(0, 'cancelled');
+  };
   try {
+    check();
     const who = await s.login(persona);
+    check();
     if (who.sub !== persona) throw new ApiError(0, 'identity');
     const res = await ask(question);
+    check();
     // The answer names nobody, so ask the slot who it was signed in as.
     if ((await s.whoami()).sub !== who.sub) throw new ApiError(0, 'identity');
+    check();
     return { kind: 'done', persona, sub: who.sub, name: who.name || personaById(persona)?.name || persona, question, res };
   } catch (e) {
     return { kind: 'error', persona, question, status: e instanceof ApiError ? e.status : 0 };
@@ -47,6 +69,16 @@ async function askSide(slot: SlotId, persona: string, question: string, ask: (q:
 }
 
 const idle = (persona: string, question: string): Side => ({ kind: 'idle', persona, question });
+
+/**
+ * How a run ended: 'ok' both columns verified; 'failed' it ran and at least one column did not
+ * come through (or the question was not askable); 'busy' another run is in progress (not started);
+ * 'cancelled' superseded by Reset or unmount (its results were dropped).
+ */
+type RunOutcome = 'ok' | 'failed' | 'busy' | 'cancelled';
+
+/** Presenter handler answer: busy is "not ready yet"; everything else is final. */
+const toHandler = (o: RunOutcome): HandlerResult => (o === 'ok' ? true : o === 'busy' ? false : 'failed');
 
 interface SheetState {
   slot: SlotId;
@@ -82,6 +114,8 @@ export function CompareView() {
 
   // Latest values for the Presenter handlers (they run outside React's render cycle).
   const busyRef = useRef(false);
+  /** The current run's generation; bumped by every run, by cancel() and on unmount. */
+  const runGen = useRef(0);
   const urlRef = useRef(urlSpec);
   const askedRef = useRef(asked);
   const sidesRef = useRef({ b: left, c: right });
@@ -113,22 +147,33 @@ export function CompareView() {
   }, [urlSpec]);
 
   const run = useCallback(
-    async (s: CompareSpec): Promise<boolean> => {
+    async (s: CompareSpec): Promise<RunOutcome> => {
+      if (busyRef.current) return 'busy';
       const q1 = s.q1.trim();
       const q2 = s.q2.trim();
-      if (busyRef.current || !q1 || !q2 || q1.length > MAX_Q || q2.length > MAX_Q) return false;
+      if (!q1 || !q2 || q1.length > MAX_Q || q2.length > MAX_Q) return 'failed';
+      const gen = ++runGen.current;
+      const live = () => runGen.current === gen;
       busyRef.current = true;
       setBusy(true);
       setSheet(null);
       const spec = { ...s, q1, q2 };
+      // Whatever an earlier run (or rehearsal) left for these people is no longer current.
+      forgetRequests([spec.left, spec.right]);
+      forgetResult(spec);
       setAsked(spec);
       if (!sameSpec(spec, urlRef.current)) router.replace(specUrl(spec), { scroll: false });
       setAnnounce(t('cmp.announce.asking'));
-      setLeft({ kind: 'loading', persona: spec.left, question: q1 });
-      setRight({ kind: 'loading', persona: spec.right, question: q2 });
+      const loadingL: Side = { kind: 'loading', persona: spec.left, question: q1 };
+      const loadingR: Side = { kind: 'loading', persona: spec.right, question: q2 };
+      setLeft(loadingL);
+      setRight(loadingR);
+      sidesRef.current = { b: loadingL, c: loadingR };
       let sides: [Side, Side];
       try {
-        sides = await withSlotLocks(['b', 'c'], () => Promise.all([askSide('b', spec.left, q1, progB.current.run), askSide('c', spec.right, q2, progC.current.run)]));
+        sides = await withSlotLocks(['b', 'c'], () =>
+          Promise.all([askSide('b', spec.left, q1, progB.current.run, live), askSide('c', spec.right, q2, progC.current.run, live)]),
+        );
       } catch {
         // Only the lock itself can throw here (no Web Locks: not a secure context).
         sides = [
@@ -136,9 +181,13 @@ export function CompareView() {
           { kind: 'error', persona: spec.right, question: q2, status: 0 },
         ];
       }
+      // Superseded (Reset, unmount): cancel() already handed the page back; drop these results.
+      if (!live()) return 'cancelled';
       const [l, r] = sides;
       setLeft(l);
       setRight(r);
+      sidesRef.current = { b: l, c: r };
+      const ok = l.kind === 'done' && r.kind === 'done';
       if (l.kind === 'done' && r.kind === 'done') {
         cacheResult(spec, l, r);
         rememberRequest(l.persona, l.res.request_id);
@@ -146,22 +195,50 @@ export function CompareView() {
         const same = isRefusal(l.res) && isRefusal(r.res) && sameResponse(l.res, r.res);
         setAnnounce(t(same ? 'cmp.announce.identical' : 'cmp.announce.done'));
       } else {
-        setAnnounce(t('cmp.announce.done'));
+        setAnnounce(t('cmp.announce.failed'));
       }
       busyRef.current = false;
       setBusy(false);
-      return true;
+      return ok ? 'ok' : 'failed';
     },
     [router, t],
+  );
+
+  /** Let go of the running comparison: abort its asks, drop its results, free the page. */
+  const cancel = useCallback(() => {
+    runGen.current += 1;
+    progB.current.reset();
+    progC.current.reset();
+    if (!busyRef.current) return;
+    busyRef.current = false;
+    setBusy(false);
+    setSheet(null);
+    setAsked(null);
+    setAnnounce('');
+  }, []);
+
+  // Unmount: nothing a late answer could update is left (useAskProgress aborts its own fetch).
+  useEffect(
+    () => () => {
+      runGen.current += 1;
+      busyRef.current = false;
+    },
+    [],
   );
 
   useTourAction('compare-run', () => void run(draft));
 
   /* ---- Presenter hooks (components/presenter/script.ts) ---- */
-  usePresenterHandler('compare-run', (arg) => {
+  usePresenterHandler('compare-run', async (arg) => {
     const s = arg as CompareSpec;
-    if (busyRef.current || !sameSpec(s, urlRef.current)) return false;
-    return run(s);
+    if (busyRef.current || !sameSpec(s, urlRef.current)) return false; // not ready yet
+    return toHandler(await run(s));
+  });
+
+  // Presenter Reset: a pending run is superseded and its results are never shown or remembered.
+  usePresenterHandler('compare-cancel', () => {
+    cancel();
+    return true;
   });
 
   const openCitation = useCallback((slot: SlotId, index: number): boolean => {
@@ -173,21 +250,28 @@ export function CompareView() {
     return true;
   }, []);
 
-  usePresenterHandler('compare-open-citation', async (arg) => {
+  usePresenterHandler('compare-open-citation', async (arg): Promise<HandlerResult> => {
     const a = (arg ?? {}) as { spec?: CompareSpec; slot?: SlotId; n?: number };
     if (busyRef.current) return false;
     if (a.spec) {
       if (!sameSpec(a.spec, urlRef.current)) return false;
       const shown = askedRef.current;
-      if (!shown || !sameSpec(shown, a.spec)) {
-        if (cachedResult(a.spec)) return false; // being restored by the URL effect; try again
-        await run(a.spec);
+      const sides = sidesRef.current;
+      const showsDone = !!shown && sameSpec(shown, a.spec) && sides.b.kind === 'done' && sides.c.kind === 'done';
+      if (!showsDone) {
+        // Being restored by the URL effect (a finished run of this comparison): try again.
+        if (cachedResult(a.spec) && !(shown && sameSpec(shown, a.spec))) return false;
+        // Not on screen, or an earlier run of it failed: ask now; a failure fails the step.
+        const o = await run(a.spec);
+        if (o !== 'ok') return toHandler(o);
       }
     }
     // The focused column wins (Enter on a chip works the same); else the one the step names.
     const focused = document.activeElement?.closest('[data-compare-col]')?.getAttribute('data-compare-col');
     const slot: SlotId = focused === 'b' || focused === 'c' ? focused : a.slot ?? 'c';
-    return openCitation(slot, (a.n ?? 2) - 1);
+    const opened = openCitation(slot, (a.n ?? 2) - 1);
+    // With a spec the answers are known to be on screen: a missing source [n] is a real failure.
+    return opened ? true : a.spec ? 'failed' : false;
   });
 
   const setMode = (m: CompareMode) => {

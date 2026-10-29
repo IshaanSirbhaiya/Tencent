@@ -27,3 +27,8 @@ export function cacheResult(spec: CompareSpec, left: DoneSide, right: DoneSide) 
 export function clearCompareCache() {
   cache.clear();
 }
+
+/** Drop one comparison (a new run of it starts: an older result must not be restored instead). */
+export function forgetResult(spec: CompareSpec) {
+  cache.delete(specKey(spec));
+}

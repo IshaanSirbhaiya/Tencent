@@ -10,7 +10,7 @@ export { SourcesSheet, type SourcesSheetProps } from './SourcesSheet';
 export { CitationChip } from './CitationChip';
 export { RefusalCard } from './RefusalCard';
 export { AskProgressLine } from './AskProgressLine';
-export { useAskProgress, ASK_STEPS, type AskProgress, type AskPhase, type AskStepKey } from './useAskProgress';
+export { useAskProgress, isAskCancelled, ASK_STEPS, type AskProgress, type AskPhase, type AskStepKey } from './useAskProgress';
 export { AskErrorCard, Composer, ScopePill, StarterCards, MAX_QUESTION, type ComposerHandle } from './Composer';
 export { Toaster, toast } from './Toast';
 export { isRefusal } from './answerText';

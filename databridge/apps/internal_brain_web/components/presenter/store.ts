@@ -16,8 +16,12 @@ export interface PresenterState {
   hidden: boolean;
   /** A step action is running. */
   busy: boolean;
-  /** The last step action did not finish. */
+  /** The last step action did not finish (Space tries it again, → skips it). */
   failed: boolean;
+  /** Reset was confirmed and waits for the running step to let go (not persisted). */
+  resetting: boolean;
+  /** Stage: the key legend row is showing (3 s after P, or toggled with ?). Not persisted. */
+  legend: boolean;
   clipOpen: boolean;
   resetOpen: boolean;
   /** persona id → the latest request id that persona's column produced (for the journey step). */
@@ -42,6 +46,8 @@ const INITIAL: PresenterState = {
   hidden: false,
   busy: false,
   failed: false,
+  resetting: false,
+  legend: false,
   clipOpen: false,
   resetOpen: false,
   reqs: {},
@@ -115,6 +121,20 @@ export function rememberRequest(persona: string, reqId: string) {
   load();
   if (!state.armed) return;
   setPresenter((s) => ({ reqs: { ...s.reqs, [persona]: reqId } }));
+}
+
+/**
+ * Forget the requests these personas' columns produced. Compare calls it when a run STARTS, so a
+ * failed or cancelled run can never leave an earlier rehearsal's request behind for a later step.
+ */
+export function forgetRequests(personas: string[]) {
+  load();
+  if (!personas.some((p) => p in state.reqs)) return;
+  setPresenter((s) => {
+    const reqs = { ...s.reqs };
+    for (const p of personas) delete reqs[p];
+    return { reqs };
+  });
 }
 
 const SERVER = INITIAL;

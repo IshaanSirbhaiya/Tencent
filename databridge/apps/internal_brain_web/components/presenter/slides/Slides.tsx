@@ -6,17 +6,45 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@/lib/cn';
 import { fmtDate } from '@/lib/format';
+import { useEffect, useState } from 'react';
+import { analyticsApi } from '@/lib/api';
 import { useMessages } from '@/lib/i18n';
 import { presenterMessages } from '@/lib/i18n/presenter';
 import type { EvalSummary } from '@/lib/types';
 import { BIG, SlideFrame, usePublicJson } from './SlideFrame';
-import { computeValue, readInputs, usdCompact } from './value';
+import { computeValue, minutesRounded, readInputs, usdCompact, usdExact, usdRounded } from './value';
 
 export const REPO_URL = 'https://github.com/IshaanSirbhaiya/Tencent';
 const REPO_TEXT = REPO_URL.replace(/^https:\/\//, '');
 
 const n = (v: number) => v.toLocaleString('en-SG');
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * Is the model chain live right now (GET /ib/status, read at view time)? null while unknown or
+ * unreachable: lines that name the model or TokenHub are shown only on a definite yes.
+ */
+function useModelLive(): boolean | null {
+  const [live, setLive] = useState<boolean | null>(null);
+  useEffect(() => {
+    let on = true;
+    analyticsApi
+      .status()
+      .then((s) => on && setLive(s?.models?.active === true))
+      .catch(() => on && setLive(null));
+    return () => {
+      on = false;
+    };
+  }, []);
+  return live;
+}
+
+/** A slides.json line, or its `_live` variant while the model is live. */
+function claimLine(data: Record<string, unknown> | null, key: string, live: boolean | null): string {
+  if (!data) return '';
+  const pick = live === true && typeof data[`${key}_live`] === 'string' ? data[`${key}_live`] : data[key];
+  return typeof pick === 'string' ? pick.trim() : '';
+}
 
 /* ------------------------------------------------------------------ title (step 0) */
 
@@ -59,11 +87,12 @@ export function ProofSlide() {
   const t = useMessages(presenterMessages);
   const ev = usePublicJson<EvalSummary>('/eval_summary.json');
   const fix = usePublicJson<{ tester_lines?: unknown }>('/finals/fixlog.json');
-  const lines = usePublicJson<{ codebuddy_line?: unknown; codebuddy_source?: unknown }>('/finals/slides.json');
+  const lines = usePublicJson<Record<string, unknown>>('/finals/slides.json');
+  const live = useModelLive();
   const e = ev.state === 'ok' ? ev.data : null;
   const src = e?.source && e.run_date ? t('sl.proof.source', { file: e.source, date: fmtDate(e.run_date) }) : e?.source ?? null;
   const tester = fix.state === 'ok' && Array.isArray(fix.data.tester_lines) ? (fix.data.tester_lines.find((x) => typeof x === 'string' && x.trim()) as string | undefined) : undefined;
-  const cb = lines.state === 'ok' && typeof lines.data.codebuddy_line === 'string' ? lines.data.codebuddy_line.trim() : '';
+  const cb = claimLine(lines.state === 'ok' ? lines.data : null, 'codebuddy_line', live);
   const smoke = e?.smoke as (EvalSummary['smoke'] & { differential?: { pairs?: number; mismatches?: number } }) | null | undefined;
 
   const leaks = isNum(e?.leaks) && isNum(e?.requests) ? e!.leaks! : null;
@@ -131,10 +160,11 @@ export function ProofSlide() {
 export function BusinessSlide() {
   const t = useMessages(presenterMessages);
   const file = usePublicJson<{ status_label?: unknown; source?: unknown }>('/finals/value_defaults.json');
-  const lines = usePublicJson<{ stack_line?: unknown }>('/finals/slides.json');
+  const lines = usePublicJson<Record<string, unknown>>('/finals/slides.json');
+  const live = useModelLive();
   const inputs = file.state === 'ok' ? readInputs(file.data) : null;
   const out = inputs ? computeValue(inputs) : null;
-  const stack = lines.state === 'ok' && typeof lines.data.stack_line === 'string' ? lines.data.stack_line.trim() : '';
+  const stack = claimLine(lines.state === 'ok' ? lines.data : null, 'stack_line', live);
   const status = file.state === 'ok' && typeof file.data.status_label === 'string' ? file.data.status_label : '';
 
   return (
@@ -162,12 +192,25 @@ export function BusinessSlide() {
                   {t('sl.biz.estimate')}
                 </span>
               </p>
-              <p className={cn(BIG, 'mt-3')}>{usdCompact(out.annual_value_usd)}</p>
+              {/* Big: the figure that is spoken. Small: the exact computed value. */}
+              <p className={cn(BIG, 'mt-3 whitespace-nowrap')} data-testid="business-value-rounded">
+                ≈&nbsp;{usdRounded(out.annual_value_usd)}
+              </p>
+              <p className="mt-1 text-[clamp(1rem,1.5vw,1.375rem)] leading-snug text-muted">{t('sl.biz.perYear')}</p>
+              <p className="mt-2 font-mono text-caption tabular-nums text-muted" data-testid="business-value-exact">
+                {t('sl.biz.exact', { v: usdExact(out.annual_value_usd), c: usdCompact(out.annual_value_usd) })}
+              </p>
             </div>
             <div className="min-w-0 border-t border-line-strong pt-[3vh]" data-testid="business-break-even">
               <p className="flex min-h-[2.5em] items-center text-[clamp(1rem,1.6vw,1.5rem)] text-muted">{t('sl.biz.breakEven')}</p>
-              <p className={cn(BIG, 'mt-3')}>{out.break_even_minutes_per_week.toFixed(1)}</p>
+              <p className={cn(BIG, 'mt-3 whitespace-nowrap')} data-testid="business-break-even-rounded">
+                <span className="mr-[0.25em] text-[0.4em] font-medium tracking-normal text-muted">{t('sl.biz.about')}</span>
+                {minutesRounded(out.break_even_minutes_per_week)}
+              </p>
               <p className="mt-1 text-[clamp(1rem,1.5vw,1.375rem)] leading-snug text-muted">{t('sl.biz.breakEvenUnit')}</p>
+              <p className="mt-2 font-mono text-caption tabular-nums text-muted" data-testid="business-break-even-exact">
+                {t('sl.biz.exactMin', { v: out.break_even_minutes_per_week.toFixed(1) })}
+              </p>
             </div>
           </div>
           <div className="mt-[5vh]">

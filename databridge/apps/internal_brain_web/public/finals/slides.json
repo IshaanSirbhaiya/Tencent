@@ -1,7 +1,10 @@
 {
   "_about": "Editable claim lines for the /present slides, so they can be corrected on the morning of 3 Nov without a rebuild. Say only what the repo proves (RUN_SHEET [CB] and [HY3]).",
-  "codebuddy_line": "CodeBuddy built the WorkBuddy connector, the token tool and the model-chain tests, and ran a security review on Tencent Hunyuan hy3. Every session transcript is kept.",
+  "_model": "Lines ending in _live are shown only while GET /ib/status reports the model chain active (read at view time); otherwise the plain line is shown. RUN_SHEET [HY3].",
+  "codebuddy_line": "CodeBuddy built the WorkBuddy connector, the token tool and the model-chain tests, and ran a security review. Six CodeBuddy sessions, transcripts in the repo.",
+  "codebuddy_line_live": "CodeBuddy built the WorkBuddy connector, the token tool and the model-chain tests, and ran a security review on Tencent Hunyuan Hy3. Six CodeBuddy sessions, transcripts in the repo.",
   "codebuddy_source": "INTERNAL_BRAIN.md, docs/tencent/DEV_PROCESS.md",
-  "stack_line": "Tencent stack: Hunyuan Hy3 through TokenHub (wired, live run pending) · WorkBuddy · CodeBuddy",
-  "stack_line_check": "[HY3] Drop 'through TokenHub' unless Hy3 has answered live through TokenHub by 3 Nov (STATUS.md)."
+  "stack_line": "Tencent stack: WorkBuddy · CodeBuddy",
+  "stack_line_live": "Tencent stack: Hunyuan Hy3 through TokenHub · WorkBuddy · CodeBuddy",
+  "stack_line_check": "[HY3] The _live variants name Hy3 and TokenHub; they show only when /ib/status says the model is live."
 }

@@ -22,10 +22,15 @@ test('same question, two people: deep link, header strips, cited answers, main s
   await expect(page.getByLabel('First person')).toHaveValue('amy.am');
   await expect(page.getByLabel('Second person')).toHaveValue('mlro.tan');
   await expect(page.getByLabel('Question for both')).toHaveValue(QV);
+  // Full names from the start: the headers do not change when the answers land.
+  await expect(page.getByTestId('compare-b').getByTestId('compare-name')).toHaveText('Amy Lim');
+  await expect(page.getByTestId('compare-c').getByTestId('compare-name')).toHaveText('Rachel Tan');
   await askBoth(page);
 
   const left = page.getByTestId('compare-b');
   const right = page.getByTestId('compare-c');
+  await expect(left.getByTestId('compare-name')).toHaveText('Amy Lim');
+  await expect(right.getByTestId('compare-name')).toHaveText('Rachel Tan');
   await expect(left.getByTestId('compare-role')).toHaveText('Account manager');
   await expect(right.getByTestId('compare-role')).toHaveText('MLRO (FinCrime)');
   await expect(left.getByTestId('compare-name')).toContainText('Amy');
@@ -174,4 +179,44 @@ test('a column whose slot turns out to be someone else shows the error, not thei
   await expect(right.getByRole('alert')).toContainText('This answer did not come through.');
   await expect(right.getByTestId('answer')).toHaveCount(0);
   await expect(left.getByTestId('answer')).toBeVisible();
+});
+
+/** What the presenter remembers per persona (sessionStorage, this tab only). */
+const remembered = (page: Page) =>
+  page.evaluate(() => {
+    try {
+      return (JSON.parse(sessionStorage.getItem('ib.presenter') ?? '{}').reqs ?? {}) as Record<string, string>;
+    } catch {
+      return {} as Record<string, string>;
+    }
+  });
+
+test('a failed re-run forgets the earlier answers: no stale request id, nothing restored', async ({ page }) => {
+  // Presenter mode armed (remembered request ids are kept only then); keys are not used here.
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('ib.presenter', '1');
+    } catch {
+      /* storage blocked */
+    }
+  });
+  await login(page, 'mlro.tan');
+  const url = people('amy.am', 'mlro.tan', QV);
+  await page.goto(url);
+  await askBoth(page);
+  const oldReq = await page.getByTestId('compare-c').getByTestId('request-id').innerText();
+  expect((await remembered(page))['mlro.tan']).toBe(oldReq);
+
+  // Same comparison again, and Rachel's slot cannot sign in this time.
+  await page.route('**/api/ib/auth/demo-login', (route) => {
+    if (route.request().headers()['x-ib-slot'] === 'c') return route.fulfill({ status: 403, json: { detail: 'forbidden' } });
+    return route.fallback();
+  });
+  await page.getByRole('button', { name: 'Ask both' }).click();
+  await expect(page.getByTestId('compare-c').getByRole('alert')).toContainText("This person couldn't be signed in.");
+  await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
+  await expect(page.getByTestId('compare-announce')).toHaveText('One or both answers did not come through.');
+  const reqs = await remembered(page);
+  expect(reqs['mlro.tan']).toBeUndefined();
+  expect(reqs['amy.am']).toBeUndefined();
 });

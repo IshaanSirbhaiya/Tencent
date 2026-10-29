@@ -18,6 +18,8 @@ const CSS = `
 :root[data-stage] button[aria-keyshortcuts="Control+K Meta+K"],
 :root[data-stage] [data-testid="theme-switch"],
 :root[data-stage] [data-stage-hide] { display: none !important; }
+:root[data-stage]:has([data-testid="compare-results"]) header [data-testid="mode-switch"],
+:root[data-stage]:has([data-testid="compare-results"]) header button:has([data-testid="whoami"]) { display: none !important; }
 :root[data-stage] [data-stage-only] { display: block !important; }
 :root[data-stage] #main { padding-inline: 2.5vw; padding-bottom: 7rem; }
 :root[data-stage] .skip-link:not(:focus) { top: -6rem; }

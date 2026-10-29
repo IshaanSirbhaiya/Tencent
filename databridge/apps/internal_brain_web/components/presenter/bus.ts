@@ -1,11 +1,21 @@
 'use client';
 // A small action channel between the Presenter and the pages it drives (the Compare page today).
 // A page registers a named handler; the Presenter calls it and waits until the page is mounted,
-// shows what the step expects, and accepts. A handler returns false for "not ready (yet)".
+// shows what the step expects, and accepts.
+//
+// A handler answers with one of three things:
+//   false     "not ready (yet)": the caller tries again until its timeout;
+//   true      accepted, and its work finished successfully;
+//   'failed'  accepted, ran, and did NOT succeed: the caller stops at once (no automatic retry), so
+//             the Presenter can show the step as failed.
 import { useEffect, useRef } from 'react';
 
-type Handler = (arg: unknown) => boolean | Promise<boolean>;
+export type HandlerResult = boolean | 'failed';
+type Handler = (arg: unknown) => HandlerResult | Promise<HandlerResult>;
 const handlers = new Map<string, Handler>();
+
+/** What a call came to: 'ok', 'failed' (ran unsuccessfully), 'not-ready' (never accepted), 'cancelled'. */
+export type CallOutcome = 'ok' | 'failed' | 'not-ready' | 'cancelled';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -23,21 +33,26 @@ export function usePresenterHandler(name: string, fn: Handler) {
 }
 
 /**
- * Call the handler `name` until it accepts or `timeoutMs` passes (0: one try). Resolves true when
- * a handler accepted (after its own work finished), false otherwise. Never throws.
+ * Call the handler `name` until it accepts or `timeoutMs` passes (0: one try). `live` (optional) is
+ * checked before every try: once it says false the call stops with 'cancelled' (a superseded
+ * presenter action). Never throws; a handler that throws counts as 'failed'.
  */
-export async function callPresenter(name: string, arg?: unknown, timeoutMs = 0): Promise<boolean> {
+export async function callPresenter(name: string, arg?: unknown, timeoutMs = 0, live: () => boolean = () => true): Promise<CallOutcome> {
   const end = Date.now() + timeoutMs;
   for (;;) {
+    if (!live()) return 'cancelled';
     const h = handlers.get(name);
     if (h) {
+      let r: HandlerResult;
       try {
-        if (await h(arg)) return true;
+        r = await h(arg);
       } catch {
-        return false;
+        return 'failed';
       }
+      if (r === true) return 'ok';
+      if (r === 'failed') return 'failed';
     }
-    if (Date.now() >= end) return false;
+    if (Date.now() >= end) return 'not-ready';
     await sleep(100);
   }
 }

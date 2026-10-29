@@ -17,6 +17,7 @@ import {
   StarterCards,
   Toaster,
   type ComposerHandle,
+  isAskCancelled,
   useAskProgress,
 } from '@/components/user';
 import { ApiError } from '@/lib/api';
@@ -79,6 +80,8 @@ export default function AskPage() {
         const n = res.citations.length;
         setAnnounce(n === 0 ? t('ask.announce.none') : n === 1 ? t('ask.announce.done1') : t('ask.announce.done', { n }));
       } catch (e) {
+        // Superseded (New conversation, or the page went away): that turn is no longer on screen.
+        if (isAskCancelled(e)) return;
         const status = e instanceof ApiError ? e.status : 0;
         if (status === 401) {
           router.replace('/login');
