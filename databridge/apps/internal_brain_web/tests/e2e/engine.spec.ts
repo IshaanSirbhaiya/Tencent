@@ -95,9 +95,9 @@ test.describe('engine view', () => {
     await shot(page, '05-ontology-dark-1280');
   });
 
-  test('compliance may explore; anyone else sees the lock card and no data', async ({ page }) => {
+  test('only the snapshot persona may explore; anyone else (compliance included) sees the lock card and no data', async ({ page }) => {
     await openEngine(page, 'maya.compliance');
-    await expect(page.getByTestId('engine-snapshot-banner')).toBeVisible();
+    await expect(page.getByTestId('engine-lock')).toBeVisible();
     await openEngine(page, 'ken.ext');
     await expect(page.getByTestId('engine-lock')).toContainText("built as Jordan's view at sync time");
     await expect(page.locator('.react-flow__node')).toHaveCount(0);

@@ -69,13 +69,13 @@ test.describe('engine proxy: on', () => {
     }
   });
 
-  test('compliance may read the snapshot', async ({ request }) => {
+  test('compliance may NOT read the snapshot (it is jdoe's view, not live-checked, not ledgered)', async ({ request }) => {
     await signIn(request, 'maya.compliance');
-    expect((await request.get('/api/walnut/graph/facets')).status()).toBe(200);
+    expect((await request.get('/api/walnut/graph/facets')).status()).toBe(403);
   });
 
   test('any other persona gets 403', async ({ request }) => {
-    for (const persona of ['ken.ext', 'priya.sre', 'admin.it']) {
+    for (const persona of ['ken.ext', 'priya.sre', 'admin.it', 'maya.compliance']) {
       await signIn(request, persona);
       const r = await request.get('/api/walnut/graph/facets');
       expect(r.status(), persona).toBe(403);

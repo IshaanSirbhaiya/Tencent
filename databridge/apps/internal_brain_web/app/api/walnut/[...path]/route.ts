@@ -14,7 +14,7 @@
 //     same-origin (Sec-Fetch-Site).
 //  4. A valid Internal Brain session is required: the IB's GET /auth/whoami is called server-side
 //     with the ib_session cookie. Only the persona the graph was built for (WALNUT_GRAPH_PERSONA,
-//     default jdoe) or a compliance_officer may read the snapshot; everyone else gets 403.
+//     default jdoe) may read the snapshot (not live-checked, reads not ledgered); everyone else gets 403.
 //  5. The upstream is fixed to http://127.0.0.1:8300. The token comes from the server-only
 //     WALNUT_GATEWAY_TOKEN (never NEXT_PUBLIC_*). The browser's Cookie and Authorization headers are
 //     never forwarded, and no upstream header (Set-Cookie included) is relayed.
@@ -148,10 +148,12 @@ async function whoami(req: NextRequest, session: string): Promise<Who | null | '
   }
 }
 
-/** Least privilege: the snapshot's own persona, or compliance. */
+/** Least privilege: only the persona the snapshot was built for. */
 function mayRead(who: Who): boolean {
   const persona = (process.env.WALNUT_GRAPH_PERSONA || 'jdoe').trim();
-  return who.sub === persona || who.roles.includes('compliance_officer');
+  // Only the persona the snapshot was built for. The snapshot is never Gate-2 checked and engine reads are
+  // not ledgered, so nobody else (compliance included) may read another person's view through it.
+  return who.sub === persona;
 }
 
 /** Read at most MAX_RESPONSE bytes of the upstream body. */

@@ -12,7 +12,7 @@ to `databridge/apps/internal_brain_web/`.
 
 ## What I ran
 
-- **Backend suite** (read-only command as given): TEST_RESULT_PLACEHOLDER
+- **Backend suite** (read-only command as given): **733 passed**, 44 warnings, in 732 s. It ran alongside other agents' pytest and Playwright runs, which is why it was slow.
 - **Live probes** against the running stack (web `next start` on 127.0.0.1:3100, IB on :8100), as
   `ken.ext` (contractor), `amy.am` and `maya.compliance`. Only demo-login, asks and GETs; no `/sim/*`.
   - `/ib/doc/confluence:cf-1001` (restricted for Ken) vs `/ib/doc/confluence:cf-999999` (unknown):

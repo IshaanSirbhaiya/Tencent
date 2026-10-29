@@ -176,7 +176,7 @@ function Engine() {
 export function EngineView() {
   const { me } = useSession();
   if (!me) return null;
-  const allowed = me.sub === ENGINE_PERSONA || me.roles.includes('compliance_officer');
+  const allowed = me.sub === ENGINE_PERSONA;
   if (!allowed) {
     return (
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">

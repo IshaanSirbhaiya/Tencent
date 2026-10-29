@@ -172,6 +172,29 @@ function isMock(): boolean {
   return process.env.NEXT_PUBLIC_IB_MOCK === '1' || process.env.IB_MOCK === '1';
 }
 
+/**
+ * DNS-rebinding guard: the Host must be this machine (or IB_PUBLIC_ORIGIN's host when deployed), so a page
+ * from another site that rebinds its name to 127.0.0.1 is refused before anything is routed.
+ */
+function allowedHost(req: NextRequest): boolean {
+  const host = (req.headers.get('host') ?? '').trim().toLowerCase();
+  const name = host.startsWith('[') ? host.slice(0, host.indexOf(']') + 1) : host.split(':')[0];
+  if (name === 'localhost' || name === '127.0.0.1' || name === '[::1]') return true;
+  const pub = process.env.IB_PUBLIC_ORIGIN;
+  if (!pub) return false;
+  try {
+    return new URL(pub).hostname.toLowerCase() === name;
+  } catch {
+    return false;
+  }
+}
+
+/** GETs can write view records (doc.viewed, graph.viewed): refuse cross-site and same-site browser fetches. */
+function getFromThisSite(req: NextRequest): boolean {
+  const site = req.headers.get('sec-fetch-site');
+  return site === null || site === 'same-origin' || site === 'none';
+}
+
 async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Promise<NextResponse> {
   // One deadline for the whole exchange, started before the incoming body is read.
   const signal = AbortSignal.timeout(DEADLINE_MS);
@@ -179,6 +202,8 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   const path = segments.join('/');
   const method = req.method.toUpperCase();
   if (!cleanSegments(segments)) return fail(400, 'bad request');
+  if (!allowedHost(req)) return fail(403, 'forbidden');
+  if (method === 'GET' && !getFromThisSite(req)) return fail(403, 'forbidden');
   if (!allowed(ALLOWED, method, path)) return fail(404, 'not found');
   const slot = slotOf(req);
   if (slot === null) return fail(400, 'bad request');
