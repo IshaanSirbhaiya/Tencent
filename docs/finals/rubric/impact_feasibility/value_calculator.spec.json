@@ -1,0 +1,78 @@
+{
+  "spec_version": "1.0",
+  "route": "/value",
+  "title": "Value calculator",
+  "status_label": "Projection, not a measurement. Hours saved are measured in the pilot.",
+  "source_doc": "docs/finals/rubric/impact_feasibility/ROI_MODEL.md",
+  "inputs": [
+    {"id": "staff", "label": "People using it", "unit": "people", "default": 600, "min": 50, "max": 10000, "step": 50,
+     "note": "Size of a mid-size Singapore fintech. Not a claim about Aspire's headcount."},
+    {"id": "minutes_saved_per_week", "label": "Minutes saved per person per week", "unit": "min/week", "default": 90, "min": 0, "max": 480, "step": 1,
+     "note": "Base case 1.5 h. Low 0.5 h, high 4 h. Projection."},
+    {"id": "hourly_cost_usd", "label": "Loaded cost per hour", "unit": "USD/h", "default": 31, "min": 10, "max": 150, "step": 1,
+     "note": "Near Singapore median pay incl. employer CPF (about US$29/h, MOM via secondary sources, verify)."},
+    {"id": "working_weeks", "label": "Working weeks per year", "unit": "weeks", "default": 46, "min": 40, "max": 52, "step": 1},
+    {"id": "annual_price_usd", "label": "Annual deployment cost", "unit": "USD/year", "default": 100000, "min": 0, "max": 1000000, "step": 1000,
+     "note": "US$100k as in SUBMISSION.md. Preset 'List price only' = staff x US$10 x 12 (US$72,000 at 600 people)."},
+    {"id": "answers_per_person_per_day", "label": "Answers per person per day", "unit": "answers/day", "default": 10, "min": 0, "max": 100, "step": 1},
+    {"id": "working_days_per_month", "label": "Working days per month", "unit": "days", "default": 21, "min": 15, "max": 23, "step": 1, "advanced": true},
+    {"id": "tokens_in", "label": "Input tokens per answer", "unit": "tokens", "default": 4000, "min": 500, "max": 50000, "step": 100, "advanced": true,
+     "note": "Assumption from SUBMISSION.md. Replace with the measured mean after the live Hy3 run."},
+    {"id": "tokens_out", "label": "Output tokens per answer", "unit": "tokens", "default": 300, "min": 50, "max": 4000, "step": 10, "advanced": true},
+    {"id": "price_in_per_mtok_usd", "label": "Hy3 input price per million tokens", "unit": "USD", "default": 0.132, "advanced": true, "readonly": true,
+     "source": "https://www.tencentcloud.com/document/product/1300/78937"},
+    {"id": "price_out_per_mtok_usd", "label": "Hy3 output price per million tokens", "unit": "USD", "default": 0.528, "advanced": true, "readonly": true,
+     "source": "https://www.tencentcloud.com/document/product/1300/78937"}
+  ],
+  "presets": [
+    {"id": "low",  "label": "Low",  "values": {"minutes_saved_per_week": 30,  "hourly_cost_usd": 32}},
+    {"id": "base", "label": "Base", "values": {"minutes_saved_per_week": 90,  "hourly_cost_usd": 31}},
+    {"id": "high", "label": "High", "values": {"minutes_saved_per_week": 240, "hourly_cost_usd": 37}},
+    {"id": "break_even_demo", "label": "Only 7 minutes", "values": {"minutes_saved_per_week": 7}},
+    {"id": "list_price_only", "label": "List price only (US$10/seat/month)", "values": {"annual_price_usd": "staff * 10 * 12"}}
+  ],
+  "outputs": [
+    {"id": "annual_value_usd", "label": "Value of time saved per year",
+     "formula": "staff * (minutes_saved_per_week / 60) * working_weeks * hourly_cost_usd", "format": "usd_compact"},
+    {"id": "model_cost_per_answer_usd", "label": "Model cost per answer (Hy3, list price)",
+     "formula": "tokens_in * price_in_per_mtok_usd / 1e6 + tokens_out * price_out_per_mtok_usd / 1e6", "format": "usd_4dp"},
+    {"id": "model_cost_per_year_usd", "label": "Model cost per year",
+     "formula": "staff * answers_per_person_per_day * working_days_per_month * 12 * model_cost_per_answer_usd", "format": "usd"},
+    {"id": "net_value_usd", "label": "Net value per year",
+     "formula": "annual_value_usd - annual_price_usd - model_cost_per_year_usd", "format": "usd_compact"},
+    {"id": "break_even_minutes_per_week", "label": "Break-even minutes per person per week",
+     "formula": "annual_price_usd / (staff * working_weeks * hourly_cost_usd) * 60", "format": "minutes_1dp",
+     "note": "Ignores model cost, which is about 1% of price at the defaults."},
+    {"id": "payback_weeks", "label": "Payback (working weeks)",
+     "formula": "minutes_saved_per_week > 0 ? annual_price_usd / (staff * (minutes_saved_per_week / 60) * hourly_cost_usd) : null", "format": "weeks_1dp",
+     "null_text": "Never (no time saved)"},
+    {"id": "breaks_even", "label": "Breaks even?",
+     "formula": "minutes_saved_per_week >= break_even_minutes_per_week", "format": "yes_no"}
+  ],
+  "reference_lines": [
+    {"id": "apqc", "label": "APQC: 2.8 h/week searching", "minutes_per_week": 168,
+     "source": "https://www.businesswire.com/news/home/20211109005449/en", "tag": "secondary"},
+    {"id": "atlassian", "label": "Atlassian: 25% of the week searching (10 h of 40)", "minutes_per_week": 600,
+     "source": "https://www.atlassian.com/blog/state-of-teams-2025", "tag": "primary; 40-hour week is our conversion"},
+    {"id": "brief", "label": "Aspire brief: about 30% of the week (12 h of 40)", "minutes_per_week": 720,
+     "source": "docs/tencent/SUBMISSION.md section 2", "tag": "challenge brief"}
+  ],
+  "test_vectors": [
+    {"name": "base",         "inputs": {}, "expect": {"annual_value_usd": 1283400, "break_even_minutes_per_week": 7.01, "model_cost_per_answer_usd": 0.0006864, "model_cost_per_year_usd": 1037.84, "net_value_usd": 1182362.16, "payback_weeks": 3.58}},
+    {"name": "low",          "inputs": {"minutes_saved_per_week": 30, "hourly_cost_usd": 32}, "expect": {"annual_value_usd": 441600}},
+    {"name": "high",         "inputs": {"minutes_saved_per_week": 240, "hourly_cost_usd": 37}, "expect": {"annual_value_usd": 4084800}},
+    {"name": "list_price",   "inputs": {"annual_price_usd": 72000}, "expect": {"break_even_minutes_per_week": 5.05}},
+    {"name": "seven_minutes","inputs": {"minutes_saved_per_week": 7}, "expect": {"annual_value_usd": 99820, "breaks_even": false}},
+    {"name": "eight_minutes","inputs": {"minutes_saved_per_week": 8}, "expect": {"annual_value_usd": 114080, "breaks_even": true}}
+  ],
+  "rounding": "Compute in full precision; round only for display. Tolerance in tests: 0.5% or 0.01 absolute.",
+  "ui_rules": [
+    "Every input is a labelled number field plus a slider; both keyboard operable.",
+    "Results region is aria-live=polite and announces once per change (debounced 300 ms).",
+    "Show the formula under each output in plain text.",
+    "Footer: 'Projection, not a measurement. Hours saved are measured in the pilot. Model prices: Tencent Cloud, 26 Oct 2026. Token sizes are assumptions until the live Hy3 run.'",
+    "Each reference line links to its source.",
+    "No numbers other than these formulas and the cited reference values appear on the page.",
+    "Pure client-side arithmetic; no backend call; nothing is stored."
+  ]
+}
