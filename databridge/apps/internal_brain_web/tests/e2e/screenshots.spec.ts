@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import path from 'node:path';
-import { S1, ask, login, resetDemo } from './helpers';
+import { S1, ask, login, quietTourOffer, resetDemo } from './helpers';
 
 // Captures demo screenshots (mock mode) into ./screenshots. Not an assertion-heavy test.
 const OUT = path.join(__dirname, '..', '..', 'screenshots');
@@ -14,6 +14,7 @@ for (const vp of [
     test.use({ viewport: { width: vp.width, height: vp.height } });
 
     test('capture', async ({ page }) => {
+      await quietTourOffer(page);
       await resetDemo(page);
       await page.goto('/login');
       await page.screenshot({ path: shot(`01-login-${vp.name}`), fullPage: true });

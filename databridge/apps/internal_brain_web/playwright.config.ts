@@ -6,6 +6,9 @@ const PORT = 3101;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // a11y-shell*.spec.ts belongs to the accessibility pass: it has its own config (tests/e2e/a11y-shell.config.ts, port 3123
+  // dev server). dbgtmp/ is scratch. Neither runs under this config.
+  testIgnore: ['**/a11y-shell*.spec.ts', '**/dbgtmp/**'],
   fullyParallel: false,
   workers: 1,
   retries: 0,

@@ -69,7 +69,7 @@ test.describe('engine proxy: on', () => {
     }
   });
 
-  test('compliance may NOT read the snapshot (it is jdoe's view, not live-checked, not ledgered)', async ({ request }) => {
+  test("compliance may NOT read the snapshot (it is jdoe's view, not live-checked, not ledgered)", async ({ request }) => {
     await signIn(request, 'maya.compliance');
     expect((await request.get('/api/walnut/graph/facets')).status()).toBe(403);
   });

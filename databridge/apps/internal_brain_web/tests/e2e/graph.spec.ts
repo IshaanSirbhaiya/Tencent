@@ -5,6 +5,7 @@ import { expectAccessible, login } from './helpers';
 // platforms; ken.ext 24 in 2 on 2). The graph may only ever show what each session's API returned.
 
 test('jdoe: galaxy loads, search focuses a node, side panel tabs, expand, table view, axe', async ({ page }) => {
+  test.setTimeout(120_000); // the 30 s canvas wait plus force-layout and axe on a loaded machine
   await login(page, 'jdoe');
   await page.goto('/dev/graph');
   await expect(page.getByTestId('graph-main-loading')).toBeVisible();

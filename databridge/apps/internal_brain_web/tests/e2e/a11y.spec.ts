@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { S1, ask, expectAccessible, login } from './helpers';
+import { S1, ask, expectAccessible, login, quietTourOffer } from './helpers';
 
 // axe-core on the five screens, in their populated states, at desktop and phone widths.
 for (const vp of [
@@ -15,13 +15,19 @@ for (const vp of [
       await expectAccessible(page, `login/${vp.name}`);
     });
 
-    test('2 ask with answer + 3 sources panel', async ({ page }) => {
+    test('2 ask with answer + sources sheet', async ({ page }) => {
+      await quietTourOffer(page); // the first-visit offer is a fixed toast; on a phone it can cover the composer (see TEST_REPORT)
       await login(page, 'jdoe');
       await ask(page, S1);
-      await expect(page.getByTestId('sources-panel')).toContainText('Confluence');
+      await expect(page.getByTestId('answer').getByTestId('source-card').first()).toContainText(/Confluence|Jira|Slack|Google Drive/);
       await expectAccessible(page, `ask/${vp.name}`);
+      await page.getByTestId('answer').getByTestId('citation-chip').first().click();
+      await expect(page.getByTestId('sheet-excerpt')).toBeVisible();
+      await expectAccessible(page, `ask-sheet/${vp.name}`);
+      await page.keyboard.press('Escape');
       // refusal state too
       await ask(page, 'Show me the security incident report from the Q3 breach.');
+      await expect(page.getByTestId('answer').getByTestId('refusal-card')).toBeVisible();
       await expectAccessible(page, `ask-refusal/${vp.name}`);
     });
 

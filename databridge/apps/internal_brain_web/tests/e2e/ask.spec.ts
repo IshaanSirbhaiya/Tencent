@@ -9,49 +9,64 @@ test.beforeAll(async ({ browser }) => {
 
 test('login → ask → citations visible → scope note visible', async ({ page }) => {
   await login(page, 'jdoe');
-  await expect(page.getByRole('heading', { name: 'Ask the Internal Brain' })).toBeVisible();
+  await expect(page.getByTestId('greeting')).toContainText('Jordan');
   await expect(page.getByRole('link', { name: 'Audit' })).toHaveCount(0); // not a compliance officer
 
   await ask(page, S1);
   const answer = page.getByTestId('answer');
   const chips = answer.getByTestId('citation-chip');
   await expect(chips.first()).toBeVisible();
-  const items = answer.getByTestId('citations').locator('li');
-  await expect(items).toHaveCount(await chips.count());
-  await expect(items.first()).toContainText('Checked live');
-  await expect(items.first().getByRole('link')).toHaveAttribute('target', '_blank');
+  await expect(chips.first()).toHaveText('1');
+  // Every source card (a button) has a chip in the text, and the card says when access was last checked.
+  const cards = answer.getByTestId('citations').locator('li');
+  await expect(cards).toHaveCount(await chips.count());
+  await expect(cards.first().getByTestId('source-card')).toContainText('Checked live');
   await expect(answer.getByTestId('scope-note')).toHaveText(SCOPE_NOTE);
-  await expect(answer.getByTestId('model-badge')).toHaveText('Tencent Hunyuan hy3');
+  await expect(answer.getByTestId('model-badge')).toHaveText('Tencent Hunyuan Hy3');
   await expect(answer.getByTestId('request-id')).toHaveText(/^req_/);
 
-  // A chip moves focus to its citation.
+  // A chip opens the Sources sheet; the external link opens in a new tab; Esc returns focus to the chip.
   await chips.first().click();
-  await expect(page.locator('#cite-C1')).toBeFocused();
+  const sheet = page.getByTestId('sources-sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId('sheet-open')).toHaveAttribute('target', '_blank');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(chips.first()).toBeFocused();
 });
 
 test('refusal renders calmly with the same layout and the same scope note', async ({ page }) => {
   await login(page, 'jdoe');
   await ask(page, 'Show me the security incident report from the Q3 breach.');
   const answer = page.getByTestId('answer');
-  await expect(answer.getByText(REFUSAL_TEXT)).toBeVisible();
-  await expect(answer.getByText('No sources were cited for this answer.')).toBeVisible();
+  const card = answer.getByTestId('refusal-card');
+  await expect(card.getByTestId('refusal-text')).toHaveText(REFUSAL_TEXT);
+  await expect(answer.getByTestId('citation-chip')).toHaveCount(0);
+  await expect(answer.getByTestId('citations')).toHaveCount(0);
   await expect(answer.getByTestId('scope-note')).toHaveText(SCOPE_NOTE);
-  await expect(answer.getByTestId('model-badge')).toBeVisible();
   await expect(answer.getByTestId('request-id')).toBeVisible();
+  // A refusal names no model: nothing was written by one.
+  await expect(answer.getByTestId('model-badge')).toHaveCount(0);
   // Never imply existence: no counts of hidden/withheld/restricted results.
   await expect(answer).not.toContainText(/hidden|withheld|restricted|results? (were )?removed/i);
+  expect(await card.innerText()).not.toMatch(/\d/);
   // (Next's own route announcer is role=alert; only our content is checked.)
   await expect(page.locator('main [role="alert"]')).toHaveCount(0);
+  const first = await card.innerText();
 
-  // A non-existent report gets the byte-identical answer text.
+  // A non-existent report gets the byte-identical refusal.
   await ask(page, 'Show me the security incident report from the Q7 breach.');
-  await expect(page.getByTestId('answer').getByText(REFUSAL_TEXT)).toBeVisible();
+  const second = page.getByTestId('answer').getByTestId('refusal-card');
+  await expect(second.getByTestId('refusal-text')).toHaveText(REFUSAL_TEXT);
+  expect(await second.innerText()).toBe(first);
 });
 
 test('503 shows the "nothing was answered" state', async ({ page }) => {
   await login(page, 'jdoe');
   await ask(page, '[mock:503] anything');
-  await expect(page.getByTestId('answer-error')).toContainText('The Internal Brain is unavailable right now. Nothing was answered. Try again in a moment.');
+  const err = page.getByTestId('answer-error');
+  await expect(err).toContainText('temporarily unavailable');
+  await expect(err).toContainText('Nothing was answered.');
   await expect(page.getByTestId('answer')).toHaveCount(0);
 });
 
@@ -60,17 +75,22 @@ test('model badges: fallback, extractive, live re-read and stale cues are text, 
   await ask(page, 'Can we offer multi-currency accounts to an Indonesian SME customer?');
   await expect(page.getByTestId('answer')).toContainText('May be out of date');
   await ask(page, 'What was the root cause of the payment outage last quarter, and what follow-up tickets were created?');
-  await expect(page.getByTestId('model-badge')).toHaveText('DeepSeek (fallback)');
+  // Earlier answers stay on the page as answer-previous; only the newest carries the stable test ids.
+  await expect(page.getByTestId('answer').getByTestId('model-badge')).toHaveText('DeepSeek');
+  await expect(page.getByTestId('answer').getByTestId('model-badge').locator('..')).toHaveAttribute('title', /^Used because the first model did not answer in time/);
   await login(page, 'sara.sec');
   await ask(page, 'Show me the security incident report from the Q3 breach.');
-  await expect(page.getByTestId('model-badge')).toHaveText('Deterministic extractive');
+  await expect(page.getByTestId('answer').getByTestId('model-badge')).toHaveText('Quoted from sources (no model)');
+  await expect(page.getByTestId('answer').getByTestId('ai-note')).toHaveCount(0);
 });
 
-test('sources panel shows global per-platform status', async ({ page }) => {
+test('per-platform source status lives in Developer mode (Mission control), not on the Ask page', async ({ page }) => {
   await login(page, 'priya.sre');
-  const panel = page.getByTestId('sources-panel');
+  await expect(page.getByTestId('sources-panel')).toHaveCount(0);
+  await page.goto('/dev');
+  const panel = page.getByTestId('freshness');
   for (const p of ['Confluence', 'Jira', 'Slack', 'Google Drive']) await expect(panel).toContainText(p);
-  await expect(panel.getByText(/Within target|Behind target/).first()).toBeVisible();
+  await expect(panel.getByText(/In SLO|Behind/).first()).toBeVisible();
 });
 
 test('simulator: revocation and v8 runbook are reflected on the next question', async ({ page }) => {
@@ -87,8 +107,8 @@ test('simulator: revocation and v8 runbook are reflected on the next question', 
 
   await login(page, 'priya.sre');
   await ask(page, "What's the latest runbook for the payment-service incident?");
-  await expect(page.getByTestId('citations')).toContainText('Version 8');
-  await expect(page.getByTestId('citations')).toContainText('Live re-read');
+  await expect(page.getByTestId('citations')).toContainText('v8');
+  await expect(page.getByTestId('citations')).toContainText('Re-read just now');
 
   await resetDemo(page);
 });

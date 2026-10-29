@@ -723,7 +723,7 @@ function OfferToast() {
       aria-label={t('offer.label')}
       data-testid="tour-offer"
       data-stage-hide
-      className="ds-pop fixed bottom-4 left-4 right-4 z-[70] rounded-xl border border-line-strong bg-overlay p-4 text-fg shadow-pop sm:right-auto sm:w-[22rem]"
+      className="ds-pop fixed left-4 right-4 top-16 z-[70] rounded-xl sm:bottom-4 sm:top-auto border border-line-strong bg-overlay p-4 text-fg shadow-pop sm:right-auto sm:w-[22rem]"
       data-state="open"
     >
       <div className="flex items-start gap-3">
