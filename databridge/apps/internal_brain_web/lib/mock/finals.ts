@@ -3,6 +3,7 @@
 // in-memory synthetic ledger and the same permission-correct map the other mock routes use, so the
 // numbers agree with the audit console. Shapes mirror the Python handlers (see lib/types.ts).
 import { createHash } from 'node:crypto';
+import { graphDocExtras } from './extra/graph';
 import type {
   AuditEvent,
   AuditStats,
@@ -398,6 +399,8 @@ export function mockDoc(sub: string, state: MockState, docId: string, syncAt: Re
           const o = u.docs.get(l.other)!;
           return { doc_id: l.other, platform: o.platform, title: o.item.title, container_name: o.containerName, kind: o.item.kind, relation: l.relation };
         });
+      // the graph mock is the source of truth for authors and links, so the panel and the graph agree
+      const gx = graphDocExtras(sub, docId);
       return {
         doc_id: it.doc_id,
         platform: p.platform,
@@ -409,11 +412,11 @@ export function mockDoc(sub: string, state: MockState, docId: string, syncAt: Re
         updated_at: it.updated_at,
         deep_link: it.deep_link,
         created_at: it.updated_at,
-        author: { id: a, name: ROLES[a]?.name ?? a },
+        author: gx ? gx.author : { id: a, name: ROLES[a]?.name ?? a },
         excerpt: `(Synthetic demo excerpt) ${it.title}. This passage is generated for mock mode so the document panel can be built without the backend; the live service returns the masked indexed text of the version checked just now.`,
         excerpt_kind: 'start',
         excerpt_truncated: false,
-        links,
+        links: gx ? gx.links : links,
         lineage: {
           connector: p.platform,
           last_sync_at: new Date(syncAt[p.platform] ?? Date.now()).toISOString(),
