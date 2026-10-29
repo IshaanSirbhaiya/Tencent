@@ -1,36 +1,44 @@
 # Status
 
-**Date:** 15 Oct 2026. Submission freeze is 10:00 SGT on 15 Oct. The deadline is Fri 16 Oct, 23:59 SGT.
+**Date:** 30 Oct 2026. Branch `final_v1.0`. Team Walnut is a FinTech finalist; Demo Day is Tue 3 Nov 2026.
+Product: **Walnut DataBridge**, with **Internal Brain** as the ask product inside it.
+Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals/PLAN.md](docs/finals/PLAN.md).
 
-This is Walnut's entry to the Tencent Cloud AI CAN DO IT Hackathon, FinTech track (Aspire): the **Internal Brain**.
-Public repo: https://github.com/IshaanSirbhaiya/Tencent. Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md).
-
-## Done
+## 1. Built
 
 | Area | State | Where |
 |---|---|---|
-| Internal Brain service: two access checks, grounding, write-ahead audit, one response shape | Built | `databridge/apps/internal_brain/` |
-| Web app: ask, map, compare, audit, simulator, guided tour | Built | `databridge/apps/internal_brain_web/` |
-| Original Walnut screens on Company A | Running on the same data | `databridge/apps/frontend/` |
-| WorkBuddy connectors (ask as a person; compliance audit) | Built, shown in WorkBuddy | `docs/tencent/workbuddy/`, `submission/02_workbuddy/` |
-| CodeBuddy sessions (6) with saved transcripts | Done | `docs/tencent/evidence/`, `submission/01_codebuddy/` |
-| Tests | 639 Internal Brain tests and 38 web end-to-end tests pass | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
-| Leak evaluation | 0 leaks in 5,958 requests (2,979 probes on 2 paths); 0 of 400 pairs differ | `databridge/evals/internal_brain/RESULTS.md` |
-| Deck (23 slides, PDF and PPTX) | Done | `submission/07_deck/` |
-| Cover image (made with Miora; 380×216 and 1920×1080) | Done | `submission/06_cover/` |
-| Demo video, 6:28: camera intro by Ishaan, then the narrated demo | Done | `submission/05_video/` |
-| Lighthouse deploy kit | Written; no live instance | `deploy/lighthouse/` |
+| Internal Brain service: two permission gates, grounding, write-ahead sealed log, one response shape | Built (unchanged rules since submission) | `databridge/apps/internal_brain/` |
+| Developer endpoints: `/ib/graph`, `/ib/graph/openable`, `/ib/doc/{id}`, `/ib/trace/{req}`, `/ib/status`, `/ib/ask/stream` (SSE stages), `/audit/stats`, `/audit/journey/{req}`, `/audit/tamper-demo` | Built | `databridge_ib/app.py`, `databridge_ib/audit/routes.py`; contract [backend_v1.md](docs/finals/contracts/backend_v1.md) |
+| Seeded demo history: about 300 replay-labelled questions through the real pipeline, with 2 real Gate-2 denials | Built | `databridge/scripts/seed_demo_activity.py` |
+| Web app, User mode: sign-in, Ask with live stage events, sources sheet, History, Settings (English / 简体中文, accessibility), Compare, Value | Built | `databridge/apps/internal_brain_web/` |
+| Web app, Developer mode: Mission control, Journey, Knowledge graph, Walnut engine, Analytics, Audit with sandbox tamper demo, Simulator, Trust centre | Built | same |
+| Presenter mode (10-step keyboard script, Stage theme, slides) and tours for both modes | Built | `components/presenter/`, `components/tour/` |
+| One-command launcher | Built | [`databridge/scripts/demo_up.sh`](databridge/scripts/demo_up.sh) |
+| Rubric evidence pack, one deliverable set per criterion | Written | [docs/finals/rubric/README.md](docs/finals/rubric/README.md) |
+| WorkBuddy connectors (ask as a person; compliance audit) | Built at submission, unchanged | `docs/tencent/workbuddy/` |
 
-## Waiting on
+## 2. Tested
+
+| Check | Result | Where |
+|---|---|---|
+| Backend tests (Internal Brain) | **718 passed**, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
+| Leak evaluation (re-run on the finals pipeline, 30 Oct 03:27 SGT) | 0 leaks in 5,958 requests; 0 of 400 pairs differ; 0 injection hard failures in 976 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
+| Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 6 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
+| Web end-to-end tests (Playwright, axe) | 38 of 38 pre-finals tests passed on the new foundation. The suite is being ported to the new UI (23 spec files); the full-run result is not recorded yet | `databridge/apps/internal_brain_web/tests/e2e/` |
+
+## 3. Pending
 
 | Item | Who | Note |
 |---|---|---|
-| Tencent Hy3 through TokenHub | Tencent (account verification pending) | Hy3 is configured but has not been run live. Until it is approved, answers quote the sources, with the same checks. To switch: `IB_FORCE_OFFLINE=0`. |
-| Lighthouse server | Tencent (sold out) | Optional. The local run is the documented path. |
+| **Hy3 live through TokenHub** | Ishaan (activation in the TokenHub console) | Wired and tested with a capturing test model; **live run pending**. Every model call currently returns 402 (code 401006). Until it runs, answers are quoted from the sources, with the same checks. Steps: [MORNING_BRIEF.md](docs/finals/MORNING_BRIEF.md) |
+| **Hallway test** (5 people × 20 min) | Team, Sat 31 Oct | The only human-centered-design evidence we cannot produce ourselves. Protocol: [HALLWAY_TEST_PROTOCOL.md](docs/finals/rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md). The fix log is empty until then: [FIX_LOG.md](docs/finals/rubric/hcd_ux/FIX_LOG.md) |
+| **Venue rehearsal** | Team, Mon 2 Nov 16:00–17:00 (mandatory) | Run sheet: [RUN_SHEET.md](docs/finals/rubric/demo_story/RUN_SHEET.md); checklist: [VENUE_TECH_CHECKLIST.md](docs/finals/rubric/demo_story/VENUE_TECH_CHECKLIST.md) |
+| Full e2e run on the ported suite | Build team | Record the pass count here when it runs |
+| Simulator Reset does not undo a revocation in the index | Build team | Open issue [QA_LIVE.md §4.1](docs/finals/QA_LIVE.md); workaround: `demo_up.sh start --fresh` |
+| Lighthouse server | Tencent (sold out) | Optional. The local run is the documented path |
 
-## Next
+## 4. At submission (16 Oct), for the record
 
-1. Record the voice-over on the video, using `submission/05_video/narration_cues.md`.
-2. Fill in the submission form ([answers](docs/tencent/SUBMISSION.md)) and attach the pack ([index](submission/README.md)).
-3. Get the teammates' confirmation.
-4. When Hy3 is approved, run it once and record the result here.
+639 Internal Brain tests and 38 web end-to-end tests passed; the leak evaluation gave the same headline
+numbers; deck, video, cover and CodeBuddy evidence are in [submission/](submission/README.md).

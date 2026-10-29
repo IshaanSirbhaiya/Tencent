@@ -1,9 +1,98 @@
-# Walnut Internal Brain
+# Walnut DataBridge: judge's guide
 
-**Ask your whole company a question, and get an answer built only from what you're allowed to open.**
+**Answers you can prove.** Ask your whole company a question, and get an answer built only from what
+you're allowed to open.
 
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech Track · Aspire: *"The Internal Brain:
 a context-aware enterprise knowledge system with RBAC, security logging and an audit trail."*
+**Walnut DataBridge** is the product; **Internal Brain** is the ask product inside it.
+
+---
+
+## Finals build
+
+This is the build for Demo Day (3 Nov 2026), on branch `final_v1.0`. Since the 16 Oct submission, one
+web app now has two modes, switched at the top left:
+
+- **User mode** for staff: Ask, Compare, History, Settings and the Value calculator.
+- **Developer mode** for engineers and compliance: Mission control, Request journey, Knowledge graph,
+  Walnut engine, Analytics, Audit (with a sandbox tamper demo), Simulator and Trust centre.
+- **Presenter mode** runs the Demo Day script from the keyboard, and **tours** teach each mode.
+
+The backend rules did not change: two permission gates before any model, identity only from the signed
+token, a write-ahead sealed log, and one response shape. The new developer views follow the same rules
+([ARCHITECTURE.md → Developer views](docs/tencent/ARCHITECTURE.md#8-developer-views-and-their-guarantees),
+[SECURITY.md §15](docs/tencent/SECURITY.md#15-developer-views-and-the-finals-v2-additions-30-oct)).
+
+Two facts first. **Hy3 is wired in but has not run live** (TokenHub activation pending), so answers
+show "Quoted from sources (no model)". **The platforms are mock servers** with the real APIs' shapes.
+
+### The 10-minute walk-through
+
+Start the stack first: `bash databridge/scripts/demo_up.sh start --fresh` ([Run it](#run-it)), then
+open http://127.0.0.1:3100. To change person, use **Sign out** in the menu at the top right and pick
+someone else. There is no password.
+
+It follows the Demo Day story: Amy and Rachel ask the same question; Ken gets identical refusals; a
+source is checked live; the journey is read as compliance (Maya); Verify and the tamper demo; then the
+knowledge graph and analytics.
+
+**Part A: User mode (about 4 minutes)**
+
+| # | Time | Person | Click | What to notice |
+|---|---|---|---|---|
+| 1 | 0:00 | **Amy** (`amy.am`, account manager) | On the sign-in page, pick Amy | Each card shows the person's role and what they can open |
+| 2 | 0:30 | Amy | **Ask** → the suggestion "Why has Velquarry Trading's account been restricted, and what should I tell the customer?" | Live stage events while it runs, then a cited answer: the approved customer script, and nothing about the case |
+| 3 | 1:00 | Amy | Type "Has a suspicious transaction report been filed on Velquarry Trading?" (also one of her starter cards) | The constant refusal: "I couldn't find an answer to that in the sources you can access." No count, no hint that a case exists |
+| 4 | 1:30 | Amy | **Compare** → "Same question · two people". First person **Amy**, second person **Rachel** (`mlro.tan`); paste the Velquarry question; **Ask both** | Same brain, two truths. Amy gets the script; Rachel, the money-laundering reporting officer, gets the case (synthetic case FC-2026-0147). Each side is its own signed-in session |
+| 5 | 2:15 | (Compare) | In Rachel's answer, press the chip **[2]** | The source sheet: platform, version, "Checked live at", and the cited sentences highlighted. **Esc** closes it and returns focus to the chip |
+| 6 | 2:45 | (Compare) | "Same person · two questions". Person **Ken** (`ken.ext`, contractor); left: the Velquarry question; right: the same question about "Bayfront Spice Traders" (a company that does not exist); **Ask both** | Two refusals and the marker "Identical responses: same text, same sources". Restricted looks exactly like non-existent |
+| 7 | 3:30 | Amy | **EN** in the header (or **Settings** → Language) | The interface flips to 简体中文. Settings also has text size, reduce motion and high contrast |
+
+**Part B: Developer mode (about 6 minutes)**
+
+| # | Time | Person | Click | What to notice |
+|---|---|---|---|---|
+| 8 | 4:00 | **Maya** (`maya.compliance`, compliance officer) | Sign out, pick Maya, then **Developer** at the top left. **Mission control** opens | The pipeline: signed identity, ledger, Gate 1, relevance, Gate 2, ledger, model chain, grounding, ledger, answer. Each step shows its live p50 from sealed timings. Select a step to read its guarantee |
+| 9 | 4:45 | Maya | **Journey** → the row with `mlro.tan` and the Velquarry question | The request end to end as compliance sees it: a millisecond waterfall (Accept, Gate 1, Gate 2, Seal, Compose, Release), the Gate-2 verdict for each document with its reason code, the model, and the three sealed ledger records on the same axis. Never the answer text |
+| 10 | 5:45 | Maya | **Audit** → **Verify audit chain** | "Chain intact", and the head matches the copy published off-host |
+| 11 | 6:15 | Maya | Same page, **Tamper demo** → **Run the tamper demo on a copy** | "Your real audit log was not modified." One row per attack on the copy: editing one old record gives "Chain broken at entry n"; deleting, restoring an old backup and deleting the anchors are flagged. One row honestly reads "Not detectable: the stated window" (a rollback after the last off-host publication) |
+| 12 | 7:00 | Maya | **Analytics** | Requests, answer rate, latency p50/p95, Gate-2 deny rate and reasons, grounding drops, fallback use, all from the verified ledger. The banner says how many requests are seeded replay; **Live only** removes them |
+| 13 | 7:45 | **Jordan** (`jdoe`, backend engineer) | Sign out, pick Jordan, Developer → **Knowledge graph** | Everything Jordan can open as one graph: 867 items, 17 places, 4 platforms. Search "migration", select a node: the panel shows the passage and its lineage, each re-checked live |
+| 14 | 8:30 | Jordan | **Compare two people** (top right of the graph) → Ken | A second, separately signed-in graph: Ken can open 24 items on 2 platforms, and none of Jordan's. No greyed placeholders for what Ken cannot open |
+| 15 | 9:00 | Jordan | **Journey** | Jordan sees only a receipt of his own requests: steps ticked, total time rounded, the sources he can still open, the record hashes. No other person's requests, no Gate-2 reasons. **Analytics** and **Audit** show a lock card |
+| 16 | 9:30 | Jordan | **Walnut engine**, then **Trust centre** | The engine underneath (932 entities, 2,246 links, 4,710 pointers; read-only). The Trust centre lists seven controls, each with the test that proves it |
+
+**Optional.** Presenter mode: open http://127.0.0.1:3100/compare?present=1, press `P`, then `Space` for
+each of the 10 steps ([PRESENTER_KEYS.md](docs/finals/rubric/demo_story/PRESENTER_KEYS.md)). The
+tours: **Take the tour** in the header (User mode 4 steps, Developer mode 5 steps). Simulator as
+`admin.it`: see [Aspire's five scenarios](#aspires-five-scenarios), and note the open Reset issue in
+[Honest limits](#honest-limits).
+
+### Screenshots
+
+From the live backend (30 Oct 2026), in [docs/finals/screens/live/](docs/finals/screens/live/):
+
+| # | Screen | File |
+|---|---|---|
+| 1 | Sign-in: pick a person | [login.png](docs/finals/screens/live/login.png) |
+| 2 | Amy asks about a suspicious-transaction report: the constant refusal | [user-amy.am-answers.png](docs/finals/screens/live/user-amy.am-answers.png) |
+| 3 | Compare: Amy vs Rachel on Velquarry | [compare-amy-rachel.png](docs/finals/screens/live/compare-amy-rachel.png) |
+| 4 | The source sheet: version, checked live, cited sentences | [compare-amy-rachel-sheet.png](docs/finals/screens/live/compare-amy-rachel-sheet.png) |
+| 5 | Ken: Velquarry vs a made-up company, identical | [compare-ken-identical.png](docs/finals/screens/live/compare-ken-identical.png) |
+| 6 | Mission control as compliance | [dev-maya-mission.png](docs/finals/screens/live/dev-maya-mission.png) |
+| 7 | Journey waterfall as compliance | [dev-maya-journey-fresh.png](docs/finals/screens/live/dev-maya-journey-fresh.png) |
+| 8 | Journey of a real Gate-2 denial (seeded replay) | [dev-maya-journey-seeded-denial.png](docs/finals/screens/live/dev-maya-journey-seeded-denial.png) |
+| 9 | Journey receipt as Jordan (own request only) | [dev-jdoe-receipt.png](docs/finals/screens/live/dev-jdoe-receipt.png) |
+| 10 | Sandbox tamper demo | [dev-maya-audit-tamper.png](docs/finals/screens/live/dev-maya-audit-tamper.png) |
+| 11 | Knowledge graph: Jordan and Ken side by side | [dev-jdoe-graph-compare.png](docs/finals/screens/live/dev-jdoe-graph-compare.png) |
+| 12 | Analytics as compliance | [dev-maya-analytics.png](docs/finals/screens/live/dev-maya-analytics.png) |
+| 13 | Walnut engine | [dev-jdoe-brain.png](docs/finals/screens/live/dev-jdoe-brain.png) |
+| 14 | Trust centre | [dev-jdoe-trust.png](docs/finals/screens/live/dev-jdoe-trust.png) |
+| 15 | Presenter mode, Stage theme, step 1 | [presenter-step-01-compare-people.png](docs/finals/screens/live/presenter-step-01-compare-people.png) |
+
+All 97 live screenshots, and how they were taken, are listed in [QA_LIVE.md](docs/finals/QA_LIVE.md).
+The 16 Oct submission screenshots are in [submission/](submission/README.md).
 
 ---
 
@@ -20,8 +109,8 @@ Aspire asked for three things. This is where to see each one:
 | Aspire asked for | What the Brain does | Where to see it | Proof |
 |---|---|---|---|
 | Knowledge across tools | One cited answer from all four platforms | **Ask** as `jdoe` | `test_scenarios_e2e.py::test_canonical` |
-| Restrictions per person | Each person's answer uses only what they can open; "restricted" looks exactly like "doesn't exist" | **Compare** (`jdoe` beside `ken.ext`), **Map** | 0 leaks in 5,958 requests; 0 of 400 paired answers differ |
-| Security logging and an audit trail | Every question and decision is logged before the answer is shown, and the log is tamper-evident | **Audit** as `maya.compliance` → **Verify audit chain** | `test_audit_tamper.py`, `test_audit_query.py::test_s5_reconstruction` |
+| Restrictions per person | Each person's answer uses only what they can open; "restricted" looks exactly like "doesn't exist" | **Compare** (Amy beside Rachel; Ken's two questions), **Knowledge graph** | 0 leaks in 5,958 requests; 0 of 400 paired answers differ |
+| Security logging and an audit trail | Every question and decision is logged before the answer is shown, and the log is tamper-evident | **Audit** as `maya.compliance` → **Verify audit chain** and the tamper demo; **Journey** | `test_audit_tamper.py`, `test_tamper_demo_route.py`, `test_audit_query.py::test_s5_reconstruction` |
 
 Everything runs on a synthetic fintech called **Company A** (32 people, 209 Confluence pages, 251 Jira
 issues, 602 Slack threads, 81 Drive files). No real company or customer data is used anywhere.
@@ -29,24 +118,8 @@ issues, 602 Slack threads, 81 Drive files). No real company or customer data is 
 **What's real and what's simulated.** The four platforms are mock servers that speak the real APIs'
 shapes (their permission models, webhooks, errors and rate limits); we have not run against a live
 tenant. Answers in the demo are quoted straight from the sources. Tencent Hy3 through TokenHub is wired
-in but has not been run live yet, because Tencent's account verification is pending; when it runs, it
-goes through exactly the same checks. The full list is in [Honest limits](#honest-limits).
-
-## Two-minute tour for judges
-
-Start the app first ([Run it](#run-it)), then follow these steps in order. Sign out from the header to
-switch person. There is no password.
-
-| # | Do this | What to notice |
-|---|---|---|
-| 1 | Sign in as anyone, open **Compare**, press **Ask for both** (it starts on `jdoe` and `ken.ext` with the database migration question) | Jordan gets a cited answer. Ken gets "I couldn't find an answer to that in the sources you can access.", with no hint that more exists |
-| 2 | Open **Map** as `jdoe`, then as `ken.ext` | Jordan can open 867 items on 4 platforms, Ken 24 on 2. Platforms Ken can't open simply don't appear |
-| 3 | **Ask** as `jdoe`: "What backfill throttle are we using for the ledger copy job?" | The answer cites a #db-migration Slack thread. The sources panel shows each source's version and when access was checked; the "How this was checked" strip sits under the answer |
-| 4 | Sign in as `admin.it`, **Simulator** → "Remove jdoe from #db-migration"; sign in as `jdoe` and ask step 3 again | Jordan now gets the plain refusal, on the very next question. Press "Reset demo" afterwards |
-| 5 | Sign in as `maya.compliance`, open **Audit**, press **Verify audit chain** | The questions above and their allow/deny decisions are in the log, and the result reads "Chain intact" |
-| 6 | Start the original Walnut screens (below) and open http://localhost:3300 | The Walnut engine underneath: the knowledge graph of Company A as `jdoe` sees it, with the pointer behind every value |
-
-**Take the tour** in the header gives the same walk inside the app.
+in but has not been run live yet: TokenHub activation is pending. When it runs, it goes through exactly
+the same checks. The full list is in [Honest limits](#honest-limits).
 
 ## Why it matters
 
@@ -64,24 +137,35 @@ can't see; and compliance can reconstruct any access, with proof the record hasn
 
 ## What you can see
 
-| Screen | Who to sign in as | What it shows |
-|---|---|---|
-| **Ask** | anyone (try `jdoe`) | One cited answer from several platforms, a sources panel with each source's version and freshness, and a "How this was checked" strip |
-| **Map** | anyone | Everything *you* can open, by platform and space. `jdoe` sees 867 items on 4 platforms; `ken.ext` sees 24 on 2 |
-| **Compare** | anyone | The same question asked by two people, side by side |
-| **Audit** | `maya.compliance` | Plain-English audit search, every allow/deny decision, a reasoned reveal of an answer, and **Verify audit chain** |
-| **Simulator** | `admin.it` | Change access live (remove someone from a channel, restrict a page, edit a runbook) and watch the next answer change |
-| **Take the tour** | button in the header | A short guided walk through the screens above |
-| **WorkBuddy** | three ready-made workspaces | Ask the Brain from Tencent WorkBuddy, as an engineer, a contractor, or the compliance officer |
-| **Original Walnut screens** | separate launcher (below) | The Walnut engine's own views on Company A, built as `jdoe` sees it: the knowledge graph (932 items and people), the company brain with a time slider, the ontology and the provenance chain of every value, with Walnut's guided demo |
+| Mode | Screen | Who to sign in as | What it shows |
+|---|---|---|---|
+| User | **Ask** (`/`) | anyone (try `jdoe` or `amy.am`) | One cited answer from several platforms, live stage events while it runs, and a source sheet with each source's version and "checked live" time |
+| User | **Compare** (`/compare`) | anyone | The same question asked by two people side by side, or one person asking two questions, each in its own signed session |
+| User | **History** (`/history`) | anyone | Your own questions by day; a row opens your receipt |
+| User | **Settings** (`/settings`) | anyone | English / 简体中文, theme, text size, reduce motion, high contrast, replay the tour |
+| User | **Value** (`/value`) | anyone | ROI calculator; inputs visible, result labelled an estimate |
+| User | **Map** (`/map`) | anyone | The pre-finals map: everything *you* can open, by platform and space. `jdoe` sees 867 items on 4 platforms; `ken.ext` sees 24 on 2 |
+| Developer | **Mission control** (`/dev`) | anyone; organisation numbers need `maya.compliance` | The pipeline with live p50 per stage, source freshness, ledger head, model status |
+| Developer | **Journey** (`/dev/journey`) | `maya.compliance` for any request; anyone for their own | Compliance: the full waterfall with Gate-2 reasons. Everyone else: a receipt of their own request |
+| Developer | **Knowledge graph** (`/dev/graph`) | anyone | Your permitted documents, places, people and links as one graph; compare two separately signed-in people |
+| Developer | **Walnut engine** (`/dev/brain`) | `jdoe` or `maya.compliance` | The engine's entity graph of Company A as `jdoe` sees it, the time slider, provenance to the row, the ontology. Read-only |
+| Developer | **Analytics** (`/dev/analytics`) | `maya.compliance` | End-to-end numbers from the verified ledger; replay history labelled |
+| Developer | **Audit** (`/dev/audit`) | `maya.compliance` | Plain-English audit search, reveal-with-reason, **Verify audit chain**, and the sandbox tamper demo |
+| Developer | **Simulator** (`/dev/sim`) | `admin.it` | Change access live (remove someone from a channel, restrict a page, edit a runbook) and watch the next answer change |
+| Developer | **Trust centre** (`/dev/trust`) | anyone | Seven controls, their framework mappings and the tests that prove them |
+| Both | **Take the tour** | header button | A guided walk: 4 steps in User mode, 5 in Developer mode |
+| Presenter | **Presenter mode** (`/compare?present=1`, then `P`) | the script signs in | The 10-step Demo Day script on the keyboard, with a Stage theme for projectors |
+| Outside the app | **WorkBuddy** | three ready-made workspaces | Ask the Brain from Tencent WorkBuddy, as an engineer, a contractor, or the compliance officer |
+| Outside the app | **Original Walnut screens** (http://localhost:3300) | started by `demo_up.sh` | The Walnut engine's own views on Company A, with Walnut's guided demo |
 
 ## Run it
 
 **You need:**
 - [Python 3.13](https://www.python.org/downloads/) and [Node 20](https://nodejs.org/).
-- On Windows, [Git for Windows](https://git-scm.com/download/win), for Git Bash. The start script is a
-  bash script.
-- Free ports: **3100** (web app), **8100** (the Brain) and **8200** (mock platforms).
+- On Windows, [Git for Windows](https://git-scm.com/download/win), for Git Bash. The launcher is a bash
+  script.
+- Free ports: **3100** (web app), **8100** (the Brain), **8200** (mock platforms), and **8300** / **3300**
+  (the Walnut engine gateway and its original screens).
 
 **1. One-time setup**, from the `databridge/` folder:
 
@@ -97,7 +181,39 @@ python3.13 -m venv .venv && .venv/bin/python -m pip install -r requirements-lock
 (cd apps/internal_brain_web && npm install)
 ```
 
-**2. Start it** in two terminals (Git Bash on Windows, any terminal on macOS/Linux), from the repo root:
+**2. Start everything with one command**, from the repo root (Git Bash on Windows):
+
+```bash
+bash databridge/scripts/demo_up.sh start --fresh
+```
+
+[`demo_up.sh`](databridge/scripts/demo_up.sh) starts, in order: the mock platforms (:8200), the Brain
+(:8100, which indexes the whole world first), the seeded demo history (`--fresh` only: about 300
+labelled replay questions through the real pipeline, about 2 minutes), the Walnut engine gateway
+(:8300), and a production build of the web app (:3100). It prints this when ready:
+
+| Open | URL |
+|---|---|
+| The app (User mode; switch to Developer at the top left) | http://127.0.0.1:3100 |
+| Developer mode | http://127.0.0.1:3100/dev |
+| Presenter mode | http://127.0.0.1:3100/compare?present=1 |
+
+`bash databridge/scripts/demo_up.sh status` lists the ports; `bash databridge/scripts/demo_up.sh stop`
+stops everything. Logs are in `databridge/var/ib-final/logs/`. Without `--fresh`, the existing demo
+history is kept. Everything binds to 127.0.0.1.
+
+**3. Sign in.** Pick a person. There is no password, and the "Demo passcode" field stays empty when you
+run it locally. The demo sign-in stands in for your company's single sign-on.
+
+**If something goes wrong:**
+- *A port is in use:* stop whatever holds it, or run `demo_up.sh stop`, and start again.
+- *"web build failed":* read `databridge/var/ib-final/logs/web-build.log`; usually `npm install` was
+  not run.
+- *Only the Walnut engine page fails:* the engine gateway did not start; see
+  `databridge/var/ib-final/logs/engine.log`. Every other page works without it.
+
+**Fallback: start each part by hand** (two terminals, from the repo root, Git Bash). This path starts no
+demo history and no engine gateway:
 
 ```bash
 # Terminal 1: mock Slack/Confluence/Jira/Drive (:8200) + the Brain (:8100)
@@ -105,36 +221,24 @@ cd databridge && bash scripts/run_local_demo.sh
 ```
 
 ```bash
-# Terminal 2: the web app on http://localhost:3100
+# Terminal 2: the web app on http://127.0.0.1:3100
 cd databridge/apps/internal_brain_web && npm run dev
 ```
 
-**3. Wait for the ready signal.** The Brain indexes the whole world on start, which takes about a
-minute. It is ready when terminal 1 prints:
-
-```text
-Uvicorn running on http://127.0.0.1:8100
-```
-
-**4. Sign in.** Open http://localhost:3100 and pick a person. There is no password, and the "Demo
-passcode" field stays empty when you run it locally. The demo sign-in stands in for your company's
-single sign-on.
-
-**If something goes wrong:**
-- *A port is in use:* stop whatever holds 3100, 8100 or 8200 and start again.
-- *The web app loads but answers fail:* terminal 1 hasn't printed the ready line yet. Wait, then ask
-  again.
-- *Ctrl+C in terminal 1* stops both the Brain and the mock platforms.
+The Brain is ready when terminal 1 prints `Uvicorn running on http://127.0.0.1:8100`. Ctrl+C in
+terminal 1 stops both the Brain and the mock platforms. The same three processes can be started without
+bash; the commands are in [README.md → Fallback](README.md#fallback-start-each-part-by-hand).
 
 **Demo people** (all fictional): `jdoe` backend engineer · `priya.sre` on-call SRE · `ken.ext` contractor
 (Slack Connect guest) · `sara.sec` security · `leo.ops` product/ops · `amy.am` account manager ·
-`mlro.tan` money-laundering reporting officer · `maya.compliance` compliance officer · `admin.it` IT admin.
+`mlro.tan` (Rachel) money-laundering reporting officer · `maya.compliance` compliance officer ·
+`admin.it` IT admin.
 
 ### Optional extras
 
 - **Use a real model (Tencent Hy3 or your own).** By default answers are quoted straight from the
   sources. To have a model write them, create `databridge/.env.ib.local` (the launcher reads it; it is
-  git-ignored) with one of these, then restart terminal 1:
+  git-ignored) with one of these, then restart (`demo_up.sh stop`, then `start`; or restart terminal 1):
 
   ```bash
   # Tencent TokenHub: Hy3, with deepseek-v4.1-flash as backup
@@ -155,8 +259,8 @@ single sign-on.
   `tests/test_llm_chain.py`). If every model fails, you get the quoted answer instead. The same file can
   hold `IB_TOKEN_KEY` and `IB_LEDGER_KEY` (32+ random characters each) for your own signing keys;
   without them the local demo uses built-in development keys.
-- **Original Walnut screens** on Company A: from `databridge/`, run
-  `bash scripts/run_walnut_original.sh`, then open http://localhost:3300. It uses ports 3300 and 8300
+- **Original Walnut screens** on Company A: `demo_up.sh` starts them. On the fallback path, from
+  `databridge/`, run `bash scripts/run_walnut_original.sh`, then open http://localhost:3300. It uses ports 3300 and 8300
   and never touches the Brain's ports. The first run builds the graph and the web app (a few minutes);
   details in [databridge/apps/frontend/README.md](databridge/apps/frontend/README.md).
 
@@ -195,7 +299,8 @@ Diagrams: [the request path](docs/tencent/ARCHITECTURE.md) and
 
 ## Proof
 
-All evaluation numbers are from [RESULTS.md](databridge/evals/internal_brain/RESULTS.md). Test paths are
+All evaluation numbers are from [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), re-run on
+30 Oct 2026 (03:27 SGT) on the finals pipeline. Test paths are
 under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 
 | What | Result | Where |
@@ -206,8 +311,12 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Allowed sources reaching the answer step | **100%** of 196 positive probes; the answer cites the expected source in 87.8% (quoted path) to 96.4% (model path) | `RESULTS.md` |
 | Map identical with and without restricted documents | test | `test_knowledge_map.py::test_map_is_identical_with_and_without_restricted_docs` |
 | Audit log edits, deletions, truncation, rollback, edited stored answers | detected | `test_audit_tamper.py`, `test_audit_verify_content.py` |
-| Automated tests, Internal Brain | **639** passing | `databridge/apps/internal_brain/tests/` |
-| Web end-to-end tests (Playwright, including accessibility checks at desktop and phone width) | **38** | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Knowledge graph and document view identical with and without restricted documents; restricted and unknown documents give the same 404 | tests | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_doc_restricted_and_unknown_are_the_same_404` |
+| Employee receipt lists only cited sources still openable; journey and stats are compliance-only | tests | `test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable`, `test_dev_views.py::test_journey_is_compliance_only_and_has_no_answer_text` |
+| Tamper demo runs on a copy; the live log's bytes are unchanged | tests | `test_tamper_demo_route.py` |
+| Automated tests, Internal Brain | **718 passed** (30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
+| Web end-to-end tests (Playwright, including axe accessibility checks) | 38 of 38 pre-finals tests passed on the new foundation; the ported suite has 23 spec files, full-run report pending | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 6 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks
 switched off) is caught on 18 of 20 probes, and a deny-everything configuration scores 0% usefulness.
@@ -244,9 +353,17 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 
 - **The platforms are mocked**, with their real API shapes and permission rules. The connectors are real
   code on the same path a real tenant would use, but have not been run against a real tenant.
-- **Hy3 has not been run live.** The TokenHub call is wired in and tested with a capturing test model,
-  but the real-model run is waiting on Tencent account verification. All numbers above come from that
-  capturing test model and the deterministic quoting path. Demo answers are quoted from the sources.
+- **Hy3 has not been run live.** The TokenHub call is wired in and tested with a capturing test model;
+  the live run is pending TokenHub activation. All numbers above come from that capturing test model and
+  the deterministic quoting path. Demo answers are quoted from the sources and say so.
+- **Demo history is replay.** `--fresh` seeds about 300 questions through the real pipeline with past
+  dates. They are labelled `replay` in the ledger and in Analytics, which offers "Live only".
+- **Simulator Reset does not undo a revocation in the index** (open, [QA_LIVE.md §4](docs/finals/QA_LIVE.md)).
+  After "Remove jdoe from #db-migration", Jordan stays out of that channel until a full sync, even after
+  Reset. Restart with `demo_up.sh start --fresh` to get the clean world back.
+- **The plain-English audit search, offline, does not recognise document names**, so "Who retrieved the
+  Q3 breach report?" falls back to the last 365 days, and the page says so. With Hy3 live, the model
+  parser is meant to cover this (wired, not yet run live).
 - **Sign-in is a demo login** standing in for SSO. A deployed build refuses to start without a passcode.
 - **The grounding check verifies values and names, not the relations between them.**
 - **The audit log has a key holder window.** It detects tampering by anyone who doesn't hold its sealing
@@ -283,10 +400,12 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 
 | Doc | What it covers |
 |---|---|
+| [docs/finals/README.md](docs/finals/README.md) | Everything written for the finals: plan, decisions, research, reviews, rubric evidence, contracts, QA, screenshots |
+| [Rubric evidence](docs/finals/rubric/README.md) | Each of the 10 judging criteria: what is seen live, what to open, what to read |
 | [Pitch deck](submission/07_deck/walnut_internal_brain_deck.pdf) | 23 slides: the problem, the idea, how it works, proof, the fintech layer, the rollout path |
 | [Submission pack](submission/README.md) | Screenshots, CodeBuddy evidence, video, cards and deck in one folder |
 | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md) | How it was built: CodeBuddy sessions, reviews, what went wrong |
-| [ARCHITECTURE.md](docs/tencent/ARCHITECTURE.md) | Components and the request path |
+| [ARCHITECTURE.md](docs/tencent/ARCHITECTURE.md) | Components, the request path, and the developer views' guarantees |
 | [SECURITY.md](docs/tencent/SECURITY.md) | Threat model, ledger attacker model, injection, every review finding and its fix |
 | [RESPONSIBLE_AI.md](docs/tencent/RESPONSIBLE_AI.md) | Grounding, abstention, citations, oversight, evaluation |
 | [MAS_TRM_MAPPING.md](docs/tencent/MAS_TRM_MAPPING.md) | Regulatory mapping, with limits |

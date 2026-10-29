@@ -1,6 +1,7 @@
 # Walnut Internal Brain: architecture
 
-> FinTech Track (Aspire), "The Internal Brain". Status as of 15 Oct 2026. Code references were re-checked
+> FinTech Track (Aspire), "The Internal Brain". Sections 1 to 7: status as of 15 Oct 2026; section 8
+> (developer views) added 30 Oct 2026 for the finals build. Code references were re-checked
 > against commit `8e66591`; line numbers can drift, so the function or test name is the stable part.
 > Paths are relative to `databridge/apps/internal_brain/databridge_ib/` unless they start with
 > `databridge/`, `deploy/`, `tests/` (= `databridge/apps/internal_brain/tests/`) or `docs/`.
@@ -37,7 +38,7 @@ The full picture, with the trust boundaries marked, is
 |---|---|---|---|
 | Internal Brain API | `databridge/apps/internal_brain/databridge_ib/` (`python -m databridge_ib`) | 8100 | Sign-in, ask pipeline, knowledge map, ingest, webhooks, audit, demo simulator |
 | Mock platforms | `databridge/apps/mock_platforms/` (`python -m mock_platforms`) | 8200 | Slack, Confluence, Jira and Drive APIs for a supported subset, with native permission semantics and signed webhooks |
-| Web app | `databridge/apps/internal_brain_web/` (Next.js 14) | 3100 | Login, Ask, Map, Compare, Audit console, Admin simulator, guided tour, and a same-origin proxy to the API |
+| Web app (Walnut DataBridge) | `databridge/apps/internal_brain_web/` (Next.js 14) | 3100 | User mode (sign-in, Ask, Compare, History, Settings, Value) and Developer mode (Mission control, Journey, Knowledge graph, Walnut engine, Analytics, Audit, Simulator, Trust centre; section 8), Presenter mode and tours, and a same-origin proxy to the API |
 | WorkBuddy MCP servers | `mcp_server.py` (`walnut-internal-brain`), `audit_mcp_server.py` (`walnut-ib-audit`) | stdio | Thin clients of `/ib/*` and `/audit/*`. Identity comes only from the `IB_TOKEN` bearer token; no tool takes an identity argument. Setup: [workbuddy/README.md](workbuddy/README.md) |
 | Deploy kit | `deploy/lighthouse/` | 80, 443 | Caddy edge plus Docker Compose for a Tencent Lighthouse VM. Written and smoke-scripted; **no live instance** (Lighthouse capacity was sold out). See [deploy/lighthouse/README.md](../../deploy/lighthouse/README.md) |
 
@@ -240,3 +241,23 @@ legacy gateway's routes are never imported.
 
 The Internal Brain does not modify `packages/core`, `packages/harness`, `packages/retrieval`,
 `packages/adapter` or `apps/gateway`; it uses them by import.
+
+## 8. Developer views and their guarantees
+
+Added for the finals (30 Oct 2026, branch `final_v1.0`). The web app now has a Developer mode
+(`/dev/*`). Every view in it reads from the same service and keeps the rules of sections 1 to 6. The full
+security record, with limits, is [SECURITY.md §15](SECURITY.md#15-developer-views-and-the-finals-v2-additions-30-oct);
+the endpoint contracts are [docs/finals/contracts/backend_v1.md](../finals/contracts/backend_v1.md).
+Paths are relative to `databridge/apps/internal_brain/databridge_ib/`; tests are in `tests/`.
+
+| # | View | Guarantee | Code | Test |
+|---|---|---|---|---|
+| 1 | **Trace receipt** (`GET /ib/trace/{req}`, any employee) vs **compliance journey** (`GET /audit/journey/{req}`, `compliance_officer`) | The receipt covers the asker's OWN requests only (another person's request and an unknown id are the same 404). It shows stage names ticked from the sealed records, the total time rounded to 100 ms, the model, per-request record hashes, and only the cited sources the asker can still open now. It never shows the considered set, Gate-2 verdicts or reason codes. The journey shows any request with millisecond stage timings, every Gate-2 verdict and reason, and the three sealed records with their sequence numbers; never the answer text. Both are ledgered | `app.py` (`/ib/trace`), `audit/routes.py` (`/journey`) | `test_dev_views.py::test_trace_is_own_requests_only_and_hides_gate2_reasons`, `::test_journey_is_compliance_only_and_has_no_answer_text`; `test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable` |
+| 2 | **Knowledge graph and document view** (`GET /ib/graph`, `POST /ib/graph/openable`, `GET /ib/doc/{id}`) | One version-bound helper, `authz.authorize`, decides every read outside the ask: Gate 1, then a live Gate 2 against the indexed version, read-through on drift, then a snapshot of whitelisted fields. Any error, timeout or 429 is a deny. The graph is drawn only from documents that passed in this call, with no hidden-neighbour counts unless exact. A restricted, unknown or failed document is the same 404. "Compare two people" is two separately signed-in graphs, with no union or greyed placeholders. `graph.viewed` and `doc.viewed` are written before anything is returned | `authz.py` (`authorize`, `VIEW_POOL`), `graph.py`, `docview.py` | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_graph_hidden_counts_are_exact_or_absent`, `::test_doc_restricted_and_unknown_are_the_same_404`, `::test_graph_ledger_down_is_503` |
+| 3 | **SSE stage events** (`POST /ib/ask/stream`) | The same pipeline call as `/ib/ask`. Events carry only a stage name from a fixed list (`pipeline.STAGES`: accepted, gate1, gate2, sealed, composing, grounded, released) and `ok`. Every successful request sends all seven in the same order, so a restricted and a made-up question give identical sequences. The answer text is sent once, after `released`, and equals the `/ib/ask` response | `app.py` (`/ib/ask/stream`), `pipeline.py` (`Pipeline.ask(on_stage=...)`) | `test_ask_stream.py` |
+| 4 | **Tamper demo on a copy** (`POST /audit/tamper-demo`, `compliance_officer`) | The attack scenarios of `scripts/tamper_demo.py` run on a temporary copy of the live log, its anchors and the external head, taken under the append lock. Afterwards the endpoint checks that every byte the live files held at copy time is unchanged (`real_log_modified: false`) and deletes the copy. Ledgered write-ahead; one run at a time | `audit/tamper.py`, `audit/routes.py` (`/tamper-demo`) | `test_tamper_demo_route.py` |
+| 5 | **Walnut engine proxy** (`/api/walnut/*` in the web app, for `/dev/brain`) | Off unless `WALNUT_PROXY=1`, always off when `IB_DEPLOYED=1`. GET only, on a closed allowlist of read paths with per-path query rules; never `/brain/query`, `/brain/ingest` or any write. Loopback Host and same-origin only. Needs a valid Internal Brain session for the persona the engine graph was built for (`jdoe`) or a compliance officer; everyone else gets 403. The gateway token stays server-side, and no browser cookie or upstream header is passed through | `databridge/apps/internal_brain_web/app/api/walnut/[...path]/route.ts` | `databridge/apps/internal_brain_web/tests/e2e/engine-proxy.spec.ts` |
+
+Other finals endpoints: `GET /ib/status` (model ids and booleans, never a key) and `GET /audit/stats`
+(compliance-only counts and timings over a half-open window, cached per verified ledger head). Both are in
+SECURITY.md §15.3 and §15.4.
