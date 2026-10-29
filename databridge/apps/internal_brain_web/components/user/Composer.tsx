@@ -158,7 +158,7 @@ export function StarterCards({ questions, onPick, disabled }: { questions: strin
                   <PlatformIcon key={p} platform={p} tone="platform" size="sm" showLabel={false} />
                 ))}
               </span>
-              <span className="line-clamp-3 text-body-sm text-fg">{q}</span>
+              <span lang="en" className="line-clamp-3 text-body-sm text-fg">{q}</span>
             </button>
           </li>
         ))}
