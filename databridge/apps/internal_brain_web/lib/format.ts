@@ -99,8 +99,14 @@ export function plural(n: number, one: string, many = `${one}s`): string {
 export function shortVersion(v: string): { text: string; full: string } {
   if (!v) return { text: '—', full: '' };
   if (/^\d+$/.test(v)) return { text: `v${v}`, full: `Version ${v}` };
-  // Jira's version is its last-updated time, already shown as "Updated …".
-  if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return { text: '', full: `Revision of ${v}` };
+  // Jira's version is its last-updated time.
+  if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return { text: `Revision of ${fmtDate(v)}`, full: `Revision of ${fmtDateTime(v)}` };
+  // Slack's version starts with the message's epoch timestamp ("<ts>" or "<ts>|<edits>|<hash>").
+  const slack = v.match(/^(\d{9,11})\.\d+(\|.*)?$/);
+  if (slack) {
+    const iso = new Date(Number(slack[1]) * 1000).toISOString();
+    return { text: `Message of ${fmtDate(iso)}`, full: `Message of ${fmtDateTime(iso)} (${v.split('|')[0]})` };
+  }
   const head = v.split('|')[0];
   return { text: `rev ${head.length > 10 ? `${head.slice(0, 10)}…` : head}`, full: `Revision ${v}` };
 }

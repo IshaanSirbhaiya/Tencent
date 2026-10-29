@@ -313,6 +313,18 @@ export const GraphCanvas = forwardRef<CanvasHandle, Props>(function GraphCanvas(
       ro.observe(el);
       cleanups.push(() => ro.disconnect());
 
+      // Re-measure after the first frames: if the container had no size yet when sigma was built
+      // (stylesheet still loading, a hidden parent), the first render would otherwise stay empty.
+      let settle = 0;
+      const remeasure = () => {
+        if (killed) return;
+        s.resize();
+        s.refresh();
+        if (++settle < 3) raf2 = requestAnimationFrame(remeasure);
+      };
+      let raf2 = requestAnimationFrame(remeasure);
+      cleanups.push(() => cancelAnimationFrame(raf2));
+
       cbRef.current.onReady?.();
     })();
     return () => {

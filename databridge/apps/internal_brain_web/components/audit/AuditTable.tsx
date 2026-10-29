@@ -1,7 +1,7 @@
 'use client';
 // The audit results: one row per request, dense, newest first. Datadog Audit Trail layout: time,
 // person, action, object, decision, and the request's last sealed record hash.
-import { History, PanelRightOpen } from 'lucide-react';
+import { History, PanelRightOpen, Sparkle } from 'lucide-react';
 import { useMemo } from 'react';
 import { Badge, CodeHash, DataTable, type ColumnDef } from '@/components/ui';
 import { fmtDateTime } from '@/lib/format';
@@ -12,7 +12,7 @@ import { CHANNEL, DecisionBadge, OutcomeBadge, decisionsDenyFirst } from './shar
 
 const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-export function AuditTable({ rows, onOpen, openId }: { rows: AuditRow[]; onOpen: (r: AuditRow) => void; openId?: string | null }) {
+export function AuditTable({ rows, onOpen, openId, latestId }: { rows: AuditRow[]; onOpen: (r: AuditRow) => void; openId?: string | null; latestId?: string | null }) {
   const t = useMessages(auditMessages);
   const columns = useMemo<ColumnDef<AuditRow, unknown>[]>(
     () => [
@@ -24,6 +24,11 @@ export function AuditTable({ rows, onOpen, openId }: { rows: AuditRow[]; onOpen:
         cell: ({ row }) => (
           <div className="tabular-nums">
             <div>{fmtDateTime(row.original.event_time)}</div>
+            {latestId && row.original.req_id === latestId ? (
+              <Badge className="mt-1" tone="accent" icon={Sparkle} data-latest="" title="The newest request in the ledger">
+                Newest
+              </Badge>
+            ) : null}
             {row.original.synthetic_replay ? (
               <Badge className="mt-1" icon={History} title="Seeded history: synthetic questions replayed through the real pipeline">
                 {t('audit.table.replay')}
@@ -125,7 +130,7 @@ export function AuditTable({ rows, onOpen, openId }: { rows: AuditRow[]; onOpen:
         ),
       },
     ],
-    [t, onOpen],
+    [t, onOpen, latestId],
   );
 
   return (
@@ -136,7 +141,7 @@ export function AuditTable({ rows, onOpen, openId }: { rows: AuditRow[]; onOpen:
       getRowId={(r) => r.req_id}
       onRowClick={onOpen}
       rowLabel={(r) => `${fmtDateTime(r.event_time)}, ${r.sub}: ${r.question ?? r.req_id}`}
-      isRowSelected={(r) => r.req_id === openId}
+      isRowSelected={(r) => r.req_id === openId || (!!latestId && r.req_id === latestId)}
       density="compact"
       maxHeightClass="max-h-[34rem]"
       testId="audit-table"

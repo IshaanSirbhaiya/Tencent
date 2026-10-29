@@ -49,10 +49,16 @@ export function sentencesFor(answer: string, tag: string): string[] {
   const out: string[] = [];
   // Split after sentence ends that are followed by a tag group or whitespace.
   const parts = answer.split(/(?<=[.!?。！？](?:\s*\[[^\]]+\])*)\s+/);
+  // The live answerer writes the tag AFTER the full stop ("…reason. [C1] Next…"), so the split can
+  // leave a fragment that is only tags: those tags belong to the sentence before it.
+  const segs: { text: string; tags: string[] }[] = [];
   for (const p of parts) {
     const tags = [...p.matchAll(TAG_RE)].flatMap((m) => m[1].split(',').map((t) => t.trim()));
-    if (tags.includes(tag)) out.push(p.replace(TAG_RE, '').replace(/\s+/g, ' ').trim());
+    const text = p.replace(TAG_RE, '').replace(/\s+/g, ' ').trim();
+    if (!text && segs.length) segs[segs.length - 1].tags.push(...tags);
+    else if (text) segs.push({ text, tags });
   }
+  for (const s of segs) if (s.tags.includes(tag)) out.push(s.text);
   return out;
 }
 
@@ -201,8 +207,9 @@ export function versionText(v: string, lang: 'en' | 'zh', t: (k: UserKey, vars?:
   if (!v) return '—';
   if (/^\d+$/.test(v)) return t('answer.version', { v });
   if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return t('answer.revisionOf', { date: fmtDay(v, lang) });
-  // A Slack message id is its epoch timestamp ("1759900000.000100").
-  if (/^\d{9,11}\.\d+$/.test(v)) return t('answer.messageOf', { date: fmtDay(updated ?? new Date(Number(v.split('.')[0]) * 1000).toISOString(), lang) });
+  // A Slack version starts with the message's epoch timestamp: "1759900000.000100" (mock) or
+  // "1759900000.000100|4|b84c0b3b…" (live: ts | edit count | content hash).
+  if (/^\d{9,11}\.\d+(\|.*)?$/.test(v)) return t('answer.messageOf', { date: fmtDay(updated ?? new Date(Number(v.split('.')[0]) * 1000).toISOString(), lang) });
   const head = v.split('|')[0];
   return `rev ${head.length > 10 ? `${head.slice(0, 10)}…` : head}`;
 }

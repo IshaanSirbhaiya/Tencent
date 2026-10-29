@@ -146,7 +146,7 @@ export const NodePanel = forwardRef<HTMLHeadingElement, Props>(function NodePane
               <Field k={t('node.kind')} v={typeName(a)} />
               {a.platform ? <Field k={t('node.platform')} v={platformName(a.platform)} /> : null}
               {isDoc ? <Field k={t('node.place')} v={placeLabel(a.containerName, a.platform) || '—'} /> : null}
-              {isDoc ? <Field k={t('node.version')} v={a.version ? <span className="font-mono text-caption">{shortVersion(a.version)}</span> : '—'} /> : null}
+              {isDoc ? <Field k={t('node.version')} v={a.version ? <span className="text-caption tabular-nums">{shortVersion(a.version)}</span> : '—'} /> : null}
               {isDoc ? <Field k={t('node.updated')} v={<span className="tabular-nums">{fmtDateTime(a.updatedAt)}</span>} /> : null}
               {isDoc && doc.kind === 'ok' ? <Field k={t('node.author')} v={doc.doc.author?.name ?? '—'} /> : null}
               {isDoc && doc.kind === 'ok' && doc.doc.created_at ? <Field k={t('node.created')} v={<span className="tabular-nums">{fmtDate(doc.doc.created_at)}</span>} /> : null}
@@ -181,7 +181,7 @@ export const NodePanel = forwardRef<HTMLHeadingElement, Props>(function NodePane
                       {d.excerpt_truncated ? <span className="text-subtle"> …</span> : null}
                     </blockquote>
                     <figcaption className="mt-2 text-caption text-muted">
-                      {d.excerpt_kind === 'best_chunk' ? `Best match for “${query}”` : 'Start of the document'} · {platformName(d.platform)} · v{shortVersion(d.version)} ·{' '}
+                      {d.excerpt_kind === 'best_chunk' ? `Best match for “${query}”` : 'Start of the document'} · {platformName(d.platform)} · {shortVersion(d.version)} ·{' '}
                       <span className="tabular-nums">{fmtDateTime(d.updated_at)}</span>
                     </figcaption>
                   </figure>
@@ -252,9 +252,14 @@ export const NodePanel = forwardRef<HTMLHeadingElement, Props>(function NodePane
 });
 
 function shortVersion(v: string): string {
-  // Jira versions are timestamps and Slack versions are message ts: show them compactly.
-  if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return v.slice(0, 16).replace('T', ' ');
-  return v.length > 18 ? `${v.slice(0, 16)}…` : v;
+  // Confluence/Drive: a number ("v6"). Jira: the last-updated time. Slack: "<ts>" or
+  // "<ts>|<edits>|<hash>" (live), shown as the message date, never as a raw epoch.
+  if (!v) return '—';
+  if (/^\d+$/.test(v)) return `v${v}`;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(v)) return `Revision of ${fmtDate(v)}`;
+  const slack = v.match(/^(\d{9,11})\.\d+(\|.*)?$/);
+  if (slack) return `Message of ${fmtDate(new Date(Number(slack[1]) * 1000).toISOString())}`;
+  return v.length > 18 ? `rev ${v.slice(0, 12)}…` : `rev ${v}`;
 }
 
 function Field({ k, v }: { k: string; v: React.ReactNode }) {
@@ -310,7 +315,7 @@ function Lineage({ d, query }: { d: DocView; query: string | null }) {
   const steps: { k: string; v: React.ReactNode; mono?: boolean }[] = [
     { k: query ? 'Value' : 'Excerpt', v: query ? `“${query.length > 28 ? `${query.slice(0, 26)}…` : query}”` : d.excerpt_kind === 'best_chunk' ? 'best match' : 'document start' },
     { k: 'Passage', v: d.excerpt_kind === 'best_chunk' ? 'best chunk' : 'first 1,200 chars' },
-    { k: 'Document', v: `v${shortVersion(d.version)}`, mono: true },
+    { k: 'Document', v: shortVersion(d.version) },
     { k: 'Connector', v: platformName(d.lineage.connector) },
     { k: 'Synced', v: d.lineage.last_sync_at ? fmtDateTime(d.lineage.last_sync_at) : '—' },
   ];

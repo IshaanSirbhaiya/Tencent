@@ -92,8 +92,14 @@ export function ModelLabel({ model, className }: { model: AskResponse['model']; 
   );
 }
 
+/** 1-based number of the first earlier card citing the same document, if any (two passages of one page). */
+export function firstOfDoc(citations: Citation[], i: number): number | undefined {
+  const j = citations.findIndex((c) => c.doc_id === citations[i].doc_id);
+  return j >= 0 && j < i ? j + 1 : undefined;
+}
+
 /** One source card under the answer. The whole card opens the passage. */
-export function SourceCard({ c, n, onOpen, compact }: { c: Citation; n: number; onOpen: (el: HTMLElement) => void; compact?: boolean }) {
+export function SourceCard({ c, n, onOpen, compact, samePageAs }: { c: Citation; n: number; onOpen: (el: HTMLElement) => void; compact?: boolean; /** an earlier card cites the same document (another passage of it) */ samePageAs?: number }) {
   const t = useMessages(userMessages);
   const { lang } = useLang();
   const now = useNow(5000);
@@ -119,6 +125,7 @@ export function SourceCard({ c, n, onOpen, compact }: { c: Citation; n: number; 
       <span className="line-clamp-2 text-body-sm font-medium text-fg group-hover:underline group-hover:decoration-line-strong group-hover:underline-offset-4">{c.title}</span>
       <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-muted">
         {version !== '—' && version ? <span className="tabular-nums">{version}</span> : null}
+        {samePageAs ? <span className="tabular-nums">{t('answer.samePage', { n: samePageAs })}</span> : null}
         {ago ? (
           <span className="inline-flex items-center gap-1 tabular-nums" title={c.authz_checked_at}>
             <ShieldCheck aria-hidden className="h-3.5 w-3.5 text-ok" />
@@ -261,7 +268,7 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
             <ol data-testid="citations" className={cn('grid gap-2', compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')}>
               {response.citations.map((c, i) => (
                 <li key={c.tag} id={`${idPrefix}cite-${latest ? '' : `${response.request_id}-`}${c.tag}`} className="min-w-0">
-                  <SourceCard c={c} n={i + 1} onOpen={(el) => onCite(i, el)} compact={compact} />
+                  <SourceCard c={c} n={i + 1} onOpen={(el) => onCite(i, el)} compact={compact} samePageAs={firstOfDoc(response.citations, i)} />
                 </li>
               ))}
             </ol>

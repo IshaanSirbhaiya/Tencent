@@ -101,9 +101,15 @@ export function CompareView() {
       setAsked(urlSpec);
       setLeft(c.left);
       setRight(c.right);
+      // The status line must describe THIS result, not the previous run (e.g. Ken's "identical").
+      const same = c.left.kind === 'done' && c.right.kind === 'done' && isRefusal(c.left.res) && isRefusal(c.right.res) && sameResponse(c.left.res, c.right.res);
+      setAnnounce(t(same ? 'cmp.announce.identical' : 'cmp.announce.done'));
     } else {
       setAsked(null);
+      setAnnounce('');
     }
+    // t is stable per language; re-announcing on a language flip is not wanted
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlSpec]);
 
   const run = useCallback(

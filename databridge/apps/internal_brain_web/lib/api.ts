@@ -417,7 +417,10 @@ export function groupAuditRows(rows: AuditLedgerRow[]): AuditRow[] {
 
 export const auditApi = {
   events: async (f: AuditFilter): Promise<AuditRow[]> => {
-    const r = await call<{ events: AuditLedgerRow[] } | AuditLedgerRow[]>(`/audit/events${qs(f)}`);
+    // The limit counts LEDGER EVENTS, not requests. The live ledger interleaves many other kinds
+    // (ingest.sync, auth.login, graph.viewed, doc.viewed…), so the server default of 100 events left
+    // only ~9 requests in the table. Ask for the API maximum (500) so the table holds ~100 requests.
+    const r = await call<{ events: AuditLedgerRow[] } | AuditLedgerRow[]>(`/audit/events${qs({ limit: '500', ...f })}`);
     return groupAuditRows(Array.isArray(r) ? r : r.events ?? []);
   },
   /** POST /audit/ask: the interpreted filter, its rows, and which parser wrote the filter. */

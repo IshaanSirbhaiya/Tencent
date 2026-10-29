@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Page } from '@/components/shell/Page';
 import { Button, Field, SkeletonText, inputClass } from '@/components/ui';
 import { auditApi } from '@/lib/api';
-import { fmtDateTime } from '@/lib/format';
+import { fmtDate, fmtDateTime, fmtTime } from '@/lib/format';
 import { useMessages } from '@/lib/i18n';
 import { auditMessages, type AuditKey } from '@/lib/i18n/audit';
 import { AUDIT_SUGGESTIONS, PERSONAS } from '@/lib/personas';
@@ -30,7 +30,8 @@ const LABEL_KEY: Record<FilterKey, AuditKey> = {
 };
 
 function chipValue(k: string, v: unknown): string {
-  if ((k === 'since' || k === 'until') && typeof v === 'string') return fmtDateTime(v);
+  // with the year: "the last 365 days" spans two years, and without it since and until looked equal
+  if ((k === 'since' || k === 'until') && typeof v === 'string') return `${fmtDate(v)}, ${fmtTime(v)}`;
   if (Array.isArray(v)) return v.join(', ');
   if (v && typeof v === 'object') return JSON.stringify(v);
   return String(v);
@@ -98,7 +99,7 @@ export function AuditConsole() {
   const [error, setError] = useState<string | null>(null);
   const [nlq, setNlq] = useState('');
   const [parsed, setParsed] = useState<Record<string, unknown> | null>(null);
-  const [parser, setParser] = useState<{ by: string; model?: string | null; fallback?: boolean | null } | null>(null);
+  const [parser, setParser] = useState<{ by: string; model?: string | null; fallback?: boolean | null; notes?: string[] } | null>(null);
   const [nlBusy, setNlBusy] = useState(false);
   const [open, setOpen] = useState<AuditRow | null>(null);
   const [status, setStatus] = useState('');
@@ -122,11 +123,62 @@ export function AuditConsole() {
     [t],
   );
 
+  // ?latest=1 (Presenter step 7, after the WorkBuddy ask): reload, then mark and reveal the newest
+  // request. Re-runs when the presenter pushes the URL again while this page is already open.
+  const wantLatest = params.get('latest') === '1';
+  const [latestId, setLatestId] = useState<string | null>(null);
+  const [latestTick, setLatestTick] = useState(0);
+  const paramKey = params.toString();
+
   useEffect(() => {
-    void load({});
-    // first load only; later loads come from the search and the filters
+    let live = true;
+    if (!wantLatest) {
+      setLatestId(null);
+      void load({});
+      return;
+    }
+    setForm(EMPTY);
+    setParsed(null);
+    setParser(null);
+    setNlq('');
+    setRows(null);
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const ev = await auditApi.events({});
+        if (!live) return;
+        setRows(ev);
+        // newest request first; pick by time so the choice never depends on the server's order
+        const newest = ev.reduce<AuditRow | null>((m, r) => (!m || (r.event_time ?? '') > (m.event_time ?? '') ? r : m), null);
+        setLatestId(newest?.req_id ?? null);
+        setLatestTick((n) => n + 1);
+        setStatus(newest ? t('audit.status.found', { n: ev.length }) : t('audit.table.empty'));
+      } catch {
+        if (live) setError(t('audit.table.error'));
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // first load, and again whenever the URL's query changes; later loads come from the search and filters
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [wantLatest, paramKey]);
+
+  // bring the highlighted row into view once it is in the table
+  useEffect(() => {
+    if (!latestId) return;
+    const raf = requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(`[data-testid="audit-table"] [data-latest]`)?.closest<HTMLElement>('tr');
+      if (row) {
+        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.motion === 'reduce';
+        row.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [latestId, latestTick]);
 
   // Presenter mode: bring the panel being run into view once the table above it has its height.
   const loaded = rows !== null || error !== null;
@@ -144,7 +196,8 @@ export function AuditConsole() {
     try {
       const r = await auditApi.ask(text);
       setParsed(r.filter ?? {});
-      setParser(r.parser ? { by: r.parser, model: r.parser_model, fallback: r.parser_fallback } : null);
+      const notes = (Array.isArray(r.notes) ? r.notes : r.notes ? [r.notes] : []).filter((n) => typeof n === 'string' && n);
+      setParser(r.parser ? { by: r.parser, model: r.parser_model, fallback: r.parser_fallback, notes } : null);
       setForm(formFromFilter(r.filter ?? {}));
       setRows(r.events);
       setStatus(t('audit.status.interpreted', { n: r.events.length }));
@@ -235,6 +288,11 @@ export function AuditConsole() {
                   ) : null}
                 </div>
                 {parser?.fallback ? <p className="mt-1 text-caption text-muted">{t('audit.search.fallback')}</p> : null}
+                {!parser?.fallback && parser?.notes?.length ? (
+                  <p className="mt-1 text-caption text-muted" data-testid="audit-parser-notes">
+                    {parser.notes.join(' · ')}
+                  </p>
+                ) : null}
                 {parsedEntries.length === 0 ? (
                   <p className="mt-1 text-xs">{t('audit.search.noFilter')}</p>
                 ) : (
@@ -350,7 +408,7 @@ export function AuditConsole() {
               <SkeletonText lines={6} label={t('audit.table.loading')} />
             </div>
           ) : (
-            <AuditTable rows={rows} onOpen={onOpen} openId={open?.req_id} />
+            <AuditTable rows={rows} onOpen={onOpen} openId={open?.req_id} latestId={latestId} />
           )}
         </section>
 
