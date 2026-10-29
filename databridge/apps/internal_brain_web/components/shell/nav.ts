@@ -3,6 +3,7 @@
 import {
   Activity,
   BarChart3,
+  Calculator,
   Boxes,
   FlaskConical,
   GitCompareArrows,
@@ -60,9 +61,10 @@ export const NAV: Record<Mode, NavGroup[]> = {
       // Transitional: the pre-finals pages, kept working until their Developer-mode versions land.
       label: 'nav.group.tools',
       items: [
+        { id: 'value', href: '/value', label: 'nav.value', icon: Calculator },
         { id: 'map', href: '/map', label: 'nav.map', icon: MapIcon },
-        { id: 'audit', href: '/audit', label: 'nav.audit', icon: ScrollText, role: 'compliance_officer' },
-        { id: 'sim', href: '/sim', label: 'nav.sim', icon: FlaskConical, role: 'admin_it' },
+        { id: 'audit', href: '/dev/audit', label: 'nav.audit', icon: ScrollText, role: 'compliance_officer' },
+        { id: 'sim', href: '/dev/sim', label: 'nav.sim', icon: FlaskConical, role: 'admin_it' },
       ],
     },
   ],
@@ -75,6 +77,7 @@ export const NAV: Record<Mode, NavGroup[]> = {
         { id: 'dev-graph', href: '/dev/graph', label: 'nav.dev.graph', icon: Network },
         { id: 'dev-brain', href: '/dev/brain', label: 'nav.dev.brain', icon: Boxes },
         { id: 'dev-analytics', href: '/dev/analytics', label: 'nav.dev.analytics', icon: BarChart3, role: 'compliance_officer' },
+        { id: 'dev-value', href: '/value', label: 'nav.dev.value', icon: Calculator },
       ],
     },
     {

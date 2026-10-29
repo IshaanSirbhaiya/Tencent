@@ -178,7 +178,7 @@ export function CodeHash({ value, head = 8, tail = 6, label = 'hash', className 
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(timer.current), []);
   if (!value) return <span className={cn('font-mono text-xs text-subtle', className)}>—</span>;
-  const short = value.length > head + tail + 1 ? `${value.slice(0, head)}…${value.slice(-tail)}` : value;
+  const short = value.length > head + tail + 1 ? `${value.slice(0, head)}…${tail ? value.slice(-tail) : ''}` : value;
   return (
     <span className={cn('inline-flex max-w-full items-center gap-1 rounded border border-line bg-raised pl-1.5 font-mono text-xs text-fg', className)}>
       <span title={value} className="truncate">
