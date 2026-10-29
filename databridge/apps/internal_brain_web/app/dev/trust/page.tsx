@@ -1,10 +1,7 @@
 'use client';
-import { ShieldCheck } from 'lucide-react';
-import { Placeholder } from '@/components/shell/Placeholder';
+import { TrustCentre } from '@/components/trust/TrustCentre';
 
-// Skeleton (Wave 0). The owning page agent replaces this file's body; keep the route.
+// Trust centre: any signed-in person (static, self-assessed evidence; no data from the ledger).
 export default function Page() {
-  return (
-    <Placeholder icon={ShieldCheck} title="Trust centre" description="The controls, the AI Verify / MAS FEAT / OWASP LLM mappings and live proofs." />
-  );
+  return <TrustCentre />;
 }

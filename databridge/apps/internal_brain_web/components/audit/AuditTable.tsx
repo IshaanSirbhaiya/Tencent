@@ -1,141 +1,146 @@
 'use client';
-import { Ban, CheckCircle2, History, XCircle } from 'lucide-react';
-import { fmtDateTime, modelLabel } from '@/lib/format';
-import { ALLOW_VERDICTS, type AuditEvent } from '@/lib/types';
-import { Badge } from '../ui';
+// The audit results: one row per request, dense, newest first. Datadog Audit Trail layout: time,
+// person, action, object, decision, and the request's last sealed record hash.
+import { History, PanelRightOpen } from 'lucide-react';
+import { useMemo } from 'react';
+import { Badge, CodeHash, DataTable, type ColumnDef } from '@/components/ui';
+import { fmtDateTime } from '@/lib/format';
+import { auditMessages } from '@/lib/i18n/audit';
+import { useMessages } from '@/lib/i18n';
+import type { AuditRow } from '@/lib/types';
+import { CHANNEL, DecisionBadge, OutcomeBadge, decisionsDenyFirst } from './shared';
 
-export function titleFor(e: AuditEvent, docId: string): string {
-  return e.considered_meta?.find((m) => m.doc_id === docId)?.title ?? docId;
-}
+const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-const REASON_LABEL: Record<string, string> = {
-  verified: 'checked',
-  drift_material: 'changed, re-read',
-  forbidden: 'not allowed',
-  not_member: 'not allowed',
-  timeout: 'source too slow',
-  source_error: 'source error',
-};
-
-function plainReason(code: string): string {
-  return REASON_LABEL[code] ?? code;
-}
-
-export function Decisions({ e, limit }: { e: AuditEvent; limit?: number }) {
-  const g = e.gate2 ?? [];
-  if (g.length === 0) return <span className="text-muted">None</span>;
-  const shown = limit ? g.slice(0, limit) : g;
-  return (
-    <ul className="space-y-1">
-      {shown.map((d) => {
-        const allow = ALLOW_VERDICTS.has(d.verdict);
-        return (
-          <li key={d.doc_id} className="flex flex-wrap items-center gap-1">
-            {allow ? (
-              <Badge tone="ok" icon={CheckCircle2}>
-                Allow
+export function AuditTable({ rows, onOpen, openId }: { rows: AuditRow[]; onOpen: (r: AuditRow) => void; openId?: string | null }) {
+  const t = useMessages(auditMessages);
+  const columns = useMemo<ColumnDef<AuditRow, unknown>[]>(
+    () => [
+      {
+        id: 'time',
+        accessorKey: 'event_time',
+        header: t('audit.table.time'),
+        meta: { className: 'whitespace-nowrap' },
+        cell: ({ row }) => (
+          <div className="tabular-nums">
+            <div>{fmtDateTime(row.original.event_time)}</div>
+            {row.original.synthetic_replay ? (
+              <Badge className="mt-1" icon={History} title="Seeded history: synthetic questions replayed through the real pipeline">
+                {t('audit.table.replay')}
               </Badge>
-            ) : (
-              <Badge tone="bad" icon={XCircle}>
-                Deny
-              </Badge>
-            )}
-            <span className="text-2xs text-muted" title={allow ? d.verdict : d.reason_code || d.verdict}>
-              {plainReason(allow ? d.verdict : d.reason_code || d.verdict)}
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        id: 'person',
+        accessorKey: 'sub',
+        header: t('audit.table.person'),
+        enableSorting: false,
+        meta: { className: 'whitespace-nowrap font-mono text-xs' },
+        cell: ({ row }) => row.original.sub,
+      },
+      {
+        id: 'action',
+        header: t('audit.table.action'),
+        enableSorting: false,
+        meta: { className: 'whitespace-nowrap' },
+        cell: ({ row }) => (
+          <div>
+            <div className="font-medium">{t('audit.table.asked')}</div>
+            <div className="text-2xs text-subtle">via {CHANNEL[row.original.channel ?? ''] ?? row.original.channel ?? '—'}</div>
+          </div>
+        ),
+      },
+      {
+        id: 'object',
+        header: t('audit.table.object'),
+        enableSorting: false,
+        meta: { className: 'min-w-[11rem] max-w-[22rem]' },
+        cell: ({ row }) => <span className="line-clamp-2">{row.original.question ?? '—'}</span>,
+      },
+      {
+        id: 'decision',
+        header: t('audit.table.decision'),
+        enableSorting: false,
+        meta: { className: 'min-w-[10rem]' },
+        cell: ({ row }) => {
+          const d = decisionsDenyFirst(row.original);
+          return (
+            <div className="space-y-1">
+              <OutcomeBadge e={row.original} />
+              {d.length ? (
+                <ul className="space-y-0.5">
+                  {d.slice(0, 3).map((x) => (
+                    <li key={x.doc_id}>
+                      <DecisionBadge d={x} />
+                    </li>
+                  ))}
+                  {d.length > 3 ? <li className="text-2xs text-subtle">+{d.length - 3} more</li> : null}
+                </ul>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'hash',
+        header: t('audit.table.hash'),
+        enableSorting: false,
+        meta: { className: 'whitespace-nowrap' },
+        cell: ({ row }) => {
+          const last = row.original.records?.[row.original.records.length - 1];
+          return last ? (
+            // the copy button must not also open the row
+            <span className="inline-flex flex-col items-start gap-0.5" onClick={stop} onKeyDown={stop}>
+              <CodeHash value={last.hash} head={8} tail={4} label={`record ${last.seq} hash`} />
+              <span className="font-mono text-2xs text-subtle tabular-nums">
+                #{last.seq} · {last.kind}
+              </span>
             </span>
-          </li>
-        );
-      })}
-      {limit && g.length > limit ? <li className="text-2xs text-muted">+{g.length - limit} more</li> : null}
-    </ul>
+          ) : (
+            <span className="font-mono text-xs text-subtle">—</span>
+          );
+        },
+      },
+      {
+        id: 'details',
+        header: () => <span className="sr-only">{t('audit.table.details')}</span>,
+        enableSorting: false,
+        meta: { className: 'w-10 pl-0 text-right' },
+        cell: ({ row }) => (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen(row.original);
+            }}
+            onKeyDown={stop}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-line-strong text-muted hover:bg-raised hover:text-fg"
+            aria-label={`Details for request ${row.original.req_id} by ${row.original.sub}`}
+            title={t('audit.table.details')}
+          >
+            <PanelRightOpen aria-hidden className="h-3.5 w-3.5" />
+          </button>
+        ),
+      },
+    ],
+    [t, onOpen],
   );
-}
 
-const CHANNEL: Record<string, string> = { ui: 'Web', 'workbuddy-mcp': 'WorkBuddy', api: 'API', replay: 'Replay' };
-
-export function AuditTable({ events, onOpen }: { events: AuditEvent[]; onOpen: (e: AuditEvent) => void }) {
   return (
-    <div
-      className="overflow-x-auto rounded-lg border border-line bg-surface"
-      role="region"
-      aria-label="Audit results (scrolls horizontally on small screens)"
-      tabIndex={0}
-    >
-      <table className="w-full min-w-[980px] border-collapse text-left text-xs" data-testid="audit-table">
-        <caption className="sr-only">Ledgered requests, newest first. Each row has a details button.</caption>
-        <thead className="border-b border-line bg-raised text-2xs uppercase tracking-wide text-muted">
-          <tr>
-            <th scope="col" className="px-3 py-2 font-semibold">Time</th>
-            <th scope="col" className="px-3 py-2 font-semibold">User</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Channel</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Question</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Considered</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Decisions</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Released</th>
-            <th scope="col" className="px-3 py-2 font-semibold">Model</th>
-            <th scope="col" className="px-3 py-2 font-semibold">
-              <span className="sr-only">Details</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line align-top">
-          {events.map((e) => {
-            const considered = e.considered ?? e.considered_meta?.map((m) => m.doc_id) ?? [];
-            return (
-              <tr key={e.req_id} className="hover:bg-raised/60">
-                <td className="whitespace-nowrap px-3 py-2.5 tabular">
-                  <div>{fmtDateTime(e.event_time)}</div>
-                  {e.synthetic_replay ? (
-                    <Badge className="mt-1" icon={History} title="Seeded history generated by replaying synthetic questions through the real pipeline">
-                      Synthetic replay
-                    </Badge>
-                  ) : null}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5 font-mono">{e.sub}</td>
-                <td className="whitespace-nowrap px-3 py-2.5">{CHANNEL[e.channel ?? ''] ?? e.channel ?? '—'}</td>
-                <td className="max-w-[260px] px-3 py-2.5">
-                  <span className="line-clamp-3">{e.question ?? '—'}</span>
-                </td>
-                <td className="max-w-[220px] px-3 py-2.5">
-                  {considered.length === 0 ? (
-                    <span className="text-muted">None</span>
-                  ) : (
-                    <ul className="space-y-0.5">
-                      {considered.slice(0, 3).map((d) => (
-                        <li key={d} className="truncate" title={d}>
-                          {titleFor(e, d)}
-                        </li>
-                      ))}
-                      {considered.length > 3 ? <li className="text-2xs text-muted">+{considered.length - 3} more</li> : null}
-                    </ul>
-                  )}
-                </td>
-                <td className="px-3 py-2.5">
-                  <Decisions e={e} limit={3} />
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
-                  {e.refused ? (
-                    <Badge icon={Ban}>Refused</Badge>
-                  ) : (
-                    <span className="tabular">{(e.released ?? []).length} doc{(e.released ?? []).length === 1 ? '' : 's'}</span>
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2.5">{modelLabel(e.model)}</td>
-                <td className="px-3 py-2.5">
-                  <button
-                    type="button"
-                    onClick={() => onOpen(e)}
-                    className="rounded border border-line-strong px-2 py-1 text-2xs font-medium hover:bg-raised"
-                    aria-label={`Details for request ${e.req_id} by ${e.sub}`}
-                  >
-                    Details
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      data={rows}
+      caption={t('audit.table.caption')}
+      getRowId={(r) => r.req_id}
+      onRowClick={onOpen}
+      rowLabel={(r) => `${fmtDateTime(r.event_time)}, ${r.sub}: ${r.question ?? r.req_id}`}
+      isRowSelected={(r) => r.req_id === openId}
+      density="compact"
+      maxHeightClass="max-h-[34rem]"
+      testId="audit-table"
+      empty={t('audit.table.empty')}
+    />
   );
 }

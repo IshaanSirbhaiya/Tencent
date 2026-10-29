@@ -3,7 +3,7 @@ import { login } from './helpers';
 
 test('audit: NL question shows the parsed filter before results; manual filter; verify; reveal', async ({ page }) => {
   await login(page, 'maya.compliance');
-  await page.getByRole('link', { name: 'Audit' }).click();
+  await page.goto('/dev/audit');
   await expect(page.getByRole('heading', { name: 'Audit console' })).toBeVisible();
   const table = page.getByTestId('audit-table');
   await expect(table.locator('tbody tr').first()).toBeVisible();
@@ -22,7 +22,7 @@ test('audit: NL question shows the parsed filter before results; manual filter; 
 
   // Manual filter by user.
   await page.getByRole('button', { name: 'Clear' }).click();
-  await page.getByLabel('User').selectOption('sara.sec');
+  await page.locator('#f-user').selectOption('sara.sec');
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(rows.first()).toContainText('sara.sec');
   const m = await rows.count();

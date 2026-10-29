@@ -45,7 +45,7 @@ test('keyboard only: audit filters, verify and drawer', async ({ page }) => {
   await tabTo(page, '[data-persona="maya.compliance"]');
   await page.keyboard.press('Enter');
   await page.waitForURL('**/');
-  await page.goto('/audit');
+  await page.goto('/dev/audit');
   await expect(page.getByTestId('audit-table')).toBeVisible();
 
   await tabTo(page, '#nl-question');

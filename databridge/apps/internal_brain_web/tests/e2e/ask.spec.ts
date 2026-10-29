@@ -75,7 +75,7 @@ test('sources panel shows global per-platform status', async ({ page }) => {
 
 test('simulator: revocation and v8 runbook are reflected on the next question', async ({ page }) => {
   await login(page, 'admin.it');
-  await page.goto('/sim');
+  await page.goto('/dev/sim');
   await page.getByRole('button', { name: 'Remove jdoe from #db-migration' }).click();
   await page.getByRole('button', { name: 'Edit failover runbook (new version)' }).click();
   await expect(page.getByTestId('sim-log').locator('li')).toHaveCount(2);
@@ -95,9 +95,9 @@ test('simulator: revocation and v8 runbook are reflected on the next question', 
 
 test('role gates: employees cannot open audit or simulator', async ({ page }) => {
   await login(page, 'jdoe');
-  await page.goto('/audit');
+  await page.goto('/dev/audit');
   await expect(page.getByRole('heading', { name: 'Not available for your role' })).toBeVisible();
-  await page.goto('/sim');
+  await page.goto('/dev/sim');
   await expect(page.getByRole('heading', { name: 'Not available for your role' })).toBeVisible();
   const r = await page.request.get('/api/ib/audit/verify');
   expect(r.status()).toBe(403);

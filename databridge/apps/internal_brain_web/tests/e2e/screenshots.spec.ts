@@ -25,7 +25,7 @@ for (const vp of [
       await page.screenshot({ path: shot(`03-ask-refusal-${vp.name}`), fullPage: true });
 
       await login(page, 'maya.compliance');
-      await page.goto('/audit');
+      await page.goto('/dev/audit');
       await expect(page.getByTestId('audit-table')).toBeVisible();
       await page.getByRole('button', { name: 'Show every denied retrieval last week.' }).click();
       await expect(page.getByTestId('parsed-filter')).toBeVisible();
@@ -39,7 +39,7 @@ for (const vp of [
       await page.screenshot({ path: shot(`05-audit-drawer-${vp.name}`) });
 
       await login(page, 'admin.it');
-      await page.goto('/sim');
+      await page.goto('/dev/sim');
       await page.getByRole('button', { name: 'Edit failover runbook (new version)' }).click();
       await expect(page.getByTestId('sim-log')).toContainText('Done');
       await page.screenshot({ path: shot(`06-sim-${vp.name}`), fullPage: true });

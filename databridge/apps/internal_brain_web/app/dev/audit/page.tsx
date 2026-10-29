@@ -1,13 +1,15 @@
 'use client';
-import { ScrollText } from 'lucide-react';
-import { Placeholder } from '@/components/shell/Placeholder';
+import { Suspense } from 'react';
+import { AuditConsole } from '@/components/audit/AuditConsole';
 import { RequireRole } from '@/components/shell/RoleGate';
 
-// Skeleton (Wave 0). The owning page agent replaces this file's body; keep the route.
+// Audit console (compliance_officer). ?verify=1 runs Verify; ?tamper=1 runs the sandbox tamper demo.
 export default function Page() {
   return (
     <RequireRole role="compliance_officer">
-      <Placeholder icon={ScrollText} title="Audit console" description="Plain-English audit search, reveal with a reason, and Verify chain." />
+      <Suspense fallback={null}>
+        <AuditConsole />
+      </Suspense>
     </RequireRole>
   );
 }

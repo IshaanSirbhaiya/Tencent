@@ -27,7 +27,7 @@ for (const vp of [
 
     test('4 audit with verify result and drawer', async ({ page }) => {
       await login(page, 'maya.compliance');
-      await page.goto('/audit');
+      await page.goto('/dev/audit');
       await expect(page.getByTestId('audit-table')).toBeVisible();
       await page.getByRole('button', { name: 'Show every denied retrieval last week.' }).click();
       await expect(page.getByTestId('parsed-filter')).toBeVisible();
@@ -41,7 +41,7 @@ for (const vp of [
 
     test('5 simulator', async ({ page }) => {
       await login(page, 'admin.it');
-      await page.goto('/sim');
+      await page.goto('/dev/sim');
       await page.getByRole('button', { name: 'Reset demo' }).click();
       await expect(page.getByTestId('sim-log')).toContainText('Done');
       await expectAccessible(page, `sim/${vp.name}`);
@@ -54,7 +54,7 @@ test('light theme: ask and audit stay AA', async ({ page }) => {
   await login(page, 'maya.compliance');
   await ask(page, 'When is the technology risk audit evidence pack due?');
   await expectAccessible(page, 'ask/light');
-  await page.goto('/audit');
+  await page.goto('/dev/audit');
   await expect(page.getByTestId('audit-table')).toBeVisible();
   await expectAccessible(page, 'audit/light');
 });
