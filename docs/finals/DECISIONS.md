@@ -1,0 +1,30 @@
+# Finals decisions log
+
+Every decision made while the user was away, with the reason. Change any of them by saying so.
+Earlier user decisions are marked **(user)**.
+
+| # | Decision | Why |
+|---|---|---|
+| D-01 (user) | Deadline plan: description and link ready for the user by Fri 20:00 to send Cindy before 23:59; the UI build continues through Sunday for the rehearsal and Demo Day; the old video stays unless the new UI is ready to re-record | Organisers' email |
+| D-02 (user) | Brand **Walnut DataBridge**; "Internal Brain" is the ask product inside it | The announcement lists us as DataBridge; the other FinTech finalist is "InternalBrain" |
+| D-03 (user) | Demo runs on the laptop, with the phone hotspot only for TokenHub; no Lighthouse | Reliability |
+| D-04 | One Next.js app (`internal_brain_web`) with a User/Developer switch; graph with React Flow 11.11.4 + seeded d3-force (pending the Opus graph research) | React Flow is already proven in the repo and fits one-hop subgraphs of ≤150 nodes; the repo design law says React Flow first, Sigma only above ~1–2k visible nodes |
+| D-05 | Developer views that show other people's requests or org-wide numbers need `compliance_officer`; everyone else gets their own trace and their own graph, and a lock card that explains why | Least privilege is the product; aggregate denial counts would hint at hidden content |
+| D-06 | `/ib/trace` shows the asker only what they were already shown: stages, timings, model, grounding, released and cited documents, and the sealed record hashes. Never the considered set or Gate-2 reasons | Rule 4 (one response shape) |
+| D-07 | Rejected research suggestions: "Searched N (K allowed, J hidden)" and "something exists but is hidden" in User mode | They break restricted ≡ non-existent, our core proof |
+| D-08 | No token streaming: the grounding check must finish before any text is shown. The UI shows a staged status line while waiting, then reveals the verified answer | Unverified text must never reach the screen |
+| D-09 | Developer mode embeds the Walnut engine (entity graph, time slider, provenance, ontology) through a new `/api/walnut` proxy to the gateway on :8300, restyled; the old :3300 app is left as it is | The user wants the whole graph and engine in Developer mode; reusing the real engine is faster and honest |
+| D-10 | Demo history is seeded through the real pipeline and labelled as replay in the ledger and the UI | Analytics needs data; never fake numbers |
+| D-11 | Design: Linear/Vercel restraint with Palantir density; dark default; Inter bundled; no gradients or neon | The repo's frontend design law and the Palantir/Databricks research |
+| D-12 | Languages: English + 简体中文 for User mode and navigation | Singapore audience and Tencent judges; cheap to do well |
+| D-13 | Codex only for the plan review and the final review | The user's limit on Codex usage |
+| D-14 | Demo story = Fable's run sheet (reviews/plan_fable.md §3.2); tagline "Answers you can prove." | Opens on the sponsor's own question; Tencent live by 2:35; a story, not a feature tour |
+| D-15 | Cut line Sat 31 Oct 22:00; P0 = demo path; `/dev/brain` engine embed moved to P2 | Sonnet, Haiku and Fable all flagged scope |
+| D-16 | `/ib/trace` = public-safe receipt (live re-authorised citations, coarse stages, no seq, ledgered); ms waterfalls only in the compliance journey | Codex: titles of uncited released docs and ms timings were side channels |
+| D-17 | "View as" = two independent, separately signed-in graphs side by side; no greyed or locked placeholders | Codex and Opus: placeholders reveal that hidden objects exist |
+| D-18 | Knowledge graph on Sigma 3.0.3 + graphology (WebGL); React Flow only for small diagrams | Opus research: ~1,230 nodes is above React Flow's comfort zone |
+| D-19 | Tamper demo runs on a copy of the live ledger via a compliance endpoint; the real chain is never edited | Fable: the WorkBuddy beat writes real records after the tamper |
+| D-20 | SSE stage events replace the elapsed-time status line (P1); text still only after grounding | Fable: a time-driven status line is the one "fake" thing a judge could catch |
+| D-21 | `/api/walnut` proxy: closed GET-only allowlist, no ask or ingest paths, gated to jdoe or compliance sessions | Haiku: the engine graph is jdoe's view and its /brain/query bypasses the gates |
+| D-22 | No Malay or Tamil machine translations; English + 简体中文 only | Fable: bad translations hurt more than they help |
+| D-23 | Hallway test with real people (user and team) on Saturday; publish the real numbers only | HCD needs human evidence; never invent it |
