@@ -5,11 +5,17 @@ import type {
   AuditAskResponse,
   AuditEvent,
   AuditFilter,
+  AuditStats,
+  DocView,
+  GraphQuery,
   HistoryItem,
+  Journey,
+  KnowledgeGraph,
   KnowledgeMap,
   RevealResult,
   SimResult,
   SourceStatus,
+  Trace,
   VerifyResult,
   WhoAmI,
 } from './types';
@@ -175,6 +181,20 @@ export const api = {
   },
   verify: () => call<VerifyResult>('/audit/verify'),
   sim: (action: SimAction) => call<SimResult>(`/sim/${action}`, { method: 'POST', body: {} }),
+
+  // ---- finals endpoints (types in lib/types.ts; contract in docs/finals/contracts/ui_foundation.md §7)
+  /** How one of MY answers was made. Someone else's request, or an unknown id: the same 404. */
+  trace: (reqId: string) => call<Trace>(`/ib/trace/${encodeURIComponent(reqId)}`),
+  /** Aggregates over the verified ledger (compliance_officer). `days` 1..3650, default 30. */
+  auditStats: (opts?: { days?: number; replay?: 'include' | 'exclude' }) =>
+    call<AuditStats>(`/audit/stats${qs({ days: opts?.days ? String(opts.days) : undefined, replay: opts?.replay })}`),
+  /** One request end to end with Gate-2 verdicts and reason codes (compliance_officer). */
+  journey: (reqId: string) => call<Journey>(`/audit/journey/${encodeURIComponent(reqId)}`),
+  /** PROVISIONAL: the permission-aware subgraph (overview, `q` search, or one-hop `focus`). */
+  graph: (query: GraphQuery = {}) =>
+    call<KnowledgeGraph>(`/ib/graph${qs({ focus: query.focus, q: query.q, limit: query.limit ? String(query.limit) : undefined })}`),
+  /** PROVISIONAL: one document I can open (excerpt, links, lineage). Restricted and unknown: the same 404. */
+  doc: (docId: string, q?: string) => call<DocView>(`/ib/doc/${encodeURIComponent(docId)}${qs({ q })}`),
 };
 
 /** The same calls, bound to a separate compare slot. Never touches the main session cookie. */

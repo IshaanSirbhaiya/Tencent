@@ -1,0 +1,302 @@
+# Backend contracts v1 (finals): graph, doc, status, trace receipt, stats
+
+For the UI agents. Everything here is served by the Internal Brain (`databridge_ib`, :8100) and is
+verified by tests in `databridge/apps/internal_brain/tests/` (file names below). Paths in the code column
+are relative to `databridge/apps/internal_brain/databridge_ib/`.
+
+General rules (unchanged):
+
+- Identity comes only from the session (`ib_session` cookie or `Authorization: Bearer`). No body or
+  query parameter names a person. There is no `view_as`.
+- Every route here needs a signed-in employee (`employee`, `compliance_officer` or `admin_it`):
+  401 without a session, 403 without one of those roles.
+- **503 `{"error": "temporarily unavailable"}`** whenever the access ledger cannot record the call
+  (write-ahead) or anything unexpected fails. The UI shows one generic "try again" state.
+- **404 `{"detail": "not found"}`** is the ONE negative answer for "restricted", "unknown" and
+  "the live check failed". Never render anything that distinguishes them.
+- Times are ISO 8601 strings. Counts are integers or `null` (`null` = not exact, do not show a number).
+- Values in the JSON examples are illustrative; the field names and types are the contract.
+
+## Proxy allowlist (the coordinator owns `app/api/ib/[...path]/route.ts`)
+
+Add exactly these (method, anchored pattern). `DOC_ID` = the existing strict doc-id segment pattern
+(`<platform>:<id>`; Slack ids contain a second `:`), URL-encoded as one segment.
+
+| Method | Path | Slot (compare/View-as) |
+|---|---|---|
+| GET | `/ib/graph` (query `focus`, `q`, `limit`) | yes (each slot uses its own cookie) |
+| POST | `/ib/graph/openable` | **yes**: this is the View-as call |
+| GET | `/ib/doc/{DOC_ID}` (query `q`) | no |
+| GET | `/ib/status` | no |
+
+`/ib/trace/{req}`, `/ib/history`, `/audit/stats`, `/audit/journey/{req}` are already allowlisted; their
+shapes changed (below).
+
+---
+
+## GET /ib/graph: the signed-in person's permission-aware graph
+
+Code: `graph.py`, `authz.py`. Tests: `tests/test_graph_doc.py`.
+
+Query parameters (all optional):
+
+| Param | Rule |
+|---|---|
+| `focus` | a node id (see below), max 300 chars. Wins over `q` |
+| `q` | search text, max 500 chars. Same relevance search as the ask pipeline, over the person's readable set |
+| `limit` | 1..300, default 120 (422 outside) |
+
+Mode: `focus` given → `"focus"` (the node and its one-hop neighbours); else `q` given → `"search"`
+(the hits and their containers and authors); else `"overview"` (platforms, containers with counts,
+and the people who author in them).
+
+Node ids:
+
+| kind | id | example |
+|---|---|---|
+| `doc` | the document id | `jira:PAY-225`, `slack:C0DBMIG:1782379020.002812`, `confluence:cf-1001`, `drive:df-1` |
+| `container` | `container:<platform>:<container key>` | `container:jira:PAY` |
+| `person` | `person:<user id>` | `person:raj.m` |
+| `platform` | `platform:<platform>` | `platform:slack` |
+
+Response 200:
+
+```json
+{
+  "as_of": "2026-10-30T02:59:39.153084+00:00",
+  "scope_note": "Answers draw only on content you can access in Confluence, Jira, Slack and Google Drive.",
+  "sub": "jdoe",
+  "mode": "focus",
+  "focus": "jira:PAY-225",
+  "query": null,
+  "limit": 120,
+  "truncated": false,
+  "nodes": [
+    {"id": "jira:PAY-225", "kind": "doc", "platform": "jira",
+     "label": "PAY-225: Refactor FX quote cache docs", "container": "container:jira:PAY",
+     "container_name": "Payments", "doc_kind": "issue", "version": "2026-09-30T10:00:00+08:00",
+     "updated_at": "2026-09-30T10:00:00+08:00", "deep_link": "https://...",
+     "degree_hidden_safe": 0, "more": false},
+    {"id": "container:jira:PAY", "kind": "container", "platform": "jira", "label": "Payments",
+     "container": null, "count": 111, "degree_hidden_safe": 110, "more": true},
+    {"id": "person:raj.m", "kind": "person", "platform": null, "label": "Raj M",
+     "container": null, "count": 58, "degree_hidden_safe": 57, "more": true},
+    {"id": "platform:jira", "kind": "platform", "platform": "jira", "label": "jira",
+     "container": null, "count": null, "degree_hidden_safe": null, "more": true}
+  ],
+  "edges": [
+    {"source": "container:jira:PAY", "target": "jira:PAY-225", "kind": "contains"},
+    {"source": "person:raj.m", "target": "jira:PAY-225", "kind": "authored"},
+    {"source": "platform:jira", "target": "container:jira:PAY", "kind": "contains"}
+  ],
+  "freshness_note": "Every document shown was checked with its source just now."
+}
+```
+
+Node fields:
+
+| Field | On | Meaning |
+|---|---|---|
+| `id`, `kind`, `platform`, `label` | all | `label` = title (doc), container name, person name, platform id |
+| `container` | doc | the id of its container node; `null` on other kinds |
+| `container_name`, `doc_kind` (`page`/`issue`/`thread`/`file`), `version`, `updated_at`, `deep_link` | doc | the CURRENT checked version only (no history exists) |
+| `count` | container, person, platform | documents this person can open (container/person) or containers (platform), counted only over documents confirmed live in this call. **`null` when not exact: show no number** |
+| `degree_hidden_safe` | all | how many of this node's confirmed neighbours are NOT in this response. `null` when not exact |
+| `more` | all | `true` = at least one confirmed neighbour is not shown (show "more", with the number only when `degree_hidden_safe` is not null); `false` = nothing more; `null` = unknown (show nothing) |
+| `rank` | doc, search mode | 1-based relevance rank of a hit |
+
+Edge kinds: `contains` (platform → container, container → doc), `authored` (person → doc; in
+overview mode person → container with an extra `"weight"`: how many of that person's documents in
+that container), `links` (doc → doc via a supported URL), `mentions` (doc → doc via a Jira key
+written in the text). Both endpoints of every edge are in `nodes`.
+
+Guarantees (tested): only documents that pass Gate 1 and a live Gate 2 (plus version-bound
+read-through) in the same call appear or are counted; containers and people are derived only from
+them; a restricted document never appears by id, title, count or edge; the response for a world with
+restricted documents equals the response for the same world without them; a focus the person cannot
+open and an unknown focus give the same 404; an empty search is `200` with `nodes: []`, `edges: []`.
+
+Errors: 404 (focus not openable or unknown), 422 (bad params), 503 (ledger down or failure).
+Ledger: `graph.viewed` (counts only) before the response.
+Measured (real synthetic world, mock platforms over HTTP, jdoe): overview about 3.4 s (it checks every
+readable document live, like the map), search about 0.5 s, focus 0.3 to 0.5 s. Fetch the overview once
+per view; do not poll.
+
+## POST /ib/graph/openable: which of these can the CALLER open now?
+
+For View-as: Jordan's graph is drawn from Jordan's session; the compare slot (Ken's own session)
+posts Jordan's doc ids here and greys out the ones not returned. Never draw a node that is not in
+Jordan's own graph; never fetch titles under Ken's session for this.
+
+Request: `{"doc_ids": ["slack:...", "jira:PAY-1"]}`, at most 300 ids, each at most 300 chars, no other
+keys (422 otherwise).
+
+Response 200 (constant shape):
+
+```json
+{"sub": "ken.ext", "as_of": "2026-10-30T03:00:00+00:00", "openable": ["jira:PAY-1"]}
+```
+
+`openable` keeps request order, drops duplicates, and leaves out every id that is restricted, unknown
+or failed its live check (the same thing). Check `sub` against the slot's `whoami`. Ledger:
+`graph.viewed` with `mode: "openable"`.
+
+## GET /ib/doc/{doc_id}: one document the person can open
+
+Code: `docview.py`. Query: `q` (optional, max 500): the excerpt becomes the best-matching chunk.
+
+Response 200:
+
+```json
+{
+  "doc_id": "slack:t1", "platform": "slack", "kind": "thread", "container": "db-migration",
+  "container_name": "db-migration", "title": "migration status",
+  "version": "1", "updated_at": "2026-10-10T09:00:00+08:00", "deep_link": "https://...",
+  "created_at": "2026-10-10T09:00:00+08:00",
+  "author": {"id": "priya", "name": "Priya ..."},
+  "excerpt": "The database migration cutover is on Friday. ...",
+  "excerpt_kind": "start",
+  "excerpt_truncated": false,
+  "links": [{"doc_id": "jira:PAY-1", "platform": "jira", "title": "Database migration epic",
+             "container_name": "PAY", "kind": "issue", "relation": "mentions"}],
+  "lineage": {"connector": "slack", "last_sync_at": "2026-10-30T02:51:54+00:00",
+              "content_checked_at": "2026-10-30T02:51:54+08:00",
+              "authz_checked_at": "2026-10-30T02:52:03+00:00", "live_read": false},
+  "scope_note": "...", "as_of": "..."
+}
+```
+
+- `author` may be `null`. `excerpt_kind` is `"start"` (first 1,200 chars of the masked text) or
+  `"best_chunk"` (with `q`). Card numbers, NRIC and IBANs are already masked at ingest.
+- `links` lists only linked documents the person can open now (`relation`: `links` or `mentions`).
+- `lineage.live_read` is true when the source had a newer version and it was re-read just now.
+- No "why I can see it" field: it is deliberately omitted (no ACL or group data leaves the server).
+
+Errors: **404 identical** for restricted, unknown and failed checks (same bytes and headers); 503
+when the ledger is down (the same 503 for every id, because `doc.viewed` is appended BEFORE the
+access decision). Re-call this when the sheet opens, even if the graph showed the node.
+
+## GET /ib/status: model and ledger status (signed-in employees; not on /health)
+
+```json
+{
+  "models": {"provider": "tencent-tokenhub", "chain": ["hy3", "deepseek-v4.1-flash"],
+             "active": true, "active_chain": ["hy3", "deepseek-v4.1-flash"],
+             "fallback": {"provider": "deterministic", "model": "extractive-v1"}},
+  "key_configured": true,
+  "force_offline": false,
+  "ledger": {"ok": true}
+}
+```
+
+`provider` is `null` when no key is configured (`"openai-compatible"` for a non-TokenHub endpoint).
+`active` is false when answers come from the deterministic quoting path (no key, or
+`IB_FORCE_OFFLINE=1`). `ledger.ok` is re-verified at most every 15 s (`null` if not checkable). No
+key, URL or ledger sequence number is ever returned. `/health` stays `{"ok": true}`.
+
+## GET /ib/trace/{req_id}: the asker's receipt (CHANGED)
+
+Own requests only; another person's request and an unknown id give the same 404.
+
+```json
+{
+  "req_id": "030f2a7b...", "question": "What does the settlement keys rotation page say?",
+  "channel": "replay", "event_time": "2026-10-29T18:57:02.614027Z", "synthetic_replay": true,
+  "status": "released",
+  "policy_version": "ib-policy-1",
+  "model": {"provider": "deterministic", "model": "extractive-v1", "fallback_used": false},
+  "prompt_version": "ib-prompt-2026-10-13.1",
+  "latency_ms_rounded": 200,
+  "stages": [{"name": "accept", "status": "ok"}, {"name": "gate1", "status": "ok"},
+             {"name": "gate2", "status": "ok"}, {"name": "seal", "status": "ok"},
+             {"name": "compose", "status": "ok"}, {"name": "release", "status": "ok"}],
+  "dropped_sentences_count": 0,
+  "citations": [{"doc_id": "confluence:cf-1004", "platform": "confluence", "kind": "page",
+                 "container": "payment-gateway", "container_name": "Payment Gateway",
+                 "title": "Settlement keys rotation", "version": "4",
+                 "updated_at": "...", "deep_link": "...", "cited_version": "4"}],
+  "answer_sha256": "…",
+  "records": [{"ordinal": 1, "kind": "request.accepted", "hash": "…"},
+              {"ordinal": 2, "kind": "retrieval.decided", "hash": "…"},
+              {"ordinal": 3, "kind": "answer.released", "hash": "…"}]
+}
+```
+
+Removed: `released`, `stage_ms`, `latency_ms`, `events` (with global `seq` and `recorded_at`).
+`status` is `released`, `refused`, `failed` or `in_progress`. A stage is `ok` when its sealed record
+exists, otherwise `skipped` (never derived from timings). `citations` lists only cited documents the
+person can STILL open (Gate 1 + live Gate 2 now); the rest are left out with no count, so a citation
+can disappear after a revocation. Ledger: `trace.viewed`.
+
+## GET /ib/history (CHANGED: two fields added)
+
+`{"items": [{"req_id", "question", "event_time", "channel", "synthetic_replay"}]}`. Label rows with
+`synthetic_replay: true` as seeded replay (D-10); `channel` is `ui`, `workbuddy-mcp`, `api` or `replay`.
+
+## GET /audit/stats (compliance; CHANGED)
+
+- The window is half-open: `now - days <= event_time < now` (future-dated events are never counted).
+- **`funnel` is removed.** Use two flows with different units:
+  - `requests_flow`: `{asked, answered, refused, failed}` (requests);
+  - `documents_flow`: `{considered, gate2_checked, gate2_allowed, gate2_denied, released, cited}`
+    (documents). `cited` = distinct cited documents per request, counted only where that request
+    released them, so `cited <= released <= gate2_allowed <= gate2_checked` (tested).
+  - `totals.citations` is still the raw citation count (it can exceed `released`: two chunks of one
+    document can both be cited).
+- New totals: `graph_views`, `doc_views`, `trace_views`.
+- `stages_ms` has a sixth stage, `release` (storing the answer). Stage timings end BEFORE the final
+  `answer.released` append; `latency_ms` likewise.
+- A failure computing the stats is a ledgered `500` (`audit.query` with `outcome: "error"`), or 503 if
+  the ledger cannot record it. A result is cached per verified ledger head (seq + hash), parameters and
+  minute; it is only consulted after the chain verified, and because every stats call appends its own
+  `audit.query`, it helps only concurrent refreshes. Measured on a seeded ledger (941 records, over
+  HTTP): about 340 to 420 ms per call, almost all chain verification and the call's own append.
+  Fetch once per view, with a manual refresh; do not poll.
+
+## GET /audit/journey/{req_id} (compliance)
+
+Unchanged shape. A projection failure is now a ledgered 500 (it used to be an unledgered 500).
+
+## Ledger event kinds (new)
+
+| Kind | Fields (besides `kind`, `event_time`, `synthetic_replay`) |
+|---|---|
+| `graph.viewed` | `sub`, `mode` (`overview`/`focus`/`search`/`openable`), `outcome` (`ok`/`not_found`), `nodes_returned`, `docs_returned`, `edges_returned`, `docs_checked`, `policy_version` |
+| `doc.viewed` | `sub`, `doc_id` (as requested, max 300 chars), `with_query`, `policy_version` (written before the access decision) |
+| `trace.viewed` | `sub`, `outcome`, `citations_returned` |
+
+They appear in `/audit/events` (filter `kind`) and in `/audit/stats` `kinds` and `totals`.
+`request.failed` now carries the request's own `event_time` and `synthetic_replay`.
+
+## Seeded demo history (B7) and the eval summary (B8)
+
+- `databridge/scripts/seed_demo_activity.py` (usage at the top of the file). Seeded asks are
+  `channel: "replay"`, `synthetic_replay: true`, spread over the last 30 days. The seeder's audit
+  queries, reveals, Verify runs and simulator steps are real calls at seed time (not replay-labelled).
+- `databridge/apps/internal_brain_web/public/eval_summary.json`, written by
+  `databridge/scripts/eval_summary.py`:
+
+```json
+{
+  "generated_at": "...", "source": "evals/internal_brain/results.json", "git_sha": "…",
+  "stale": true, "note": "Full evaluation re-run pending: the Internal Brain changed after this run.",
+  "run_date": "2026-10-14T20:12:33+00:00", "full_run": true, "limit": 0,
+  "leaks": 0, "leak_requests": 0, "requests": 5958, "requests_per_mode": 2979,
+  "upper95": 0.001007, "payload_requests": 683, "payload_upper95": 0.004392, "violations": 0,
+  "differential": {"pairs": 400, "mismatches": 0, "control_mismatches": 0},
+  "injection": {"requests": 976, "hard_failures": 0},
+  "recall": {"released": {"fake-capture": 1.0, "extractive": 1.0},
+             "released_all_modes": {"min": 1.0, "max": 1.0}},
+  "cited_recall": {"per_mode": {"fake-capture": 0.964, "extractive": 0.878},
+                   "range": {"min": 0.878, "max": 0.964}},
+  "quality_findings": 14, "canaries_valid": true, "runtime_s": 61.9,
+  "per_mode": {"fake-capture": {"requests": 2979, "with_leak": 0, "upper95": 0.001007,
+                                "with_model_payload": 683, "refused": 2296}},
+  "tests": {"backend": 0, "e2e": 38},
+  "smoke": null
+}
+```
+
+Show `note` whenever `stale` is true. `smoke`, when present, is a later run from a scratch directory
+(`limit` 0 means a full run), with the same keys as the headline. Rates are fractions (0.001007 =
+0.1007 %).

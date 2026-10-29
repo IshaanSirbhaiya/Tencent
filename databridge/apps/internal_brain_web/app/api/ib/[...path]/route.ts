@@ -32,6 +32,8 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^ib\/ask$/ },
   { method: 'GET', re: /^ib\/(history|sources|map)$/ },
   { method: 'GET', re: /^ib\/trace\/[A-Za-z0-9_-]{1,200}$/ },
+  { method: 'GET', re: /^ib\/graph$/ },
+  { method: 'GET', re: new RegExp(`^ib\\/doc\\/${DOC_ID}$`) },
   { method: 'GET', re: /^audit\/(events|verify|stats)$/ },
   { method: 'GET', re: /^audit\/journey\/[A-Za-z0-9_-]{1,200}$/ },
   { method: 'GET', re: new RegExp(`^audit\\/doc\\/${DOC_ID}\\/accessors$`) },

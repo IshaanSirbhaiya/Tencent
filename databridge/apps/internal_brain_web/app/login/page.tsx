@@ -1,10 +1,10 @@
 'use client';
 import { ChevronRight, Database, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { BrandMark, MockBanner, PRODUCT, SUBTITLE } from '@/components/Brand';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { TourButton } from '@/components/tour/Tour';
+import { useEffect, useState } from 'react';
+import { PRODUCT, SUBTITLE } from '@/components/Brand';
+import { AppShell } from '@/components/shell/AppShell';
+import { useSession } from '@/components/shell/Providers';
 import { ApiError, api } from '@/lib/api';
 import { PERSONAS, type Persona } from '@/lib/personas';
 
@@ -13,12 +13,17 @@ export default function LoginPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [passcode, setPasscode] = useState('');
+  const session = useSession();
+  // A fresh sign-in: forget whoever was cached before.
+  const { clear } = session;
+  useEffect(() => clear(), [clear]);
 
   async function signIn(p: Persona) {
     setBusy(p.id);
     setError(null);
     try {
       const r = await api.login(p.id, passcode.trim() || undefined);
+      await session.refresh();
       router.replace(r.roles.includes('admin_it') && !r.roles.includes('compliance_officer') ? '/sim' : '/');
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
@@ -65,21 +70,11 @@ export default function LoginPage() {
   );
 
   return (
-    <>
-      <MockBanner />
-      <main id="main" tabIndex={-1} className="mx-auto flex min-h-[calc(100vh-24px)] max-w-3xl flex-col justify-center px-4 py-10 focus:outline-none sm:px-6">
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <BrandMark />
-            <div>
-              <p className="text-base font-semibold tracking-tight">{PRODUCT}</p>
-              <p className="text-sm text-muted">{SUBTITLE}</p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <TourButton />
-            <ThemeToggle />
-          </div>
+    <AppShell variant="public">
+      <div className="mx-auto flex min-h-[calc(100vh-var(--topbar-h)-24px)] max-w-3xl flex-col justify-center px-4 py-10 sm:px-6">
+        <div className="mb-6">
+          <p className="text-title text-fg">{PRODUCT}</p>
+          <p className="mt-1 text-sm text-muted">{SUBTITLE}</p>
         </div>
 
         <section aria-labelledby="signin-heading" className="rounded-lg border border-line bg-surface" data-tour="personas">
@@ -136,7 +131,7 @@ export default function LoginPage() {
             Demo sign-in stands in for your company's single sign-on.
           </p>
         </section>
-      </main>
-    </>
+      </div>
+    </AppShell>
   );
 }

@@ -2,46 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens. Dark is the default (projector-tested); light is a toggle.
-   One accent (blue). ok / warn / bad are always paired with an icon AND a text label. */
-:root {
-  --bg: 11 13 16;
-  --surface: 18 21 26;
-  --raised: 25 29 35;
-  --line: 40 45 53;
-  --line-strong: 62 68 78;
-  --fg: 231 233 236;
-  --muted: 163 171 182;
-  --accent: 128 172 255;
-  --accent-solid: 47 100 208;
+/* ==========================================================================================
+   Walnut DataBridge design tokens (docs/finals/contracts/ui_foundation.md §2).
+
+   - Colours are space-separated RGB triplets so Tailwind can apply alpha: bg-accent/10.
+   - Dark is the default (projector-tested). Light is AA. High contrast is a modifier on either.
+   - Near-neutral greys + ONE accent (indigo). Every other hue is semantic and always paired with
+     an icon AND a text label: platform identity, permission state, status.
+   - Root attributes (set before first paint by the init script in app/layout.tsx):
+       data-theme="dark|light"   data-contrast="more"   data-text="100|115|130"
+       data-mode="user|dev"      data-motion="reduce"   lang="en|zh-Hans"
+   ========================================================================================== */
+:root,
+[data-theme-scope='dark'] {
+  /* surfaces */
+  --bg: 10 11 13;
+  --surface: 17 18 21;
+  --raised: 26 28 32;
+  --overlay: 22 24 28;
+  --line: 36 39 45;
+  --line-strong: 70 75 85;
+  /* text */
+  --fg: 236 237 239;
+  --muted: 156 162 172;
+  --subtle: 128 134 145;
+  /* the one accent */
+  --accent: 146 155 255;
+  --accent-solid: 94 106 210;
   --accent-fg: 255 255 255;
-  --ok: 86 201 146;
-  --warn: 232 184 88;
+  --focus: 146 155 255;
+  /* status */
+  --ok: 86 200 145;
+  --warn: 226 178 84;
   --bad: 244 124 114;
-  --focus: 128 172 255;
+  /* platform identity (Okabe-Ito derived, muted; distinguishable under deutan/protan/tritan) */
+  --pf-confluence: 110 172 232;
+  --pf-jira: 72 186 160;
+  --pf-slack: 214 138 184;
+  --pf-drive: 208 186 96;
+  /* permission state */
+  --perm-full: 86 200 145;
+  --perm-partial: 226 178 84;
+  --perm-locked: 128 134 145;
+  /* elevation: borders first; one soft shadow for floating layers only */
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(var(--line-strong) / 0.6);
+  /* tour */
   --tour-scrim: 0 0 0;
   --tour-scrim-alpha: 0.6;
+
+  /* type (body size depends on mode: User 15-16 px, Developer 13-14 px) */
+  --fs-body: 0.9375rem;
+  --lh-body: 1.6;
+  --fs-body-sm: 0.875rem;
+
+  /* motion */
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --dur-slow: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* layout */
+  --topbar-h: 3.25rem;
+  --sidenav-w: 15rem;
+
   color-scheme: dark;
 }
 
-:root[data-theme='light'] {
-  --bg: 246 247 249;
+:root[data-theme='light'],
+[data-theme-scope='light'] {
+  --bg: 250 250 251;
   --surface: 255 255 255;
-  --raised: 242 244 247;
-  --line: 222 226 231;
-  --line-strong: 190 197 206;
-  --fg: 17 20 24;
-  --muted: 72 82 96;
-  --accent: 29 86 196;
-  --accent-solid: 29 86 196;
+  --raised: 243 244 246;
+  --overlay: 255 255 255;
+  --line: 228 230 234;
+  --line-strong: 160 166 177;
+  --fg: 15 17 21;
+  --muted: 77 84 96;
+  --subtle: 101 108 121;
+  --accent: 76 84 200;
+  --accent-solid: 76 84 200;
   --accent-fg: 255 255 255;
-  --ok: 20 110 68;
-  --warn: 128 84 0;
-  --bad: 176 34 24;
-  --focus: 29 86 196;
+  --focus: 76 84 200;
+  --ok: 22 116 72;
+  --warn: 140 88 0;
+  --bad: 188 38 30;
+  --pf-confluence: 24 104 176;
+  --pf-jira: 0 120 96;
+  --pf-slack: 156 52 116;
+  --pf-drive: 124 98 0;
+  --perm-full: 22 116 72;
+  --perm-partial: 140 88 0;
+  --perm-locked: 101 108 121;
+  --shadow-pop: 0 8px 24px rgb(15 17 21 / 0.12), 0 0 0 1px rgb(var(--line-strong) / 0.5);
   --tour-scrim: 17 20 24;
   --tour-scrim-alpha: 0.42;
   color-scheme: light;
+}
+
+/* High contrast: stronger borders and secondary text, in either theme. */
+:root[data-contrast='more'] {
+  --line: 84 90 100;
+  --line-strong: 140 146 156;
+  --fg: 255 255 255;
+  --muted: 210 214 220;
+  --subtle: 190 195 203;
+  --accent: 170 178 255;
+  --focus: 255 214 10;
+}
+:root[data-theme='light'][data-contrast='more'] {
+  --line: 120 126 136;
+  --line-strong: 60 66 76;
+  --fg: 0 0 0;
+  --muted: 36 40 48;
+  --subtle: 52 58 68;
+  --accent: 52 58 170;
+  --accent-solid: 52 58 170;
+  --focus: 0 0 0;
+}
+
+/* Text size (Settings): scales every rem. */
+:root[data-text='115'] {
+  font-size: 115%;
+}
+:root[data-text='130'] {
+  font-size: 130%;
+}
+
+/* Density by mode: Developer mode is denser (Palantir-like), User mode is roomy (chat-like). */
+:root[data-mode='dev'] {
+  --fs-body: 0.8125rem;
+  --lh-body: 1.5;
+  --fs-body-sm: 0.75rem;
+  --sidenav-w: 14rem;
 }
 
 html,
@@ -53,19 +145,26 @@ body {
 body {
   font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.tabular {
+:root[lang='zh-Hans'] body {
+  line-height: 1.7;
+}
+
+.tabular,
+.tnum {
   font-variant-numeric: tabular-nums;
 }
 
-/* Visible focus everywhere, never removed. */
+/* Visible focus everywhere, never removed (WCAG 2.4.7 / 2.4.11). */
 :focus-visible {
   outline: 2px solid rgb(var(--focus));
   outline-offset: 2px;
   border-radius: 4px;
 }
 
+/* Reduced motion: the OS setting or the in-app switch (data-motion="reduce"). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -75,6 +174,14 @@ body {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 .skip-link {
@@ -92,6 +199,70 @@ body {
   top: 8px;
 }
 
+/* Floating layers (popover, menu, tooltip, palette) enter with a short fade + 4px rise. */
+@keyframes ds-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ds-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ds-sheet-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes ds-sheet-in-left {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.ds-pop[data-state='open'],
+.ds-pop[data-state='delayed-open'],
+.ds-pop[data-state='instant-open'] {
+  animation: ds-in var(--dur-base) var(--ease-out);
+}
+.ds-scrim[data-state='open'] {
+  animation: ds-fade var(--dur-base) var(--ease-out);
+}
+.ds-sheet[data-state='open'] {
+  animation: ds-sheet-in var(--dur-slow) var(--ease-out);
+}
+.ds-sheet-left[data-state='open'] {
+  animation: ds-sheet-in-left var(--dur-slow) var(--ease-out);
+}
+
+/* Skeleton: a calm pulse, stilled by reduced motion. */
+@keyframes ds-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.ds-skeleton {
+  animation: ds-pulse 1.6s ease-in-out infinite;
+}
+
 /* Citation target highlight when jumped to from an answer chip. */
 .cite-target:target,
 .cite-target[data-active='true'] {
@@ -107,7 +278,7 @@ body {
   stroke-width: 3px !important;
 }
 
-/* Calm indeterminate progress (map loading). Reduced motion: the global rule above stills it. */
+/* Calm indeterminate progress (map loading). Reduced motion: the global rules above still it. */
 @keyframes ib-indeterminate {
   from {
     transform: translateX(-100%);
@@ -118,4 +289,15 @@ body {
 }
 .ib-indeterminate {
   animation: ib-indeterminate 1.6s ease-in-out infinite;
+}
+
+/* cmdk: hide the empty group headings it renders while filtering. */
+[cmdk-group]:not([hidden]) + [cmdk-group] {
+  border-top: 1px solid rgb(var(--line));
+}
+
+/* Thin, theme-aware scrollbars for dense panels. */
+.ds-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line-strong)) transparent;
 }

@@ -17,6 +17,7 @@ import {
   EXTRACTIVE,
   citation,
 } from './fixtures';
+import { mockDoc, mockGraph, mockJourney, mockStats, mockTrace } from './finals';
 import { buildMap } from './map';
 
 const COOKIE = 'ib_session';
@@ -228,8 +229,37 @@ export async function handleMock(req: NextRequest, path: string, session?: strin
     });
   }
 
+  if (path.startsWith('ib/trace/')) {
+    const t = mockTrace(s.ledger, sub, decodeURIComponent(path.slice('ib/trace/'.length)));
+    return t ? json(t) : err(404, 'not found');
+  }
+
+  if (path === 'ib/graph') {
+    const p = req.nextUrl.searchParams;
+    const limit = p.get('limit');
+    const g = mockGraph(sub, s.state, { focus: p.get('focus'), q: p.get('q'), limit: limit ? Number(limit) : undefined });
+    return g ? json(g) : err(404, 'not found');
+  }
+
+  if (path.startsWith('ib/doc/')) {
+    const d = mockDoc(sub, s.state, decodeURIComponent(path.slice('ib/doc/'.length)), s.syncAt);
+    return d ? json(d) : err(404, 'not found');
+  }
+
   if (path.startsWith('audit/')) {
     if (!me.roles.includes('compliance_officer')) return err(403, 'forbidden');
+    if (path === 'audit/stats') {
+      const p = req.nextUrl.searchParams;
+      const days = Number(p.get('days') ?? 30);
+      const replay = p.get('replay');
+      if (!Number.isInteger(days) || days < 1 || days > 3650) return err(422, 'invalid stats query: days must be 1..3650');
+      if (replay !== null && replay !== 'include' && replay !== 'exclude') return err(422, 'invalid stats query: replay must be include or exclude');
+      return json(mockStats(s.ledger, days, replay !== 'exclude'));
+    }
+    if (path.startsWith('audit/journey/')) {
+      const j = mockJourney(s.ledger, decodeURIComponent(path.slice('audit/journey/'.length)));
+      return j ? json(j) : err(404, 'no such request');
+    }
     const ledgerQuery = (filter: Record<string, unknown>, n: number) => {
       s.queries += 1;
       s.ledger.push({ req_id: `aud_${s.queries}`, event_time: new Date().toISOString(), sub, kind: 'audit.query', question: `filter ${JSON.stringify(filter)} → ${n} rows`, channel: 'ui', considered: [], gate2: [], released: [], model: null, refused: null, synthetic_replay: false });
