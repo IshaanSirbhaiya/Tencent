@@ -320,3 +320,30 @@ def test_events_window_note_is_plain_english(env):
     client, *_ = env
     applied = client.get("/audit/events", headers=CO).json()["window"]["applied"]
     assert applied == "no dates given, so the last 365 days"
+
+
+def test_projection_failure_is_a_ledgered_500_on_every_query_route(template, tmp_path):
+    """Opus final review #9: /audit/events, /audit/doc/{id}/accessors and /audit/ask catch up the
+    projection through ``_sync_or_refuse``: a projection (not ledger) failure is a ledgered 500
+    with the fixed envelope, never an unledgered framework 500."""
+    cfg, _, store = clone(template, tmp_path)
+    ledger = AccessLedger(cfg)
+    proj = AuditProjection(ledger)
+
+    def broken():
+        raise RuntimeError("sqlite: database disk image is malformed")
+    proj.sync = broken
+    app = FastAPI()
+    app.include_router(make_audit_router(ledger, store, proj, require_role, clock=lambda: NOW))
+    client = TestClient(app, raise_server_exceptions=False)
+    calls = [("events", lambda: client.get("/audit/events", params={"user": "jdoe"}, headers=CO)),
+             ("accessors", lambda: client.get("/audit/doc/jira:PAY-201/accessors", headers=CO)),
+             ("ask", lambda: client.post("/audit/ask", json={"question": "what did jdoe ask"},
+                                         headers=CO))]
+    for op, call in calls:
+        r = call()
+        assert r.status_code == 500, (op, r.text)
+        assert "sqlite" not in r.text and "malformed" not in r.text
+        last = _last(ledger)
+        assert last["op"] == op and last["outcome"] == "error", last
+    store.close()

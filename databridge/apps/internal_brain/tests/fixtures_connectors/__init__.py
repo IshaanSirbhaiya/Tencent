@@ -479,8 +479,8 @@ class MockEnv:
         self.hooks: list[tuple[str, dict[str, str], bytes]] = []
         self.app = create_app(path, webhook_sink=lambda p, h, b: self.hooks.append((p, h, b)),
                               svc_token=svc, admin_token=admin, webhook_secret=secret)
-        self.svc = TestClient(self.app, base_url="http://mock", headers={"Authorization": f"Bearer {svc}"})
-        self.admin = TestClient(self.app, base_url="http://mock",
+        self.svc = TestClient(self.app, base_url="http://testserver", headers={"Authorization": f"Bearer {svc}"})
+        self.admin = TestClient(self.app, base_url="http://testserver",
                                 headers={"Authorization": f"Bearer {admin}"})
         self.directory = directory_from_world(self.world)
 

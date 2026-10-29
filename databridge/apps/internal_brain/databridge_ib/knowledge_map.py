@@ -4,7 +4,12 @@ Same rules as an answer:
 - Gate 1 picks the candidates (the stored source permissions), then Gate 2 asks each source, live,
   whether this person may open each item NOW; only confirmed items are listed or counted. An error,
   timeout or rate limit leaves the item out (fail closed), and a revocation whose webhook was lost
-  is honoured immediately (Codex review track 5 #1). Nothing the person cannot open is listed,
+  is honoured immediately (Codex review track 5 #1).
+- Version-bound (Codex final review, plan item 4): the check goes through
+  :func:`authz.authorize`, the same rule as the graph and document views. When the source's version
+  moved on, the document is re-read, its fresh ACL must still admit the person and the fetched
+  version must be the one checked; what is listed (title, kind, version, dates, link) comes from
+  that immutable snapshot, never from the index row's older metadata. Nothing the person cannot open is listed,
   counted or hinted at, so the map of a world WITH restricted documents equals the map of the same
   world WITHOUT them (P2).
 - The view is written to the access ledger BEFORE anything is returned (``map.viewed``).
@@ -17,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Callable, Mapping
 
-from . import gates
+from . import authz
 from .config import POLICY_VERSION
 from .directory import Directory
 from .index import Index
@@ -34,25 +39,21 @@ def build_map(user: DirectoryUser, *, index: Index, directory: Directory, ledger
               connectors: Mapping[str, Any], clock: Callable[[], datetime],
               timeout_s: float = MAP_CHECK_TIMEOUT_S) -> dict:
     epoch = getattr(directory, "epoch", 0)
-    candidates = sorted(index.readable(user, epoch))
-    rows = {d: (index.doc(d) or {}) for d in candidates}
-    checks = gates.check_all(user, candidates, {d: r.get("platform", "") for d, r in rows.items()},
-                             connectors, timeout_s=timeout_s,
-                             known_versions={d: r.get("version") for d, r in rows.items()},
-                             pool=_MAP_POOL)
-    readable = [d for d in candidates if checks.get(d) is not None and checks[d].allowed]
+    readable = index.readable(user, epoch)
+    candidates = sorted(readable)
+    ok, _ = authz.authorize(user, candidates, index=index, connectors=connectors,
+                            readable=readable, timeout_s=timeout_s, pool=_MAP_POOL)
     groups: dict[tuple[str, str], dict] = {}
     items: dict[tuple[str, str], list[dict]] = defaultdict(list)
-    for doc_id in readable:
-        row = index.doc(doc_id)
-        if row is None:
+    for doc_id in candidates:
+        s = ok.get(doc_id)
+        if s is None:
             continue
-        key = (row["platform"], row["container"])
-        groups.setdefault(key, {"container": row["container"],
-                                "name": row.get("container_name") or row["container"]})
-        items[key].append({"doc_id": doc_id, "title": row["title"], "kind": row["kind"],
-                           "version": row["version"], "updated_at": row["updated_at"],
-                           "deep_link": row.get("deep_link") or ""})
+        key = (s.platform, s.container)
+        groups.setdefault(key, {"container": s.container, "name": s.container_name or s.container})
+        items[key].append({"doc_id": doc_id, "title": s.title, "kind": s.kind,
+                           "version": s.version, "updated_at": s.updated_at,
+                           "deep_link": s.deep_link})
     platforms = []
     for platform in sorted({p for p, _ in groups}, key=lambda p: (
             PLATFORM_ORDER.index(p) if p in PLATFORM_ORDER else 99, p)):

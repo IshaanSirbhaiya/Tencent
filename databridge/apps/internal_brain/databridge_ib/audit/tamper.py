@@ -16,7 +16,9 @@ Two callers:
 Scenarios (``expected`` = whether verification must flag it):
 
   baseline                    untouched copy                                      not flagged
-  edit-record                 one historical field changed, not re-sealed         flagged (chain)
+  edit-record                 one historical DECISION flipped, not re-sealed       flagged (chain)
+                              (a Gate-2 "forbidden" -> "verified"; else a refused
+                              answer -> released; else the record's ``sub``)
   suffix-delete               the last N records deleted                          flagged (anchor)
   directory-rollback          log + anchors restored from an earlier backup        flagged ONLY by
                               (before the last external publication)               the external head
@@ -138,6 +140,46 @@ def _first_bad_seq(rep: dict) -> Optional[int]:
     return None
 
 
+def _decision_edit(lines: list[str], k: int) -> tuple[int, str, Callable[[dict], None]]:
+    """The "edit one old record" tamper, as the presenter tells it: ONE word of a DECISION flipped
+    (Fable final review). The Gate-2 denial nearest the middle of the log becomes "verified"; with
+    no denial on record, a refused answer becomes released; with neither, record ``k``'s ``sub``
+    changes. Returns ``(seq, what_we_did, mutate)``; ``seq`` is the 1-based line, which is the
+    record the chain check must name."""
+    denials: list[tuple[int, int]] = []
+    refusals: list[int] = []
+    for i, ln in enumerate(lines[:-1] if len(lines) > 1 else lines, start=1):
+        try:
+            ev = json.loads(ln).get("ib_event") or {}
+        except ValueError:
+            continue
+        if ev.get("kind") == "retrieval.decided":
+            for j, g in enumerate(ev.get("gate2") or []):
+                if isinstance(g, dict) and g.get("verdict") == "forbidden":
+                    denials.append((i, j))
+                    break
+        elif ev.get("kind") == "answer.released" and ev.get("refused") is True:
+            refusals.append(i)
+    if denials:
+        seq, j = min(denials, key=lambda x: (abs(x[0] - k), x[0]))
+
+        def flip_gate2(rec: dict) -> None:
+            rec["ib_event"]["gate2"][j]["verdict"] = "verified"
+        return (seq, f"Changed one Gate-2 decision in record {seq} from 'forbidden' to "
+                     f"'verified' without re-sealing it.", flip_gate2)
+    if refusals:
+        seq = min(refusals, key=lambda x: (abs(x - k), x))
+
+        def flip_refused(rec: dict) -> None:
+            rec["ib_event"]["refused"] = False
+        return (seq, f"Changed the answer decision in record {seq} from refused to released "
+                     f"(refused: true -> false) without re-sealing it.", flip_refused)
+
+    def flip_sub(rec: dict) -> None:
+        rec.setdefault("ib_event", {})["sub"] = "someone-else"
+    return k, f"Changed who made record {k} (ib_event.sub) without re-sealing it.", flip_sub
+
+
 # ------------------------------------------------------------------------------------------------
 # the scenarios
 # ------------------------------------------------------------------------------------------------
@@ -198,15 +240,16 @@ def run_scenarios(src_var: Path, external: Optional[Path], key: str, *, work: Pa
 
     scenario("baseline", "Copied the log and changed nothing.", lambda v, e: None)
 
+    edit_seq, edit_what, edit_fn = _decision_edit(log_lines, k)
+
     def edit(v: Path, e: Optional[Path]) -> None:
         p = _log(v)
         lines = _lines(p)
-        rec = json.loads(lines[k - 1])
-        rec.setdefault("ib_event", {})["sub"] = "someone-else"
-        lines[k - 1] = json.dumps(rec, sort_keys=True)
+        rec = json.loads(lines[edit_seq - 1])
+        edit_fn(rec)
+        lines[edit_seq - 1] = json.dumps(rec, sort_keys=True)
         _write_lines(p, lines)
-    scenario("edit-record", f"Changed who made record {k} (ib_event.sub) without re-sealing it.",
-             edit)
+    scenario("edit-record", edit_what, edit)
 
     def suffix(v: Path, e: Optional[Path]) -> None:
         p = _log(v)
@@ -301,9 +344,12 @@ def run_on_live_copy(ledger: AccessLedger, sink, *, budget_s: float = 20.0,
     Raises `TamperDemoBusy` when another run is in progress."""
     if not _RUN_LOCK.acquire(blocking=False):
         raise TamperDemoBusy("a tamper demo is already running")
-    t0 = time.monotonic()
-    tmp = Path(tempfile.mkdtemp(prefix="ib-tamper-live-"))
+    # the lock is released on EVERY path, including a failure to create the temporary directory
+    # (Codex final review #7: a failed mkdtemp used to leave the demo "already running" forever)
+    tmp: Optional[Path] = None
     try:
+        t0 = time.monotonic()
+        tmp = Path(tempfile.mkdtemp(prefix="ib-tamper-live-"))
         src = tmp / "source" / "var"
         ext_src = sink_file(sink)
         with ledger.core.lock(timeout=lock_timeout_s):         # no append is half-written
@@ -327,8 +373,11 @@ def run_on_live_copy(ledger: AccessLedger, sink, *, budget_s: float = 20.0,
                 "records_copied": len(lines), "external_head_copied": s_ext is not None,
                 "scenarios": scen, "elapsed_ms": int((time.monotonic() - t0) * 1000)}
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-        _RUN_LOCK.release()
+        try:
+            if tmp is not None:
+                shutil.rmtree(tmp, ignore_errors=True)
+        finally:
+            _RUN_LOCK.release()
 
 
 __all__ = ["SCENARIOS", "TamperDemoBusy", "restore_prefix", "reseal", "run_scenarios",

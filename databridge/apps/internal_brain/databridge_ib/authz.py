@@ -13,6 +13,11 @@ its semantics so the developer views cannot be weaker than an answer (Codex plan
 4. **Snapshot** — what is returned is an immutable :class:`AuthorizedDoc` built at decision time (the
    fresh doc, or a copy of the index row bound to the checked version and re-checked against the
    stored policy), never a later re-read of a mutable row. Any exception: deny.
+5. **One deadline** (Codex final review #4) — a single monotonic deadline bounds the live checks AND
+   the read-through: the drifted documents are re-fetched on a small bounded pool and waited for
+   only until the deadline. A check or a read-through that has not finished by then is a deny, and
+   its id is reported in ``undecided`` so a caller never presents a count as exact when part of it
+   was never decided.
 
 Callers serialise only whitelisted fields of a snapshot (:func:`public_meta`); the raw index row, its
 ACL expression, the full text and unresolved link ids never leave through these helpers.
@@ -20,7 +25,8 @@ ACL expression, the full text and unresolved link ids never leave through these 
 from __future__ import annotations
 
 import json
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Optional
@@ -33,7 +39,19 @@ from .sensitive import mask_doc
 
 #: the developer views' own small pool: their live checks never queue ahead of an answer's Gate 2
 VIEW_POOL = ThreadPoolExecutor(max_workers=6, thread_name_prefix="ib-view-gate2")
+#: read-through (fetch + ACL of drifted documents) runs on its own small pool, never on the check
+#: pool (no nested waits on one pool), and is waited for only until the call's deadline
+READ_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ib-view-read")
 VIEW_CHECK_TIMEOUT_S = 20.0
+
+
+def deadline_in(timeout_s: float) -> float:
+    """A monotonic deadline ``timeout_s`` from now (one per view call)."""
+    return time.monotonic() + max(0.0, float(timeout_s))
+
+
+def remaining(deadline: float) -> float:
+    return max(0.0, deadline - time.monotonic())
 
 
 @dataclass(frozen=True)
@@ -124,33 +142,70 @@ def _snapshot(user: DirectoryUser, doc_id: str, chk: AccessCheck, index: Index,
     return _from_row(row, chk)
 
 
+def _needs_read(chk: AccessCheck, index: Index, doc_id: str) -> bool:
+    if not chk.allowed or not chk.current_version:
+        return False
+    row = index.doc(doc_id)
+    return row is not None and chk.current_version != row.get("version")
+
+
 def authorize(user: DirectoryUser, doc_ids: Iterable[str], *, index: Index,
               connectors: Mapping[str, Any], readable: Optional[frozenset] = None,
               directory_epoch: int = 0, timeout_s: float = VIEW_CHECK_TIMEOUT_S,
-              pool: Optional[ThreadPoolExecutor] = None) -> tuple[dict[str, AuthorizedDoc], int]:
+              pool: Optional[ThreadPoolExecutor] = None, deadline: Optional[float] = None,
+              undecided: Optional[set] = None) -> tuple[dict[str, AuthorizedDoc], int]:
     """``({doc_id: snapshot} for every id that passes Gate 1, Gate 2 and read-through, n_checked)``.
-    Ids outside Gate 1 are dropped before any source call, exactly like unknown ids."""
+    Ids outside Gate 1 are dropped before any source call, exactly like unknown ids.
+
+    ``deadline`` (monotonic; default ``now + timeout_s``) bounds the checks AND the read-through.
+    Whatever is not decided by then is denied; when ``undecided`` is given, those ids are added to
+    it (a check that timed out, a read-through that did not finish, or work never started)."""
+    deadline = deadline if deadline is not None else deadline_in(timeout_s)
     readable = readable if readable is not None else index.readable(user, directory_epoch)
     cands = [d for d in dict.fromkeys(doc_ids) if isinstance(d, str) and d in readable]
     if not cands:
         return {}, 0
+    if remaining(deadline) <= 0:
+        if undecided is not None:
+            undecided.update(cands)
+        return {}, len(cands)
     rows = {d: (index.doc(d) or {}) for d in cands}
     checks = gates.check_all(user, cands, {d: r.get("platform", "") for d, r in rows.items()},
-                             connectors, timeout_s=timeout_s,
+                             connectors, timeout_s=remaining(deadline),
                              known_versions={d: r.get("version") for d, r in rows.items()},
                              pool=pool or VIEW_POOL)
     out: dict[str, AuthorizedDoc] = {}
+    reads = {}
     for d in cands:
         c = checks.get(d)
         if c is None:
             continue
+        if c.reason_code == "timeout":
+            if undecided is not None:
+                undecided.add(d)
+            continue
         try:
-            snap = _snapshot(user, d, c, index, connectors)
+            if _needs_read(c, index, d):            # drift: connector I/O, bounded by the deadline
+                reads[d] = READ_POOL.submit(_snapshot, user, d, c, index, connectors)
+                continue
+            snap = _snapshot(user, d, c, index, connectors)    # index-only: no connector I/O
         except Exception:                                           # noqa: BLE001 — fail closed
             snap = None
         if snap is not None:
             out[d] = snap
-    return out, len(cands)
+    for d, fut in reads.items():
+        try:
+            snap = fut.result(timeout=remaining(deadline))
+        except FutTimeout:
+            fut.cancel()                            # late: deny, never return unchecked content
+            if undecided is not None:
+                undecided.add(d)
+            continue
+        except Exception:                                           # noqa: BLE001 — fail closed
+            continue
+        if snap is not None:
+            out[d] = snap
+    return {d: out[d] for d in cands if d in out}, len(cands)
 
 
 def resolve_link(link: str, readable) -> Optional[str]:
@@ -165,6 +220,15 @@ def resolve_link(link: str, readable) -> Optional[str]:
     return None
 
 
+def link_candidates(link: str, readable) -> list[str]:
+    """Every id ``link`` could resolve to inside ``readable``, in resolution order (a view that
+    resolves inside its AUTHORISED set must have decided all of them before the result is final)."""
+    candidates = [link] + [p + link for p in ("jira:", "confluence:", "drive:")]
+    if identifiers(link):
+        candidates.append("jira:" + link.upper())
+    return [c for c in dict.fromkeys(candidates) if c in readable]
+
+
 def public_meta(s: AuthorizedDoc) -> dict[str, Any]:
     """The whitelisted metadata of an authorised document (no text, no ACL, no raw links)."""
     return {"doc_id": s.doc_id, "platform": s.platform, "kind": s.kind,
@@ -172,4 +236,5 @@ def public_meta(s: AuthorizedDoc) -> dict[str, Any]:
             "version": s.version, "updated_at": s.updated_at, "deep_link": s.deep_link}
 
 
-__all__ = ["AuthorizedDoc", "authorize", "resolve_link", "public_meta", "VIEW_POOL"]
+__all__ = ["AuthorizedDoc", "authorize", "resolve_link", "link_candidates", "public_meta",
+           "deadline_in", "remaining", "VIEW_POOL", "READ_POOL"]

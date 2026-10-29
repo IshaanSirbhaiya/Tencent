@@ -153,7 +153,7 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         except (ValidationError, ValueError) as exc:
             _refuse(sub, "events", "rejected", 422, f"invalid audit filter: {_brief(exc)}",
                     {"params": _clip(raw)})
-        _sync()
+        _sync_or_refuse(sub, "events", {"params": _clip(raw)})
         try:
             rows = projection.search(f)
         except Exception:                                            # noqa: BLE001
@@ -167,7 +167,7 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         sub = _sub_of(principal)
         if not doc_id or len(doc_id) > 300:
             _refuse(sub, "accessors", "rejected", 422, "invalid doc id", {"doc": doc_id[:300]})
-        _sync()
+        _sync_or_refuse(sub, "accessors", {"doc": doc_id})
         try:
             res = projection.accessors(doc_id)
         except Exception:                                            # noqa: BLE001
@@ -184,7 +184,7 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
             _refuse(sub, "ask", "rejected", 422, "a question is required", {"question": ""})
         # catch up first, so a document named by its title resolves against every title the
         # ledger has recorded so far (considered_meta, which the officer already sees)
-        _sync()
+        _sync_or_refuse(sub, "ask", {"question": question})
         try:
             titles = projection.known_titles()
         except Exception:                                            # noqa: BLE001

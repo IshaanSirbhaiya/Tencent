@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import admin, confluence, drive, jira, slack
 from .common import PlatformError, platform_error_handler
@@ -27,6 +28,15 @@ from .state import World
 from .webhooks import Sink, WebhookEmitter
 
 DEFAULT_WORLD = Path(__file__).resolve().parents[3] / "fixtures" / "enterprise" / "world.json"
+#: DNS-rebinding guard: loopback Host names, the in-process test transport's fixed Host, and any
+#: extra names in MOCK_ALLOWED_HOSTS (comma-separated). Anything else is a 400 before any route.
+TRUSTED_HOSTS = ("127.0.0.1", "localhost", "[::1]", "testserver")
+
+
+def trusted_hosts() -> list[str]:
+    extra = [h.strip().lower() for h in os.environ.get("MOCK_ALLOWED_HOSTS", "").split(",")
+             if h.strip()]
+    return list(dict.fromkeys(list(TRUSTED_HOSTS) + extra))
 
 
 def create_app(world_path: str | Path | None = None, *, webhook_sink: Optional[Sink] = None,
@@ -51,6 +61,7 @@ def create_app(world_path: str | Path | None = None, *, webhook_sink: Optional[S
     app = FastAPI(title="Walnut IB mock platforms", lifespan=lifespan,
                   description="A supported semantic subset of Slack, Confluence, Jira and Drive "
                               "- not a replica.")
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts())
     app.state.world = World(path)
     app.state.svc_token = svc
     app.state.admin_token = adm

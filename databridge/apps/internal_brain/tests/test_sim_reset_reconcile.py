@@ -33,7 +33,7 @@ def world(tmp_path_factory):
     app = FastAPI()
     app.include_router(make_sim_router(
         cfg, lambda role: (lambda: SimpleNamespace(id="admin.it", roles=(role,))),
-        client_factory=lambda: _Client(e.mock, base_url="http://mock",
+        client_factory=lambda: _Client(e.mock, base_url="http://testserver",
                                        headers={"Authorization": f"Bearer {ADMIN}"}),
         ingestor=e.ingestor))
     return e, TestClient(app)

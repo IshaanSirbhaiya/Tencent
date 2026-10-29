@@ -410,7 +410,41 @@ with the indexed version as the known version, read-through on drift (re-fetch, 
 mask, re-index; admitted only if the fresh ACL still admits the person and the fetched version is the
 one Gate 2 checked), then an immutable snapshot of whitelisted fields. Any error, timeout or 429 is a
 deny. The views use their own small worker pool (`authz.VIEW_POOL`, 6 workers, 20 s per call), so a
-heavy graph cannot starve an answer's Gate 2.
+heavy graph cannot starve an answer's Gate 2. `/ib/map` uses the same `authz.authorize` (its own
+8-worker pool, 45 s): what it lists comes from the version-bound snapshot, not the index row
+(`test_final_review_fixes.py::test_map_lists_the_checked_version_and_honours_a_drifted_acl`).
+
+**One deadline (finals Codex review #4).** A single monotonic deadline per call bounds the live
+checks AND the read-through: drifted documents are re-fetched on a separate 4-worker pool
+(`authz.READ_POOL`) and waited for only until the deadline. A check or read-through not finished by
+then is a deny, never unchecked content, and is reported as undecided so no count built on it is
+called exact (`::test_read_through_is_bounded_by_the_same_deadline`,
+`::test_checks_past_the_deadline_are_denied_and_undecided`). Connector calls still running at the
+deadline finish in the background (each is bounded by the connector's own transport timeout).
+
+**The graph is built from the authorised version (finals Codex review #1).** Document-to-document
+edges come from each snapshot's CURRENT links, resolved only inside the set of documents confirmed in
+the call; the index's older links only choose what to check. A link removed in the source's newer
+version is not drawn, and a target the newer version adds is checked live in the same call
+(`::test_graph_edge_removed_in_the_current_version_is_not_shown`,
+`::test_graph_edge_added_in_the_current_version_is_checked_and_shown`).
+
+**Caps after the live check (finals Codex review #3, Opus #8).** Candidates are checked in bounded
+batches (`graph.CHECK_BATCH`, `docview.MAX_LINKS`) until the list is exhausted, the work cap
+(`MAX_CHECKS_*`, `docview.MAX_LINK_CHECKS` = 240) is reached or the deadline expires; the public cap
+(`limit`, 12 links) applies to confirmed documents only, so a live-denied (stale) document never takes
+a visible slot. Graph search re-runs the search without the live-denied hits (up to
+`graph.SEARCH_ROUNDS` = 4), as the ask pipeline does. Within the budget the response equals the
+response of a world without the stale documents (`::test_doc_links_skip_live_denied_targets_d1_to_d12_plus_b`,
+`::test_graph_focus_checks_past_denied_neighbours_within_budget`,
+`::test_graph_search_rechecks_past_live_denied_hits`). When the budget runs out first, the graph says
+`complete: false` and gives `null` for every count that depended on unchecked candidates, and the
+document view omits its link list (`links: []`, `links_complete: false`) rather than showing a partial
+list as the whole neighbourhood (`::test_graph_focus_past_the_work_cap_omits_counts`,
+`::test_doc_links_are_omitted_when_the_budget_cannot_settle_them`). **Limit:** that
+`complete: false` / `links_complete: false` signal itself can differ between a world with more than a
+work cap of stale documents and one without them; it says only "the budget ran out", never which
+documents or how many.
 
 | View | Who | What it can never show | Evidence |
 |---|---|---|---|
@@ -437,7 +471,18 @@ unknown id give the same 404. It shows stage names with `ok`/`skipped` (derived 
 records exist, never from timings), the total latency rounded to 100 ms, the model, per-request record
 ordinals and hashes (no global ledger sequence number) and only the cited documents the person can
 STILL open now (Gate 1 + live Gate 2; the rest are left out with no count). It never shows the
-considered or released sets, Gate 2 verdicts or reason codes. Ledgered as `trace.viewed`.
+considered or released sets, Gate 2 verdicts or reason codes. Ledgered as `trace.viewed`; a
+reconstruction or authorisation failure is still recorded, best effort, as `trace.viewed`
+`outcome: "error"` (counts only, no id or exception text) before the 503
+(`test_final_review_fixes.py::test_trace_reconstruction_failure_is_ledgered_then_503`,
+`::test_trace_authorisation_failure_is_ledgered_then_503`). The full projection catch-up (which
+verifies the whole ledger, O(records)) runs at most every 15 s (`app.TRACE_SYNC_TTL_S`), so an
+employee cannot make the service verify the ledger on every call; in between, the projection follows
+this process's own appends, so a just-made request is visible at once
+(`::test_trace_projection_catch_up_is_debounced`). The same applies to `/audit/events`,
+`/audit/doc/{id}/accessors` and `/audit/ask`, which now catch up through `_sync_or_refuse`: a
+projection failure there is a ledgered 500 with a fixed body
+(`test_audit_routes.py::test_projection_failure_is_a_ledgered_500_on_every_query_route`).
 Tests: `test_dev_views.py::test_trace_is_own_requests_only_and_hides_gate2_reasons`,
 `test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable`,
 `::test_trace_restricted_question_equals_nonexistent_question`, `::test_trace_ledger_down_is_503`.
@@ -500,12 +545,26 @@ ledgered or returned. The ledger records are the same three as `/ib/ask`.
 Tests: `test_ask_stream.py` (event order, payloads, no answer before release, equal to `/ib/ask`,
 restricted vs made-up, ledger down, failure at release, auth and roles, `on_stage` changes nothing).
 
-**Limits.** Stage events give the asker the time each stage took, finer than the receipt's rounded
-total. The gate2 interval grows with the number of documents checked live; those are documents the
-asker can read in the index (or could, until a revocation the index has not seen yet). Restricted
-documents are filtered out at Gate 1 and never checked, so they do not change it, but we have not
-measured timing parity (§5, §8). The stream runs on its own thread: a client that disconnects does
-not cancel the request, so a burst of streams costs the same as a burst of asks (no rate limit, §8).
+**Gate events are held (finals Codex review #2).** The interval between `gate1` and `gate2` is the
+live permission checks, and its length differs between a document revoked at the source but still
+in the index (it is checked, then denied) and a document that does not exist (nothing to check). So
+the stream does not send those boundaries in real time: `accepted` goes at once; `gate1` and `gate2`
+are held and sent back to back only when the retrieval decision is sealed, immediately followed by
+`sealed` (`app.HELD_STAGES`). `composing`, `grounded` and `released` follow as they happen, after all
+permission work. The event order and payloads are unchanged. If the request fails before sealing, the
+held events are dropped and the stream ends with `error`.
+Tests: `test_final_review_fixes.py::test_gate1_and_gate2_are_held_until_the_checks_are_sealed`
+(a connector delayed 0.4 s: only `accepted` has been handed to the stream while the checks run;
+`gate1`, `gate2`, `sealed` follow within 0.15 s of each other after them),
+`::test_held_stages_are_dropped_when_the_request_fails_before_sealing`.
+
+**Limits.** The time from `accepted` to the `gate1`/`gate2`/`sealed` burst still covers retrieval and
+the live checks. For the denied-versus-absent case that time is no finer than the total response time
+`/ib/ask` already gives the asker (neither case calls the model: both are refusals), so the stream adds
+no timing the plain endpoint lacks; it does not make the two totals equal. Timing parity of the total
+response is not measured or normalised (§5, §8). The stream runs on its own thread: a client that
+disconnects does not cancel the request, so a burst of streams costs the same as a burst of asks (no
+rate limit, §8).
 
 ### 15.7 Tamper demo on a copy (`POST /audit/tamper-demo`, B11, D-19)
 
@@ -522,7 +581,14 @@ time are reported as skipped). Measured: under 1 s on 1,500 records.
 Tests: `test_tamper_demo_route.py` (role check, write-ahead ledgering, the live log's old bytes
 unchanged with exactly the endpoint's two records appended, the external head file byte-identical,
 `edit-record` detected at the record it edited, the temporary directory removed, ledger down = 503
-with nothing run, the runtime bound on 1,500 records).
+with nothing run, the runtime bound on 1,500 records). `edit-record` flips one DECISION, as the
+presenter describes it: the Gate-2 `forbidden` verdict nearest the middle of the copy becomes
+`verified` (with no denial on record, a refused answer becomes released; with neither, the record's
+`sub` changes), and `what_we_did` says exactly which
+(`::test_scenarios_report_and_edit_detected_at_the_right_seq`,
+`::test_edit_record_falls_back_to_a_refusal_then_to_the_sub`). The run lock is released on every
+path, including a failure to create the temporary directory
+(`::test_a_failed_temp_directory_does_not_lock_the_demo`).
 
 **Limits.** The copy contains whatever the ledger holds (questions, document ids) and sits in the
 OS temporary directory for the length of the run; a crash mid-run can leave it there. The
@@ -572,3 +638,25 @@ is never released, only the restores send webhooks).
 
 **Limit.** `?webhook=0` is a mock-platform feature guarded by the mock's admin token; real platforms
 have no such switch. It is not reachable through `/sim/*`.
+
+### 15.10 Host allowlist on the IB and the mock platforms (finals Opus review #1)
+
+Both FastAPI apps refuse any request whose `Host` is not on an allowlist, with a 400 before any route,
+authentication or ledger work (Starlette `TrustedHostMiddleware`). A DNS-rebinding page always sends
+its own domain as the Host, so it cannot reach either service through the browser.
+
+* IB (`IbConfig.trusted_hosts`): `127.0.0.1`, `localhost`, `[::1]`; when `IB_DEPLOYED` is unset,
+  also `testserver` (the fixed Host of the in-process test transport used by the tests and the eval;
+  a single-label name public DNS cannot give a page); when deployed, also the host of
+  `IB_PUBLIC_ORIGIN`. Extra names (a LAN rehearsal) only through `IB_ALLOWED_HOSTS`.
+* Mock platforms (`mock_platforms.app.trusted_hosts`): the same loopback names and `testserver`,
+  plus `MOCK_ALLOWED_HOSTS`.
+
+The seeder, `demo_up.sh` and the web proxy call `http://127.0.0.1:8100`, the IB calls the mock at
+`http://127.0.0.1:8200`, so none of them changes.
+Tests: `test_final_review_fixes.py::test_a_foreign_host_header_is_refused_before_any_route` (a
+refused call never reaches the ledger), `::test_trusted_hosts_follow_deployment`,
+`databridge/apps/mock_platforms/tests/test_mock_auth_ratelimit.py::test_a_foreign_host_header_is_refused`.
+
+**Limit.** An IB bound to a LAN address (`IB_HOST=0.0.0.0`) answers only to the names above unless
+`IB_ALLOWED_HOSTS` lists the LAN name or address.

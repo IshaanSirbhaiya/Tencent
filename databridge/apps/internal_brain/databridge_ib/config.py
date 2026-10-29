@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 DATABRIDGE_ROOT = Path(__file__).resolve().parents[3]          # .../databridge
 DEFAULT_WORLD = DATABRIDGE_ROOT / "fixtures" / "enterprise" / "world.json"
@@ -26,6 +27,22 @@ DEV_LEDGER_KEY = "ib-ledger-dev-key-not-for-deployment-0001"
 
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
+
+
+#: Host headers the IB answers to (DNS-rebinding guard, Opus final review #1). Loopback names only:
+#: a rebinding page always presents ITS OWN domain name as the Host, never one of these.
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+#: the fixed Host of the in-process ASGI test transport (Starlette ``TestClient``), used by the
+#: tests and the eval harness; a single-label name no public DNS can hand to a browser page
+TEST_TRANSPORT_HOST = "testserver"
+
+
+def _host_of(origin: str) -> str:
+    try:
+        host = urlsplit(origin).hostname or ""
+    except ValueError:
+        return ""
+    return f"[{host}]" if ":" in host else host
 
 
 @dataclass(frozen=True)
@@ -72,6 +89,24 @@ class IbConfig:
     #: recorded as ``channel="replay"``, ``synthetic_replay=True`` at ``X-IB-Replay-At``. Off by default.
     replay_key: str = field(default_factory=lambda: _env("IB_REPLAY_KEY"))
     live: bool = field(default_factory=lambda: _env("IB_LIVE") == "1")
+    #: the public origin of the web app on a deployment (e.g. https://brain.example.com); its host
+    #: is the only non-loopback Host the IB accepts when deployed
+    public_origin: str = field(default_factory=lambda: _env("IB_PUBLIC_ORIGIN"))
+    #: extra Host names, comma-separated (e.g. a LAN name for a rehearsal); empty by default
+    extra_hosts: str = field(default_factory=lambda: _env("IB_ALLOWED_HOSTS"))
+
+    def trusted_hosts(self) -> list[str]:
+        """The Host allowlist: loopback always; when deployed, ``IB_PUBLIC_ORIGIN``'s host; when
+        not deployed, the in-process test transport; plus ``IB_ALLOWED_HOSTS``. Anything else is a
+        400 before any route runs."""
+        hosts = list(LOOPBACK_HOSTS)
+        if self.deployed:
+            if _host_of(self.public_origin):
+                hosts.append(_host_of(self.public_origin))
+        else:
+            hosts.append(TEST_TRANSPORT_HOST)
+        hosts += [h.strip().lower() for h in self.extra_hosts.split(",") if h.strip()]
+        return list(dict.fromkeys(hosts))
 
     # derived paths ---------------------------------------------------------------------------
     @property

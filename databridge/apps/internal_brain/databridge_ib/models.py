@@ -310,7 +310,7 @@ class TraceViewed(EventBase):
     """A person opened the receipt of one of their own requests (``/ib/trace``). Counts only."""
     kind: Literal["trace.viewed"] = "trace.viewed"
     sub: str
-    outcome: Literal["ok", "not_found"] = "ok"
+    outcome: Literal["ok", "not_found", "error"] = "ok"     # error: the receipt could not be built
     citations_returned: int = 0
 
 

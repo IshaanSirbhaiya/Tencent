@@ -83,3 +83,13 @@ def test_ratelimit_covers_permission_checks(client, admin):
 def test_ratelimit_rejects_unknown_platform(client, admin):
     assert client.post("/admin/ratelimit", json={"platform": "teams", "on": True},
                        headers=admin).status_code == 400
+
+
+@pytest.mark.parametrize("host", ["evil.example", "evil.example:8200", "192.168.1.20:8200",
+                                  "127.0.0.1.evil.example"])
+def test_a_foreign_host_header_is_refused(client, host):
+    """DNS-rebinding guard (Opus final review #1): only loopback Host names reach a route."""
+    r = client.get("/health", headers={"Host": host})
+    assert r.status_code == 400
+    for ok in ("127.0.0.1:8200", "localhost:8200", "[::1]:8200"):
+        assert client.get("/health", headers={"Host": ok}).status_code == 200

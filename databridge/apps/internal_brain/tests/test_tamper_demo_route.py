@@ -104,6 +104,12 @@ def test_scenarios_report_and_edit_detected_at_the_right_seq(env):
     edit = by["edit-record"]
     k = int(edit["what_we_did"].split("record ")[1].split(" ")[0])
     assert edit["detected"] is True and edit["first_bad_seq"] == k
+    # the edit flips a DECISION (Fable final review): a sealed Gate-2 denial in record k
+    assert edit["what_we_did"] == (f"Changed one Gate-2 decision in record {k} from 'forbidden' "
+                                   f"to 'verified' without re-sealing it.")
+    rec = json.loads(Path(env[1].path).read_text(encoding="utf-8").splitlines()[k - 1])
+    assert rec["ib_event"]["kind"] == "retrieval.decided"
+    assert "forbidden" in [g["verdict"] for g in rec["ib_event"]["gate2"]]
     for only_external in ("directory-rollback", "key-holder-rewrite"):
         assert by[only_external]["internal_ok"] and by[only_external]["external_head_match"] is False
     assert by["rollback-after-publication"]["detected"] is False         # the stated window
@@ -198,3 +204,45 @@ def test_budget_skips_instead_of_running_long(env):
         import shutil
         shutil.rmtree(src, ignore_errors=True)
     assert out and all(s.get("skipped") and s["ok"] is False for s in out)
+
+
+def test_a_failed_temp_directory_does_not_lock_the_demo(env, monkeypatch, tmp_path):
+    """Codex final review #7: mkdtemp raising once used to leave the run lock held, so every later
+    call answered "already running" until the service restarted."""
+    _, ledger, sink = env
+    real = tempfile.mkdtemp
+    calls = []
+
+    def flaky(*a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError("no space left on device")
+        return real(*a, dir=str(tmp_path), **{x: y for x, y in k.items() if x != "dir"})
+    monkeypatch.setattr(tampermod.tempfile, "mkdtemp", flaky)
+    with pytest.raises(OSError):
+        tampermod.run_on_live_copy(ledger, sink)
+    out = tampermod.run_on_live_copy(ledger, sink)              # not TamperDemoBusy
+    assert out["real_log_modified"] is False and len(calls) == 2
+
+
+def test_edit_record_falls_back_to_a_refusal_then_to_the_sub():
+    """No Gate-2 denial on record: a refused answer is flipped to released; neither: the ``sub``."""
+    def line(ev):
+        return json.dumps({"ib_event": ev, "seq": 1})
+    acc = {"kind": "request.accepted", "sub": "jdoe"}
+    ok = {"kind": "retrieval.decided", "gate2": [{"doc_id": "d", "verdict": "verified"}]}
+    ref = {"kind": "answer.released", "refused": True}
+    seq, what, fn = tampermod._decision_edit([line(acc), line(ok), line(ref), line(acc)], 1)
+    assert seq == 3 and "from refused to released" in what and f"record {seq} " in what
+    rec = {"ib_event": dict(ref)}
+    fn(rec)
+    assert rec["ib_event"]["refused"] is False
+    seq, what, fn = tampermod._decision_edit([line(acc), line(ok), line(acc)], 2)
+    assert seq == 2 and "ib_event.sub" in what
+    deny = {"kind": "retrieval.decided", "gate2": [{"doc_id": "a", "verdict": "verified"},
+                                                   {"doc_id": "b", "verdict": "forbidden"}]}
+    seq, what, fn = tampermod._decision_edit([line(acc), line(deny), line(ref), line(acc)], 3)
+    assert seq == 2 and "'forbidden' to 'verified'" in what
+    rec = {"ib_event": json.loads(json.dumps(deny))}
+    fn(rec)
+    assert [g["verdict"] for g in rec["ib_event"]["gate2"]] == ["verified", "verified"]

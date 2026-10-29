@@ -19,6 +19,7 @@ from typing import Any, Callable, Mapping, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import auth as authmod
@@ -46,7 +47,11 @@ TRACE_STAGES = (("accept", "request.accepted"), ("gate1", "retrieval.decided"),
                 ("gate2", "retrieval.decided"), ("seal", "retrieval.decided"),
                 ("compose", "answer.released"), ("release", "answer.released"))
 STATUS_LEDGER_TTL_S = 15.0
+TRACE_SYNC_TTL_S = 15.0             # /ib/trace full projection catch-up, at most this often
 NOT_FOUND = "not found"
+#: /ib/ask/stream holds these stage events until ``sealed`` (their timing is the live permission
+#: checks; SECURITY.md §15, Codex final review #2)
+HELD_STAGES = frozenset({"gate1", "gate2"})
 
 
 class OpenableBody(BaseModel):
@@ -99,6 +104,9 @@ def require_role(current, role: str):
 def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None,
                sim_router_factory: Optional[Callable] = None) -> FastAPI:
     app = FastAPI(title="Walnut Internal Brain", docs_url=None, redoc_url=None, openapi_url=None)
+    # DNS-rebinding guard (Opus final review #1): only loopback Host names (plus the public origin's
+    # host when deployed) reach any route; a page on another domain gets a 400 before auth.
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=svc.cfg.trusted_hosts())
     app.state.svc = svc
     current = principal_dependency(lambda: app.state.svc)
 
@@ -154,6 +162,22 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                 ok = False
             _ledger_ok_cache.update(at=time.monotonic(), ok=ok)
             return ok
+
+    _trace_sync_at: dict[str, Optional[float]] = {"at": None}
+    _trace_sync_lock = threading.Lock()
+
+    def _trace_sync() -> None:
+        """Full projection catch-up for /ib/trace at most every ``TRACE_SYNC_TTL_S`` (Opus final
+        review #3: a catch-up verifies the whole ledger, O(records); an employee must not be able
+        to trigger one per request). Between catch-ups the projection is still current for this
+        process's own appends (it is subscribed to ``AccessLedger.append``). A failed catch-up is
+        not remembered, so the next call retries (and a ledger that does not verify is a 503)."""
+        with _trace_sync_lock:
+            last = _trace_sync_at["at"]
+            if last is not None and time.monotonic() - last < TRACE_SYNC_TTL_S:
+                return
+            svc.projection.sync()
+            _trace_sync_at["at"] = time.monotonic()
 
     @app.get("/ib/status")
     def status(user: DirectoryUser = Depends(current)):
@@ -250,8 +274,14 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         ``Pipeline.ask`` with a progress callback. Events, in order:
 
         * ``stage`` ``{"name": <accepted|gate1|gate2|sealed|composing|grounded|released>, "ok": true}``
-          as each real stage completes: names only, never a count, id or reason (rule 4), and the
-          same seven names for every successful request;
+          names only, never a count, id or reason (rule 4), and the same seven names for every
+          successful request. ``accepted`` is sent at once; ``gate1`` and ``gate2`` are HELD and
+          sent back to back only when the retrieval decision is sealed, immediately followed by
+          ``sealed`` (Codex final review #2: the gate1 -> gate2 interval is the live permission
+          checks, whose duration differs between a stale-denied and an absent document; the
+          stream must not time it more finely than the whole response already does).
+          ``composing``, ``grounded`` and ``released`` follow as they happen (after all
+          permission work). SECURITY.md §15;
         * ``answer``: exactly the /ib/ask JSON, sent only after ``released`` (D-08: no answer text
           before grounding and the write-ahead ``answer.released``);
         * ``done`` ``{}``.
@@ -266,7 +296,16 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         kwargs = _ask_kwargs(request)
         events: "queue.Queue[Optional[tuple[str, dict]]]" = queue.Queue()
 
+        held: list[str] = []
+
         def on_stage(name: str) -> None:
+            if name in HELD_STAGES:             # permission-sensitive boundaries: not real-time
+                held.append(name)
+                return
+            if name == "sealed":                # Gate 2 is over: release them together, then sealed
+                for h in held:
+                    events.put(("stage", {"name": h, "ok": True}))
+                held.clear()
             events.put(("stage", {"name": name, "ok": True}))
 
         def work() -> None:
@@ -338,7 +377,7 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             if svc.projection is None or not req_id or len(req_id) > 200:
                 _record("not_found", 0)
                 raise HTTPException(404, NOT_FOUND)
-            svc.projection.sync()
+            _trace_sync()
             res = (svc.projection.reconstruct(req_id) if svc.projection.owns(req_id, user.id)
                    else None)
             if res is None or res.get("sub") != user.id:
@@ -374,6 +413,12 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             raise
         except Exception as exc:                                    # noqa: BLE001
             log.error("trace failed: %s", type(exc).__name__)       # incl. ledger down: fail closed
+            # best effort: a reconstruction or authorisation failure is still a recorded view
+            # (counts only, no id, no exception text); a ledger that is down stays a plain 503
+            try:
+                _record("error", 0)
+            except Exception:                                       # noqa: BLE001
+                pass
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         return body
 

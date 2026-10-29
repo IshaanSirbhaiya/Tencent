@@ -106,8 +106,8 @@ class E2E:
         self.deliver = True                       # False ⇒ webhooks are lost (Gate-2-only test)
         self.mock = create_app(world_path or WORLD, webhook_sink=self._sink, svc_token=SVC,
                                admin_token=ADMIN, webhook_secret=SECRET)
-        self.svc = _Client(self.mock, base_url="http://mock", headers={"Authorization": f"Bearer {SVC}"})
-        self.admin = _Client(self.mock, base_url="http://mock",
+        self.svc = _Client(self.mock, base_url="http://testserver", headers={"Authorization": f"Bearer {SVC}"})
+        self.admin = _Client(self.mock, base_url="http://testserver",
                                 headers={"Authorization": f"Bearer {ADMIN}"})
         self.directory = Directory.from_world(self.world)
         self.connectors = {}
