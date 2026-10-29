@@ -102,3 +102,21 @@ class ModelChain:
                 notes.append(f"{model}: {type(exc).__name__}")
                 log.warning("model %s failed: %s", model, type(exc).__name__)
         return None, None, notes
+
+    def complete(self, messages: list[dict], *, seed: int = 7) -> tuple[Optional[str], Optional[str], list[str]]:
+        """``(text | None, model | None, notes)`` from the first model in the chain that returns
+        non-empty text, in the chain's order, with NO grounding wall. Only for output that is
+        validated against a closed schema before use (the audit filter parser, audit/nl_llm.py);
+        answers to employees always go through `answer`."""
+        notes: list[str] = []
+        for model in self.models:
+            try:
+                res = self.harness_factory(model).complete_text(TASK, messages, seed=seed)
+                text = getattr(res, "text", "") or ""
+                if text.strip():
+                    return text, model, notes
+                notes.append(f"{model}: empty")
+            except Exception as exc:                                # noqa: BLE001
+                notes.append(f"{model}: {type(exc).__name__}")
+                log.warning("model %s failed: %s", model, type(exc).__name__)
+        return None, None, notes

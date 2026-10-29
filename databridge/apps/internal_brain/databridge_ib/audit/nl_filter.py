@@ -22,7 +22,9 @@ half-open, ``since <= event_time < until``: "yesterday" ends at today's midnight
 Fail closed (Codex sec r1 #16/#17). A constraint the question names but that does not validate (a
 title with characters outside the closed vocabulary, an impossible date such as 2026-02-30) raises
 `NlFilterError` carrying the unparsed constraint; it is never dropped to run a broader query. A
-configured model whose output does not validate, or that fails, is an `NlFilterError` too.
+configured model whose output does not validate, or that fails, is an `NlFilterError` too,
+unless the caller asks for ``llm_fallback=True`` (the wired Hy3 parser, plan v2 B13): then the rule
+parser's result is used, with a note saying so, exactly as when no model is configured.
 """
 from __future__ import annotations
 
@@ -109,6 +111,8 @@ class NlParse:
     source: str = "deterministic"                 # deterministic | llm
     notes: list[str] = field(default_factory=list)
     recognised: list[str] = field(default_factory=list)
+    model: Optional[str] = None                   # the model that proposed an llm filter
+    model_tried: bool = False                     # a model was asked (its filter may be unused)
 
     def as_dict(self) -> dict[str, Any]:
         return {"filter": self.filter.model_dump(mode="json", exclude_none=True),
@@ -293,13 +297,18 @@ def _validate_llm(out: Any, now: dt.datetime, limit: int) -> AuditFilter:
 
 
 def parse_audit_question(question: str, now: dt.datetime, *, llm: Optional[LlmParser] = None,
-                         limit: int = 100) -> NlParse:
+                         limit: int = 100, llm_fallback: bool = False) -> NlParse:
     """The closed filter for ``question``. Deterministic rules first; ``llm`` (optional) is asked
     only when they recognise nothing, and its output is validated against the closed schema.
 
     Raises `NlFilterError` (never anything else) when the question cannot become a valid filter:
     a named constraint that does not validate, an impossible date, or a configured model whose
-    output does not validate or that fails. Nothing broader is substituted."""
+    output does not validate or that fails. Nothing broader is substituted.
+
+    ``llm_fallback=True``: a model that fails or whose output does not validate is NOT an error;
+    the rule parser's result is returned (``source == "deterministic"``) with a note, the same
+    result as with no model configured. ``llm`` may return a dict, an `AuditFilter`, or an object
+    with ``filter`` and ``model`` (nl_llm.ModelFilter), whose model name is kept."""
     try:
         det = parse_deterministic(question, now, limit=limit)
     except NlFilterError:
@@ -309,14 +318,23 @@ def parse_audit_question(question: str, now: dt.datetime, *, llm: Optional[LlmPa
                             {"question": str(question)[:300]}) from None
     if det.recognised or llm is None:
         return det
+    model: Optional[str] = None
     try:
-        f = _validate_llm(llm(str(question), now), now, limit)
+        out = llm(str(question), now)
+        if not isinstance(out, (dict, AuditFilter)) and hasattr(out, "filter"):
+            model = str(getattr(out, "model", "") or "") or None
+            out = out.filter
+        f = _validate_llm(out, now, limit)
     except Exception:                                                # noqa: BLE001 — any failure
+        if llm_fallback:
+            det.model_tried = True
+            det.notes.append("the model's filter was not usable; the rule parser's result is shown")
+            return det
         raise NlFilterError("the rules recognised nothing and the model's filter did not "
                             "validate; nothing was searched",
                             {"question": str(question)[:300]}) from None
     return NlParse(filter=f, source="llm", notes=["filter proposed by the model and validated"],
-                   recognised=["llm"])
+                   recognised=["llm"], model=model, model_tried=True)
 
 
 __all__ = ["NlParse", "NlFilterError", "LlmParser", "parse_audit_question", "parse_deterministic",

@@ -278,3 +278,34 @@ def test_url_delivery_is_fire_and_forget():
     rec = em.emit("slack", "content.changed", ["C1:1.0"], at="2026-10-13T09:00:00+08:00")
     assert verify_signature(rec["headers"], rec["body"])
     em.close()
+
+
+def test_silent_change_applies_without_a_webhook(client, svc, admin, sink):
+    """``?webhook=0``: the source changes (a revocation the IB can only learn from its live Gate 2
+    check), but nothing is sent or recorded; the restore then sends its webhook as usual."""
+    url = "/slack/api/conversations.members"
+    n = len(sink.calls)
+    sent = len(client.get("/admin/webhooks", headers=admin).json()["deliveries"])
+    r = client.post("/admin/slack/channels/C0DBMIG/members/remove?webhook=0", json={"user": "jdoe"},
+                    headers=admin)
+    assert r.status_code == 200 and r.json() == {"ok": True, "changed": True, "webhook": None}
+    assert "U0JDOE" not in client.get(url, params={"channel": "C0DBMIG"},
+                                      headers=svc).json()["members"]
+    assert len(sink.calls) == n
+    assert len(client.get("/admin/webhooks", headers=admin).json()["deliveries"]) == sent
+    client.post("/admin/slack/channels/C0DBMIG/members/add", json={"user": "jdoe"}, headers=admin)
+    [p] = _assert_signed(sink)
+    assert p["type"] == "membership.changed" and len(sink.calls) == n + 1
+
+
+def test_silent_flag_values(client, admin, sink):
+    n = len(sink.calls)
+    for flag in ("false", "off", "no", "0"):
+        client.post(f"/admin/slack/channels/C0DBMIG/members/remove?webhook={flag}",
+                    json={"user": "jdoe"}, headers=admin)
+        client.post(f"/admin/slack/channels/C0DBMIG/members/add?webhook={flag}",
+                    json={"user": "jdoe"}, headers=admin)
+    assert len(sink.calls) == n
+    client.post("/admin/slack/channels/C0DBMIG/members/remove?webhook=1", json={"user": "jdoe"},
+                headers=admin)
+    assert len(sink.calls) == n + 1                     # anything else still sends

@@ -8,6 +8,8 @@
 * ``GET  /audit/verify``                   chain + anchors + external head
 * ``GET  /audit/stats?days=``               counts/timings/distributions (ledgered ``audit.query``)
 * ``GET  /audit/journey/{req_id}``          one request end to end, no answer text (ledgered)
+* ``POST /audit/tamper-demo``               the tamper scenarios on a temporary COPY of the live
+                                            ledger (D-19; ledgered write-ahead, ``op: tamper-demo``)
 
 Write-ahead and fail-closed: the audit event is appended before the response is returned; an append
 failure is a 503 and nothing is returned. Failed calls are ledgered too (Codex sec r1 #9): an invalid
@@ -44,6 +46,7 @@ from .ledger import AccessLedger, LedgerUnavailable
 from .nl_filter import LlmParser, NlFilterError, parse_audit_question
 from .query import AuditFilter, AuditProjection
 from .stats import compute_stats
+from .tamper import TamperDemoBusy, run_on_live_copy
 
 COMPLIANCE_ROLE = "compliance_officer"
 REVEAL_MISMATCH = "content does not match the sealed ledger digest"
@@ -82,6 +85,7 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
                       require_role: Callable[[str], Any], *,
                       sink: Optional[AnchorSink] = None,
                       llm: Optional[LlmParser] = None,
+                      llm_fallback: bool = False,
                       clock: Optional[Callable[[], dt.datetime]] = None) -> APIRouter:
     dep = require_role(COMPLIANCE_ROLE)
     if not isinstance(dep, fa_params.Depends):
@@ -179,7 +183,7 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         if not question:
             _refuse(sub, "ask", "rejected", 422, "a question is required", {"question": ""})
         try:
-            parsed = parse_audit_question(question, now(), llm=llm)
+            parsed = parse_audit_question(question, now(), llm=llm, llm_fallback=llm_fallback)
         except NlFilterError as exc:
             _refuse(sub, "ask", "rejected", 422, exc.message,
                     {"question": question, "unparsed": exc.unparsed},
@@ -195,10 +199,13 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
             _refuse(sub, "ask", "error", 500, "the audit query failed", {"question": question})
         dumped = parsed.filter.model_dump(mode="json", exclude_none=True)
         how = "; ".join(parsed.notes) or "as asked"
-        _ledger_query(sub, {"op": "ask", "question": question, "parser": parsed.source, **dumped},
-                      len(rows))
+        model_info = {"parser_model": parsed.model} if parsed.model else {}
+        if parsed.model_tried and parsed.source != "llm":
+            model_info["parser_fallback"] = True
+        _ledger_query(sub, {"op": "ask", "question": question, "parser": parsed.source,
+                            **model_info, **dumped}, len(rows))
         return {"filter": dumped, "window": _window(dumped, how), "parser": parsed.source,
-                "notes": parsed.notes, "events": rows}
+                **model_info, "notes": parsed.notes, "events": rows}
 
     @router.post("/reveal")
     def audit_reveal(body: RevealBody, principal=dep) -> Any:
@@ -298,6 +305,32 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
             _refuse(sub, "journey", "rejected", 404, "no such request", {"req_id": req_id})
         _ledger_query(sub, {"op": "journey", "req_id": req_id}, 1)
         return res
+
+    @router.post("/tamper-demo")
+    def audit_tamper_demo(principal=dep) -> dict:
+        """The tamper scenarios (scripts/tamper_demo.py) on a temporary COPY of the live ledger,
+        its anchor ledger and the external head file (decision D-19). The copy is taken under the
+        ledger's append lock and deleted afterwards; the live files are only ever read. Ledgered
+        write-ahead (``audit.query`` ``op: tamper-demo``, ``outcome: started``) before the copy,
+        then ``outcome: ok`` with the result; a failure is a ledgered 409/500 (503 if the ledger
+        cannot record). ``real_log_modified`` is re-checked after the run: every byte the live
+        files held at copy time must be unchanged (they may have grown: other requests append)."""
+        sub = _sub_of(principal)
+        _append_query(sub, {"op": "tamper-demo", "outcome": "started", "target": "copy"}, 0)
+        try:
+            out = run_on_live_copy(ledger, sink)
+        except TamperDemoBusy:
+            _refuse(sub, "tamper-demo", "rejected", 409, "a tamper demo is already running")
+        except LedgerUnavailable:
+            raise _unavailable() from None
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "tamper-demo", "error", 500, "the tamper demo failed")
+        scen = out["scenarios"]
+        _append_query(sub, {"op": "tamper-demo", "outcome": "ok", "target": "copy",
+                            "real_log_modified": out["real_log_modified"],
+                            "as_expected": sum(1 for r in scen if r.get("ok")),
+                            "head_before": out["head_before"]}, len(scen))
+        return out
 
     @router.get("/verify")
     def audit_verify(principal=dep) -> dict:

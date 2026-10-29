@@ -157,6 +157,8 @@ def main(argv=None) -> int:
         return run_worker(args.worker_spec)
 
     t_start = time.perf_counter()
+    from .report import ib_code_sha256
+    code_sha = ib_code_sha256()                  # the code under test, before any shard starts
     world = load_world()
     oracle = Oracle(world)
     all_probes = generate(world, oracle)
@@ -228,6 +230,7 @@ def main(argv=None) -> int:
     from .report import build, write
     results = build(world=world, oracle=oracle, probes=probes, all_probes=all_probes, outs=outs,
                     p2=p2, p2_meta=p2_meta, failed=failed, runtime_s=time.perf_counter() - t_start,
+                    code_sha256=code_sha,
                     args=vars(args) | {"out": str(args.out), "work": "<temp>/" + work.name})   # no home path
     write(results, args.out)
     h = results["headline"]

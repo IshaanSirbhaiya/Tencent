@@ -6,6 +6,11 @@ Slack ``"<channel>:<thread_ts>"``, Confluence page id, Jira issue key, Drive fil
 ``container`` is set only when an ACL change spans a container (Slack channel membership, a
 Confluence restriction cascading to descendants, a Drive permission removal, a Jira ACL-relevant
 edit); plain content events carry ``container: null``.
+
+Silent changes (``?webhook=0`` on any mutation): the change is applied but NO webhook is sent or
+recorded, and the response's ``webhook`` is ``null`` (``webhooks`` holds ``null`` entries). This
+simulates a lost webhook, a revocation the Internal Brain only learns about from its live Gate 2
+check or a later poll (scenario S4 "revocation without webhook"; the demo seeder uses it).
 """
 from __future__ import annotations
 
@@ -27,8 +32,15 @@ def _err(status: int, msg: str) -> PlatformError:
     return PlatformError("admin", status, "bad_request" if status == 400 else "not_found", msg)
 
 
+def silent(request: Request) -> bool:
+    """``?webhook=0`` (or ``false``/``off``/``no``): apply the change without sending a webhook."""
+    return str(request.query_params.get("webhook", "")).lower() in {"0", "false", "off", "no"}
+
+
 def _emit(request: Request, platform: str, type_: str, object_ids: list[str], *,
-          container: Optional[str] = None, user: Optional[str] = None) -> dict[str, Any]:
+          container: Optional[str] = None, user: Optional[str] = None) -> Optional[dict[str, Any]]:
+    if silent(request):
+        return None
     w: World = world(request)
     rec = request.app.state.webhooks.emit(platform, type_, object_ids, at=w.now_iso(),
                                           container=container, user=user)

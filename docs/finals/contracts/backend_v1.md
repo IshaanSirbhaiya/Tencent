@@ -300,3 +300,204 @@ They appear in `/audit/events` (filter `kind`) and in `/audit/stats` `kinds` and
 Show `note` whenever `stale` is true. `smoke`, when present, is a later run from a scratch directory
 (`limit` 0 means a full run), with the same keys as the headline. Rates are fractions (0.001007 =
 0.1007 %).
+
+
+---
+
+# v2 (30 Oct): tamper on a copy, SSE stage events, Hy3 audit search, real Gate 2 denials
+
+Plan v2 items B11 to B15 (docs/finals/PLAN.md §9; decisions D-08, D-19, D-20). The general rules at the
+top of this file still apply. Tests are in `databridge/apps/internal_brain/tests/` unless a path says
+otherwise.
+
+## Proxy allowlist (v2 additions)
+
+| Method | Path | Slot (compare/View-as) |
+|---|---|---|
+| POST | `/ib/ask/stream` | yes (same rule as `/ib/ask`) |
+| POST | `/audit/tamper-demo` | no |
+
+## POST /ib/ask/stream: the ask, with live stage events (SSE)
+
+Code: `app.py` (`ask_stream`), `pipeline.py` (`on_stage`, `STAGES`). Tests: `tests/test_ask_stream.py`.
+
+Request: exactly `/ib/ask`'s body, `{"question": "..."}` (no other keys; 422 otherwise). The same
+identity, roles (401/403), channel label (`workbuddy-mcp` only on bearer calls) and replay switch as
+`/ib/ask`. Those errors are ordinary JSON responses, sent before any stream starts.
+
+Response: `200`, `content-type: text/event-stream`, `cache-control: no-cache, no-transform`,
+`x-accel-buffering: no`. Each event is `event: <name>\ndata: <one line of JSON>\n\n`:
+
+```
+event: stage
+data: {"name":"accepted","ok":true}
+
+event: stage
+data: {"name":"gate1","ok":true}
+... gate2, sealed, composing, grounded ...
+event: stage
+data: {"name":"released","ok":true}
+
+event: answer
+data: {"request_id":"...","answer":"...","citations":[...],"model":{...},"scope_note":"...","as_of":"..."}
+
+event: done
+data: {}
+```
+
+| Stage | Sent when this has COMPLETED |
+|---|---|
+| `accepted` | `request.accepted` is sealed in the ledger |
+| `gate1` | the index pre-filter (what the person can read) and the ranking |
+| `gate2` | the live source checks, read-through and linked objects |
+| `sealed` | `retrieval.decided` is sealed (before any model call) |
+| `composing` | an answer text exists (the model chain, whose grounding wall checks each sentence, or the extractive answerer) |
+| `grounded` | the answer's citation tags were checked against the released passages and the citations bound |
+| `released` | `answer.released` is sealed |
+
+Rules for the UI:
+
+- Stage events carry only `name` and `ok: true`. No counts, ids, titles or reasons, ever. Every
+  successful request sends the same seven names in the same order, whether it answers or refuses, so
+  the sequence says nothing about restricted content (tested: a restricted and a made-up question
+  give identical event sequences).
+- The answer text arrives only in `answer`, after `released` (D-08). Its `data` is exactly the JSON
+  `/ib/ask` returns for the same question (tested equal apart from `request_id` and `as_of`). Do not
+  show any answer text before it.
+- `error` with `{"error": "temporarily unavailable"}` ends the stream on any failure, including the
+  ledger (no `answer`, no `done` after it). Show the normal "try again" state. Example: the ledger is
+  down → the only event is `error`; a failure at `answer.released` → stages up to `grounded`, then
+  `error`.
+- The ledger records are the same three as `/ib/ask`. A client that disconnects does not cancel the
+  request (it runs to completion and is ledgered, as with `/ib/ask`).
+- Stage events are real progress, not a timer (D-20). Their timing is not padded: how long each stage
+  takes is visible to the asker, as the total latency of `/ib/ask` already is (SECURITY.md §5,
+  "Timing": not controlled).
+
+**What the Next proxy must do to stream** (`app/api/ib/[...path]/route.ts`, coordinator-owned):
+
+1. Allow `POST ib/ask/stream` in `ALLOWED` and `SLOT_ALLOWED` (same as `ib/ask`).
+2. Send `accept: text/event-stream` upstream.
+3. When the upstream answer is `2xx` with `content-type: text/event-stream` and has a body, return
+   `new NextResponse(upstream.body, {status: 200})` immediately: pass the `ReadableStream` through.
+   Never `await upstream.arrayBuffer()` / `.text()` for this path (that buffers the whole stream and
+   the stages arrive all at once).
+4. Set `content-type: text/event-stream; charset=utf-8`, `cache-control: no-store` (or
+   `no-cache, no-transform`) and `x-accel-buffering: no` on the response; relay the session cookie
+   as for any other path. Do not compress or rewrite the body.
+5. Any non-stream upstream answer (401/403/422/503 JSON) goes through the normal non-stream branch.
+6. The route's 90 s deadline covers the whole stream; the browser reads it with `fetch` +
+   `response.body.getReader()` (EventSource cannot POST) and splits on blank lines.
+
+## POST /audit/tamper-demo: the tamper scenarios on a COPY of the live ledger (compliance)
+
+Code: `audit/tamper.py` (`run_on_live_copy`, `run_scenarios`, shared with
+`databridge/scripts/tamper_demo.py`), `audit/routes.py`. Tests: `tests/test_tamper_demo_route.py`.
+
+No body. `compliance_officer` only (403 otherwise, 401 without a session).
+
+What it does (decision D-19): appends `audit.query` `{op: "tamper-demo", outcome: "started",
+target: "copy"}` (write-ahead), copies the live log, its anchor ledger and the external head file
+into a temporary directory **under the ledger's append lock** (so no append is half-copied), runs
+every scenario on its own copy of that snapshot, deletes the temporary directory, re-checks that
+every byte the live files held at copy time is unchanged, then appends `{op: "tamper-demo", outcome:
+"ok", real_log_modified, as_expected, head_before}`. The live ledger is only ever read.
+
+Response 200:
+
+```json
+{
+  "real_log_modified": false,
+  "head_before": "3f9a0c1d2e4b",
+  "records_copied": 1512,
+  "external_head_copied": true,
+  "elapsed_ms": 840,
+  "scenarios": [
+    {"id": "baseline", "title": "Untouched copy", "what_we_did": "Copied the log and changed nothing.",
+     "expected": "not flagged", "expected_detected": false, "detected": false, "ok": true,
+     "verify_ok": true, "internal_ok": true, "external_head_match": true, "records": 1512,
+     "problems": []},
+    {"id": "edit-record", "title": "Edit one old record",
+     "what_we_did": "Changed who made record 754 (ib_event.sub) without re-sealing it.",
+     "expected": "flagged", "expected_detected": true, "detected": true, "ok": true,
+     "verify_ok": false, "internal_ok": false, "external_head_match": false, "records": 753,
+     "first_bad_seq": 754,
+     "problems": ["record 754: its seal or digest does not verify", "..."]}
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `real_log_modified` | `false` when every byte of the live log, anchor ledger and external head file at copy time is unchanged after the run (they may have grown: other requests keep appending) |
+| `head_before` | the first 12 hex characters of the live head that was copied (it includes this call's own `started` record) |
+| `scenarios[].id` | `baseline`, `edit-record`, `suffix-delete`, `directory-rollback`, `rollback-after-publication`, `remove-internal-anchors`, `external-head-missing`, `key-holder-rewrite`. The external-head scenarios are left out when nothing was published yet |
+| `expected` / `expected_detected` | what verification must say. `rollback-after-publication` is `not flagged`: the stated window (SECURITY.md §3) |
+| `detected` | verification flagged the copy (`verify_ok` false) |
+| `ok` | the outcome matched the expectation (show a pass mark when true) |
+| `first_bad_seq` | only when the chain check names a record: the first record that fails (`edit-record` names the record it edited) |
+| `problems` | the verifier's own text; temporary paths are replaced by `<copy>` |
+| `skipped` | present and `true` only if the 20 s time budget ran out before the scenario started (`ok` false) |
+
+Errors: 409 (another tamper demo is running in this process), 500 (the run failed), 503 (the ledger
+could not record the call: then nothing is copied or run). 409 and 500 are ledgered (`outcome:
+rejected`/`error`). Measured: under 1 s on a 1,500-record ledger (`test_runtime_is_bounded_on_1500_records`
+asserts < 5 s). It appends two records per call: do not poll; run it on a button press.
+
+## POST /audit/ask (CHANGED: the Hy3 parser)
+
+Code: `audit/nl_llm.py`, `audit/nl_filter.py`, `bootstrap.py` (`audit_filter_parser`), `llm.py`
+(`ModelChain.complete`). Tests: `tests/test_audit_nl_llm.py`.
+
+The rules still run first. Only when they recognise nothing in the question is the model asked: the
+SAME chain as the answers (TokenHub Hy3, then DeepSeek), when a key is configured and
+`IB_FORCE_OFFLINE` is not `1`. It gets a fixed prompt with the closed filter vocabulary and the
+question plus the current time, nothing else, and must reply with one JSON object. Its reply must
+validate as the closed `AuditFilter`; otherwise (no JSON, unknown key, bad value, model error) the
+rule parser's result is used.
+
+Response additions (all other fields unchanged):
+
+| Field | When |
+|---|---|
+| `parser` | `"llm"` (the model's filter was used) or `"deterministic"` (the rules) |
+| `parser_model` | with `parser: "llm"`: the model that wrote the filter, e.g. `"hy3"` or `"deepseek-v4.1-flash"` |
+| `parser_fallback` | `true` when the model was asked but its filter was not usable (`notes` then says "the rule parser's result is shown") |
+
+The ledgered `audit.query` (`op: "ask"`) carries the same `parser`, `parser_model` and
+`parser_fallback`.
+
+## Mock platforms: silent changes (`?webhook=0`)
+
+Code: `databridge/apps/mock_platforms/mock_platforms/admin.py` (`silent`, `_emit`). Tests:
+`databridge/apps/mock_platforms/tests/test_mock_admin_webhooks.py::test_silent_change_applies_without_a_webhook`,
+`::test_silent_flag_values`.
+
+Any `/admin/*` mutation with `?webhook=0` (also `false`, `off`, `no`) changes the platform but sends
+and records no webhook; the response's `webhook` is `null`. It simulates a lost webhook. The `/sim/*`
+routes are unchanged (they always send).
+
+## Seeded demo history: real Gate 2 denials (B14)
+
+`databridge/scripts/seed_demo_activity.py` now also runs the manifest's two S4 revocations
+(`s4_remove_member`, `s4_restrict_page`) silently, asks the matching S4 question as the affected
+person (replay-labelled), confirms the Gate 2 denial in the officer's journey view, and restores the
+source with a normal (webhook-sending) admin call. Its summary gains `silent_revocations`,
+`gate2_denials_confirmed` and `silent_restored`. On the analytics page, `/audit/stats`
+`gate2.verdicts.forbidden` and `gate2.reasons` then hold real denials. Test:
+`tests/test_seed_silent_revocations.py` (both revocations are real Gate 2 `forbidden` decisions; the
+denied document is never released). Run the seeder right after the stack starts: a poll that lands
+between the silent change and the question lets Gate 1 drop the document first (no denial then).
+
+## Eval summary (B15)
+
+`public/eval_summary.json` gains `ib_code_sha256`: the digest of
+`apps/internal_brain/databridge_ib/**/*.py` the evaluation ran on (written by the eval into
+`results.json` `config.ib_code_sha256`). `stale` is now `true` exactly when the current code's digest
+differs from it, committed or not; older results without the digest keep the git rule. Show `note`
+whenever `stale` is true.
+
+## Ledger (v2)
+
+No new event kinds. `audit.query` gains `op: "tamper-demo"` rows (`outcome`: `started`, `ok`,
+`rejected`, `error`) and the parser fields above on `op: "ask"` rows.

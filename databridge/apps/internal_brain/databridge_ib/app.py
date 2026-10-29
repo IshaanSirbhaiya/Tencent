@@ -10,6 +10,7 @@ import hmac
 import json
 import logging
 import os
+import queue
 import threading
 import time
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import auth as authmod
@@ -218,26 +219,81 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                 "employment": user.employment}
 
     # -- ask ---------------------------------------------------------------------------------
-    @app.post("/ib/ask")
-    def ask(req: AskRequest, request: Request, user: DirectoryUser = Depends(current)):
-        if not (set(user.roles) & EMPLOYEE_ROLES):
-            raise HTTPException(403, "forbidden")
+    def _ask_kwargs(request: Request) -> dict:
+        """Channel label and the replay switch, the same for /ib/ask and /ib/ask/stream."""
         # the MCP label is honoured only on bearer-token calls (the MCP client's transport), never
         # on the browser's cookie session (CodeBuddy security review CB5 finding 5)
         bearer = request.headers.get("authorization", "").lower().startswith("bearer ")
         channel = ("workbuddy-mcp" if bearer and request.headers.get("x-ib-channel") == "workbuddy-mcp"
                    else "ui")
         replay_at = _replay_time(request, bearer)        # None unless the seeding switch applies
+        if replay_at is not None:
+            return {"channel": "replay", "event_time": replay_at, "replay": True}
+        return {"channel": channel}
+
+    @app.post("/ib/ask")
+    def ask(req: AskRequest, request: Request, user: DirectoryUser = Depends(current)):
+        if not (set(user.roles) & EMPLOYEE_ROLES):
+            raise HTTPException(403, "forbidden")
+        kwargs = _ask_kwargs(request)
         try:
-            if replay_at is not None:
-                resp = svc.pipeline.ask(user, req.question, channel="replay", event_time=replay_at,
-                                        replay=True)
-            else:
-                resp = svc.pipeline.ask(user, req.question, channel=channel)
+            resp = svc.pipeline.ask(user, req.question, **kwargs)
         except Exception as exc:                                    # noqa: BLE001
             log.error("ask failed: %s", type(exc).__name__)
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         return json.loads(resp.model_dump_json())
+
+    @app.post("/ib/ask/stream")
+    def ask_stream(req: AskRequest, request: Request, user: DirectoryUser = Depends(current)):
+        """/ib/ask as Server-Sent Events (plan v2 B12, decision D-20). Same identity, roles,
+        channel label, replay switch and ledger records as /ib/ask: it runs the same
+        ``Pipeline.ask`` with a progress callback. Events, in order:
+
+        * ``stage`` ``{"name": <accepted|gate1|gate2|sealed|composing|grounded|released>, "ok": true}``
+          as each real stage completes: names only, never a count, id or reason (rule 4), and the
+          same seven names for every successful request;
+        * ``answer``: exactly the /ib/ask JSON, sent only after ``released`` (D-08: no answer text
+          before grounding and the write-ahead ``answer.released``);
+        * ``done`` ``{}``.
+
+        Any failure (including the ledger) ends the stream with ``error``
+        ``{"error": "temporarily unavailable"}`` and no ``answer``. Auth and role failures, and a
+        refused replay switch, are ordinary 401/403/422 responses before the stream starts. The
+        pipeline runs on its own thread, so a client that disconnects does not change what is
+        ledgered (as with /ib/ask, the request completes)."""
+        if not (set(user.roles) & EMPLOYEE_ROLES):
+            raise HTTPException(403, "forbidden")
+        kwargs = _ask_kwargs(request)
+        events: "queue.Queue[Optional[tuple[str, dict]]]" = queue.Queue()
+
+        def on_stage(name: str) -> None:
+            events.put(("stage", {"name": name, "ok": True}))
+
+        def work() -> None:
+            try:
+                resp = svc.pipeline.ask(user, req.question, on_stage=on_stage, **kwargs)
+                events.put(("answer", json.loads(resp.model_dump_json())))
+                events.put(("done", {}))
+            except Exception as exc:                                # noqa: BLE001
+                log.error("ask stream failed: %s", type(exc).__name__)
+                events.put(("error", {"error": "temporarily unavailable"}))
+            finally:
+                events.put(None)
+
+        threading.Thread(target=work, name="ib-ask-stream", daemon=True).start()
+
+        def stream():
+            while True:
+                item = events.get()
+                if item is None:
+                    return
+                kind, data = item
+                payload = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+                yield f"event: {kind}\ndata: {payload}\n\n"
+
+        return StreamingResponse(stream(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache, no-transform",
+                                          "X-Accel-Buffering": "no"})
 
     @app.get("/ib/map")
     def knowledge_map(user: DirectoryUser = Depends(current)):

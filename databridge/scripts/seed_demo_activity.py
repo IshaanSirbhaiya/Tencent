@@ -26,7 +26,16 @@ It also performs, as real (not replay-labelled) calls at seed time:
   settlement-keys page), each followed by one replay-labelled question from the affected person and
   then RESTORED through the mock platform's admin API (members/add, unrestrict), whose signed
   webhooks bring the index back. Audit routes have no replay switch, so these events carry the real
-  time and ``synthetic_replay: false``.
+  time and ``synthetic_replay: false``;
+* two SILENT revocations (plan v2 B14), the manifest's S4 actions (``s4_remove_member``,
+  ``s4_restrict_page``) sent straight to the mock platform's admin API with ``?webhook=0``: the
+  source changes but the Internal Brain is not told, so its index still lists the document and only
+  the live Gate 2 check can refuse it. The affected person then asks the matching S4 question
+  (replay-labelled), so ``retrieval.decided`` holds a real Gate 2 ``forbidden`` decision and the
+  analytics "Gate-2 reasons" panel has real denials. The officer's journey view of that request
+  confirms the denial (``gate2_denials_confirmed``). Each change is then RESTORED with a normal
+  (webhook-sending) admin call. Run the seeder promptly after the stack starts: a poll that lands
+  between the silent change and the question would let Gate 1 drop the document first.
 
 Modes
 -----
@@ -286,13 +295,72 @@ class InProcessBrain:
 
 
 # --------------------------------------------------------------------------------------------
-def _mock_admin(path: str) -> None:
+def _mock_admin(path: str, body: dict | None = None) -> None:
     import httpx
     base = os.environ.get("IB_MOCK_BASE", "http://127.0.0.1:8200").rstrip("/")
     tok = os.environ.get("MOCK_ADMIN_TOKEN", "admin-dev")
-    r = httpx.post(f"{base}{path}", json={"user": "jdoe"} if "members" in path else {},
+    if body is None:
+        body = {"user": "jdoe"} if "members" in path else {}
+    r = httpx.post(f"{base}{path}", json=body,
                    headers={"Authorization": f"Bearer {tok}"}, timeout=30)
     r.raise_for_status()
+
+
+#: manifest S4 action -> (the world question that asks about it, the admin call that restores it)
+SILENT = (("s4_remove_member", "S4-q4", "/admin/slack/channels/{channel}/members/add"),
+          ("s4_restrict_page", "S4-q2", "/admin/confluence/pages/{page_id}/unrestrict"))
+
+
+def silent_revocation_plan(world: dict, manifest: dict) -> list[dict]:
+    """The silent revocations (B14), derived from the manifest's S4 actions and the world's S4
+    questions (nothing typed in here): the revoking admin call (sent with ``?webhook=0``), who asks
+    what afterwards, and the admin call that restores the source."""
+    questions = {q["id"]: q for q in world.get("questions", [])}
+    out = []
+    for action, qid, restore in SILENT:
+        spec = (manifest.get("s4_actions") or {}).get(action)
+        q = questions.get(qid)
+        if not spec or not q or q.get("applies_after") != action:
+            continue
+        method, path = spec["admin_call"].split(" ", 1)
+        body = spec["body"] if isinstance(spec["body"], dict) else {"body": spec["body"]}
+        restore_body = {"user": spec["user"]} if "user" in spec else {}
+        out.append({"action": action, "revoke": f"{path}?webhook=0", "revoke_body": body,
+                    "persona": q["persona"], "question": q["question"],
+                    "restore": restore.format(**spec), "restore_body": restore_body})
+    return out
+
+
+def silent_revocations(brain, plan: list[dict], *, admin=_mock_admin, now=None,
+                       officer: str = "maya.compliance") -> Counter:
+    """Run `silent_revocation_plan`: revoke silently, ask as the affected person (replay-labelled),
+    confirm the Gate 2 denial in the officer's journey view, restore (with a webhook). A failed
+    restore is reported loudly; the next step still runs."""
+    stats: Counter = Counter()
+    at = ((now or datetime.now(timezone.utc)) - timedelta(minutes=1)).isoformat()
+    for step in plan:
+        try:
+            admin(step["revoke"], step["revoke_body"])
+            stats["silent_revocations"] += 1
+            r = brain.ask(step["persona"], step["question"], at)
+            rid = r.get("request_id") if isinstance(r, dict) else None
+            if rid:
+                j = brain.get(officer, f"/audit/journey/{rid}")
+                if any(g.get("verdict") == "forbidden" for g in j.get("gate2") or []):
+                    stats["gate2_denials_confirmed"] += 1
+        except SystemExit:
+            raise
+        except Exception as exc:                                    # noqa: BLE001
+            print(f"  silent revocation {step['action']} failed: {type(exc).__name__}")
+        finally:
+            try:
+                admin(step["restore"], step["restore_body"])
+                brain.after_source_change()
+                stats["silent_restored"] += 1
+            except Exception as exc:                                # noqa: BLE001
+                print(f"  RESTORE {step['restore']} FAILED ({type(exc).__name__}): restore the mock "
+                      "platforms (POST /sim/reset, then restart the Internal Brain)")
+    return stats
 
 
 def _up(base: str) -> bool:
@@ -321,7 +389,7 @@ def reset_state(state: Path, base: str) -> None:
     print(f"reset: {state} is empty")
 
 
-def run(brain, plan: list[dict], manifest: dict) -> dict:
+def run(brain, plan: list[dict], manifest: dict, silent: list[dict] | None = None) -> dict:
     t0 = time.time()
     stats: Counter = Counter()
     per: dict[str, Counter] = defaultdict(Counter)
@@ -385,6 +453,8 @@ def run(brain, plan: list[dict], manifest: dict) -> dict:
             except Exception as exc:                                # noqa: BLE001
                 print(f"  RESTORE {restore} FAILED ({type(exc).__name__}): restore the mock "
                       "platforms (POST /sim/reset, then restart the Internal Brain)")
+    # silent revocations: real Gate 2 denials (B14)
+    stats.update(silent_revocations(brain, silent or []))
     return {"stats": dict(stats), "per_persona": {p: dict(c) for p, c in sorted(per.items())},
             "seconds": round(time.time() - t0, 1)}
 
@@ -431,7 +501,7 @@ def main(argv=None) -> int:
             raise SystemExit(f"something answers on {args.base}: stop the Internal Brain first "
                              "(in-process mode writes the same state directory)")
         brain = InProcessBrain(args.state_dir)
-    out = run(brain, plan, manifest)
+    out = run(brain, plan, manifest, silent_revocation_plan(world, manifest))
     print(json.dumps(out, indent=1))
     return 0 if not out["stats"].get("failed") else 1
 

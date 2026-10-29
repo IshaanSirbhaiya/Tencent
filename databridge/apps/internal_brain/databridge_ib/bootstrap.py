@@ -112,6 +112,18 @@ def start_anchor_publisher(svc, interval_s: float):
     threading.Thread(target=run, name="ib-anchor", daemon=True).start()
 
 
+def audit_filter_parser(svc):
+    """The plain-English audit search's model (plan v2 B13): the answers' own chain (TokenHub Hy3,
+    then DeepSeek), or None when no key is configured or ``IB_FORCE_OFFLINE=1`` (the chain is None
+    then). It sees only the question and the clock; its output is validated against the closed
+    filter, and any failure falls back to the rule parser (``llm_fallback=True``)."""
+    chain = getattr(svc.pipeline, "chain", None)
+    if chain is None:
+        return None
+    from .audit.nl_llm import make_chain_parser
+    return make_chain_parser(chain)
+
+
 def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Optional[float] = None):
     from .sim import make_sim_router
     svc = build_services(cfg)
@@ -119,7 +131,8 @@ def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Opti
     def audit_factory(current, require_role):
         from .audit.routes import make_audit_router
         return make_audit_router(svc.ledger, svc.answers, svc.projection, require_role,
-                                 sink=svc.anchor_sink)
+                                 sink=svc.anchor_sink, llm=audit_filter_parser(svc),
+                                 llm_fallback=True)
 
     app = create_app(svc, audit_router_factory=audit_factory,
                      sim_router_factory=lambda cur, rr: make_sim_router(svc.cfg, rr))

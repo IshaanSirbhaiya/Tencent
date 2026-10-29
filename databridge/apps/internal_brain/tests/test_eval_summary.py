@@ -40,3 +40,11 @@ def test_summary_matches_the_eval_output(tmp_path):
     body = json.loads(out.read_text(encoding="utf-8"))
     assert body["leaks"] == h["leaks"] and body["tests"] == {"backend": None, "e2e": 38}
     assert body["stale"] in (True, False, None) and body["note"]
+
+
+def test_staleness_uses_the_code_digest_the_eval_recorded():
+    mod = _mod()
+    from evals.internal_brain.report import ib_code_sha256
+    assert mod.ib_code_sha256() == ib_code_sha256()          # the two copies agree
+    assert mod.stale("2000-01-01T00:00:00+00:00", ib_code_sha256()) is False
+    assert mod.stale("2999-01-01T00:00:00+00:00", "0" * 64) is True

@@ -141,7 +141,7 @@ tests are in `tests/test_audit_*.py`). "Residual" means accepted for the demo, w
 | 13 | Medium | Structured `/audit/events` filters were not closed or range-capped | **Fixed** | `AuditFilter.windowed`: no dates = last 365 days, until-only = 365 days before it, since-only = until now; both ends validated and capped; the response states the `window`; `::test_structured_window_is_always_closed_and_capped`, `tests/test_audit_routes.py::test_events_window_is_capped_and_stated` |
 | 14 | Medium | Limits do not bound document expansion, reconstruction or accessor history | **Residual** | Each retrieval row's doc list is the post-Gate-1 top-K plus depth-1 links (`pipeline.py:146`), small by construction; accessors are now capped and disclose truncation (#22); reveal no longer calls `reconstruct`. Production: bound doc expansion and response bytes, paginate reconstruction and accessor history |
 | 15 | Medium | `doc_events` keyed by `(req_id, doc_id)` loses distinctions if a request has several retrieval decisions | **Residual** | The pipeline writes one `retrieval.decided` per request (its single append, `pipeline.py:149`), but nothing in the ledger enforces it. Production: key document decisions by retrieval-event seq, or refuse a second `retrieval.decided` for a request before append |
-| 16 | Medium | Invalid NL constraints silently broadened the query; an invalid model filter fell back to a broad one | **Fixed** | `NlFilterError` carries the unparsed constraint; the route answers 422 `{"error", "unparsed"}` and ledgers the rejection; a configured model that fails or does not validate is also 422; `tests/test_audit_nl_filter.py::test_invalid_constraint_is_not_dropped`, `::test_llm_output_is_validated_and_fails_closed`, `tests/test_audit_routes.py::test_ask_invalid_constraint_is_422_with_the_constraint`. Residual: a question in which the rules recognise nothing, with no model configured, runs the default 365-day query; the returned `filter`, `window` and `notes` show this |
+| 16 | Medium | Invalid NL constraints silently broadened the query; an invalid model filter fell back to a broad one | **Fixed** | `NlFilterError` carries the unparsed constraint; the route answers 422 `{"error", "unparsed"}` and ledgers the rejection; a configured model that fails or does not validate is also 422; `tests/test_audit_nl_filter.py::test_invalid_constraint_is_not_dropped`, `::test_llm_output_is_validated_and_fails_closed`, `tests/test_audit_routes.py::test_ask_invalid_constraint_is_422_with_the_constraint`. Residual: a question in which the rules recognise nothing, with no model configured, runs the default 365-day query; the returned `filter`, `window` and `notes` show this. **Changed in v2:** the wired Hy3 parser falls back to the rules instead of a 422 (§15.8) |
 | 17 | Medium | Impossible dates and huge periods raised uncaught exceptions (500) | **Fixed** | Dates are validated, periods are clamped before subtraction, reversed ranges are ordered before capping, and any parser exception is a ledgered 422; `::test_parser_errors_are_nl_filter_errors`, `::test_huge_and_reversed_periods_are_capped_not_crashing` |
 | 18 | Medium | Calendar upper bounds were inclusive | **Fixed** | Every range is half-open, `since <= event_time < until`, in `nl_filter.parse_time` and `AuditProjection.search`; `::test_calendar_bounds_are_half_open`, `tests/test_audit_query.py::test_search_upper_bound_is_exclusive` |
 | 19 | Medium | Publication can succeed remotely while the local `anchor.published` append fails | **Residual** | The sink being ahead of the log is tolerated by verification (#5 checks only the opposite direction). Production: stable publication ids (`log_id`+`seq`), idempotent remote writes, and startup reconciliation that records a receipt for any remote head the log does not mention |
@@ -163,7 +163,7 @@ Retrieved content is untrusted. Our position is **containment**, not detection.
 | Output checks | Markdown stripped and trailing tags moved inside their sentence, then Walnut's grounding wall binds sentences to cited passages and rejects unsupported numbers, dates and named terms; a violation falls through to the extractive answer; a model answer citing no released passage is replaced too | `narrate.py:99-120`, `llm.py:65-81`, `pipeline.py:162-171` |
 | Extractive answer skips text addressed to an AI | Sentences such as "ignore previous instructions", "AI assistant: …" or "decode this" are never quoted as answers | `narrate.py:43-47, 131-162` |
 | No arbitrary fetch | Links are followed only for supported id shapes on tenant hosts, depth 1, resolved only within the asker's readable set, then Gate 2 | `connectors/_http.py:237-282`; `pipeline.py:260-281`; `tests/test_connector_slack.py::test_links_only_supported_shapes` |
-| Audit NL filter | Output is a closed schema; any model sees only the question and the clock | `tests/test_audit_nl_filter.py::test_injection_text_cannot_escape_the_schema`, `::test_model_receives_only_question_and_clock` |
+| Audit NL filter | Output is a closed schema; any model sees only the question and the clock (the Hy3 parser: §15.8) | `tests/test_audit_nl_filter.py::test_injection_text_cannot_escape_the_schema`, `::test_model_receives_only_question_and_clock` |
 
 **Injection fixtures on all four platforms** are planted in the synthetic world
 (`databridge/fixtures/enterprise/generate.py`, facts below):
@@ -391,3 +391,182 @@ The accuracy, first-run and judging reviews led to document fixes: latency (19�
 (6 of 6 attacks; the 7th is the stated window), the WorkBuddy audit tool names, the architecture status
 lines, the CDSA edition note, what is real and simulated, how to tell when the stack is ready, and the
 "honest limit" and break-even paragraphs in SUBMISSION.md.
+
+
+## 15. Developer views and the finals v2 additions (30 Oct)
+
+The finals plan (docs/finals/PLAN.md §9) added views for engineers and compliance, and four backend
+items (B11 to B14). Contracts: `docs/finals/contracts/backend_v1.md` (v1 and the v2 section). Paths
+are relative to `databridge/apps/internal_brain/databridge_ib/`; tests are in `tests/`. These
+sections cite functions and tests, not line numbers (the `d69ab97` line references above predate them).
+
+### 15.1 One authorisation rule for every read outside the ask
+
+`/ib/graph`, `/ib/graph/openable`, `/ib/doc/{id}` and the citations on `/ib/trace/{req}` all go through
+`authz.authorize`, a copy of the ask pipeline's rule: Gate 1 (stored source permissions), a live Gate 2
+with the indexed version as the known version, read-through on drift (re-fetch, re-compile the ACL,
+mask, re-index; admitted only if the fresh ACL still admits the person and the fetched version is the
+one Gate 2 checked), then an immutable snapshot of whitelisted fields. Any error, timeout or 429 is a
+deny. The views use their own small worker pool (`authz.VIEW_POOL`, 6 workers, 20 s per call), so a
+heavy graph cannot starve an answer's Gate 2.
+
+| View | Who | What it can never show | Evidence |
+|---|---|---|---|
+| `GET /ib/graph` | any employee | a document that failed Gate 2 in this call, by node, title, count or edge; a "hidden neighbours" number unless it is exact | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_graph_hidden_counts_are_exact_or_absent`, `::test_graph_gate2_failure_and_revocation_drop_docs` |
+| `POST /ib/graph/openable` | any employee | anything about ids the caller cannot open (they are simply absent, like unknown ids) | `::test_openable_returns_only_what_the_caller_can_open` |
+| `GET /ib/doc/{id}` | any employee | ACLs, raw link ids, the full text; whether a refused id exists (restricted, unknown and a failed check are the same 404) | `::test_doc_restricted_and_unknown_are_the_same_404`, `::test_doc_is_identical_with_and_without_restricted_docs` |
+
+"View as" (D-17) is two independent graphs, each drawn from its own signed-in session; there is no
+union, diff or greyed placeholder for a document the other person cannot open.
+
+Write-ahead: `graph.viewed` (counts only) before the graph is returned; `doc.viewed` BEFORE the
+access decision, so a ledger outage is the same 503 for a permitted, a restricted and an unknown id
+(`::test_graph_ledger_down_is_503`, `::test_doc_ledger_down_is_the_same_503_for_every_id`).
+
+**Limits.** The graph overview checks every readable document live (capped at 1,500 checks,
+`graph.MAX_CHECKS_OVERVIEW`); it costs about 3.4 s for jdoe on the synthetic world and is not rate
+limited. `doc.viewed` records the id as requested (up to 300 characters), so the ledger holds the ids
+people tried to open, including ones they could not.
+
+### 15.2 The trace receipt (`GET /ib/trace/{req_id}`) is public-safe
+
+The asker's receipt for one of their OWN requests (decision D-16). Another person's request and an
+unknown id give the same 404. It shows stage names with `ok`/`skipped` (derived from which sealed
+records exist, never from timings), the total latency rounded to 100 ms, the model, per-request record
+ordinals and hashes (no global ledger sequence number) and only the cited documents the person can
+STILL open now (Gate 1 + live Gate 2; the rest are left out with no count). It never shows the
+considered or released sets, Gate 2 verdicts or reason codes. Ledgered as `trace.viewed`.
+Tests: `test_dev_views.py::test_trace_is_own_requests_only_and_hides_gate2_reasons`,
+`test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable`,
+`::test_trace_restricted_question_equals_nonexistent_question`, `::test_trace_ledger_down_is_503`.
+
+### 15.3 Journey and stats are compliance-only; stage timings live there
+
+`GET /audit/journey/{req_id}` (one request end to end: considered and released documents, Gate 2
+verdicts and reason codes, the model, the sealed records, the per-stage millisecond timings; never the
+answer text) and `GET /audit/stats` (counts, timings and distributions) need `compliance_officer`,
+like every `/audit/*` route, and every call is ledgered, including failures (a ledgered 500, or 503
+when the ledger cannot record it). The stats window is half-open (`now - days <= event_time < now`),
+and a cached result is only served for the verified ledger head it was computed on.
+Tests: `test_dev_views.py::test_journey_is_compliance_only_and_has_no_answer_text`,
+`::test_stats_needs_compliance_and_is_ledgered`, `test_dev_views_hardening.py` (all six).
+
+**Stage timings.** `answer.released` carries `stage_ms` (accept, gate1, gate2, seal, compose, release),
+measured with `time.perf_counter` and ending before the final append
+(`test_dev_views.py::test_answer_release_records_stage_timings`). The millisecond waterfall is shown
+only in the compliance journey and stats. Two honest notes: the gate2 time grows with the number of
+documents checked live, so it says something about how many candidates passed Gate 1 (the asker's own
+readable set, plus documents revoked since the last sync); and the asker can already time their own
+request end to end (§5, "Timing": not controlled). §15.6 adds per-stage timing for the asker.
+
+### 15.4 `GET /ib/status`
+
+Any signed-in employee (not on the public `/health`). It returns model ids, the provider label,
+booleans (`key_configured`, `force_offline`, `active`) and `ledger.ok`. Never a key, a base URL or a
+ledger sequence number. `ledger.ok` is re-verified at most every 15 s, so an employee cannot make the
+service verify the whole ledger on every call.
+Test: `test_graph_doc.py::test_status_is_authenticated_and_never_returns_a_secret`.
+
+**Limit.** It tells every employee whether the ledger currently verifies. We accept this: it is the
+same fact the service acts on (a broken ledger is a 503 for everyone).
+
+### 15.5 The replay switch (seeded demo history)
+
+`X-IB-Replay-Key` lets the seeder record past-dated, replay-labelled requests (decision D-10). It is
+honoured only when ALL hold, otherwise the call is a 403 and never silently recorded as live: the
+server has `IB_REPLAY_KEY` of at least 24 characters, it is not deployed (`IB_DEPLOYED` unset), the
+call uses a bearer token and comes from loopback, the key matches (constant-time), and
+`X-IB-Replay-At` is within the last 400 days and not in the future (otherwise 422). Seeded requests
+are `channel: "replay"`, `synthetic_replay: true` in the ledger and in the UI; a failure keeps the
+label and the event time. The same switch applies to `/ib/ask/stream`.
+Tests: `test_graph_doc.py::test_replay_switch_labels_the_request`,
+`::test_replay_switch_refuses_every_unsafe_call`, `::test_deployed_config_refuses_a_replay_key`,
+`::test_request_failed_keeps_the_replay_label_and_time`.
+
+**Limit.** On a local run with the key set, anyone on the machine who has the key and a valid token
+can write backdated (but labelled) history. `recorded_at` always holds the real append time.
+
+### 15.6 SSE stage events (`POST /ib/ask/stream`, B12, D-20)
+
+The same pipeline call as `/ib/ask` with a progress callback (`Pipeline.ask(on_stage=...)`). Stage
+events carry only a name from a fixed list (`pipeline.STAGES`) and `ok: true`: no counts, ids, titles
+or reasons. Every successful request sends all seven names in the same order whatever the outcome,
+so a restricted question and a made-up one give identical event sequences. The answer text is sent
+once, after `released` (D-08), and equals the `/ib/ask` JSON. Any failure, including the ledger, ends
+with one `error` event and no answer. A callback error is ignored and cannot change what is retrieved,
+ledgered or returned. The ledger records are the same three as `/ib/ask`.
+Tests: `test_ask_stream.py` (event order, payloads, no answer before release, equal to `/ib/ask`,
+restricted vs made-up, ledger down, failure at release, auth and roles, `on_stage` changes nothing).
+
+**Limits.** Stage events give the asker the time each stage took, finer than the receipt's rounded
+total. The gate2 interval grows with the number of documents checked live; those are documents the
+asker can read in the index (or could, until a revocation the index has not seen yet). Restricted
+documents are filtered out at Gate 1 and never checked, so they do not change it, but we have not
+measured timing parity (§5, §8). The stream runs on its own thread: a client that disconnects does
+not cancel the request, so a burst of streams costs the same as a burst of asks (no rate limit, §8).
+
+### 15.7 Tamper demo on a copy (`POST /audit/tamper-demo`, B11, D-19)
+
+The scenarios of `scripts/tamper_demo.py` (now shared code in `audit/tamper.py`) run on a temporary
+COPY of the live log, its anchor ledger and the external head file. The copy is taken under the
+ledger's append lock, so it never holds a half-written append. The live files are only read. After the
+run the endpoint re-checks that every byte the live files held at copy time is unchanged
+(`real_log_modified: false`; the files may have grown, because other requests keep appending), and
+deletes the temporary directory. Compliance only; ledgered write-ahead (`audit.query`
+`op: "tamper-demo"`, `outcome: "started"`) before the copy, then `outcome: "ok"` with the result; a
+failure is a ledgered 409 or 500, and a ledger that cannot record the call means 503 and no copy.
+One run at a time per process (409 otherwise); the run has a 20 s budget (scenarios not started in
+time are reported as skipped). Measured: under 1 s on 1,500 records.
+Tests: `test_tamper_demo_route.py` (role check, write-ahead ledgering, the live log's old bytes
+unchanged with exactly the endpoint's two records appended, the external head file byte-identical,
+`edit-record` detected at the record it edited, the temporary directory removed, ledger down = 503
+with nothing run, the runtime bound on 1,500 records).
+
+**Limits.** The copy contains whatever the ledger holds (questions, document ids) and sits in the
+OS temporary directory for the length of the run; a crash mid-run can leave it there. The
+`key-holder-rewrite` scenario uses the live ledger key in process to re-seal the COPY (the key never
+leaves the process and is never returned). The demo shows what verification detects on a copy; it
+does not test the live chain (that is `GET /audit/verify`).
+
+### 15.8 Hy3 for the plain-English audit search (B13)
+
+`POST /audit/ask` still runs the rules first. Only when they recognise nothing is a model asked: the
+same chain as the answers (TokenHub Hy3, then DeepSeek), and only when a key is configured and
+`IB_FORCE_OFFLINE` is not `1` (`bootstrap.audit_filter_parser`). The model receives a fixed prompt with
+the closed filter vocabulary and a user message with the question and the current time. It never
+receives a ledger row, event, document, user list or any other content: the parser has no access to
+them. Its reply must be one JSON object with only the closed keys (`audit/nl_llm.py`,
+`parse_filter_json`) and must then validate as `AuditFilter` (patterns, `extra="forbid"`, the 365-day
+cap). Any failure (no JSON, an extra key, a bad value, a model error or timeout) falls back to the
+rule parser's result, with a note and `parser_fallback: true`. The response and the ledgered
+`audit.query` record `parser` (`llm` or `deterministic`) and `parser_model` (which model wrote the
+filter). The model has no tools, and the filter is only ever a search over the projection the officer
+may already query.
+Tests: `test_audit_nl_llm.py` (valid JSON used and the model named, fall-through hy3 → DeepSeek,
+six kinds of invalid output and two kinds of exception fall back to the rules, rules first, the
+model's messages hold only the vocabulary, the question and the clock, the route records the parser,
+the bootstrap wiring, `IB_FORCE_OFFLINE`).
+
+**Change to disposition #16 (§3).** Before v2 no model was wired, and a configured model that failed
+was a 422. The wired parser now falls back to the rules instead. When the rules recognised nothing,
+the rule result is the default query (the last 365 days, nothing else narrowed), the same result as
+with no model configured, and the response's `filter`, `window`, `notes` and `parser_fallback` say
+so. A constraint the RULES name is still never dropped: an invalid one is still a 422
+(`tests/test_audit_nl_filter.py::test_invalid_constraint_is_not_dropped`), and with no fallback the
+old fail-closed contract holds (`test_audit_nl_llm.py::test_without_fallback_the_old_fail_closed_contract_holds`).
+The officer's question text does leave the host for TokenHub when a key is configured; it is the
+officer's own text, not ledger content.
+
+### 15.9 Real Gate 2 denials in the seeded history (B14)
+
+The mock platforms accept `?webhook=0` on any `/admin/*` mutation: the change is applied and no
+webhook is sent or recorded (a lost webhook). The seeder uses it for the manifest's two S4 revocations,
+asks the matching question as the affected person (replay-labelled), confirms the Gate 2 `forbidden`
+decision in the officer's journey view, and restores the source with a normal call. The denials in
+the analytics "Gate-2 reasons" panel are therefore real live-check refusals, not typed-in numbers.
+Tests: `databridge/apps/mock_platforms/tests/test_mock_admin_webhooks.py::test_silent_change_applies_without_a_webhook`,
+`tests/test_seed_silent_revocations.py` (both revocations are real Gate 2 denials, the denied document
+is never released, only the restores send webhooks).
+
+**Limit.** `?webhook=0` is a mock-platform feature guarded by the mock's admin token; real platforms
+have no such switch. It is not reachable through `/sim/*`.

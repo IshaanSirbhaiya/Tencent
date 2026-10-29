@@ -47,8 +47,22 @@ def _pct(x: float | None) -> str:
 
 
 # -- aggregation ---------------------------------------------------------------------------------
+def ib_code_sha256() -> str:
+    """A digest of the Internal Brain code under test (``apps/internal_brain/databridge_ib/**/*.py``,
+    paths and contents, line endings normalised). ``scripts/eval_summary.py`` compares it with the
+    current code to decide whether these results are stale."""
+    root = WORLD.parents[2] / "apps" / "internal_brain" / "databridge_ib"
+    h = hashlib.sha256()
+    for f in sorted(root.rglob("*.py")):
+        if "__pycache__" in f.parts:
+            continue
+        h.update(f.relative_to(root).as_posix().encode("utf-8") + b"\0")
+        h.update(f.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return h.hexdigest()
+
+
 def build(*, world, oracle, probes, all_probes, outs: dict, p2: dict, p2_meta: dict, failed: list,
-          runtime_s: float, args: dict) -> dict:
+          runtime_s: float, args: dict, code_sha256: str | None = None) -> dict:
     a_recs = [r for name, o in sorted(outs.items()) if name.startswith("A") and name != "A_control"
               for r in o["records"]]
     by_mode: dict[str, list[dict]] = defaultdict(list)
@@ -178,6 +192,7 @@ def build(*, world, oracle, probes, all_probes, outs: dict, p2: dict, p2_meta: d
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "config": {
             "world": str(WORLD), "world_sha256": hashlib.sha256(WORLD.read_bytes()).hexdigest(),
+            "ib_code_sha256": code_sha256 or ib_code_sha256(),
             "manifest_sha256": manifest_sha, "meta": world["meta"],
             "model_paths": {
                 "fake-capture": "ModelChain(['hy3']) → databridge_harness.Harness(FakeBackend(capturing "

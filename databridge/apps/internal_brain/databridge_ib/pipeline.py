@@ -7,6 +7,16 @@
 
 Any ledger failure aborts the request (fail closed): no retrieval without ``request.accepted``, no
 model call without ``retrieval.decided``, no response without ``answer.released``.
+
+Progress (``on_stage``, optional; ``POST /ib/ask/stream``): the pipeline calls ``on_stage(name)`` as
+each real stage COMPLETES, with names only (`STAGES`): ``accepted`` (request.accepted sealed),
+``gate1`` (index pre-filter and ranking done), ``gate2`` (live source checks and linked objects done),
+``sealed`` (retrieval.decided sealed), ``composing`` (an answer text was produced: the model chain,
+whose grounding wall checks every sentence, or the extractive answerer), ``grounded`` (the answer's
+citation tags checked against the released passages and the citations bound), ``released``
+(answer.released sealed). Every successful request emits all seven, in this order, whatever the
+outcome (an answer, a refusal, no candidates), so the sequence carries no information (rule 4). A
+callback that raises is ignored: it can never change what is retrieved, ledgered or returned.
 """
 from __future__ import annotations
 
@@ -31,6 +41,8 @@ from .timewin import strip as strip_window
 from .sensitive import mask_doc
 
 EXTRACTIVE = ModelInfo(provider="deterministic", model="extractive-v1")
+#: progress stage names, in order (``on_stage``)
+STAGES = ("accepted", "gate1", "gate2", "sealed", "composing", "grounded", "released")
 MAX_PASSAGES = 14
 MAX_CHUNKS_PER_DOC = 2
 MAX_LINKED = 4
@@ -67,6 +79,15 @@ def _dt(s: str) -> datetime:
     return datetime.fromisoformat(s)
 
 
+def _emit(on_stage: Optional[Callable[[str], None]], name: str) -> None:
+    if on_stage is None:
+        return
+    try:
+        on_stage(name)
+    except Exception:                                               # noqa: BLE001 — progress only
+        pass
+
+
 @dataclass
 class Pipeline:
     index: Index
@@ -81,10 +102,11 @@ class Pipeline:
 
     # -- the call -----------------------------------------------------------------------------
     def ask(self, user: DirectoryUser, question: str, *, channel: str = "ui",
-            event_time: Optional[datetime] = None, replay: bool = False) -> AskResponse:
+            event_time: Optional[datetime] = None, replay: bool = False,
+            on_stage: Optional[Callable[[str], None]] = None) -> AskResponse:
         req_id = uuid.uuid4().hex
         try:
-            return self._ask(user, question, channel, event_time, replay, req_id)
+            return self._ask(user, question, channel, event_time, replay, req_id, on_stage)
         except Exception as exc:
             # best effort: a sanitized failure record (the error class only, never the message)
             try:
@@ -100,7 +122,8 @@ class Pipeline:
             raise
 
     def _ask(self, user: DirectoryUser, question: str, channel: str,
-             event_time: Optional[datetime], replay: bool, req_id: str) -> AskResponse:
+             event_time: Optional[datetime], replay: bool, req_id: str,
+             on_stage: Optional[Callable[[str], None]] = None) -> AskResponse:
         t0 = time.perf_counter()
         now = self.clock()
         etime = event_time or now
@@ -111,6 +134,7 @@ class Pipeline:
                                            question_sha256=_sha(question),
                                            policy_version=POLICY_VERSION, directory_epoch=epoch,
                                            **common))
+        _emit(on_stage, "accepted")
         # 3 — window (ranking preference)
         window = parse_window(question, now)
         search_q = strip_window(question)       # time phrases rank by date, not as content words
@@ -128,6 +152,7 @@ class Pipeline:
                     hits.append(h)
                     seen.add(h.chunk_id)
         cand_docs = list(dict.fromkeys(h.doc_id for h in hits))
+        _emit(on_stage, "gate1")
         t_g2 = time.perf_counter()
         checks: dict[str, AccessCheck] = {}
         released_hits: list[Hit] = []
@@ -150,6 +175,7 @@ class Pipeline:
         released_hits = released_hits[:MAX_PASSAGES]
         released_docs = list(dict.fromkeys(h.doc_id for h in released_hits))
         considered = list(dict.fromkeys(cand_docs + linked))
+        _emit(on_stage, "gate2")
         t_seal1 = time.perf_counter()
         # 8 — write-ahead before any model call
         self.ledger.append(RetrievalDecided(
@@ -159,6 +185,7 @@ class Pipeline:
             gate2=tuple(Gate2Decision(doc_id=d, verdict=c.verdict, reason_code=c.reason_code)
                         for d, c in checks.items()),
             released=tuple(released_docs), **common))
+        _emit(on_stage, "sealed")
         # 9/10 — generate + ground
         t_comp = time.perf_counter()
         passages = self._passages(released_hits)
@@ -180,10 +207,12 @@ class Pipeline:
                 if self.chain is not None:      # the model was tried and did not produce a usable answer
                     model = ModelInfo(provider="deterministic", model="extractive-v1",
                                       fallback_used=True)
+        _emit(on_stage, "composing")            # an answer text exists (model or extractive)
         refused = answer.strip() == REFUSAL_TEXT
         by_tag = {p.tag: p for p in passages}
         cites = [] if refused else [by_tag[t] for t in narrate.cited_tags(answer) if t in by_tag]
         citations = tuple(self._citation(p, checks, live) for p in cites)
+        _emit(on_stage, "grounded")             # bound to cited, released passages only
         # 11 — write-ahead before release
         t_end = time.perf_counter()
         ref, sha = self.answers.put(req_id, answer)
@@ -202,6 +231,7 @@ class Pipeline:
                              "authz_checked_at": c.authz_checked_at.isoformat()} for c in citations),
             dropped_sentences_count=dropped, latency_ms=int((time.perf_counter() - t0) * 1000),
             stage_ms=stage_ms, **common))
+        _emit(on_stage, "released")
         # 12 — one shape for every outcome
         return AskResponse(request_id=req_id, answer=answer, citations=citations, model=model,
                            as_of=now)

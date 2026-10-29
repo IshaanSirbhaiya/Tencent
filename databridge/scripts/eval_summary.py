@@ -12,9 +12,12 @@ revision); nothing is typed in by hand except the e2e count, which is a paramete
 
 Honesty fields:
 * ``full_run`` is false when the eval was run with ``--limit``;
-* ``stale`` is true when Internal Brain code changed after the eval was generated (a later commit to
-  ``apps/internal_brain/databridge_ib`` or uncommitted changes there), so the page can say
-  "re-run pending" instead of presenting old numbers as current;
+* ``stale`` is true when Internal Brain code changed after the eval was generated, so the page can
+  say "re-run pending" instead of presenting old numbers as current. When the results record
+  ``config.ib_code_sha256`` (the digest of ``apps/internal_brain/databridge_ib/**/*.py`` the eval
+  ran on), stale means the current code's digest differs, whether or not it is committed yet.
+  Older results without it fall back to git: a later commit to that folder, or uncommitted changes
+  there;
 * ``smoke`` (optional) holds the headline of a smaller run made after the change.
 """
 from __future__ import annotations
@@ -64,6 +67,7 @@ def from_results_json(res: dict) -> dict:
     args = ((res.get("config") or {}).get("args") or {})
     return {
         "run_date": res.get("generated_at"),
+        "ib_code_sha256": (res.get("config") or {}).get("ib_code_sha256"),
         "full_run": not args.get("limit"),
         "limit": args.get("limit") or 0,
         "leaks": h.get("leaks"),
@@ -140,7 +144,22 @@ def backend_test_count() -> int | None:
     return int(m.group(1)) if m else None
 
 
-def stale(run_date: str | None) -> bool | None:
+def ib_code_sha256() -> str:
+    """The same digest as ``evals/internal_brain/report.py::ib_code_sha256`` (tested equal)."""
+    import hashlib
+    root = ROOT / IB_CODE
+    h = hashlib.sha256()
+    for f in sorted(root.rglob("*.py")):
+        if "__pycache__" in f.parts:
+            continue
+        h.update(f.relative_to(root).as_posix().encode("utf-8") + bytes(1))
+        h.update(f.read_bytes().replace(bytes([13, 10]), bytes([10])) + bytes(1))
+    return h.hexdigest()
+
+
+def stale(run_date: str | None, code_sha256: str | None = None) -> bool | None:
+    if code_sha256:
+        return ib_code_sha256() != code_sha256
     if not run_date:
         return None
     try:
@@ -167,7 +186,7 @@ def main(argv=None) -> int:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": source,
         "git_sha": _git("rev-parse", "HEAD") or None,
-        "stale": stale(summary.get("run_date")),
+        "stale": stale(summary.get("run_date"), summary.get("ib_code_sha256")),
         **summary,
         "tests": {"backend": None if args.no_collect else backend_test_count(), "e2e": args.e2e},
         "smoke": None,
