@@ -6,6 +6,8 @@
 * ``POST /audit/reveal`` {"req_id","reason"}  the answer text          (ledgered ``audit.reveal``
                                             BEFORE the text is read; a non-empty reason is required)
 * ``GET  /audit/verify``                   chain + anchors + external head
+* ``GET  /audit/stats?days=``               counts/timings/distributions (ledgered ``audit.query``)
+* ``GET  /audit/journey/{req_id}``          one request end to end, no answer text (ledgered)
 
 Write-ahead and fail-closed: the audit event is appended before the response is returned; an append
 failure is a 503 and nothing is returned. Failed calls are ledgered too (Codex sec r1 #9): an invalid
@@ -39,6 +41,7 @@ from .content import AnswerStore, ContentStoreUnavailable, sha256_text
 from .ledger import AccessLedger, LedgerUnavailable
 from .nl_filter import LlmParser, NlFilterError, parse_audit_question
 from .query import AuditFilter, AuditProjection
+from .stats import compute_stats
 
 COMPLIANCE_ROLE = "compliance_officer"
 REVEAL_MISMATCH = "content does not match the sealed ledger digest"
@@ -217,6 +220,48 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         return {"req_id": body.req_id, "answer": stored.answer, "answer_ref": ref,
                 "answer_sha256": sealed, "content_matches_ledger": True,
                 "revealed_by": sub, "reason": reason}
+
+    @router.get("/stats")
+    def audit_stats(principal=dep, days: Optional[str] = Query(None),
+                    replay: Optional[str] = Query(None)) -> dict:
+        """Counts, timings and distributions over the verified ledger (no question or answer text,
+        no titles). Ledgered like every audit read."""
+        sub = _sub_of(principal)
+        raw = {k: v for k, v in dict(days=days, replay=replay).items() if v is not None}
+        try:
+            n_days = int(days) if days is not None else 30
+            if not 1 <= n_days <= 3650:
+                raise ValueError("days must be 1..3650")
+            if replay not in (None, "include", "exclude"):
+                raise ValueError("replay must be include or exclude")
+        except ValueError as exc:
+            _refuse(sub, "stats", "rejected", 422, f"invalid stats query: {str(exc)[:120]}",
+                    {"params": _clip(raw)})
+        try:
+            evs = list(ledger.events(strict=True))
+        except LedgerUnavailable:
+            raise _unavailable() from None
+        out = compute_stats(evs, now=now(), days=n_days, include_replay=replay != "exclude")
+        _ledger_query(sub, {"op": "stats", "days": n_days, "replay": replay or "include"},
+                      out["totals"]["requests"])
+        return out
+
+    @router.get("/journey/{req_id}")
+    def audit_journey(req_id: str, principal=dep) -> dict:
+        """One request end to end: accepted, both gates (with reason codes), the model, grounding,
+        the sealed records and their hashes. Never the answer text (that is /audit/reveal)."""
+        sub = _sub_of(principal)
+        if not req_id or len(req_id) > 200:
+            _refuse(sub, "journey", "rejected", 422, "invalid request id", {"req_id": req_id[:200]})
+        _sync()
+        try:
+            res = projection.reconstruct(req_id)
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "journey", "error", 500, "the audit query failed", {"req_id": req_id})
+        if res is None:
+            _refuse(sub, "journey", "rejected", 404, "no such request", {"req_id": req_id})
+        _ledger_query(sub, {"op": "journey", "req_id": req_id}, 1)
+        return res
 
     @router.get("/verify")
     def audit_verify(principal=dep) -> dict:

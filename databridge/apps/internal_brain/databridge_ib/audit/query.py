@@ -476,7 +476,7 @@ class AuditProjection:
             "synthetic_replay": False, "policy_version": None, "directory_epoch": None,
             "time_window": None, "considered": [], "gate2": [], "released": [], "citations": [],
             "model": None, "prompt_version": None, "answer_ref": None, "answer_sha256": None,
-            "refused": None, "latency_ms": None, "dropped_sentences_count": None,
+            "refused": None, "latency_ms": None, "dropped_sentences_count": None, "stage_ms": {},
             "failure": None, "status": "in_progress", "reveals": [], "events": []}
         by_doc = {d["doc_id"]: d for d in docs}
         for r in evs:
@@ -504,6 +504,7 @@ class AuditProjection:
                            answer_ref=d.get("answer_ref"), answer_sha256=d.get("answer_sha256"),
                            refused=d.get("refused"), latency_ms=d.get("latency_ms"),
                            dropped_sentences_count=d.get("dropped_sentences_count"),
+                           stage_ms=d.get("stage_ms") or {},
                            status="refused" if d.get("refused") else "released")
                 out["citations"] = [{**c, "title": by_doc.get(c.get("doc_id"), {}).get("title")}
                                     for c in d.get("citations") or () if isinstance(c, dict)]

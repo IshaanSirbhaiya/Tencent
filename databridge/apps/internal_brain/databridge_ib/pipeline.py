@@ -112,6 +112,7 @@ class Pipeline:
         window = parse_window(question, now)
         search_q = strip_window(question)       # time phrases rank by date, not as content words
         # 4 — GATE 1 + rank over the permitted corpus only
+        t_g1 = time.perf_counter()
         readable = self.index.readable(user, epoch)
         hits = self.index.search(search_q, readable, k=self.top_k, window=window,
                                  relevant_only=True)                  # 5 — relevance gate
@@ -124,6 +125,7 @@ class Pipeline:
                     hits.append(h)
                     seen.add(h.chunk_id)
         cand_docs = list(dict.fromkeys(h.doc_id for h in hits))
+        t_g2 = time.perf_counter()
         checks: dict[str, AccessCheck] = {}
         released_hits: list[Hit] = []
         linked: list[str] = []
@@ -145,6 +147,7 @@ class Pipeline:
         released_hits = released_hits[:MAX_PASSAGES]
         released_docs = list(dict.fromkeys(h.doc_id for h in released_hits))
         considered = list(dict.fromkeys(cand_docs + linked))
+        t_seal1 = time.perf_counter()
         # 8 — write-ahead before any model call
         self.ledger.append(RetrievalDecided(
             sub=user.id, time_window=window, gate1_policy_version=POLICY_VERSION,
@@ -154,6 +157,7 @@ class Pipeline:
                         for d, c in checks.items()),
             released=tuple(released_docs), **common))
         # 9/10 — generate + ground
+        t_comp = time.perf_counter()
         passages = self._passages(released_hits)
         answer, model, dropped = REFUSAL_TEXT, EXTRACTIVE, 0
         if passages:
@@ -178,6 +182,10 @@ class Pipeline:
         cites = [] if refused else [by_tag[t] for t in narrate.cited_tags(answer) if t in by_tag]
         citations = tuple(self._citation(p, checks, live) for p in cites)
         # 11 — write-ahead before release
+        t_end = time.perf_counter()
+        ms = lambda a, b: max(0, int(round((b - a) * 1000)))           # noqa: E731
+        stage_ms = {"accept": ms(t0, t_g1), "gate1": ms(t_g1, t_g2), "gate2": ms(t_g2, t_seal1),
+                    "seal": ms(t_seal1, t_comp), "compose": ms(t_comp, t_end)}
         ref, sha = self.answers.put(req_id, answer)
         self.ledger.append(AnswerReleased(
             sub=user.id, model=model, prompt_version=narrate.PROMPT_VERSION, answer_sha256=sha,
@@ -186,7 +194,7 @@ class Pipeline:
                              "content_checked_at": c.content_checked_at.isoformat(),
                              "authz_checked_at": c.authz_checked_at.isoformat()} for c in citations),
             dropped_sentences_count=dropped, latency_ms=int((time.perf_counter() - t0) * 1000),
-            **common))
+            stage_ms=stage_ms, **common))
         # 12 — one shape for every outcome
         return AskResponse(request_id=req_id, answer=answer, citations=citations, model=model,
                            as_of=now)

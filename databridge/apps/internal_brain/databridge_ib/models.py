@@ -239,6 +239,8 @@ class AnswerReleased(EventBase):
     citations: tuple[dict[str, Any], ...]          # {doc_id, version, content_checked_at, authz_checked_at}
     dropped_sentences_count: int = 0
     latency_ms: int
+    # per-stage timings in ms (gate1, gate2, compose, seal) for the developer view; timings only
+    stage_ms: dict[str, int] = Field(default_factory=dict)
 
 
 class RequestFailed(EventBase):

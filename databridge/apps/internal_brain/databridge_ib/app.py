@@ -173,6 +173,35 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         return {"items": [{"req_id": r.get("req_id"), "question": r.get("question"),
                            "event_time": r.get("event_time")} for r in rows]}
 
+    @app.get("/ib/trace/{req_id}")
+    def trace(req_id: str, user: DirectoryUser = Depends(current)):
+        """How one of MY answers was made, for the developer view: the stages and their timings,
+        the model, grounding, what was released to me and the sealed ledger records. Only my own
+        requests (anything else is the same 404), and only what I was already shown: never the
+        considered set, Gate-2 denials or reason codes (those stay in the compliance journey)."""
+        if not (set(user.roles) & EMPLOYEE_ROLES):
+            raise HTTPException(403, "forbidden")
+        if svc.projection is None or not req_id or len(req_id) > 200:
+            raise HTTPException(404, "not found")
+        try:
+            svc.projection.sync()
+            res = svc.projection.reconstruct(req_id)
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("trace failed: %s", type(exc).__name__)
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+        if res is None or res.get("sub") != user.id:
+            raise HTTPException(404, "not found")
+        return {"req_id": req_id, "question": res.get("question"), "channel": res.get("channel"),
+                "event_time": res.get("event_time"), "status": res.get("status"),
+                "policy_version": res.get("policy_version"), "model": res.get("model"),
+                "prompt_version": res.get("prompt_version"), "latency_ms": res.get("latency_ms"),
+                "stage_ms": res.get("stage_ms") or {},
+                "dropped_sentences_count": res.get("dropped_sentences_count"),
+                "released": res.get("released") or [], "citations": res.get("citations") or [],
+                "answer_sha256": res.get("answer_sha256"),
+                "events": [{k: e.get(k) for k in ("seq", "kind", "hash", "recorded_at")}
+                           for e in res.get("events") or []]}
+
     @app.get("/ib/sources")
     def sources(user: DirectoryUser = Depends(current)):
         if not (set(user.roles) & EMPLOYEE_ROLES):          # same rule as ask and map
