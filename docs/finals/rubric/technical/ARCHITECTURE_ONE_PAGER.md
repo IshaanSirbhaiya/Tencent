@@ -79,7 +79,7 @@ Source: `docs/tencent/ARCHITECTURE.md:191-206`.
 | `GET /ib/trace/{req_id}` | the asker, own requests only | Stages, timings, model, released, cited, record hashes; never the considered set or reason codes | Built (`databridge_ib/app.py:176-203`) |
 | `GET /audit/journey/{req_id}` | compliance | The full journey incl. Gate 2 verdicts; no answer text | Built (`databridge_ib/audit/routes.py:249-264`) |
 | `GET /audit/stats` | compliance | Counts, timings, distributions only | Built (`databridge_ib/audit/routes.py:224-247`; `databridge_ib/audit/stats.py`) |
-| `GET /ib/graph`, `GET /ib/doc/{id}` | any employee | Permission-aware graph and document view | **In progress** (`docs/finals/PLAN.md` §5, B5-B6) |
+| `GET /ib/graph`, `GET /ib/doc/{id}` | any employee | Permission-aware graph and document view | **Built** (`tests/test_graph_doc.py`) |
 
 Tests for the built routes: `tests/test_dev_views.py` (6 tests).
 

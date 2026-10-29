@@ -238,7 +238,7 @@ jobs legible in the demo. Neither, from public text, showed evaluation numbers; 
 | Why BM25 and no embeddings? | Embedding at ingest would send every chunk of every document to the provider regardless of permissions, and would embed the query before access is decided (Codex review finding 11). Permitted-only embeddings are on the roadmap; BM25 over the asker's corpus leaks nothing through statistics. |
 | Do you use Hy3's thinking mode? | `no_think` for answers (speed, grounded by construction), `high` for the audit-filter builder and planning. The journey shows which. |
 | What happens if TokenHub is down on stage? | Chain falls to DeepSeek, then extractive; `fallback_used` is shown; demo continues. |
-| How do you measure answer quality? | Grounding wall at runtime; offline faithfulness over N questions (claims supported / total) and leak evals (0/5,958; 0/400); 639 + 38 tests [V]. We do not yet report retrieval recall per stage; that is next. |
+| How do you measure answer quality? | Grounding wall at runtime; offline faithfulness over N questions (claims supported / total) and leak evals (0/5,958; 0/400); 733 backend tests [V]; browser run: see docs/finals/TEST_REPORT.md. We do not yet report retrieval recall per stage; that is next. |
 | Does the voice path weaken the controls? | No. Speech becomes text before any gate; the token is the identity; the ledger stores the text. |
 | Is WorkBuddy just a chat window on your API? | It is a second identity-bound front door through MCP, and it can trigger the action tool; a judge can connect their own WorkBuddy in 2 minutes with the README. |
 | Did you try Hy4 preview? | It is listed on TokenHub; [either] we ran it side by side [or] we did not activate it in time; the chain is model-agnostic. Say which is true. |
@@ -266,7 +266,7 @@ moments are the identical refusal and the broken chain.
 
 **A. Novelty comparison table** (new)
 
-- File: `docs/finals/rubric/deliverables/C2_novelty_comparison.md`, one slide, and a section on `/dev/trust`.
+- File: `docs/finals/rubric/ai_innovation/INNOVATION_ONE_PAGER.md` (the planned C2 file was not written), one slide, and a section on `/dev/trust`.
 - Rows: live per-document re-check at answer time · restricted ≡ non-existent (tested) · write-ahead
   hash-chained ledger with live verify · tipping-off compartment · provenance pointers with time travel ·
   actions under the asker's token only. Columns: Walnut · Glean · M365 Copilot · Rovo · Onyx · Elastic DLS.
@@ -336,7 +336,7 @@ Mention only; show in Q&A if asked about provenance.
 
 ## 5. Gaps and cautions
 
-- Hy3 live call not yet confirmed in the repo docs [V]. Hy4 preview is on the official TokenHub model list
+- Hy3 live call not yet run (TokenHub activation pending) [V]. Hy4 preview is on the official TokenHub model list
   but untested by us; do not claim results.
 - Tencent's own TokenHub page does not spell out the `tools` schema for Hy3; third-party hosts confirm
   OpenAI-style tools work. Test on TokenHub before building the action agent around it; fallback is a

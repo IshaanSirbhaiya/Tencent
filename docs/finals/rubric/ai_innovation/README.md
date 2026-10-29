@@ -19,7 +19,7 @@ How to read every number: [../impact_feasibility/EVIDENCE_NOTES.md](../impact_fe
 | Hy3 composing answers through TokenHub | **Wired, live pending** (account activation) |
 | DeepSeek fallback | Wired, live pending |
 | Extractive fallback | Running; serves every demo answer today |
-| NL audit parser | Running, **rule-based**; optional model hook tested but not wired |
+| NL audit parser | Running, rules first; Hy3 fallback parser **wired, live run pending** |
 | WorkBuddy MCP front door | Running |
 | CodeBuddy build and Hy3 security review | Done (transcripts in `docs/tencent/evidence/`) |
 | Miora art | Done |
@@ -51,7 +51,7 @@ How to read every number: [../impact_feasibility/EVIDENCE_NOTES.md](../impact_fe
 | Where is the AI? It looks like a filter. | Hy3 is the answer writer (live run pending until confirmed), DeepSeek backs it up, the grounding wall checks it, and WorkBuddy's agent calls it through MCP. The filter is what makes the AI safe to switch on. |
 | Is Hy3 actually running? | Say the truth on the day. Today: wired and tested with a capturing model; live run pending TokenHub activation. Hy3 did run our CodeBuddy security review. |
 | Why does the answering model get no tools? | Deliberate. Tools touch systems. Actions will be a separate call whose proposals our code runs after a human confirms (planned). |
-| Does the audit search use an LLM? | No. It's rule-based, with a closed schema and fail-closed parsing. A model hook exists and is tested, but it's not switched on. |
+| Does the audit search use an LLM? | Rules run first. Only when they recognise nothing does a model parser (Hy3, then DeepSeek) get the question and the clock, never a ledger row; its output must pass a closed schema, or we fall back to the rules. It is wired and tested; the live Hy3 run is pending. |
 | Why no embeddings? | Embedding at ingest would send every chunk to a provider before access is decided. We rank with BM25 over the asker's permitted chunks only, so statistics leak nothing. |
 | What if TokenHub is down on stage? | The chain falls to DeepSeek, then to quotes; the answer is labelled. The demo continues. |
 | How do you measure quality? | 0 leaks in 5,958 requests; 0 / 400 differential; 0 injection failures; 100% of allowed sources reach the answer step; 87.8-96.4% cite the expected source. No faithfulness score yet. |

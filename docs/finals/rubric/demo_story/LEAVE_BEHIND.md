@@ -23,7 +23,7 @@ A permission-aware answer engine for a regulated company's Confluence, Jira, Sla
 Note on the page: the real-model (Hy3) run was pending when the evals were generated; the numbers come from a capturing test model and the quoting path. Keep this note unless the evals are re-run with Hy3.
 
 **5. The Tencent stack line**
-Hy3 through TokenHub, WorkBuddy (MCP) as a second front door, CodeBuddy to build and review, Tencent Cloud for hosting. State only what is live on 3 Nov: TO FILL.
+Hy3 through TokenHub, WorkBuddy (MCP) as a second front door, CodeBuddy to build and review, a one-command Lighthouse deploy kit for Tencent Cloud (no live instance). State only what is live on 3 Nov: TO FILL.
 
 **6. Value (estimate)**
 About US$1.3M a year for a 600-person fintech. Inputs: 600 staff, 90 minutes saved per person per week, US$31 an hour, 46 weeks. Break-even about 5 to 7 minutes per person per week, depending on price. Estimate, not a measurement; a pilot would measure it. Confirm all numbers against `rubric/research/A_impact_feasibility.md` and the submission.

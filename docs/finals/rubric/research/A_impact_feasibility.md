@@ -23,7 +23,7 @@ This builds on `docs/finals/research/05_competition_pitch.md` (run sheet, Aspire
 | 2 | ROI calculator page in the app | `databridge/apps/internal_brain_web/app/value/page.tsx` (new "Value" route) | 4:05-4:40, about 15 s live | Impact, Feasibility |
 | 3 | Cost-per-answer table (Hy3 on TokenHub, measured tokens) | `docs/finals/deliverables/COST_PER_ANSWER.md`, also a panel on the Value page | 4:05-4:40, 5 s | Feasibility |
 | 4 | Production architecture and scale path diagram | `docs/finals/deliverables/SCALE_ARCHITECTURE.md` + `docs/tencent/diagrams/scale_path.mmd` | 2:50-3:25 stack slide; Q&A | Feasibility |
-| 5 | 10-week pilot plan for Aspire | `docs/finals/deliverables/PILOT_PLAN.md` | 4:30-4:40, one line; Q&A | Feasibility, Impact |
+| 5 | 10-week pilot plan for Aspire | `docs/finals/rubric/impact_feasibility/PILOT_PLAN.md` | 4:30-4:40, one line; Q&A | Feasibility, Impact |
 | 6 | Risk register with mitigations | `docs/finals/deliverables/RISK_REGISTER.md` | Q&A only | Feasibility |
 | 7 | Pricing, unit economics and go-to-market note | `docs/finals/deliverables/PRICING_GTM.md` | Q&A only | Feasibility |
 | 8 | Certification path (one table) | section of `PILOT_PLAN.md` | Q&A only | Feasibility |
@@ -135,7 +135,7 @@ Outline (one page, numbered, every number with its source):
 2. The problem in three numbers: Gartner 47%; APQC 2.8 h/week; Copilot CW1226324 (Jan 2026).
 3. Why now: MAS AIRM issued 7 Oct 2026, Sections 3-4 apply from 7 Oct 2027; PDPA 10% of turnover.
 4. What we change: "answers only from what you're allowed to open, and proof afterwards". Two gates, sealed audit.
-5. Measured proof: 0 / 5,958 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 639 + 38 tests.
+5. Measured proof: 0 / 5,958 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 733 backend tests; browser run: see docs/finals/TEST_REPORT.md.
 6. Value (projection): break-even 7 min/person/week; base US$1.3M/yr; range US$0.44M-4.1M; assumptions in one line.
 7. Relevance to Aspire: covers all five scenarios; matches Aspire's own MCP permission promise; extends to AspireOS bank clients.
 8. Limits: synthetic data, mock platforms with real API shapes, no live tenant yet.
@@ -235,7 +235,7 @@ At 50 answers a day, US$0.72. For 600 seats at 10/day: about **US$87/month**, or
 | Scale (1,000-10,000 users) | Containers (TKE) behind a load balancer; stateless API pods; a Gate 2 worker pool per source with per-source rate-limit budgets; vector index service; read replicas; ledger on write-once storage | Webhook/event ingestion (Drive changes.watch, Slack events, Atlassian webhooks); per-source circuit breakers; per-compartment kill switch; SIEM export of the ledger | about US$1-3k, i.e. US$0.30-1.00 per seat |
 | Option: no data leaves the tenant | Self-host **Hy3 open weights** (Apache 2.0, 295B total / 21B active MoE; see 05 doc §4) on GPU instances | Removes the PDPA s.26 cross-border transfer question | High fixed GPU cost (FP8 weights alone are about 300 GB, so a multi-GPU node) **[estimate]**. Worth it only for large banks |
 
-Infrastructure trust we inherit: Tencent Cloud states it holds **MTCS Level 3** and an **OSPAR attestation (since June 2020)**
+Infrastructure trust that a Tencent Cloud Singapore deployment would build on (to confirm with Tencent): Tencent Cloud states it holds **MTCS Level 3** and an **OSPAR attestation (since June 2020)**
 for multiple products in its Singapore region ([Tencent Cloud compliance](https://www.tencentcloud.com/document/product/363/34543)) **[primary; confirm which products are in scope]**.
 OSPAR is the Association of Banks in Singapore's audit standard for outsourced service providers to banks.
 
@@ -317,7 +317,7 @@ The 200-firm figure is an assumption to be replaced with a MAS FID count **[veri
 | R10 | Never tested on a live tenant | Certain / High | Shadow-mode weeks 2-4 re-run the leak harness on real permissions before any user | Pilot step |
 | R11 | Unsupported content (PDF, slides, images skipped) | Certain / Medium | Clearly scoped; roadmap: text extraction with the same ACL rules | Documented |
 | R12 | Adoption: people don't change habits | Medium / High | Front doors where people already work (WorkBuddy; Slack later); pilot metrics weekly | Built (WorkBuddy) |
-| R13 | Small team maintaining a security product | High / High | Narrow scope; 639 + 38 tests and the leak harness in CI; seek a design-partner contract; certification path above | Honest answer in Q&A |
+| R13 | Small team maintaining a security product | High / High | Narrow scope; 733 backend tests; browser run: see docs/finals/TEST_REPORT.md and the leak harness in CI; seek a design-partner contract; certification path above | Honest answer in Q&A |
 | R14 | Ledger growth and retention | Low / Low | Retention policy per MAS record-keeping needs; external anchor; answer text outside the ledger (built) | Partly built |
 
 ### 3.4 Our concrete deliverables for Feasibility
@@ -333,7 +333,7 @@ workers (rate budgets) → Hy3/TokenHub (or self-hosted) → grounding → seale
 (3.3c) with the "federated Slack" change; the Tencent services named. **Demo: 2:50-3:25 on the Tencent stack slide
 (one diagram, 10 s); full version in Q&A.**
 
-**D6. `docs/finals/deliverables/PILOT_PLAN.md`**
+**D6. `docs/finals/rubric/impact_feasibility/PILOT_PLAN.md`**
 Outline: the 10-week table (3.3d), success metrics, the roles needed from Aspire (sponsor, IT admin for SSO and
 connectors, a compliance reviewer), data handling (read-only, Singapore region, synthetic-to-real switch), the
 certification path (3.3e), and the exit and stop criteria. **Demo: 4:30-4:40, one line: "Ten-week pilot: two weeks
@@ -353,10 +353,10 @@ Without these, cost and latency remain estimates. Say so.
 
 ### 3.5 Proof points to say on stage (Feasibility)
 
-1. "It runs today: 639 backend and 38 browser tests, and the leak harness re-runs on any company's permissions."
+1. "It runs today: 733 backend tests (browser run: see docs/finals/TEST_REPORT.md), and the leak harness re-runs on any company's permissions."
 2. "An answer costs under a tenth of a US cent on Hy3. Refusals cost nothing, because they never reach the model."
 3. "Slack and Atlassian tightened their APIs in 2025 and 2026. The market is moving to checking the source live, as the user. That's already how our Gate 2 works."
-4. "Deploys to Tencent Cloud Singapore, which already holds MTCS Level 3 and OSPAR. Hy3's open weights mean a bank can host the model itself."
+4. "The design targets Tencent Cloud Singapore, which already holds MTCS Level 3 and OSPAR. A one-command Lighthouse deploy kit is included; no live instance. Hy3's open weights mean a bank can host the model itself."
 5. "Ten-week pilot. The first two weeks run in shadow mode: our leak test on Aspire's real permissions, before a single user."
 6. "What breaks first at scale is API quota, not the model. We budget Gate 2 calls per source."
 
@@ -372,7 +372,7 @@ Without these, cost and latency remain estimates. Say so.
 | What if TokenHub is down? | "Hy3, then DeepSeek, then an extractive answer built only from permitted sentences. A kill switch turns the model off entirely." |
 | Does data leave Singapore? | "Only the permitted passages for one question go to the model, through the Singapore endpoint. A bank that wants nothing to leave can self-host Hy3's open weights." (Endpoint location and retention terms **[verify]** in TokenHub terms.) |
 | Who maintains this? You're students. | "Fair question. The scope is narrow, the safety properties are tested on every commit, and the pilot is the contract that funds maintenance. We'd want Aspire as a design partner, as AISG's 100E model does." |
-| Certifications? | "Infrastructure inherits Tencent's MTCS L3 and OSPAR. For us: pen test and AI Verify tests in the pilot, CSA Cyber Trust within six months, then SOC 2." |
+| Certifications? | "Hosting would build on Tencent Cloud's MTCS L3 and OSPAR attestations (to confirm with Tencent; no live deployment yet). For us: pen test and AI Verify tests in the pilot, CSA Cyber Trust within six months, then SOC 2." |
 | How is it priced? | "Around US$10 a seat a month. At that price a person breaks even on five minutes a week." |
 | What did you build versus reuse? | "Built: the two gates, the four permission compilers, the sealed ledger, the eval harness, the UI and the MCP server. Reused: the Walnut evidence engine by import, Hy3 via TokenHub, and WorkBuddy as a front door." (Keep this consistent with SUBMISSION.md.) |
 

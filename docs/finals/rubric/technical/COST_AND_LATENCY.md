@@ -2,21 +2,21 @@
 
 > **Status.** 30 Oct 2026. Every number is labelled **Measured** (with its source) or **Estimate** (with
 > its working). No real-model call has succeeded yet, so **every model cost and model latency figure is an
-> estimate**. Measured eval numbers are from RESULTS.md (14 Oct): **re-run pending**.
+> estimate**. Eval counts were re-run on 30 Oct (`eval_summary.json`); latency figures are from the 14 Oct RESULTS.md and were not re-measured.
 > `databridge_ib/…` = `databridge/apps/internal_brain/databridge_ib/…`. Line numbers refer to commit `e5406b9` (read them with `git show e5406b9:<path>`); the code is being edited this week, so the function or test name is the stable part.
 
 ## 1. Latency
 
 | Item | Value | Type | Source / working |
 |---|---|---|---|
-| Mean pipeline latency, model path (fake model, so model time ≈ 0) | **19.8 ms** | Measured (re-run pending) | `RESULTS.md:49` |
-| Mean pipeline latency, extractive path | **19.0 ms** | Measured (re-run pending) | `RESULTS.md:50` |
+| Mean pipeline latency, model path (fake model, so model time ≈ 0) | **19.8 ms** | Measured (14 Oct run; not re-measured) | `RESULTS.md:49` |
+| Mean pipeline latency, extractive path | **19.0 ms** | Measured (14 Oct run; not re-measured) | `RESULTS.md:50` |
 | Gate 2 worst case per answer | **2 s** hard budget for the whole batch, then deny | Design limit | `databridge_ib/gates.py:44`; `databridge_ib/pipeline.py:80` |
 | Gate 2 against real platform APIs | Unknown | Not measured | Mock platforms on localhost only |
 | Hy3 generation time | Unknown | Not measured | No live call yet |
 | Map (re-checks every item live) | "a few seconds" for a big map; 45 s batch budget | Stated limit | `INTERNAL_BRAIN.md:255-256`; `docs/tencent/ARCHITECTURE.md:114-116` |
 | Index build at start-up | About 1 minute (demo world) | Measured by hand | `INTERNAL_BRAIN.md:112-113` |
-| Eval shard build / run | 11.5-15.9 s build; 0.3-44.3 s run per shard | Measured (re-run pending) | `RESULTS.md:36` |
+| Eval shard build / run | 11.5-15.9 s build; 0.3-44.3 s run per shard | Measured (14 Oct run; not re-measured) | `RESULTS.md:36` |
 
 **Per-stage timings are now recorded** (30 Oct): every `answer.released` event carries `stage_ms` for
 accept, gate1, gate2, seal and compose (`databridge_ib/pipeline.py:185-188`), and `/audit/stats` reports
@@ -31,9 +31,9 @@ measurement.
 
 | Item | Value | Type | Source |
 |---|---|---|---|
-| Fake-model requests refused with **no model call** | 2,296 of 2,979 (77%) | Measured (re-run pending) | `RESULTS.md:49` |
-| Requests where the model received passages | 683 of 2,979 (23%) | Measured (re-run pending) | `RESULTS.md:12, 49` |
-| Model answers replaced after grounding | 2 of 683 | Measured, **fake model** (re-run pending) | `RESULTS.md:49` |
+| Fake-model requests refused with **no model call** | 2,296 of 2,979 (77%) | Measured 30 Oct (`eval_summary.json`) | `RESULTS.md:49` |
+| Requests where the model received passages | 683 of 2,979 (23%) | Measured 30 Oct (`eval_summary.json`) | `RESULTS.md:12, 49` |
+| Model answers replaced after grounding | 2 of 683 | Measured, **fake model** (14 Oct run; not re-measured) | `RESULTS.md:49` |
 
 **Caveat.** The eval is adversarial: most probes ask for things the persona may not see, so it refuses
 far more often than real users would. Do not use 77% as a forecast of real traffic.

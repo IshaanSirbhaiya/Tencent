@@ -48,7 +48,7 @@ just not relevant (`databridge_ib/models.py:20-21`). We do **not** show:
 the thing exists. We tested this: restricted and non-existent requests give byte-identical responses
 (`tests/test_scenarios_e2e.py::test_s3_existing_vs_nonexistent_identical`, line 53;
 `tests/test_fintech_scenarios.py::test_fc_real_vs_nonexistent_customer_is_byte_identical`, line 100;
-P2: 0 of 400 mismatches, `RESULTS.md:16`, **re-run pending**).
+P2: 0 of 400 mismatches, `RESULTS.md:16`, re-run 30 Oct).
 
 The new UI keeps this rule: research suggested "Searched N (K allowed, J hidden)" and we rejected it
 (`docs/finals/DECISIONS.md` D-07). The own-request trace hides the considered set and reason codes, and
@@ -57,14 +57,14 @@ someone else's request id gives the same 404 as an unknown one (`tests/test_dev_
 **The explanation still exists, for the right person.** Compliance can reconstruct any refusal through
 `/audit/journey`, and that access is itself logged.
 
-## 4. In progress (30 Oct)
+## 4. Built (30 Oct)
 
 | Item | Status | Evidence |
 |---|---|---|
 | Per-stage timings in `answer.released.stage_ms` | Built and tested | `databridge_ib/pipeline.py:185-188`; `tests/test_dev_views.py::test_answer_release_records_stage_timings` (line 37) |
 | `/ib/trace`, `/audit/journey`, `/audit/stats` | Built and tested | `tests/test_dev_views.py` |
-| "How this was answered" link under each answer → request journey waterfall | **In progress** (web UI) | `docs/finals/PLAN.md` §3.1-3.2 |
-| Permission-aware graph (`/ib/graph`) and document view (`/ib/doc`) with "why I can see it" | **In progress**, not built or tested yet | `docs/finals/PLAN.md` §5, B5-B6 |
+| "How this was answered" link under each answer → request journey waterfall | **Built** (web UI, `/dev/journey`) | `components/user/AnswerCard.tsx`; `docs/finals/PLAN.md` §3.1-3.2 |
+| Permission-aware graph (`/ib/graph`) and document view (`/ib/doc`) with "why I can see it" | **Built** (`/ib/graph`, `/ib/doc`) | `tests/test_graph_doc.py` |
 
 ## 5. Limits
 

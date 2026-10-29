@@ -13,14 +13,14 @@
 >
 > **References.** `databridge_ib/…` = `databridge/apps/internal_brain/databridge_ib/…`; `tests/…` =
 > `databridge/apps/internal_brain/tests/…`. Line numbers refer to commit `e5406b9` (read them with `git show e5406b9:<path>`); the code is being edited this week, so the function or test name is the stable part. Eval numbers from
-> [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (14 Oct): **re-run pending**.
+> [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (14 Oct run); headline numbers re-run on the finals code, 30 Oct (`eval_summary.json`).
 
 ## Summary
 
 | # | Principle | Checks (per research, [verify]) | Our outcome | Evidence ready | Main gap |
 |---|---|---|---|---|---|
 | 1 | Transparency | 15 | Partial | Yes | No "AI-generated" label; no staff notice of logging |
-| 2 | Explainability | 1 | Met | Yes | "Why this answer" UI panel in progress |
+| 2 | Explainability | 1 | Met | Yes | "How this was answered" link to the request journey (`/dev/journey`) |
 | 3 | Reproducibility | 10 | Met | Yes | Model ids are aliases |
 | 4 | Safety | 17 | Met | Yes | Relations between facts not verified |
 | 5 | Security | 14 | Met | Yes | Track 1 disposition; rate limits; timing |
@@ -45,7 +45,7 @@ Six principles met, five partial, none with no mechanism at all.
 - **Outcome.** Met.
 - **Our process.** Citations per sentence. Each asker can see how their own answer was made: stages, timings, model, grounding drops and the sealed record hashes, via `/ib/trace` (`databridge_ib/app.py:176-203`). Compliance sees the full decision trail, including Gate 2 verdicts, via `/audit/journey` (`databridge_ib/audit/routes.py:249-264`).
 - **Evidence to attach.** [EXPLAINABILITY.md](EXPLAINABILITY.md); `tests/test_dev_views.py::test_trace_is_own_requests_only_and_hides_gate2_reasons` (line 93); `::test_journey_is_compliance_only_and_has_no_answer_text` (line 76).
-- **Gap.** The user-facing "how this was answered" panel for the new UI is in progress (`docs/finals/PLAN.md` §3.1).
+- **Gap.** The user-facing "How this was answered" link opens the request journey (`/dev/journey`); a plain-language narration of it is not built.
 
 ## 3. Reproducibility
 
@@ -58,14 +58,14 @@ Six principles met, five partial, none with no mechanism at all.
 
 - **Outcome.** Met.
 - **Our process.** Constant refusal; no model call when nothing is relevant (`databridge_ib/pipeline.py:163`); grounding wall with extractive fallback (`databridge_ib/narrate.py:129-197`); no tools (`databridge_ib/llm.py:91-92`).
-- **Evidence to attach.** `tests/test_llm_chain.py::test_ungrounded_number_refused_by_grounding_wall` (line 198); RESULTS.md: 0 uncited answers **(re-run pending)**.
+- **Evidence to attach.** `tests/test_llm_chain.py::test_ungrounded_number_refused_by_grounding_wall` (line 198); RESULTS.md: 0 uncited answers (re-run 30 Oct).
 - **Gap.** Relations between facts are not verified; one valid citation is enough for a model answer.
 
 ## 5. Security
 
 - **Outcome.** Met.
 - **Our process.** Threat model and adversary table (`docs/tencent/SECURITY.md:27-42`). Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds, with dispositions for tracks 2-7 (`docs/tencent/SECURITY.md:124-393`).
-- **Evidence to attach.** [OWASP_LLM_REDTEAM.md](OWASP_LLM_REDTEAM.md); RESULTS.md: 0 leaks / 5,958, 0 injection failures / 976 **(re-run pending)**.
+- **Evidence to attach.** [OWASP_LLM_REDTEAM.md](OWASP_LLM_REDTEAM.md); RESULTS.md: 0 leaks / 5,958, 0 injection failures / 976 (re-run 30 Oct).
 - **Gap.** Track 1 (35 findings) has no written disposition (`docs/tencent/SECURITY.md:208-218`). No rate limiter. Timing side channel not controlled.
 
 ## 6. Robustness
@@ -79,7 +79,7 @@ Six principles met, five partial, none with no mechanism at all.
 
 - **Outcome.** Partial.
 - **Our process.** The same gates for every role. Per-persona utility is published (`RESULTS.md:118-141`). See [FAIRNESS_NOTE.md](FAIRNESS_NOTE.md).
-- **Gap.** English only. Cited recall is uneven for some roles (for example `mlro.tan` world must-cite 71.4% on the model path, `RESULTS.md:128`) **(re-run pending)**.
+- **Gap.** English only. Cited recall is uneven for some roles (for example `mlro.tan` world must-cite 71.4% on the model path, `RESULTS.md:128`; per-role figure from the 14 Oct run, not re-checked).
 
 ## 8. Data governance
 
@@ -104,10 +104,10 @@ Six principles met, five partial, none with no mechanism at all.
 
 - **Outcome.** Partial.
 - **Our process.** Aims to cut search time (Aspire's brief: about 30% of the week, `INTERNAL_BRAIN.md:53`). axe accessibility checks on five screens at desktop and phone width (`databridge/apps/internal_brain_web/tests/e2e/a11y.spec.ts`). Refusals make no model call, which saves compute (`RESULTS.md:49`).
-- **Gap.** English answers only (Aspire works in SG, ID, TH, VN). No assistive-technology testing. Language switch (English / 简体中文) for the UI is planned, not built (`docs/finals/PLAN.md` §4).
+- **Gap.** English answers only (Aspire works in SG, ID, TH, VN). No assistive-technology testing. The UI language switch (English / 简体中文) is built (header and Settings); answers stay English.
 
 ## Next steps
 
 1. Download the AI Verify Process Checks Tool and mark each item Yes / No / N/A with the evidence above.
 2. Run Project Moonshot against `/ib/ask` (optional, `../research/D_technical_responsible_ai.md` §4 R4b).
-3. Re-run the eval after the 30 Oct pipeline edits and update every "re-run pending" number.
+3. Done 30 Oct: the eval was re-run on the finals code and the headline numbers match `eval_summary.json`. Re-check per-role cited recall if it is quoted.

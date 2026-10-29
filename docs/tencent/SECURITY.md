@@ -63,8 +63,10 @@ Haiku). See sections 9-14.
   rated an enabled demo login **Critical** (finding 1). There is no real SSO/IdP (plan §3, roadmap).
 - The logout revocation, fail-closed revocation list, `Secure` cookie and passcode came with commit `d69ab97`.
   They have **no dedicated regression tests yet**.
-- MCP tokens for WorkBuddy and the MCP server's "no identity argument" schema test are **not built yet**
-  (`mcp_server.py` and `databridge/scripts/ib_mint_token.py` are absent).
+- MCP tokens for WorkBuddy are built (`databridge/scripts/ib_mint_token.py`, `tests/test_mint_token_cli.py`), and the
+  MCP servers (`databridge_ib/mcp_server.py`, `databridge_ib/audit_mcp_server.py`) have "no identity argument"
+  schema tests (`tests/test_mcp_server.py::test_internal_brain_tools_have_no_identity_argument`,
+  `::test_audit_tools_have_no_identity_argument`).
 
 ## 3. Ledger attacker model
 

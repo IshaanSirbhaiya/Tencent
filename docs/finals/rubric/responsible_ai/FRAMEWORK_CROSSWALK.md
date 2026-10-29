@@ -7,7 +7,7 @@
 >
 > **References.** `databridge_ib/…` = `databridge/apps/internal_brain/databridge_ib/…`; `tests/…` =
 > `databridge/apps/internal_brain/tests/…`. Line numbers refer to commit `e5406b9` (read them with `git show e5406b9:<path>`); the code is being edited this week, so the function or test name is the stable part. Eval numbers from
-> [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (14 Oct): **re-run pending**.
+> [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (14 Oct run); headline numbers re-run on the finals code, 30 Oct (`eval_summary.json`).
 > Framework descriptions come from the sources in
 > [research/D_technical_responsible_ai.md](../research/D_technical_responsible_ai.md) §2 and §9. Items that
 > research marked **[verify]** are marked here too.
@@ -21,9 +21,9 @@
 | C3 | **Identity from a signed token only**; no identity in bodies or tools | `databridge_ib/auth.py:34-63`; `tests/test_app_routes.py::test_identity_from_token_only`; `tests/test_mcp_server.py::test_internal_brain_tools_have_no_identity_argument` |
 | C4 | **Write-ahead sealed ledger**; tamper evidence; external head | `databridge_ib/pipeline.py:106-110, 151-158, 184-197`; `tests/test_audit_tamper.py`; `tests/test_app_routes.py::test_ledger_failure_is_503` |
 | C5 | **Grounding wall + extractive fallback** | `databridge_ib/narrate.py:129-197`; `tests/test_llm_chain.py::test_ungrounded_number_refused_by_grounding_wall` |
-| C6 | **One response shape** (restricted ≡ non-existent) | `databridge_ib/models.py:18-21, 179-185`; P2 0 / 400 (re-run pending) |
+| C6 | **One response shape** (restricted ≡ non-existent) | `databridge_ib/models.py:18-21, 179-185`; P2 0 / 400 (re-run 30 Oct) |
 | C7 | **Masking at ingest** (card, CVV, NRIC/FIN, IBAN) | `databridge_ib/ingest.py:64, 102`; `tests/test_sensitive.py`; `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` |
-| C8 | **No tools for the model**; injection containment | `databridge_ib/llm.py:91-92`; `databridge_ib/narrate.py:31-67`; injection 0 / 976 (re-run pending) |
+| C8 | **No tools for the model**; injection containment | `databridge_ib/llm.py:91-92`; `databridge_ib/narrate.py:31-67`; injection 0 / 976 (re-run 30 Oct) |
 | C9 | **Kill switch** `IB_FORCE_OFFLINE=1` | `databridge_ib/llm.py:78-79`; `tests/test_model_config.py::test_force_offline_wins_over_any_key` |
 | C10 | **Reasoned reveal + role-segregated audit** | `databridge_ib/audit/routes.py:46, 84, 183-222`; `tests/test_audit_routes.py::test_reveal_requires_reason_and_is_ledgered`, `::test_non_compliance_roles_forbidden` |
 | C11 | **Leak and injection eval with canaries** | `databridge/evals/internal_brain/run.py`; `RESULTS.md:143-146`; `tests/test_eval_smoke.py::test_eval_canary_detects_a_leaky_pipeline` |

@@ -14,7 +14,7 @@
 |---|---|---|
 | Python env | `cd databridge && py -3.13 -m venv .venv && .venv/Scripts/python -m pip install -r requirements-lock.txt` | `PY --version` is 3.13 |
 | Web deps | `cd databridge/apps/internal_brain_web && npm install` | no errors |
-| Tests green | `cd databridge && PY -m pytest apps/internal_brain/tests -q` | 645 passed on 30 Oct (about 75 s) |
+| Tests green | `cd databridge && PY -m pytest apps/internal_brain/tests -q` | 733 passed on 30 Oct at commit 8582f4b |
 | Optional: Hy3 | Create `databridge/.env.ib.local` (git-ignored) with `TOKENHUB_API_KEY=<key>` and `IB_FORCE_OFFLINE=0` | See §4, failure 1 |
 | Optional: WorkBuddy | `cd databridge && PY scripts/workbuddy_setup.py --user-config`; restart WorkBuddy; press **Trust** on each connector | Three connectors appear (`docs/tencent/workbuddy/README.md`) |
 
@@ -59,7 +59,7 @@ Brain and the mock platforms (`databridge/scripts/run_local_demo.sh:26`).
 | 7 | **Backend dead, no time to fix** | — | Web app in built-in mock mode: `npm run dev:mock` (fixtures, no Brain needed; it is what the Playwright tests use, `databridge/apps/internal_brain_web/playwright.config.ts:5, 21-22`). Check it still works in the new UI on Mon 2 Nov | "This is the recorded fixture mode." Say it |
 | 8 | **Everything fails** | — | Play the backup video: `submission/05_video/walnut_internal_brain_demo.mp4` (re-record if the new UI is ready, `docs/finals/DECISIONS.md` D-01) | "Here's the same flow recorded on this laptop." |
 | 9 | **Tamper moment fails to run** | — | Show `databridge/apps/internal_brain/tests/test_audit_tamper.py` passing, or the recorded output of `PY scripts/tamper_demo.py` | — |
-| 10 | **Projector too dark / small** | — | Use the presenter mode and large text if built (`docs/finals/PLAN.md` §3.3, in progress); otherwise browser zoom 125% | — |
+| 10 | **Projector too dark / small** | — | Use presenter mode (press `P`) and large text; browser zoom 125% also works | — |
 
 ## 5. Fixed persona order (rehearse it this way)
 

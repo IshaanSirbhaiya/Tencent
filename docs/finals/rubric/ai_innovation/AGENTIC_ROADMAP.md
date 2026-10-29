@@ -69,7 +69,7 @@ an identity field; a spoken question and the same typed question produce the sam
 |---|---|---|
 | Explain this answer | A short plain-English narration of the request journey, every number taken from the journey JSON | Planned |
 | Faithfulness score | Offline: claims supported by their cited passage, with and without the grounding wall | Planned |
-| Model hook for the audit parser | Wire the existing, tested `llm=` hook in `audit/nl_filter.py` to Hy3 for questions the rules do not recognise | Planned (hook exists and is tested; not wired) |
+| Model hook for the audit parser | The `llm=` hook in `audit/nl_filter.py` is wired to Hy3 (then DeepSeek) through `audit/nl_llm.py` for questions the rules do not recognise | Wired (hook exists and is tested); not run live |
 | Hy4 preview side by side | Same question to `hy3` and `hy4-preview`, both grounded | Only if activated and tested |
 
 ## 4. How to talk about it on stage

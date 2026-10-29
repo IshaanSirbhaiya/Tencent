@@ -5,8 +5,8 @@ Demo Day 3 Nov 2026.
 
 Every claim in these files links to a file and line, a test or an eval in this repo. Everything is
 self-assessed by the team, on synthetic data. Eval numbers come from
-[RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (run of 14 Oct) and are marked
-**re-run pending** until the eval is re-run after the 30 Oct pipeline edits.
+[RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (run of 14 Oct). The headline numbers were re-run
+on the finals code on 30 Oct and match `eval_summary.json`; latency and per-role figures are from the 14 Oct run.
 
 ## Index
 
@@ -48,5 +48,5 @@ ARCHITECTURE, DATA_FLOWS). Technical evidence: [../technical/](../technical/READ
 | "Human in the loop" | "Humans stay the authority on access; compliance can reconstruct and reveal; no review queue yet" | No review queue is built |
 | "Production-ready" | "Prototype with a deploy kit; no live deployment" | `docs/tencent/ARCHITECTURE.md:42` |
 | "The graph shows the whole company" | "The graph shows only what the signed-in person can open, checked live" | `/ib/graph` and `/ib/doc` build an induced graph of live-authorised documents only (`databridge_ib/graph.py`, `authz.py`; `tests/test_graph_doc.py`, incl. paired-world differential tests) |
-| Current eval numbers without the caveat | "From the 14 Oct run; re-run pending" | They predate the 30 Oct pipeline edits |
+| Current eval numbers without the caveat | "From the 14 Oct run" for headline numbers | They were re-run on 30 Oct; only latency and per-role figures are 14 Oct |
 | Any Aspire customer count or licence status | — | Not verified (`../research/D_technical_responsible_ai.md:419`) |

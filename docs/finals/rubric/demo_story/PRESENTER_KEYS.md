@@ -4,10 +4,12 @@ Build target: `databridge/apps/internal_brain_web`. Purpose: one person (Dev) ru
 
 Items marked **PROPOSED** are names or query strings chosen in this spec because the repo has no existing one. Change them freely, but keep the behaviour, and tell the coordinator.
 
+**Stage rules:** only ONE browser window is used on stage (no second pre-opened window); `R` is the recovery key.
+
 ## 1. Enabling, and why (WCAG 2.1.4)
 
 Single-key shortcuts are a WCAG 2.1.4 risk. So:
-- Presenter keys are **off by default**. They are active only when presenter mode is armed: `NEXT_PUBLIC_IB_PRESENTER=1` at build or start, or `localStorage["ib.presenter"]="1"` (PROPOSED).
+- Presenter keys are **off by default**. They are active only when presenter mode is armed: `NEXT_PUBLIC_IB_PRESENTER=1` at build or start, or `localStorage["ib.presenter"]="1"` (built; `components/presenter/controller.ts`).
 - They are ignored whenever focus is in an input, textarea, select or contenteditable, and whenever Ctrl, Alt or Meta is held.
 - A small visible HUD (bottom-right, outside the 5% safe margin) shows the armed state, the step number and four status dots: API, model (TokenHub), ledger, WorkBuddy. HUD text is also in the accessibility tree.
 - Normal users never see the HUD or any shortcut.
@@ -20,7 +22,6 @@ Single-key shortcuts are a WCAG 2.1.4 risk. So:
 | `Space` | Run the next step. The HUD shows what the next step will do. Debounce: ignore a second press within 400 ms |
 | `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end |
 | `R` | Reset: restores the tamper sandbox copy, clears the ask boxes, re-warms the model, returns to Step 0. Never edits the real ledger |
-| `2` | (PROPOSED extra) On the Compare view, opens citation [2] of the focused answer. Same as Enter on the chip |
 | `Esc` | Closes the sources sheet and returns focus to the chip that opened it. Normal app behaviour, not presenter-only |
 | `L` | (PROPOSED extra) Toggles English and 简体中文 and back. Needed so the driver never uses the mouse |
 
@@ -31,7 +32,7 @@ Everything on the run sheet must be reachable by these keys alone.
 - **Light** theme, **150%** scale (root font size x1.5; body text at least 24 px; answers at least 40 px as the plan asks for projector legibility).
 - Navigation hidden; content inside a 1280 x 720 safe area, nothing in the outer 5%.
 - Colours keep AA contrast (check with the contrast test). No gradients, no animation beyond a short fade. Respect `prefers-reduced-motion`.
-- Footer label always visible: "Demo data: synthetic Company A". When the answer was composed by WorkBuddy, show "composed by WorkBuddy (Hy3) from the Brain's sealed answer" only if true.
+- Footer label always visible: "Demo data: synthetic Company A". When the answer was composed by WorkBuddy, show "composed by WorkBuddy (Hy3) from the Brain's sealed answer" [ONLY IF HY3 LIVE; default: omit the label].
 - Theme is applied by a class on `<html>` (PROPOSED: `data-theme="stage"`); `R` and leaving presenter mode remove it.
 - The dark theme stays available for the rehearsal test on the venue projector; decide on 2 Nov.
 
@@ -59,17 +60,17 @@ Questions (exact strings, from `lib/personas.ts`):
 | Step | Trigger | Run sheet time | URL | App action |
 |---|---|---|---|---|
 | 0 | `P` | before 0:00 | `/compare?mode=people&left=amy.am&right=mlro.tan` | Stage theme on. Two columns labelled Amy (Account manager) and Rachel (MLRO). Boxes pre-filled with Q-V but not submitted. HUD ready |
-| 1 | `Space` | 0:07 | same | Both columns submit Q-V at once, each with its own persona token. Staged status line, then both verified answers. Rachel's shows the classification pill "Internal · FinCrime" (from the strictest cited label). Save Rachel's `req_id` in presenter state for step 5 |
+| 1 | `Space` | 0:07 | same | Both columns submit Q-V at once, each with its own persona token. Staged status line, then both verified answers. There is no classification pill in the app. Save Rachel's `req_id` in presenter state for step 5 |
 | 2 | `Space` | 0:45 | `/compare?mode=person&person=ken.ext` | Mode "same person, two questions". Both columns are Ken. Left submits Q-V; right submits Q-B. Both show the same refusal card. Optional (P1): a line "Responses identical" computed from the two user-visible refusal bodies only. It must never state or imply anything about hidden documents (D-07). Hold |
-| 3 | `Space` | 1:10 | `/compare?mode=people&left=amy.am&right=mlro.tan` | Returns to step 1's results (restored, not re-asked). Focus on Rachel's answer. Key `2` (or Enter on chip [2]) opens the **sources sheet** |
-| 3b | `2` | 1:12 | same, sheet open | Sheet shows: document title, the cited passage highlighted, "checked live" age, version. `Esc` closes it and returns focus to chip [2] |
+| 3 | `Space` | 1:10 | `/compare?mode=people&left=amy.am&right=mlro.tan` | Returns to step 1's results (restored, not re-asked). Focus on Rachel's answer. `Space` itself opens citation [2], i.e. the **sources sheet** (no second key) |
+| 3b | (none; same `Space` as step 3) | 1:12 | same, sheet open | Sheet shows: document title, the cited passage highlighted, "checked live" age, version. `Esc` closes it and returns focus to chip [2] |
 | 4 | `Space` | 1:40 | `/dev/journey/<req>` where `<req>` is Rachel's `req_id` from step 1 | Session switches to `maya.compliance`. Journey opens in under 2 seconds: waterfall with real milliseconds per stage, model name, three ledger records with sequence and hash. Full ms waterfall shows only to the compliance role (D-16) |
 | 5 | `Space` | 2:10 | `/dev/audit` | Opens the audit view as Maya |
 | 5b | `Space` | 2:15 | `/dev/audit` | **Verify** on the live ledger. Green: intact |
-| 6 | `Space` | 2:20 | `/dev/audit` | **Tamper**: calls the compliance endpoint `POST /audit/tamper-demo` (B11), which changes one word ("denied" to "allowed") in a temporary **copy** of the ledger and returns the verify report. The real chain is never edited (D-19) |
+| 6 | `Space` | 2:20 | `/dev/audit` | **Tamper**: calls the compliance endpoint `POST /audit/tamper-demo` (B11), which changes one decision ("forbidden" to "verified"; the backend scenario is being changed to exactly this) in a temporary **copy** of the ledger and returns the verify report. The real chain is never edited (D-19) |
 | 6b | `Space` | 2:25 | `/dev/audit` | **Verify** on the tampered copy. Red: "broken at entry N" with the exact sequence number. Ishaan or Mehul reads the number off the screen |
 | 7 | `Space` | 2:35 | HUD card "WorkBuddy" | App stays open. HUD says "Switch to WorkBuddy". Dev switches window (Alt+Tab) to the WorkBuddy window (**off-app**; see §7) |
-| 8 | `Space` | 3:12 | `/dev/audit` | Back in the app. Shows the real ledger (not the sandbox copy). Scrolls to and highlights the newest row, channel `workbuddy-mcp` (Jordan). Then `L` flips to 简体中文 and `L` back (3 s) |
+| 8 | `Space` | 3:12 | `/dev/audit` | Back in the app. Shows the real ledger (not the sandbox copy). The newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus (Alt-Tab back; `?latest=1`), not on a key. Then `L` flips to 简体中文 and `L` back (3 s) |
 | 9 | `Space` | 3:20 | `/present/proof` (PROPOSED) | **Proof slide** |
 | 10 | `Space` | 3:50 | `/present/business` (PROPOSED) | **Business slide** |
 | 11 | `Space` | 4:30 | `/present/close` (PROPOSED) | **Close slide** |
@@ -80,7 +81,7 @@ Note: the run sheet's Ken step happens before the passage step. The tamper in st
 ## 7. The WorkBuddy beat (off-app)
 
 - Not controlled by the app. WorkBuddy is a separate window, already open, warm, configured as Jordan with the Internal Brain connector (`scripts/workbuddy_setup.py`).
-- Aaruni starts the action by pasting the prompt: `What's the status of the DB migration and were any blockers raised in Slack last week?` (prompt text from the plan; Jordan's canonical question is "What's the status of the database migration project and were there any blockers raised in Slack last week?" in `personas.ts`. Pick one string and rehearse it. Both exist in the repo.)
+- Aaruni starts the action by pasting the one exact prompt used everywhere (it is Jordan's canonical question in `personas.ts`): `What's the status of the database migration project and were there any blockers raised in Slack last week?`
 - Expected: a cited answer stitched from Jira, Slack and Confluence.
 - Step 8 then shows the new ledger row. This is the live proof that WorkBuddy used the same gates.
 - If the network fails: `B` plays clip C.
@@ -100,7 +101,7 @@ Three full-screen slides rendered by the app so the Stage theme and fonts match.
 **Business slide** (`/present/business`):
 - One number: about US$1.3M a year, labelled "estimate".
 - Four inputs on the slide (default case in the repo research: 600 staff, 90 minutes saved per person per week, US$31 an hour, 46 weeks). Confirm against the one-pager.
-- One Tencent stack line: Hy3 through TokenHub, WorkBuddy, CodeBuddy, Tencent Cloud. State only what is live ([HY3] check).
+- One Tencent stack line [ONLY IF HY3 LIVE for the Hy3 part; default: "WorkBuddy, CodeBuddy, TokenHub (Hy3 wired, live run pending); a Lighthouse deploy kit, no live instance"]. State only what is live ([HY3] check).
 
 **Close slide** (`/present/close`):
 - The tagline in large type: "Answers you can prove."

@@ -59,7 +59,7 @@ and the live Hy3 run.
 
 | File | What it holds |
 |---|---|
-| [QA_LIVE.md](QA_LIVE.md) | Every page × persona run against the live backend: 32 checks, 11 bugs fixed, 6 open issues (§4) |
+| [QA_LIVE.md](QA_LIVE.md) | Every page × persona run against the live backend: 32 checks, 11 bugs fixed, 4 open issues (§4; two more fixed in 8582f4b) |
 | [../../databridge/evals/internal_brain/RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md) | The leak and injection evaluation, re-run 30 Oct on the finals pipeline |
 
 ## 7. Screenshots

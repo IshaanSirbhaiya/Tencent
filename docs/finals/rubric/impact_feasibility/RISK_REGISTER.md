@@ -19,7 +19,7 @@ Tests are under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | R10 | Never tested on a live tenant | Certain / High | Shadow mode in pilot weeks 2-4 re-runs the leak harness on real permissions before any user | Pilot step ([PILOT_PLAN.md](PILOT_PLAN.md)) |
 | R11 | Unsupported content (PDF, slides, images skipped) | Certain / Medium | Clearly scoped; roadmap: text extraction under the same ACL rules | Documented; skipped types tested (`test_connector_drive.py::test_unsupported_mime_folder_missing_trashed_skip`) |
 | R12 | Adoption: people keep old habits | Medium / High | Front doors where people already work (WorkBuddy now; Slack later); weekly pilot metrics | WorkBuddy built (`test_mcp_server.py`, `docs/tencent/workbuddy/README.md`) |
-| R13 | A small team maintaining a security product | High / High | Narrow scope; 645 backend tests (collected 30 Oct) and the leak harness on every change; a design-partner contract; the certification path | Honest answer in Q&A |
+| R13 | A small team maintaining a security product | High / High | Narrow scope; 733 backend tests (30 Oct, commit 8582f4b) and the leak harness on every change; a design-partner contract; the certification path | Honest answer in Q&A |
 | R14 | Ledger growth and retention | Low / Low | Retention policy per MAS record-keeping needs; external anchor; answer text kept outside the ledger | Partly built (`docs/tencent/DATA_FLOWS.md`; `test_audit_tamper.py`) |
 
 Also stated in `INTERNAL_BRAIN.md` "Honest limits": the ledger has a key-holder window beyond the last

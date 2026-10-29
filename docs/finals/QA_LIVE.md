@@ -50,7 +50,7 @@ Result: **Pass** = works live with a clean console. **Fixed** = a bug was found 
 | 25 | Analytics `/dev/analytics` | maya.compliance | Pass | Every panel populated; Gate-2 reasons: verified 1,305, forbidden 3 (`not_member` 2, `not_permitted` 1); replay banner (304 replay requests) and Live-only toggle | | |
 | 26 | Audit: reveal with reason, Verify, sandbox tamper | maya.compliance | Pass | Reveal needs a reason and returns the answer; Verify: chain intact, external head matches; tamper: every scenario as expected, real log not modified | | |
 | 27 | Value calculator `/value` | maya.compliance | Pass | | | |
-| 28 | Simulator `/dev/sim` | admin.it | Pass, with an open backend issue | Revoke → Jordan's DB-migration answer loses the Slack source (Compare). **Reset does not bring it back** (§4.1) | Restored by hand for the demo: silent remove plus a webhook-sending add on the mock (see §4.1) | backend |
+| 28 | Simulator `/dev/sim` | admin.it | Pass; the backend issue found here is fixed in `8582f4b` | Revoke → Jordan's DB-migration answer loses the Slack source (Compare). Reset did not bring it back at the time of this pass (§4.1, now fixed) | Restored by hand during the pass: silent remove plus a webhook-sending add on the mock (see §4.1) | backend |
 | 29 | Presenter `/compare?present=1` | (signs in as mlro.tan, then maya.compliance) | Pass | P, then Space through all 10 steps: title, Amy vs Rachel, Ken identical, citation [2] sheet (live passage), journey as Maya, Verify, tamper, WorkBuddy (focus → `/dev/audit?latest=1` with the Newest row), proof, business, close. S toggles Stage | | |
 | 30 | Slides `/present`, `/present/proof`, `/present/business`, `/present/close` | | Pass | | | |
 | 31 | Legacy `/login`, `/map`, `/audit`, `/sim`, `/dev/styleguide` | | Pass | | | |
@@ -75,20 +75,21 @@ questions still render identically (rows 13, 17).
 | `lib/api.ts` (audit block) | Audit | `limit=500` |
 | `components/compare/CompareView.tsx` | Compare | status on cache restore |
 
-## 4. Open issues (not fixed here)
+## 4. Issues (items 1 and 2 fixed in `8582f4b`; 4 remain open)
 
-1. **Simulator Reset does not undo a revocation in the index (backend).** Revoke sends a
+1. **FIXED in `8582f4b`: Simulator Reset did not undo a revocation in the index (backend).** Revoke sends a
    `membership.changed` webhook, and the IB removes jdoe from the channel ACL in its index. `/admin/reset`
    (mock) reloads the world **without** webhooks, and the incremental poll compares the platform with
    its own cursor, which still lists jdoe as a member, so it sees no change. Jordan stays out of
    #db-migration in Gate 1 until a full sync (checked: more than 5 minutes later, still revoked). This
    breaks the demo's headline answer after a rehearsal. Restored for now with a silent remove
    (`?webhook=0`) followed by a normal add on the mock, after which Jordan's answer cites Slack again.
-   Fix options: make mock `/admin/reset` emit `membership.changed`/`acl.changed` for whatever it
-   restores, or make IB `/sim/reset` run `sync_all(full=True)` after the reset.
-2. **Plain-English audit search, offline.** With `IB_FORCE_OFFLINE=1` the rule parser does not recognise
-   documents: "Who retrieved the Q3 breach report?" becomes "the last 365 days" (100 events) and lists
-   unrelated requests. The parser note now says so. With Hy3 live, the model fallback should apply.
+   Fixed in commit `8582f4b`: the simulator reset now runs a full reconciliation, so a revocation is undone at once.
+   (Fix options considered: make mock `/admin/reset` emit `membership.changed`/`acl.changed` for whatever it
+   restores, or make IB `/sim/reset` run `sync_all(full=True)` after the reset; the latter was applied.)
+2. **FIXED in `8582f4b`: Plain-English audit search, offline.** With `IB_FORCE_OFFLINE=1` the rule parser did not recognise
+   documents (now resolved from the local index, commit `8582f4b`): "Who retrieved the Q3 breach report?" becomes "the last 365 days" (100 events) and lists
+   unrelated requests. The parser note said so. Hy3 is wired as the model fallback and has not run live.
 3. **Graph blank canvas: root cause not reproduced.** The hardening covers a hung or failed worker, an
    unchecked cached layout and a zero-size container. If it recurs, capture the browser, the dist dir
    and the network panel.

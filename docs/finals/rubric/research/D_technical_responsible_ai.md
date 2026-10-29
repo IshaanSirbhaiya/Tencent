@@ -14,9 +14,9 @@ Repo facts come from `INTERNAL_BRAIN.md`, `docs/tencent/{SECURITY,RESPONSIBLE_AI
 ## 0. Summary in ten lines
 
 1. Technical judges score three things: does it run live, is the architecture sound and legible, and is there evidence beyond the demo (tests, evals, reviews).
-2. We have unusually strong evidence: 0 leaks in 5,958 requests, 0 of 400 differential mismatches, 0 injection failures in 976 requests, 639 backend tests, 38 Playwright tests, and recorded security reviews (Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds) with written dispositions for all but Codex track 1.
+2. We have unusually strong evidence: 0 leaks in 5,958 requests, 0 of 400 differential mismatches, 0 injection failures in 976 requests, 733 backend tests, a Playwright suite (see docs/finals/TEST_REPORT.md), and recorded security reviews (Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds) with written dispositions for all but Codex track 1.
 3. Our biggest technical gap is that **Hy3 has never run live**. Every number comes from a capturing fake model or the extractive path. Close this before 3 Nov if TokenHub verification has cleared. If it has not, say so first, in one sentence.
-4. Other gaps: no CI pipeline (no `.github/workflows/`), no live deployment (the Lighthouse kit exists but has never run), no real SSO, retrieval is lexical only, and there is no human review queue or feedback loop.
+4. Other gaps: a CI workflow exists (`.github/workflows/ci.yml`) but its first GitHub run is not yet recorded, no live deployment (the Lighthouse kit exists but has never run), no real SSO, retrieval is lexical only, and there is no human review queue or feedback loop.
 5. For Responsible AI, Singapore judges will think in **AI Verify (11 principles)**, **IMDA's GenAI framework (2024)**, the **agentic framework (Jan 2026)**, the **IMDA Starter Kit's four risks**, **MAS FEAT/Veritas** and the new **MAS AI Risk Management Guidelines (7 Oct 2026)**.
 6. Our design already answers the hardest RAG risks: OWASP LLM08 (permission-aware retrieval), LLM02 (masking and a two-gate check), LLM01 (containment) and LLM06 (the model has no tools).
 7. The missing pieces are mostly documents, not code: a system card that doubles as a MAS inventory entry, an AI Verify process-check self-assessment, an OWASP red-team report, a data card, a fairness note, an incident runbook and a privacy impact summary.
@@ -93,20 +93,20 @@ All paths below are new files under `docs/finals/rubric/` unless shown otherwise
 | # | Artefact | File | Outline | Where it shows in the demo |
 |---|---|---|---|---|
 | T1 | **Architecture one-pager** | `technical/ARCHITECTURE_ONE_PAGER.md` + `technical/architecture.png` | (a) The request path as 6 boxes: token → Gate 1 → Gate 2 → sealed ledger → Hy3 → grounding wall → one response shape. (b) Trust boundaries TB1-TB9 as small badges. (c) Tencent products marked: TokenHub/Hy3, WorkBuddy MCP, CodeBuddy (built and reviewed), Lighthouse kit. (d) "Fail closed" marks on every arrow that can fail. (e) A footer listing what is mocked | One slide, 15 seconds, right after the problem. Reuse `ARCHITECTURE.md`'s mermaid diagrams, simplified |
-| T2 | **Evidence card** (test and eval dashboard) | `technical/EVIDENCE.md` plus the in-app Trust center (R9) | One table: test counts (639 + 38), the eval headline (RESULTS.md), the canaries, review rounds and finding counts, and **one command each** to reproduce | A 10-second slide; Trust center during Q&A |
+| T2 | **Evidence card** (test and eval dashboard) | `technical/EVIDENCE_CARD.md` plus the in-app Trust center (R9) | One table: test counts (733 backend; browser run in docs/finals/TEST_REPORT.md), the eval headline (RESULTS.md), the canaries, review rounds and finding counts, and **one command each** to reproduce | A 10-second slide; Trust center during Q&A |
 | T3 | **Completeness checklist** | `technical/COMPLETENESS_CHECKLIST.md` | Table 1.3 above, with Done/Partial/Missing and the next step for each row | Appendix slide; hand it over when a judge asks "is this production-ready?" |
 | T4 | **CI badge** | `.github/workflows/ib.yml` (code change, outside this research) | Jobs: `pytest apps/internal_brain/tests -q`; `python -m evals.internal_brain.run --limit 60` (fails on any leak); `npm run e2e` in mock mode | A green badge on the README and the evidence slide. It closes the "no CI" gap in about 1 hour |
 | T5 | **Live Hy3 run** | Re-run the eval with `TOKENHUB_API_KEY`; append a "hy3" mode to `RESULTS.md` | Same checks; publish any non-zero count (the doc already promises this) | Ask one question live on Hy3 with the model name shown in the answer. If it is still blocked, show the extractive answer and say why in one sentence |
 | T6 | **Demo reliability runbook** | `technical/DEMO_RUNBOOK.md` | Pre-warm the index (about 1 minute); `IB_FORCE_OFFLINE` fallback; recorded backup video; fixed persona order; "Reset demo"; port checks; what to do if Gate 2 times out on venue Wi-Fi (everything is localhost) | Not shown; it protects the live demo |
 | T7 | **Failure on purpose** | Part of the demo script | Stop the ledger (or show `test_ledger_failure_is_503`): the answer becomes a 503, never an unlogged answer | 10 seconds; it answers "what happens with bad input" before anyone asks |
-| T8 | **Cost and latency card** | `technical/COST_LATENCY.md` | Measured: 19-20 ms mean pipeline latency excluding the model; 77% of eval requests needed no model call. **Estimate, to verify on the live run:** about 2-3k input tokens and about 200 output tokens per answered question at Hy3's list price (about 1 yuan per million input tokens and 4 per million output, `05_competition_pitch.md` §4), so well under one Singapore cent per answer | One line on stage; full card in the appendix |
+| T8 | **Cost and latency card** | `technical/COST_AND_LATENCY.md` | Measured: 19-20 ms mean pipeline latency excluding the model; 77% of eval requests needed no model call. **Estimate, to verify on the live run:** about 2-3k input tokens and about 200 output tokens per answered question at Hy3's list price (about 1 yuan per million input tokens and 4 per million output, `05_competition_pitch.md` §4), so well under one Singapore cent per answer | One line on stage; full card in the appendix |
 
 ### 1.5 Proof points to say on stage (Technical Execution)
 
 1. "Everything you see is running on this laptop now: four platforms, the Brain and the web app. Nothing is pre-recorded."
 2. "Two checks run before the model sees a word. The second asks Slack, Confluence, Jira or Drive live. If they don't answer in two seconds, the answer is no."
 3. "We attacked it 5,958 times. Zero leaks. And we proved the test can fail: switch the checks off and it catches 18 of 20 leaks."
-4. "639 backend tests, 38 browser tests, and ten security review passes, including one CodeBuddy ran on Hunyuan Hy3. Every finding is written down with its fix."
+4. "733 backend tests, a browser suite, and ten security review passes, including one CodeBuddy ran on Hunyuan Hy3. Every finding is written down with its fix."
 5. "If the audit log can't be written, you get no answer. Watch." (T7)
 6. "Same connector code for mock and real: only the base URL changes."
 7. If Hy3 has run: "This answer was written by Hunyuan Hy3 through TokenHub, and it went through exactly the same checks." If not: "Hy3 is wired in and tested. Tencent account verification is pending, so today's answers are quoted from the sources, and that is the safer path anyway."
@@ -343,7 +343,7 @@ are reused.
 | R6 | **Human oversight design + incident runbook** | `HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md` | Oversight: who can do what (`RESPONSIBLE_AI.md` §2); automatic escalation triggers (grounding violation, model error, uncited answer → extractive); what is *not* built (review queue, dual control). Runbook for 5 incidents: (1) suspected leak → find recipients with `/audit/doc/{id}/accessors`, revoke at the source (honoured on the next question), preserve the ledger, verify the chain; (2) model misbehaviour → `IB_FORCE_OFFLINE=1`; (3) ledger tamper alert → compare with the external head, freeze, escalate; (4) prompt-injection doc found → restrict at source, search the ledger for answers citing it; (5) key compromise → rotate `IB_TOKEN_KEY` (all sessions die), re-publish the head. Each step names the command or route, owner and the MAS/PDPC notification consideration | 2 h | One slide "If something goes wrong" + live revocation demo |
 | R7 | **Privacy impact summary** | `PRIVACY_IMPACT_SUMMARY.md` | Data inventory (questions, answer text, ids, hashes: where each lives, from `DATA_FLOWS.md`); purposes; who can see what; transfers (TokenHub: passages only; retention unverified); retention (none defined → proposal); minimisation (≤ 14 passages; no text in ledger; local embeddings); masking; PDPA ss.18/20/24/25/26 table; staff notice text for the login screen | 1.5 h | Q&A |
 | R8 | **"Why this answer" explainability view** | Web app (`components/AnswerPanel.tsx`); doc `EXPLAINABILITY.md` | Expand the existing "How this was checked" strip: for *this* answer show passages released, each source's version, `authz_checked_at`, "checked live with Slack at 14:02:07", model and prompt version, fallback used. **Never show denied or considered-but-denied counts to the asker** (that would leak); the full `retrieval.decided` view stays in the compliance console. Explaining the asymmetry is itself a Responsible AI point | 2-4 h (UI) | Ask screen, step 3 of the tour |
-| R9 | **Trust center page** | `databridge/apps/internal_brain_web/app/trust/page.tsx` + read-only `/ib/trust` or a static `results.json` import | Tiles: Leaks 0 / 5,958 (95% UB 0.10%); P2 0 / 400; injection 0 / 976; canaries valid; tests 639 + 38; last eval date; "Verify audit chain" button (compliance only, or a public read of `ok` + `seq`); framework crosswalk table (AI Verify, MGF-GenAI, agentic MGF, Starter Kit, FEAT, MAS AIRG, PDPA, OWASP) with links to R1-R7; "Honest limits" box | 0.5-1 day | 20 seconds at the end of the demo; open during Q&A |
+| R9 | **Trust center page** | `databridge/apps/internal_brain_web/app/dev/trust/page.tsx` (built) + read-only `/ib/trust` or a static `results.json` import | Tiles: Leaks 0 / 5,958 (95% UB 0.10%); P2 0 / 400; injection 0 / 976; canaries valid; tests 639 + 38; last eval date; "Verify audit chain" button (compliance only, or a public read of `ok` + `seq`); framework crosswalk table (AI Verify, MGF-GenAI, agentic MGF, Starter Kit, FEAT, MAS AIRG, PDPA, OWASP) with links to R1-R7; "Honest limits" box | 0.5-1 day | 20 seconds at the end of the demo; open during Q&A |
 | R10 | **Framework crosswalk** | `FRAMEWORK_CROSSWALK.md` | One matrix: rows = our controls (two gates, grounding, ledger, masking, no-tools, constant refusal, kill switch, eval); columns = AI Verify principle, MGF-GenAI dimension, agentic MGF dimension, Starter Kit risk, FEAT, MAS AIRG para, PDPA section, ISO 42001 clause, NIST function, OWASP id | 1.5 h | The Trust center table; one slide |
 
 ### 4.1 Priority with four days left
@@ -422,7 +422,7 @@ Optional fourth (already in the tour): **revocation on the next question** (Simu
 
 ## 7. Competitor framing (for Q1 in 4.4)
 
-| Property | Typical enterprise RAG (replicate and filter) | Bedrock managed KB (2026 docs) | Walnut Internal Brain |
+| Property | Typical enterprise RAG (replicate and filter) | Bedrock managed KB (2026 docs) | Walnut DataBridge: Internal Brain |
 |---|---|---|---|
 | ACLs crawled and filtered | Yes | Yes | Yes (Gate 1) |
 | Live re-check at query time | No; stale until the next sync | Yes for 8 connector types; fails closed | Yes for all 4 platforms; fails closed (Gate 2) |
@@ -447,7 +447,7 @@ model".
 | 0:40-0:55 | Architecture one-pager (T1) | Two gates, ledger, Tencent stack | "Filter what goes in" |
 | 0:55-2:40 | Live demo: Ask (R8 strip), Compare (L1), revocation, injection (L2) | Live, end to end | Explainability, anti-tipping-off, injection |
 | 2:40-3:20 | Audit + tamper (L3) | Write-ahead, 503 on failure (T7) | Accountability |
-| 3:20-4:10 | Evidence slide (T2) + Trust center glimpse (R9) | 5,958 / 0, canaries, 639 + 38 tests, CI badge | Crosswalk: AI Verify, Starter Kit, MAS AIRG |
+| 3:20-4:10 | Evidence slide (T2) + Trust center glimpse (R9) | 5,958 / 0, canaries, 733 backend tests, CI badge | Crosswalk: AI Verify, Starter Kit, MAS AIRG |
 | 4:10-5:00 | Honest limits + rollout with Aspire | Mocked tenants, Hy3 status | "What we don't do yet" |
 
 ---

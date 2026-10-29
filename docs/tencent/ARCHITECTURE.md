@@ -1,4 +1,4 @@
-# Walnut Internal Brain: architecture
+# Walnut DataBridge: Internal Brain architecture
 
 > FinTech Track (Aspire), "The Internal Brain". Sections 1 to 7: status as of 15 Oct 2026; section 8
 > (developer views) added 30 Oct 2026 for the finals build. Code references were re-checked

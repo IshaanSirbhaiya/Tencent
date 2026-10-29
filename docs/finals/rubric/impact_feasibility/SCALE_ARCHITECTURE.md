@@ -33,7 +33,7 @@ The market is moving from "crawl everything into one index" to "ask the source, 
 | **Scale** (1,000-10,000 users) | Containers (TKE) behind a load balancer; stateless API pods; a Gate 2 worker pool per source with rate budgets; read replicas; ledger on write-once storage | Webhook and event ingestion; per-source circuit breakers; per-compartment kill switch; SIEM export of the ledger | about US$1-3k (US$0.30-1.00 per seat) |
 | **Option: nothing leaves the tenant** | Self-host Hy3 open weights (Apache 2.0, 295B total / 21B active; [model card](https://huggingface.co/tencent/Hy3)) on GPU nodes | Removes the cross-border transfer question (PDPA s.26) | High fixed GPU cost; for large banks only [estimate] |
 
-Infrastructure we inherit: Tencent Cloud states MTCS Level 3 and an OSPAR attestation for products in its
+Infrastructure trust a Tencent Cloud Singapore deployment would build on (to confirm with Tencent; we are not deployed there): Tencent Cloud states MTCS Level 3 and an OSPAR attestation for products in its
 Singapore region ([Tencent Cloud compliance](https://www.tencentcloud.com/document/product/363/34543), [primary]; confirm which products are in scope).
 
 ## 3. Production diagram

@@ -1,5 +1,7 @@
 # Research B: Human-Centered Design and UX and Accessibility
 
+> **Note (30 Oct):** this is research. The adopted demo cast is in [../demo_story/RUN_SHEET.md](../demo_story/RUN_SHEET.md) (Amy, Rachel, Ken, Maya, Jordan). Priya is an on-call SRE.
+
 Scope: two judging criteria (10 pts each) for Demo Day, 3 Nov, 5 min pitch + live demo + 1 min Q&A.
 Product: Walnut DataBridge / Internal Brain (permission-aware knowledge assistant for a fintech).
 
@@ -61,7 +63,7 @@ We found no verifiable named winner write-ups in this search, so this is the pat
 | # | Artefact (file) | Outline | Where in 5-min demo |
 |---|---|---|---|
 | H1 | `Tencent/docs/finals/ux/personas_and_journeys.md` + in-app page `/about/people` (DEVELOPER mode) | One card per persona: Jordan, Priya, Ken, Sara, Maya, Leo, Amy, Rachel, IT admin. Each: role, context, JTBD sentence, top pain, "what Walnut does", access level, a 5-step journey (trigger, ask, answer, verify, act) with an emotion line (worried, relieved). Mark clearly which personas are DESIGN PERSONAS (assumption-based) vs TESTED (people who actually tried it). | 0:00-0:30 hook (Priya/Ken), then flash the card grid in 5 s |
-| H2 | `Tencent/docs/finals/ux/usability_test_report.md` | 1 page: goal, method (5 hallway users, 4 tasks, think-aloud), tasks, per-task success/time/errors table, SUS per user + mean + percentile, top 5 findings, what we changed (fix log with before/after screenshot), what we did NOT test. | Slide 3 (20 s): "5 people, 4 tasks, N of 20 completed unaided" |
+| H2 | `docs/finals/rubric/hcd_ux/USABILITY_REPORT_TEMPLATE.md` (filled after the hallway test) | 1 page: goal, method (5 hallway users, 4 tasks, think-aloud), tasks, per-task success/time/errors table, SUS per user + mean + percentile, top 5 findings, what we changed (fix log with before/after screenshot), what we did NOT test. | Slide 3 (20 s): "5 people, 4 tasks, N of 20 completed unaided" |
 | H3 | `Tencent/docs/finals/ux/test_script_and_consent.md` | Script, tasks, consent line, observer sheet, SUS form (see section 3). | Appendix / Q&A |
 | H4 | `Tencent/docs/finals/ux/heuristic_review.md` | Our own Nielsen heuristic audit: each of 10 heuristics, one screenshot, one finding, status. Label as self-review (lower evidential weight than user tests). | Appendix |
 | H5 | Fix log: `Tencent/docs/finals/ux/changes_from_testing.md` | "Tester said X, we changed Y, commit/screenshot". 3 to 5 rows. This is the strongest HCD proof. | One sentence on stage + one before/after screenshot |
@@ -185,7 +187,7 @@ Evidence: a Playwright test that toggles each and asserts a DOM/CSS effect.
 - 2:00-2:30 Switch to Ken: same question, different answer, plain-language denial with next step. (HCD + trust)
 - 2:30-3:15 Accessibility moment: hands off the mouse, keyboard-only the same flow; NVDA reads the answer and the citation; flip language toggle to 简体中文 and the answer and UI change; toggle large text/reduced motion. (20-45 s maximum total; pre-rehearsed; have recording as fallback.)
 - 3:15-4:00 DEVELOPER mode: graph, request journey, audit, analytics (Maya/Sara). Tour is one click, mention only.
-- 4:00-4:40 Evidence slide: left = test result (n, tasks, SUS, one quote, one fix); right = accessibility table (WCAG 2.2 AA, axe, 38 browser tests, honest gaps).
+- 4:00-4:40 Evidence slide: left = test result (n, tasks, SUS, one quote, one fix); right = accessibility table (WCAG 2.2 AA, axe, browser tests (see docs/finals/TEST_REPORT.md), honest gaps).
 - 4:40-5:00 Close: "simple for Priya, provable for Maya".
 Q&A 1 min: answers below.
 

@@ -154,9 +154,9 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Prompt injection planted on all four platforms | **0 hard failures** in 976 injection-relevant requests |
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 87.8% (quoted) to 96.4% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
-| Backend tests (Internal Brain) | **718 passed** (30 Oct 2026, Windows, Python 3.13, 167 s) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
-| Web end-to-end tests (Playwright, axe checks) | 38 of 38 pre-finals tests passed on the new foundation; the suite is now 23 spec files. Full-run report: pending |
-| Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 6 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
+| Backend tests (Internal Brain) | **733 passed** (commit 8582f4b, 30 Oct 2026, Windows, Python 3.13) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
+| Web end-to-end tests (Playwright, axe checks) | 38 of 38 pre-finals tests passed earlier; the suite is now 23 spec files; full e2e run: see docs/finals/TEST_REPORT.md |
+| Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits
 
@@ -169,7 +169,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 - **The audit log has a key-holder window**: records after the last off-host head publication can be
   rewritten by someone with the sealing key ([SECURITY.md](docs/tencent/SECURITY.md) §3). The tamper
   demo shows this row as "Not detectable: the stated window".
-- **Open issues** from live QA, including "Simulator Reset does not undo a revocation in the index", are
+- **Open issues** from live QA (the simulator Reset revocation bug was fixed in 8582f4b) are
   in [QA_LIVE.md §4](docs/finals/QA_LIVE.md). The full list of limits is in
   [INTERNAL_BRAIN.md → Honest limits](INTERNAL_BRAIN.md#honest-limits).
 
@@ -179,7 +179,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 |---|---|---|
 | **CodeBuddy** | Six build sessions: drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests, ran a security review, then fixed its own code after a Codex review | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md), transcripts in `docs/tencent/evidence/`, screenshots in `submission/01_codebuddy/` |
 | **WorkBuddy** | The Brain's second front door: three connectors (ask as Jordan, ask as Ken, compliance audit), each carrying its own signed token | [WorkBuddy guide](docs/tencent/workbuddy/README.md), screenshots in `submission/02_workbuddy/` |
-| **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1 and CB5; first in the Brain's answer chain and in the audit search's fallback parser | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py`, `audit/nl_llm.py` |
+| **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1 and CB5; configured as the first model in the Brain's answer chain and as the audit search's fallback parser (rules run first, the model only when they recognise nothing); wired, not yet run live | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py`, `audit/nl_llm.py` |
 | **TokenHub** | The Brain's model gateway (Hy3, then DeepSeek as backup). Wired in and tested; live run pending activation | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
 | **Lighthouse** | A hardened one-command deploy kit (HTTPS, passcode-gated demo, only ports 80/443 open); no live instance because Lighthouse was unavailable during the event | [deploy/lighthouse/](deploy/lighthouse/README.md) |
 | **Miora** | Tencent's AI design agent made the cover art from our written brief; we added the title | `submission/06_cover/` |

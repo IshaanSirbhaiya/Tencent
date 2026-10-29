@@ -16,7 +16,7 @@ Every number is linked to a source or a repo file; estimates are labelled.
 | [PILOT_PLAN.md](PILOT_PLAN.md) | Ten weeks with one Aspire team, shadow mode first, stop rules | One line on stage; Q&A |
 | [RISK_REGISTER.md](RISK_REGISTER.md) | 14 risks, each with a mitigation and its test or file | Q&A |
 | [PRICING_GTM.md](PRICING_GTM.md) | Price, unit economics, go-to-market (all estimates) | Q&A |
-| [CERTIFICATION_PATH.md](CERTIFICATION_PATH.md) | From inherited MTCS L3/OSPAR to Cyber Trust and SOC 2 | Q&A |
+| [CERTIFICATION_PATH.md](CERTIFICATION_PATH.md) | From Tencent Cloud's MTCS L3/OSPAR attestations (to confirm) to Cyber Trust and SOC 2 | Q&A |
 | [EVIDENCE_NOTES.md](EVIDENCE_NOTES.md) | How to read 0/5,958 (0.10% per path vs 0.05% pooled), all measured numbers, what is not measured | Before anyone quotes a number |
 
 ## Stage one-liners
@@ -32,10 +32,10 @@ Every number is linked to a source or a repo file; estimates are labelled.
 
 **Feasibility**
 
-1. "It runs today: 645 backend tests, 38 browser tests, and a leak harness that re-runs on any company's permissions." (Say 639 if the final run is not green.)
+1. "It runs today: 733 backend tests, and a leak harness that re-runs on any company's permissions."
 2. "An answer costs under a tenth of a US cent on Hy3, at list price. Refusals cost nothing, because they never reach the model."
 3. "Slack's 2025 terms bar indexing its data for AI. Its answer is live search as the user. That's already how our Gate 2 works."
-4. "It deploys to Tencent Cloud Singapore, which holds MTCS Level 3 and OSPAR. Hy3's open weights let a bank host the model itself."
+4. "The design targets Tencent Cloud Singapore, which holds MTCS Level 3 and OSPAR. A one-command Lighthouse deploy kit is included; we have no live instance. Hy3's open weights would let a bank host the model itself."
 5. "Ten-week pilot. Weeks two to four run our leak test on Aspire's real permissions before a single user."
 6. "What breaks first at scale is API quota, not the model. We budget Gate 2 calls per source."
 

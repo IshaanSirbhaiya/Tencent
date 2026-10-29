@@ -5,7 +5,7 @@
 > tested. **Partial** = built with a stated limit. **Missing** = not built.
 > `databridge_ib/…` = `databridge/apps/internal_brain/databridge_ib/…`; `tests/…` =
 > `databridge/apps/internal_brain/tests/…`. Line numbers refer to commit `e5406b9` (read them with `git show e5406b9:<path>`); the code is being edited this week, so the function or test name is the stable part. Eval numbers from
-> RESULTS.md (14 Oct): **re-run pending**.
+> RESULTS.md (14 Oct run); headline numbers re-run on the finals code, 30 Oct.
 
 **Score: 10 Done, 8 Partial, 4 Missing.** One change since the research: CI moved from Missing to Partial
 (the workflow exists; it has not yet run green on GitHub).
@@ -20,7 +20,7 @@
 | 6 | Indexing and retrieval | **Partial** | BM25 over the permitted corpus only; local hashing embedder; relevance gate (`databridge_ib/index.py:1-12, 39-42, 159-168`) | Lexical: 7 expected refusals per path answered from related pages (`RESULTS.md:24`). No semantic embedder or reranker |
 | 7 | Generation | **Partial** | Hy3 → deepseek-v4.1-flash → extractive (`databridge_ib/llm.py:29-30, 88-104`); `tests/test_llm_chain.py` | **Hy3 never called live** (TokenHub 402 / 401006 on 30 Oct, `docs/finals/PLAN.md` §3.4) |
 | 8 | Grounding and citations | **Done** | Walnut grounding wall; versioned citations with `authz_checked_at` (`databridge_ib/models.py:158-170`); 0 uncited answers in the final run | Relations between facts not verified; one valid citation is enough (Codex track 1 #15) |
-| 9 | Evaluation harness | **Done** | `PY -m evals.internal_brain.run`; exits 1 on any leak (`databridge/evals/internal_brain/run.py:237-240`); canaries valid (`RESULTS.md:143-146`) | No real-model run; **re-run pending** after 30 Oct edits |
+| 9 | Evaluation harness | **Done** | `PY -m evals.internal_brain.run`; exits 1 on any leak (`databridge/evals/internal_brain/run.py:237-240`); canaries valid (`RESULTS.md:143-146`) | No real-model run |
 | 10 | Security review | **Done** (one gap) | Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds (`docs/tencent/SECURITY.md:124-393`) | Track 1 (35 findings) has no written disposition; 3, 9, 11, 12, 15 open |
 | 11 | Audit and observability | **Partial** | Write-ahead sealed ledger, external head, `/audit/verify`. **New 30 Oct:** per-stage timings (`databridge_ib/pipeline.py:185-188`), `/audit/stats`, `/audit/journey`, `/ib/trace` (`tests/test_dev_views.py`) | No alerting or tracing system; no service-account monitoring (TRM 9.2.2); timing not controlled |
 | 12 | Deployment | **Partial** | `deploy/lighthouse/` (Caddy, Docker Compose, `smoke.sh`); `assert_deployable` refuses dev keys (`databridge_ib/config.py:48-66`) | No live instance; demo runs on the laptop (`docs/finals/DECISIONS.md` D-03) |
@@ -29,21 +29,21 @@
 | 15 | Fallbacks and kill switch | **Done** | Extractive fallback; `IB_FORCE_OFFLINE=1` (`databridge_ib/llm.py:78-79`); ledger failure → 503 | Kill switch is global and needs a restart |
 | 16 | Sensitive data | **Done** | Card, CVV, NRIC/FIN, IBAN masked before index and model (`databridge_ib/ingest.py:64, 102`); `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` | Other personal data not redacted |
 | 17 | Accessibility | **Done** (automated) | axe on 5 screens at desktop and phone width; keyboard tests (`databridge/apps/internal_brain_web/tests/e2e/a11y.spec.ts`, `keyboard.spec.ts`) | No assistive-technology testing; new UI's tests are being ported |
-| 18 | Multilingual | **Missing** | English only; SG and ID market *policies* | UI English / 简体中文 planned (`docs/finals/PLAN.md` §4); answers stay English |
+| 18 | Multilingual | **Missing** | English only; SG and ID market *policies* | UI English / 简体中文 built (header toggle and Settings); answers stay English |
 | 19 | Feedback loop | **Missing** | — | "Helpful / Wrong source / Out of date" buttons planned, ledgered "if time" (`docs/finals/PLAN.md` §3.1) |
 | 20 | Retention and deletion | **Missing** | — (`docs/tencent/DATA_FLOWS.md:36-41`) | Roadmap: WORM storage, crypto-shredding of answer text |
 | 21 | Load and scale | **Missing** | Mean 19-20 ms pipeline latency in the eval, model excluded (`RESULTS.md:49-50`) | Large-ledger and concurrency load tests not written (`docs/tencent/SECURITY.md:330`) |
 | 22 | Second front door | **Done** | WorkBuddy MCP servers, no identity argument (`tests/test_mcp_server.py::test_internal_brain_tools_have_no_identity_argument`) | WorkBuddy's own model sits outside our ledger (TB7) |
 
-## In progress this week (not counted above)
+## Built this week (not counted above)
 
 | Item | Status |
 |---|---|
-| `/ib/graph` permission-aware subgraph | In progress (`docs/finals/PLAN.md` §5 B5) |
-| `/ib/doc/{id}` document view | In progress (B6) |
-| Seeded, labelled demo history | Todo (B7) |
-| `eval_summary.json` and eval re-run | Todo (B8) |
-| Model status in `/health` | Todo (B10) |
+| `/ib/graph` permission-aware subgraph | Built (`tests/test_graph_doc.py`) |
+| `/ib/doc/{id}` document view | Built (`tests/test_graph_doc.py`) |
+| Seeded, labelled demo history | Built (about 300 replay-labelled questions) |
+| `eval_summary.json` and eval re-run | Built (re-run 30 Oct) |
+| Model status (`GET /ib/status`, authenticated; `/health` stays minimal) | Done (B10, `databridge_ib/app.py` `/ib/status`) |
 
 ## Where judges will probe
 

@@ -40,7 +40,7 @@ Since submission we have added:
 - A **presenter mode** and **interactive tours** for both modes.
 - An **evidence pack** for every rubric criterion.
 
-Test and eval status (30 Oct): 718 backend tests pass; the leak evaluation, re-run on the finals build,
+Test and eval status (30 Oct): 733 backend tests pass (commit 8582f4b); the leak evaluation, re-run on the finals build,
 found 0 leaks in 5,958 adversarial requests and 0 differences in 400 paired questions. Hy3 via TokenHub
 is wired in; the live run is pending activation, so today's answers are quoted from the sources with the
 same checks. The platforms are mock servers that use the real APIs' shapes, and all data is synthetic.

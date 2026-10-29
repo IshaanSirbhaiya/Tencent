@@ -66,8 +66,8 @@ knowledge graph and analytics.
 **Optional.** Presenter mode: open http://127.0.0.1:3100/compare?present=1, press `P`, then `Space` for
 each of the 10 steps ([PRESENTER_KEYS.md](docs/finals/rubric/demo_story/PRESENTER_KEYS.md)). The
 tours: **Take the tour** in the header (User mode 4 steps, Developer mode 5 steps). Simulator as
-`admin.it`: see [Aspire's five scenarios](#aspires-five-scenarios), and note the open Reset issue in
-[Honest limits](#honest-limits).
+`admin.it`: see [Aspire's five scenarios](#aspires-five-scenarios), and note that Reset now reconciles revocations (fixed in 8582f4b; see
+[Honest limits](#honest-limits)).
 
 ### Screenshots
 
@@ -314,9 +314,9 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Knowledge graph and document view identical with and without restricted documents; restricted and unknown documents give the same 404 | tests | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_doc_restricted_and_unknown_are_the_same_404` |
 | Employee receipt lists only cited sources still openable; journey and stats are compliance-only | tests | `test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable`, `test_dev_views.py::test_journey_is_compliance_only_and_has_no_answer_text` |
 | Tamper demo runs on a copy; the live log's bytes are unchanged | tests | `test_tamper_demo_route.py` |
-| Automated tests, Internal Brain | **718 passed** (30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
-| Web end-to-end tests (Playwright, including axe accessibility checks) | 38 of 38 pre-finals tests passed on the new foundation; the ported suite has 23 spec files, full-run report pending | `databridge/apps/internal_brain_web/tests/e2e/` |
-| Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 6 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
+| Automated tests, Internal Brain | **733 passed** (commit 8582f4b, 30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
+| Web end-to-end tests (Playwright, including axe accessibility checks) | 38 of 38 pre-finals tests passed earlier; the ported suite has 23 spec files; full e2e run: see docs/finals/TEST_REPORT.md | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 4 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks
 switched off) is caught on 18 of 20 probes, and a deny-everything configuration scores 0% usefulness.
@@ -358,12 +358,10 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
   the deterministic quoting path. Demo answers are quoted from the sources and say so.
 - **Demo history is replay.** `--fresh` seeds about 300 questions through the real pipeline with past
   dates. They are labelled `replay` in the ledger and in Analytics, which offers "Live only".
-- **Simulator Reset does not undo a revocation in the index** (open, [QA_LIVE.md §4](docs/finals/QA_LIVE.md)).
-  After "Remove jdoe from #db-migration", Jordan stays out of that channel until a full sync, even after
-  Reset. Restart with `demo_up.sh start --fresh` to get the clean world back.
-- **The plain-English audit search, offline, does not recognise document names**, so "Who retrieved the
-  Q3 breach report?" falls back to the last 365 days, and the page says so. With Hy3 live, the model
-  parser is meant to cover this (wired, not yet run live).
+- **Simulator Reset** now runs a full reconciliation, so a revocation is undone at once (fixed in 8582f4b,
+  [QA_LIVE.md §4](docs/finals/QA_LIVE.md)).
+- **Plain-English audit search (offline)** now resolves document titles from the local index (fixed in
+  8582f4b). Hy3 is wired as the model fallback parser and has not run live.
 - **Sign-in is a demo login** standing in for SSO. A deployed build refuses to start without a passcode.
 - **The grounding check verifies values and names, not the relations between them.**
 - **The audit log has a key holder window.** It detects tampering by anyone who doesn't hold its sealing

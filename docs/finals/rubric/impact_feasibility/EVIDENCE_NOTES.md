@@ -45,7 +45,7 @@ a deny-everything configuration scores 0% recall (`RESULTS.md`, "Eval canaries")
 | Answer cites the expected source | 87.8% (extractive) to 96.4% (model path) | same |
 | Expected refusals that were answered | 7 per path, all from documents the asker could open (relevance, not a leak) | `RESULTS.md`, "Findings" |
 | Tamper attacks caught | 6 / 6 | `submission/04_evidence/tamper_demo_output.txt` |
-| Backend tests | 639 passing in the 16 Oct submission; **645 collected** on 30 Oct (`pytest --collect-only`). Quote 645 only after a green run | `databridge/apps/internal_brain/tests/` |
+| Backend tests | 733 passing (commit 8582f4b, 30 Oct); 639 at the 16 Oct submission. Quote the green run only | `databridge/apps/internal_brain/tests/` |
 | Browser tests | 38 at submission | `databridge/apps/internal_brain_web/tests/e2e/` |
 | Mean latency | 19-20 ms per request in-process (no network, no Hy3) | `RESULTS.md`, "Per mode" |
 

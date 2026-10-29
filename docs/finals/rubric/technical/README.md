@@ -2,8 +2,8 @@
 
 Walnut DataBridge (Internal Brain) · Demo Day 3 Nov 2026. Every number links to the file, test or eval
 that proves it. Eval numbers come from
-[RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (run of 14 Oct) and are marked
-**re-run pending** until the eval is re-run after the 30 Oct pipeline edits.
+[RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (run of 14 Oct). The headline numbers were re-run
+on the finals code on 30 Oct and match `eval_summary.json`; latency is from the 14 Oct run.
 
 | File | What it answers | Use it when a judge asks… |
 |---|---|---|
@@ -24,6 +24,6 @@ we never make.
 
 | Number | Caveat |
 |---|---|
-| **0 leaks in 5,958** adversarial requests | Capturing fake model + extractive path; Hy3 not live; re-run pending |
-| **645 backend tests** passing (30 Oct) | Run locally on Windows; CI run on GitHub not yet recorded |
+| **0 leaks in 5,958** adversarial requests | Capturing fake model + extractive path; Hy3 not live; re-run 30 Oct on the finals code |
+| **733 backend tests** passing (30 Oct, commit 8582f4b) | Run locally on Windows; CI run on GitHub not yet recorded |
 | **~20 ms** pipeline latency | Model time excluded; mock platforms on localhost |

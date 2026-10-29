@@ -5,7 +5,7 @@
 > (macOS/Linux). `tests/…` = `databridge/apps/internal_brain/tests/…`.
 >
 > **Eval numbers** are from [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md), generated
-> 14 Oct (`RESULTS.md:3`). They predate the 30 Oct pipeline edits: **re-run pending**. Machine-readable
+> 14 Oct (`RESULTS.md:3`). The headline numbers were re-run on the finals code on 30 Oct and match `eval_summary.json`; latency is from the 14 Oct run. Machine-readable
 > twin: `databridge/evals/internal_brain/results.json`.
 
 ## Set-up for the test commands
@@ -22,17 +22,17 @@ export PYTHONPATH="apps/internal_brain:packages/core:packages/harness:packages/a
 
 | # | Claim | Number | Proof | Reproduce |
 |---|---|---|---|---|
-| 1 | Leaks in adversarial requests | **0 / 5,958** (2,979 probes × 2 paths) **(re-run pending)** | `RESULTS.md:9-13` | `PY -m evals.internal_brain.run` (1-10 min; exits 1 on any leak, `databridge/evals/internal_brain/run.py:237-240`) |
-| 2 | 95% upper bound on per-request leak rate | **0.1007%** per path (rule of three, 3/N) **(re-run pending)** | `RESULTS.md:11` | same |
-| 3 | Requests where the model received passages | **683**, payload leak bound 0.4392% **(re-run pending)** | `RESULTS.md:12` | same |
-| 4 | Restricted vs non-existent (P2) | **0 mismatches / 400**; control rebuild 0 **(re-run pending)** | `RESULTS.md:16, 101-108` | same; unit: `PY -m pytest tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted` |
-| 5 | Injection hard failures | **0 / 976** injection-relevant requests **(re-run pending)** | `RESULTS.md:17, 110-116` | same |
-| 6 | Released recall on positive probes | **100%** both paths **(re-run pending)** | `RESULTS.md:18` | same |
-| 7 | Cited recall | **96.4%** model path, **87.8%** extractive **(re-run pending)** | `RESULTS.md:131, 141` | same |
-| 8 | Eval canaries valid | Leaky config caught **18 / 20**; deny-all **0%** utility **(re-run pending)** | `RESULTS.md:143-146` | same; unit: `PY -m pytest tests/test_eval_smoke.py::test_eval_canary_detects_a_leaky_pipeline` |
-| 9 | Requests needing no model call | **2,296 / 2,979** on the model path **(re-run pending)** | `RESULTS.md:49` | same |
-| 10 | Mean pipeline latency, model excluded | **19.8 ms** (model path), **19.0 ms** (extractive) **(re-run pending)** | `RESULTS.md:49-50` | same |
-| 11 | Backend tests (Internal Brain) | **645 passed** in 75 s, run 30 Oct on Windows, Python 3.13 (639 at submission, `INTERNAL_BRAIN.md:209`; +6 in `tests/test_dev_views.py`) | `databridge/apps/internal_brain/tests/` | `PY -m pytest apps/internal_brain/tests -q` |
+| 1 | Leaks in adversarial requests | **0 / 5,958** (2,979 probes × 2 paths) (re-run 30 Oct) | `RESULTS.md:9-13` | `PY -m evals.internal_brain.run` (1-10 min; exits 1 on any leak, `databridge/evals/internal_brain/run.py:237-240`) |
+| 2 | 95% upper bound on per-request leak rate | **0.1007%** per path (rule of three, 3/N) (re-run 30 Oct) | `RESULTS.md:11` | same |
+| 3 | Requests where the model received passages | **683**, payload leak bound 0.4392% (re-run 30 Oct) | `RESULTS.md:12` | same |
+| 4 | Restricted vs non-existent (P2) | **0 mismatches / 400**; control rebuild 0 (re-run 30 Oct) | `RESULTS.md:16, 101-108` | same; unit: `PY -m pytest tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted` |
+| 5 | Injection hard failures | **0 / 976** injection-relevant requests (re-run 30 Oct) | `RESULTS.md:17, 110-116` | same |
+| 6 | Released recall on positive probes | **100%** both paths (re-run 30 Oct) | `RESULTS.md:18` | same |
+| 7 | Cited recall | **96.4%** model path, **87.8%** extractive (re-run 30 Oct) | `RESULTS.md:131, 141` | same |
+| 8 | Eval canaries valid | Leaky config caught **18 / 20**; deny-all **0%** utility (re-run 30 Oct) | `RESULTS.md:143-146` | same; unit: `PY -m pytest tests/test_eval_smoke.py::test_eval_canary_detects_a_leaky_pipeline` |
+| 9 | Requests needing no model call | **2,296 / 2,979** on the model path (re-run 30 Oct) | `RESULTS.md:49` | same |
+| 10 | Mean pipeline latency, model excluded | **19.8 ms** (model path), **19.0 ms** (extractive) (14 Oct run; not re-measured) | `RESULTS.md:49-50` | same |
+| 11 | Backend tests (Internal Brain) | **733 passed**, run 30 Oct on Windows, Python 3.13, commit 8582f4b (639 at submission, `INTERNAL_BRAIN.md`) | `databridge/apps/internal_brain/tests/` | `PY -m pytest apps/internal_brain/tests -q` |
 | 12 | Synthetic-world generator tests | **35 passed**, run 30 Oct | `databridge/fixtures/enterprise/tests/` | `PY -m pytest fixtures/enterprise/tests -q` |
 | 13 | Web end-to-end tests (Playwright, incl. axe at desktop and phone width) | **38** at submission; being ported to the new UI this week | `INTERNAL_BRAIN.md:210`; `databridge/apps/internal_brain_web/tests/e2e/` | `cd apps/internal_brain_web && npx playwright install chromium && npm run e2e` |
 | 14 | Ledger tamper attacks detected | **6 of 6**; the 7th (rollback after the last publication) is the stated window | `docs/tencent/SECURITY.md:74-90`; `tests/test_audit_tamper.py` | `PY scripts/tamper_demo.py`; `PY -m pytest tests/test_audit_tamper.py` |
@@ -84,7 +84,5 @@ All reviewers are AI models or the team. No human third-party review.
 | Gap | Status |
 |---|---|
 | Live Hy3 run | `RESULTS.md:30`: PENDING (no TokenHub key that works yet) |
-| Eval re-run after the 30 Oct edits | Pending (coordinator) |
 | CI run on GitHub | Workflow added 30 Oct (`.github/workflows/ci.yml`); first run result not yet recorded |
 | Load test, large ledger | Not written (`docs/tencent/SECURITY.md:330`) |
-| `/ib/graph`, `/ib/doc` | In progress |

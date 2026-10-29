@@ -22,10 +22,10 @@ Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals
 
 | Check | Result | Where |
 |---|---|---|
-| Backend tests (Internal Brain) | **718 passed**, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
+| Backend tests (Internal Brain) | **733 passed**, commit 8582f4b, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
 | Leak evaluation (re-run on the finals pipeline, 30 Oct 03:27 SGT) | 0 leaks in 5,958 requests; 0 of 400 pairs differ; 0 injection hard failures in 976 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
-| Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 6 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
-| Web end-to-end tests (Playwright, axe) | 38 of 38 pre-finals tests passed on the new foundation. The suite is being ported to the new UI (23 spec files); the full-run result is not recorded yet | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
+| Web end-to-end tests (Playwright, axe) | 38 of 38 pre-finals tests passed earlier. The suite is ported to the new UI (23 spec files); full e2e run: see docs/finals/TEST_REPORT.md | `databridge/apps/internal_brain_web/tests/e2e/` |
 
 ## 3. Pending
 
@@ -35,7 +35,6 @@ Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals
 | **Hallway test** (5 people × 20 min) | Team, Sat 31 Oct | The only human-centered-design evidence we cannot produce ourselves. Protocol: [HALLWAY_TEST_PROTOCOL.md](docs/finals/rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md). The fix log is empty until then: [FIX_LOG.md](docs/finals/rubric/hcd_ux/FIX_LOG.md) |
 | **Venue rehearsal** | Team, Mon 2 Nov 16:00–17:00 (mandatory) | Run sheet: [RUN_SHEET.md](docs/finals/rubric/demo_story/RUN_SHEET.md); checklist: [VENUE_TECH_CHECKLIST.md](docs/finals/rubric/demo_story/VENUE_TECH_CHECKLIST.md) |
 | Full e2e run on the ported suite | Build team | Record the pass count here when it runs |
-| Simulator Reset does not undo a revocation in the index | Build team | Open issue [QA_LIVE.md §4.1](docs/finals/QA_LIVE.md); workaround: `demo_up.sh start --fresh` |
 | Lighthouse server | Tencent (sold out) | Optional. The local run is the documented path |
 
 ## 4. At submission (16 Oct), for the record

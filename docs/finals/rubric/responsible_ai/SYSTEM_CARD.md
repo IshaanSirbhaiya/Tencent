@@ -8,7 +8,7 @@
 > commit `e5406b9` (30 Oct). The function or test name is the stable part.
 >
 > **Eval numbers** come from [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (run of
-> 14 Oct). They predate the 30 Oct pipeline edits, so each one is marked **(re-run pending)**.
+> 14 Oct). The headline numbers were re-run on the finals code on 30 Oct and match `eval_summary.json`.
 
 This card follows the shape of a model card ([Mitchell et al., 2019](https://arxiv.org/abs/1810.03993)),
 adapted to a whole system. Section 9 is laid out as an AI inventory record for the MAS Guidelines on AI
@@ -90,14 +90,14 @@ scope statement above is the control.
 
 | Measure | Result | Source |
 |---|---|---|
-| Leaks | 0 of 5,958 requests; 95% upper bound 0.1007% per request per path **(re-run pending)** | `RESULTS.md:9-11` |
-| Requests where the fake model received passages | 683; 95% upper bound on payload leak rate 0.4392% **(re-run pending)** | `RESULTS.md:12` |
-| Restricted vs non-existent (P2) | 400 compared, 0 mismatches; control rebuild 0 **(re-run pending)** | `RESULTS.md:16, 101-108` |
-| Injection hard failures | 0 in 976 injection-relevant requests **(re-run pending)** | `RESULTS.md:17, 110-116` |
-| Released recall on positive probes | 100% on both paths **(re-run pending)** | `RESULTS.md:18` |
-| Cited recall | 96.4% (fake model), 87.8% (extractive) **(re-run pending)** | `RESULTS.md:131, 141` |
-| Eval canaries | Valid: leaky config caught on 18 of 20; deny-all scores 0% utility **(re-run pending)** | `RESULTS.md:143-146` |
-| Backend tests | 645 passed, 30 Oct, 75 s | `python -m pytest apps/internal_brain/tests -q` (see [EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
+| Leaks | 0 of 5,958 requests; 95% upper bound 0.1007% per request per path (re-run 30 Oct) | `RESULTS.md:9-11` |
+| Requests where the fake model received passages | 683; 95% upper bound on payload leak rate 0.4392% (re-run 30 Oct) | `RESULTS.md:12` |
+| Restricted vs non-existent (P2) | 400 compared, 0 mismatches; control rebuild 0 (re-run 30 Oct) | `RESULTS.md:16, 101-108` |
+| Injection hard failures | 0 in 976 injection-relevant requests (re-run 30 Oct) | `RESULTS.md:17, 110-116` |
+| Released recall on positive probes | 100% on both paths (re-run 30 Oct) | `RESULTS.md:18` |
+| Cited recall | 96.4% (fake model), 87.8% (extractive) (re-run 30 Oct) | `RESULTS.md:131, 141` |
+| Eval canaries | Valid: leaky config caught on 18 of 20; deny-all scores 0% utility (re-run 30 Oct) | `RESULTS.md:143-146` |
+| Backend tests | 733 passed, 30 Oct, commit 8582f4b | `python -m pytest apps/internal_brain/tests -q` (see [EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
 | Real-model run (Hy3) | **Not run** | `RESULTS.md:30` |
 
 ## 7. Known limits and gaps
@@ -116,7 +116,7 @@ Copied in substance from `INTERNAL_BRAIN.md:243-261` and `docs/tencent/SECURITY.
 9. **No rate limiter; timing side channel not controlled** (`docs/tencent/SECURITY.md:194, 220-224`).
 10. **Codex track 1 (35 findings) has no written disposition;** findings 3, 9, 11, 12 and 15 are open by our reading (`docs/tencent/SECURITY.md:208-218`).
 11. **English only.** Market-specific policy content for SG and ID only.
-12. **In progress (30 Oct):** per-stage timings, `/audit/stats`, `/audit/journey` and `/ib/trace` are built and tested (`tests/test_dev_views.py`). The permission-aware graph (`/ib/graph`) and document view (`/ib/doc`) are **in progress**, not built (`docs/finals/PLAN.md` §5, B5-B6).
+12. **Built (30 Oct):** per-stage timings, `/audit/stats`, `/audit/journey` and `/ib/trace` (`tests/test_dev_views.py`), and the permission-aware graph (`/ib/graph`) and document view (`/ib/doc`) (`tests/test_graph_doc.py`) are built and tested.
 
 ## 8. Risk materiality assessment (self-assessed)
 
@@ -152,7 +152,7 @@ tenant is connected, and when Hy3 (or any model) goes live.
 | Personal data | Employee names and authored text in source documents; masked card, NRIC/FIN and IBAN values |
 | Materiality | Medium (section 8) |
 | Key controls | Section 5 |
-| Validation | Leak and injection eval, canaries, 645 backend tests, recorded security reviews ([EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
+| Validation | Leak and injection eval, canaries, 733 backend tests, recorded security reviews ([EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
 | Monitoring | Ledger events, `/audit/verify`, `/audit/stats` (counts and timings only, `databridge_ib/audit/stats.py:1-5`). No alerting yet. |
 | Kill switch | `IB_FORCE_OFFLINE=1` (global, needs a restart) |
 | Incident process | [HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md](HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md) |
@@ -165,4 +165,4 @@ tenant is connected, and when Hy3 (or any model) goes live.
 | 13 Oct 2026 | First eval run: 0 leaks; 6 forged-citation injection failures; 102 uncited model answers | `docs/tencent/SECURITY.md:178-183`; `docs/tencent/RESPONSIBLE_AI.md:37` |
 | 14 Oct 2026 | Fixes in `8b5eb57` and `d69ab97`; final run: 0 leaks, 0 injection failures, 0 uncited answers | `RESULTS.md:3` |
 | 15 Oct 2026 | Codex tracks 5-7 and two Claude review rounds; fixes recorded | `docs/tencent/SECURITY.md:316-393` |
-| 30 Oct 2026 | Per-stage timings, `/audit/stats`, `/audit/journey`, `/ib/trace` (`e5406b9`). Eval re-run pending. | `git show e5406b9`; `tests/test_dev_views.py` |
+| 30 Oct 2026 | Per-stage timings, `/audit/stats`, `/audit/journey`, `/ib/trace` (`e5406b9`). Eval re-run 30 Oct. | `git show e5406b9`; `tests/test_dev_views.py` |
