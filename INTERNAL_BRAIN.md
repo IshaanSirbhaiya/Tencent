@@ -314,7 +314,7 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Knowledge graph and document view identical with and without restricted documents; restricted and unknown documents give the same 404 | tests | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_doc_restricted_and_unknown_are_the_same_404` |
 | Employee receipt lists only cited sources still openable; journey and stats are compliance-only | tests | `test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable`, `test_dev_views.py::test_journey_is_compliance_only_and_has_no_answer_text` |
 | Tamper demo runs on a copy; the live log's bytes are unchanged | tests | `test_tamper_demo_route.py` |
-| Automated tests, Internal Brain | **733 passed** (commit 8582f4b, 30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
+| Automated tests, Internal Brain | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
 | Web end-to-end tests (Playwright, including axe accessibility checks) | 38 of 38 pre-finals tests passed earlier; the ported suite has 23 spec files; full e2e run: see docs/finals/TEST_REPORT.md | `databridge/apps/internal_brain_web/tests/e2e/` |
 | Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 4 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 

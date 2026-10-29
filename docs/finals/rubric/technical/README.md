@@ -25,5 +25,5 @@ we never make.
 | Number | Caveat |
 |---|---|
 | **0 leaks in 5,958** adversarial requests | Capturing fake model + extractive path; Hy3 not live; re-run 30 Oct on the finals code |
-| **733 backend tests** passing (30 Oct, commit 8582f4b) | Run locally on Windows; CI run on GitHub not yet recorded |
+| **754 backend tests** passing (30 Oct, commit 7bf3246) | Run locally on Windows; CI run on GitHub not yet recorded |
 | **~20 ms** pipeline latency | Model time excluded; mock platforms on localhost |

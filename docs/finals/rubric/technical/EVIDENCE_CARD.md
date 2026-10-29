@@ -32,7 +32,7 @@ export PYTHONPATH="apps/internal_brain:packages/core:packages/harness:packages/a
 | 8 | Eval canaries valid | Leaky config caught **18 / 20**; deny-all **0%** utility (re-run 30 Oct) | `RESULTS.md:143-146` | same; unit: `PY -m pytest tests/test_eval_smoke.py::test_eval_canary_detects_a_leaky_pipeline` |
 | 9 | Requests needing no model call | **2,296 / 2,979** on the model path (re-run 30 Oct) | `RESULTS.md:49` | same |
 | 10 | Mean pipeline latency, model excluded | **19.8 ms** (model path), **19.0 ms** (extractive) (14 Oct run; not re-measured) | `RESULTS.md:49-50` | same |
-| 11 | Backend tests (Internal Brain) | **733 passed**, run 30 Oct on Windows, Python 3.13, commit 8582f4b (639 at submission, `INTERNAL_BRAIN.md`) | `databridge/apps/internal_brain/tests/` | `PY -m pytest apps/internal_brain/tests -q` |
+| 11 | Backend tests (Internal Brain) | **754 passed**, run 30 Oct on Windows, Python 3.13, commit 7bf3246 (639 at submission, `INTERNAL_BRAIN.md`) | `databridge/apps/internal_brain/tests/` | `PY -m pytest apps/internal_brain/tests -q` |
 | 12 | Synthetic-world generator tests | **35 passed**, run 30 Oct | `databridge/fixtures/enterprise/tests/` | `PY -m pytest fixtures/enterprise/tests -q` |
 | 13 | Web end-to-end tests (Playwright, incl. axe at desktop and phone width) | **38** at submission; being ported to the new UI this week | `INTERNAL_BRAIN.md:210`; `databridge/apps/internal_brain_web/tests/e2e/` | `cd apps/internal_brain_web && npx playwright install chromium && npm run e2e` |
 | 14 | Ledger tamper attacks detected | **6 of 6**; the 7th (rollback after the last publication) is the stated window | `docs/tencent/SECURITY.md:74-90`; `tests/test_audit_tamper.py` | `PY scripts/tamper_demo.py`; `PY -m pytest tests/test_audit_tamper.py` |

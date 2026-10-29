@@ -97,7 +97,7 @@ scope statement above is the control.
 | Released recall on positive probes | 100% on both paths (re-run 30 Oct) | `RESULTS.md:18` |
 | Cited recall | 96.4% (fake model), 87.8% (extractive) (re-run 30 Oct) | `RESULTS.md:131, 141` |
 | Eval canaries | Valid: leaky config caught on 18 of 20; deny-all scores 0% utility (re-run 30 Oct) | `RESULTS.md:143-146` |
-| Backend tests | 733 passed, 30 Oct, commit 8582f4b | `python -m pytest apps/internal_brain/tests -q` (see [EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
+| Backend tests | 754 passed, 30 Oct, commit 7bf3246 | `python -m pytest apps/internal_brain/tests -q` (see [EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
 | Real-model run (Hy3) | **Not run** | `RESULTS.md:30` |
 
 ## 7. Known limits and gaps
@@ -152,7 +152,7 @@ tenant is connected, and when Hy3 (or any model) goes live.
 | Personal data | Employee names and authored text in source documents; masked card, NRIC/FIN and IBAN values |
 | Materiality | Medium (section 8) |
 | Key controls | Section 5 |
-| Validation | Leak and injection eval, canaries, 733 backend tests, recorded security reviews ([EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
+| Validation | Leak and injection eval, canaries, 754 backend tests, recorded security reviews ([EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
 | Monitoring | Ledger events, `/audit/verify`, `/audit/stats` (counts and timings only, `databridge_ib/audit/stats.py:1-5`). No alerting yet. |
 | Kill switch | `IB_FORCE_OFFLINE=1` (global, needs a restart) |
 | Incident process | [HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md](HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md) |

@@ -22,7 +22,7 @@ Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals
 
 | Check | Result | Where |
 |---|---|---|
-| Backend tests (Internal Brain) | **733 passed**, commit 8582f4b, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
+| Backend tests (Internal Brain) | **754 passed**, commit 7bf3246, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
 | Leak evaluation (re-run on the finals pipeline, 30 Oct 03:27 SGT) | 0 leaks in 5,958 requests; 0 of 400 pairs differ; 0 injection hard failures in 976 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 | Web end-to-end tests (Playwright, axe) | 38 of 38 pre-finals tests passed earlier. The suite is ported to the new UI (23 spec files); full e2e run: see docs/finals/TEST_REPORT.md | `databridge/apps/internal_brain_web/tests/e2e/` |
