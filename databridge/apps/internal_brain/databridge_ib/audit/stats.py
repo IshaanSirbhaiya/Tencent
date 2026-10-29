@@ -10,7 +10,8 @@ import datetime as dt
 from collections import Counter, defaultdict
 from typing import Any, Iterable, Optional
 
-STAGES = ("accept", "gate1", "gate2", "seal", "compose")
+#: per-stage timings recorded in ``answer.released.stage_ms``; they end before that final append
+STAGES = ("accept", "gate1", "gate2", "seal", "compose", "release")
 PLATFORMS = ("confluence", "jira", "slack", "drive")
 ALLOWED_VERDICTS = ("verified", "drift_material")      # AccessCheck.allowed
 
@@ -41,7 +42,10 @@ def _pct(values: list[int], p: float) -> Optional[int]:
 
 def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
                   include_replay: bool = True) -> dict[str, Any]:
-    """`events` yields objects with ``kind``, ``data``, ``seq`` and ``recorded_at`` (LedgerEvent)."""
+    """`events` yields objects with ``kind``, ``data``, ``seq`` and ``recorded_at`` (LedgerEvent).
+
+    The window is half-open, ``now - days <= event_time < now``: an event dated in the future
+    (clock skew, a mis-dated replay) is never counted."""
     since = now - dt.timedelta(days=days)
     kinds: Counter = Counter()
     channels: Counter = Counter()
@@ -54,6 +58,8 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
     stage_vals: dict[str, list[int]] = defaultdict(list)
     latencies: list[int] = []
     totals = Counter()
+    released_by_req: dict[str, set] = {}
+    cited_by_req: dict[str, set] = {}
     first_seq = last_seq = None
     head_hash = None
     for le in events:
@@ -64,7 +70,7 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
         last_seq, head_hash = le.seq, getattr(le, "hash", None)
         totals["ledger_events"] += 1
         when = _when(data, getattr(le, "recorded_at", None))
-        if when is None or when < since:
+        if when is None or when < since or when >= now:
             continue
         if data.get("synthetic_replay") and not include_replay:
             continue
@@ -85,6 +91,7 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
                 per_platform[_platform(d)]["considered"] += 1
             for d in released:
                 per_platform[_platform(d)]["released"] += 1
+            released_by_req.setdefault(str(data.get("req_id") or ""), set()).update(map(str, released))
             for g in data.get("gate2") or ():
                 if not isinstance(g, dict):
                     continue
@@ -102,6 +109,8 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             if m.get("fallback_used"):
                 totals["fallback_used"] += 1
             totals["citations"] += len(data.get("citations") or ())
+            cited_by_req.setdefault(str(data.get("req_id") or ""), set()).update(
+                str(c.get("doc_id")) for c in data.get("citations") or () if isinstance(c, dict))
             totals["dropped_sentences"] += int(data.get("dropped_sentences_count") or 0)
             if isinstance(data.get("latency_ms"), int):
                 latencies.append(int(data["latency_ms"]))
@@ -121,11 +130,20 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             totals["syncs"] += 1
         elif k == "map.viewed":
             totals["map_views"] += 1
+        elif k == "graph.viewed":
+            totals["graph_views"] += 1
+        elif k == "doc.viewed":
+            totals["doc_views"] += 1
+        elif k == "trace.viewed":
+            totals["trace_views"] += 1
         elif k == "auth.login":
             totals["logins"] += 1
     allowed = sum(v for key, v in gate2_verdicts.items() if key in ALLOWED_VERDICTS)
     gate2_total = sum(gate2_verdicts.values())
     finished = totals["answered"] + totals["refused"]
+    # distinct cited documents per request, counted only where the same request released them, so
+    # the document flow never rises between steps (a citation always comes from a released doc)
+    cited_docs = sum(len(c & released_by_req.get(r, set())) for r, c in cited_by_req.items())
     return {
         "window": {"since": since.isoformat(), "until": now.isoformat(), "days": days},
         "ledger": {"events": totals["ledger_events"], "first_seq": first_seq, "last_seq": last_seq,
@@ -138,12 +156,16 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             "fallback_used": totals["fallback_used"], "reveals": totals["reveals"],
             "audit_queries": totals["audit_queries"], "access_changes": totals["access_changes"],
             "syncs": totals["syncs"], "map_views": totals["map_views"], "logins": totals["logins"],
+            "graph_views": totals["graph_views"], "doc_views": totals["doc_views"],
+            "trace_views": totals["trace_views"],
         },
-        "funnel": {
-            "asked": totals["requests"], "considered_docs": totals["considered"],
-            "gate2_checked": gate2_total, "gate2_allowed": allowed,
-            "gate2_denied": gate2_total - allowed, "released_docs": totals["released_docs"],
-            "cited": totals["citations"], "answered": totals["answered"],
+        # requests and documents are different units: two flows, never one funnel
+        "requests_flow": {"asked": totals["requests"], "answered": totals["answered"],
+                          "refused": totals["refused"], "failed": totals["failed"]},
+        "documents_flow": {
+            "considered": totals["considered"], "gate2_checked": gate2_total,
+            "gate2_allowed": allowed, "gate2_denied": gate2_total - allowed,
+            "released": totals["released_docs"], "cited": cited_docs,
         },
         "gate2": {"verdicts": dict(gate2_verdicts), "reasons": dict(gate2_reasons)},
         "latency_ms": {"count": len(latencies), "p50": _pct(latencies, 0.5),

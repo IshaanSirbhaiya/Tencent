@@ -10,12 +10,15 @@ import hmac
 import json
 import logging
 import os
+import threading
+import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import auth as authmod
 from .config import IbConfig
@@ -23,9 +26,10 @@ from .connectors.base import SourceConnector, WebhookRejected
 from .directory import Directory
 from .index import Index
 from .ingest import Ingestor
+from . import authz, docview, graph
 from .knowledge_map import build_map
 from .llm import ModelChain
-from .models import AskRequest, DirectoryUser, SessionStarted
+from .models import AskRequest, DirectoryUser, SessionStarted, TraceViewed
 from .pipeline import Pipeline
 
 log = logging.getLogger("databridge_ib.app")
@@ -34,6 +38,19 @@ ALLOWED_PREFIXES = ("/health", "/auth/", "/ib/", "/webhooks/", "/audit/", "/sim/
 COOKIE = "ib_session"
 EMPLOYEE_ROLES = {"employee", "compliance_officer", "admin_it"}
 MAX_WEBHOOK_BYTES = 256 * 1024
+LOOPBACK = {"127.0.0.1", "::1"}
+MAX_REPLAY_AGE = timedelta(days=400)
+#: the asker's trace receipt: stage names and the ledger kinds that prove each stage completed
+TRACE_STAGES = (("accept", "request.accepted"), ("gate1", "retrieval.decided"),
+                ("gate2", "retrieval.decided"), ("seal", "retrieval.decided"),
+                ("compose", "answer.released"), ("release", "answer.released"))
+STATUS_LEDGER_TTL_S = 15.0
+NOT_FOUND = "not found"
+
+
+class OpenableBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    doc_ids: list[str] = Field(max_length=graph.MAX_OPENABLE)
 
 
 @dataclass
@@ -87,6 +104,72 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
     @app.get("/health")
     def health():
         return {"ok": True}
+
+    def _replay_time(request: Request, bearer: bool) -> Optional[datetime]:
+        """The demo-history seeding switch (scripts/seed_demo_activity.py). Applies only when the
+        caller sends ``X-IB-Replay-Key``; then EVERY condition must hold or the call is a 403
+        (never silently recorded as live activity): the server has ``IB_REPLAY_KEY`` (>= 24 chars)
+        and is not deployed, the call is a bearer-token call from loopback, the key matches, and
+        ``X-IB-Replay-At`` is an ISO time within the last 400 days and not in the future."""
+        sent = request.headers.get("x-ib-replay-key")
+        if sent is None:
+            return None
+        key = svc.cfg.replay_key
+        host = request.client.host if request.client else ""
+        if not (key and len(key) >= 24 and not svc.cfg.deployed and bearer and host in LOOPBACK
+                and hmac.compare_digest(sent.encode(), key.encode())):
+            raise HTTPException(403, "forbidden")
+        try:
+            at = datetime.fromisoformat(request.headers.get("x-ib-replay-at", ""))
+        except ValueError:
+            raise HTTPException(422, "invalid replay time") from None
+        at = at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if not now - MAX_REPLAY_AGE <= at <= now:
+            raise HTTPException(422, "invalid replay time")
+        return at
+
+    def _employee(user: DirectoryUser) -> None:
+        if not (set(user.roles) & EMPLOYEE_ROLES):
+            raise HTTPException(403, "forbidden")
+
+    _ledger_ok_cache: dict[str, Any] = {"at": None, "ok": None}
+    _ledger_ok_lock = threading.Lock()
+
+    def _ledger_ok() -> Optional[bool]:
+        """Whether the access ledger verifies, re-checked at most every 15 s (a verification costs
+        O(records); an employee must not be able to trigger one per request)."""
+        head = getattr(svc.ledger, "head", None)
+        if head is None:
+            return None
+        with _ledger_ok_lock:
+            last = _ledger_ok_cache["at"]
+            if last is not None and time.monotonic() - last < STATUS_LEDGER_TTL_S:
+                return _ledger_ok_cache["ok"]
+            try:
+                head()
+                ok = True
+            except Exception:                                       # noqa: BLE001
+                ok = False
+            _ledger_ok_cache.update(at=time.monotonic(), ok=ok)
+            return ok
+
+    @app.get("/ib/status")
+    def status(user: DirectoryUser = Depends(current)):
+        """Model and ledger status for any signed-in employee (never on the public /health).
+        Model ids and booleans only: never a key, a base URL or any other secret."""
+        _employee(user)
+        from . import llm as llmmod
+        chain = getattr(svc.pipeline, "chain", None)
+        configured = llmmod.model_configured()
+        return {"models": {"provider": llmmod.provider_label() if configured else None,
+                           "chain": llmmod.configured_models(),
+                           "active": chain is not None,
+                           "active_chain": list(chain.models) if chain is not None else [],
+                           "fallback": {"provider": "deterministic", "model": "extractive-v1"}},
+                "key_configured": configured,
+                "force_offline": os.environ.get("IB_FORCE_OFFLINE") == "1",
+                "ledger": {"ok": _ledger_ok()}}
 
     # -- auth --------------------------------------------------------------------------------
     @app.post("/auth/demo-login")
@@ -144,8 +227,13 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         bearer = request.headers.get("authorization", "").lower().startswith("bearer ")
         channel = ("workbuddy-mcp" if bearer and request.headers.get("x-ib-channel") == "workbuddy-mcp"
                    else "ui")
+        replay_at = _replay_time(request, bearer)        # None unless the seeding switch applies
         try:
-            resp = svc.pipeline.ask(user, req.question, channel=channel)
+            if replay_at is not None:
+                resp = svc.pipeline.ask(user, req.question, channel="replay", event_time=replay_at,
+                                        replay=True)
+            else:
+                resp = svc.pipeline.ask(user, req.question, channel=channel)
         except Exception as exc:                                    # noqa: BLE001
             log.error("ask failed: %s", type(exc).__name__)
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
@@ -171,36 +259,113 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         rows = svc.projection.search(svc.projection.filter_type(user=user.id, kind="request.accepted",
                                                                 limit=50))
         return {"items": [{"req_id": r.get("req_id"), "question": r.get("question"),
-                           "event_time": r.get("event_time")} for r in rows]}
+                           "event_time": r.get("event_time"), "channel": r.get("channel"),
+                           "synthetic_replay": bool(r.get("synthetic_replay"))} for r in rows]}
 
     @app.get("/ib/trace/{req_id}")
     def trace(req_id: str, user: DirectoryUser = Depends(current)):
-        """How one of MY answers was made, for the developer view: the stages and their timings,
-        the model, grounding, what was released to me and the sealed ledger records. Only my own
-        requests (anything else is the same 404), and only what I was already shown: never the
-        considered set, Gate-2 denials or reason codes (those stay in the compliance journey)."""
-        if not (set(user.roles) & EMPLOYEE_ROLES):
-            raise HTTPException(403, "forbidden")
-        if svc.projection is None or not req_id or len(req_id) > 200:
-            raise HTTPException(404, "not found")
+        """The public-safe RECEIPT of one of MY requests (Codex/Opus plan reviews):
+        stage names with ok/skipped (from which sealed records exist, never from timings), the
+        total latency rounded to 100 ms, the model, and the cited documents I can STILL open
+        (Gate 1 + live Gate 2 now; the rest are omitted silently, with no count). Per-request
+        ordinals and record hashes, never global ledger seq numbers. Never the released or
+        considered sets, Gate-2 verdicts or reason codes (those stay in the compliance journey).
+        Another person's request and an unknown id give the same 404. Ledgered (trace.viewed)."""
+        _employee(user)
+        now = datetime.now(timezone.utc)
+
+        def _record(outcome: str, n: int) -> None:
+            svc.ledger.append(TraceViewed(sub=user.id, outcome=outcome, citations_returned=n,
+                                          event_time=now))
+
         try:
+            if svc.projection is None or not req_id or len(req_id) > 200:
+                _record("not_found", 0)
+                raise HTTPException(404, NOT_FOUND)
             svc.projection.sync()
-            res = svc.projection.reconstruct(req_id)
+            res = (svc.projection.reconstruct(req_id) if svc.projection.owns(req_id, user.id)
+                   else None)
+            if res is None or res.get("sub") != user.id:
+                _record("not_found", 0)
+                raise HTTPException(404, NOT_FOUND)
+            cited: list[tuple[str, Any]] = []
+            for c in res.get("citations") or []:
+                d = c.get("doc_id") if isinstance(c, dict) else None
+                if d and d not in [x for x, _ in cited]:
+                    cited.append((d, c.get("version")))
+            ok, _ = authz.authorize(user, [d for d, _ in cited], index=svc.index,
+                                    connectors=svc.connectors,
+                                    directory_epoch=getattr(svc.directory, "epoch", 0))
+            citations = [{**authz.public_meta(ok[d]), "cited_version": v}
+                         for d, v in cited if d in ok]
+            kinds = {e.get("kind") for e in res.get("events") or []}
+            lat = res.get("latency_ms")
+            body = {"req_id": req_id, "question": res.get("question"),
+                    "channel": res.get("channel"), "event_time": res.get("event_time"),
+                    "synthetic_replay": bool(res.get("synthetic_replay")),
+                    "status": res.get("status"), "policy_version": res.get("policy_version"),
+                    "model": res.get("model"), "prompt_version": res.get("prompt_version"),
+                    "latency_ms_rounded": (int(round(lat / 100.0)) * 100
+                                           if isinstance(lat, (int, float)) else None),
+                    "stages": [{"name": n, "status": "ok" if k in kinds else "skipped"}
+                               for n, k in TRACE_STAGES],
+                    "dropped_sentences_count": res.get("dropped_sentences_count"),
+                    "citations": citations, "answer_sha256": res.get("answer_sha256"),
+                    "records": [{"ordinal": i + 1, "kind": e.get("kind"), "hash": e.get("hash")}
+                                for i, e in enumerate(res.get("events") or [])]}
+            _record("ok", len(citations))
+        except HTTPException:
+            raise
         except Exception as exc:                                    # noqa: BLE001
-            log.error("trace failed: %s", type(exc).__name__)
+            log.error("trace failed: %s", type(exc).__name__)       # incl. ledger down: fail closed
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
-        if res is None or res.get("sub") != user.id:
-            raise HTTPException(404, "not found")
-        return {"req_id": req_id, "question": res.get("question"), "channel": res.get("channel"),
-                "event_time": res.get("event_time"), "status": res.get("status"),
-                "policy_version": res.get("policy_version"), "model": res.get("model"),
-                "prompt_version": res.get("prompt_version"), "latency_ms": res.get("latency_ms"),
-                "stage_ms": res.get("stage_ms") or {},
-                "dropped_sentences_count": res.get("dropped_sentences_count"),
-                "released": res.get("released") or [], "citations": res.get("citations") or [],
-                "answer_sha256": res.get("answer_sha256"),
-                "events": [{k: e.get(k) for k in ("seq", "kind", "hash", "recorded_at")}
-                           for e in res.get("events") or []]}
+        return body
+
+    # -- developer views: graph and document (authz.py rules; ledgered before returning) -------
+    @app.get("/ib/graph")
+    def knowledge_graph(focus: Optional[str] = Query(None, max_length=300),
+                        q: Optional[str] = Query(None, max_length=500),
+                        limit: int = Query(graph.DEFAULT_LIMIT, ge=1, le=graph.MAX_LIMIT),
+                        user: DirectoryUser = Depends(current)):
+        _employee(user)
+        try:
+            return graph.build_graph(user, index=svc.index, directory=svc.directory,
+                                     ledger=svc.ledger, connectors=svc.connectors,
+                                     clock=lambda: datetime.now(timezone.utc), focus=focus, q=q,
+                                     limit=limit)
+        except graph.NotFound:
+            raise HTTPException(404, NOT_FOUND) from None
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("graph failed: %s", type(exc).__name__)       # incl. ledger down: fail closed
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+
+    @app.post("/ib/graph/openable")
+    def graph_openable(body: OpenableBody, user: DirectoryUser = Depends(current)):
+        _employee(user)
+        if any(len(d) > 300 for d in body.doc_ids):
+            raise HTTPException(422, "invalid id")
+        try:
+            return graph.openable(user, body.doc_ids, index=svc.index, directory=svc.directory,
+                                  ledger=svc.ledger, connectors=svc.connectors,
+                                  clock=lambda: datetime.now(timezone.utc))
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("openable failed: %s", type(exc).__name__)    # incl. ledger down
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+
+    @app.get("/ib/doc/{doc_id}")
+    def document(doc_id: str, q: Optional[str] = Query(None, max_length=500),
+                 user: DirectoryUser = Depends(current)):
+        _employee(user)
+        try:
+            return docview.view_doc(user, doc_id, index=svc.index, directory=svc.directory,
+                                    ledger=svc.ledger, connectors=svc.connectors,
+                                    ingest_status=svc.ingestor.status,
+                                    clock=lambda: datetime.now(timezone.utc), q=q)
+        except docview.NotFound:
+            raise HTTPException(404, NOT_FOUND) from None
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("doc failed: %s", type(exc).__name__)         # incl. ledger down: fail closed
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
 
     @app.get("/ib/sources")
     def sources(user: DirectoryUser = Depends(current)):

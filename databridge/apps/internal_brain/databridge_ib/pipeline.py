@@ -89,9 +89,12 @@ class Pipeline:
             # best effort: a sanitized failure record (the error class only, never the message)
             try:
                 from .models import RequestFailed
+                # the failure belongs to the same request: same event time, same replay label
+                # (a seeded request's failure must not count as live activity)
                 self.ledger.append(RequestFailed(sub=user.id, stage="ask",
                                                  error_code=type(exc).__name__, req_id=req_id,
-                                                 event_time=self.clock()))
+                                                 event_time=event_time or self.clock(),
+                                                 synthetic_replay=replay))
             except Exception:                                       # noqa: BLE001
                 pass
             raise
@@ -183,10 +186,14 @@ class Pipeline:
         citations = tuple(self._citation(p, checks, live) for p in cites)
         # 11 — write-ahead before release
         t_end = time.perf_counter()
-        ms = lambda a, b: max(0, int(round((b - a) * 1000)))           # noqa: E731
-        stage_ms = {"accept": ms(t0, t_g1), "gate1": ms(t_g1, t_g2), "gate2": ms(t_g2, t_seal1),
-                    "seal": ms(t_seal1, t_comp), "compose": ms(t_comp, t_end)}
         ref, sha = self.answers.put(req_id, answer)
+        t_rel = time.perf_counter()
+        ms = lambda a, b: max(0, int(round((b - a) * 1000)))           # noqa: E731
+        # Per-stage timings END BEFORE the final ``answer.released`` append (it carries them):
+        # ``seal`` is the retrieval.decided append, ``release`` is storing the answer text.
+        stage_ms = {"accept": ms(t0, t_g1), "gate1": ms(t_g1, t_g2), "gate2": ms(t_g2, t_seal1),
+                    "seal": ms(t_seal1, t_comp), "compose": ms(t_comp, t_end),
+                    "release": ms(t_end, t_rel)}
         self.ledger.append(AnswerReleased(
             sub=user.id, model=model, prompt_version=narrate.PROMPT_VERSION, answer_sha256=sha,
             answer_ref=ref, refused=refused,

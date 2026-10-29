@@ -55,6 +55,8 @@ class IbConfig:
         bad += [n for n, v, d in (("MOCK_SVC_TOKEN", self.svc_token, "svc-dev"),
                                   ("MOCK_ADMIN_TOKEN", self.admin_token, "admin-dev"),
                                   ("MOCK_WEBHOOK_SECRET", self.webhook_secret, "whsec-dev")) if v == d]
+        if self.replay_key:
+            bad.append("IB_REPLAY_KEY (seeding switch; never on a deployment)")
         if self.token_key == self.ledger_key:
             bad.append("IB_LEDGER_KEY (must differ from IB_TOKEN_KEY)")
         if bad:
@@ -65,6 +67,10 @@ class IbConfig:
             raise RuntimeError("refusing to start: IB_DEMO_LOGIN=1 on a deployment needs "
                                "IB_DEMO_PASSCODE of at least 8 characters")
     demo_login: bool = field(default_factory=lambda: _env("IB_DEMO_LOGIN") == "1")
+    #: the demo-history seeding switch (scripts/seed_demo_activity.py): when set (>= 24 chars) and
+    #: NOT deployed, a loopback bearer call to /ib/ask carrying this key in ``X-IB-Replay-Key`` is
+    #: recorded as ``channel="replay"``, ``synthetic_replay=True`` at ``X-IB-Replay-At``. Off by default.
+    replay_key: str = field(default_factory=lambda: _env("IB_REPLAY_KEY"))
     live: bool = field(default_factory=lambda: _env("IB_LIVE") == "1")
 
     # derived paths ---------------------------------------------------------------------------

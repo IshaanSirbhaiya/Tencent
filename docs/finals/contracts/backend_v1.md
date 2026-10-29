@@ -292,7 +292,7 @@ They appear in `/audit/events` (filter `kind`) and in `/audit/stats` `kinds` and
   "quality_findings": 14, "canaries_valid": true, "runtime_s": 61.9,
   "per_mode": {"fake-capture": {"requests": 2979, "with_leak": 0, "upper95": 0.001007,
                                 "with_model_payload": 683, "refused": 2296}},
-  "tests": {"backend": 0, "e2e": 38},
+  "tests": {"backend": 680, "e2e": 38},
   "smoke": null
 }
 ```

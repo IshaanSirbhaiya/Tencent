@@ -26,7 +26,9 @@ answers 401/403 itself.
 """
 from __future__ import annotations
 
+import copy
 import datetime as dt
+import threading
 from typing import Any, Callable, NoReturn, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -110,6 +112,24 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
             projection.sync()
         except LedgerUnavailable:
             raise _unavailable() from None
+
+    def _sync_or_refuse(sub: str, op: str, info: dict) -> None:
+        """Projection catch-up; a failure that is NOT the ledger (SQLite, a bad row) is a ledgered
+        500 with a fixed envelope (Codex plan review #5); a ledger failure is a 503."""
+        try:
+            _sync()
+        except HTTPException:
+            raise
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, op, "error", 500, "the audit query failed", info)
+
+    #: last computed stats, keyed on the VERIFIED ledger head (seq + hash), the parameters and the
+    #: minute. Consulted only after ``ledger.events(strict=True)`` has verified the chain, so a
+    #: cached result is never served for a ledger that does not verify. Every stats call appends
+    #: its own ``audit.query``, which moves the head: the cache therefore helps only concurrent
+    #: refreshes (two panels loading at once), never a later call.
+    stats_cache: dict[str, Any] = {"key": None, "out": None}
+    stats_lock = threading.Lock()
 
     @router.get("/events")
     def audit_events(principal=dep,
@@ -237,11 +257,27 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         except ValueError as exc:
             _refuse(sub, "stats", "rejected", 422, f"invalid stats query: {str(exc)[:120]}",
                     {"params": _clip(raw)})
+        info = {"params": _clip(raw)}
         try:
-            evs = list(ledger.events(strict=True))
+            evs = list(ledger.events(strict=True))          # verifies the whole chain first
         except LedgerUnavailable:
             raise _unavailable() from None
-        out = compute_stats(evs, now=now(), days=n_days, include_replay=replay != "exclude")
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "stats", "error", 500, "the audit query failed", info)
+        try:
+            t_now = now()
+            head = (evs[-1].seq, evs[-1].hash) if evs else (0, None)
+            key = (head, n_days, replay or "include", int(t_now.timestamp() // 60))
+            with stats_lock:
+                cached = stats_cache["out"] if stats_cache["key"] == key else None
+            if cached is None:
+                cached = compute_stats(evs, now=t_now, days=n_days,
+                                       include_replay=replay != "exclude")
+                with stats_lock:
+                    stats_cache["key"], stats_cache["out"] = key, cached
+            out = copy.deepcopy(cached)
+        except Exception:                                            # noqa: BLE001
+            _refuse(sub, "stats", "error", 500, "the audit query failed", info)
         _ledger_query(sub, {"op": "stats", "days": n_days, "replay": replay or "include"},
                       out["totals"]["requests"])
         return out
@@ -253,7 +289,7 @@ def make_audit_router(ledger: AccessLedger, store: AnswerStore, projection: Audi
         sub = _sub_of(principal)
         if not req_id or len(req_id) > 200:
             _refuse(sub, "journey", "rejected", 422, "invalid request id", {"req_id": req_id[:200]})
-        _sync()
+        _sync_or_refuse(sub, "journey", {"req_id": req_id})
         try:
             res = projection.reconstruct(req_id)
         except Exception:                                            # noqa: BLE001

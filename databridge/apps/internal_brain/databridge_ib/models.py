@@ -191,7 +191,8 @@ class AskResponse(_Frozen):
 IB_EVENT = "ib_event"
 EVENT_KINDS = ("request.accepted", "retrieval.decided", "answer.released", "request.failed",
                "audit.query", "audit.reveal", "acl.changed", "membership.changed",
-               "directory.changed", "ingest.sync", "anchor.published", "map.viewed", "auth.login")
+               "directory.changed", "ingest.sync", "anchor.published", "map.viewed", "auth.login",
+               "graph.viewed", "doc.viewed", "trace.viewed")
 
 
 class Gate2Decision(_Frozen):
@@ -239,7 +240,8 @@ class AnswerReleased(EventBase):
     citations: tuple[dict[str, Any], ...]          # {doc_id, version, content_checked_at, authz_checked_at}
     dropped_sentences_count: int = 0
     latency_ms: int
-    # per-stage timings in ms (gate1, gate2, compose, seal) for the developer view; timings only
+    # per-stage timings in ms (accept, gate1, gate2, seal, compose, release) for the developer
+    # view; timings only. They end BEFORE this event's own append (latency_ms likewise).
     stage_ms: dict[str, int] = Field(default_factory=dict)
 
 
@@ -275,6 +277,41 @@ class MapViewed(EventBase):
     items_returned: int = 0                         # item entries actually sent (capped per space)
     containers_listed: int
     policy_version: str
+
+
+class GraphViewed(EventBase):
+    """A person opened (part of) their knowledge graph, or asked which ids they can open
+    (``mode="openable"``). Counts only: no titles, no ids, no query text (write-ahead, before the
+    response). ``docs_checked`` counts the live Gate-2 checks this call ran (compliance-only
+    record); everything returned was confirmed in the same call."""
+    kind: Literal["graph.viewed"] = "graph.viewed"
+    sub: str
+    mode: Literal["overview", "focus", "search", "openable"]
+    outcome: Literal["ok", "not_found"] = "ok"
+    nodes_returned: int = 0
+    docs_returned: int = 0
+    edges_returned: int = 0
+    docs_checked: int = 0
+    policy_version: str
+
+
+class DocViewed(EventBase):
+    """A person asked to open one document's passage (``/ib/doc``). Appended BEFORE the access
+    decision, so a ledger outage is the same 503 for a permitted, a restricted and an unknown id;
+    the decision itself is not recorded here (the response is the same 404 either way)."""
+    kind: Literal["doc.viewed"] = "doc.viewed"
+    sub: str
+    doc_id: str                                     # as requested (capped at 300 chars)
+    with_query: bool = False
+    policy_version: str
+
+
+class TraceViewed(EventBase):
+    """A person opened the receipt of one of their own requests (``/ib/trace``). Counts only."""
+    kind: Literal["trace.viewed"] = "trace.viewed"
+    sub: str
+    outcome: Literal["ok", "not_found"] = "ok"
+    citations_returned: int = 0
 
 
 class AuditReveal(EventBase):

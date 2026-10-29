@@ -458,6 +458,15 @@ class AuditProjection:
         return {"doc_id": doc_id, "accessors": accessors, "requests": reqs,
                 "truncated": truncated, "limit": lim}
 
+    def owns(self, req_id: str, sub: str) -> bool:
+        """True when ``req_id`` is a request ``sub`` asked. An ownership-constrained lookup: the
+        asker's trace checks this BEFORE reconstructing anything, so another person's request costs
+        the same single indexed lookup as an unknown id (Codex plan review, role checks)."""
+        with self._lock:
+            return self._db.execute(
+                "SELECT 1 FROM events WHERE req_id = ? AND sub = ? AND kind = 'request.accepted' "
+                "LIMIT 1", (req_id, sub)).fetchone() is not None
+
     def reconstruct(self, req_id: str) -> Optional[dict[str, Any]]:
         """Everything the ledger says about one request: who asked what, when, through which
         channel; the considered documents (ids, titles, containers); Gate-2 decisions and reason

@@ -54,8 +54,11 @@ def test_stats_needs_compliance_and_is_ledgered(tmp_path):
     s = r.json()
     assert s["totals"]["requests"] >= 1
     assert s["totals"]["answered"] + s["totals"]["refused"] >= 1
-    assert s["funnel"]["asked"] == s["totals"]["requests"]
-    assert s["funnel"]["gate2_allowed"] + s["funnel"]["gate2_denied"] == s["funnel"]["gate2_checked"]
+    assert s["requests_flow"]["asked"] == s["totals"]["requests"]
+    df = s["documents_flow"]
+    assert df["gate2_allowed"] + df["gate2_denied"] == df["gate2_checked"]
+    assert df["cited"] <= df["released"] <= df["gate2_allowed"] <= df["gate2_checked"]
+    assert "funnel" not in s                 # requests and documents are never one funnel
     assert s["stages_ms"]["gate2"]["count"] >= 1
     # counts only: no question or answer text anywhere in the payload
     assert Q not in json.dumps(s)
@@ -97,15 +100,19 @@ def test_trace_is_own_requests_only_and_hides_gate2_reasons(tmp_path):
     t = jd.get(f"/ib/trace/{rid}")
     assert t.status_code == 200, t.text
     body = t.json()
-    assert body["question"] == Q and set(body["stage_ms"]) == set(STAGES)
-    for hidden in ("considered", "gate2", "time_window", "answer_ref"):
+    assert body["question"] == Q and [s["name"] for s in body["stages"]] == list(STAGES)
+    assert all(s["status"] == "ok" for s in body["stages"])
+    for hidden in ("considered", "gate2", "time_window", "answer_ref", "released", "stage_ms",
+                   "latency_ms", "events"):
         assert hidden not in body
-    assert "reason_code" not in json.dumps(body)
-    assert len(body["events"]) >= 3 and all(e["hash"] for e in body["events"])
+    assert "reason_code" not in json.dumps(body) and '"seq"' not in json.dumps(body)
+    assert [r["ordinal"] for r in body["records"]] == [1, 2, 3]
+    assert all(r["hash"] for r in body["records"])
+    assert body["latency_ms_rounded"] % 100 == 0 and body["synthetic_replay"] is False
     # someone else's request id is indistinguishable from an unknown one
     other = _as(app, svc, "sara.sec", ("employee", "compliance_officer"))
-    assert other.get(f"/ib/trace/{rid}").status_code == 404
-    assert other.get("/ib/trace/does-not-exist").status_code == 404
+    a, b = other.get(f"/ib/trace/{rid}"), other.get("/ib/trace/does-not-exist")
+    assert a.status_code == b.status_code == 404 and a.content == b.content
 
 
 def test_compute_stats_window_and_replay_filter():
@@ -129,7 +136,8 @@ def test_compute_stats_window_and_replay_filter():
            E(5, "request.accepted", {"sub": "b", "event_time": recent, "synthetic_replay": True})]
     s = compute_stats(evs, now=now, days=30)
     assert s["totals"]["requests"] == 2 and s["channels"] == {"workbuddy-mcp": 1, "ui": 1}
-    assert s["funnel"]["gate2_allowed"] == 1 and s["funnel"]["gate2_denied"] == 1
+    assert s["documents_flow"]["gate2_allowed"] == 1 and s["documents_flow"]["gate2_denied"] == 1
+    assert s["documents_flow"]["cited"] == 1 and s["documents_flow"]["released"] == 1
     assert s["platforms"]["jira"] == {"considered": 1, "released": 1, "gate2_checked": 1}
     assert s["latency_ms"]["p50"] == 40 and s["stages_ms"]["gate1"]["p50"] == 3
     assert s["ledger"]["last_seq"] == 5

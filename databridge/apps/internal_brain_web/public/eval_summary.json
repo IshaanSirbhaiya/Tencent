@@ -1,0 +1,107 @@
+{
+ "generated_at": "2026-10-29T19:04:25.765323+00:00",
+ "source": "evals/internal_brain/results.json",
+ "git_sha": "8fe6b68bfb3261a473b44e0c0899c74c75f0ac96",
+ "stale": true,
+ "run_date": "2026-10-14T20:12:33+00:00",
+ "full_run": true,
+ "limit": 0,
+ "leaks": 0,
+ "leak_requests": 0,
+ "requests": 5958,
+ "requests_per_mode": 2979,
+ "upper95": 0.0010070493454179255,
+ "payload_requests": 683,
+ "payload_upper95": 0.004392386530014641,
+ "violations": 0,
+ "differential": {
+  "pairs": 400,
+  "mismatches": 0,
+  "control_mismatches": 0
+ },
+ "injection": {
+  "requests": 976,
+  "hard_failures": 0
+ },
+ "recall": {
+  "released": {
+   "fake-capture": 1.0,
+   "extractive": 1.0
+  },
+  "released_all_modes": {
+   "min": 1.0,
+   "max": 1.0
+  }
+ },
+ "cited_recall": {
+  "per_mode": {
+   "fake-capture": 0.9642857142857143,
+   "extractive": 0.8775510204081632
+  },
+  "range": {
+   "min": 0.8776,
+   "max": 0.9643
+  }
+ },
+ "quality_findings": 14,
+ "canaries_valid": true,
+ "runtime_s": 61.9,
+ "per_mode": {
+  "fake-capture": {
+   "requests": 2979,
+   "with_leak": 0,
+   "upper95": 0.0010070493454179255,
+   "with_model_payload": 683,
+   "refused": 2296
+  },
+  "extractive": {
+   "requests": 2979,
+   "with_leak": 0,
+   "upper95": 0.0010070493454179255,
+   "with_model_payload": 0,
+   "refused": 2326
+  }
+ },
+ "tests": {
+  "backend": 680,
+  "e2e": 38
+ },
+ "smoke": {
+  "source": "scratch run (not committed)",
+  "run_date": "2026-10-29T19:02:18+00:00",
+  "limit": 0,
+  "leaks": 0,
+  "requests": 5958,
+  "differential": {
+   "pairs": 400,
+   "mismatches": 0,
+   "control_mismatches": 0
+  },
+  "injection": {
+   "requests": 976,
+   "hard_failures": 0
+  },
+  "recall": {
+   "released": {
+    "fake-capture": 1.0,
+    "extractive": 1.0
+   },
+   "released_all_modes": {
+    "min": 1.0,
+    "max": 1.0
+   }
+  },
+  "cited_recall": {
+   "per_mode": {
+    "fake-capture": 0.9642857142857143,
+    "extractive": 0.8775510204081632
+   },
+   "range": {
+    "min": 0.8776,
+    "max": 0.9643
+   }
+  },
+  "violations": 0
+ },
+ "note": "Full evaluation re-run pending: the Internal Brain changed after this run."
+}
