@@ -17,6 +17,7 @@ import {
   EXTRACTIVE,
   citation,
 } from './fixtures';
+import { EXTRA_HANDLERS } from './extra';
 import { mockDoc, mockGraph, mockJourney, mockStats, mockTrace } from './finals';
 import { buildMap } from './map';
 
@@ -169,6 +170,10 @@ export async function handleMock(req: NextRequest, path: string, session?: strin
   const sub = principal(session);
   if (!sub) return err(401, 'authentication required');
   const me = ROLES[sub];
+  for (const h of EXTRA_HANDLERS) {
+    const r = await h({ req, path, method, sub, roles: me?.roles ?? [] });
+    if (r) return r;
+  }
 
   if (path === 'auth/logout' && method === 'POST') {
     const res = json({ ok: true });
