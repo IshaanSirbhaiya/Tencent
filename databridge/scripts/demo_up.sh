@@ -51,7 +51,11 @@ esac
 
 FRESH=0; [ "${2:-}" = "--fresh" ] && FRESH=1
 if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local; set +a; fi
-export IB_FORCE_OFFLINE="${IB_FORCE_OFFLINE:-1}" IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
+if [ -z "${IB_FORCE_OFFLINE:-}" ]; then
+  # Live Tencent Hunyuan when TokenHub answers for this account; otherwise the honest fallback.
+  if "$PY" scripts/hy3_check.py --quiet; then IB_FORCE_OFFLINE=0; else IB_FORCE_OFFLINE=1; fi
+fi
+export IB_FORCE_OFFLINE IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
 export IB_REPLAY_KEY="${IB_REPLAY_KEY:-$("$PY" -c 'import secrets; print(secrets.token_hex(16))')}"
 
 if [ "$FRESH" = "1" ]; then
