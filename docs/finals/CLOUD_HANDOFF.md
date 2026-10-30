@@ -213,6 +213,54 @@ ArrowLeft after a stuck step dropped to /present with no HUD.
 **Opus and Codex:** were still running at hand-off. If their files are missing, re-run Opus in the
 cloud on `git diff 7bf3246..final_v1.2 -- databridge/`; Codex waits for the laptop.
 
+**Uploads checkpoint** (full detail in `contracts/uploads.md` §8):
+- **Tests:** uploads 53, extract_files 21, mock 151, connector_drive 65.
+- **The two Drive failures are FIXED:** a header-only CSV is now indexed.
+- **Full IB suite:** run 2 had no failures at 90%. Re-run to confirm.
+- **Lock file:** `python-pptx==1.0.2` and `pypdfium2==5.14.0` are now added to
+  `requirements-lock.txt` (the coordinator did this at hand-off). Check that `XlsxWriter` (a python-pptx
+  dependency) installs; pin it if pip complains.
+- **Hardening done:** reader worker process with a 15 s kill, XXE refusal, per-format isolation,
+  WhatsApp parser, CSV rows as citable lines, filename fix.
+- **Gaps:** no OCR; WhatsApp phone numbers not masked; one file at a time; no PDF sample in
+  `make_files.py`.
+
+**Opus round-2 checkpoint** (`reviews/round2_opus_act_tools_kit.md`, PARTIAL). Fix with tests:
+1. **MED:** Act has no rate limit, and the 500-proposal store is global, so evicting the oldest drops
+   other people's proposals. Add a per-person 429 (`action.failed` stage `rate`) and a per-person cap
+   (`actions.py:435-441`, `app.py:478-505`).
+2. **MED (rule 4):** ticket description links expose restricted doc ids, channels and spaces to the
+   project's browsers. Route links through an IB redirect that runs Gate 1 and Gate 2 for the clicker
+   (`actions.py:404-407`).
+3. **MED (honesty):** offline mock labels say Hy3/TokenHub unless `NEXT_PUBLIC_IB_MOCK_MODEL=extractive`;
+   DeepSeek fixture, mock `/ib/status` and mock deliverables ignore the switch. Make extractive the
+   default everywhere (`lib/mock/fixtures.ts:106-110`, `mock/extra/analytics.ts:667-678`,
+   `mock/extra/deliver.ts:133`).
+4. **MED:** `live_kit/check_absent.py --sim` reads `count`; the endpoint returns
+   `documents_containing` (`check_absent.py:157`).
+5. **LOW:** confirm doesn't re-run `context()` on the cited docs (`actions.py:459-499`).
+6. **Smaller:**
+   - the 409 "nothing changed" message after a timeout;
+   - the default summary echoes the question;
+   - the presenter P key makes ledgered asks, but its docstring says it doesn't;
+   - the Leo answer cache isn't cleared on logout;
+   - `/present/preflight` has no auth and no `IB_DEPLOYED` check;
+   - the `demo_up.sh` `--fresh` guard accepts `var/../..` (reject `..`);
+   - `fill_template.py --name` path traversal and CSV formula injection;
+   - the video's hard-coded test counts;
+   - `.gitignore` missing `*.tok`.
+7. **NOT reviewed yet (do next):**
+   - the MCP tools (`mcp_server.py`, `audit_mcp_server.py`, `docview.py`);
+   - `ModelChain.draft` grounding;
+   - `jira.creatable` / `create_issue`;
+   - the Act web components;
+   - voice;
+   - `demo_day.ps1`, `demo_preflight.py`, the `.cmd` launchers.
+
+**Scripts/video/evidence review (a4b24bb):** the agent may not have written
+`reviews/round2_scripts_video_evidence.md` before hand-off. If it is missing, fold that scope into
+the Opus re-run.
+
 ## 4. What to do next, in order
 
 1. **Make each WIP track pass its own tests,** then the FULL suites:
