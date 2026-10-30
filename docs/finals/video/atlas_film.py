@@ -79,7 +79,7 @@ def frames(path: Path, cw: int, ch: int, start: float = 0.0, dur: float | None =
     if dur is not None:
         cmd += ["-t", f"{dur:.3f}"]
     cmd += ["-vf", f"fps={FPS},scale={cw}:{ch}:flags=lanczos", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"]
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)   # a reader that stops early closes the pipe
     size, i = cw * ch * 3, 0
     try:
         while True:
