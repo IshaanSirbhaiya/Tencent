@@ -341,8 +341,9 @@ def test_claude_answers_go_through_the_grounding_wall(tmp_path):
         assert seen and all("Leads only" not in x and "CNRY" not in x for x in seen)
         assert "Zorblax" not in ans["answer"] and "9.9%" not in ans["answer"]
         if invent:
+            # the wall refused the model's text: the answer says so (Story 1 fix #2)
             assert ans["model"] == {"provider": "deterministic", "model": "extractive-v1",
-                                    "fallback_used": True}
+                                    "fallback_used": True, "reason_code": "model_rejected_evidence"}
         else:
             assert ans["model"] == {"provider": "standin", "model": "standin-1",
                                     "fallback_used": False}

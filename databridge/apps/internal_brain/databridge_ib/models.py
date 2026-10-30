@@ -174,7 +174,8 @@ class ModelInfo(_Frozen):
     provider: str               # "tencent-tokenhub" | "deterministic"
     model: str                  # "hy3" | "deepseek-v4.1-flash" | "extractive-v1"
     fallback_used: bool = False
-    #: why a deterministic answer was served without a model call (D-43: "quoted_approved_script").
+    #: why a deterministic answer was served: without a model call (D-43 "quoted_approved_script"),
+    #: or after a model try failed ("model_rejected_evidence", "model_unavailable"); narrate.REASON_CODES.
     #: Omitted from the serialized form when unset, so every other answer's bytes are unchanged.
     reason_code: Optional[str] = None
 

@@ -202,8 +202,9 @@ class Pipeline:
         elif passages:
             context = narrate.build_context(passages)
             with for_person(user.id):
-                text, info, _notes = (self.chain.answer(context, question) if self.chain
-                                      else (None, None, []))
+                text, info, notes = (self.chain.answer(context, question) if self.chain
+                                     else (None, None, []))
+            answered = bool(text and info)      # a model returned text past the wall
             valid = {p.tag for p in passages}
             removed = 0
             if text and text.strip() != REFUSAL_TEXT:
@@ -215,8 +216,11 @@ class Pipeline:
             else:                           # no model, or an answer citing no permitted passage
                 answer = quoted
                 if self.chain is not None:      # the model was tried and did not produce a usable answer
+                    # why, so the answer's label tells the truth (Story 1 fix #2): the wall refused
+                    # the model's text, or no model replied in time
                     model = ModelInfo(provider="deterministic", model="extractive-v1",
-                                      fallback_used=True)
+                                      fallback_used=True,
+                                      reason_code=narrate.fallback_reason(notes, answered))
         _emit(on_stage, "composing")            # an answer text exists (model or extractive)
         refused = answer.strip() == REFUSAL_TEXT
         by_tag = {p.tag: p for p in passages}
