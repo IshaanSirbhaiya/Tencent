@@ -46,6 +46,30 @@ Q_WORKBUDDY = ("What's the status of the database migration project and were the
                "raised in Slack last week?")
 CLIPS = ("clipA_compare_amy_rachel_ken.mp4", "clipB_journey_audit_tamper.mp4", "clipC_workbuddy_jordan.mp4")
 
+#: Slowest acceptable warm-up ask, by what produced the answer (``ask_limit_s``). A quoted answer
+#: (no model call: model off, a refusal with nothing released, or the D-43 approved-script quote)
+#: keeps the 8 s bar. An answer for which a model was called (a model answer, or a quoted fallback
+#: after the model's draft failed grounding) gets 15 s: measured model answers on the founder's
+#: laptop took 7 to 11 s, so 15 s leaves headroom without hiding a hung call. Opening a source and
+#: the journey never call a model and keep the quoted bar.
+QUOTED_MAX_S = 8.0
+MODEL_MAX_S = 15.0
+
+
+def model_called(model: Optional[dict]) -> bool:
+    """Whether a model was called for an /ib/ask answer, from its ``model`` field alone: any
+    non-deterministic provider, or a deterministic answer that is a fallback after a model try."""
+    m = model or {}
+    if m.get("provider") != "deterministic" and not str(m.get("model", "")).startswith("extractive"):
+        return True
+    return bool(m.get("fallback_used"))
+
+
+def ask_limit_s(model: Optional[dict], quoted_max_s: float = QUOTED_MAX_S,
+                model_max_s: float = MODEL_MAX_S) -> float:
+    """The slowest acceptable time for one ask, given the answer's ``model`` field."""
+    return model_max_s if model_called(model) else quoted_max_s
+
 
 class Client:
     """One signed-in browser-like session against the web app's /api/ib proxy."""
@@ -223,7 +247,10 @@ def main() -> int:
     ap.add_argument("--web", default=None, help="web app origin (default :3100, or :3101 with --offline)")
     ap.add_argument("--warm", action="store_true", help="ask every scripted question once (real asks)")
     ap.add_argument("--sim-reset", action="store_true", help="as admin.it, reset the platform simulator first")
-    ap.add_argument("--max-s", type=float, default=8.0, help="slowest acceptable ask, seconds (default 8)")
+    ap.add_argument("--max-s", type=float, default=QUOTED_MAX_S,
+                    help=f"slowest acceptable quoted (no model) ask, seconds (default {QUOTED_MAX_S:g})")
+    ap.add_argument("--model-max-s", type=float, default=MODEL_MAX_S,
+                    help=f"slowest acceptable ask that called a model, seconds (default {MODEL_MAX_S:g})")
     ap.add_argument("--out", default=str(OUT_DEFAULT))
     ap.add_argument("--allow-remote", action="store_true",
                     help="allow a non-loopback https --web (the demo sign-in and passcode go there)")
@@ -317,7 +344,7 @@ def main() -> int:
     # -- 4. pre-warm: every scripted question once ----------------------------------------------
     warm: list[dict[str, Any]] = []
     if a.warm:
-        print(f"Pre-warm (real asks, pass when under {a.max_s:.0f} s)")
+        print(f"Pre-warm (real asks, pass when under {a.max_s:.0f} s quoted, {a.model_max_s:.0f} s with a model)")
         res: dict[str, dict] = {}
 
         def ask(key: str, persona: str, who: str, q: str, expect: str) -> Optional[dict]:
@@ -334,7 +361,8 @@ def main() -> int:
             right = (expect == "refuse") == refused
             if expect == "answer2":
                 right = len(cites) >= 2
-            fast = secs <= a.max_s
+            limit = ask_limit_s(body.get("model"), a.max_s, a.model_max_s)
+            fast = secs <= limit
             model = (body.get("model") or {}).get("model", "?")
             outcome = "refused" if refused else f"answered, {len(cites)} citations"
             status = "pass" if right and fast else "fail"
@@ -342,8 +370,9 @@ def main() -> int:
             if not right:
                 detail += " (NOT what the script expects)"
             if not fast:
-                detail += f" (slower than {a.max_s:.0f} s)"
-            rep.add("warm", key, who, status, detail, seconds=round(secs, 2), model=model, outcome=outcome)
+                detail += f" (slower than {limit:.0f} s)"
+            rep.add("warm", key, who, status, detail, seconds=round(secs, 2), model=model, outcome=outcome,
+                    limit_s=limit)
             warm.append({"key": key, "persona": persona, "seconds": round(secs, 2), "ok": status == "pass"})
             res[key] = body
             if expect == "answer2" and len(cites) >= 2:      # step 3 opens citation [2]: warm the live read
@@ -394,7 +423,7 @@ def main() -> int:
             + ("" if off == dt.timedelta(hours=8) else " (Singapore is UTC+8: set the time zone)"))
 
     out = {"generated_at": now.isoformat(), "mode": "offline" if a.offline else "live", "web": web,
-           "ok": rep.ok, "max_s": a.max_s, "warmed": a.warm, "model": model_info, "warm": warm,
+           "ok": rep.ok, "max_s": a.max_s, "model_max_s": a.model_max_s, "warmed": a.warm, "model": model_info, "warm": warm,
            "items": rep.items}
     p = Path(a.out)
     p.parent.mkdir(parents=True, exist_ok=True)

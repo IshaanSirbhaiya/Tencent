@@ -209,7 +209,21 @@ def run_probe(env, oracle: Oracle, cap: Capture, probe: Probe, mode: str, marker
     rec["n_model_calls"] = len(cap.calls)
     if mode == "extractive" and cap.calls:
         bad("model_called_in_extractive_mode", calls=len(cap.calls))
-    if mode == "fake-capture" and passages and not cap.calls:
+    # D-43: the one sanctioned skip is the quoted approved-script answer, and the eval checks it
+    # independently: the answer must be exactly the deterministic quote, citing approved wording only
+    from databridge_ib.narrate import (QUOTED_APPROVED_SCRIPT, cited_tags, extractive_answer,
+                                       is_approved_script)
+    skipped = getattr(resp.model, "reason_code", None) == QUOTED_APPROVED_SCRIPT
+    rec["quoted_skip"] = skipped
+    if skipped:
+        if cap.calls:
+            bad("model_called_on_quoted_skip", calls=len(cap.calls))
+        by_tag = {p.tag: p for p in passages}
+        cited_p = [by_tag.get(t) for t in cited_tags(resp.answer)]
+        if (not cited_p or any(p is None or not is_approved_script(p) for p in cited_p)
+                or resp.answer != extractive_answer(passages, probe.question)):
+            bad("quoted_skip_not_approved_wording_only")
+    elif mode == "fake-capture" and passages and not cap.calls:
         bad("model_not_called_with_passages")
     if not passages and cap.calls:
         bad("model_called_without_released_passages", calls=len(cap.calls))

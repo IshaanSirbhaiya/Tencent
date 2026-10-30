@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 PLATFORMS = ("slack", "confluence", "jira", "drive")
 Platform = Literal["slack", "confluence", "jira", "drive"]
@@ -174,6 +174,16 @@ class ModelInfo(_Frozen):
     provider: str               # "tencent-tokenhub" | "deterministic"
     model: str                  # "hy3" | "deepseek-v4.1-flash" | "extractive-v1"
     fallback_used: bool = False
+    #: why a deterministic answer was served without a model call (D-43: "quoted_approved_script").
+    #: Omitted from the serialized form when unset, so every other answer's bytes are unchanged.
+    reason_code: Optional[str] = None
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_reason(self, handler):
+        out = handler(self)
+        if isinstance(out, dict) and out.get("reason_code") is None:
+            out.pop("reason_code", None)
+        return out
 
 
 class AskResponse(_Frozen):
