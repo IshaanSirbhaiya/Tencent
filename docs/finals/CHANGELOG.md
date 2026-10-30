@@ -41,7 +41,7 @@ Teammate Dev's Workflow 1 ("Your first day leading Project Atlas"), integrated. 
 | Brain | `databridge_ib/subject.py`: a briefing on a named project is scoped to it (search by section, the project's own documents only, the rules page reads more of them through both gates). `pipeline.py` and `views/service.py` call it; every other question is unchanged (D-45) |
 | Demo | `IB_WORLD=atlas bash scripts/demo_up.sh start` runs the main stack on the Atlas world with its own state (`var/ib-atlas`); it refuses to reuse a stack already running. Default unchanged |
 | Eval | `IB_EVAL_WORLD=<path>` runs the leak eval on another world. Atlas world: 0 leaks in 7,374 requests, 0 differential mismatches |
-| Tests | `tests/test_subject_scope.py` (15). Full IB suite: the affected files (test_subject_scope, test_quoted_script_skip, test_story1_fixes) 79 passed after the merge; the full-suite result is in the branch hand-over. Default-world leak eval: 0 leaks in 7,374 requests, 0 differential mismatches (unchanged) |
+| Tests | `tests/test_subject_scope.py` (15). Full IB suite: after the merge, on the Windows laptop, 1,494 passed and 13 failed: 10 also fail on the base commit on this machine (bash-run script tests), 1 was fixed in c06daf8 (demo_up.sh keeps its STATE line), and 2 are feat/story1-fixes tests not yet updated for that branch (the daily-cap reason code, the AI badge string). Default-world leak eval: 0 leaks in 7,374 requests, 0 differential mismatches (unchanged) |
 
 ## 30 Oct 2026, night (cloud session 2)
 
