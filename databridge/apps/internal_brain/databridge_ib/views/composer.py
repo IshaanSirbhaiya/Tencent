@@ -8,12 +8,12 @@ the sources (pagecheck.py).
 
 Bounded, because it spends real money:
 
-* a hard spend cap (``IB_CLAUDE_BUDGET_USD``, default 10) kept in a file under the IB state
-  directory, so it survives restarts. A call is refused unless its worst case (input + the
-  ``max_tokens`` ceiling, at list price) still fits; the real usage is then added;
-* the spend file FAILS CLOSED: unreadable, corrupt or unwritable, no further call is reserved;
-* rate limits per person (12 a minute) and for the whole service (40 a minute), and at most 4
-  calls in flight. Over any of them, or over the cap, the service falls back to the rules (plan.py);
+* the shared guard (``model_guard.ModelGuard``, the same one the answer backend uses): a total
+  and a daily spend cap kept in a persistent ledger OUTSIDE the demo state (a demo reset never
+  clears it), a service-wide and a per-person rate. A call is refused unless its worst case
+  (input + the ``max_tokens`` ceiling, at list price) still fits; the real usage is then recorded.
+  The ledger FAILS CLOSED: missing, unreadable, corrupt or unwritable, no further call is made;
+* at most 4 calls in flight. Over any limit the service falls back to the rules (plan.py);
 * one deadline per call; a timeout, an API error, a refusal or an invalid reply is a fallback,
   never an error the person sees.
 
@@ -26,14 +26,12 @@ import json
 import logging
 import os
 import threading
-import time
-from collections import deque
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from pydantic import ValidationError
 
+from ..model_guard import WINDOW_S, ModelGuard, Ticket, _Window  # noqa: F401  (re-exported)
 from ..models import ModelInfo
 from ..narrate import neutralise_tags
 from .pagespec import PDecision, json_schema, prompt_schema, read_page
@@ -58,108 +56,8 @@ FAST_FACTOR = 2.0
 FAST_BETA = "fast-mode-2026-02-01"
 DECIDE_MAX_TOKENS, COMPOSE_MAX_TOKENS = 2_000, 16_000
 DECIDE_TIMEOUT_S, COMPOSE_TIMEOUT_S = 25.0, 120.0
-USER_RATE, GLOBAL_RATE, WINDOW_S, MAX_INFLIGHT = 12, 40, 60.0, 4
+MAX_INFLIGHT = 4
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-
-
-@dataclass
-class Spend:
-    usd: float
-    calls: int
-
-
-class Budget:
-    """A spend cap that survives restarts. ``reserve`` before a call, ``settle`` after it. One
-    instance per file (``for_path``): the page composer and the answer backend share the cap."""
-
-    _shared: dict[str, "Budget"] = {}
-    _shared_lock = threading.Lock()
-
-    @classmethod
-    def for_path(cls, path: Path, cap_usd: float) -> "Budget":
-        key = str(Path(path).resolve())
-        with cls._shared_lock:
-            b = cls._shared.get(key)
-            if b is None:
-                b = cls._shared[key] = cls(path, cap_usd)
-            return b
-
-    def __init__(self, path: Path, cap_usd: float):
-        self.path, self.cap = Path(path), float(cap_usd)
-        self._lock = threading.Lock()
-        self._reserved = 0.0
-        #: a spend that could not be written: closed until a restart reads a good file
-        self._broken = False
-
-    def _read(self) -> Optional[Spend]:
-        """The spend so far; no file yet is zero. A file that cannot be read or parsed is None:
-        the cap then FAILS CLOSED (no call is reserved, and the file is never overwritten, so a
-        corrupt file cannot reset the spend)."""
-        try:
-            raw = self.path.read_text(encoding="utf-8")
-        except FileNotFoundError:
-            return Spend(0.0, 0)
-        except OSError:
-            return None
-        try:
-            d = json.loads(raw)
-            s = Spend(float(d["usd"]), int(d["calls"]))
-        except (ValueError, TypeError, KeyError):
-            return None
-        if not (s.usd >= 0.0 and s.calls >= 0) or s.usd != s.usd:      # negative or NaN
-            return None
-        return s
-
-    def spent(self) -> Spend:
-        """For status: an unreadable file reads as the whole cap spent (unavailable)."""
-        with self._lock:
-            return self._read() or Spend(self.cap, 0)
-
-    def reserve(self, worst_usd: float) -> bool:
-        with self._lock:
-            s = self._read()
-            if s is None or self._broken or s.usd + self._reserved + worst_usd > self.cap:
-                return False
-            self._reserved += worst_usd
-            return True
-
-    def settle(self, worst_usd: float, actual_usd: float) -> None:
-        with self._lock:
-            self._reserved = max(0.0, self._reserved - worst_usd)
-            s = self._read()
-            if s is None:
-                log.error("spend file unreadable: the cap stays closed")
-                return
-            s.usd += max(0.0, actual_usd)
-            s.calls += 1
-            try:
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                tmp = self.path.with_suffix(".tmp")
-                tmp.write_text(json.dumps({"usd": round(s.usd, 6), "calls": s.calls,
-                                           "cap": self.cap, "model": PUBLIC_MODEL}),
-                               encoding="utf-8")
-                os.replace(tmp, self.path)
-            except Exception:
-                self._broken = True             # a spend we could not record: fail closed
-                raise
-
-
-class _Window:
-    def __init__(self, n: int, window: float):
-        self.n, self.window = n, window
-        self._hits: dict[str, deque] = {}
-        self._lock = threading.Lock()
-
-    def allow(self, key: str) -> bool:
-        now = time.monotonic()
-        with self._lock:
-            q = self._hits.setdefault(key, deque())
-            while q and now - q[0] > self.window:
-                q.popleft()
-            if len(q) >= self.n:
-                return False
-            q.append(now)
-            return True
 
 
 def cost_usd(usage: Any, fast: bool = False) -> float:
@@ -218,18 +116,22 @@ DECIDE_SYSTEM = "\n".join([
 
 
 class ClaudeComposer:
-    def __init__(self, *, state_dir: Path, cap_usd: Optional[float] = None, client: Any = None,
-                 model: str = MODEL, fast: Optional[bool] = None, effort: Optional[str] = None):
-        cap = cap_usd if cap_usd is not None else float(os.environ.get("IB_CLAUDE_BUDGET_USD", "10"))
+    def __init__(self, *, state_dir: Optional[Path] = None, cap_usd: Optional[float] = None,
+                 client: Any = None, model: str = MODEL, fast: Optional[bool] = None,
+                 effort: Optional[str] = None, guard: Optional[ModelGuard] = None):
+        """``state_dir`` is kept for the call sites; the spend lives in the guard, outside the
+        state. ``guard``: the shared one by default. ``cap_usd`` (tests): a private guard on the
+        same ledger with that total cap."""
         self.model = model
         #: speed for the stage: fast mode and low effort by default (IB_CLAUDE_FAST=0,
         #: IB_CLAUDE_EFFORT=medium for a slower, more thorough page)
         self.fast = fast if fast is not None else os.environ.get("IB_CLAUDE_FAST", "1") != "0"
         self.effort = effort or os.environ.get("IB_CLAUDE_EFFORT", "low")
-        self.budget = (Budget(Path(state_dir) / "claude_spend.json", cap) if client is not None
-                       else Budget.for_path(Path(state_dir) / "claude_spend.json", cap))
-        self._user = _Window(USER_RATE, WINDOW_S)
-        self._global = _Window(GLOBAL_RATE, WINDOW_S)
+        if guard is None:
+            guard = ModelGuard.shared()
+            if cap_usd is not None:
+                guard = ModelGuard(guard.dir, guard.caps.with_total(cap_usd))
+        self.guard = guard
         self._slots = threading.BoundedSemaphore(MAX_INFLIGHT)
         self._client = client
 
@@ -248,20 +150,18 @@ class ClaudeComposer:
         return self._client
 
     def status(self) -> dict[str, Any]:
-        s = self.budget.spent()
-        return {"provider": PUBLIC_PROVIDER, "model": PUBLIC_MODEL, "spent_usd": round(s.usd, 4),
-                "cap_usd": self.budget.cap, "calls": s.calls,
-                "available": s.usd < self.budget.cap and not self.budget._broken}
+        g = self.guard.status()
+        return {"provider": PUBLIC_PROVIDER, "model": PUBLIC_MODEL, "spent_usd": g["spent_usd"],
+                "cap_usd": g["total_cap_usd"], "calls": g["calls"], "available": g["available"]}
 
     # -- one bounded call ----------------------------------------------------------------------
     def _call(self, sub: str, system: str, user_text: str, parse: Callable[[str], Any], *,
-              effort: str, max_tokens: int, timeout_s: float,
+              effort: str, max_tokens: int, timeout_s: float, kind: str,
               schema: Optional[dict[str, Any]] = None
               ) -> tuple[Any, Optional[ModelInfo], str]:
         """One call. ``schema``: the strict structured output format (small schemas only).
-        ``parse`` turns the reply text into the result; None or an exception is invalid output."""
-        if not (self._user.allow(sub) and self._global.allow("*")):
-            return None, None, "rate"
+        ``parse`` turns the reply text into the result; None or an exception is invalid output.
+        A guard refusal is ``rate`` (a rate limit) or ``budget`` (a spend cap, or a bad ledger)."""
         if not self._slots.acquire(blocking=False):
             return None, None, "busy"
         # an upper bound, so the cap is hard: a token is at least one character (input at most
@@ -269,9 +169,10 @@ class ClaudeComposer:
         # output at most max_tokens (thinking included)
         worst = ((len(system) + len(user_text) + 8_000) * PRICE_IN / 1_000_000
                  + max_tokens * PRICE_OUT / 1_000_000) * (FAST_FACTOR if self.fast else 1.0)
-        if not self.budget.reserve(worst):
+        ticket, why = self.guard.admit(sub, kind, worst)
+        if ticket is None:
             self._slots.release()
-            return None, None, "budget"
+            return None, None, "rate" if why.startswith("rate") else "budget"
         actual = 0.0
         try:
             kw: dict[str, Any] = dict(
@@ -314,7 +215,7 @@ class ClaudeComposer:
             return None, None, "timeout" if "Timeout" in type(exc).__name__ else "model_error"
         finally:
             try:
-                self.budget.settle(worst, actual)
+                self.guard.settle(ticket, actual)
             except Exception as exc:                                # noqa: BLE001
                 log.error("spend not recorded: %s", type(exc).__name__)
             finally:
@@ -329,7 +230,7 @@ class ClaudeComposer:
                 "Decide: page or chat.")
         return self._call(sub, DECIDE_SYSTEM, text, PDecision.model_validate_json, effort="low",
                           max_tokens=DECIDE_MAX_TOKENS, timeout_s=DECIDE_TIMEOUT_S,
-                          schema=json_schema(PDecision))
+                          kind="decide", schema=json_schema(PDecision))
 
     def rewrite(self, sub: str, question: str, previous: str
                 ) -> tuple[Optional[str], Optional[ModelInfo], str]:
@@ -342,7 +243,7 @@ class ClaudeComposer:
             q = " ".join(str(t or "").strip().strip('"').split())
             return q[:300] if q else None
         return self._call(sub, REWRITE_SYSTEM, text, parse, effort="low", max_tokens=1_000,
-                          timeout_s=DECIDE_TIMEOUT_S)
+                          timeout_s=DECIDE_TIMEOUT_S, kind="rewrite")
 
     def compose(self, sub: str, question: str, request: str, context: str, people: str
                 ) -> tuple[Optional[dict[str, Any]], Optional[ModelInfo], str]:
@@ -352,7 +253,7 @@ class ClaudeComposer:
                 + (f"People who appear in the sources (handle = name): {people}\n" if people else "")
                 + f"\n{context}\n\nDesign the page.")
         return self._call(sub, COMPOSE_SYSTEM, text, lambda t: read_page(t)[0], effort=self.effort,
-                          max_tokens=COMPOSE_MAX_TOKENS, timeout_s=COMPOSE_TIMEOUT_S)
+                          max_tokens=COMPOSE_MAX_TOKENS, timeout_s=COMPOSE_TIMEOUT_S, kind="page")
 
 
 REWRITE_SYSTEM = "\n".join([
@@ -373,5 +274,5 @@ def _headers(context: str) -> str:
     return "\n".join(line for line in context.splitlines() if line.startswith("[C"))[:4_000]
 
 
-__all__ = ["ClaudeComposer", "Budget", "cost_usd", "claude_enabled", "MODEL", "PROVIDER",
+__all__ = ["ClaudeComposer", "ModelGuard", "cost_usd", "claude_enabled", "MODEL", "PROVIDER",
            "PUBLIC_MODEL", "PUBLIC_PROVIDER"]

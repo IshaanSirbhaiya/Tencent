@@ -326,19 +326,23 @@ def _chat_fake():
                       usage=(10, 10))
 
 
-@pytest.mark.parametrize("content", ["{not json", '{"usd": "lots", "calls": 1}', '{"calls": 3}',
-                                     '{"usd": -5, "calls": 1}', "[]"])
+@pytest.mark.parametrize("content", ["{not json", '{"usd": "lots", "calls": 1, "entries": []}',
+                                     '{"calls": 3, "entries": []}', '{"usd": 1, "calls": 1}',
+                                     '{"usd": -5, "calls": 1, "entries": []}', "[]"])
 def test_a_corrupt_spend_file_fails_closed_and_is_not_overwritten(tmp_path, content):
-    (tmp_path / "claude_spend.json").write_text(content, encoding="utf-8")
+    from databridge_ib.model_guard import guard_dir
+    guard_dir().mkdir(parents=True)
+    (guard_dir() / "spend.json").write_text(content, encoding="utf-8")
     fake = _chat_fake()
     c = cmod.ClaudeComposer(state_dir=tmp_path, cap_usd=10, client=fake)
     assert c.decide("jdoe", "q", "a", "ctx")[2] == "budget" and fake.calls == []
     assert c.status()["available"] is False
-    assert (tmp_path / "claude_spend.json").read_text(encoding="utf-8") == content
+    assert (guard_dir() / "spend.json").read_text(encoding="utf-8") == content
 
 
 def test_an_unreadable_spend_file_fails_closed(tmp_path):
-    (tmp_path / "claude_spend.json").mkdir()                 # a directory: read_text raises OSError
+    from databridge_ib.model_guard import guard_dir
+    (guard_dir() / "spend.json").mkdir(parents=True)        # a directory: read_text raises OSError
     fake = _chat_fake()
     c = cmod.ClaudeComposer(state_dir=tmp_path, cap_usd=10, client=fake)
     assert c.decide("jdoe", "q", "a", "ctx")[2] == "budget" and fake.calls == []
@@ -365,10 +369,10 @@ def test_a_settle_write_error_never_leaks_a_slot_and_closes_the_cap(tmp_path, mo
 def test_the_answer_backend_has_a_per_person_limit(tmp_path, monkeypatch):
     from databridge_ib.claude import ClaudeBackend
     from databridge_ib.llm import for_person
-    from databridge_ib.views.composer import Budget
-    monkeypatch.setenv("IB_CLAUDE_USER_LIMIT", "2")
+    from databridge_ib.model_guard import REFUSED, ModelGuard
+    monkeypatch.setenv("IB_CLAUDE_USER_LIMIT", "2")             # the alias, read at start-up
     fake = FakeClaude(lambda kind, text: "ok", usage=(10, 10))
-    be = ClaudeBackend(Budget(tmp_path / "s.json", 10), client=fake)
+    be = ClaudeBackend(ModelGuard(tmp_path / "g"), client=fake)
     msgs = [{"role": "user", "content": "hi"}]
 
     def call(sub):
@@ -378,5 +382,6 @@ def test_the_answer_backend_has_a_per_person_limit(tmp_path, monkeypatch):
                 return "ok"
             except RuntimeError as exc:
                 return str(exc)
-    assert [call("jdoe") for _ in range(3)] == ["ok", "ok", "per-person rate limit"]
+    assert [call("jdoe") for _ in range(3)] == ["ok", "ok", REFUSED]
     assert call("priya") == "ok"
+

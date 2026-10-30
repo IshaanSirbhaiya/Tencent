@@ -65,9 +65,7 @@ def build_services(cfg: Optional[IbConfig] = None, *, chain: Optional[ModelChain
     ledger = AccessLedger(cfg, external=sink)
     answers = AnswerStore(cfg)
     if chain is None:
-        # Hy3 via TokenHub when it is live; else the opt-in stand-in (claude.py, IB_CLAUDE=1); else none
-        from .claude import claude_chain
-        chain = ModelChain.tokenhub() or claude_chain(cfg.var_root / "views")
+        chain = select_chain(cfg.var_root / "views")
     pipeline = Pipeline(index=index, directory=directory, connectors=connectors, ledger=ledger,
                         answers=answers, chain=chain)
     ingestor = Ingestor(index, connectors, cfg.var_root / "cursors.json", directory=directory,
@@ -83,6 +81,28 @@ def build_services(cfg: Optional[IbConfig] = None, *, chain: Optional[ModelChain
                    projection=projection)
     svc.anchor_sink = sink
     return svc
+
+
+def tokenhub_live() -> Optional[bool]:
+    """``IB_TOKENHUB_LIVE`` as the launcher set it from the real ``scripts/hy3_check.py`` result:
+    True ("1"), False (any other value), or None when unset (legacy: a configured key is used)."""
+    raw = os.environ.get("IB_TOKENHUB_LIVE")
+    if raw is None or not raw.strip():
+        return None
+    return raw.strip() == "1"
+
+
+def select_chain(state_dir=None, *, standin_client=None) -> Optional[ModelChain]:
+    """The answer chain, picked once at start-up. TokenHub (Hy3) only when it is live
+    (``IB_TOKENHUB_LIVE=1``; when that is unset, whenever a key is configured, as before); else the
+    opt-in stand-in (claude.py, ``IB_CLAUDE=1``); else None (quoted answers). A TokenHub that is
+    not live is never built, so it is never tried per ask."""
+    from .claude import claude_chain
+    live = tokenhub_live()
+    chain = ModelChain.tokenhub() if live is not False else None
+    if chain is None:
+        chain = claude_chain(state_dir, client=standin_client)
+    return chain
 
 
 def build_anchor_sink(cfg: IbConfig):

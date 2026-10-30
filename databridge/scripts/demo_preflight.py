@@ -158,14 +158,17 @@ def origin_error(url: str, allow_remote: bool) -> str | None:
 
 
 def model_line(st: dict, offline: bool) -> tuple[dict, tuple[str, str, str]]:
-    """``(model_info, (label, status, detail))`` from a /ib/status body. Hy3 is named only when the
-    active chain IS TokenHub; any other active model (the stand-in) is "AI model active", and the
-    "quoted (no model)" line only when no model is active."""
+    """``(model_info, (label, status, detail))`` from a /ib/status body. Hunyuan/Hy3 is called LIVE
+    only when the ACTIVE chain is TokenHub (``active_provider == "tencent-tokenhub"``, never assumed)
+    AND the launcher found it live (``primary_live``, from ``IB_TOKENHUB_LIVE=1``). Any other active
+    model (the stand-in) is "AI model active", and the "quoted (no model)" line only when no model
+    is active. ``hy3_confirmed`` (``warm_confirms``) can still take LIVE back after the warm-up."""
     m = st.get("models") or {}
     active = bool(m.get("active"))
-    hy3 = active and m.get("active_provider", "tencent-tokenhub") == "tencent-tokenhub"
+    hy3 = active and m.get("active_provider") == "tencent-tokenhub" and m.get("primary_live") is True
     chain = ", ".join(m.get("active_chain") or m.get("chain") or []) or "none"
     info = {"live": hy3, "ai": active and not hy3, "chain": chain,
+            "active_chain": list(m.get("active_chain") or []),
             "force_offline": st.get("force_offline"), "key_configured": st.get("key_configured")}
     if offline:
         return info, ("Model", "info", "mock fixtures (offline build)")
@@ -175,8 +178,43 @@ def model_line(st: dict, offline: bool) -> tuple[dict, tuple[str, str, str]]:
         return info, ("Model: AI model active", "pass",
                       "an AI model answers from the cited sources; never claim Hy3")
     why = "IB_FORCE_OFFLINE=1" if st.get("force_offline") else "no live model"
-    return info, ("Model: extractive fallback (quoted from the sources)", "warn",
+    return info, ("Model: Quoted from sources (no model)", "warn",
                   f"{why}; say 'quoted from the sources, with the same checks'. Expected when TokenHub is not live")
+
+
+def warm_confirms(info: dict, warm_models: list) -> Optional[tuple[str, str, str]]:
+    """After the warm-up: a LIVE TokenHub chain whose warm answers all came back quoted (no answer
+    model in the active chain) is not live. Downgrades ``info`` in place and returns the line that
+    replaces the model line, or None when nothing changes."""
+    if not info.get("live"):
+        return None
+    chain = set(info.get("active_chain") or [])
+    got = [str(x) for x in warm_models if x]
+    if not got or any(x in chain for x in got):
+        return None
+    info["live"], info["ai"] = False, False
+    return ("Model: Quoted from sources (no model)", "warn",
+            "the TokenHub chain is set but every warm-up answer was quoted (extractive); never claim Hy3")
+
+
+def budget_line(st: dict) -> Optional[tuple[str, str, str]]:
+    """``(label, status, detail)`` for the stand-in model's guard ("Model budget": numbers only),
+    or None when /ib/status does not show it (it does only to admin and compliance)."""
+    b = st.get("model_budget")
+    if not isinstance(b, dict):
+        return None
+    if not b.get("ok"):
+        return ("Model budget", "warn",
+                "the spend ledger cannot be read: no model calls, answers are quoted (see the checklist)")
+
+    def usd(k: str) -> str:
+        v = b.get(k)
+        return f"US${float(v):.2f}" if isinstance(v, (int, float)) else "?"
+    detail = (f"{usd('spent_usd')} of {usd('total_cap_usd')} spent; today {usd('today_usd')} of "
+              f"{usd('daily_cap_usd')}; {b.get('calls', '?')} calls")
+    if b.get("available"):
+        return ("Model budget", "pass", detail)
+    return ("Model budget", "warn", detail + "; a cap is reached: answers are quoted, pages use the rules")
 
 
 def main() -> int:
@@ -251,6 +289,9 @@ def main() -> int:
         if code == 200 and isinstance(st, dict):
             model_info, line = model_line(st, a.offline)
             rep.add("model", "model", *line)
+            bline = None if a.offline else budget_line(st)
+            if bline:
+                rep.add("model", "model_budget", *bline)
         else:
             rep.add("model", "model", "Model status /ib/status", "fail", f"HTTP {code}")
         code, v, secs = maya.call("GET", "audit/verify", timeout=120)
@@ -334,6 +375,15 @@ def main() -> int:
                 rep.add("warm", "fixture_label", "Fixture answers carry a model label", "warn",
                         f"the mock labels them {', '.join(labelled)}: they are recorded fixtures. Say "
                         "'this is the recorded fixture mode'; never say Hy3 wrote them")
+        else:
+            # LIVE only if the warm-up answers really came from the TokenHub chain
+            down = warm_confirms(model_info, [i.get("model") for i in rep.items
+                                              if i["group"] == "warm" and i.get("outcome") != "refused"])
+            if down:
+                for i in rep.items:
+                    if i["key"] == "model":
+                        i.update(label=down[0], status=down[1], detail=down[2])
+                print(f"  [WARN] {down[0]}: {down[2]}", flush=True)
     maya.sign_out()
 
     # -- 5. clock -----------------------------------------------------------------------------

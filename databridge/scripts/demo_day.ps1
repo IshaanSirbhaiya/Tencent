@@ -47,6 +47,14 @@ $Py = Join-Path $Db '.venv\Scripts\python.exe'
 $DayDir = Join-Path $Db 'var\demo-day'
 $LogDir = Join-Path $DayDir 'logs'
 $BrowserProfile = Join-Path $Db 'var\demo-browser'
+# The stand-in model's spend ledger (D-42): no reset or wipe here may touch it (demo_up.sh --fresh
+# wipes var\ib-final only, and refuses a state that is, holds or sits in this dir).
+$ModelGuardDir = if ($env:IB_MODEL_GUARD_DIR) { $env:IB_MODEL_GUARD_DIR } else { Join-Path $Db 'var\model_guard' }
+function Test-TouchesModelGuard([string]$Path) {
+  $p = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/') + '\'
+  $g = [IO.Path]::GetFullPath($ModelGuardDir).TrimEnd('\', '/') + '\'
+  return ($g.StartsWith($p, [StringComparison]::OrdinalIgnoreCase) -or $p.StartsWith($g, [StringComparison]::OrdinalIgnoreCase))
+}
 $Report = Join-Path $DayDir 'preflight.json'
 $LiveUrl = 'http://127.0.0.1:3100'
 $MockUrl = 'http://127.0.0.1:3101'
@@ -286,6 +294,11 @@ function Find-Bash {
 # Run a demo_up.sh command in its OWN hidden console, so the services it starts keep running when
 # this window is closed. Its output is followed here line by line.
 function Invoke-DemoUp([string]$Arguments, [int]$TimeoutSec = 900) {
+  # IB_TOKENHUB_LIVE is decided by demo_up.sh from the real hy3_check result and passed to the Brain
+  # (1: the TokenHub chain; 0: never tried, so the stand-in answers when IB_CLAUDE=1). A stale value
+  # in this console is dropped. IB_FORCE_OFFLINE is never forced on here: demo_up.sh keeps it 0 when
+  # TokenHub is not live but the stand-in is opted in.
+  Remove-Item Env:IB_TOKENHUB_LIVE -ErrorAction SilentlyContinue
   $log = Join-Path $LogDir "demo_up-$Stamp.log"
   $rel = "var/demo-day/logs/demo_up-$Stamp.log"
   if ($DryRun) { Dry "run (Git Bash) scripts/demo_up.sh $Arguments"; return 0 }
@@ -352,6 +365,7 @@ function Open-DemoBrowser([string]$Url) {
   Close-DemoBrowser
   # A clean profile every time: no extensions, no saved sessions (so every demo slot is signed out),
   # no zoom left over from rehearsal, no "restore pages" bubble.
+  if (Test-TouchesModelGuard $BrowserProfile) { Bad "refusing to wipe ${BrowserProfile}: it holds the model spend ledger"; return }
   for ($i = 0; $i -lt 5 -and (Test-Path $BrowserProfile); $i++) {
     Remove-Item -Recurse -Force $BrowserProfile -ErrorAction SilentlyContinue
     if (Test-Path $BrowserProfile) { Start-Sleep -Milliseconds 600 }
@@ -392,8 +406,8 @@ function Test-Prereqs([bool]$NeedServices) {
       Bad 'No Python venv at databridge\.venv. Fix: cd databridge; py -3.13 -m venv .venv; .venv\Scripts\python -m pip install -r requirements-lock.txt'
       $fatal++
     }
-    if (Test-Path (Join-Path $Db '.env.ib.local')) { Ok 'Settings file present (.env.ib.local): a model is tried at start (Hy3 if a TokenHub key is set; else the stand-in model if IB_CLAUDE=1)' }
-    elseif ($env:TOKENHUB_API_KEY) { Ok 'TokenHub key in the environment: Hy3 is tried at start' }
+    if (Test-Path (Join-Path $Db '.env.ib.local')) { Ok 'Settings file present (.env.ib.local): demo_up.sh runs hy3_check at start and sets IB_TOKENHUB_LIVE (TokenHub only if it answers; else the stand-in model if IB_CLAUDE=1; else quoted)' }
+    elseif ($env:TOKENHUB_API_KEY) { Ok 'TokenHub key in the environment: hy3_check runs at start and sets IB_TOKENHUB_LIVE' }
     else { Warn 'No settings file and no TokenHub key (databridge\.env.ib.local or TOKENHUB_API_KEY): answers will use the extractive fallback (no model)' }
     # Where the sign-in passcode comes from (never its value).
     $pc = Get-DemoPasscode
@@ -467,9 +481,11 @@ function Show-Verdict([int]$Code, [string]$Base) {
   try {
     $r = Get-Content $Report -Raw | ConvertFrom-Json
     if ($r.mode -eq 'offline') { $model = 'Model: OFFLINE MOCK (recorded fixtures). Say so on stage.' }
-    elseif ($r.model.live) { $model = "Model: Tencent Hunyuan LIVE ($($r.model.chain)). Hy3 lines are allowed." }
-    elseif ($r.model.ai) { $model = 'Model: AI model active (not Hy3). Say "an AI model, from the cited sources"; never claim Hy3.' }
-    else { $model = 'Model: extractive fallback. Use the default lines: "quoted from the sources, with the same checks".' }
+    # model.live is true only when the active chain is TokenHub AND IB_TOKENHUB_LIVE=1 AND the
+    # warm-up answers came from it (demo_preflight.py model_line / warm_confirms)
+    elseif ($r.model.live -eq $true) { $model = "Model: Tencent Hunyuan LIVE ($($r.model.chain)). Hy3 lines are allowed." }
+    elseif ($r.model.ai -eq $true) { $model = 'Model: AI model active (not Hy3). Say "an AI model, from the cited sources"; never claim Hy3.' }
+    else { $model = 'Model: Quoted from sources (no model). Use the default lines: "quoted from the sources, with the same checks".' }
   } catch { }
   if ($DryRun) { Say ''; Say 'DRY RUN finished: nothing was changed.' 'Magenta'; return }
   if ($Code -eq 0) { Show-Big $ReadyArt 'Green' } else {
@@ -591,6 +607,8 @@ function Reset-Demo {
     Close-DemoBrowser
     if ((Test-Prereqs $true) -gt 0) { return 1 }
     Head 'Fresh: stop the Brain and the platforms, wipe var\ib-final, reseed (the web app keeps running)'
+    # the wipe itself is demo_up.sh's (var\ib-final only); the model spend ledger is never touched
+    if (Test-TouchesModelGuard (Join-Path $Db 'var\ib-final')) { Bad 'refusing: var\ib-final holds the model spend ledger'; return 1 }
     foreach ($port in @(8100, 8200)) { if (Test-Port $port) { Stop-DemoPort $port | Out-Null } }
     $code = Invoke-DemoUp 'start --fresh' 1200
     if ($code -ne 0) { Bad "demo_up.sh start --fresh failed (exit $code)"; Show-Big $NotReadyArt 'Red'; return 1 }

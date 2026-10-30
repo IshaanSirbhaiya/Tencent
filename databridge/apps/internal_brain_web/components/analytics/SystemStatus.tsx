@@ -1,7 +1,10 @@
 'use client';
 import { ArrowRight, CircleCheck, CircleSlash, Database, KeyRound } from 'lucide-react';
 import { Badge, PlatformIcon, Skeleton, StatusBadge } from '@/components/ui';
+import { budgetLine } from '@/lib/budget';
 import { cn } from '@/lib/cn';
+import { useMessages } from '@/lib/i18n';
+import { budgetMessages } from '@/lib/i18n/budget';
 import { fmtAgo, fmtDuration, PLATFORM_LABEL } from '@/lib/format';
 import type { IbStatus, SourceStatus } from '@/lib/types';
 import { int } from './format';
@@ -60,6 +63,7 @@ const MODEL_LABEL: Record<string, string> = { hy3: 'Hy3', 'deepseek-v4.1-flash':
 
 /** The model chain and ledger health from /ib/status. Unknown fields render as "not reported". */
 export function ModelStatus({ status, unavailable }: { status: IbStatus | null; unavailable?: boolean }) {
+  const tb = useMessages(budgetMessages);
   if (unavailable) return <p className="text-body-sm text-muted">Model status is not reported by this backend.</p>;
   if (!status) {
     return (
@@ -125,6 +129,19 @@ export function ModelStatus({ status, unavailable }: { status: IbStatus | null; 
           ? `Answers come from ${int(chain.length)} model${chain.length === 1 ? '' : 's'} in order, then the deterministic quote if all fail. Every answer is labelled with its model.`
           : 'No model is active: every answer is the deterministic extractive quote of permitted passages, labelled as such.'}
       </p>
+      {status.model_budget ? <BudgetLine line={budgetLine(status.model_budget, tb)} /> : null}
     </div>
+  );
+}
+
+/** The stand-in model's budget (D-42): numbers only, present for admin and compliance. */
+function BudgetLine({ line }: { line: { label: string; status: 'pass' | 'warn'; detail: string } }) {
+  return (
+    <p className="flex items-start gap-1.5 text-caption text-muted" data-testid="model-budget">
+      {line.status === 'pass' ? <CircleCheck aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ok" /> : <CircleSlash aria-hidden className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" />}
+      <span>
+        <span className="font-medium text-fg">{line.label}</span>: {line.detail}
+      </span>
+    </p>
   );
 }

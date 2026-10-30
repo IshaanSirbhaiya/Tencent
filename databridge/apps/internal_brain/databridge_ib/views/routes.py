@@ -77,8 +77,13 @@ def mount(app: FastAPI, service: ViewService, current: Callable,
         except Exception as exc:                                    # noqa: BLE001
             log.error("rewrite write-ahead failed: %s", type(exc).__name__)
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
-        got, _info, _code = await run_in_threadpool(comp.rewrite, user.id, body.question,
-                                                    body.previous)
+        got, _info, code = await run_in_threadpool(comp.rewrite, user.id, body.question,
+                                                   body.previous)
+        if code in ("budget", "rate"):      # a guard limit: no call; a counts-only row, then as-is
+            try:
+                await run_in_threadpool(service.guard_refused, user, "rewrite", code)
+            except Exception as exc:                                # noqa: BLE001
+                log.error("rewrite guard row failed: %s", type(exc).__name__)
         if not got or got.strip().lower() == body.question.strip().lower():
             return {"question": body.question, "rewritten": False}
         return {"question": got, "rewritten": True}
