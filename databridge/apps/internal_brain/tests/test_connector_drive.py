@@ -613,3 +613,54 @@ def test_event_user_native_first_and_unresolved_stays_none(env):           # sec
     assert conn._ib_user("stranger@elsewhere.example") is None
     assert conn._ib_user("jdoe") == "jdoe"
     assert conn._ib_user("mallory") is None
+
+
+# ---------------------------------------------------------------- round 4 Codex B13: capped download
+class _BigMedia:
+    """A FakeDrive wrapper whose ``alt=media`` body for one CSV is far over the cap, with no size
+    in its metadata; it counts the bytes the client actually pulled from the stream."""
+
+    def __init__(self, fake, fid: str, total: int, *, content_length: bool = False):
+        self.fake, self.fid, self.total, self.pulled = fake, fid, total, 0
+        self.content_length = content_length
+
+    def _body(self):
+        chunk = b"a,b\n" + b"1,2\n" * 16_383                       # 64 KiB of valid CSV
+        sent = 0
+        while sent < self.total:
+            self.pulled += len(chunk)
+            sent += len(chunk)
+            yield chunk
+
+    def __call__(self, request):
+        import httpx
+        if request.url.params.get("alt") == "media" and request.url.path.endswith(f"/{self.fid}"):
+            headers = {"Content-Length": str(self.total)} if self.content_length else {}
+            return httpx.Response(200, headers=headers, content=self._body())
+        return self.fake(request)
+
+
+def _csv_file(fake) -> str:
+    return next(i for i, it in sorted(fake.items.items()) if it["mime"] == "text/csv")
+
+
+def test_download_is_capped_while_streaming(env):
+    """A body with no declared size that is 4x the cap: the read stops just past the cap and the
+    file is skipped; it is never buffered whole."""
+    from databridge_ib import extract_files as X
+    d, fake, _, _ = env
+    fid = _csv_file(fake)
+    big = _BigMedia(fake, fid, 4 * X.MAX_FILE_BYTES)
+    c = DriveConnector(client_for(big, "svc-test"), d, SECRET, sleep=lambda s: None)
+    assert c.fetch(f"drive:{fid}") is None
+    assert 0 < big.pulled <= X.MAX_FILE_BYTES + 128 * 1024
+
+
+def test_download_over_the_cap_by_content_length_reads_no_body(env):
+    from databridge_ib import extract_files as X
+    d, fake, _, _ = env
+    fid = _csv_file(fake)
+    big = _BigMedia(fake, fid, X.MAX_FILE_BYTES + 1, content_length=True)
+    c = DriveConnector(client_for(big, "svc-test"), d, SECRET, sleep=lambda s: None)
+    assert c.fetch(f"drive:{fid}") is None
+    assert big.pulled == 0

@@ -10,13 +10,18 @@ Order of one ``create`` (PLAN §4, with review_opus.md #9-#11 and review_codex.m
    document). None (refused, failed, every source revoked): one 404. Any error: 503;
 5. evidence (source units only, capped) and the build: model (bounded) and/or deterministic,
    every field checked (``verify.py``);
-6. after a model call, the cited documents are authorised AGAIN: a document that is no longer
-   openable, or whose version moved on, is removed and the content checked again;
+6. after ANY model call (round 4 B4: also when the model's output was invalid and the deterministic
+   fallback is released), the cited documents are authorised AGAIN: a document that is no longer
+   openable, or whose version moved on, is removed and the content checked again. A model title is
+   re-checked against what is left (round 4 B3), else the fixed title; a deterministic build is
+   rebuilt from the remaining sources only;
 7. the response is built privately, its canonical digest computed once, LEDGER
    ``deliverable.created``; only then is it published to the export store and returned.
 
-``export``: rate limit → owner + TTL lookup (one 404) → format/kind (422) → re-authorise and
-re-check against the sources as they are now → build the file (CSV, or .pptx when python-pptx is
+``export``: rate limit → owner + TTL lookup (one 404) → format/kind (422) → LEDGER
+``deliverable.requested`` with ``export_format`` (round 4 B2: write-ahead, before Gate 2 and the
+source read; a ledger failure is a 503) → re-authorise and re-check against the sources as they
+are now → build the file (CSV, or .pptx when python-pptx is
 installed) from the STORED copy (never mutated) → LEDGER ``deliverable.exported`` → bytes.
 
 The store is in memory (90 min, 300 entries): it is lost on a restart, and the ledger's digest
@@ -179,14 +184,22 @@ class DeliverableService:
                         "checked_at": checked_at})
         return out
 
-    # -- create ---------------------------------------------------------------------------------
-    def create(self, user: DirectoryUser, req_id: str, kind: str, chart: str = "auto"
-               ) -> dict[str, Any]:
-        if kind not in KINDS:
-            raise Invalid("kind")
-        if not self._rate.allow(user.id):
+    # -- admission (round 4 B12: the route calls this BEFORE it reads the request body) ---------
+    def admit(self, user: DirectoryUser, op: str) -> None:
+        """The per-person rate limit for ``create`` or ``export``; over it: ``deliverable.failed``
+        stage ``rate`` (no ids) and ``RateLimited``."""
+        limiter = self._export_rate if op == "export" else self._rate
+        if not limiter.allow(user.id):
             self._fail(user, "rate", "rate_limited")
             raise RateLimited()
+
+    # -- create ---------------------------------------------------------------------------------
+    def create(self, user: DirectoryUser, req_id: str, kind: str, chart: str = "auto", *,
+               admitted: bool = False) -> dict[str, Any]:
+        if not admitted:
+            self.admit(user, "create")
+        if kind not in KINDS:
+            raise Invalid("kind")
         if not isinstance(req_id, str) or not actmod.ID_RE.match(req_id) or self.projection is None:
             self._fail(user, "lookup", "not_found")
             raise NotFound()
@@ -224,12 +237,10 @@ class DeliverableService:
             content, title, generated, model, fallback, check = self._build(kind, chart, evidence,
                                                                             context, ctx.question)
             cites = dict(ctx.cites)
-            if generated == "model":                    # a model call took time: authorise again
-                content, cites, evidence = self._reauthorise(user, kind, content, cites, evidence,
-                                                             check)
-                if content is None:
-                    content, title, generated, model, fallback = self._deterministic(
-                        kind, evidence, ctx.question, fallback="nothing_passed")
+            if self.chain is not None:      # a model call took time: authorise again (B4: always)
+                content, title, generated, model, fallback, cites, evidence = self._reauthorise(
+                    user, kind, content, title, generated, model, fallback, cites, evidence,
+                    check, ctx.question)
             status = ("ready" if content is not None
                       else "needs_model" if kind == "analysis" else "insufficient")
             now = self.clock()
@@ -308,7 +319,8 @@ class DeliverableService:
                     content = build.check_analysis(spec, evidence, check)
                 if content is not None:
                     title = build.checked_title(spec.get("title", ""), kind, evidence,
-                                                build.content_tags(kind, content), check)
+                                                build.content_tags(kind, content), check,
+                                                labels=build.title_labels(kind, content))
                     return content, title, "model", info, "none", check
                 code = "nothing_passed"
             got = self._deterministic(kind, evidence, question, fallback=code)
@@ -337,7 +349,12 @@ class DeliverableService:
                 return c, title, "deterministic", info(SOURCE_CHART), fallback
         return None, build.FIXED_TITLE[kind], "none", None, fallback
 
-    def _reauthorise(self, user, kind, content, cites, evidence, check):
+    def _reauthorise(self, user, kind, content, title, generated, model, fallback, cites,
+                     evidence, check, question):
+        """After a model call (whatever it returned): the cited documents authorised AGAIN. Nothing
+        revoked: unchanged. Else the model's content is checked again against the remaining
+        sources and its TITLE too (round 4 B3: a title worded from a revoked source is replaced by
+        the fixed one); a deterministic build (round 4 B4) is rebuilt from the remaining sources."""
         ids = list(dict.fromkeys(s.doc_id for s in cites.values()))
         try:
             ok, _ = authz.authorize(user, ids, index=self.index, connectors=self.connectors,
@@ -346,12 +363,20 @@ class DeliverableService:
             ok = {}
         keep = {t: s for t, s in cites.items() if s.doc_id in ok and ok[s.doc_id].version == s.version}
         if len(keep) == len(cites):
-            return content, cites, evidence
+            return content, title, generated, model, fallback, cites, evidence
         ev2 = {t: e for t, e in evidence.items() if t in keep}
-        out, dropped = build.recheck(kind, content, ev2)
-        check.items_dropped += dropped
-        check.items_kept = max(0, check.items_kept - dropped)
-        return out, keep, ev2
+        if generated == "model":
+            out, dropped = build.recheck(kind, content, ev2)
+            check.items_dropped += dropped
+            check.items_kept = max(0, check.items_kept - dropped)
+            if out is not None:
+                if title not in build.FIXED_TITLE.values():
+                    title = build.checked_title(title, kind, ev2, build.content_tags(kind, out),
+                                                check, labels=build.title_labels(kind, out))
+                return out, title, generated, model, fallback, keep, ev2
+            fallback = "nothing_passed"
+        c, t, g, m, fb = self._deterministic(kind, ev2, question, fallback=fallback)
+        return c, t, g, m, fb, keep, ev2
 
     # -- store ----------------------------------------------------------------------------------
     def _evict(self) -> None:
@@ -371,12 +396,11 @@ class DeliverableService:
             return e
 
     # -- export ---------------------------------------------------------------------------------
-    def export(self, user: DirectoryUser, deliverable_id: str, fmt: str
-               ) -> tuple[bytes, str, str]:
+    def export(self, user: DirectoryUser, deliverable_id: str, fmt: str, *,
+               admitted: bool = False) -> tuple[bytes, str, str]:
         """``(bytes, content_type, content_disposition)``."""
-        if not self._export_rate.allow(user.id):
-            self._fail(user, "rate", "rate_limited")
-            raise RateLimited()
+        if not admitted:
+            self.admit(user, "export")
         e = self._lookup(user, deliverable_id)
         if e is None:
             self._fail(user, "lookup", "not_found")                # no ids (Opus review #11)
@@ -384,6 +408,12 @@ class DeliverableService:
         if fmt not in e.response.get("exports", ()):              # only after ownership
             raise Invalid("format")
         sealed = copy.deepcopy(e.response)                        # never mutate the sealed copy
+        # round 4 B2 (rule 3): write-ahead, on record before Gate 2 and any source read; a ledger
+        # failure is a 503 with nothing read and no bytes
+        self._append(DeliverableRequested(sub=user.id, req_id=e.req_id,
+                                          deliverable_id=deliverable_id, deliverable=e.kind,
+                                          model_planned=False, policy_version=POLICY_VERSION,
+                                          export_format=fmt, event_time=self.clock()))
         try:
             ok, _ = authz.authorize(user, list(dict.fromkeys(e.tag_doc.values())),
                                     index=self.index, connectors=self.connectors,

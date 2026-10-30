@@ -517,22 +517,36 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         """The opaque source link in a follow-up ticket (v3.1). Gate 1 + a live Gate 2 for the
         person who CLICKS it (their own token), then a 303 to the source. Not openable, unknown
         or malformed token, a failed check: the same 404 as any unknown id (rule 4). Write-ahead
-        ``doc.viewed`` before the decision; a ledger failure is a 503."""
+        ``doc.viewed`` before the decision; a ledger failure is a 503 (it is the same for every
+        token). Round 4: a per-person rate limit first (429; only the first refusal per window is
+        ledgered), and once the audit row is written ANY error in the access check is the same
+        404 as an unknown token (A4: a 503 there would tell a resolving token from an unknown)."""
         _employee(user)
+        try:
+            svc.actions.limit_open(user)
+        except actmod.RateLimited:
+            raise HTTPException(429, "too many requests") from None
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("open failed: %s", type(exc).__name__)        # ledger down
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         try:
             doc_id = svc.actions.resolve_open(token) if len(token) <= 64 else None
             svc.ledger.append(DocViewed(sub=user.id, doc_id=(doc_id or "ib-open:unresolved")[:300],
                                         policy_version=POLICY_VERSION,
                                         event_time=datetime.now(timezone.utc)))
-            snap = None
-            if doc_id is not None:
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("open failed: %s", type(exc).__name__)        # incl. ledger down
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+        snap = None
+        if doc_id is not None:
+            try:
                 ok, _ = authz.authorize(user, [doc_id], index=svc.index,
                                         connectors=svc.connectors,
                                         directory_epoch=getattr(svc.directory, "epoch", 0))
                 snap = ok.get(doc_id)
-        except Exception as exc:                                    # noqa: BLE001
-            log.error("open failed: %s", type(exc).__name__)        # incl. ledger down
-            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+            except Exception as exc:                                # noqa: BLE001
+                log.error("open check failed: %s", type(exc).__name__)   # fail closed: the 404
+                snap = None
         link = getattr(snap, "deep_link", "") or ""
         if snap is None or not link.startswith(("https://", "http://")):
             raise HTTPException(404, NOT_FOUND)

@@ -12,7 +12,7 @@ from databridge_core.value_forms import value_spans
 
 from .evidence import Evidence, nfkc
 from .verify import (Check, cell_numeric, check_cell, check_chart, check_sentence,
-                     check_short_text, unsafe_text, words)
+                     check_short_text, label_tokens, unsafe_text, words)
 
 MAX_COLS = 6
 MAX_ROWS = 20
@@ -34,14 +34,29 @@ def sentence_case_ok(title: str) -> bool:
                for w in ws[1:])
 
 
+def title_labels(kind: str, content: Optional[Mapping[str, Any]]) -> Optional[list[str]]:
+    """Round 4 B6: a CHART's title may only use the words of its own checked labels (series names,
+    axis labels, x values), which are bound to the values; so a title cannot name a metric the
+    points are not bound to. Other kinds: None (no extra rule)."""
+    if kind != "chart" or not content:
+        return None
+    out = [str(content.get("x_label") or ""), str(content.get("y_label") or "")]
+    for s in content.get("series") or []:
+        out.append(str(s.get("name") or ""))
+        out += [str(p.get("x") or "") for p in s.get("points") or []]
+    return out
+
+
 def checked_title(title: str, kind: str, evidence: Mapping[str, Evidence], tags,
-                  check: Optional[Check]) -> str:
+                  check: Optional[Check], *, labels: Optional[Sequence[str]] = None) -> str:
     """The model's title when it is short, plain, sentence case and made of words from the cited
-    units; else the fixed title for the kind (Fable review §6.4: titles are the loudest AI tell)."""
+    units (of the content's OWN tags); else the fixed title for the kind (Fable review §6.4:
+    titles are the loudest AI tell). ``labels``: the title's words must also be among these."""
     t = nfkc(title).strip()
     hay = [u for x in _order(tags) if x in evidence for u in evidence[x].units]
     if (t and len(t) <= 60 and not t.endswith(":") and not _BANNED_TITLE.search(t)
-            and sentence_case_ok(t) and check_short_text(t, hay)):
+            and sentence_case_ok(t) and check_short_text(t, hay)
+            and (labels is None or set(label_tokens(t)) <= set(words(" ".join(labels))))):
         return t
     if t and check is not None:
         check.names_dropped += 1
@@ -188,14 +203,16 @@ def check_table(content: Mapping[str, Any], evidence: Mapping[str, Evidence], ch
     rows_in = content.get("rows") or []
     used = {t for r in rows_in for c in r for t in (c.get("tags") or [])}
     hay = [u for t in _order(used) if t in evidence for u in evidence[t].units]
-    cols = []
+    cols, bound = [], []
     for i, col in enumerate(content.get("columns") or [], 1):
         col = nfkc(str(col))
         if check_short_text(col, hay):
             cols.append(col)
+            bound.append(col)                   # round 4 B6: cells are bound to this label
         else:
             check.names_dropped += 1
             cols.append(f"Column {i}")
+            bound.append("")                    # a neutral label claims no metric
     rows = []
     for r in rows_in:
         if not r:
@@ -210,9 +227,9 @@ def check_table(content: Mapping[str, Any], evidence: Mapping[str, Evidence], ch
             continue
         out = [lab]
         quoted = source == "cited_facts"            # a quoted sentence and the values it states
-        for c in r[1:]:
+        for j, c in enumerate(r[1:], 1):
             got = check_cell(str(c.get("text", "")), c.get("tags") or [], lab["text"], evidence,
-                             check, is_label=quoted)
+                             check, is_label=quoted, column=bound[j] if j < len(bound) else "")
             out.append(got if got is not None else {"text": "", "tags": [], "numeric": False})
         if quoted or any(c["text"] for c in out[1:]):
             rows.append(out)
@@ -266,4 +283,4 @@ def recheck(kind: str, content: Mapping[str, Any], evidence: Mapping[str, Eviden
 
 
 __all__ = ["source_table", "quoted_table", "source_chart", "model_chart", "check_table",
-           "check_analysis", "checked_title", "content_tags", "recheck", "FIXED_TITLE"]
+           "check_analysis", "checked_title", "title_labels", "content_tags", "recheck", "FIXED_TITLE"]

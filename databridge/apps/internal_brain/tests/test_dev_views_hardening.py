@@ -109,3 +109,17 @@ def test_stats_cache_is_keyed_on_the_verified_head(tmp_path, monkeypatch):
     second = off.get("/audit/stats").json()
     # the first call appended its own audit.query, so the head moved: recomputed, and it shows
     assert len(calls) == 2 and second["totals"]["audit_queries"] == first["totals"]["audit_queries"] + 1
+
+
+def test_graph_views_exclude_poll_write_ahead_rows_and_the_upload_folder_picker():
+    """Round 5 (Opus cross-check): the live poll's ``checking`` write-ahead rows and the upload
+    folder picker's rows (D-34) are ``graph.viewed`` for the audit trail, but not graph views."""
+    t = (NOW - dt.timedelta(days=1)).isoformat()
+
+    def gv(seq, mode, outcome="ok"):
+        return E(seq, "graph.viewed", {"sub": "a", "event_time": t, "mode": mode,
+                                       "outcome": outcome})
+    evs = [gv(1, "overview"), gv(2, "focus"), gv(3, "changes"),            # counted
+           gv(4, "changes", "checking"), gv(5, "upload_folders", "checking"),
+           gv(6, "upload_folders")]                                          # not counted
+    assert compute_stats(evs, now=NOW, days=30)["totals"]["graph_views"] == 3

@@ -37,6 +37,7 @@ from pydantic import ValidationError
 from ..config import IbConfig
 from ..models import (DeliverableCreated, DeliverableExported, DeliverableFailed,  # noqa: I001
                       DeliverableRequested)
+from ..models import ActionRequested  # noqa: I001  (round 4 A1)
 from ..models import (EVENT_KINDS, IB_EVENT, ActionConfirmed, ActionExecuted, ActionFailed,
                       ActionProposed, ActionRejected, AnchorPublished, AnswerReleased, AuditQueryEvent,
                       AuditReveal, DocViewed, EventBase, GraphViewed, MapViewed, RequestAccepted,
@@ -69,6 +70,7 @@ _MODELS: dict[str, type[EventBase]] = {
     "action.executed": ActionExecuted,
     "action.failed": ActionFailed,
     "action.rejected": ActionRejected,
+    "action.requested": ActionRequested,
     "deliverable.requested": DeliverableRequested,
     "deliverable.created": DeliverableCreated,
     "deliverable.exported": DeliverableExported,

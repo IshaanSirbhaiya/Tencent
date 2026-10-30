@@ -6,7 +6,8 @@ Text-like files are indexed as text: ``text/plain`` (a WhatsApp chat export is r
 message per paragraph, ``extract_files.whatsapp_text``), ``text/markdown``, Google Docs (exported
 as ``text/plain``) and Google Sheets (exported as ``text/csv``). Uploaded Office, PDF and CSV files
 (Word ``.docx``, Excel ``.xlsx``, PowerPoint ``.pptx``, ``application/pdf``, ``text/csv``) are
-downloaded (``alt=media``, at most ``extract_files.MAX_FILE_BYTES``) and their text is extracted
+downloaded (``alt=media``, at most ``extract_files.MAX_FILE_BYTES``, checked on
+``Content-Length`` and while streaming, never after buffering the body) and their text is extracted
 with Walnut's own convert readers (``databridge_ib.extract_files``: magic-byte, zip-bomb, XML DTD,
 macro, page and time limits, in a worker process; any failure ⇒ the file is skipped, never
 indexed). Every other mimeType (images, Google
@@ -303,18 +304,56 @@ class DriveConnector:
             return None
         if kind is None or declared > X.MAX_FILE_BYTES:
             return None
-        resp = self._call(f"files/{meta['id']}", {"alt": "media", "supportsAllDrives": "true"},
-                          ok=(400, 403, 404))
-        if not resp.is_success or len(resp.content) > X.MAX_FILE_BYTES:
+        data = self._download_capped(str(meta["id"]), X.MAX_FILE_BYTES)
+        if data is None:
             return None
         try:
-            return X.extract(kind, resp.content)
+            return X.extract(kind, data)
         except X.Refused as exc:
             if kind == "csv" and exc.reason == "no_text":
                 # a CSV with a header and no rows passed every check but has no "Row N" line:
                 # index its (cleaned) text as before, rather than dropping the file
-                return X.clean_text(resp.content.decode("utf-8")) or None
+                return X.clean_text(data.decode("utf-8")) or None
             return None
+
+    def _download_capped(self, fid: str, cap: int, *, attempts: int = 5) -> Optional[bytes]:
+        """``alt=media`` bytes, never more than ``cap`` held (round 4 Codex B13): a declared
+        ``Content-Length`` over the cap is refused before any body byte is read, and the body is
+        streamed and abandoned the moment it passes the cap (the metadata ``size`` can be missing or
+        false). None when the file is gone, refused by the source or over the cap. Retries like
+        every ingest call (429 / 5xx / transport); ``ConnectorError`` once they are spent."""
+        import time
+        sleep = self._sleep or time.sleep
+        params = {"alt": "media", "supportsAllDrives": "true"}
+        last = "no attempt"
+        for attempt in range(attempts):
+            try:
+                with self.client.stream("GET", self._url(f"files/{fid}"), params=params) as resp:
+                    status = resp.status_code
+                    if status == 429 or status >= 500:
+                        last = f"{status}"
+                    elif status in (400, 403, 404):
+                        return None
+                    elif not resp.is_success:
+                        raise ConnectorError(f"GET files/{fid} (media) -> {status}")
+                    else:
+                        try:
+                            declared = int(resp.headers.get("content-length", "-1"))
+                        except ValueError:
+                            return None
+                        if declared > cap:
+                            return None                     # no body byte read
+                        buf = bytearray()
+                        for chunk in resp.iter_bytes():
+                            buf += chunk
+                            if len(buf) > cap:
+                                return None                 # abandoned mid-stream
+                        return bytes(buf)
+            except httpx.HTTPError as exc:
+                last = type(exc).__name__
+            if attempt + 1 < attempts:
+                sleep(min(30.0, 0.5 * (2 ** attempt)))
+        raise ConnectorError(f"GET files/{fid} (media) failed after {attempts} attempts: {last}")
 
     def _build_doc(self, meta: Mapping[str, Any], text: str) -> SourceDoc:
         fid = str(meta["id"])

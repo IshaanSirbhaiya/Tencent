@@ -100,10 +100,19 @@ def build_csv(kind: str, content: Mapping[str, Any], citations: Sequence[Mapping
 # ------------------------------------------------------------------------------------------------
 PPTX_CAP = 2 * 1024 * 1024
 PPTX_ROWS_PER_SLIDE = 10
-#: what the speaker notes say was checked (Opus review #8: never "every number was found")
+#: what the speaker notes say was checked (Opus review #8: never "every number was found").
+#: Round 4 B14: per slide type, and only what that slide's content was checked for.
+#: The chart slide: every point is a number.
 NOTES_CHECKED = ("Each value on this slide was matched by Walnut's checks to a number written in "
-                 "the cited source line, bound to its label. The checks do not prove that a "
-                 "comparison between values is meaningful.")
+                 "its cited source cell or line, bound to its label. The checks do not prove that "
+                 "a comparison between values is meaningful.")
+#: A table slide: number cells were matched; text cells were found in the same source row.
+NOTES_TABLE = ("Each number in this table was matched by Walnut's checks to a number written in "
+               "its cited source cell or line, in the same row as its label; the other cells were "
+               "found in that same source row or sentence. The checks do not prove that a "
+               "comparison between values is meaningful.")
+#: The title and Sources slides state nothing that was checked.
+NOTES_PLAIN = "This slide names the deck and the sources it was built from; it states no values."
 _XML_BAD = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f￾￿]")
 
 
@@ -124,17 +133,37 @@ def ptext(s: Any) -> str:
     XlsxWriter ``write()``, which turns a leading ``=`` into a formula), then XML-invalid control
     characters removed (lxml refuses them). Round 3 M1: a leading ``{`` (XlsxWriter writes
     ``{=...}`` as an array formula) or a link prefix (``http(s)://``, ``ftp(s)://``, ``mailto:``,
-    ``internal:``, ``external:``, ``file://``) also gets the leading ``'``."""
-    g = guard(s)
+    ``internal:``, ``external:``, ``file://``) also gets the leading ``'``.
+
+    Round 4 B1: the control characters are removed FIRST and the guard then sees the final string,
+    so ``"\x00{=SUM(1,1)}"`` cannot shed its NUL after the guard and become ``{=SUM(1,1)}``."""
+    clean = _XML_BAD.sub("", "" if s is None else str(s))
+    g = guard(clean)
     if not g.startswith("'") and _PPTX_TRIGGER.match(g):
         g = "'" + g
-    return _XML_BAD.sub("", g)
+    return g
+
+
+def _strings_as_text(worksheet: Any) -> None:
+    """Route every ``str`` cell of this worksheet through ``write_string`` (never a formula, an
+    array formula or a link). ``write`` and ``write_column`` both go through ``_write``."""
+    real = worksheet._write
+
+    def _write(row, col, *args):
+        if args and isinstance(args[0], str):
+            return worksheet.write_string(row, col, *args)
+        return real(row, col, *args)
+    worksheet._write = _write
 
 
 def _safe_chart_data(**kw: Any):
     """A python-pptx ``CategoryChartData`` whose embedded workbook is written by XlsxWriter with
     ``strings_to_formulas=False`` and ``strings_to_urls=False`` (round 3 M1), so no category or
-    series name becomes a formula or a hyperlink even if a string slips past ``ptext``."""
+    series name becomes a formula or a hyperlink even if a string slips past ``ptext``.
+
+    Round 4 B1: those options do not stop ``write()`` turning ``{=...}`` into an ARRAY formula, so
+    every string cell (each category label and series name, via ``write`` or ``write_column``) is
+    written with ``write_string``: always a text cell, whatever it starts with."""
     from contextlib import contextmanager
 
     from pptx.chart.data import CategoryChartData
@@ -147,6 +176,7 @@ def _safe_chart_data(**kw: Any):
             workbook = Workbook(xlsx_file, {"in_memory": True, "strings_to_formulas": False,
                                             "strings_to_urls": False})
             worksheet = workbook.add_worksheet()
+            _strings_as_text(worksheet)
             yield workbook, worksheet
             workbook.close()
 
@@ -177,11 +207,11 @@ def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mappin
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
     blank, title_only, title_layout = prs.slide_layouts[6], prs.slide_layouts[5], prs.slide_layouts[0]
 
-    def notes(slide, tags: Sequence[str]) -> None:
+    def notes(slide, tags: Sequence[str], said: str = NOTES_PLAIN) -> None:
         srcs = [c for c in citations if not tags or c["tag"] in tags]
         lines = [ptext(f"[{c['n']}] {c.get('title', '')} · {c.get('platform', '')} · "
                        f"v{c.get('version', '')}") for c in srcs]
-        slide.notes_slide.notes_text_frame.text = "\n".join(lines + [NOTES_CHECKED])
+        slide.notes_slide.notes_text_frame.text = "\n".join(lines + [said])
 
     def foot(slide) -> None:
         tb = slide.shapes.add_textbox(Inches(0.5), Inches(6.95), Inches(12.3), Inches(0.4))
@@ -213,7 +243,7 @@ def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mappin
                     for run in tbl.cell(r_i, j).text_frame.paragraphs[0].runs:
                         run.font.size = Pt(12)
             notes(s, [t for r in content["rows"][i:i + PPTX_ROWS_PER_SLIDE] for c in r
-                      for t in c["tags"]])
+                      for t in c["tags"]], NOTES_TABLE)
             foot(s)
     elif kind == "chart":
         cats: list[str] = []
@@ -249,7 +279,7 @@ def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mappin
         if content.get("x_label"):
             chart.category_axis.has_title = True
             chart.category_axis.axis_title.text_frame.text = ptext(content["x_label"])
-        notes(s, [p["tag"] for se in content["series"] for p in se["points"]])
+        notes(s, [p["tag"] for se in content["series"] for p in se["points"]], NOTES_CHECKED)
         foot(s)
     else:
         raise ValueError("kind")
@@ -289,4 +319,5 @@ def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mappin
 
 
 __all__ = ["guard", "filename", "content_disposition", "build_csv", "build_pptx", "ptext",
-           "pptx_available", "CSV_CAP", "PPTX_CAP", "FILENAME_RE", "CONTENT_TYPES", "NOTES_CHECKED"]
+           "pptx_available", "CSV_CAP", "PPTX_CAP", "FILENAME_RE", "CONTENT_TYPES", "NOTES_CHECKED",
+           "NOTES_TABLE", "NOTES_PLAIN"]
