@@ -3,7 +3,7 @@
 // asks Q_DELIVER and builds every deliverable kind the server offers for that one answer, then
 // restores whoever was signed in. The result is cached in this tab (TTL 90 min, the server's
 // export store TTL; R rebuilds it). D signs Leo in and opens the cached panel at once: no model
-// call inside a 15-second beat. Every build is still a real, ledgered request.
+// call inside a 15-second beat; Esc closes it and signs the previous person back in. Every build is still a real, ledgered request.
 import { useSyncExternalStore } from 'react';
 import { deliverablesStatus } from '@/components/user/DeliverSheet';
 import { api, deliverApi } from '@/lib/api';
@@ -46,6 +46,7 @@ function writeCache(c: DeliverCache | null) {
 
 export function clearDeliverCache() {
   epoch++;
+  restore = null; // a sign-out or Reset owns the session now: nothing to put back
   writeCache(null);
   set({ open: false, cache: null });
 }
@@ -131,24 +132,48 @@ export function useDeliverOverlay(): DeliverOverlayState {
 export function setDeliverKind(kind: DeliverableKind) {
   set({ kind });
 }
+/** Puts back whoever was signed in before D (set by openDeliverables, used once on close). */
+let restore: (() => Promise<unknown>) | null = null;
+
+/**
+ * Esc on the D overlay: close it and put the main session back to whoever was signed in before D
+ * (round-3 Fable #2), as the warm-up does; otherwise ← to the journey would ask as Leo and read
+ * "Request not found". Serialised, so a step's own sign-in after this always wins.
+ */
 export function closeDeliverOverlay() {
   set({ open: false });
+  const r = restore;
+  restore = null;
+  if (r) void r().catch(() => undefined);
 }
 
 /** D: Leo signed in, the cached panel open (Chart when the model wrote it, else Table). */
 export async function openDeliverables(serial: Serial, refresh: () => Promise<unknown> | undefined): Promise<boolean> {
   const cache = readCache() ?? (await warmDeliverables(serial));
   if (!cache) return false;
+  let prev: string | null = null;
   await serial(async () => {
-    let sub: string | null = null;
     try {
-      sub = (await api.whoami()).sub;
+      prev = (await api.whoami()).sub;
     } catch {
       /* signed out */
     }
-    if (sub !== DELIVER_PERSONA) await api.switchTo(DELIVER_PERSONA);
+    if (prev !== DELIVER_PERSONA) await api.switchTo(DELIVER_PERSONA);
     await refresh();
   });
+  // D pressed again while open keeps the first "before" (restore is set only when none is pending)
+  if (!restore && prev !== DELIVER_PERSONA) {
+    const back = prev;
+    restore = () =>
+      serial(async () => {
+        try {
+          if (back) await api.switchTo(back);
+          else await api.logout();
+        } finally {
+          await refresh();
+        }
+      });
+  }
   const chart = cache.deliverables.chart;
   const kind: DeliverableKind = chart && chart.status === 'ready' && chart.generated === 'model' ? 'chart' : cache.kinds.includes('table') ? 'table' : cache.kinds[0];
   set({ open: true, cache, kind });

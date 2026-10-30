@@ -32,6 +32,9 @@ Order matters: freeze the build, record the clips, then rehearse. Tick every box
 - [ ] Forced-failure run: Dev kills the network at the WorkBuddy beat and presses `B`; check the recovery line
 - [ ] Laptop swap run: change to laptop B in under a minute and resume
 - [ ] Q&A drill: a teammate asks 10 questions from `QA_BANK.md`; stop at 1:00
+- [ ] Walk-up `D`: after a full run press `D` then `R` once (confirm). `D` opens Leo's panel; `Esc` closes it and signs the previous person back in (`←` to the journey shows the waterfall); `R` rebuilds the `D` cache
+- [ ] Walk-up grow: reset (`R`, or **Reset Walnut Demo**) and run `python docs/finals/live_kit/check_absent.py --all` first (must end `RESULT: all checks passed`); then open the `?grow=1` tab (`/present?present=1&grow=1`) after a sign-in exists, before Q&A. The HUD must read `/ 13`. Drive it with `P` and `Space` only (`QA_BANK.md`, walk-ups)
+- [ ] The Esc rule, said aloud once: `Esc` only when a sheet is visible (it closes that sheet). Once `P` has started the script, `Esc` never hides the bar; `H` hides it on purpose and `Esc` or `H` brings it back
 - [ ] Record one run on a phone; watch it; note back-turns, filler words and rushed lines
 
 ## Agree and write down

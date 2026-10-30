@@ -9,6 +9,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { analyticsApi } from '@/lib/api';
 import { usePresenter } from '@/components/presenter/store';
+import { useMe } from '@/components/shell/Providers';
 
 export const DEMO_KEY = 'ib-demo-features';
 const EVENT = 'ib:demo-features';
@@ -91,9 +92,15 @@ export function useDemoFeatures(): DemoFeatures {
   const local = useSyncExternalStore(subscribe, snapLocal, () => false);
   const srv = useSyncExternalStore(subscribe, snapServer, () => null);
   const presenter = usePresenter();
+  // /ib/status is 401 while signed out, so `server` stays unknown; ask again once someone signs in
+  // (a ?grow=1 tab opened before the sign-in then gets its grow steps; round-3 Fable #1).
+  const sub = useMe()?.sub ?? null;
   useEffect(() => {
-    if (server === null) void fetchServer();
-  }, []);
+    if (server !== null) return;
+    // a read still in flight may have been sent before this sign-in (a 401): ask once more after it
+    if (inflight) void inflight.then(() => (server === null && sub ? fetchServer() : undefined));
+    else void fetchServer();
+  }, [sub]);
   return { on: srv === true && (local || presenter.armed), server: srv, local };
 }
 

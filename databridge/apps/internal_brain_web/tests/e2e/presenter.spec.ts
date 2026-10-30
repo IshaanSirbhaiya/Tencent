@@ -21,7 +21,7 @@ async function next(page: Page) {
 const barState = (page: Page) => bar(page).getAttribute('data-state');
 
 /** Press `key` for a step, wait until that step has started and finished; returns the bar state. */
-async function press(page: Page, key: 'Space' | 'ArrowRight' = 'Space') {
+async function press(page: Page, key: 'Space' | 'ArrowRight' | 'ArrowLeft' = 'Space') {
   await page.waitForTimeout(450); // the bar debounces a double press (400 ms)
   await page.keyboard.press(key);
   await expect.poll(() => barState(page)).toBe('busy');
@@ -244,7 +244,7 @@ test('B plays the recording (or says it is not recorded yet) and B returns; L fl
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
-test('R asks first, then signs every slot out and returns to step 0; Esc hides the bar', async ({ page }) => {
+test('R asks first, then signs every slot out and returns to step 0; H hides the bar, Esc never does once started', async ({ page }) => {
   await startPresenting(page);
   await next(page);
   await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
@@ -265,7 +265,11 @@ test('R asks first, then signs every slot out and returns to step 0; Esc hides t
   // Step 0 signs the main session back in.
   await expect.poll(async () => (await (await page.request.get('/api/ib/auth/whoami')).json()).sub).toBe('mlro.tan');
 
+  // The Esc rule (round-3 Fable #1): once started, an Esc with nothing open never hides the HUD;
+  // H hides it on purpose and Esc (or H) brings it back.
   await page.keyboard.press('Escape');
+  await expect(bar(page)).toBeVisible();
+  await page.keyboard.press('h');
   await expect(bar(page)).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(bar(page)).toBeVisible();
@@ -470,4 +474,95 @@ test('/present/preflight is served on the loopback stage laptop (the presenter f
   // From any other host name and signed out: one 404 (health, ledger and per-persona counts stay local).
   const away = await page.request.get('/present/preflight', { headers: { host: 'demo.example' } });
   expect(away.status()).toBe(404);
+});
+
+test('D then Esc puts the session back: ← to the journey shows the waterfall, not "Request not found" (round-3 Fable #2)', async ({ page }) => {
+  test.setTimeout(180_000);
+  await startPresenting(page);
+  expect(await press(page)).toBe('ready'); // 01
+  expect(await press(page)).toBe('ready'); // 02
+  expect(await press(page)).toBe('ready'); // 03: the sources sheet
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('sources-sheet')).toHaveCount(0);
+  expect(await press(page)).toBe('ready'); // 04: the journey, as Maya
+  await expect(page.getByTestId('journey-waterfall')).toBeVisible();
+  expect(await press(page)).toBe('ready'); // 05: Verify
+  await expect(stepNo(page)).toHaveText('05');
+
+  // D: Leo's answer and its deliverables, from the warm-up cache; the main session is Leo meanwhile.
+  await page.waitForTimeout(450);
+  await page.keyboard.press('d');
+  await expect(page.getByTestId('presenter-deliver-answer')).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => mainSub(page)).toBe('leo.ops');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('presenter-deliver-answer')).toHaveCount(0);
+  await expect(bar(page)).toBeVisible();
+  // Esc put back whoever was signed in before D
+  await expect.poll(() => mainSub(page)).toBe('maya.compliance');
+
+  expect(await press(page, 'ArrowLeft')).toBe('ready');
+  await expect(stepNo(page)).toHaveText('04');
+  await expect(page).toHaveURL(/\/dev\/journey\/[^/]+$/);
+  await expect(page.getByTestId('journey-waterfall')).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('Request not found');
+
+  // ← to the journey signs Maya in again even when something else changed the main session.
+  expect(await press(page)).toBe('ready'); // 05
+  await page.request.post('/api/ib/auth/demo-login', { data: { persona: 'leo.ops' } });
+  expect(await press(page, 'ArrowLeft')).toBe('ready');
+  await expect(page.getByTestId('journey-waterfall')).toBeVisible();
+  expect(await mainSub(page)).toBe('maya.compliance');
+  await expect(page.locator('main')).not.toContainText('Request not found');
+});
+
+test('the ?grow=1 walk-up runs on Space alone: P, then Space through grow, grow-post and grow-ask, no Esc (round-3 Fable #1)', async ({ page }) => {
+  test.setTimeout(240_000);
+  await login(page, 'jdoe');
+  // compile the graph page once so the grow step does not wait on the dev server
+  await page.goto('/dev/graph');
+  await expect(page.getByTestId('graph-main-canvas')).toBeVisible({ timeout: 90_000 });
+  await page.goto('/present?present=1&grow=1');
+  await expect(bar(page)).toContainText('/ 13');
+  await page.keyboard.press('p');
+  await expect(stepNo(page)).toHaveText('00');
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  expect(await press(page)).toBe('ready'); // 01
+  expect(await press(page)).toBe('ready'); // 02
+
+  // 03 grow: the note is in Jordan's Add sheet; focus is on the sheet, not its Close button.
+  expect(await press(page)).toBe('ready');
+  await expect(stepNo(page)).toHaveText('03');
+  const sheet = page.locator('[data-testid$="-addsheet"]');
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveAttribute('data-presenter-owned', '');
+  await expect(sheet.locator('textarea')).toHaveValue(/^Update on DBMIG-12/);
+  await expect(sheet.getByRole('button', { name: 'Close' })).not.toBeFocused();
+  await expect(sheet).toBeFocused();
+
+  // 04 grow-post: Space posts (it does not close the sheet first); then the sheet closes by itself.
+  expect(await press(page)).toBe('ready');
+  await expect(stepNo(page)).toHaveText('04');
+  await expect(page.locator('[data-testid$="-addsheet"]')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator('[data-testid$="-live-item"]')).toHaveCount(1, { timeout: 15_000 });
+  const owners = await page.locator('[data-testid$="-live-item"]').evaluateAll((els) => els.map((e) => e.closest('[data-sub]')?.getAttribute('data-sub')));
+  expect(owners).toEqual(['jdoe']); // Ken's side: nothing
+  await expect(bar(page)).toBeVisible();
+
+  // 05 grow-ask: both of them asked on Compare.
+  expect(await press(page)).toBe('ready');
+  await expect(stepNo(page)).toHaveText('05');
+  await expect(page).toHaveURL(/\/compare\?.*a=jdoe&b=ken\.ext/);
+  await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
+  await expect(page.getByTestId('compare-c').getByTestId('refusal-text')).toHaveText(REFUSAL_TEXT);
+  await expect(bar(page)).toBeVisible();
+});
+
+test('a ?grow=1 tab opened signed out picks up the grow steps once P signs someone in (round-3 Fable #1)', async ({ page }) => {
+  await page.goto('/present?present=1&grow=1');
+  await expect(bar(page)).toBeVisible();
+  await expect(bar(page)).toContainText('/ 10'); // /ib/status is 401 before the sign-in
+  await page.keyboard.press('p');
+  await expect(stepNo(page)).toHaveText('00');
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  await expect(bar(page)).toContainText('/ 13');
 });

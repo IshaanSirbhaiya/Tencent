@@ -91,11 +91,25 @@ function fmtSize(n: number): string {
   return `${n} B`;
 }
 
-export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note: AddNote; channels: Channel[]; testId?: string }) {
+const FOLDER_ID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/**
+ * `presenterOwned`: the presenter's grow step opened the sheet (round-3 Fable #1). Focus then goes
+ * to the sheet itself, not its Close button or the text field, so Space keeps driving the script
+ * (controller.ts lets `data-presenter-owned` dialogs through) and never closes the sheet or types.
+ *
+ * Upload folder: there is no per-person list of Drive folders in the API (/ib/map lists shared
+ * drives, not folders), so the field stays a typed folder id with a plain label and an example; a
+ * name list would need a server route that lists only the folders the person can open.
+ */
+export function AddDocumentSheet({ note, channels, testId = 'add-doc', presenterOwned = false }: { note: AddNote; channels: Channel[]; testId?: string; presenterOwned?: boolean }) {
   const t = useMessages(graphMessages);
   const [tab, setTab] = useState<'note' | 'file'>('note');
   const [file, setFile] = useState<File | null>(null);
-  const [folder, setFolder] = useState('fd-3');
+  const [folder, setFolder] = useState('');
+  const contentRef = useRef<HTMLDivElement>(null);
+  const owned = useRef(presenterOwned);
+  owned.current = presenterOwned;
   const [title, setTitle] = useState('');
   const [up, setUp] = useState<Status>({ kind: 'idle' });
   const [soon, setSoon] = useState(false);
@@ -109,7 +123,9 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
   const noteKind = note.status.kind;
   const prevNote = useRef(noteKind);
   useEffect(() => {
-    if (prevNote.current === 'busy' && (noteKind === 'ok' || noteKind === 'error')) (noteKind === 'ok' ? textRef.current : postRef.current)?.focus();
+    // presenter-owned: focus stays on the sheet (Space must not type into the emptied field)
+    if (prevNote.current === 'busy' && (noteKind === 'ok' || noteKind === 'error'))
+      (owned.current ? contentRef.current : noteKind === 'ok' ? textRef.current : postRef.current)?.focus();
     prevNote.current = noteKind;
   }, [noteKind]);
   const prevUp = useRef(up.kind);
@@ -125,7 +141,7 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
   };
 
   const upload = async () => {
-    if (!file || up.kind === 'busy') return;
+    if (!file || up.kind === 'busy' || !FOLDER_ID.test(folder.trim())) return;
     if (file.size > MAX_FILE) {
       setUp({ kind: 'error', text: t('add.tooBig') });
       return;
@@ -171,6 +187,13 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
       description={t('add.desc')}
       width="md"
       data-testid={testId}
+      ref={contentRef}
+      {...(presenterOwned ? { 'data-presenter-owned': '' } : {})}
+      onOpenAutoFocus={(e) => {
+        if (!owned.current) return;
+        e.preventDefault();
+        contentRef.current?.focus();
+      }}
     >
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'note' | 'file')}>
         <TabsList aria-label={t('add.title')}>
@@ -259,13 +282,13 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field id={`${testId}-folder`} label={t('add.folder')} hint={t('add.folderHint')}>
-                  <Input id={`${testId}-folder`} aria-describedby={`${testId}-folder-hint`} value={folder} onChange={(e) => setFolder(e.target.value)} pattern="[A-Za-z0-9_-]{1,128}" data-testid={`${testId}-folder`} />
+                  <Input id={`${testId}-folder`} aria-describedby={`${testId}-folder-hint`} value={folder} onChange={(e) => setFolder(e.target.value)} pattern="[A-Za-z0-9_-]{1,128}" placeholder="fd-7" autoComplete="off" spellCheck={false} data-testid={`${testId}-folder`} />
                 </Field>
                 <Field id={`${testId}-ftitle`} label={t('add.fileTitle')}>
                   <Input id={`${testId}-ftitle`} value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
                 </Field>
               </div>
-              <Button ref={uploadRef} type="submit" variant="primary" busy={up.kind === 'busy'} disabled={!file || up.kind === 'busy' || file.size > MAX_FILE} data-testid={`${testId}-upload`}>
+              <Button ref={uploadRef} type="submit" variant="primary" busy={up.kind === 'busy'} disabled={!file || up.kind === 'busy' || file.size > MAX_FILE || !FOLDER_ID.test(folder.trim())} data-testid={`${testId}-upload`}>
                 {up.kind === 'busy' ? t('add.uploading') : t('add.upload')}
               </Button>
               {msg(up, `${testId}-upload-status`)}

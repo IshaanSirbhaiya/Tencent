@@ -143,7 +143,9 @@ function build(sub: string, b: Record<string, unknown>) {
     deliverable_id, req_id: ctx.req.req_id, kind, status, label: 'Draft for your review', title: title || 'Chart from your sources',
     generated: content ? generated : 'none', model: content ? model : null, check, content,
     citations: [...new Set(used)].map((t) => citation(t, ctx.cites.get(t)!, nOf(t))),
-    exports: content && kind !== 'analysis' ? ['csv'] : [], fallback: 'none', prompt_version: 'ib-deliver-2026-10-31.1',
+    exports: content && kind !== 'analysis' ? ['csv'] : [],
+    // like the real server: with no model connected every build says 'no_model' (service.py _build)
+    fallback: MOCK_MODEL_LABELS ? 'none' : 'no_model', prompt_version: 'ib-deliver-2026-10-31.1',
     scope_note: SCOPE_NOTE, as_of: new Date().toISOString(),
   };
   if (content) store().set(deliverable_id, { sub, req: ctx.req.req_id, body });

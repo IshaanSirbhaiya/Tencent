@@ -52,11 +52,15 @@ press P until Ishaan says the first line. If anything looks wrong now: press **R
 |---|---|
 | **P** | Start: Stage theme, title card, signs the personas in |
 | **Space** | Next step. A failed step does not advance: Space tries again, **Right arrow** skips it |
-| **Left arrow** | Back one step |
+| **→** (Right arrow) | Skip a failed step (otherwise the same as Space) |
+| **Left arrow** | Back one step (the journey step signs Maya in again) |
 | **B** | Play the backup clip for this step (muted, labelled "recording"); B again returns to live |
 | **R** | Reset (asks to confirm): signs everyone out, back to the title card. Never edits the real ledger |
-| **L** | English / Simplified Chinese |
-| **S** / **Esc** / **?** | Stage theme on/off / hide the bar / show the key legend |
+| **L** | English / Simplified Chinese (not in the 5:00; cut 30 Oct) |
+| **D** | Q&A only ("Dev, D."): Leo's answer and its table, chart and analysis from the `P` warm-up. **Esc** closes it and signs the previous person back in |
+| **2** | Open citation [2] on the current Compare page |
+| **S** / **H** / **?** | Stage theme on/off / hide or show the bar / show the key legend |
+| **Esc** | Closes an open sheet or dialog. Once the script has started it never hides the bar (it only shows a hidden one) |
 | **Ctrl+Shift+P** | Turn the presenter keys off (and on) |
 | **F11** | Full screen on/off |
 

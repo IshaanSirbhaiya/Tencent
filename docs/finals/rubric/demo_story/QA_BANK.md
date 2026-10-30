@@ -49,6 +49,18 @@ Rules:
 | How many people did you test with? | Use the filled usability report. If not filled: "Not yet reported." Never guess |
 | Does the UI tell the user something is hidden? | "No. That would break our own rule: restricted and non-existent must look the same." |
 
+## Walk-ups: show it instead of saying it (about 25 s each)
+
+Only after the 5:00 and only on these triggers. Dev drives; the lead speaks the line while it runs.
+`D` (Deliverables) is Q10 ("Dev, D."). Both walk-ups below were measured in mock (round-3 Fable
+review §2.3, §2.4; `tests/e2e/presenter.spec.ts`, `act.spec.ts`); time each once on the stage stack
+before offering it, and write the time here: TO FILL.
+
+| Walk-up | Trigger question | Exact sequence (Dev) | Line (about 25 s) | Lead |
+|---|---|---|---|---|
+| Act | "Can it do anything, or only answer?" / "Is this just RAG?" (after Q20's sentence) | No presenter key. In the demo tab: go to `/login`, click **Amy**, click the Velquarry starter chip, **Ask**, then **Draft the reply** in "Act on this answer". For the ticket: `/login`, **Jordan**, his migration question, **Create a ticket**, **Create ticket in DBMIG**. Afterwards `←` back to the journey step signs Maya in again | "It can act, but only from what the asker can already open. Amy gets a reply drafted only from the sources this answer cited, in the approved wording; it is not sent, she copies or edits it. Jordan, an engineer, files the follow-up ticket in his own name, and the audit trail records it before it is created." | Dev |
+| The brain grows | "What happens when something new is posted?" | Prepared before Q&A (see `REHEARSAL_CHECKLIST.md`): a second tab opened at `/present?present=1&grow=1` **after** a sign-in exists. On the question: switch to that tab, `P`, then `Space` x 5 and nothing else: 01 Amy/Rachel, 02 Ken, 03 the note is in Jordan's Add box (Ken on the right), 04 it posts, the sheet closes and the note appears in Jordan's "Just added", Ken's side stays empty, 05 both ask. A failed step: `Space` tries it again. `Esc` is never needed and never hides the bar once started | "Jordan posts an update in the database-migration channel. Seconds later it is in his graph. Ken, a contractor, is not in that channel, so on his side nothing appears. And it is already answerable: Jordan gets the answer with the citation; Ken gets the same refusal as for anything else." | Ishaan |
+
 ## Q&A drill
 
 A teammate asks 10 random questions from the bank at the rehearsal; stop at 1:00. Record it on a phone.

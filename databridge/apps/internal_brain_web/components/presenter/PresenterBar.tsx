@@ -159,7 +159,7 @@ export function PresenterBar() {
                 <Key k="B" label={t('pr.key.clip')} />
                 <Key k="R" label={t('pr.key.reset')} />
                 <Key k="L" label={t('pr.key.lang')} />
-                <Key k="Esc" label={t('pr.key.hide')} />
+                <Key k="H" label={t('pr.key.hide')} />
                 <Key k="?" label={t('pr.key.legend')} />
               </>
             ) : (

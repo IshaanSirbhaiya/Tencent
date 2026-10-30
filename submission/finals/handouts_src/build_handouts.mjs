@@ -105,8 +105,10 @@ const judge = page('Judge cards', sheets.join(''));
 // Mirrors onKeyDown in databridge/apps/internal_brain_web/components/presenter/controller.ts (checked
 // 30 Oct, round 2b finding 5). R asks to confirm, then signs every demo session out and goes to step 00;
 // it restores nothing. While a dialog (source sheet, reset confirm) is open the presenter keys are off
-// and Esc closes the dialog; otherwise Esc hides or shows the bar.
-const keys = [['P','Start: Stage on, step 00'],['Space','Next step (failed step: retry)'],['→','Skip to the next step'],['←','Back one step'],['B','Fallback clip (again = live)'],['R','Reset, after a confirm: all demo sessions signed out, step 00'],['L','English / 简体中文'],['S','Stage theme on / off'],['D','Deliverables: Leo, his panel'],['2','Open citation 2 (Compare)'],['?','Key help'],['Esc','Close a sheet or dialog; else hide / show the bar']];
+// and Esc closes the dialog. Once P has started the script, Esc never hides the bar (it only brings a
+// hidden bar back); H hides it (round-3 Fable #1). Esc on D's panel signs the previous person back in.
+// The language flip is cut from the 5:00 (round-3 Fable #8).
+const keys = [['P','Start: Stage on, step 00'],['Space','Next step (failed step: retry)'],['→','Skip to the next step'],['←','Back one step'],['B','Fallback clip (again = live)'],['R','Reset, after a confirm: all demo sessions signed out, step 00'],['L','English / 简体中文'],['S','Stage theme on / off'],['D','Deliverables: Leo, his panel (Esc: back to the previous person)'],['2','Open citation 2 (Compare)'],['?','Key help'],['Esc','Close a sheet or dialog; never hides the bar once started'],['H','Hide / show the bar']];
 // Mirrors STEPS in databridge/apps/internal_brain_web/components/presenter/script.ts (HUD 00 to 10;
 // P gives 00, the title). The grow steps (?grow=1) are a Q&A walk-up, never on this path.
 const steps = [
@@ -116,7 +118,7 @@ const steps = [
  ['04','1:40','Journey','"Mehul, over to the compliance officer\'s chair."'],
  ['05','2:10','Verify: intact','"I am the compliance officer. Verify: intact."'],
  ['06','2:20','Tamper a copy','"Now I change one word in a copy of the log, denied to allowed. Verify."  Read the entry number off the screen.'],
- ['07','2:35','WorkBuddy (off-app)','"Aaruni, Tencent."  Alt+Tab to WorkBuddy; paste the one exact question. At 3:12 Alt+Tab back: the newest audit row appears; L flips language and back.'],
+ ['07','2:35','WorkBuddy (off-app)','"Aaruni, Tencent."  Alt+Tab to WorkBuddy; paste the one exact question. At 3:12 Alt+Tab back: the newest audit row appears.'],
  ['08','3:20','Proof','"' + N.req + ' adversarial requests, zero leaks. ' + N.pairs + ' paired questions, zero differences."'],
  ['09','3:50','Business','"About 1.3 million US dollars a year, an estimate."'],
  ['10','4:30','Close','"Answers you can prove. We want one pilot team. Scan to try it." Stop.'],
@@ -125,7 +127,7 @@ const ladder = [
  ['App stalls','Ishaan says the next line\'s first four words; Dev presses B (clip plays).'],
  ['Wrong state','Press R, then confirm: signs every demo session out and goes back to step 00. It restores nothing and never edits the real ledger (the tamper step only ever changes a copy).'],
  ['Network fails in the WorkBuddy beat','Play clip C and say in one clause that it is a recording.'],
- ['Running long','Cut in order: language flip, CodeBuddy line, Hy3 open-weight line, audit-row cut. Never cut the tamper or the identical refusals.'],
+ ['Running long','Cut in order: CodeBuddy line, Hy3 open-weight line, audit-row cut. Never cut the tamper or the identical refusals.'],
  ['Hy3 not live','Keep the default line: "quoted from the sources, with the same checks".'],
 ];
 const cheat = page('Presenter cheat sheet', `<main class="ch">
@@ -135,7 +137,7 @@ const cheat = page('Presenter cheat sheet', `<main class="ch">
 <p class="fine">A recording is never presented as live. If a judge interrupts: one sentence, then "let me finish this step, then I will come back."</p></div></section>
 <h2>Steps 01 to 10 (Space for each; P gives step 00, the title)</h2>
 <table class="steps"><tr><th>#</th><th>Time</th><th>Beat</th><th>Spoken cue</th></tr>${steps.map(s=>`<tr><td>${s[0]}</td><td>${s[1]}</td><td><b>${esc(s[2])}</b></td><td>${esc(s[3])}</td></tr>`).join('')}</table>
-<p class="fine">Morning checks: re-run the proof numbers; Hy3 is wired but the live run is pending, so say "quoted from the sources"; platforms are mocks; data is synthetic. The grow beat (?grow=1) is a Q&amp;A walk-up only, never on the Space path. WorkBuddy question: What's the status of the database migration project and were there any blockers raised in Slack last week?</p>
+<p class="fine">Morning checks: re-run the proof numbers; Hy3 is wired but the live run is pending, so say "quoted from the sources"; platforms are mocks; data is synthetic. The grow beat (?grow=1) is a Q&amp;A walk-up only, never on the Space path: open that tab after a sign-in exists, then P and Space alone (no Esc). WorkBuddy question: What's the status of the database migration project and were there any blockers raised in Slack last week?</p>
 </main>`);
 
 fs.mkdirSync(path.join(here, 'html'), { recursive: true });

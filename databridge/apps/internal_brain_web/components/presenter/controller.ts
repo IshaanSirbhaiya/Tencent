@@ -125,7 +125,7 @@ function toggleLegend() {
   setPresenter({ legend: !getPresenter().legend });
 }
 
-/** Run step `i`: forward runs its action; back only re-opens its page. */
+/** Run step `i`: forward runs its action; back re-opens its page (and, for some, its session). */
 export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
   const step = STEPS[i];
   if (!step) return;
@@ -133,7 +133,7 @@ export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
   setPresenter({ step: i, started: true, busy: true, failed: false, clipOpen: false });
   try {
     const c = ctx(gen);
-    if (dir === 'back') await c.go(stepUrl(step, c));
+    if (dir === 'back') await (step.back ? step.back(c) : c.go(stepUrl(step, c)));
     else await step.action(c);
     if (gen === generation) setPresenter({ busy: false });
   } catch {
@@ -241,7 +241,13 @@ function typing(t: EventTarget | null): boolean {
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT';
 }
 
-const openDialog = () => document.querySelector('[role="dialog"],[role="alertdialog"]');
+/**
+ * A dialog that has the keyboard (sources sheet, reset confirm, recording, D's panel). The grow
+ * step's Add sheet is presenter-owned (`data-presenter-owned`, round-3 Fable #1): the script put it
+ * there and Space keeps driving the script over it.
+ */
+const openDialog = () => document.querySelector('[role="dialog"]:not([data-presenter-owned]),[role="alertdialog"]');
+const anyDialog = () => document.querySelector('[role="dialog"],[role="alertdialog"]');
 
 let lastAdvance = 0;
 let swallowSpaceUp = false;
@@ -266,6 +272,8 @@ function onKeyDown(e: KeyboardEvent) {
     }
     return;
   }
+  // Esc with a presenter-owned sheet open closes that sheet (its own handler), never the HUD.
+  if (key === 'Escape' && anyDialog()) return;
   const inComposite = e.target instanceof Element && !!e.target.closest(COMPOSITE);
 
   switch (key) {
@@ -329,6 +337,15 @@ function onKeyDown(e: KeyboardEvent) {
       });
       return;
     case 'escape':
+      // The Esc rule (PRESENTER_KEYS.md §2): with a sheet or dialog open, Esc closes it (above). Once
+      // the script has started, Esc never hides the HUD: an Esc pressed one time too many must not
+      // leave the driver without the bar and step number. It only brings a hidden HUD back.
+      // H hides it on purpose; before P, Esc still hides or shows it.
+      e.preventDefault();
+      if (s.started && !s.hidden) return;
+      setPresenter({ hidden: !s.hidden });
+      return;
+    case 'h':
       e.preventDefault();
       setPresenter({ hidden: !s.hidden });
       return;

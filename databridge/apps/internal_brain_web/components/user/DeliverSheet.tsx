@@ -396,7 +396,10 @@ function SettledBody({ load, onRetry, onShowTable, t }: { load: Load; onRetry: (
       {t('deliver.showTable')}
     </Button>
   ) : null;
-  if (d.status === 'needs_model') return <Notice testId="deliver-needs-model" text={t('deliver.needsModel')} action={tableBtn} />;
+  // no_model: no model is connected on this build (never "it ran and failed"); otherwise it ran and
+  // nothing it wrote passed the source check (nothing_passed).
+  if (d.status === 'needs_model')
+    return <Notice testId="deliver-needs-model" text={t(d.fallback === 'no_model' ? 'deliver.noModel' : 'deliver.needsModel')} action={tableBtn} />;
   return <Notice testId="deliver-insufficient" text={t('deliver.insufficient')} action={tableBtn} />;
 }
 

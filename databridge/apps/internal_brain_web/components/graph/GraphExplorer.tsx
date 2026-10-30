@@ -105,6 +105,14 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
   const presenter = usePresenter();
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  // The presenter's grow step opened the sheet (round-3 Fable #1): Space keeps driving the script
+  // while it is open (controller.ts skips `data-presenter-owned` dialogs), and a successful post
+  // closes it so the room sees the feed.
+  const [addOwned, setAddOwned] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
   const frozen = useRef(false);
   const lastAnnounce = useRef(0);
 
@@ -398,6 +406,9 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
   usePresenterHandler(slot === 'a' ? 'graph.addNote' : `graph.addNote.${slot}`, async (arg) => {
     if (slot !== 'a' || !demo.on || phase.kind !== 'ready') return false;
     const a = (arg ?? {}) as { channel?: string; text?: string; post?: boolean };
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+    setAddOwned(true);
     if (!a.post) {
       if (a.channel && channels.some((c) => c.id === a.channel)) note.setChannel(a.channel);
       if (typeof a.text === 'string') note.setText(a.text);
@@ -406,7 +417,14 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
       return true;
     }
     setAddOpen(true);
-    return (await note.post()) ? true : 'failed';
+    if (!(await note.post())) return 'failed'; // the sheet stays open with the error; Space retries
+    // posted: "Posted to Slack" shows for a moment, then the sheet closes and the feed is in view
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null;
+      setAddOpen(false);
+      setAddOwned(false);
+    }, 1500);
+    return true;
   });
 
   const toggle = (set: Set<string>, v: string) => {
@@ -517,7 +535,16 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
         ) : null}
         <div className="ml-auto flex items-center gap-2">
           {slot === 'a' && demo.on ? (
-            <Sheet open={addOpen} onOpenChange={setAddOpen}>
+            <Sheet
+              open={addOpen}
+              onOpenChange={(v) => {
+                // opened or closed by the person: an ordinary dialog again
+                if (closeTimer.current) clearTimeout(closeTimer.current);
+                closeTimer.current = null;
+                setAddOwned(false);
+                setAddOpen(v);
+              }}
+            >
               {/* a real trigger, so closing the sheet returns focus here (round-3 H1); below `sm` the
                   label is visually hidden (still the accessible name) so the button is not clipped */}
               <SheetTrigger asChild>
@@ -528,7 +555,7 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
                   </Badge>
                 </Button>
               </SheetTrigger>
-              <AddDocumentSheet note={note} channels={channels} testId={`${testId}-addsheet`} />
+              <AddDocumentSheet note={note} channels={channels} presenterOwned={addOwned} testId={`${testId}-addsheet`} />
             </Sheet>
           ) : null}
           {compact ? null : (

@@ -75,6 +75,9 @@ test('Leo: table copied cell by cell, chart with value labels, analysis needs th
   await sheet.getByTestId('deliver-tab-analysis').click();
   const an = sheet.getByTestId('deliver-panel-analysis');
   await expect(an.getByTestId('deliver-needs-model')).toBeVisible();
+  // fallback 'no_model' (no model connected): never reads as "a model ran and failed" (round-3 Fable #5)
+  await expect(an.getByTestId('deliver-needs-model')).toContainText('Needs the model (Hy3). It is not connected on this build; the table and chart are built from the sources.');
+  await expect(an.getByTestId('deliver-needs-model')).not.toContainText('passed the source check');
   await expect(an.getByTestId('deliver-by')).toHaveCount(0); // nothing claims to be written by a model
   await expectAccessible(page, 'deliverables analysis (dark)');
   await page.screenshot({ path: `${SHOTS}/mock-3-analysis-dark.png` });
@@ -103,11 +106,13 @@ test('states: needs the model, nothing to build, error with retry', async ({ pag
     if (mode === 'error') return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"temporarily unavailable"}' });
     const res = await route.fetch();
     const body = await res.json();
-    return route.fulfill({ response: res, json: { ...body, status: 'needs_model', content: null, generated: 'none', exports: [] } });
+    return route.fulfill({ response: res, json: { ...body, status: 'needs_model', content: null, generated: 'none', exports: [], fallback: 'nothing_passed' } });
   });
   await answer.getByTestId('deliver-analysis').click();
   const sheet = page.getByTestId('deliver-sheet');
   await expect(sheet.getByTestId('deliver-needs-model')).toBeVisible();
+  // a model ran and nothing passed the source check: the original sentence
+  await expect(sheet.getByTestId('deliver-needs-model')).toContainText('It didn’t produce anything that passed the source check, so nothing was written.');
   mode = 'pass';
   await sheet.getByTestId('deliver-show-table').click();
   await expect(sheet.getByTestId('deliver-panel-table').getByTestId('deliver-table')).toBeVisible();

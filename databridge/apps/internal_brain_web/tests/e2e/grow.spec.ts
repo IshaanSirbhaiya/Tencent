@@ -206,6 +206,8 @@ test('Compare: only the poster receives the note; upload tab and engine refresh 
   expect(owners).toEqual(['jdoe']);
   await page.screenshot({ path: 'test-results/grow-mock-compare.png' });
 
+  // The engine refresh lives on /dev/brain, which renders only with WALNUT_PROXY=1 (engine.spec.ts).
+  if (process.env.ENGINE_PROXY !== 'on') return;
   await page.goto('/dev/brain');
   const refresh = page.getByTestId('engine-refresh');
   await expect(refresh).toBeVisible({ timeout: 30_000 });
@@ -275,6 +277,11 @@ test('upload: the chosen file is named; too big is caught on pick; success clear
   const sheet = page.getByTestId('graph-main-addsheet');
   await expect(sheet).toBeVisible({ timeout: 45_000 });
   await sheet.getByRole('tab', { name: 'Upload a file' }).click();
+  // round-3 Fable #9: no magic default id; a plain label and an example; Upload waits for a folder id
+  const folder = sheet.getByTestId('graph-main-addsheet-folder');
+  await expect(folder).toHaveValue('');
+  await expect(sheet.getByText('Drive folder id', { exact: true })).toBeVisible();
+  await folder.fill('fd-7');
   const input = sheet.getByTestId('graph-main-addsheet-file');
   await input.setInputFiles({ name: 'big.txt', mimeType: 'text/plain', buffer: Buffer.alloc(5 * 1024 * 1024 + 10, 97) });
   await expect(sheet.getByTestId('graph-main-addsheet-upload-status-error')).toHaveText('That file is larger than 5 MB.');

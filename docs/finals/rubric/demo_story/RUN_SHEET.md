@@ -60,7 +60,7 @@ The 5:00 path is the 11 steps in `script.ts` (HUD 00 to 10). The live-growth bea
 | 2:35–2:40 | Tencent, off-app | Mehul → Aaruni | Mehul: "Aaruni, Tencent." Aaruni: "Tencent is inside the product." | Dev presses `Space`: HUD says "WorkBuddy"; Dev switches window to WorkBuddy (off-app) |
 | 2:40–2:55 | | Aaruni | "Jordan is on call at 3 a.m. and asks from WorkBuddy." (beat while the agent runs) | WorkBuddy window: Aaruni starts the action: "What's the status of the database migration project and were there any blockers raised in Slack last week?" |
 | 2:55–3:12 | | Aaruni | "WorkBuddy's agent calls our tool with Jordan's signed token, not a name it chose. Same gates, same ledger, channel 'WorkBuddy'. Both answers are quoted from the sources, with the same checks. [ONLY IF HY3 LIVE: say "Hy3 wrote both answers" instead.] [CB] CodeBuddy built the connector and ran our security review." | Cited answer stitched from Jira, Slack and Confluence appears |
-| 3:12–3:20 | | Aaruni | "Dev has not touched the mouse all demo; and the UI speaks the room's languages." | Dev switches back to the app (Alt-Tab): `/dev/audit`. The newest row, channel `workbuddy-mcp`, appears when the window regains focus (`?latest=1`), not on a key. `L` flips to 简体中文 and back (3 s). Delete the "mouse" clause if Dev used the mouse |
+| 3:12–3:20 | | Aaruni | "Dev has not touched the mouse all demo." | Dev switches back to the app (Alt-Tab): `/dev/audit`. The newest row, channel `workbuddy-mcp`, appears when the window regains focus (`?latest=1`), not on a key. Delete the line if Dev used the mouse. No language flip here: it was cut (round-3 Fable #8; on `/dev/audit` Developer mode stays English and says so, so "the UI speaks the room's languages" would be contradicted on screen) |
 | 3:20–3:30 | Proof | Aaruni | "We did not just demo it. We attacked it: 7,374 adversarial requests, zero leaks. Four hundred paired questions, zero differences." [NUM] | Proof slide [S] |
 | 3:30–3:50 | | Aaruni | "[TESTER] Five people tested it on Saturday; one broke the source sheet, we fixed it. Numbers re-run this morning; every one maps to a test in the repo." | Same slide: three large numbers, one tester line, one CodeBuddy line |
 | 3:50–4:30 | Business, in Aspire's words | Ishaan | "Aspire's team told us 'what can we offer this customer' takes time today, and the brief says about 30 % of the week goes to searching. Break-even is about seven minutes saved per person per week. Base case for a 600-person fintech: about 1.3 million US dollars a year; an estimate, inputs on the one-pager. The design targets Tencent Cloud (a one-command Lighthouse deploy kit is included; we have no live instance), and Hy3 is open-weight, so a bank could host it inside its own walls." [BIZ] | Business slide [S]: one number, four inputs, Tencent stack line |
@@ -94,10 +94,12 @@ Target: three timed rehearsal runs between 4:40 and 5:00; none over 5:00.
 
 Cut in this order, stopping when back on time:
 
-1. The 简体中文 flip (3 s).
-2. The CodeBuddy line (5 s).
-3. The Hy3 open-weight line (6 s) [ONLY IF HY3 LIVE; default: skip it or say "the design does not depend on one model"].
-4. The WorkBuddy audit-row cut (8 s).
+1. The CodeBuddy line (5 s).
+2. The Hy3 open-weight line (6 s) [ONLY IF HY3 LIVE; default: skip it or say "the design does not depend on one model"].
+3. The WorkBuddy audit-row cut (8 s).
+
+The 简体中文 flip is no longer in the 5:00 (cut 30 Oct, round-3 Fable #8). If a judge asks about
+languages, answer with `QA_BANK.md` Q21; `L` still works on any user page (for example `/compare`).
 
 **Never cut:** the tamper, or the identical refusals.
 

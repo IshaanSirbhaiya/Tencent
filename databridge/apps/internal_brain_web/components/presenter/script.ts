@@ -73,6 +73,9 @@ export interface PresenterStep {
   /** The step happens outside the app (the bar shows a card instead). */
   offApp?: boolean;
   action: (ctx: StepCtx) => Promise<void>;
+  /** ← to this step; default: re-open `url` only. Steps whose page depends on the main session
+   *  sign it in again (D or a Q&A walk-up may have changed it meanwhile). */
+  back?: (ctx: StepCtx) => Promise<void>;
 }
 
 const fail = (what: string) => {
@@ -145,6 +148,11 @@ export const STEPS: PresenterStep[] = [
       const url = journeyUrl(ctx);
       await ctx.go(url);
       if (url !== '/dev/journey') await ctx.reveal('[data-testid="journey-waterfall"]', 10_000);
+    },
+    // ← after Q&A (D signs Leo in): the journey must be read as Maya again, never "Request not found".
+    back: async (ctx) => {
+      await ctx.signInMain('maya.compliance');
+      await ctx.go(journeyUrl(ctx));
     },
   },
   {

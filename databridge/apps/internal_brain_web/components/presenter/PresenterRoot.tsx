@@ -61,7 +61,10 @@ export function PresenterRoot() {
   // ?grow=1 (round-2 Fable #1): never on the default Space path.
   const demo = useDemoFeatures();
   useEffect(() => {
-    if (setGrowSteps(demo.on && growOptIn())) setPresenter((p) => ({ step: Math.min(p.step, STEPS.length - 1) }));
+    // read ?grow=1 on every page change, even before demo features are known (a signed-out tab):
+    // the opt-in is stored for this tab, so the steps appear once the sign-in makes demo.on true
+    const opted = growOptIn();
+    if (setGrowSteps(demo.on && opted)) setPresenter((p) => ({ step: Math.min(p.step, STEPS.length - 1) }));
   }, [demo.on, pathname]);
   const langRef = useRef(lang);
   langRef.current = lang;

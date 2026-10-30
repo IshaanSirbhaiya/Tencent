@@ -22,11 +22,12 @@ Single-key shortcuts are a WCAG 2.1.4 risk. So:
 | `Space` | Run the next step. The HUD shows what the next step will do. Debounce: ignore a second press within 400 ms |
 | `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end |
 | `R` | Reset: restores the tamper sandbox copy, clears the ask boxes, re-warms the model, returns to step 00. Never edits the real ledger |
-| `Esc` | Hides or shows the HUD (`controller.ts`). While a dialog is open (sources sheet, reset confirm) presenter keys are ignored, so `Esc` closes the sheet through the sheet's own handler |
+| `Esc` | **The Esc rule** (round-3 Fable #1, `controller.ts`). With a sheet or dialog open, `Esc` closes it through its own handler (sources sheet, reset confirm, `D`'s panel, the grow step's Add sheet) and never touches the HUD. Once `P` has started the script, `Esc` with nothing open **never hides the HUD**; it only brings a hidden HUD back. Before `P`, `Esc` hides or shows the HUD as before. While a dialog is open the other presenter keys are ignored, except over the grow step's Add sheet, which the script opened itself (`data-presenter-owned`): `Space` keeps driving the script there |
+| `H` | Hides or shows the HUD on purpose, at any time |
 | `ArrowLeft` | Back one step. `ArrowRight` skips a failed step |
-| `L` | Toggles English and 简体中文. Needed so the driver never uses the mouse |
+| `L` | Toggles English and 简体中文. Not used in the 5:00 (the flip was cut, round-3 Fable #8: Developer pages stay English) |
 | `S` | Stage theme on or off |
-| `D` | Opens Deliverables |
+| `D` | Q&A: signs Leo in and opens his cached Deliverables panel (built by the `P` warm-up). `Esc` closes it and signs back in whoever was signed in before `D` (round-3 Fable #2), so `←` to the journey shows the waterfall; the journey step's `←` also signs Maya in again on its own |
 | `2` | Opens citation [2] on the current Compare page |
 | `?` | Key legend |
 
@@ -73,7 +74,7 @@ This is the live order. Step ids and URLs are copied from `components/presenter/
 | 04 | `journey` | `Space` | 1:40 | `/dev/journey/<req>` (Rachel's `req_id`) | Session switches to `maya.compliance`. Opens on the waterfall: real milliseconds per stage, model name, three ledger records with sequence and hash (D-16) |
 | 05 | `verify` | `Space` | 2:10 | `/dev/audit?verify=1` | **Verify** on the live ledger. Green: intact |
 | 06 | `tamper` | `Space` | 2:20 | `/dev/audit?tamper=1` | **Sandbox tamper, then Verify**: one Gate-2 decision changes in a temporary **copy** of the log, 'forbidden' to 'verified' (spoken: "denied to allowed"), and the copy is verified. Red: "broken at entry N". The real chain is never edited (D-19) |
-| 07 | `workbuddy` | `Space` | 2:35 | `/dev/audit` | **Off-app** (see §7). The bar shows the WorkBuddy card; Dev switches window (Alt+Tab). Back in the app, the newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus, not on a key. Then `L` flips to 简体中文 and `L` back (3 s) |
+| 07 | `workbuddy` | `Space` | 2:35 | `/dev/audit` | **Off-app** (see §7). The bar shows the WorkBuddy card; Dev switches window (Alt+Tab). Back in the app, the newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus, not on a key. No language flip (cut, round-3 Fable #8) |
 | 08 | `proof` | `Space` | 3:20 | `/present/proof` | **Proof slide** |
 | 09 | `business` | `Space` | 3:50 | `/present/business` | **Business slide** |
 | 10 | `close` | `Space` | 4:30 | `/present/close` | **Close slide** |
@@ -83,6 +84,19 @@ This is the live order. Step ids and URLs are copied from `components/presenter/
 after the Ken beat) are added only when demo features are on (D-24) **and** the tab was opened with
 `?grow=1` (stored for this tab; `?grow=0` turns it off). Without `?grow=1` the HUD counts `/ 10`;
 with it, `/ 13`. Use it for a Q&A walk-up only (round-2 Fable #1; test in `presenter.spec.ts`).
+
+The grow walk-up, keys only (round-3 Fable #1; `presenter.spec.ts` "the ?grow=1 walk-up runs on Space
+alone"):
+1. **Open the `?grow=1` tab after a sign-in exists** (`/present?present=1&grow=1`): `/ib/status` needs a
+   session. A tab opened signed out keeps the opt-in and picks the grow steps up once `P` signs someone in
+   (`components/sim/demo.ts` asks again after a sign-in), but check that the HUD reads `/ 13` before Q&A.
+   Reset and `docs/finals/live_kit/check_absent.py --all` first.
+2. `P`, then `Space` x 5, no `Esc`: 01 and 02 as usual; 03 `grow` opens Jordan's Add sheet with the note
+   filled and the focus on the sheet itself (not its Close button), and `Space` still advances; 04
+   `grow-post` posts, shows "Posted to Slack" for about 1.5 s, then closes the sheet so the room sees the
+   "Just added" feed (Jordan's side; Ken's stays empty); 05 `grow-ask` asks both on Compare.
+3. A failed step (for example the post) leaves the sheet open with the error; `Space` tries it again.
+   `Esc` closes the sheet but never the HUD.
 
 Note: the run sheet's Ken step happens before the passage step. The tamper in step 06 writes only to the sandbox copy, so the WorkBuddy beat in step 07 writes a real record to the real chain afterwards (D-19), which the audit page shows when Dev returns to the app.
 
