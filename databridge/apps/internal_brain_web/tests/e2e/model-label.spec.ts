@@ -10,7 +10,7 @@ import type { ModelInfo } from '../../lib/types';
 const D = { provider: 'deterministic', model: 'extractive-v1' };
 const CASES: { name: string; m: ModelInfo; src: string; en: RegExp; zh: RegExp }[] = [
   { name: 'model rejected for evidence', m: { ...D, fallback_used: true, reason_code: 'model_rejected_evidence' }, src: 'rejected', en: /evidence check/, zh: /证据检查/ },
-  { name: 'model timed out or unavailable', m: { ...D, fallback_used: true, reason_code: 'model_unavailable' }, src: 'unavailable', en: /did not reply in time/, zh: /未能及时回复/ },
+  { name: 'model timed out or unavailable', m: { ...D, fallback_used: true, reason_code: 'model_unavailable' }, src: 'unavailable', en: /unavailable or too slow/, zh: /不可用或响应过慢/ },
   { name: 'approved script quoted (D-43)', m: { ...D, fallback_used: false, reason_code: 'quoted_approved_script' }, src: 'script', en: /Approved wording/, zh: /经批准/ },
   { name: 'no model configured', m: { ...D, fallback_used: false }, src: 'offline', en: /no AI model on/, zh: /未启用 AI 模型/ },
 ];
@@ -38,7 +38,7 @@ test('model label: the rejected and timed-out cases never share a label or a too
   const [rej, una] = CASES;
   expect(modelLabelKey(rej.m)).not.toBe(modelLabelKey(una.m));
   expect(modelTipKey(rej.m)).not.toBe(modelTipKey(una.m));
-  expect(translate(userMessages, 'en', modelTipKey(rej.m)!)).not.toMatch(/in time|timed out/);
+  expect(translate(userMessages, 'en', modelTipKey(rej.m)!)).not.toMatch(/in time|timed out|unavailable/);
 });
 
 test('model label: a model-written answer says AI once; a second model gets the fallback tip', () => {

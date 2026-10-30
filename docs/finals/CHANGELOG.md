@@ -43,6 +43,33 @@ Teammate Dev's Workflow 1 ("Your first day leading Project Atlas"), integrated. 
 | Eval | `IB_EVAL_WORLD=<path>` runs the leak eval on another world. Atlas world: 0 leaks in 7,374 requests, 0 differential mismatches |
 | Tests | `tests/test_subject_scope.py` (15). Full IB suite: after the merge, on the Windows laptop, 1,494 passed and 13 failed: 10 also fail on the base commit on this machine (bash-run script tests), 1 was fixed in c06daf8 (demo_up.sh keeps its STATE line), and 2 are feat/story1-fixes tests not yet updated for that branch (the daily-cap reason code, the AI badge string). Default-world leak eval: 0 leaks in 7,374 requests, 0 differential mismatches (unchanged) |
 
+## 30 Oct 2026, late night: Story 1 workflow-test fixes (branch `feat/story1-fixes`)
+
+From the Story 1 ("The Call") workflow test and the model-on stage QA. Fake models only in the tests; the live
+re-run of Story 1 is still to do (laptop). The run's own output is not kept in the repo.
+
+**Test results** (Windows, Python 3.13, `IB_FORCE_OFFLINE=1`, 30 Oct late night): IB backend 1,480 passed, 2 skipped, 12 failed in the full run (54 min, on a loaded laptop). Two were tests pinning the old answer badge and the old fallback `model` object; they are updated, and their files re-run green (`test_model_guard.py`, `test_standin_labels.py`, `test_story1_fixes.py`: 101 passed, the bash tests deselected). The other 10 are the `demo_up.sh`/`wipe_guard.sh` bash tests: on this laptop `bash` with `PATH=/usr/bin:/bin` resolves to WSL and fails with an RPC error before the script runs; those tests and scripts are unchanged from `1b6500c`; mock
+platforms 159 passed; fixtures 47 passed; vendor-import guard ok; web `tsc` clean; `next build` (separate
+distDir) ok; web e2e (Playwright, mock, the affected specs: model-label, ask, user, compare, presenter,
+preflight, views, analytics, audit-trust) 87 passed, 0 failed. Leak eval: 0 leaks in 7,374 requests, 0 of 400
+P2 pairs differ, 0 injection hard failures in 1,152. The fake-capture mode now has 4 answers quoted without
+a model call (D-43), each re-checked by the eval.
+
+| Area | Change |
+|---|---|
+| Answers | The approved-script skip (D-43, from `feat/model-tuning`): approved wording is quoted, never re-worded by a model |
+| Answers | The prompt asks for every status fact the passages give (filings, decisions, counts); grounding wall unchanged (D-44, `ib-prompt-2026-10-30.1`) |
+| Answers | `model.reason_code` on a quoted fallback: `model_rejected_evidence` or `model_unavailable` (backend_v1 v5) |
+| User mode | True labels for quoted answers, EN and 简体中文, no provider name; "AI-generated" shown once |
+| Pages | The page-or-chat prompt sends case and status overviews to a page; "Open as page" stays the stage step |
+| Page check | Value counters balance: proposed = kept + dropped |
+| Security | HTTP client loggers at WARNING: no endpoint host in `ib.log` (SECURITY §15.16) |
+| Model | `IB_MODEL_ANSWER_TIMEOUT_S` (default 12 s, no SDK retry) for the stand-in answer call |
+| Presenter | The D warm-up starts at the proof step; a step's sign-in waits at most 8 s; business headline "Projected"; the proof slide says the eval used a test model |
+| Compare, journey | A "Different answers" line; the journey's model card shows "AI model" for an unnamed model |
+| Preflight | 8 s quoted / 15 s with a model; rows say "AI model"; a WARN when Rachel's answer leaves out one of her three stage facts |
+| Docs | D-43, D-44; backend_v1 v5; SECURITY §15.16; RUN_SHEET bridge line for step 01 and the "Open as page" step; PRESENTER_KEYS |
+
 ## 30 Oct 2026, night (cloud session 2)
 
 Branch `final_v1.2-cloud` (now locked as `final_v1.3`). The round-4 fixes from the laptop section below were finished
