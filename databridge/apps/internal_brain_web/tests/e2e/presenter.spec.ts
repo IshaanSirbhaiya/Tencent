@@ -23,8 +23,23 @@ const barState = (page: Page) => bar(page).getAttribute('data-state');
 /** Press `key` for a step, wait until that step has started and finished; returns the bar state. */
 async function press(page: Page, key: 'Space' | 'ArrowRight' | 'ArrowLeft' = 'Space') {
   await page.waitForTimeout(450); // the bar debounces a double press (400 ms)
+  // A step served from the warm-up cache can go busy -> ready faster than a poll samples it, so an
+  // observer armed before the key press records that the step started (flaked once in the 30 Oct run).
+  await page.evaluate(() => {
+    const w = window as unknown as { __barWentBusy?: boolean; __barObs?: MutationObserver };
+    w.__barObs?.disconnect();
+    w.__barWentBusy = false;
+    const el = document.querySelector('[data-testid="presenter-bar"]');
+    if (!el) return;
+    w.__barObs = new MutationObserver(() => {
+      if (el.getAttribute('data-state') === 'busy') w.__barWentBusy = true;
+    });
+    w.__barObs.observe(el, { attributes: true, attributeFilter: ['data-state'] });
+  });
   await page.keyboard.press(key);
-  await expect.poll(() => barState(page)).toBe('busy');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __barWentBusy?: boolean }).__barWentBusy === true))
+    .toBe(true);
   await expect.poll(() => barState(page), { timeout: 30_000 }).not.toBe('busy');
   return barState(page);
 }

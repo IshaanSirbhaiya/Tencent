@@ -430,12 +430,12 @@ Developer mode shows every page to everyone. Pages that need a role show a lock 
 
 | | |
 |---|---|
-| What | **User "Try it"** (4 steps and a checklist: sign in, ask, open a source, Ken's identical refusals) and **Developer** (5 steps: pipeline, journey, graph, trust, then analytics and Verify for compliance or the least-privilege note for others). Spotlight and "Do it for me". A first-visit offer (at the top on phones since `810ddbb`) |
+| What | **User "Try it"** (4 steps and a checklist: sign in, ask, open a source, Ken's identical refusals) and **Developer** (5 steps: pipeline, journey, graph, trust, then analytics and Verify for compliance or the least-privilege note for others). Spotlight and "Do it for me". The two tours are separate (D-36): each mode offers its own on first entry, the header button starts the current mode's tour, and neither chains into the other. A first-visit offer (at the top on phones since `810ddbb`) |
 | Who | Anyone |
 | Where | "Take the tour" in the header; Settings → replay |
 | How | 1. Press **Take the tour**. 2. Press **Do it for me** or do the step. 3. Arrows move, Esc closes |
-| Guarantees | Keyboard only works end to end; a missing anchor centres the card with a note |
-| Tests | `tour.spec.ts` (8 tests); `tour-screens.spec.ts` (6, `TOUR_SCREENS=1`) |
+| Guarantees | Keyboard only works end to end; a missing anchor centres the card with a note; a mode switch never carries a tour across |
+| Tests | `tour.spec.ts` (11 tests); `tour-screens.spec.ts` (6, `TOUR_SCREENS=1`) |
 | Screens | [tour/](screens/tour/) (36 files), e.g. [tour/07-user-step4-identical-dark.png](screens/tour/07-user-step4-identical-dark.png), [tour/17-dev-step5-locked-light.png](screens/tour/17-dev-step5-locked-light.png) |
 
 ### S4. Deep links and the session check
