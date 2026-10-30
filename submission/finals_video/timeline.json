@@ -1,0 +1,92 @@
+[
+ {
+  "label": "00 Camera intro",
+  "start": 0.0,
+  "end": 31.8
+ },
+ {
+  "label": "01 Title",
+  "start": 31.45,
+  "end": 37.45
+ },
+ {
+  "label": "02 Same question, two people",
+  "start": 37.1,
+  "end": 76.58
+ },
+ {
+  "label": "03 Restricted looks like nothing",
+  "start": 76.23,
+  "end": 98.12
+ },
+ {
+  "label": "04 A source, checked live",
+  "start": 97.77,
+  "end": 124.22
+ },
+ {
+  "label": "05 Developer mode: the journey",
+  "start": 123.87,
+  "end": 157.72
+ },
+ {
+  "label": "06 The knowledge graph",
+  "start": 157.37,
+  "end": 181.29
+ },
+ {
+  "label": "07 Analytics",
+  "start": 180.94,
+  "end": 199.13
+ },
+ {
+  "label": "08 Audit, Verify and the tamper demo",
+  "start": 198.78,
+  "end": 235.88
+ },
+ {
+  "label": "09 The Trust centre",
+  "start": 235.53,
+  "end": 249.54
+ },
+ {
+  "label": "10 The Walnut engine",
+  "start": 249.19,
+  "end": 279.09
+ },
+ {
+  "label": "11 Built with CodeBuddy",
+  "start": 278.74,
+  "end": 291.74
+ },
+ {
+  "label": "12 WorkBuddy: the connectors",
+  "start": 291.39,
+  "end": 297.39
+ },
+ {
+  "label": "12 WorkBuddy: two people",
+  "start": 297.04,
+  "end": 308.04
+ },
+ {
+  "label": "13 Tencent Hy3",
+  "start": 307.69,
+  "end": 321.19
+ },
+ {
+  "label": "14 The proof",
+  "start": 320.84,
+  "end": 338.84
+ },
+ {
+  "label": "15 What it's worth",
+  "start": 338.49,
+  "end": 357.49
+ },
+ {
+  "label": "16 Close",
+  "start": 357.14,
+  "end": 368.14
+ }
+]

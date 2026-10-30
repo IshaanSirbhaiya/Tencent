@@ -1,0 +1,251 @@
+1
+00:00:31,950 --> 00:00:33,750
+This is Walnut DataBridge.
+
+2
+00:00:33,750 --> 00:00:36,550
+And we'll start with Aspire's own question.
+
+3
+00:00:37,600 --> 00:00:46,800
+Two people at a fintech ask the same thing: why has Velquarry Trading's account been restricted, and what should I tell the customer?
+
+4
+00:00:46,800 --> 00:00:52,800
+Amy, an account manager, gets the approved customer script, with its sources, and nothing else.
+
+5
+00:00:52,800 --> 00:00:55,200
+Rachel is the money-laundering reporting officer.
+
+6
+00:00:55,200 --> 00:00:59,600
+She gets the actual case: the flagged transfers, and the review.
+
+7
+00:00:59,600 --> 00:01:01,600
+Same system, two different truths.
+
+8
+00:01:01,600 --> 00:01:07,200
+In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+
+9
+00:01:07,200 --> 00:01:09,200
+So the system never does.
+
+10
+00:01:16,730 --> 00:01:18,730
+Now Ken, an outside contractor.
+
+11
+00:01:18,730 --> 00:01:21,530
+On the left, he asks about Velquarry.
+
+12
+00:01:21,530 --> 00:01:25,930
+On the right, about a company that doesn't exist at all.
+
+13
+00:01:25,930 --> 00:01:28,730
+The answers are identical, word for word.
+
+14
+00:01:28,730 --> 00:01:31,530
+A restricted file looks exactly like nothing.
+
+15
+00:01:31,530 --> 00:01:35,930
+We tested that on four hundred pairs of questions: zero differences.
+
+16
+00:01:38,270 --> 00:01:40,070
+Here's Rachel's own screen.
+
+17
+00:01:40,070 --> 00:01:44,470
+Every sentence points at a passage she can open right now.
+
+18
+00:01:44,470 --> 00:01:52,470
+Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
+
+19
+00:01:52,470 --> 00:01:55,270
+And the whole app also speaks Chinese.
+
+20
+00:02:04,370 --> 00:02:07,570
+Now the developer side, as Maya from compliance.
+
+21
+00:02:07,570 --> 00:02:10,370
+This is Rachel's request, end to end.
+
+22
+00:02:10,370 --> 00:02:16,770
+Each bar is a real timing: two permission checks before anything is composed, then the answer.
+
+23
+00:02:16,770 --> 00:02:21,570
+These three records were sealed and chained before Rachel saw a word.
+
+24
+00:02:21,570 --> 00:02:26,770
+And below, every document that was considered, with its verdict and the reason.
+
+25
+00:02:26,770 --> 00:02:29,170
+Maya never sees the answer itself.
+
+26
+00:02:37,870 --> 00:02:47,070
+This is everything Jordan, a backend engineer, can open, as one graph: every item on four platforms, each one checked with its source.
+
+27
+00:02:47,070 --> 00:02:56,270
+Compare two people, and Ken's graph sits right beside it: a small corner of the company, and no greyed-out boxes for the rest.
+
+28
+00:02:56,270 --> 00:02:59,070
+For Ken, the rest simply isn't there.
+
+29
+00:03:01,440 --> 00:03:11,440
+Maya's analytics come straight from the verified log: how many questions, how many were answered, how fast, and how often the live check said no.
+
+30
+00:03:11,440 --> 00:03:15,440
+Seeded history is labelled, and one click leaves it out.
+
+31
+00:03:19,280 --> 00:03:26,480
+Maya can also ask the audit log in plain English: everything Rachel accessed in the last seven days.
+
+32
+00:03:26,480 --> 00:03:29,680
+She sees the filter first, then the rows.
+
+33
+00:03:29,680 --> 00:03:32,880
+Verify re-checks every link in the chain: intact.
+
+34
+00:03:32,880 --> 00:03:34,680
+Now the fun part.
+
+35
+00:03:34,680 --> 00:03:38,680
+The tamper demo copies the log and attacks the copy.
+
+36
+00:03:38,680 --> 00:03:45,080
+It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
+
+37
+00:03:45,080 --> 00:03:48,280
+Deleting or rolling back records is caught too.
+
+38
+00:03:48,280 --> 00:03:51,080
+And the real log was never touched.
+
+39
+00:03:56,030 --> 00:04:00,430
+The Trust centre lists the seven controls behind all of this.
+
+40
+00:04:00,430 --> 00:04:08,030
+Each one is enforced in code, mapped to Singapore's AI and data rules, and proved by a named test.
+
+41
+00:04:09,690 --> 00:04:12,890
+Underneath it all is Walnut, the evidence engine.
+
+42
+00:04:12,890 --> 00:04:21,290
+Here's Company A as Jordan sees it: every entity, every link, and every value with a pointer back to its source.
+
+43
+00:04:21,290 --> 00:04:26,490
+Drag the time slider, and the company's knowledge rewinds to any past date.
+
+44
+00:04:26,490 --> 00:04:33,290
+And any value can be traced, step by step, to the exact row in the exact file.
+
+45
+00:04:39,240 --> 00:04:41,640
+We built this with Tencent CodeBuddy.
+
+46
+00:04:41,640 --> 00:04:48,840
+It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
+
+47
+00:04:48,840 --> 00:04:51,240
+Every session is in the repo.
+
+48
+00:04:51,890 --> 00:04:56,690
+And it lives inside Tencent WorkBuddy too, as a second front door.
+
+49
+00:04:56,690 --> 00:05:03,490
+Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
+
+50
+00:05:08,190 --> 00:05:14,190
+Tencent Hy3 is wired in through TokenHub, with a backup model and a safe fallback.
+
+51
+00:05:14,190 --> 00:05:20,590
+Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks.
+
+52
+00:05:21,340 --> 00:05:24,540
+We didn't just demo it, we attacked it.
+
+53
+00:05:24,540 --> 00:05:28,540
+Five thousand nine hundred and fifty-eight adversarial requests: zero leaks.
+
+54
+00:05:28,540 --> 00:05:30,940
+Four hundred paired questions: zero differences.
+
+55
+00:05:30,940 --> 00:05:37,340
+And seven hundred and fifty-four backend tests, plus a hundred and twenty-four browser tests, all passing.
+
+56
+00:05:38,990 --> 00:05:40,790
+What's it worth?
+
+57
+00:05:40,790 --> 00:05:49,590
+For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
+
+58
+00:05:49,590 --> 00:05:51,990
+It's an estimate, not a measurement.
+
+59
+00:05:51,990 --> 00:05:56,390
+And it pays for itself at about seven minutes a week.
+
+60
+00:05:57,640 --> 00:05:59,440
+Walnut DataBridge.
+
+61
+00:05:59,440 --> 00:06:01,240
+Answers you can prove.
+
+62
+00:06:01,240 --> 00:06:04,840
+We'd love one pilot team at one regulated company.
+
+63
+00:06:04,840 --> 00:06:06,640
+Thanks for watching!
