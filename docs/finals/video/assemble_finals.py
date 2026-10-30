@@ -149,44 +149,53 @@ def check_script_numbers() -> list[str]:
 # segment out (printed); {"slot": True} is a teammate's slot (optional, and left out of planned cue sheets until
 # its clip exists); {"pills": [(at, seconds, text)]} puts label pills on a still. kind: camera (the intro, kept
 # whole with its sound), card (cards/), clip (clips/), still (submission/02_workbuddy/).
-# Order (VIDEO_PLAN.md, "The new timeline"): the core story first, then the new value, the Tencent tools,
-# the teammates' slots, and the proof, business and close slides.
+# Order (founder's principle, 30 Oct evening; VIDEO_PLAN.md "The new timeline"): the 16 Oct video's spine, beat
+# by beat, with each new feature next to the beat it strengthens. 16 Oct beats in brackets.
 SEGMENTS = [
     ("camera", "intro_final.mp4", 0, "00 Camera intro", {}),
-    ("card", "01_title.png", 6, "01 Title", {}),
-    # core: the most screen time
-    ("clip", "02_compare_amy_rachel.webm", (40, 45, 50), "02 Same question, two people", {}),
+    ("card", "01_title.png", 9, "01 Title", {}),                   # [1] 9 s: Tencent is named in the first line
+    # [3] one question, every sentence sourced, checked live (+ 简体中文)
+    ("clip", "04_source_live.webm", (30, 34, 38), "04 One question, checked live", {}),
+    # [4] the map: Jordan's everything, Ken's corner
+    ("clip", "06_graph.webm", (20, 20, 26), "06 The map of what you can see", {}),
+    # [5] + [7] same question, two people; the fintech part
+    ("clip", "02_compare_amy_rachel.webm", (36, 38, 43), "02 Same question, two people", {}),
+    # [6] restricted looks like non-existent
     ("clip", "03_ken_identical.webm", (23, 25, 28), "03 Restricted looks like nothing", {}),
-    ("clip", "04_source_live.webm", (25, 30, 35), "04 A source, checked live", {}),
-    ("clip", "05_journey.webm", (30, 35, 40), "05 Developer mode: the journey", {}),
-    ("clip", "08_audit.webm", (40, 45, 50), "08 Audit, Verify and the tamper demo", {}),
-    # new value: short and sharp
-    ("clip", "17_act.webm", (15, 18, 22), "17 Act: a draft and a ticket", {"optional": True}),
-    ("clip", "18_deliverables.webm", (12, 18, 22), "18 Deliverables: a table, a chart, a file", {"optional": True}),
+    # enhancements to [7] and [3]: the answer becomes a reply, a ticket, a file
+    ("clip", "17_act.webm", (18, 22, 26), "17 Act: a draft and a ticket", {"optional": True}),
+    ("clip", "18_deliverables.webm", (10, 15, 20), "18 Deliverables: a table, a chart, a file", {"optional": True}),
+    # [5b] the guided tour (+ dictation, the accessibility caption, the value calculator)
+    ("clip", "21_extras.webm", (0, 12, 16), "21 New here: tour, dictation, value calculator", {"optional": True}),
+    # [8] nothing stale: live growth and uploads
     ("clip", "06b_brain_grow.webm", (0, 22, 28), "06b Watch the brain grow", {"optional": True}),
     ("clip", "19_upload.webm", (0, 10, 15), "19 Add a file", {"optional": True}),
-    ("clip", "21_extras.webm", (0, 18, 25), "21 Tour, dictation, value calculator, presenter", {"optional": True}),
-    ("clip", "06_graph.webm", (20, 20, 24), "06 The knowledge graph", {}),
-    ("clip", "10_engine.webm", (20, 20, 25), "10 The Walnut engine", {}),
+    # [9] the compliance side: the journey, the audit log and the tamper demo (+ analytics, Trust centre)
+    ("clip", "05_journey.webm", (30, 35, 40), "05 Developer mode: the journey", {}),
+    ("clip", "08_audit.webm", (40, 43, 50), "08 Audit, Verify and the tamper demo", {}),
     ("clip", "07_analytics.webm", (12, 12, 15), "07 Analytics", {}),
     ("clip", "09_trust.webm", 14, "09 The Trust centre", {}),
-    # Tencent tools
-    ("card", "11_codebuddy.png", (10, 12, 14), "11 Built with CodeBuddy", {}),
+    # [10] WorkBuddy
     ("still", "workbuddy_mcp_panel.png", (5, 6, 6), "12 WorkBuddy: the connectors",
      {"pills": [(0.6, 4.0, "Tencent WorkBuddy · real window capture (15 Oct)")]}),
-    ("still", "workbuddy_compare.png", (7, 8, 11), "12 WorkBuddy: two people",
+    ("still", "workbuddy_compare.png", (8, 9, 12), "12 WorkBuddy: two people",
      {"pills": [(1.0, 4.0, "One question, Jordan's and Ken's connectors: two answers")]}),
-    ("card", "20_miora.png", (0, 8, 10), "20 Miora: the cover art", {"optional": True}),
-    ("clip", "13_hy3_status.webm", (12, 12, 14), "13 Tencent Hy3", {}),
+    # [11] what's underneath
+    ("clip", "10_engine.webm", (20, 18, 25), "10 The Walnut engine", {}),
+    # [12] how it fits together, and Hy3
+    ("clip", "13_hy3_status.webm", (14, 14, 17), "13 Tencent Hy3", {}),
     # the teammates' slots: names, routes and lines come after the merge (TODO in the script)
     ("clip", "S1_voice.webm", (0, 8, 20), "S1 Voice", {"optional": True, "slot": True}),
     ("clip", "S2_jit_ui.webm", (0, 8, 20), "S2 Just-in-time UI", {"optional": True, "slot": True}),
     ("clip", "S3_dots.webm", (0, 6, 15), "S3 Dots", {"optional": True, "slot": True}),
-    # the app's own slides
-    ("card", "14_proof.png", 18, "14 The proof",
-     {"pills": [(9.5, 7.0, "PROOF_PILL")]}),
-    ("card", "15_business.png", 19, "15 What it's worth", {}),
-    ("card", "16_close.png", 11, "16 Close", {}),
+    # [13] the numbers (+ the business case), [14] how we built it and thanks
+    ("card", "14_proof.png", 20, "14 The proof",
+     {"pills": [(10.5, 7.5, "PROOF_PILL")]}),
+    ("card", "15_business.png", 21, "15 What it's worth",
+     {"pills": [(12.0, 7.0, "Target host: Tencent Cloud. One-command deploy kit in the repo; no live instance yet")]}),
+    ("card", "11_codebuddy.png", (10, 12, 14), "11 Built with CodeBuddy", {}),
+    ("card", "20_miora.png", (0, 8, 10), "20 Miora: the cover art", {"optional": True}),
+    ("card", "16_close.png", 13, "16 Close", {}),
 ]
 
 
@@ -440,7 +449,10 @@ def self_test() -> int:
     assert t["short"] < t["main"] < t["full"], t
     assert 330 <= t["short"] <= 400 and t["main"] < 480, t
     order = [Path(n).stem for _, n, _, _, _ in SEGMENTS]
-    assert order.index("02_compare_amy_rachel") < order.index("08_audit") < order.index("06_graph") < order.index("07_analytics")
+    # the 16 Oct spine, in its order: [3] 04, [4] 06, [5]+[7] 02, [6] 03, [9] 05 08, [10] 12, [11] 10, [12] 13, [13] 14, [14] 11 16
+    spine = ["04_source_live", "06_graph", "02_compare_amy_rachel", "03_ken_identical", "05_journey", "08_audit",
+             "workbuddy_mcp_panel", "10_engine", "13_hy3_status", "14_proof", "11_codebuddy", "16_close"]
+    assert [order.index(s) for s in spine] == sorted(order.index(s) for s in spine), "the 16 Oct spine is out of order"
     # the script: every scene of the plan has a section; cuts add lines, never remove; TODO placeholders are never read
     TODO_SCENES.clear()
     lines = {c: scenes_from_script(False, c) for c in CUTS}

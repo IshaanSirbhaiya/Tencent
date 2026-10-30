@@ -531,30 +531,41 @@ const SCENES = {
   // the copy of ActSheet / DeliverSheet / AddDocumentSheet is still being edited. A state the scene cannot
   // film (feature off, no data, an error) throws, so the take is kept as FAILED and nothing false is shown.
   // They WRITE to the stack (a mock Jira ticket, an uploaded file): record them last, and reset after.
-  '17_act': { who: 'jdoe', mode: 'user', async run(page) {                                  // ~22 s
+  // Scene 17 follows what the app really does (tests/e2e/act.spec.ts): the reply draft is Amy's (the approved
+  // wording for the Velquarry customer, never sent); the follow-up ticket is Jordan's (proposed, confirmed, created
+  // in the mock Jira). Two personas, one scene: Amy first, then a demo-login as Jordan on the same page.
+  '17_act': { who: 'amy.am', mode: 'user', async run(page) {                                // ~26 s
     await goto(page, WEB, 0.8);
-    const starter = page.getByTestId('starter').first();            // Jordan's first starter: the migration status
-    mark(page, 'Jordan · backend engineer: from an answer to an action', 3.5);
-    await hover(page, starter, 0.5);
-    await click(page, starter, 0);
+    const amyStarter = page.getByTestId('starter').filter({ hasText: 'Velquarry' }).first();   // Aspire's question again
+    mark(page, 'Amy · account manager: "what should I tell the customer?" becomes a reply', 3.5);
+    await hover(page, amyStarter, 0.5);
+    await click(page, amyStarter, 0);
     await waitAnswer(page);
     await pause(page, 0.5);
-    await read(page, page.getByTestId('answer-text'), 2.5);
+    await read(page, page.getByTestId('answer-text'), 2);
     await hover(page, page.getByTestId('act-row'), 1.0, { dx: 0.3 });
     await click(page, page.getByTestId('act-draft'), 0);
     const draft = await oneOf(page, ['act-draft-view', 'act-unavailable', 'act-nothing', 'act-error'], 60000);
     if (draft !== 'act-draft-view') throw new Error(`Act draft not available on this build: ${draft}`);
     await pause(page, 0.6);
-    mark(page, 'A draft reply: every sentence from the cited facts', 4.5);
+    mark(page, 'A draft reply: the approved wording, built from the cited facts, never sent', 4.5);
     await hover(page, page.getByTestId('act-draft-label').first(), 1.0);
-    await read(page, page.getByTestId('act-draft-text'), 4);
-    await hover(page, page.getByTestId('act-sources'), 1.5);
-    await page.keyboard.press('Escape'); await pause(page, 0.8);
+    await read(page, page.getByTestId('act-draft-text'), 3.5);
+    await hover(page, page.getByTestId('act-sources'), 1.2);
+    await page.keyboard.press('Escape'); await pause(page, 0.6);
+    await login(page, 'jdoe');                                        // now Jordan, same browser, same mode
+    await goto(page, WEB, 0.8);
+    const jordanStarter = page.getByTestId('starter').first();        // Jordan's first starter: the migration status
+    mark(page, 'Jordan · backend engineer: a ticket proposal, nothing is created until he confirms', 4.5);
+    await hover(page, jordanStarter, 0.5);
+    await click(page, jordanStarter, 0);
+    await waitAnswer(page);
+    await pause(page, 0.5);
+    await hover(page, page.getByTestId('act-row'), 0.8, { dx: 0.3 });
     await click(page, page.getByTestId('act-ticket'), 0);
     const ticket = await oneOf(page, ['act-ticket-view', 'act-unavailable', 'act-nothing', 'act-error'], 60000);
     if (ticket !== 'act-ticket-view') throw new Error(`Act ticket not available on this build: ${ticket}`);
     await pause(page, 0.6);
-    mark(page, 'A ticket proposal: nothing is created until he confirms', 4.5);
     await read(page, page.getByTestId('act-ticket-summary'), 2.5);
     await hover(page, page.getByTestId('act-ticket-description'), 1.5);
     await click(page, page.getByTestId('act-ticket-confirm'), 0);
@@ -618,35 +629,35 @@ const SCENES = {
     await hover(page, page.getByTestId('graph-main-addsheet-upload-status'), 2.5);
     await page.keyboard.press('Escape'); await pause(page, 0.5);
   } },
-  // Scene 21 (30 Oct): three small things that exist today, one beat each: the first-visit tour offer, the
-  // microphone button in the composer (dictation; hovered, never pressed, so no mic is used and nothing is
-  // asked), the value calculator and the stage presenter's landing page (/present). Test ids only, except the
-  // landing page's `main` element (components/tour/Tour.tsx, user/Composer.tsx, value/).
-  '21_extras': { who: 'jdoe', mode: 'user', async run(page) {                              // ~19 s
+  // Scene 21 (30 Oct, re-cut after the Fable script review): one story beat, "Jordan is new here", on the Ask
+  // page: the first-visit tour offer, then the microphone button in the composer (dictation; hovered, never
+  // pressed, so no mic is used and nothing is asked), with a caption for the accessibility settings
+  // (components/settings/*, lib/i18n/en.ts 'settings.textSize' / 'highContrast' / 'reduceMotion'; axe runs in
+  // tests/e2e/*.spec.ts). Then a short look at the value calculator, carried by its caption. The stage
+  // presenter is no longer in the video: it is a stage tool and the judges see it live on 3 Nov.
+  '21_extras': { who: 'jdoe', mode: 'user', async run(page) {                              // ~13 s
     await goto(page, WEB, 0.8);
     await page.evaluate(() => { try { localStorage.removeItem('ib-tour-offer'); } catch (e) {} });
     await page.reload(); await page.waitForLoadState('networkidle').catch(() => {});
-    await pause(page, 1.0);
+    await pause(page, 0.8);
     if (await page.getByTestId('tour-offer').count()) {
-      mark(page, 'New here? A guided tour is offered once, and any time after', 3.5);
-      await hover(page, page.getByTestId('tour-offer'), 2.0);
+      mark(page, 'New here? A guided tour: a User track and a Developer track', 3.0);
+      await hover(page, page.getByTestId('tour-offer'), 1.8);
     } else {
-      mark(page, 'A guided tour is offered on first visit, and any time after', 3.5);
-      await pause(page, 2.0);
+      mark(page, 'A guided tour is offered on first visit, and any time after', 3.0);
+      await pause(page, 1.8);
     }
     if (!(await page.getByTestId('dictate').count())) throw new Error('no microphone button here (browser has no speech API?)');
-    mark(page, 'Dictate a question: it types into the box, nothing is asked until Ask is pressed', 4.5);
-    await hover(page, page.getByTestId('dictate'), 2.5);                  // hovered, never pressed
-    await goto(page, `${WEB}/value`, 0.8);
+    mark(page, 'Dictate a question: it types into the box; nothing is asked until Ask is pressed', 3.5);
+    await hover(page, page.getByTestId('dictate'), 2.0);                  // hovered, never pressed
+    mark(page, 'Text size, high contrast and reduce motion are settings; accessibility checks run in the browser tests', 3.5);
+    await pause(page, 1.4);
+    await goto(page, `${WEB}/value`, 0.6);
     await slow(page, page.getByTestId('value-calculator').waitFor({ timeout: 30000 }));
-    await pause(page, 0.6);
-    mark(page, 'The value calculator: every input editable, the result an estimate', 4.5);
-    await read(page, page.getByTestId('value-calculator'), 3);
-    await hover(page, page.getByTestId('out-annual'), 1.8);
-    await hover(page, page.getByTestId('out-break-even'), 1.8);
-    await goto(page, `${WEB}/present`, 0.8);                               // the stage presenter's landing page
-    mark(page, 'The stage presenter: one person runs the whole demo from the keyboard', 3.5);
-    await read(page, page.locator('main').first(), 2.5);
+    await pause(page, 0.4);
+    mark(page, 'The value calculator: every input editable, the result an estimate', 3.5);
+    await hover(page, page.getByTestId('out-annual'), 1.4);
+    await hover(page, page.getByTestId('out-break-even'), 1.4);
   } },
   '13_hy3_status': { who: 'maya.compliance', mode: 'dev', async run(page) {              // ~13 s
     await goto(page, `${WEB}/dev`, 0);
@@ -687,7 +698,7 @@ function titleHtml() {
   <p class="eyebrow" style="margin-top:120px">FinTech track · Aspire · Finalist</p>
   <h1>Answers you<br>can prove.</h1>
   <p class="lead muted">One question across Confluence, Jira, Slack and Google Drive, answered only from what the asker can open. Every source checked live, every step sealed in an audit log.</p>
-  <div class="pills"><span>Two permission gates before any model</span><span>Sealed, hash-chained audit</span><span>Built with Tencent CodeBuddy</span></div>
+  <div class="pills"><span>Two permission gates before any model</span><span>Sealed, hash-chained audit</span><span>Built with Tencent CodeBuddy</span><span>Wired for Tencent Hunyuan (Hy3)</span></div>
   </div><div class="foot"><span>Tencent Cloud AI CAN DO IT Hackathon Singapore 2026</span><span>Made-up demo data for "Company A"</span></div></body></html>`;
 }
 function codebuddyHtml() {

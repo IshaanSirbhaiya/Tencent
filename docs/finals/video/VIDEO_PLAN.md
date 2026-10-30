@@ -2,37 +2,45 @@
 
 ## Shot list (a two-minute read)
 
-**The video in one line:** the same pattern as the 16 Oct video (Ishaan's camera intro, then a narrated demo of the
-real app, then proof, business case and close), but starting with Aspire's own question, giving the most time to
-the core story, and showing every new feature briefly. Main cut 7:56 (under the 8:00 limit of the 5 to 8
-minute range), short cut 6:04, full cut 9:39. The first video was 6:28.
+**The video in one line:** the 16 Oct video's spine, beat for beat and in its order, re-shot on the new UI, with
+every new feature attached to the beat it strengthens ("and now it also..."), never as a block of its own
+(founder's principle, 30 Oct evening). Main cut 7:56 (under the 8:00 limit of the 5 to 8 minute range), short cut
+6:18, full cut 9:43. The first video was 6:28.
 
-1. **Camera intro (0:32).** Ishaan, the same file as before. Stay quiet.
-2. **Title (6 s).** "Walnut DataBridge. Answers you can prove."
-3. **The core story (3:00 in the main cut).**
-   - 02 Amy and Rachel ask the same question and get different, cited answers (45 s).
-   - 03 Ken asks about a real and a made-up customer and gets the identical refusal (25 s).
-   - 04 Every sentence opens to its exact passage, checked live; the user screens also speak Chinese (30 s).
-   - 05 Developer mode: Rachel's request as a waterfall, three sealed records, every document and verdict (35 s).
-   - 08 The audit log in plain English, Verify, and the tamper demo that catches an edit (45 s).
-4. **Everything new, each brief (about 2:30 in the main cut).**
-   Act: draft and ticket with confirm (18 s) · Deliverables: table, chart, .pptx (18 s) · live growth: Jordan posts, Ken
-   sees nothing (22 s) · add a file (10 s) · tour, dictation, value calculator, presenter (18 s) · knowledge graph
-   (20 s) · Walnut engine (20 s) · analytics (12 s) · Trust centre (14 s).
-5. **The Tencent tools (about 46 s).** CodeBuddy, nine sessions (12 s) · WorkBuddy (14 s) · Miora cover (8 s) · Hy3,
-   wired but not live, said plainly (12 s).
-6. **Teammates' features (placeholders, 22 s in the main cut).** Voice, just-in-time UI, dots: added after the merge;
-   left out until their clips exist.
-7. **Proof, business, close (48 s).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,131 backend and 166
-   browser tests, none failing · about US$1.3M a year, an estimate, break-even about 7 minutes a week · "Answers you
-   can prove", one pilot team, thanks.
+1. **Camera intro (0:32).** Ishaan, the same file as before. Stay quiet. [16 Oct beat 1]
+2. **Title (9 s).** "Walnut DataBridge. Answers you can prove." Spoken: built with Tencent CodeBuddy, wired for Tencent's
+   Hunyuan (true per `DEV_PROCESS.md` and the model chain; Hy3 is not live). Tencent is named 38 s in, as on 16 Oct. [beat 1]
+3. **One question, every sentence sourced (34 s).** Rachel asks Aspire's question; every sentence opens to its exact
+   passage, checked live seconds ago; and now the user screens work in 简体中文. [beat 3]
+4. **The map (20 s).** Everything Jordan can open, as one graph; Ken's corner beside it, no greyed-out boxes: for Ken
+   the rest isn't there. [beat 4]
+5. **Same question, two people (38 s).** Amy and Rachel, side by side: the approved script vs the case; tipping-off is a
+   crime, so the system never hints. [beats 5 and 7]
+6. **Restricted looks like nothing (25 s).** Ken, a real customer vs a made-up one: identical; 400 pairs, zero
+   differences. [beat 6]
+7. **And now it also... (49 s in the main cut).** Act: Amy's answer becomes the reply draft, never sent; Jordan's a ticket
+   with confirm (22 s) · Deliverables: table, chart, .pptx (15 s) · new here: tour, dictation, accessibility caption, value
+   calculator (12 s). [enhancements to beats 7, 3 and 5b]
+8. **Nothing stale (32 s).** Live growth: Jordan posts, it is in his graph at once, Ken sees nothing (22 s) · add a file
+   (10 s). [beat 8]
+9. **The compliance side (1:44).** Maya: Rachel's request as a waterfall, three sealed records, every verdict (35 s) · the
+   audit log in plain English, Verify, the tamper demo on a copy (43 s) · analytics from the verified log (12 s) · Trust
+   centre, seven controls, each proved by a test (14 s). [beat 9]
+10. **WorkBuddy (15 s), the Walnut engine (18 s), how it fits together and Hy3 (14 s).** Same captures, same engine lines,
+    Hy3 wired but not live, said plainly. [beats 10 to 12]
+11. **Teammates' features (placeholders, 22 s in the main cut).** Voice, just-in-time UI, dots: added after the merge;
+    left out until their clips exist.
+12. **The numbers, how we built it, thanks (1:14).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,131
+    backend and 166 browser tests, none failing (20 s) · about US$1.3M a year, an estimate, break-even about 7 minutes a
+    week, Tencent Cloud as the target host (21 s) · built with CodeBuddy, nine sessions (12 s) · Miora (8 s) · "Answers
+    you can prove", one pilot team, thanks (13 s). [beats 13 and 14]
 
-**The short cut (6:04)** drops live growth, add a file, the tour/dictation/value/presenter beat, Miora and the
-slots, and uses only the base spoken lines. **The full cut (9:39)** gives every scene its longest slot and adds the
-**[FULL]** lines.
+**The short cut (6:18)** drops live growth, add a file, the new-here beat, Miora and the slots, and uses only the
+base spoken lines. **The full cut (9:43)** gives every scene its longest slot and adds the **[FULL]** lines.
 
-**Recording order:** `record_finals.cjs cards`, then 02, 03, 04, 05, 06, 07, 08, 09, 10, 13, then the scenes that write
-to the stack (06b, 17, 18, 19), then 21, then the teammates' slots. Details in the checklist below.
+**Recording order** is unchanged (it is about stack state, not the edit): `record_finals.cjs cards`, then 02, 03, 04,
+05, 06, 07, 08, 09, 10, 13, then the scenes that write to the stack (06b, 17, 18, 19), then 21, then the teammates'
+slots. Details in the checklist below.
 
 ## Pre-record checklist (tonight, after 18:30 SGT)
 
@@ -114,50 +122,52 @@ or not, and a clip is stretched or trimmed to its slot (never sped up more than 
 `ORGANISER_UPDATE.md`, `PLAN.md`, the finalist notes; D-01 only says the old video stays unless the new UI is
 ready). The only stated range is **5 to 8 minutes**, for the 16 Oct submission form
 (`docs/tencent/SUBMISSION.md:253`). So the **main cut stays under 8:00 even with every teammate slot filled**
-(7:56); the full cut (9:39) is for YouTube or anyone who asks for the whole tour. Confirm with the
+(7:56); the full cut (9:43) is for YouTube or anyone who asks for the whole tour. Confirm with the
 organisers whether a limit applies.
 
-Seconds on screen: S = short cut (6:04), M = main cut (7:56 with the three teammate slots,
-7:35 without them), F = full cut (9:39, 8:45 without the slots). A dash means the
+Seconds on screen: S = short cut (6:18), M = main cut (7:56 with the three teammate slots,
+7:35 without them), F = full cut (9:43, 8:49 without the slots). A dash means the
 scene is left out of that cut. Crossfades (0.35 s each) are allowed for in the totals.
 
-| # | Scene | S | M | F | Status |
-|---|---|---|---|---|---|
-| 00 | Camera intro: Ishaan to camera (reused) | 31 | 31 | 31 | recorded |
-| 01 | Title card | 6 | 6 | 6 | card |
-| | **CORE STORY: the most screen time** | | | | |
-| 02 | Amy vs Rachel: the same question, two answers | 40 | 45 | 50 | recorder ready; re-record |
-| 03 | Ken: a restricted file looks exactly like nothing | 23 | 25 | 28 | recorder ready; re-record |
-| 04 | Every sentence cited, checked live; then 简体中文 | 25 | 30 | 35 | recorder ready; re-record |
-| 05 | Developer mode: the request journey | 30 | 35 | 40 | recorder ready; re-record |
-| 08 | The sealed audit log, Verify, the tamper demo | 40 | 45 | 50 | recorder ready; re-record |
-| | **EVERYTHING NEW SINCE 16 OCT: short and sharp** | | | | |
-| 17 | Act: a cited draft and a ticket, with confirm | 15 | 18 | 22 | **new recorder scene** |
-| 18 | Deliverables: a cited table, a chart, a .pptx | 12 | 18 | 22 | **new recorder scene** |
-| 06b | Live growth: Jordan posts, Ken sees nothing | - | 22 | 28 | recorder rewritten |
-| 19 | Add a file (upload) | - | 10 | 15 | **new recorder scene** |
-| 21 | Tour, dictation, value calculator, presenter | - | 18 | 25 | **new recorder scene** |
-| 06 | The knowledge graph (Jordan; Compare two people) | 20 | 20 | 24 | recorder ready; re-record |
-| 10 | The Walnut engine: time slider, provenance | 20 | 20 | 25 | recorder ready; re-record |
-| 07 | Analytics (Live only) | 12 | 12 | 15 | recorder ready; re-record |
-| 09 | Trust centre | 14 | 14 | 14 | recorder ready; re-record |
-| | **THE TENCENT TOOLS** | | | | |
-| 11 | Built with CodeBuddy (nine sessions) | 10 | 12 | 14 | card; re-run cards |
-| 12 | Ask from WorkBuddy (15 Oct captures) | 12 | 14 | 17 | stills |
-| 20 | Miora: the cover art | - | 8 | 10 | **new card**; re-run cards |
-| 13 | Tencent Hy3 (wired, not live) | 12 | 12 | 14 | recorder ready; re-record |
-| | **TEAMMATES' FEATURES: placeholders until the merge** | | | | |
-| S1 | Voice (teammate) | - | 8 | 20 | slot, TODO |
-| S2 | Just-in-time UI (teammate) | - | 8 | 20 | slot, TODO |
-| S3 | Dots (teammate) | - | 6 | 15 | slot, TODO |
-| | **PROOF, BUSINESS, CLOSE** | | | | |
-| 14 | The proof slide | 18 | 18 | 18 | slide |
-| 15 | What it's worth | 19 | 19 | 19 | slide |
-| 16 | Close | 11 | 11 | 11 | slide |
-| | **Total, with crossfades** | **6:04** | **7:56** | **9:39** | |
+| # | Scene | 16 Oct beat | S | M | F | Status |
+|---|---|---|---|---|---|---|
+| 00 | Camera intro | 1 | 31 | 31 | 31 | recorded |
+| 01 | Title | 1 | 9 | 9 | 9 | card; re-run cards (new pill) |
+| | **THE 16 OCT SPINE, UPGRADED: one question, then who sees what** | | | | | |
+| 04 | One question, checked live | 3 | 30 | 34 | 38 | recorder ready; re-record |
+| 06 | The map of what you can see | 4 | 20 | 20 | 26 | recorder ready; re-record |
+| 02 | Same question, two people | 5 + 7 | 36 | 38 | 43 | recorder ready; re-record |
+| 03 | Restricted looks like nothing | 6 | 23 | 25 | 28 | recorder ready; re-record |
+| | **ENHANCEMENTS NEXT TO THE BEAT THEY STRENGTHEN** | | | | | |
+| 17 | Act: a draft and a ticket | +7, +3 | 18 | 22 | 26 | **recorder rewritten** (Amy, then Jordan) |
+| 18 | Deliverables: a table, a chart, a file | +3 | 10 | 15 | 20 | new recorder scene |
+| 21 | New here: tour, dictation, value calculator | 5b | - | 12 | 16 | **recorder rewritten** (one beat) |
+| | **NOTHING STALE (16 Oct beat 8)** | | | | | |
+| 06b | Watch the brain grow | 8 | - | 22 | 28 | recorder rewritten |
+| 19 | Add a file | +8 | - | 10 | 15 | new recorder scene |
+| | **THE COMPLIANCE SIDE (16 Oct beat 9)** | | | | | |
+| 05 | Developer mode: the journey | 9 | 30 | 35 | 40 | recorder ready; re-record |
+| 08 | Audit, Verify and the tamper demo | 9 | 40 | 43 | 50 | recorder ready; re-record |
+| 07 | Analytics | +9 | 12 | 12 | 15 | recorder ready; re-record |
+| 09 | The Trust centre | +9, +12 | 14 | 14 | 14 | recorder ready; re-record |
+| | **WORKBUDDY, THE ENGINE, HOW IT FITS (16 Oct beats 10 to 12)** | | | | | |
+| 12 | WorkBuddy: the connectors | 10 | 13 | 15 | 18 | stills |
+| 10 | The Walnut engine | 11 | 20 | 18 | 25 | recorder ready; re-record |
+| 13 | Tencent Hy3 | 12 | 14 | 14 | 17 | recorder ready; re-record |
+| | **TEAMMATES' FEATURES: placeholders until the merge** | | | | | |
+| S1 | Voice | slot | - | 8 | 20 | slot, TODO |
+| S2 | Just-in-time UI | slot | - | 8 | 20 | slot, TODO |
+| S3 | Dots | slot | - | 6 | 15 | slot, TODO |
+| | **THE NUMBERS, HOW WE BUILT IT, THANKS (16 Oct beats 13 and 14)** | | | | | |
+| 14 | The proof | 13 | 20 | 20 | 20 | slide |
+| 15 | What it's worth | new | 21 | 21 | 21 | slide (+ host pill) |
+| 11 | Built with CodeBuddy | 14 | 10 | 12 | 14 | card; re-run cards |
+| 20 | Miora: the cover art | +14 | - | 8 | 10 | card |
+| 16 | Close | 14 | 13 | 13 | 13 | slide |
+| | **Total, with crossfades** | | **6:18** | **7:56** | **9:43** | |
 
-Where the time goes: the core story (02, 03, 04, 05, 08) is 2:38 in the short cut, 3:00 in the main cut and 3:23 in
-the full cut, the largest block in every cut. No new-value scene is over 28 s. EN and 简体中文 is a beat inside
+Where the time goes: the 16 Oct spine (04, 06, 02, 03, 05, 08, 12, 10, 13, 14, 11, 16) is 4:31 of the 5:47 of demo in the
+main cut; no enhancement scene is over 22 s, and each sits next to the beat it strengthens. EN and 简体中文 is a beat inside
 scene 04 (user screens only, D-32).
 
 **What is built (30 Oct).** The recorder has scenes 17, 18, 19, 21 and a rewritten 06b, and a Miora card (20);

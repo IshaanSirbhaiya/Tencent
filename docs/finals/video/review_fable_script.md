@@ -17,7 +17,8 @@ slot minus 0.9 s) now reports nothing in any cut; before the edits it flagged sc
 |---|---|---|
 | Script as found (30 Oct, before this pass) | **7 / 10** | Right shape (core story first, 3:00 of 7:56), honest numbers, one tagline. Lost points to: the title line was filler, the hook's best line (tipping-off) came after a summary line, a list-shaped scene 21, a close with no last thought, four scenes with no room for a breath, one [FULL] line that READINESS said not to say, Tencent not named until 5:15 |
 | After the line edits in this pass | **8 / 10** | Hook order fixed, tagline earned at the tamper demo and paid off at the close, every scene has room, honest synthetic-data line in the full cut |
-| After the bigger changes in §4 (about 40 min of work, plus the recording itself) | **9 / 10** | Tencent named in the first minute, one fewer list scene, the WorkBuddy stills re-captured under the new name, a real tester line |
+| After §4.1, 4.2, 4.5, 4.6 and 4.7 (applied the same evening, see §6) | **8.5 / 10** on paper | Tencent named at 0:38, scene 21 is one beat with an accessibility caption, scene 17 matches the tests, the slides and the close have room. The last half point needs a take |
+| Plus §4.4 (WorkBuddy re-capture, founder's screen) and a real tester line | **9 / 10** | |
 
 The whole-video ceiling is still set by what the picture shows: nothing has been recorded yet, and the new scenes
 (17, 18, 19, 21, 06b) have never been seen in a browser. A script cannot earn the ninth point before a take exists.
@@ -191,6 +192,86 @@ the tour offer is on screen. No spoken words, so no time cost; earns criterion 8
 - 18: ".pptx" needs python-pptx on the stack; otherwise cut the [MAIN] PowerPoint line.
 - 21: the microphone button needs the speech API in headless Chromium; otherwise cut "You can dictate a question".
 - 06: "Ken can open N" anchor (READINESS :393) if persona names become role-only.
+
+## 6. Second pass, same evening: §4 applied (all but the WorkBuddy re-capture)
+
+Done at the coordinator's request, after the first pass was committed. Both self-tests pass; `node --check` passes;
+the three planned cue sheets were regenerated. Main cut stays **7:56** with all three teammate slots (7:35 without);
+after the third pass (§7) short is 6:18, full 9:43. No TIGHT warning in any cut.
+
+| Item | What changed | Where |
+|---|---|---|
+| §4.1 Tencent in the first 20 s | Title card 6 → 9 s. Line: "This is Walnut DataBridge, built with Tencent CodeBuddy and wired for Tencent's Hunyuan. Let's start with Aspire's own question." "Wired for" because Hy3 is first in the model chain through TokenHub but has not answered live (STATUS, scene 13); the card gets a fourth pill, "Wired for Tencent Hunyuan (Hy3)" | `SEGMENTS` 01, `titleHtml()`, script scene 01 |
+| §4.2 Scene 21 | One story beat ("New here?"): tour offer, then the microphone button, with a new caption "Text size, high contrast and reduce motion are settings; accessibility checks run in the browser tests" (axe runs in 13 of 30 e2e files, so not "every test"); then a short look at the value calculator, carried by its caption. The presenter page is out of the video (a stage tool; the judges see it live). Spoken: one line in main, one [FULL] line. Slot 18 → 12 (main), 25 → 16 (full) | `record_finals.cjs` 21_extras (5 labels, test ids only), `SEGMENTS` 21, script scene 21 |
+| §4.5 Room on the slides and Hy3 | 13: 12 → 14 (full 16); 14: 18 → 20 (pill moved to 10.5 s); 15: 19 → 21; 16: 11 → 13. Close restored to "We'd love one pilot team at one regulated company." Slack now 2.3 to 3.3 s on 13/14/15 and 1.3 s on 16 | `SEGMENTS`, script scenes 13 to 16 |
+| §4.7 Scene 17 follows the tests | `act.spec.ts`: the reply draft is the account manager's, the ticket the engineer's. The scene now starts as Amy (Velquarry starter, the hook's question, "what should I tell the customer?" becomes a reply), Draft reply, Esc; then `login(page, 'jdoe')` on the same page, the migration starter, Create ticket, Confirm, the link. Four labels, test ids only. Slot 18 → 22 (main), 15 → 18 (short), 22 → 26 (full). Line: "Amy asks for a draft reply to the customer: the approved wording, built from the cited facts, and never sent. Jordan's answer offers a ticket, but it's only a proposal until he confirms." | `record_finals.cjs` 17_act, `SEGMENTS` 17, script scene 17 |
+| Paying for it (main cut, +15 s) | 04: 30 → 28; 18: 18 → 15; 21: 18 → 12; 06: 20 → 18; 10: 20 → 18 (all had 3.5 s or more of slack). 02 and 08 untouched: they are the story | `SEGMENTS`; `VIDEO_PLAN.md` timeline table and shot list updated to match |
+
+Not done: §4.3 (say "synthetic" in the main cut; still a [FULL] line in scene 06, founder's call) and §4.4 (WorkBuddy
+re-capture; needs the founder's screen).
+
+First-take checks added by this pass: 17 needs Amy's Velquarry answer to offer a draft (`act-draft-view`) and
+Jordan's migration answer to offer a ticket (`act-ticket-view`); either missing fails the take with its reason. 21
+still needs the speech API for the microphone button (else drop the dictation half of the line).
+
+## 7. Third pass: the 16 Oct video is the core (founder's principle, 30 Oct evening)
+
+Principle applied: the original video's beats, in its order, with its messages, are the main body; every new
+feature is attached to the beat it strengthens ("and now it also..."), never a block of its own. `SEGMENTS` was
+reordered, the self-test now asserts the spine order, the script sections were re-grouped and each scene names
+its original beat, and `VIDEO_PLAN.md`'s shot list and timeline table were regenerated from `SEGMENTS`. Main cut
+**7:56** with the three slots (7:35 without); short 6:18; full 9:43. Both self-tests pass; cues regenerated; no TIGHT.
+
+### 7.1 Original vs new, beat by beat
+
+| 16 Oct beat (time) | Its message | New scene (main cut s) | Same message, upgraded how | Enhancement attached ("and now it also...") |
+|---|---|---|---|---|
+| 1 Hello (0:32–0:52) | name, the challenge, CodeBuddy and WorkBuddy named | 00 + 01 (9) | title card and tagline; "built with Tencent CodeBuddy and wired for Tencent's Hunyuan" at 0:38 | |
+| 2 Why this matters (0:52–1:21) | hours lost; the wrong person seeing a fraud case is a crime | dropped (the camera intro says it; 16 Oct's own call) | the crime point survives in 02 (tipping-off) | |
+| 3 One question, three platforms (1:21–1:57) | one plain question, one answer, every sentence sourced, only what Jordan can open, re-checked with the source | 04 (34) | Rachel asks Aspire's question; source sheet shows the exact lines, the version, "checked live seconds ago" | the user screens work in 简体中文 (04); Act (17) and Deliverables (18) turn the same kind of answer into a reply, a ticket, a file |
+| 4 The map (1:57–2:13) | Jordan 867 / Ken 24; no "plus 843 hidden" | 06 (20) | the knowledge graph; Compare two people; "for Ken, the rest simply isn't there" (near-verbatim); counts on screen, not spoken | |
+| 5 Same question, two people (2:13–2:31) | Compare side by side | 02 (38) | Amy and Rachel, one screen | |
+| 5b Guided tour (2:31–2:45) | for anyone new | 21 (12) | the tour offer | dictation, the accessibility caption, the value calculator |
+| 6 Restricted vs non-existent (2:45–3:02) | byte-for-byte identical; 400 answers, none changes | 03 (25) | Ken, Velquarry vs Bayfront; the live "Identical responses" marker; "four hundred pairs, zero differences" | |
+| 7 The fintech part (3:02–3:29) | what can I tell this customer? approved script, never case notes | 02 (with 5) | Amy vs Rachel; tipping-off said plainly | 17 Act: the answer becomes the reply draft, never sent |
+| 8 Access changes (3:29–3:59) | checked with the source every time; nothing stale | 06b (22) + 19 (10) | Jordan posts a note, it is in his graph at once, Ken sees nothing; "Nothing stale" | uploads through the same checks |
+| 9 The audit trail (3:59–4:42) | Maya, plain English; what was considered, allowed, denied and why; chained and sealed; Verify catches an edit | 05 (35) + 08 (43) | the request journey with real ms and three sealed records; the tamper demo live on a copy, Verify points at the entry | 07 analytics from the same log (12); 09 Trust centre (14) |
+| 10 WorkBuddy (4:42–5:04) | people don't want another app; signed tokens; the AI can't decide who you are | 12 (15) | same captures; "Nobody wants another app, so it also lives inside Tencent WorkBuddy"; "The agent never decides who you are" | |
+| 11 What's underneath (5:04–5:41) | the Walnut engine; time slider; follow a value to the row | 10 (18) | same lines, re-shot inside DataBridge | |
+| 12 How it fits together (5:41–6:02) | two checks, grounding, audit record; Hy3 via TokenHub or quoted answers | 13 (14) | the live model chain; [FULL] "Two checks before any model, a grounding check after, the record written first" | |
+| 13 The numbers (6:02–6:12) | attacked on purpose: ~6,000 requests, 0 leaks; 400 pairs, 0 differences | 14 (20) | the app's proof slide: 7,374 / 0, 400 / 0, test counts | 15 the business case (21), with a Tencent Cloud host pill |
+| 14 Built with, thanks (6:12–6:28) | CodeBuddy mapped boundaries, built the connector, reviewed security; six sessions; thanks | 11 (12) + 20 (8) + 16 (13) | nine sessions; Miora; "Answers you can prove"; the ask | |
+
+Every original beat except 2 (dropped on 16 Oct's own advice) is present, in the original order, with the same
+message. The spine (04, 06, 02, 03, 05, 08, 12, 10, 13, 14, 11, 16) is 4:31 of the 5:47 of demo in the main cut.
+Trade-off accepted: the hook is now Rachel's single cited answer (as 16 Oct opened on Jordan's), and the
+two-people compare comes third; the question itself is still the first thing said after the title.
+
+Lines changed for the new order: 04 opens with "Rachel is the money-laundering reporting officer at a fintech. She
+asks Aspire's question..."; 06 introduces Jordan and Ken ("Here is everything Jordan, a backend engineer, can
+open..."); 02 opens "Now the same question from two people: Amy, an account manager, left; Rachel, right. And what
+should I tell the customer?"; 03 "Now Ken on his own."; 17 "And now Amy's answer can become the reply itself.";
+18 "Answers can also become files"; 21 "And if you're new here..."; 06b ends "Nothing stale."; 05 "Now the
+compliance side, as Maya."; 12 "Nobody wants another app, so it also lives inside Tencent WorkBuddy."; 13 gains
+the [FULL] frame line. Slots: 04 28 → 34, 02 45 → 38, 06 18 → 20, 08 45 → 43, 12 14 → 15, 13 full 16 → 17.
+
+### 7.2 The ten criteria: scene, the line or visual that earns it, the gap, the smallest truthful fix
+
+| # | Criterion | Scene(s) | The line or visual that earns it | Gap | Smallest truthful fix |
+|---|---|---|---|---|---|
+| 1 | Impact & Relevance | 04, 02, 17, 15 | Aspire's question asked twice (Rachel, then Amy and Rachel); "In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence. So the system never does."; Amy's answer becomes the customer reply; "about one point three million US dollars a year. It's an estimate" | none | |
+| 2 | Human-Centered Design | 04, 02, 21, 17 | persona screens, plain answers, the source sheet; the tour offer; "not sent" and "nothing is created until he confirms" | no evidence of real users (the hallway test has not happened) | none truthful today. When `FIX_LOG.md` has a real row, one [MAIN] line in 21: "Five people tested it on Saturday; one broke the source sheet, we fixed it." Do not add it before |
+| 3 | AI Interaction | 04, 05, 13, 12 | cited answer inside two gates; the model card on the journey; "Tencent Hy3 is wired in through TokenHub, with a safe fallback. Until it is switched on, answers are quoted from the sources"; WorkBuddy's agent with signed tokens | no model is live, and the video says so | only Hy3 going live (founder): then `--hy3`, re-shoot 02, 04, 05, 13 |
+| 4 | Technical Execution | 05, 08, 10, 14 | "Each bar is a real timing"; "three records were sealed and chained before Rachel saw a word"; the tamper demo; the engine; "one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing" | none | |
+| 5 | Feasibility | 15, 07, 09 | break-even "about seven minutes a week"; analytics from the verified log; the new pill "Target host: Tencent Cloud. One-command deploy kit in the repo; no live instance yet" | was: Tencent Cloud as the host never said | **done**: the pill on scene 15 (no spoken cost; wording from the run sheet and rubric row 5) |
+| 6 | Demo & Storytelling | the whole arc; 08 → 16 | the 16 Oct spine in order; the tagline earned at the tamper demo ("That's what we mean by answers you can prove") and paid off at the close | nothing recorded yet | record |
+| 7 | Innovation & Creativity | 03, 08, 06b | "A restricted file looks exactly like nothing"; the tamper on a copy, "Verify points at the exact entry"; "Ken's graph, right beside it, shows nothing new" | none | |
+| 8 | UX & Accessibility | 04, 21 | "the screens you ask from work in Chinese too"; the dictation button; the new caption "Text size, high contrast and reduce motion are settings; accessibility checks run in the browser tests" | was: nothing beyond language | **done**: the caption in 21 (axe runs in 13 of 30 e2e files, so "in the browser tests", not "every test") |
+| 9 | Responsible AI & Ethics | 02, 03, 05, 08, 09, 06 | tipping-off; identical refusals; "Maya sees every decision. She never sees the answer itself."; write-ahead chain; "seven controls ... mapped to Singapore's AI and data rules, and proved by a named test"; [FULL] "Company A is a synthetic company; every name here is made up" | the synthetic-data line is full-cut only | founder's call (§4.3): drop the [FULL] tag in 06 (main slack 1.5 s; needs +2 s on 06, taken from 02's 3.9 s) |
+| 10 | Overall Quality & Judge's Impression | 01, 14, 15, 16 | one design system; honest numbers from `eval_summary.json`; "We'd love one pilot team at one regulated company" | nothing recorded yet | record, then watch each cut once silent |
+
+No criterion is without a scene. The two filled this pass: 5 (host pill) and 8 (accessibility caption). The two
+that cannot be filled truthfully today: 2 (needs the hallway test) and 3 beyond "quoted" (needs Hy3 live).
 
 ## 5. What not to touch
 

@@ -86,7 +86,7 @@ in the assembler, `--cut short|main|full` (main is the default; other cuts add `
 the new order (audit before graph and analytics), optional rows for every new scene and the teammate slots
 `S1_voice`, `S2_jit_ui`, `S3_dots`, `--cues-only --plan` for cue sheets before anything is recorded; in the script,
 every scene with cuts, on screen, caption, proof and voice-over, **[MAIN]** / **[FULL]** extras, and TODO
-placeholders for the slots. Cuts: short 6:04, main 7:56 (with all slots), full 9:39. Both self-tests pass and now
+placeholders for the slots. Cuts: short 6:18, main 7:56 (with all slots), full 9:43 (after the Fable script review of 30 Oct: title 9 s, Act as Amy then Jordan, scene 21 re-cut, 13 to 16 longer). Both self-tests pass and now
 also check the cut totals, the script sections and that TODO lines are never read; `node --check` and `py_compile` pass.
 
 New scenes use `data-testid` selectors only (no visible text), because ActSheet, DeliverSheet and AddDocumentSheet
