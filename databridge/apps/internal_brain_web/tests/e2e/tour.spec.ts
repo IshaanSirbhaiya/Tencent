@@ -367,7 +367,7 @@ test('tour @ 390px fits the screen; 简体中文 strings', async ({ page }) => {
   await login(page, 'jdoe');
   await page.getByRole('banner').getByRole('button', { name: '导览' }).click();
   await expect(card(page).getByRole('heading', { name: '提出建议的问题' })).toBeVisible();
-  await expect(counter(page)).toContainText('第 2 步，共 4 步');
+  await expect(counter(page)).toContainText('第 2 步，共 6 步');
   await expect(page.getByTestId('tour-spotlight')).toBeVisible();
   const box = await card(page).boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
