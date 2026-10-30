@@ -1,36 +1,40 @@
 """Prepare a team-recorded film for the finals video: Dev's Atlas film (founder's decision, option A: used as
-recorded) and the team's "The Call" recording (``--film <v3>/call_film.mp4 --out <v3>/work/call_clean.mp4 --cuts none``).
+recorded) and the team's "The Call" recording (``--film <v3>/call_film.mp4 --out <v3>/work/call_clean.mp4``).
 
-    python docs/finals/video/atlas_film.py                 detect, blur, cut, render, then verify
+    python docs/finals/video/atlas_film.py                 detect, blur, render, then verify
     python docs/finals/video/atlas_film.py --verify-only   re-check an already rendered file
-    python docs/finals/video/atlas_film.py --self-test     the box and range logic, no media
+    python docs/finals/video/atlas_film.py --self-test     the box, range and level logic, no media
 
-(Needs a Python with numpy and opencv, e.g. ``databridge\\.venv\\Scripts\\python``; ffmpeg on PATH.)
+(Needs a Python with numpy and opencv, e.g. ``databridge/.venv/Scripts/python``; ffmpeg on PATH.)
 
-What it does to ``<v3>/atlas_film.mp4`` (3024x1964 at 120 fps, a music bed as audio):
+Founder's order (30 Oct): the film is NOT cut, re-ordered or re-timed, and its own sound (the voice-over) is
+kept exactly as recorded. The only picture changes:
 
-1. **Blurs the model-label line** wherever it is on screen. The answer card shows, next to "Answer", the
+1. **The model-label line is blurred** wherever it is on screen. The answer card shows, next to "Answer", the
    provider and the model that wrote it, and the page header says "Laid out by <model>". Both must never be
-   seen (the founder's rule: no provider name anywhere). The two words are found in every frame by template
-   matching (whole words and their halves, so a half-scrolled label is caught too). The templates are cut
-   from the film itself at run time (frame ``--ref-time``, rectangles ``PROVIDER_BOX`` / ``MODEL_BOX``):
-   no image of the label is ever stored, and neither name is written in this file. Each hit is blurred,
-   with a few frames of margin either side.
-2. **Cuts the page-loading waits** ("Checking your sources again and laying out the page…"), keeping about a
-   second of each so the wait never looks faked (``CUTS``, seconds of the source).
-3. Scales it to 1920x1080 at 30 fps (the 3024x1964 frame is fitted to 1080 high and centred) with no audio:
-   the narration (B_C4) replaces the music bed.
-4. **Verifies** the result: the same matcher runs on the rendered file every 0.5 s across the whole clip,
-   and on every frame near a detection; any score above ``VERIFY_MAX`` fails the run (exit 1).
+   seen (no provider name anywhere). The two words are found in every frame by template matching (whole
+   words and their halves, so a half-scrolled label is caught too); a provider hit is widened over the model
+   id after it. The templates are cut from the Atlas film at run time (frame ``REF_TIME``, rectangles
+   ``PROVIDER_BOX`` / ``MODEL_BOX``): no image of the label is stored, and neither name is written here.
+   Each hit is blurred with a few frames of margin either side.
+2. Scaled to 1920x1080 (fitted to 1080 high, centred) and 120 -> 30 fps without changing the length.
 
-The detections, the blurred time ranges and the verification are written to ``<v3>/work/atlas_film.json``
-(outside git). The output is ``<v3>/work/atlas_clean.mp4``; assemble_v3.py uses it for C4.
+The sound: the source track, its timing untouched (copied as is). The one allowed change is a whole-clip gain
+towards -16 LUFS when it is more than 1 LU off (never above -1 dBTP; no limiter, no compression).
+
+**Verified** after rendering (exit 1 if not): the matcher on the rendered file every 0.5 s across the whole
+clip and on every frame near a detection, no score above ``VERIFY_MAX``; the length equals the source's
+(+-0.05 s); the sound is present and as long as the source's (+-0.05 s).
+
+Written to ``<v3>/work/`` (outside git): ``<name>_clean.mp4``, ``<name>_film.json`` (blurred ranges, level,
+verification) and ``<name>_clean_hits.json`` (the detections, reused by a re-run).
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -46,7 +50,12 @@ PROVIDER_BOX = (593, 333, 652, 353)
 MODEL_BOX = (658, 333, 759, 353)
 # the two page-loading waits, in seconds of the source (contact sheets every 0.5 s: loading 35.0-42.5 and
 # 69.5-77.0); each keeps ~0.8 s of "Checking your sources again…" at its start and ~0.4 s at its end
-CUTS = [(35.8, 42.1), (70.3, 76.6)]
+# Founder's order (30 Oct): the films are NOT cut, re-timed or re-voiced. The two page-loading waits of the
+# Atlas film (35.0-42.5 s and 69.5-77.0 s, from contact sheets) are noted here only; --cuts can still cut a
+# silent film (--no-audio), never one whose own voice is kept.
+ATLAS_WAITS = [(35.8, 42.1), (70.3, 76.6)]
+CUTS: list[tuple[float, float]] = []
+TARGET_LUFS = -16.0
 DETECT_MIN, HALF_MIN = 0.55, 0.72       # template-match scores that count as the label (whole word / half word)
 VERIFY_MAX = 0.45                        # after blurring, no frame may score above this
 PAD_PX, PAD_FRAMES = 8, 4
@@ -174,23 +183,72 @@ def ranges(hits_by_frame: dict[int, list], cw: int, ch: int, gap: int = PAD_FRAM
     return out
 
 
-def render(film: Path, out: Path, report: Path) -> dict:
+def loudness(path: Path) -> tuple[float, float]:
+    """(integrated LUFS, true peak dBTP) of a file's sound."""
+    err = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(path), "-vn", "-af", "ebur128=peak=true", "-f", "null", "-"],
+                         capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
+    summ = err.split("Summary:")[-1]
+    i = re.search(r"I:\s+(-?[\d.]+) LUFS", summ)
+    pk = re.search(r"Peak:\s+(-?[\d.]+) dBFS", summ)
+    return (float(i.group(1)) if i else float("nan"), float(pk.group(1)) if pk else 0.0)
+
+
+def level_gain(lufs: float, peak: float) -> float:
+    """The one allowed sound change: a whole-clip gain towards -16 LUFS, only when it is more than 1 LU off,
+    never pushing the peak above -1 dBTP (no limiter, no compression, no timing change)."""
+    if lufs != lufs or abs(lufs - TARGET_LUFS) <= 1.0:
+        return 0.0
+    return round(min(TARGET_LUFS - lufs, -1.0 - peak), 2)
+
+
+def stream_seconds(path: Path, kind: str) -> float | None:
+    out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", f"{kind}:0", "-show_entries",
+                          "stream=duration", "-of", "json", str(path)], capture_output=True, text=True).stdout
+    st = json.loads(out or "{}").get("streams") or []
+    v = st[0].get("duration") if st else None
+    return float(v) if v not in (None, "N/A") else None
+
+
+def detect(film: Path, cw: int, ch: int, temps, cache: Path) -> dict[int, list]:
+    """Pass 1: the label's hits per frame. Kept in <v3>/work (outside git) so a re-render need not search again."""
+    cv2, _ = _cv()
+    key = {"film": str(film), "bytes": film.stat().st_size, "mtime": int(film.stat().st_mtime), "size": [cw, ch],
+           "thresholds": [DETECT_MIN, HALF_MIN], "pad": PAD_FRAMES}
+    if cache.exists():
+        c = json.loads(cache.read_text(encoding="utf-8"))
+        if c.get("key") == key:
+            print("film: label hits read from the cache")
+            return {int(k): [tuple(h) for h in v] for k, v in c["hits"].items()}
+    hits: dict[int, list] = {}
+    for i, (_, f) in enumerate(frames(film, cw, ch)):
+        hs, _ = find(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), temps)
+        if hs:
+            hits[i] = hs
+    cache.write_text(json.dumps({"key": key, "hits": hits}), encoding="utf-8")
+    return hits
+
+
+def run_ff(cmd: list[str]) -> None:
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode:
+        raise SystemExit(f"ffmpeg failed: {r.stderr[-800:]}")
+
+
+def render(film: Path, out: Path, report: Path, keep_audio: bool = True) -> dict:
     cv2, np = _cv()
     sw, sh, dur = probe(film)
     cw, ch = content_size(sw, sh)
     temps = templates(film, cw, ch)
-    print(f"atlas: {sw}x{sh}, {dur:.1f}s -> {cw}x{ch} centred on {W}x{H}; pass 1, finding the label")
-    hits_by_frame: dict[int, list] = {}
-    for i, (t, f) in enumerate(frames(film, cw, ch)):
-        hs, _ = find(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), temps)
-        if hs:
-            hits_by_frame[i] = hs
-    rs = ranges(hits_by_frame, cw, ch)
-    print(f"atlas: label seen on {len(hits_by_frame)} frames, {len(rs)} ranges; pass 2, blurring and cutting")
+    print(f"film: {sw}x{sh}, {dur:.2f}s -> {cw}x{ch} centred on {W}x{H} at {FPS} fps; pass 1, finding the label", flush=True)
     out.parent.mkdir(parents=True, exist_ok=True)
+    hits_by_frame = detect(film, cw, ch, temps, out.with_name(out.stem + "_hits.json"))
+    rs = ranges(hits_by_frame, cw, ch)
+    print(f"film: label seen on {len(hits_by_frame)} frames, {len(rs)} ranges; pass 2, blurring"
+          + (" and cutting" if CUTS else " (no cuts: the source's timing)"), flush=True)
+    silent = out.with_name(out.stem + ".video.mp4")
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{W}x{H}",
                             "-r", str(FPS), "-i", "-", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "17",
-                            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)], stdin=subprocess.PIPE)
+                            "-pix_fmt", "yuv420p", str(silent)], stdin=subprocess.PIPE)
     canvas = np.zeros((H, W, 3), np.uint8)
     canvas[:] = (13, 11, 10)                                   # the video's dark background (0x0a0b0d)
     ox, kept = (W - cw) // 2, 0
@@ -212,24 +270,37 @@ def render(film: Path, out: Path, report: Path) -> dict:
         kept += 1
     enc.stdin.close()
     if enc.wait():
-        raise SystemExit("atlas: ffmpeg could not encode the clean film")
-    info = {"source": str(film), "source_size": [sw, sh], "source_seconds": round(dur, 2), "content": [cw, ch],
+        raise SystemExit("film: ffmpeg could not encode the clean picture")
+    # the sound: the source's own track, its timing untouched; at most one whole-clip gain
+    audio: dict = {"kept": False}
+    if keep_audio and stream_seconds(film, "a") is not None:
+        lufs, peak = loudness(film)
+        gain = level_gain(lufs, peak)
+        acodec = ["-c:a", "copy"] if gain == 0 else ["-af", f"volume={gain}dB", "-c:a", "aac", "-b:a", "256k"]
+        run_ff(["ffmpeg", "-v", "error", "-y", "-i", str(silent), "-i", str(film), "-map", "0:v", "-map", "1:a",
+                "-c:v", "copy", *acodec, "-movflags", "+faststart", str(out)])
+        audio = {"kept": True, "source_lufs": lufs, "source_peak_dbfs": peak, "gain_db": gain}
+        silent.unlink()
+    else:
+        silent.replace(out)
+    info = {"source": str(film), "source_size": [sw, sh], "source_seconds": round(dur, 3), "content": [cw, ch],
             "offset_x": ox, "cuts": CUTS, "blurred_ranges": rs, "frames_blurred": blurred_frames,
-            "output": str(out), "output_seconds": round(kept / FPS, 2)}
+            "output": str(out), "output_frames": kept, "audio": audio}
     report.write_text(json.dumps(info, indent=1), encoding="utf-8")
     return info
 
 
 def verify(film: Path, out: Path, report: Path, info: dict | None = None) -> bool:
-    """Every 0.5 s of the whole output, and every frame near a blurred range: no label score above VERIFY_MAX."""
+    """No readable label (every 0.5 s of the whole output, and every frame near a blurred range), and, with no
+    cuts, the same length as the source (+-0.05 s) with the sound present and as long as the source's."""
     cv2, _ = _cv()
     sw, sh, _ = probe(film)
     cw, ch = content_size(sw, sh)
     temps = templates(film, cw, ch)
     info = info or json.loads(report.read_text(encoding="utf-8"))
     ox = info["offset_x"]
-    # the blurred ranges in output time (the cuts moved them earlier)
-    def out_t(s: float) -> float:
+
+    def out_t(s: float) -> float:                           # the blurred ranges in output time
         return s - sum(min(b, max(a, s)) - a for a, b in CUTS)
     near = [(out_t(r["from"]) - 1.0, out_t(r["to"]) + 1.0) for r in info["blurred_ranges"]]
     worst, bad, checked = 0.0, [], 0
@@ -242,12 +313,23 @@ def verify(film: Path, out: Path, report: Path, info: dict | None = None) -> boo
         worst = max(worst, best)
         if best > VERIFY_MAX:
             bad.append(round(t, 2))
+    problems = [f"a readable label at {bad[:10]}"] if bad else []
+    src_d, out_d = probe(film)[2], probe(out)[2]
+    src_a, out_a = stream_seconds(film, "a"), stream_seconds(out, "a")
+    if not CUTS:
+        if abs(out_d - src_d) > 0.05:
+            problems.append(f"length {out_d:.3f}s, the source is {src_d:.3f}s")
+        if (info.get("audio") or {}).get("kept") and (out_a is None or src_a is None or abs(out_a - src_a) > 0.05):
+            problems.append(f"sound {out_a}s, the source's is {src_a}s")
     info["verify"] = {"frames_checked": checked, "worst_score": round(worst, 3), "max_allowed": VERIFY_MAX,
-                      "failed_at": bad[:50], "ok": not bad}
+                      "failed_at": bad[:50], "source_seconds": round(src_d, 3), "output_seconds": round(out_d, 3),
+                      "source_audio_seconds": src_a, "output_audio_seconds": out_a, "problems": problems,
+                      "ok": not problems}
     report.write_text(json.dumps(info, indent=1), encoding="utf-8")
-    print(f"atlas verify: {checked} frames checked, worst label score {worst:.3f} (max {VERIFY_MAX}); "
-          + ("OK, no readable label" if not bad else f"FAILED at {bad[:10]}"))
-    return not bad
+    print(f"film verify: {checked} frames checked, worst label score {worst:.3f} (max {VERIFY_MAX}); length "
+          f"{out_d:.3f}s vs {src_d:.3f}s; sound {out_a} vs {src_a}; "
+          + ("OK" if not problems else "FAILED: " + "; ".join(problems)))
+    return not problems
 
 
 def self_test() -> int:
@@ -258,10 +340,12 @@ def self_test() -> int:
     rs = ranges(hits, 1662, 1080)
     assert len(rs) == 2 and rs[0]["from"] == round(6 / 30, 2) and rs[0]["box"][0] == 92, rs
     assert boxes_for(14, hits) and boxes_for(16, hits) and not boxes_for(17, hits)   # 12 + PAD_FRAMES
-    assert in_cut(36.0) and not in_cut(35.0) and in_cut(70.3) and not in_cut(76.6)
-    assert all(b - a < 7 for a, b in CUTS), "a cut must leave the start and the end of the wait"
+    assert not CUTS and not in_cut(36.0), "the films are not cut by default (founder's order)"
+    assert in_cut(36.0, ATLAS_WAITS) and not in_cut(35.0, ATLAS_WAITS) and not in_cut(76.6, ATLAS_WAITS)
+    assert level_gain(-8.2, -0.5) == -7.8 and level_gain(-16.6, -3) == 0.0 and level_gain(float("nan"), 0) == 0.0
+    assert level_gain(-24.0, -3.0) == 2.0, "a gain up never pushes the peak above -1 dBTP"
     assert pad_box((0, 0, 10, 10), 100, 100) == (0, 0, 18, 14)
-    print(f"self-test ok: ranges, margins and cuts ({', '.join(f'{a}-{b}s' for a, b in CUTS)})")
+    print("self-test ok: ranges, margins, no cuts by default, the whole-clip level gain")
     return 0
 
 
@@ -269,9 +353,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--film", type=Path, default=V3 / "atlas_film.mp4",
                     help="the film to clean (default the Atlas film; the team's Call film: --film <v3>/call_film.mp4 "
-                         "--out <v3>/work/call_clean.mp4 --cuts none)")
+                         "--out <v3>/work/call_clean.mp4)")
     ap.add_argument("--out", type=Path, default=V3 / "work" / "atlas_clean.mp4")
-    ap.add_argument("--cuts", default=None, help="waits to cut, 'a-b,c-d' in source seconds, or 'none' (default: the Atlas cuts)")
+    ap.add_argument("--cuts", default="none", help="'none' (default; founder's order) or 'a-b,c-d' in source seconds, only with --no-audio")
+    ap.add_argument("--no-audio", action="store_true", help="drop the film's sound (default: keep it exactly as recorded)")
     ap.add_argument("--ref-film", type=Path, default=None, help="where the label templates are cut from (default the Atlas film)")
     ap.add_argument("--verify-only", action="store_true")
     ap.add_argument("--self-test", action="store_true")
@@ -280,17 +365,19 @@ def main() -> int:
         return self_test()
     global CUTS, REF_FILM
     REF_FILM = a.ref_film
-    if a.cuts is not None:
-        CUTS = [] if a.cuts == "none" else [tuple(float(x) for x in c.split("-")) for c in a.cuts.split(",")]
+    CUTS = [] if a.cuts == "none" else [tuple(float(x) for x in c.split("-")) for c in a.cuts.split(",")]
+    if CUTS and not a.no_audio:
+        print("refused: cutting a film whose own voice is kept would put the voice out of sync (founder's order: no cuts)")
+        return 2
     if not a.film.exists():
         print(f"no Atlas film at {a.film} (copy Dev's film there as atlas_film.mp4)")
         return 2
     report = a.out.with_name(a.out.stem.replace("_clean", "") + "_film.json")
-    info = None if a.verify_only else render(a.film, a.out, report)
+    info = None if a.verify_only else render(a.film, a.out, report, keep_audio=not a.no_audio)
     if info:
         for r in info["blurred_ranges"]:
             print(f"  blurred {r['from']:6.2f}-{r['to']:6.2f}s  box {r['box']} ({r['frames']} frames)")
-        print(f"atlas: {info['source_seconds']}s -> {info['output_seconds']}s -> {a.out}")
+        print(f"film: {info['source_seconds']}s, {info['output_frames']} frames at {FPS} fps, sound {info['audio']} -> {a.out}")
     return 0 if verify(a.film, a.out, report, info) else 1
 
 

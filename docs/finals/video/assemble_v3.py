@@ -21,15 +21,18 @@ Running order (plan v4) and inputs, all in <v3> unless given on the command line
 | C2 | the AI film (optional: left out, no placeholder, if missing) | ``C2_ai_film.mp4``/``.mov`` | own, -16 LUFS |
 | C3 | the feature slides | ``--slides`` (1918x1080: padded; ``--mask-topbar`` crops the top bar) | own, -16 LUFS |
 | T1 | card "Company A · a fictional Singapore fintech · every record is synthetic" | drawn here | none |
-| C4 | Atlas: Dev's film, cleaned | ``work/atlas_clean.mp4`` from atlas_film.py (verified) | narration B_C4 |
+| C4 | Atlas: Dev's film, label blurred | ``work/atlas_clean.mp4`` from atlas_film.py (verified) | its own voice-over |
 | T2 | hinge card "It knows everything about the project. Does it know who's asking?" | drawn here | none |
-| C5 | The Call, recorded by the team | ``work/call_clean.mp4`` from atlas_film.py --film call_film.mp4 | A_C5, or its own |
+| C5 | The Call, recorded by the team | ``work/call_clean.mp4`` from atlas_film.py --film call_film.mp4 | its own (A_C5 only if silent) |
 | C6a | the company brain | takes C6_1 ... C6_5b (record_v3.cjs) | narration B_C6a |
 | C6b | built with Tencent | CodeBuddy card, the live WorkBuddy capture (``C6_workbuddy.*``), Miora, deploy | A_C6b |
 | C6c | the proof | take C6_7_proof | narration B_C6c |
 | C7 | close card "Walnut DataBridge · Answers you can prove." | drawn here | A_C7 |
 
-Narration: one file per block in ``<v3>/narration/`` (``B_C4``, ``A_C5``, ``B_C6a``, ``A_C6b``, ``B_C6c``, ``A_C7``;
+The team's films (C4, C5) are used exactly as recorded, sound and timing untouched (founder's order, 30 Oct).
+
+Narration: one file per block in ``<v3>/narration/`` (``B_C6a``, ``A_C6b``, ``B_C6c``, ``A_C7``; ``A_C5`` only if
+the Call film has no sound;
 ``.wav``, ``.m4a``, ``.mp3``, ``.aac``, ``.flac`` or ``.ogg``), cleaned (high-pass, -16 LUFS). ``--preview`` uses
 ``<v3>/narration_placeholder/`` instead (and B_C5 for A_C5). Each block's paragraphs are found in the audio
 (the pauses nearest to where the words say they should be), and the picture is fitted to them: each
@@ -82,29 +85,21 @@ CARD_CLOSE = ("Walnut DataBridge", "Answers you can prove")
 PILL_TENCENT = "Hunyuan via TokenHub: wired, not live yet · Tencent Cloud deploy kit: no live instance yet"
 
 # ---- the parts --------------------------------------------------------------------------------------
-# narrated parts: block = the NARRATION_SCRIPT_V4.md block, audio = its file name. clips = (scene, optional):
-# takes carry their own seg marks (paragraph numbers). films: anchors = (paragraph, second of the CLEAN film).
-# lo / hi: how far the footage may be slowed / sped up between two anchors (beyond: hold / trim).
-# The Atlas anchors are in SOURCE seconds of Dev's film (contact sheets every 2 s and 0.5 s, 30 Oct):
-# 0 intro card · 16.5 the Ask page · 22 checking and writing · 42.5 the page beside the chat (purpose,
-# status) · 47 the team · 77 the rebuilt page (blockers, 118 of 120) · 81 the first-week checklist · 87 hold.
-ATLAS_ANCHORS_SRC = [(1, 0.0), (2, 16.5), (3, 22.0), (4, 42.5), (5, 47.0), (6, 77.0), (7, 81.0), (8, 87.0)]
+# narrated parts: block = the NARRATION_SCRIPT_V5.md block, audio = its file name. clips = (scene, optional):
+# takes carry their own seg marks (paragraph numbers). lo / hi: how far a take may be slowed / sped up
+# between two anchors (beyond: hold / trim). The team's films are never re-timed (team_film).
 PARTS = [
     {"id": "C1", "kind": "camera"},
     {"id": "C2", "kind": "film", "optional": True},
     {"id": "C3", "kind": "slides"},
     {"id": "T1", "kind": "card", "card": CARD_COMPANY, "seconds": 3.5},
-    {"id": "C4", "kind": "narrated", "block": "C4", "audio": "B_C4", "film": "atlas", "lo": 0.75, "hi": 2.0,
-     "captions": [(4, "Purpose and status: Amber · the pilot is conditional"),
-                  (5, "The team: all 12 members · what each delivered and owns next"),
-                  (6, "Pilot date: 6 Nov superseded · 12 Nov provisional · 2 callback failures left"),
-                  (7, "First week: who to meet · what to confirm · what comes first")]},
+    # C4 and C5: the team's films, with their OWN voice-over, exactly as recorded (founder's order, 30 Oct): not
+    # cut, re-timed or re-voiced; only the model label blurred and the frame scaled (atlas_film.py). A_C5 is laid
+    # under the Call film only if that film has no sound at all.
+    {"id": "C4", "kind": "team_film", "film": "atlas", "block": "C4", "plan_seconds": 89.2},
     {"id": "T2", "kind": "card", "card": CARD_HINGE, "seconds": 4.0},
-    {"id": "C5", "kind": "narrated", "block": "C5", "audio": "A_C5", "film": "call", "lo": 0.85, "hi": 1.25,
-     "plan_seconds": 72,                                   # the team's speech doc: about 70-75 s
-     "captions": [(1, "Amy · account manager"), (2, "Velquarry Trading · account frozen · on the line"),
-                  (3, "Tipping-off: an offence under Singapore law (CDSA s.57)"),
-                  (8, "Rachel · MLRO, financial crime · the exact same question")]},
+    {"id": "C5", "kind": "team_film", "film": "call", "block": "C5", "fallback_audio": "A_C5",
+     "plan_seconds": 75},                                  # the team's speech doc: about 70-75 s
     {"id": "C6a", "kind": "narrated", "block": "C6a", "audio": "B_C6a", "lo": 0.8, "hi": 1.8,
      "clips": [("C6_1_graph", False), ("C6_2_ken", False), ("C6_3_journey", False), ("C6_4_audit", False),
                ("C6_5_engine", False), ("C6_5b_platform", True)]},
@@ -360,6 +355,30 @@ def with_narration(video: Path, audio: Path | None, total: float, out: Path) -> 
          "-t", f"{total:.2f}", str(out)])
 
 
+def team_film(part: dict, clean: Path, out: Path, work: Path, preview: bool) -> tuple[float, str]:
+    """A cleaned team film, its own sound as it is (atlas_film.py already levelled it): re-encoded to the video's
+    format only (48 kHz stereo AAC, the same H.264 settings), never filtered, cut or re-timed. Its length must
+    stay the clean file's (+-0.05 s)."""
+    src = duration(clean)
+    if has_audio(clean):
+        run(["ffmpeg", "-y", "-i", str(clean), "-map", "0:v", "-map", "0:a", *ENC, str(out)])
+        note = "own voice, as recorded"
+    else:
+        audio = narration_file(part.get("fallback_audio", ""), preview) if part.get("fallback_audio") else None
+        if audio is None and not preview:
+            raise SystemExit(f"REFUSED {part['id']}: the film has no sound and there is no {part.get('fallback_audio')}")
+        total = max(src, (LEAD + duration(audio) + TAIL) if audio else src)
+        v = work / f"{part['id']}_held.mp4"
+        run(["ffmpeg", "-y", "-i", str(clean), "-vf", f"tpad=stop_mode=clone:stop_duration={total - src + 0.1:.2f}",
+             "-an", "-c:v", "libx264", "-crf", "17", "-t", f"{total:.2f}", str(v)])
+        with_narration(v, audio, total, out)
+        note = f"no sound in the film: {audio.name if audio else 'silent'} laid under it"
+    got = duration(out)
+    if has_audio(clean) and abs(got - src) > 0.05:
+        raise SystemExit(f"REFUSED {part['id']}: re-encoding changed the length ({got:.3f}s vs {src:.3f}s)")
+    return got, note
+
+
 # ---- a narrated part -----------------------------------------------------------------------------
 def film_source(part: dict, args) -> tuple[Path | None, list[tuple[float, float]], list]:
     """(clean film, anchors in clean seconds, problems) for C4 / C5."""
@@ -374,12 +393,9 @@ def film_source(part: dict, args) -> tuple[Path | None, list[tuple[float, float]
     info = json.loads(report.read_text(encoding="utf-8")) if report.exists() else {}
     if not (info.get("verify") or {}).get("ok"):
         return None, [], [f"{report.name}: the label blur is not verified (run atlas_film.py again)"]
-    cuts = [tuple(c) for c in info.get("cuts", [])]
-    if name == "atlas":
-        anchors = [(p, shift_cuts(s, cuts)) for p, s in ATLAS_ANCHORS_SRC]
-    else:
-        anchors = [(float(p), float(s)) for p, s in (args.call_anchors or [])]
-    return clean, anchors, []
+    if info.get("cuts"):
+        return None, [], [f"{report.name}: the film was cut; the founder's order is no cuts (run atlas_film.py again)"]
+    return clean, [], []
 
 
 def narrated(part: dict, args, work: Path, out: Path, preview: bool) -> tuple[float, str, list[dict]]:
@@ -586,6 +602,12 @@ def planned(preview_root: Path | None = None) -> list[dict]:
     for p in PARTS:
         if p["kind"] in ("camera", "film", "slides"):
             d = fixed[p["id"]]
+        elif p["kind"] == "team_film":
+            clean = V3 / "work" / f"{p['film']}_clean.mp4"
+            try:
+                d = duration(clean) if clean.exists() else p["plan_seconds"]
+            except Exception:                                # noqa: BLE001
+                d = p["plan_seconds"]
         elif p.get("audio"):
             f = narration_file(p["audio"], True, preview_root)
             try:
@@ -614,7 +636,9 @@ def cue_sheet(timeline: list[dict], title: str) -> str:
           "`submission/finals_video/v3/narration/`. Read calmly; pause at the paragraph breaks: the picture "
           "is lined up with them."
           + ("" if any(x["part"] == "C2" for x in timeline) else " The AI film is not in yet: every time below moves "
-             "later by its length."), ""]
+             "later by its length."), "",
+          "C4 (Atlas, Dev's film) and C5 (The Call, the team's recording) keep their own voice-over exactly as "
+          "recorded: nothing to record for them (A_C5 only if the Call recording turns out to have no sound).", ""]
     for p in PARTS:
         if not p.get("audio") or p["id"] not in span:
             continue
@@ -657,7 +681,9 @@ def self_test() -> int:
     for n in (e["requests"], e["differential"]["pairs"], c["codebuddy_sessions"]):
         assert norm(words(n)) in text, f"the narration never says {words(n)}"
     # every part with narration has its block; names as the coordinator gave them
-    assert [p["audio"] for p in PARTS if p.get("audio")] == ["B_C4", "A_C5", "B_C6a", "A_C6b", "B_C6c", "A_C7"]
+    assert [p["audio"] for p in PARTS if p.get("audio")] == ["B_C6a", "A_C6b", "B_C6c", "A_C7"]
+    assert [p["id"] for p in PARTS if p["kind"] == "team_film"] == ["C4", "C5"]
+    assert not any("captions" in p or "lo" in p for p in PARTS if p["kind"] == "team_film"), "the films are not re-timed"
     assert CARD_HINGE[1] == "Can it keep a secret?" and "not live yet" in PILL_TENCENT
     assert [p["id"] for p in PARTS] == ["C1", "C2", "C3", "T1", "C4", "T2", "C5", "C6a", "C6b", "C6c", "C7"]
     assert all(p["block"] in bl for p in PARTS if p.get("block"))
@@ -705,17 +731,16 @@ def self_test() -> int:
     fast = fit_segments([(2, 30.0)], 31.0, {2.0: 5.0}, 6.0, 0.8, 2.0)
     assert fast[0]["speed"] == 2.0 and fast[0]["trim"] == 20.0 and map_time(25.0, fast) is None, fast
     assert abs(shift_cuts(50.0, [(35.8, 42.1), (70.3, 76.6)]) - (50.0 - 6.3)) < 1e-9
-    atl = [shift_cuts(s, [(35.8, 42.1), (70.3, 76.6)]) for _, s in ATLAS_ANCHORS_SRC]
-    assert atl == sorted(atl), "the Atlas anchors are out of order after the cuts"
     # the timeline: under 8:00 with the placeholder lengths (as a human reads them) and the AI film at 1:00
     lengths = {"B_C4": 56.3, "A_C5": 60.8, "B_C6a": 69.8, "B_C6c": 11.7, "A_C6b": 25.9, "A_C7": 13.6}
-    tot = 10.1 + 60 + 79.8 + 3.5 + 4.0 + sum(v * HUMAN + LEAD + TAIL for v in lengths.values())
+    tot = 10.1 + 60 + 79.8 + 3.5 + 4.0 + 89.2 + 75 + sum(v * HUMAN + LEAD + TAIL for k, v in lengths.items()
+                                                         if k not in ("B_C4", "A_C5"))
     assert tot < MAX_MAIN, tot
     # subtitles, cue sheet, filters
     srt = srt_from([{"start": 1.0, "end": 5.0, "text": "One two. Three four five six."}])
     assert srt.startswith("1\n00:00:01,000 --> ") and "\n2\n" in srt
     cs = cue_sheet(planned(), "planned")
-    assert "## B_C4" in cs and "## A_C5 · Aaruni" in cs and "Company A" in cs and "Pandan" not in cs
+    assert "## B_C6a" in cs and "## A_C7 · Aaruni" in cs and "## B_C4" not in cs and "Pandan" not in cs
     assert len(slide_lines()) >= 8
     assert "gblur" in blurfill(864) and "overlay=(W-w)/2:(H-h)/2" in blurfill(864)
     assert "crop=iw-108:ih-60:54:60" in slides_vf(True) and "crop" not in slides_vf(False)
@@ -747,11 +772,6 @@ def main() -> int:
     ap.add_argument("--slides", type=Path, default=None, help=f"default <v3>/C3_slides.*, else {DEFAULT_SLIDES}")
     ap.add_argument("--mask-topbar", action="store_true", help="C3: crop the top bar (cursor, focus ring) and re-scale")
     ap.add_argument("--intro-height", type=int, default=864, help="C1: the camera frame's height on the 1080 canvas")
-    ap.add_argument("--call-audio", choices=("auto", "narration", "own"), default="auto",
-                    help="C5: auto (default) = A_C5 if it is in <v3>/narration, else the film's own voice; "
-                         "narration = A_C5 (the placeholder in a preview); own = the film's own sound")
-    ap.add_argument("--call-anchors", type=lambda s: [tuple(x.split("@")) for x in s.split(",")], default=None,
-                    help="C5: 'segment@second,...' of the clean Call film (e.g. 1@0,5@24,8@49)")
     ap.add_argument("--burn-subs", action="store_true", help="burn the subtitles into the picture as well")
     ap.add_argument("--allow-long", action="store_true", help="do not refuse a main cut over 8:00")
     a = ap.parse_args()
@@ -813,17 +833,18 @@ def main() -> int:
             elif p["kind"] == "stills":
                 length, note, pc = stills_part(p, a, work, out, a.preview)
                 cues += [{**c, "start": c["start"] + t, "end": c["end"] + t} for c in pc]
-            else:
-                own = a.call_audio == "own" or (a.call_audio == "auto" and narration_file("A_C5", False) is None
-                                                 and (fs := film_source(p, a))[0] is not None and has_audio(fs[0]))
-                if p["id"] == "C5" and own:
-                    clean, _, bad = film_source(p, a)
-                    if bad:
-                        raise SystemExit(f"REFUSED C5: {bad[0]}")
-                    length, note = own_sound(clean, slides_vf(False), out), "the team's film, own sound"
+            elif p["kind"] == "team_film":
+                clean, _, bad = film_source(p, a)
+                if bad:
+                    if not a.preview:
+                        raise SystemExit(f"REFUSED {p['id']}: {bad[0]}")
+                    length = silent_card(("MISSING", bad[0][:80]), 5.0, out, work)
+                    note = f"MISSING: {bad[0]}"
                 else:
-                    length, note, pc = narrated(p, a, work, out, a.preview)
-                    cues += [{**c, "start": c["start"] + t, "end": c["end"] + t} for c in pc]
+                    length, note = team_film(p, clean, out, work, a.preview)
+            else:
+                length, note, pc = narrated(p, a, work, out, a.preview)
+                cues += [{**c, "start": c["start"] + t, "end": c["end"] + t} for c in pc]
             parts.append(out)
             timeline.append({"part": p["id"], "start": round(t, 2), "end": round(t + length, 2), "note": note})
             print(f"{stamp(t, False):>6}  {p['id']:4} {length:6.1f}s  {note}")
