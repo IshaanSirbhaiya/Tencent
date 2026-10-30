@@ -67,8 +67,9 @@ export const Composer = forwardRef<
       aria-label={t('ask.formLabel')}
       data-tour="ask-form"
       className={cn(
-        'rounded-2xl border border-line-strong bg-surface transition-colors duration-fast has-[textarea:focus]:border-focus has-[textarea:focus]:ring-1 has-[textarea:focus]:ring-focus',
-        size === 'lg' ? 'p-3 sm:p-4' : 'p-2.5 sm:p-3',
+        // one rounded field: the question on the left, the microphone and send on the right
+        'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 rounded-[1.75rem] border border-line bg-surface shadow-[var(--ask-shadow,none)] transition-[border-color,box-shadow] duration-fast has-[textarea:focus]:border-focus/60 has-[textarea:focus]:ring-4 has-[textarea:focus]:ring-focus/10',
+        size === 'lg' ? 'py-2.5 pl-5 pr-2.5' : 'py-2 pl-4 pr-2',
       )}
     >
       <label htmlFor="question" className="sr-only">
@@ -95,20 +96,21 @@ export const Composer = forwardRef<
             if (canSend) send();
           }
         }}
-        rows={size === 'lg' ? 2 : 1}
+        rows={1}
         maxLength={MAX_QUESTION}
         aria-describedby="question-keys question-count"
         placeholder={placeholder}
         className={cn(
-          'block w-full resize-none bg-transparent px-1.5 text-fg placeholder:text-subtle focus:outline-none focus-visible:outline-none',
-          size === 'lg' ? 'min-h-[3.5rem] text-body leading-7 sm:text-[1.0625rem]' : 'min-h-[2rem] text-body leading-7',
+          'block w-full resize-none bg-transparent text-body leading-6 text-fg placeholder:text-subtle focus:outline-none focus-visible:outline-none',
+          size === 'lg' ? 'min-h-[2.5rem] py-2' : 'min-h-[2.25rem] py-1.5',
         )}
       />
-      <div className="mt-2 flex items-center justify-between gap-3 pl-1.5">
-        <p id="question-keys" className="hidden text-caption text-subtle sm:block">
+      <div className="contents">
+        {/* read to screen readers; on screen the placeholder and the arrow say enough */}
+        <p id="question-keys" className="sr-only">
           {t('ask.keys')}
         </p>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex items-center gap-1.5 pb-0.5">
           <p
             id="question-count"
             aria-live="polite"
@@ -153,7 +155,7 @@ export const Composer = forwardRef<
               }}
               className={cn(
                 'inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors duration-fast focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
-                dict.listening ? 'border-focus bg-accent-solid/10 text-fg' : 'border-line bg-surface text-muted hover:border-line-strong hover:text-fg',
+                dict.listening ? 'border-focus bg-accent-solid/10 text-fg' : 'border-transparent bg-transparent text-muted hover:bg-raised hover:text-fg',
               )}
             >
               {dict.listening ? <Square aria-hidden className="h-3.5 w-3.5 fill-current" /> : <Mic aria-hidden className="h-4 w-4" />}
@@ -165,18 +167,18 @@ export const Composer = forwardRef<
             title={t('ask.send')}
             disabled={!canSend}
             aria-busy={busy || undefined}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent-solid text-accent-fg transition-colors duration-fast hover:bg-accent-solid/90 disabled:cursor-not-allowed disabled:bg-raised disabled:text-subtle"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent-solid text-accent-fg shadow-[0_1px_2px_rgb(0_0_0/0.12)] transition-colors duration-fast hover:bg-accent-solid/90 disabled:cursor-not-allowed disabled:bg-raised disabled:text-subtle disabled:shadow-none"
           >
             <ArrowUp aria-hidden className="h-4 w-4" />
           </button>
         </div>
       </div>
       {dict.supported ? (
-        <p id="dictation-note" className="mt-2 pl-1.5 text-caption text-subtle">
+        <p id="dictation-note" className="sr-only">
           {tv('voice.note')}
         </p>
       ) : null}
-      <p role="status" aria-live="polite" data-testid="dictation-status" className={dict.state === 'idle' ? 'sr-only' : 'mt-1 pl-1.5 text-caption text-muted'}>
+      <p role="status" aria-live="polite" data-testid="dictation-status" className={dict.state === 'idle' ? 'sr-only' : 'col-span-2 mt-1 text-caption text-muted'}>
         {dict.state === 'listening'
           ? tv('voice.listening')
           : dict.state === 'stopped'
@@ -222,7 +224,7 @@ export function StarterCards({ questions, onPick, disabled }: { questions: strin
   if (!questions.length) return null;
   return (
     <section aria-labelledby="starters-heading">
-      <h2 id="starters-heading" className="mb-3 text-micro font-semibold uppercase tracking-wider text-subtle">
+      <h2 id="starters-heading" className="mb-3 text-body-sm font-medium text-muted">
         {t('ask.starters')}
       </h2>
       <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -233,14 +235,14 @@ export function StarterCards({ questions, onPick, disabled }: { questions: strin
               onClick={() => onPick(q)}
               disabled={disabled}
               data-testid="starter"
-              className="group flex h-full w-full min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface p-4 text-left transition-colors duration-fast hover:border-line-strong hover:bg-raised/60 disabled:opacity-60"
+              className="group flex h-full w-full min-w-0 items-start gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left transition-[border-color,background-color] duration-fast hover:border-line-strong hover:bg-raised/50 disabled:opacity-60"
             >
-              <span aria-hidden className="flex items-center gap-1.5">
+              <span aria-hidden className="mt-0.5 flex shrink-0 items-center gap-1">
                 {inferPlatforms(q).map((p) => (
                   <PlatformIcon key={p} platform={p} tone="platform" size="sm" showLabel={false} />
                 ))}
               </span>
-              <span lang="en" className="line-clamp-3 text-body-sm text-fg">{q}</span>
+              <span lang="en" className="line-clamp-3 text-body-sm leading-6 text-fg">{q}</span>
             </button>
           </li>
         ))}

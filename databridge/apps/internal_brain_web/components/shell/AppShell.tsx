@@ -237,7 +237,7 @@ function Frame({ children, requireRole, variant = 'app', container = true }: App
 
       <div className="flex min-h-0 min-w-0 flex-1">
         {showNav ? (
-          <aside aria-label={t('shell.sidebar')} className="sticky top-topbar hidden h-[calc(100dvh-var(--topbar-h)-var(--banner-h,0px))] w-sidenav shrink-0 border-r border-line bg-bg lg:block">
+          <aside aria-label={t('shell.sidebar')} data-sidebar className="sticky top-topbar hidden h-[calc(100dvh-var(--topbar-h)-var(--banner-h,0px))] w-sidenav shrink-0 overflow-hidden border-r border-line bg-bg transition-[width] duration-slow ease-out lg:block">
             <SideNav />
           </aside>
         ) : null}

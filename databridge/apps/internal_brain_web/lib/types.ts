@@ -805,3 +805,46 @@ export interface Deliverable {
   scope_note: string;
   as_of: string;
 }
+
+// ---- just-in-time views of an answer (POST /ib/views; same switch as deliverables) ----
+export interface IbStatus {
+  views?: ViewsStatus;
+}
+export type ViewBlockKind =
+  | 'facts' | 'table' | 'chart' | 'steps' | 'timeline' | 'conversation' | 'sections' | 'sources'
+  | 'hero' | 'stats' | 'prose' | 'people' | 'cards' | 'callout';
+export interface ViewsStatus {
+  enabled: boolean;
+  /** a model is connected; without one, the layout is picked by rules from the instruction */
+  model: boolean;
+  blocks: ViewBlockKind[];
+  /** Claude composes pages (the key is configured; it may be over its spend cap) */
+  composer?: { provider: string; model: string; available: boolean };
+}
+/** POST /ib/views mode "decide": does this answer open a page, or stay in the chat? */
+export interface JitDecision {
+  render: 'page' | 'chat';
+  title: string;
+  decided_by: 'claude' | 'rules';
+  view_id?: string;
+}
+/** One A2UI v0.9 message (createSurface, updateComponents or updateDataModel). */
+export type A2uiMessage = { version: 'v0.9' } & Record<string, unknown>;
+export interface JitView {
+  view_id: string;
+  req_id: string;
+  status: 'ready' | 'insufficient';
+  label: string;
+  title: string;
+  generated: 'model' | 'rules' | 'none';
+  model: ModelInfo | null;
+  check: DeliverCheck;
+  /** the block types in order ('missing' = asked for, but the sources cannot fill it) */
+  layout: (ViewBlockKind | 'missing')[];
+  a2ui: A2uiMessage[];
+  citations: DeliverCitation[];
+  fallback: string;
+  prompt_version: string;
+  scope_note: string;
+  as_of: string;
+}

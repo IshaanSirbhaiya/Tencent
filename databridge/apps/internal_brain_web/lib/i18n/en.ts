@@ -23,6 +23,8 @@ export const en = {
   'shell.retrySession': 'Check again',
   'shell.moreActions': 'More options',
   'shell.sidebar': 'Sidebar',
+  'shell.navCollapse': 'Collapse the sidebar to icons',
+  'shell.navExpand': 'Open the sidebar',
   'shell.mockNotice': 'Mock mode notice',
   'shell.devEnglishOnly': 'Developer mode is shown in English',
   'persona.current': '(current)',

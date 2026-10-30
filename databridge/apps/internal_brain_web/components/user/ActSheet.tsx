@@ -72,7 +72,7 @@ export function ActRow({ response }: { response: AskResponse }) {
     'inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 text-caption font-medium text-fg transition-colors duration-fast hover:border-line-strong hover:bg-raised';
   return (
     <section aria-labelledby={headingId} className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid="act-row">
-      <h3 id={headingId} className="mr-1 text-micro font-semibold uppercase tracking-wider text-subtle">
+      <h3 id={headingId} data-part="label" className="mr-1 text-micro font-semibold uppercase tracking-wider text-subtle">
         {t('act.heading')}
       </h3>
       <button
@@ -99,7 +99,7 @@ export function ActRow({ response }: { response: AskResponse }) {
         <Ticket aria-hidden className="h-3.5 w-3.5 text-muted" />
         {t('act.ticket')}
       </button>
-      <span className="basis-full text-caption text-subtle sm:basis-auto">{t('act.hint')}</span>
+      <span data-part="hint" className="basis-full text-caption text-subtle sm:basis-auto">{t('act.hint')}</span>
       <ActSheet response={response} mode={mode} onClose={() => setMode(null)} onMode={setMode} returnFocusTo={opener.current} />
     </section>
   );

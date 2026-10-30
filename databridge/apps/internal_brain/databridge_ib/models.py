@@ -399,7 +399,7 @@ class ActionRequested(EventBase):
 
 
 #: what a deliverable is built as (deliverables/; docs/finals/deliverables/PLAN.md)
-DeliverableKind = Literal["table", "chart", "analysis", "summary", "slides"]
+DeliverableKind = Literal["table", "chart", "analysis", "summary", "slides", "view"]
 
 
 class DeliverableRequested(EventBase):
@@ -422,7 +422,7 @@ class DeliverableCreated(EventBase):
     sub: str
     deliverable_id: str
     deliverable: DeliverableKind
-    status: Literal["ready", "needs_model", "insufficient"]
+    status: Literal["ready", "needs_model", "insufficient", "page", "chat"]   # page/chat: a view decision
     generated: Literal["model", "deterministic", "none"]
     model: Optional[ModelInfo] = None
     prompt_version: str

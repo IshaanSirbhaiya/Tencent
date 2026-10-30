@@ -266,3 +266,26 @@ export function versionText(v: string, lang: 'en' | 'zh', t: (k: UserKey, vars?:
   const head = v.split('|')[0];
   return `rev ${head.length > 10 ? `${head.slice(0, 10)}…` : head}`;
 }
+
+/**
+ * Display only: each sentence's citation chips gathered into one cluster at its end. A model
+ * answer passed through the grounding wall can carry a tag after every value inside a sentence
+ * ("planned for 24 [C2] October 2026 [C2]"), which reads as noise; the tags are the same, so they
+ * are shown once, after the sentence. The answer text itself (copy, highlight, the sealed record)
+ * is unchanged.
+ */
+export function gatherTags(answer: string): string {
+  return answer
+    .split(/(?<=[.!?])(\s+)/)
+    .map((part) => {
+      const tags: string[] = [];
+      for (const m of part.matchAll(TAG_RE)) for (const t of m[1].split(',')) tags.push(t.trim());
+      if (!tags.length) return part;
+      const body = part.replace(/\s*\[(C\d+(?:\s*,\s*C\d+)*)\]/g, '');
+      const uniq = [...new Set(tags)];
+      const end = body.match(/[.!?]$/);
+      const group = `[${uniq.join(',')}]`;
+      return end ? `${body.slice(0, -1)} ${group}${end[0]}` : `${body} ${group}`;
+    })
+    .join('');
+}

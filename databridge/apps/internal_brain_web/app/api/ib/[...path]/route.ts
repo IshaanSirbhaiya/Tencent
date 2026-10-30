@@ -41,6 +41,10 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: /^ib\/open\/[0-9a-f]{32}$/ },
   // Deliverables from an answer (IB_DELIVERABLES=1): main session only (never in a compare slot)
   { method: 'POST', re: /^ib\/deliverables(\/export)?$/ },
+  // Just-in-time views of an answer (same switch as deliverables): main session only
+  { method: 'POST', re: /^ib\/views$/ },
+  // A follow-up rewritten into a standalone search question (Claude; main session only)
+  { method: 'POST', re: /^ib\/rewrite$/ },
   { method: 'GET', re: new RegExp(`^ib\\/doc\\/${DOC_ID}$`) },
   { method: 'GET', re: /^audit\/(events|verify|stats)$/ },
   { method: 'GET', re: /^audit\/journey\/[A-Za-z0-9_-]{1,200}$/ },

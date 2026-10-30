@@ -245,6 +245,7 @@ Walnut DataBridge is up.
   Presenter         http://127.0.0.1:3100/compare?present=1
   Developer         http://127.0.0.1:3100/dev
   Live AI           IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE (0 = Tencent Hunyuan Hy3 via TokenHub)
+  Page composer     $( [ -n "${ANTHROPIC_API_KEY:-}" ] && [ "${IB_CLAUDE:-1}" != "0" ] && echo "Claude (cap US\$${IB_CLAUDE_BUDGET_USD:-10})" || echo "rules (no Claude key, or IB_CLAUDE=0)")
   Logs              $LOGS/
 Stop with: bash scripts/demo_up.sh stop
 EOF

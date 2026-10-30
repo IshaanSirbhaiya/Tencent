@@ -226,7 +226,9 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                 # the demo-proof features are mounted (IB_DEMO_FEATURES=1, not deployed; D-24)
                 "demo_features": bool(getattr(svc.cfg, "demo_features_on", False)),
                 # deliverables from an answer (IB_DELIVERABLES=1; D-25): which kinds are offered
-                "deliverables": app.state.deliverables.status()}
+                "deliverables": app.state.deliverables.status(),
+                # just-in-time views of an answer (views/; same switch as deliverables)
+                "views": app.state.views.status()}
 
     # -- auth --------------------------------------------------------------------------------
     @app.post("/auth/demo-login")
@@ -560,6 +562,17 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         chain=getattr(svc.pipeline, "chain", None),
         enabled=bool(getattr(svc.cfg, "deliverables", False)), sync=_trace_sync)
     deliv_routes.mount(app, app.state.deliverables, current, _employee)
+
+    # -- just-in-time views of an answer (views/; built on the deliverables' rules and records) --
+    from .views import composer as view_composer, routes as view_routes, service as view_service
+    app.state.views = view_service.ViewService(
+        actions=svc.actions, ledger=svc.ledger, projection=svc.projection, index=svc.index,
+        connectors=svc.connectors, directory=svc.directory,
+        chain=getattr(svc.pipeline, "chain", None),
+        # Claude composes pages when ANTHROPIC_API_KEY is set and the IB is not forced offline
+        composer=view_composer.ClaudeComposer.from_env(svc.cfg.var_root / "views"),
+        enabled=bool(getattr(svc.cfg, "deliverables", False)), sync=_trace_sync)
+    view_routes.mount(app, app.state.views, current, _employee)
 
     # -- developer views: graph and document (authz.py rules; ledgered before returning) -------
     @app.get("/ib/graph")
