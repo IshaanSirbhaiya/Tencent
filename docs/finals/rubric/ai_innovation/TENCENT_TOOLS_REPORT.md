@@ -2,6 +2,7 @@
 
 Walnut DataBridge, Tencent Cloud AI CAN DO IT Hackathon Singapore 2026, FinTech finalist. Demo Day 3 Nov.
 Written 30 Oct 2026. Every row points to a file, a test or a transcript.
+Which AI tools built, reviewed and tested the project (Tencent tools first): [DEV_PROCESS.md](../../../tencent/DEV_PROCESS.md#build-tools-the-one-statement).
 
 **Why this page exists.**
 1. The rules say a project must be built on **CodeBuddy or WorkBuddy**, with proof (at least three chat
@@ -9,8 +10,9 @@ Written 30 Oct 2026. Every row points to a file, a test or a transcript.
 2. The finals judges are WorkBuddy/CodeBuddy and Tencent RTC experts. The organisers asked teams to
    "showcase how Tencent Cloud products are used in your solution and include more live demonstrations of
    these products".
-3. Until today, all six CodeBuddy sessions (CB1–CB6, 14–15 Oct) predated the finals build, and the
-   WorkBuddy connectors did not know the finals features.
+3. Until 30 Oct, all six CodeBuddy sessions (CB1–CB6, 14–15 Oct) predated the finals build, and the
+   WorkBuddy connectors did not know the finals features. Done since: CB7–CB9 ran on the finals code (nine
+   sessions in all) and the connectors were upgraded and live-tested 33/33.
 
 ## 1. Summary
 
@@ -49,9 +51,9 @@ Written 30 Oct 2026. Every row points to a file, a test or a transcript.
 
 | Gap | Action | Owner |
 |---|---|---|
-| The finals UI (Next.js) was built without CodeBuddy | Say it plainly if asked: CodeBuddy built and reviewed the Tencent-facing parts (both connectors, the skill) and reviewed the finals backend; Claude built the UI. DEV_PROCESS.md says the same | Presenter |
+| The finals UI (Next.js) was built without CodeBuddy | Say it plainly if asked: CodeBuddy built and reviewed the Tencent-facing parts (both connectors, the skill) and reviewed the finals backend; the UI was built with other AI assistants. The full list of build tools is in [DEV_PROCESS.md](../../../tencent/DEV_PROCESS.md#build-tools-the-one-statement) | Presenter |
 | CodeBuddy quota (429, code 14003) hits after bursts of turns | Short, single-purpose prompts; resume the same session after a pause (as done for CB5 and CB8) | Coordinator |
-| The runner parks `databridge/.env.ib.local` during a session; a demo-stack restart in that window starts the Brain on dev keys (happened once on 30 Oct; no damage, fixed by the next restart) | Never start or restart the stack while a CodeBuddy session runs. Better: `demo_up.sh` should refuse to start when `.env.ib.local` is missing (a one-line guard; not changed here because another agent owns the demo scripts) | Coordinator |
+| The runner parks `databridge/.env.ib.local` during a session; a demo-stack restart in that window starts the Brain on dev keys (happened once on 30 Oct; no damage, fixed by the next restart) | Never start or restart the stack while a CodeBuddy session runs. Done: `demo_up.sh` now refuses to start when `.env.ib.local` is missing (commit `7645420`; `ALLOW_DEV_KEYS=1` overrides for a throwaway state dir) | Coordinator |
 | CB7 finding F2 (unbounded stream threads) is open | The Act work on `app.py` has landed (30 Oct); the ready patch is still not applied (no stream cap in `app.py` at `1076517`). Apply it with its test (both in the triage file) | Coordinator |
 
 ## 3. WorkBuddy

@@ -4,11 +4,28 @@ Who built what, and the evidence for each claim. The hackathon requires proof of
 use; this page is that proof in writing. Every row points to a transcript, a review file or a commit you
 can check.
 
+## Build tools: the one statement
+
+Which AI tools built, reviewed and tested this project. The Tencent tools come first.
+
+| Tool | Role | Evidence |
+|---|---|---|
+| **CodeBuddy** (Tencent) | Nine recorded sessions (CB1–CB9), each with its prompt and full transcript. They drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests and the WorkBuddy skill, and ran two security reviews (CB5, CB7) that found real bugs, which were fixed with tests | [CodeBuddy sessions](#codebuddy-sessions), `docs/tencent/evidence/`, `submission/01_codebuddy/` |
+| **WorkBuddy** (Tencent) | The Brain's second front door through MCP connectors (ask as a person; compliance audit). Driven live over stdio: 33 of 33 checks passed. The retest inside the WorkBuddy app is still to do | [workbuddy_live_test.md](../finals/rubric/ai_innovation/workbuddy_live_test.md), [workbuddy/](workbuddy/README.md) |
+| **Miora** (Tencent) | The cover art, from our written brief; we added the title | `submission/06_cover/` |
+| **Hunyuan Hy3 / TokenHub** (Tencent) | Hy3 ran inside CodeBuddy sessions CB1, CB5, CB7 and CB9. In the Brain it is wired in through TokenHub and tested with a capturing test model, not run live (activation pending) | `llm.py`, `tests/test_llm_chain.py` |
+
+Other assistants used in development, each named once: Claude (Anthropic) was the coding assistant for the
+Internal Brain, the web app and the documents, directed and reviewed by the team; Codex was a read-only
+security and code reviewer (tracks 1 to 7 and the later rounds); Claude Opus, Sonnet and Haiku and Fable 5.1
+served as independent review seats (plans, security, UX, claims, pitch). Every review is written down with its
+disposition ([SECURITY.md](SECURITY.md), `docs/finals/reviews/`). No human third party has reviewed it.
+
 ## The short version
 
 | Part | What | Built by |
 |---|---|---|
-| Foundation | The Walnut evidence engine: provenance pointers, the sealed audit ledger, the grounding wall, the model harness | The Walnut team. Used by import; the Internal Brain does not modify it. |
+| Foundation | The Walnut evidence engine: provenance pointers, the sealed audit ledger, the grounding wall, the model harness | The Walnut team. The Internal Brain imports parts of it unchanged: `core` (ledger, source pointers, value forms), `harness`, `convert` (file readers) and the gateway's grounding wall. It keeps its own retrieval index (`databridge_ib/index.py`) and does not use `packages/retrieval`. |
 | The Internal Brain | Connectors, the two permission gates, the answer pipeline, the audit console, the web app, the mock platforms, the evaluation | Claude (Anthropic), directed and reviewed by the team |
 | WorkBuddy front door | The two MCP connectors (ask, compliance audit), the token tool, the WorkBuddy setup guide | **CodeBuddy** (sessions CB2, CB3, CB6) |
 | WorkBuddy finals upgrade | Four new connector tools (answer receipt, what can I open, org activity summary, tamper demo) and their tests | **CodeBuddy** (CB8), reviewed and corrected by Claude |

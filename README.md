@@ -8,19 +8,58 @@ asker may open, checks each source live, and writes every step to a tamper-evide
 
 ### The platform underneath
 
-Internal Brain runs on **Walnut**, a data platform of 21 packages in `databridge/packages/`, with its own
-web app (`databridge/apps/frontend`, port 3300). Each item below names its package and its test files:
+Internal Brain is built on **Walnut**, a data platform the team wrote before the hackathon: **21 Python
+packages** in [`databridge/packages/`](databridge/packages) with **353 test files**, a gateway, and its
+own web app ([`databridge/apps/frontend`](databridge/apps/frontend/README.md), port 3300). Walnut connects
+sources, screens and ingests what they hold, builds a typed, time-aware graph in which every value points
+to the row or passage it came from, answers across sources by delegating to one agent per source, and
+runs user-built agents only under compiled permissions. The full inventory, with file:line references,
+test runs and screens, is **[docs/PLATFORM.md](docs/PLATFORM.md)**.
 
-- **Connect sources:** adapter contract and policy (`adapter`), MCP ingest with crawl plans and screening (`mcp_ingest`), **adapter agents** that keep sources synced and fresh (`adapter_agents`), schema ingest (`ingest`, `semantic`)
-- **Know:** a typed, time-aware **knowledge graph** where every value points to its source (`graph`), passage retrieval (`retrieval`)
-- **Ask across sources:** the **federated engine** (plan, delegate to each adapter agent, combine exactly; `federated`), the **orchestrator** (`orchestrator`)
-- **Shape data:** **convert** between file and table formats (`convert`), **materialise** reproducible datasets with receipts (`materialise`)
-- **Agents:** declarations compiled into grants (`agentdef`, `workflow_spec`), a governed runtime with human approval (`agent_runtime`), plain-English automations (`automation`), a send gate (`outbox`)
-- **Trust:** source pointers and the sealed decision ledger (`core`), the grounding wall, and one door to any model (`harness`)
+| Capability | What it does | Code | Tests | Answers Internal Brain questions? |
+|---|---|---|---|---|
+| **Source connectors** (Slack, Confluence, Jira, Drive) | Read each platform through its real API shape and re-check the asker's access live, per document, before any passage is used | [`databridge_ib/connectors/`](databridge/apps/internal_brain/databridge_ib/connectors) | 4 files; 314 passed | **Yes** |
+| **Adapter contract and policy** | One frozen request type per read, a policy engine per source, and no I/O in the contract itself, so every citation can be re-executed | [`packages/adapter`](databridge/packages/adapter) | 26 files; 667 passed; 1 fails on Linux only (file order, [note d](docs/PLATFORM.md#7-notes-on-the-test-runs)) | Platform capability |
+| **AI adapter agents and the adapter builder** | Describe a source in plain English; the builder compiles it, and an adapter agent keeps its MCP connections synced, screened and fresh, and proposes ontology kinds it cannot yet store | [`packages/adapter_agents`](databridge/packages/adapter_agents), [`/builder`](databridge/apps/frontend/app/builder/page.tsx) | 23 files; 198 passed | Platform capability |
+| **MCP ingest** | Connect any MCP server: approved crawl plan, raw bytes captured, deterministic screening before any model (card numbers checked by Luhn, IBANs by mod 97), graph rows with pointers | [`packages/mcp_ingest`](databridge/packages/mcp_ingest) | 56 files; 854 passed, 7 skipped; 2 fail on Linux only ([note f](docs/PLATFORM.md#7-notes-on-the-test-runs)) | Platform capability |
+| **Schema ingest, intake and the semantic layer** | Read database schemas, annotate columns with a confidence and a human confirmation step, and turn documents into records whose every field points to its source span | [`ingest`](databridge/packages/ingest), [`semantic`](databridge/packages/semantic), [`intake`](databridge/packages/intake) | 35 files; 752 passed, 9 skipped | Platform capability |
+| **Knowledge and evidence graph** | A typed, bi-temporal graph over SQLite, loaded from domain packs; every node and link cites its source row, and a time slider shows any past date | [`packages/graph`](databridge/packages/graph) | 45 files; 908 passed, 3 skipped | Shown (`/dev/brain` on port 3100; `/graph`, `/brain` on 3300) |
+| **Per-person knowledge map** | Everything one person may open, as one graph, built only from documents re-checked live in that call | [`databridge_ib/graph.py`](databridge/apps/internal_brain/databridge_ib/graph.py) | 2 files; 33 passed | Shown (`/dev/graph`) |
+| **Federated engine** | Splits a cross-source question into sub-tasks, lets each adapter agent answer read-only, and combines the results with exact decimal arithmetic, never model arithmetic | [`packages/federated`](databridge/packages/federated) | 11 files; 138 passed, 4 skipped | Platform capability |
+| **Orchestrator, agent definitions and agent runtime** | An agent runs only if its declaration compiles into grants; every claim must cite a pointer, and every write becomes a proposal a named human approves | [`orchestrator`](databridge/packages/orchestrator), [`agentdef`](databridge/packages/agentdef), [`workflow_spec`](databridge/packages/workflow_spec), [`agent_runtime`](databridge/packages/agent_runtime), [`automation`](databridge/packages/automation) | 39 files; 780 passed, 8 skipped; 2 more fail only when run on the 30th of a month (a test-date clash, [note b](docs/PLATFORM.md#7-notes-on-the-test-runs)) | Platform capability |
+| **Convert and materialise** | Convert between CSV, Excel, JSON, Parquet, Arrow, XML, YAML, HTML and Markdown tables, PDF, DOCX, PPTX, email and images; materialise a dataset as a hashed plan that re-executes to the same bytes, with a receipt | [`convert`](databridge/packages/convert), [`materialise`](databridge/packages/materialise) | 65 files; convert 519 passed, 18 skipped, 2 need the optional `readability-lxml` module ([note c](docs/PLATFORM.md#7-notes-on-the-test-runs)); materialise 371 passed | **Yes** (convert reads uploads and Drive files) |
+| **Grounding wall with source pointers** | Binds each sentence of an answer to a cited passage and drops what it cannot bind; values carry `SourcePointer`s | [`gateway/llm.py`](databridge/apps/gateway/databridge_gateway/llm.py), [`core/provenance.py`](databridge/packages/core/databridge_core/provenance.py) | 5 files; 54 passed | **Yes** |
+| **Sealed, hash-chained ledger** | Every request is written ahead, sealed and chained; an edit by anyone without the sealing key breaks verification | [`core/decision_ledger.py`](databridge/packages/core/databridge_core/decision_ledger.py), [`databridge_ib/audit/`](databridge/apps/internal_brain/databridge_ib/audit) | core 13 files: 276 passed, 1 fails on Linux only (pydantic recursion depth, [note e](docs/PLATFORM.md#7-notes-on-the-test-runs)); Internal Brain audit 10 files: 124 passed | **Yes** |
+| **Model harness** | The only code allowed to call a model; Tencent Hunyuan (Hy3) via TokenHub when activated, otherwise an optional stand-in model or the extractive path | [`packages/harness`](databridge/packages/harness) | 7 files; 36 passed | **Yes** |
+| **Evals** | Platform evals (schema annotation, SQL, intake, retrieval), and the Internal Brain leak evaluation: 0 leaks in 7,374 requests | [`packages/evals`](databridge/packages/evals), [`RESULTS.md`](databridge/evals/internal_brain/RESULTS.md) | 6 files; 23 passed | Checks the answers |
 
-Internal Brain uses `core` (ledger), the grounding wall, `harness` and `convert` to answer; the rest are
-platform capabilities shown in the original screens. Full inventory, with file:line, tests and screens:
-**[docs/PLATFORM.md](docs/PLATFORM.md)**.
+Test counts are `test_*.py` files; every result was re-run package by package on 30 Oct in the cloud
+Linux checkout, and each test that does not pass is explained in
+[docs/PLATFORM.md §7](docs/PLATFORM.md#7-notes-on-the-test-runs) (the check:
+[platform_claims_check.md](docs/finals/reviews/platform_claims_check.md)). The Internal Brain's own
+suite: 1,274 passed ([STATUS.md](STATUS.md)).
+
+```mermaid
+flowchart TB
+  S["Sources: Slack · Confluence · Jira · Drive · MCP servers · databases · files"]
+  C["Connectors and adapters: IB connectors (live access checks) · adapter · adapter_agents · mcp_ingest"]
+  I["Ingest and convert: mcp_ingest screening · ingest · intake · semantic · convert · materialise"]
+  K["Knowledge: graph (bi-temporal, pointer per value) · retrieval · IB permission-aware index and map"]
+  F["Federation and agents: federated · orchestrator · agentdef · agent_runtime · automation · outbox"]
+  G["Grounding and ledger: core pointers · grounding wall · sealed hash-chained ledger · harness"]
+  A["Apps: Internal Brain (3100 / 8100) · original Walnut screens (3300 / 8300) · WorkBuddy MCP connectors"]
+  S --> C --> I --> K --> F --> G --> A
+```
+
+### Built with Tencent
+
+| Tencent product | How it was used | Evidence |
+|---|---|---|
+| **CodeBuddy** | Nine recorded build sessions, CB1 to CB9. CodeBuddy built both WorkBuddy MCP connectors, the token CLI and the model-chain tests, upgraded the connectors for the finals, wrote the WorkBuddy skill, and ran two security reviews: CB5 raised seven findings (three fixed with tests), CB7 reviewed the finals backend and raised eight (F7 fixed with tests) | [conversation history PDF](submission/01_codebuddy/conversation_history_codebuddy_workbuddy_miora.pdf), 20 session images in [`submission/01_codebuddy/`](submission/01_codebuddy), transcripts in [`docs/tencent/evidence/`](docs/tencent/evidence), [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md), [TENCENT_TOOLS_REPORT.md](docs/finals/rubric/ai_innovation/TENCENT_TOOLS_REPORT.md) |
+| **WorkBuddy** | Three MCP connectors (`ib-as-jdoe`, `ib-as-ken`, `ib-compliance`) let people ask from inside WorkBuddy. The person is the signed token, never a name the agent picks; the same two gates apply and every call is ledgered with channel `workbuddy-mcp`. Driven over stdio with the official MCP client: 33 of 33 checks pass; 40 MCP tests | [workbuddy_live_test.md](docs/finals/rubric/ai_innovation/workbuddy_live_test.md), [`workbuddy_live_test.py`](docs/tencent/evidence/workbuddy_live_test.py), [WORKBUDDY_GUI_TEST.md](docs/finals/rubric/ai_innovation/WORKBUDDY_GUI_TEST.md) (GUI retest checklist), [`submission/02_workbuddy/`](submission/02_workbuddy), [WorkBuddy guide](docs/tencent/workbuddy/README.md) |
+| **Miora** | The finals cover and thumbnail, from a Miora session on 30 Oct (two earlier sessions made the submission cover) | [`submission/06_cover/finals/`](submission/06_cover/finals), [COVER_MIORA_PROMPT.md](docs/finals/COVER_MIORA_PROMPT.md) |
+| **Hunyuan (Hy3) via TokenHub** | First in the Internal Brain's model chain (`DEFAULT_CHAIN = ("hy3", ...)`), on the TokenHub Singapore endpoint. Wired and tested with a capturing test model; **live once TokenHub is activated**. Hy3 also ran inside CodeBuddy sessions CB1, CB5, CB7 and CB9 | [`databridge_ib/llm.py:30`](databridge/apps/internal_brain/databridge_ib/llm.py), [`scripts/hy3_check.py`](databridge/scripts/hy3_check.py), `test_llm_chain.py`, `test_model_config.py` |
+| **Tencent Cloud Lighthouse** | A hardened one-command deploy kit: Caddy HTTPS, passcode-gated demo, ports 80 and 443 only. No live instance (Lighthouse capacity was sold out); the demo runs locally | [`deploy/lighthouse/`](deploy/lighthouse/README.md) |
 
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech track (Aspire) · Team Walnut, finalist.
 This is the **finals build** (branch `final_v1.3`) for Demo Day, 3 Nov 2026. The judge's guide is
@@ -85,7 +124,7 @@ Sign in by picking a person. There is no password; the demo sign-in stands in fo
 on by itself (`IB_FORCE_OFFLINE=0`) only if TokenHub answers; otherwise it keeps the quoted answer. Set
 `IB_FORCE_OFFLINE` yourself to override. Check by hand from `databridge/`:
 `.venv/Scripts/python scripts/hy3_check.py` (exit 0 live, 1 not live, 2 no key; the key is never
-printed). The chain is Hy3, then DeepSeek V4 Flash, then the quoted answer. This has not yet run live
+printed). The chain is Hy3, then an optional stand-in model, then the quoted answer. This has not yet run live
 (see the table above).
 
 ### Fallback: start each part by hand
@@ -123,7 +162,7 @@ other people see a lock card that explains why.
 | Mode | Page | URL | Sign in as | What it shows |
 |---|---|---|---|---|
 | User | **Ask** | `/` | anyone | One composer, with optional voice dictation (browser speech, English / 简体中文, never sends by itself). Live stage events while the request runs, then a cited answer with `[n]` chips. A source opens a sheet with the passage, version and "checked live" time. Refusals are one constant text |
-| User | **Compare** | `/compare` | anyone | Same question, two people (Amy vs Rachel on Velquarry); or one person, two questions (Ken: a real company vs a made-up one, marked "Identical responses") |
+| User | **Compare** | `/compare` | anyone | Same question, two people (Amy vs Rachel on Velquarry); or one person, two questions (Ken: a company in the demo data vs a made-up one, marked "Identical responses") |
 | User | **History** | `/history` | anyone | Your own questions by day; a row opens your request receipt |
 | User | **Settings** | `/settings` | anyone | English / 简体中文, theme, text size, reduce motion, high contrast, replay tour |
 | User | **Value** | `/value` | anyone | ROI calculator; every input is visible and the result is labelled an estimate |
@@ -180,8 +219,9 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Prompt injection planted on all four platforms | **0 hard failures** in 1,152 injection-relevant requests |
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 93.2% (quoted) to 97.1% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
-| Backend tests (Internal Brain) | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, to become `final_v1.3`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
+| Backend tests (Internal Brain) | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, now locked as `final_v1.3`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
 | Web end-to-end tests (Playwright, axe checks) | 185 passed, 0 failed, 42 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
+| CI on GitHub (backend tests on Python 3.13, web typecheck on Node 20) | Green: 17 successful GitHub Actions runs, 29–30 Oct, 0 failed (superseded pushes were cancelled, not failed); latest [run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962); the workflow also runs on `final_v1.2-cloud`, `final_v1.3` and `final_v1.4` |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits
@@ -210,7 +250,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | **CodeBuddy** | Nine build sessions (CB1–CB9). CB1–CB6 (14–15 Oct) drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests, ran a security review, then fixed its own code after a Codex review. CB7–CB9 (30 Oct) worked on the finals code: a security review of the finals backend, the WorkBuddy connector upgrade, the Walnut WorkBuddy skill | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md), transcripts in `docs/tencent/evidence/`, screenshots in `submission/01_codebuddy/` |
 | **WorkBuddy** | The Brain's second front door: three connectors (ask as Jordan, ask as Ken, compliance audit), each carrying its own signed token. The compliance connector is never in the same WorkBuddy connector list as the employee ones (its own workspace, or `--compliance-user-config` on a separate seat; D-30) | [WorkBuddy guide](docs/tencent/workbuddy/README.md), screenshots in `submission/02_workbuddy/` |
 | **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1, CB5, CB7 and CB9; configured as the first model in the Brain's answer chain and as the audit search's fallback parser (rules run first, the model only when they recognise nothing); wired, not yet run live | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py`, `audit/nl_llm.py` |
-| **TokenHub** | The Brain's model gateway (Hy3, then DeepSeek as backup). Wired in and tested; live run pending activation | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
+| **TokenHub** | The Brain's model gateway (Hy3, then an optional stand-in model). Wired in and tested; live run pending activation | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
 | **Lighthouse** | A hardened one-command deploy kit (HTTPS, passcode-gated demo, only ports 80/443 open); no live instance because Lighthouse was unavailable during the event | [deploy/lighthouse/](deploy/lighthouse/README.md) |
 | **Miora** | Tencent's AI design agent made the cover art from our written brief; we added the title | `submission/06_cover/` |
 
@@ -423,7 +463,7 @@ cd databridge
 
 Keep the marker. A plain `python -m pytest` hangs on a test that expects a local Ollama instance.
 
-No API key is needed. In the original platform, setting `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` makes a
+No API key is needed. In the original platform, setting a hosted model's API key in the environment ([`config/models.yaml`](databridge/config/models.yaml)) makes a
 real model run the classification and extraction steps. The Internal Brain uses `TOKENHUB_API_KEY`
 instead. Without a key, a deterministic backend runs the same code paths offline, and no test in the suite
 needs a live model.

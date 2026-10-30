@@ -4,7 +4,7 @@
 
 Everything written for the finals of the Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 (FinTech
 track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product inside it. Demo Day is
-3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are now committed on `final_v1.2-cloud`, to become `final_v1.3`, and covered by the clean-checkout cloud test run on the evening of 30 Oct). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
+3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are now committed on `final_v1.2-cloud`, locked as `final_v1.3`, and covered by the clean-checkout cloud test run on the evening of 30 Oct). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
 
 | Start here | What it is |
 |---|---|
@@ -12,14 +12,19 @@ track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product insi
 | [CHANGELOG.md](CHANGELOG.md) | Every change since the 16 Oct submission, newest first, by area, with commit links; plus what is in progress |
 | [../PLATFORM.md](../PLATFORM.md) | The Walnut platform in this repo: all 21 packages, what each does, its tests and screens, and which ones the Internal Brain uses to answer |
 
+**Platform and Tencent.** What the Internal Brain uses to answer, what is a way to ask, what is a view,
+and what is a platform capability only, with re-run test figures: [../PLATFORM.md](../PLATFORM.md). The
+Tencent tools in the build (CodeBuddy, WorkBuddy, Miora, Hunyuan via TokenHub, the Lighthouse kit) and
+their evidence: [README, Built with Tencent](../../README.md#built-with-tencent).
+
 ## 1. Plan and decisions
 
 | File | What it is |
 |---|---|
 | [PLAN.md](PLAN.md) | The finals build plan: the two modes and every page (§3), backend items, design system, demo story, risks; §9 holds the v2 changes after five plan reviews |
 | [DECISIONS.md](DECISIONS.md) | Decisions D-01 to D-34, each with its reason (D-26 to D-33 were taken in the 30 Oct cloud session, D-34 (the upload folder picker) on the laptop that evening and wait for Ishaan's confirmation) |
-| [MERGE_PLAN.md](MERGE_PLAN.md) | The teammate's three feature branches (voice, just-in-time UI, dots) merged one at a time into new branches, with hard-rule checklists. Written 30 Oct evening; nothing merged |
-| [app_mode/PLAN_v2.md](app_mode/PLAN_v2.md) | The "Demo story" app mode (a separate, mouse-driven way through the 11 steps for the booth and hands-on time; the 5:00 stays on the keyboard presenter). **Plan only, not built.** v1 ([PLAN.md](app_mode/PLAN.md)) and four reviews ([Opus](app_mode/review_opus.md), [Sonnet](app_mode/review_sonnet.md), [Haiku](app_mode/review_haiku.md), [Fable](app_mode/review_fable.md)) sit beside it |
+| [MERGE_PLAN.md](MERGE_PLAN.md) | The teammate's three feature branches (voice, just-in-time UI, dots) merged one at a time into new branches, with hard-rule checklists. Written 30 Oct evening. The first branch (`final_mehulupdates`, pages beside the chat) is merged on `final_v1.4` only; voice and dots have not arrived |
+| [app_mode/PLAN_v2.md](app_mode/PLAN_v2.md) | The "Demo story" app mode (a separate, mouse-driven way through the 11 steps for the booth and hands-on time; the 5:00 stays on the keyboard presenter). **Plan only, not built.** v1 ([PLAN.md](app_mode/PLAN.md)) and four reviews ([review 1](app_mode/review_opus.md), [review 2](app_mode/review_sonnet.md), [claims review](app_mode/review_haiku.md), [judge-impact review](app_mode/review_fable.md)) sit beside it |
 | [CLOUD_HANDOFF.md](CLOUD_HANDOFF.md) | The 30 Oct cloud session: questions for Ishaan, verified test results, the hand-off state of every track |
 | [WORLD_EXPANSION_STATUS.md](WORLD_EXPANSION_STATUS.md) | The everyday-company world (append-only): how it was verified and the new counts |
 | [MORNING_BRIEF.md](MORNING_BRIEF.md) | 30 Oct brief for the team: what only a person can do (Hy3 activation, hallway test), what was built overnight |
@@ -45,15 +50,15 @@ track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product insi
 
 ## 3. Reviews of the plan
 
-[Sonnet](reviews/plan_sonnet.md) · [Haiku](reviews/plan_haiku.md) · [Opus](reviews/plan_opus.md) ·
-[Fable](reviews/plan_fable.md) · [Codex](reviews/plan_codex.md). Each accepted finding became a decision in
-DECISIONS.md and a change in PLAN.md §9. Fable's run sheet (§3.2) became the demo story (D-14).
+Five independent AI review seats: [UX](reviews/plan_sonnet.md) · [claims](reviews/plan_haiku.md) · [security](reviews/plan_opus.md) ·
+[judge impact](reviews/plan_fable.md) · [code](reviews/plan_codex.md). Each accepted finding became a decision in
+DECISIONS.md and a change in PLAN.md §9. The judge-impact seat's run sheet (§3.2) became the demo story (D-14).
 
 Later review rounds of the build are in [reviews/](reviews/): the final reviews (`final_*.md`), round 2 and 2b
 (Act, tools, kit; [dispositions](reviews/round2_dispositions.md)) and round 3 (Deliverables, live growth,
 uploads; [dispositions](reviews/round3_dispositions.md)) and round 4 (30 Oct evening; the cloud work, the web proxy
-and demo kit, and a live UX re-check: [Codex](reviews/round4_codex_cloud_work.md),
-[Opus](reviews/round4_opus_web_kit.md), [Sonnet](reviews/round4_sonnet_ux_live.md),
+and demo kit, and a live UX re-check: [code review](reviews/round4_codex_cloud_work.md),
+[web and kit review](reviews/round4_opus_web_kit.md), [live UX review](reviews/round4_sonnet_ux_live.md),
 [dispositions](reviews/round4_dispositions.md); this pass's change list:
 [docs_pass_30oct_evening.md](reviews/docs_pass_30oct_evening.md)).
 

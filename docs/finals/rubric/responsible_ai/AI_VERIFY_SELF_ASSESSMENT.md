@@ -64,7 +64,7 @@ Six principles met, five partial, none with no mechanism at all.
 ## 5. Security
 
 - **Outcome.** Met.
-- **Our process.** Threat model and adversary table (`docs/tencent/SECURITY.md:27-42`). Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds, with dispositions for tracks 2-7 (`docs/tencent/SECURITY.md:124-393`).
+- **Our process.** Threat model and adversary table (`docs/tencent/SECURITY.md:27-42`). Codex tracks 1-7, CodeBuddy on Hy3 and two further AI review rounds (list: `docs/tencent/DEV_PROCESS.md`), with dispositions for tracks 2-7 (`docs/tencent/SECURITY.md:124-393`).
 - **Evidence to attach.** [OWASP_LLM_REDTEAM.md](OWASP_LLM_REDTEAM.md); RESULTS.md: 0 leaks / 7,374, 0 injection failures / 1,152 (re-run 30 Oct).
 - **Gap.** Track 1 (35 findings) has no written disposition (`docs/tencent/SECURITY.md:208-218`). No rate limiter. Timing side channel not controlled.
 

@@ -11,6 +11,10 @@ Every feature, who can use it, where it is and the test that proves it:
 [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since the 16 Oct submission:
 [CHANGELOG.md](docs/finals/CHANGELOG.md).
 
+**Platform and Tencent.** The Walnut platform underneath (21 packages), which parts answer questions,
+which are ways to ask or views, and the verified test figures: [docs/PLATFORM.md](docs/PLATFORM.md).
+The Tencent tools used in the build, with evidence: [README, Built with Tencent](README.md#built-with-tencent).
+
 ---
 
 ## Finals build
@@ -248,7 +252,7 @@ bash; the commands are in [README.md → Fallback](README.md#fallback-start-each
   git-ignored) with one of these, then restart (`demo_up.sh stop`, then `start`; or restart terminal 1):
 
   ```bash
-  # Tencent TokenHub: Hy3, with deepseek-v4.1-flash as backup
+  # Tencent TokenHub: Hy3 first, then the optional stand-in model
   TOKENHUB_API_KEY=<your TokenHub key>
   ```
 
@@ -329,8 +333,9 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Tamper demo runs on a copy; the live log's bytes are unchanged | tests | `test_tamper_demo_route.py` |
 | Live stage events never time the permission checks (Gate 1 and Gate 2 are sent only once the decision is sealed); a foreign `Host` header is refused before any route | tests | `test_final_review_fixes.py::test_gate1_and_gate2_are_held_until_the_checks_are_sealed`, `::test_a_foreign_host_header_is_refused_before_any_route` |
 | The engine snapshot is readable only by the persona it was built for | tests | `internal_brain_web/tests/e2e/engine-proxy.spec.ts`, `engine.spec.ts` |
-| Automated tests, Internal Brain | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, to become `final_v1.3`; 639 at submission) | `databridge/apps/internal_brain/tests/` |
+| Automated tests, Internal Brain | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, now locked as `final_v1.3`; 639 at submission) | `databridge/apps/internal_brain/tests/` |
 | Web end-to-end tests (Playwright, including axe accessibility checks) | 185 passed, 0 failed, 42 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
+| CI on GitHub (backend tests on Python 3.13, web typecheck on Node 20) | Green: 17 successful GitHub Actions runs, 29–30 Oct, 0 failed (superseded pushes were cancelled, not failed); latest [run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962); the workflow also runs on `final_v1.2-cloud`, `final_v1.3` and `final_v1.4` |
 | Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 4 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks
@@ -397,8 +402,9 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 
 ## What's inside
 
-- **The Walnut evidence engine** underneath: provenance pointers, the sealed ledger, the grounding wall
-  and the model harness. The Internal Brain uses it by import and does not modify it.
+- **Parts of the Walnut platform**, imported unchanged: `core` (source pointers, the sealed ledger, value
+  forms), the model harness, `convert` (file readers) and the gateway's grounding wall. The Internal Brain keeps
+  its own permission-first retrieval index; it does not use the platform's retrieval package.
 - **The Internal Brain** on top: the permission compilers, the two checks, the audit log and console,
   the web app, the mock platforms, the Company A world, the fintech rules, the WorkBuddy connectors, the
   evaluation and the original-screen configuration.
@@ -408,7 +414,7 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
   boundaries, and ran a security review on Tencent Hunyuan `hy3`; then it fixed its own code after a Codex
   review. Every session's transcript is kept: [docs/tencent/DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md).
 - **WorkBuddy** is the second front door, including an audit assistant for compliance.
-- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with `deepseek-v4.1-flash` as backup (wired in,
+- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with an optional stand-in model behind it (wired in,
   not yet run live; see [Honest limits](#honest-limits)).
 - **Lighthouse:** a hardened deploy kit (Docker, HTTPS, passcode-gated demo) is in
   [deploy/lighthouse/](deploy/lighthouse/README.md).

@@ -98,7 +98,7 @@ Risks for the first take of the new scenes (nothing could be checked without a b
   is allowed for him; it writes a mock Jira ticket. Any other state (`act-unavailable`, `act-error`, ...) fails the take.
 - 18 Deliverables: assumes the table kind is offered (`deliver-table` row button) for that answer; `deliver-table` and
   `deliver-chart` are both a row button and a view element, so the recorder scopes them to `deliver-sheet`.
-- 19 Upload: recorded as Leo (`leo.ops`), not Jordan, who may write to no folder (round-5 Opus #1). Sets the file on
+- 19 Upload: recorded as Leo (`leo.ops`), not Jordan, who may write to no folder (round-5 review #1). Sets the file on
   the hidden input and picks **Pricing & Offers** by its label (Leo writes there, Ken cannot read it; checked in
   `world.json`), never by position; the take fails if that folder is not listed. Writes a file into the mock Drive.
 - 06b: needs demo features on; `graph-left-add`, `graph-left-addsheet-*`, `graph-left-live-item`, `graph-right-live`.
