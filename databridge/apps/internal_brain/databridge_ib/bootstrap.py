@@ -147,8 +147,29 @@ def audit_filter_parser(svc):
     return make_chain_parser(chain)
 
 
+#: HTTP client and SDK loggers that print request URLs (and so a model endpoint's host) or the
+#: provider and model at INFO. Story 1 fix #4: ib.log must name no endpoint host, URL or provider.
+QUIET_LOGGERS = ("httpx", "httpx2", "httpcore", "httpcore2", "openai", "openai._base_client",
+                 "anthropic", "anthropic._base_client", "LiteLLM", "LiteLLM Router", "LiteLLM Proxy",
+                 "litellm", "urllib3")
+
+
+def quiet_http_loggers() -> None:
+    """Raise the URL-printing loggers to WARNING (idempotent). Their warnings and errors still log;
+    the per-request INFO lines ("HTTP Request: POST https://<host>/...") do not."""
+    for name in QUIET_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
+def configure_logging() -> None:
+    """The service's logging at start-up: INFO for the IB, WARNING for the HTTP clients."""
+    logging.basicConfig(level=logging.INFO)
+    quiet_http_loggers()
+
+
 def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Optional[float] = None):
     from .sim import make_sim_router
+    quiet_http_loggers()            # also when the app is served by another entry point
     svc = build_services(cfg)
 
     def audit_factory(current, require_role):
@@ -189,7 +210,7 @@ def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Opti
 
 def main() -> None:
     import uvicorn
-    logging.basicConfig(level=logging.INFO)
+    configure_logging()
     port = int(os.environ.get("IB_PORT", "8100"))
     app = build_app(poll_s=float(os.environ.get("IB_POLL_S", "120")))
     uvicorn.run(app, host=os.environ.get("IB_HOST", "127.0.0.1"), port=port)
