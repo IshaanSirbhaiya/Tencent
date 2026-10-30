@@ -1,0 +1,4 @@
+Atlas research notes — synthetic prototype sessions, 16 October 2026
+Oliver Chen ran 6 synthetic prototype sessions; 4 participants could not tell if a document needed resubmission.
+The revised design uses explicit Uploaded, Needs action and In review states.
+There is no production conversion result in these notes. The 1-business-day goal remains unmeasured.

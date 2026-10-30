@@ -1,0 +1,4 @@
+ATL-103: Merchant status screen
+Status: Done
+Assignee: samira.frontend
+Samira Khan delivered the Atlas document-upload and application-status screens on 23 October 2026. She is helping reproduce the remaining callback-state failures.

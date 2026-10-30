@@ -1,0 +1,6 @@
+Imported WhatsApp export — synthetic; manually supplied to Drive, not a live WhatsApp connector
+Group: Atlas pilot coordination; participants consented to this fictional shared archive.
+[28/10/2026, 18:10] Leo Hartono: Atlas pilot cohort is still 10. Can we review support ownership in the morning?
+[28/10/2026, 18:12] Daniel Wu: Yes. Please put any decision into the project Slack thread and SOP so the team has an official record.
+[28/10/2026, 18:14] Priya Raman: I can join at 09:30 SGT. My rollback rehearsal is complete.
+[28/10/2026, 18:16] Leo Hartono: Thanks. This chat only schedules the review; it is not a launch approval.

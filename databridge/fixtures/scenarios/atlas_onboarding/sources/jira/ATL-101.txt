@@ -1,0 +1,4 @@
+ATL-101: Product requirements and pilot scope
+Status: Done
+Assignee: daniel.pm
+The Atlas PRD defines 10 invited Singapore merchants and a human operations review. Ava Brooks approved the scope on 9 October 2026.

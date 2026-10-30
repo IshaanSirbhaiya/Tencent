@@ -1,0 +1,4 @@
+ATL-112: Shareable pilot access review
+Status: Done
+Assignee: sara.sec
+Sara Lindqvist completed the Atlas role-access review on 27 October 2026. No release-blocking access findings remain in this shareable review. The final list of pilot users must still be checked before go/no-go.

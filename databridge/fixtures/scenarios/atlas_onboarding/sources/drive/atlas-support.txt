@@ -1,0 +1,7 @@
+Atlas support SOP draft — not yet approved
+Leo Hartono has confirmed 10 invited Singapore merchants for the proposed pilot.
+Support coverage is planned for 09:00–18:00 SGT on pilot business days.
+The daily exception owner is unconfirmed; Alex Morgan and Leo Hartono must agree the owner before go/no-go.
+Step 1: Acknowledge a merchant's onboarding question.
+Step 2: Check the application record and ask the assigned operations reviewer.
+Step 3: Escalate callback-state inconsistencies to Elena Park; do not manually label an application approved.

@@ -1,0 +1,7 @@
+Imported email archive — synthetic, not a live email connector
+Subject: Atlas pilot date revision — approved conditionally
+From: ava.sponsor@companya.example
+To: daniel.pm, jdoe, leo.ops
+Sent: 2026-10-29T15:00:00+08:00
+
+I approve revising the provisional Atlas pilot from 6 November to 12 November 2026. This supersedes the earlier proposed date. The pilot is still conditional on all 120 QA cases passing and the support SOP being ready. Keep the cohort at 10 Singapore merchants. The go/no-go is 3 November at 16:00 SGT. Alex will take product ownership tomorrow. Ava.

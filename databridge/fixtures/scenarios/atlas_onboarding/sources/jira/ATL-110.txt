@@ -1,0 +1,4 @@
+ATL-110: Operations support SOP
+Status: In Progress
+Assignee: leo.ops
+Leo Hartono has assembled the Atlas 10-merchant pilot cohort and drafted the support SOP. The daily exception owner must be confirmed before 3 November 2026.

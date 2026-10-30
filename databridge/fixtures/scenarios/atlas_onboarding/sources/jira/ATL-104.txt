@@ -1,0 +1,4 @@
+ATL-104: Research and onboarding flow
+Status: Done
+Assignee: oliver.design
+Oliver Chen tested the Atlas flow with 6 synthetic research participants and delivered the revised designs on 16 October 2026. Research observations are not production conversion results.

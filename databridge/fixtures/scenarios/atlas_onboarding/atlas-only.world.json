@@ -1,0 +1,1196 @@
+{
+  "meta": {
+    "seed": 301026,
+    "now": "2026-10-30T17:00:00+08:00",
+    "tenant": "companya",
+    "domain": "companya.example",
+    "scale": "atlas-onboarding",
+    "generator_version": "atlas-1",
+    "synthetic": true,
+    "description": "Fictional Company A fintech; fixed 30 Oct 2026 snapshot."
+  },
+  "directory": {
+    "users": [
+      {
+        "id": "alex.product",
+        "name": "Alex Morgan",
+        "email": "alex.product@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS00",
+          "confluence": "acc-alex.product",
+          "jira": "acc-alex.product",
+          "drive": "alex.product@companya.example"
+        }
+      },
+      {
+        "id": "ava.sponsor",
+        "name": "Ava Brooks",
+        "email": "ava.sponsor@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS01",
+          "confluence": "acc-ava.sponsor",
+          "jira": "acc-ava.sponsor",
+          "drive": "ava.sponsor@companya.example"
+        }
+      },
+      {
+        "id": "daniel.pm",
+        "name": "Daniel Wu",
+        "email": "daniel.pm@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS02",
+          "confluence": "acc-daniel.pm",
+          "jira": "acc-daniel.pm",
+          "drive": "daniel.pm@companya.example"
+        }
+      },
+      {
+        "id": "jdoe",
+        "name": "Jordan Doe",
+        "email": "jdoe@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas",
+          "grp-eng",
+          "grp-payments-eng",
+          "grp-staff"
+        ],
+        "platform_ids": {
+          "confluence": "acc-jdoe",
+          "drive": "jdoe@companya.example",
+          "jira": "acc-jdoe",
+          "slack": "U0JDOE"
+        }
+      },
+      {
+        "id": "elena.backend",
+        "name": "Elena Park",
+        "email": "elena.backend@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS04",
+          "confluence": "acc-elena.backend",
+          "jira": "acc-elena.backend",
+          "drive": "elena.backend@companya.example"
+        }
+      },
+      {
+        "id": "samira.frontend",
+        "name": "Samira Khan",
+        "email": "samira.frontend@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS05",
+          "confluence": "acc-samira.frontend",
+          "jira": "acc-samira.frontend",
+          "drive": "samira.frontend@companya.example"
+        }
+      },
+      {
+        "id": "oliver.design",
+        "name": "Oliver Chen",
+        "email": "oliver.design@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS06",
+          "confluence": "acc-oliver.design",
+          "jira": "acc-oliver.design",
+          "drive": "oliver.design@companya.example"
+        }
+      },
+      {
+        "id": "mei.data",
+        "name": "Mei Tan",
+        "email": "mei.data@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS07",
+          "confluence": "acc-mei.data",
+          "jira": "acc-mei.data",
+          "drive": "mei.data@companya.example"
+        }
+      },
+      {
+        "id": "lucas.qa",
+        "name": "Lucas Reed",
+        "email": "lucas.qa@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas"
+        ],
+        "platform_ids": {
+          "slack": "UATLAS08",
+          "confluence": "acc-lucas.qa",
+          "jira": "acc-lucas.qa",
+          "drive": "lucas.qa@companya.example"
+        }
+      },
+      {
+        "id": "priya.sre",
+        "name": "Priya Raman",
+        "email": "priya.sre@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas",
+          "grp-eng",
+          "grp-sre",
+          "grp-staff"
+        ],
+        "platform_ids": {
+          "confluence": "acc-priya.sre",
+          "drive": "priya.sre@companya.example",
+          "jira": "acc-priya.sre",
+          "slack": "U0PRIYASRE"
+        }
+      },
+      {
+        "id": "leo.ops",
+        "name": "Leo Hartono",
+        "email": "leo.ops@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas",
+          "grp-product",
+          "grp-staff"
+        ],
+        "platform_ids": {
+          "confluence": "acc-leo.ops",
+          "drive": "leo.ops@companya.example",
+          "jira": "acc-leo.ops",
+          "slack": "U0LEOOPS"
+        }
+      },
+      {
+        "id": "sara.sec",
+        "name": "Sara Lindqvist",
+        "email": "sara.sec@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [
+          "grp-atlas",
+          "grp-eng",
+          "grp-security",
+          "grp-staff"
+        ],
+        "platform_ids": {
+          "confluence": "acc-sara.sec",
+          "drive": "sara.sec@companya.example",
+          "jira": "acc-sara.sec",
+          "slack": "U0SARASEC"
+        }
+      },
+      {
+        "id": "ken.ext",
+        "name": "Ken Adeyemi",
+        "email": "ken.ext@acmevendor.example",
+        "employment": "contractor",
+        "kind": "connect",
+        "active": true,
+        "roles": [
+          "employee"
+        ],
+        "groups": [],
+        "platform_ids": {
+          "confluence": "acc-ken.ext",
+          "drive": "ken.ext@acmevendor.example",
+          "jira": "acc-ken.ext",
+          "slack": "U0KENEXT"
+        }
+      },
+      {
+        "id": "admin.it",
+        "name": "Alex Mercer",
+        "email": "admin.it@companya.example",
+        "employment": "employee",
+        "kind": "member",
+        "active": true,
+        "roles": [
+          "employee",
+          "admin_it"
+        ],
+        "groups": [
+          "grp-it",
+          "grp-staff"
+        ],
+        "platform_ids": {
+          "confluence": "acc-admin.it",
+          "drive": "admin.it@companya.example",
+          "jira": "acc-admin.it",
+          "slack": "U0ADMINIT"
+        }
+      }
+    ],
+    "groups": [
+      {
+        "id": "grp-atlas",
+        "name": "Atlas project team",
+        "members": [
+          "alex.product",
+          "ava.sponsor",
+          "daniel.pm",
+          "jdoe",
+          "elena.backend",
+          "samira.frontend",
+          "oliver.design",
+          "mei.data",
+          "lucas.qa",
+          "priya.sre",
+          "leo.ops",
+          "sara.sec"
+        ],
+        "member_groups": []
+      },
+      {
+        "id": "grp-atlas-security",
+        "name": "Atlas security",
+        "members": [
+          "sara.sec"
+        ],
+        "member_groups": []
+      }
+    ]
+  },
+  "confluence": {
+    "spaces": [
+      {
+        "id": "sp-atlas",
+        "key": "ATLAS",
+        "name": "Atlas project",
+        "read": {
+          "users": [],
+          "groups": [
+            "grp-atlas"
+          ]
+        },
+        "anonymous": false
+      },
+      {
+        "id": "sp-sec",
+        "key": "ATLASSEC",
+        "name": "Security working papers",
+        "read": {
+          "users": [
+            "sara.sec"
+          ],
+          "groups": []
+        },
+        "anonymous": false
+      },
+      {
+        "id": "sp-boreal",
+        "key": "BOREAL",
+        "name": "Boreal project",
+        "read": {
+          "users": [],
+          "groups": [
+            "grp-atlas"
+          ]
+        },
+        "anonymous": false
+      }
+    ],
+    "pages": [
+      {
+        "id": "atlas-overview",
+        "space": "ATLAS",
+        "parent": null,
+        "title": "Project Atlas: product overview and current status",
+        "version": 3,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-30T16:00:00+08:00",
+        "author": "daniel.pm",
+        "body": "Project Atlas overview\nPurpose and scope\nProject Atlas is Company A's merchant-onboarding workspace for Singapore SME customers.\nThe target is to reduce median onboarding time from 5 business days to 1 business day; this is a target, not a measured result.\nThe first pilot covers 10 invited Singapore merchants, document upload, application status and an operations review queue.\nAutomated approval, overseas merchants and WhatsApp notifications are outside the first pilot scope.\nCurrent status as of 30 October 2026\nAtlas is Amber: the pilot is conditional on two remaining callback tests passing and the support SOP being ready.\nThe revised provisional pilot is 12 November 2026; 6 November 2026 is superseded by decision ADR-003.\nAlex Morgan takes product ownership from Daniel Wu on 30 October 2026.\nThe next go/no-go is 3 November 2026 at 16:00 SGT.\nPointers: ADR-003; ATL-108; ATL-109; Atlas team roster in Drive.",
+        "read_restriction": null,
+        "history": [
+          {
+            "version": 2,
+            "updated": "2026-10-23T10:00:00+08:00",
+            "body": "The initial proposed Atlas pilot date was 6 November 2026; QA sign-off was still pending."
+          }
+        ]
+      },
+      {
+        "id": "atlas-architecture",
+        "space": "ATLAS",
+        "parent": null,
+        "title": "Atlas architecture and ownership",
+        "version": 1,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-23T16:00:00+08:00",
+        "author": "jdoe",
+        "body": "Atlas architecture\nJordan Doe owns the technical design and coordinates the integration.\nSamira Khan's merchant status screen calls Elena Park's onboarding API.\nThe API consumes verification callbacks and writes an application-state event for Mei Tan's funnel dashboard.\nA duplicate callback must not move a completed application back to pending.\nPriya Raman owns staging, alert routing and the rollback procedure.\nThe pilot keeps a human operations review before any merchant is approved.\nThe integration uses a fictional verification sandbox; no real merchant data or live vendor credentials exist in this fixture.",
+        "read_restriction": null,
+        "history": []
+      },
+      {
+        "id": "atlas-adr-003",
+        "space": "ATLAS",
+        "parent": null,
+        "title": "Atlas ADR-003: scope and revised pilot decision",
+        "version": 1,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-29T16:00:00+08:00",
+        "author": "ava.sponsor",
+        "body": "Atlas ADR-003\nDecision recorded 29 October 2026\nAva Brooks approved moving the provisional Atlas pilot from 6 November 2026 to 12 November 2026.\nThe earlier 6 November date is superseded; the revised date remains conditional, not a launch commitment.\nReason: ATL-108 still has two failing callback scenarios and ATL-109 cannot be signed off.\nThe pilot remains 10 invited Singapore merchants; overseas onboarding is deferred.\nElena Park targets the remaining fix for 2 November 2026; Lucas Reed plans the regression rerun for 3 November 2026.\nAlex Morgan must confirm the pilot scope and acceptance criteria with Ava Brooks on 2 November 2026.\nGo/no-go owners are Alex Morgan, Lucas Reed, Leo Hartono and Sara Lindqvist; the meeting is 3 November 2026 at 16:00 SGT.\nApproval evidence: imported email dated 29 October; confirmation in #proj-atlas.",
+        "read_restriction": null,
+        "history": []
+      },
+      {
+        "id": "atlas-first-week",
+        "space": "ATLAS",
+        "parent": null,
+        "title": "Atlas product-lead handover: first-week checklist",
+        "version": 1,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-30T16:00:00+08:00",
+        "author": "daniel.pm",
+        "body": "Atlas product-lead handover\nDaniel Wu hands Atlas product ownership to Alex Morgan on 30 October 2026.\nStep 1: Meet Jordan Doe and Lucas Reed to review ATL-108 and the two failing callback tests on 2 November 2026.\nStep 2: Confirm the 10-merchant pilot scope and acceptance criteria with Ava Brooks on 2 November 2026.\nStep 3: Review Leo Hartono's support SOP and confirm the pilot exception owner before the 3 November go/no-go.\nStep 4: Attend the go/no-go on 3 November 2026 at 16:00 SGT; publish the decision before confirming a pilot date.\nStep 5: Check Mei Tan's baseline dashboard before treating the 1-day onboarding goal as an achieved outcome.\nOpen question: no approved budget figure is recorded in the accessible Atlas project records.",
+        "read_restriction": null,
+        "history": []
+      },
+      {
+        "id": "atlas-pilot-checks",
+        "space": "ATLAS",
+        "parent": null,
+        "title": "Atlas pilot acceptance criteria and rollback",
+        "version": 1,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-30T16:00:00+08:00",
+        "author": "lucas.qa",
+        "body": "Atlas pilot acceptance criteria\nAll 120 required regression cases must pass; 118 pass and 2 fail in the 30 October run.\nA duplicate callback must preserve the completed application state.\nA delayed callback arriving after a retry must not overwrite the newest verified state.\nLeo Hartono must publish a support SOP with a named daily exception owner.\nSara Lindqvist must confirm the final pilot access list, using the shareable access checklist.\nPriya Raman can disable new pilot invitations and return merchants to the existing operations process if the pilot is stopped.\nThere is no permission to treat a provisional date as an approved launch.",
+        "read_restriction": null,
+        "history": []
+      },
+      {
+        "id": "atlas-sec-private",
+        "space": "ATLASSEC",
+        "parent": null,
+        "title": "Atlas restricted security working note",
+        "version": 1,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-28T16:00:00+08:00",
+        "author": "sara.sec",
+        "body": "Synthetic restricted working detail: ATLAS-RESTRICTED-ORCHID-804.\nThis fictional note is only available to Sara Lindqvist. The shareable access-review conclusion is in ATL-112.",
+        "read_restriction": null,
+        "history": []
+      },
+      {
+        "id": "boreal-overview",
+        "space": "BOREAL",
+        "parent": null,
+        "title": "Project Boreal: mobile receipts",
+        "version": 1,
+        "status": "current",
+        "created": "2026-10-05T10:00:00+08:00",
+        "updated": "2026-10-27T16:00:00+08:00",
+        "author": "samira.frontend",
+        "body": "Project Boreal is a separate mobile-receipts project. Its proposed pilot is 20 November 2026. Its scope and dates do not apply to Atlas.",
+        "read_restriction": null,
+        "history": []
+      }
+    ]
+  },
+  "jira": {
+    "projects": [
+      {
+        "id": "91000",
+        "key": "ATL",
+        "name": "Project Atlas",
+        "roles": {
+          "Team": {
+            "users": [],
+            "groups": [
+              "grp-atlas"
+            ]
+          }
+        },
+        "browse": {
+          "roles": [
+            "Team"
+          ],
+          "users": [],
+          "groups": [],
+          "reporter": false,
+          "assignee": false
+        }
+      }
+    ],
+    "security_levels": [],
+    "issues": [
+      {
+        "id": "91101",
+        "key": "ATL-101",
+        "project": "ATL",
+        "summary": "Product requirements and pilot scope",
+        "description": "The Atlas PRD defines 10 invited Singapore merchants and a human operations review. Ava Brooks approved the scope on 9 October 2026.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "daniel.pm",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "daniel.pm",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: The Atlas PRD defines 10 invited Singapore merchants and a human operations review. Ava Brooks approved the scope on 9 October 2026."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91102",
+        "key": "ATL-102",
+        "project": "ATL",
+        "summary": "Onboarding API and application events",
+        "description": "Elena Park implemented the Atlas application API and event publication. Integration completed on 23 October 2026; callback edge-case fixes are tracked separately in ATL-108.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "elena.backend",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "elena.backend",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Elena Park implemented the Atlas application API and event publication. Integration completed on 23 October 2026; callback edge-case fixes are tracked separately in ATL-108."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91103",
+        "key": "ATL-103",
+        "project": "ATL",
+        "summary": "Merchant status screen",
+        "description": "Samira Khan delivered the Atlas document-upload and application-status screens on 23 October 2026. She is helping reproduce the remaining callback-state failures.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "samira.frontend",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "samira.frontend",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Samira Khan delivered the Atlas document-upload and application-status screens on 23 October 2026. She is helping reproduce the remaining callback-state failures."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91104",
+        "key": "ATL-104",
+        "project": "ATL",
+        "summary": "Research and onboarding flow",
+        "description": "Oliver Chen tested the Atlas flow with 6 synthetic research participants and delivered the revised designs on 16 October 2026. Research observations are not production conversion results.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "oliver.design",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "oliver.design",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Oliver Chen tested the Atlas flow with 6 synthetic research participants and delivered the revised designs on 16 October 2026. Research observations are not production conversion results."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91105",
+        "key": "ATL-105",
+        "project": "ATL",
+        "summary": "Funnel event schema",
+        "description": "Mei Tan delivered the Atlas event schema on 23 October 2026. Production baseline measurement is not yet available.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "mei.data",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "mei.data",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Mei Tan delivered the Atlas event schema on 23 October 2026. Production baseline measurement is not yet available."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91106",
+        "key": "ATL-106",
+        "project": "ATL",
+        "summary": "Staging and rollback",
+        "description": "Priya Raman completed Atlas staging and a rollback rehearsal on 24 October 2026. Pilot alert routing still needs a final recipient check.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "priya.sre",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "priya.sre",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Priya Raman completed Atlas staging and a rollback rehearsal on 24 October 2026. Pilot alert routing still needs a final recipient check."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91107",
+        "key": "ATL-107",
+        "project": "ATL",
+        "summary": "Initial regression run",
+        "description": "Lucas Reed completed the Atlas 120-case regression run on 28 October 2026. Seven callback failures were opened; five were fixed and two remain on 30 October 2026. Completing this test-run task does not mean pilot sign-off.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "lucas.qa",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "lucas.qa",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Lucas Reed completed the Atlas 120-case regression run on 28 October 2026. Seven callback failures were opened; five were fixed and two remain on 30 October 2026. Completing this test-run task does not mean pilot sign-off."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91108",
+        "key": "ATL-108",
+        "project": "ATL",
+        "summary": "Atlas callback retry blocker and current status",
+        "description": "Atlas has two remaining callback-state failures blocking QA sign-off. Five of the original seven failures are fixed. Elena Park owns the remaining fix, targeted for 2 November 2026. Lucas Reed will rerun all 120 cases on 3 November 2026. A duplicate callback can reset completed to pending; a delayed callback can overwrite the newest state. No production merchants are affected because the pilot has not started.",
+        "status": "In Progress",
+        "reporter": "daniel.pm",
+        "assignee": "elena.backend",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "elena.backend",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Atlas has two remaining callback-state failures blocking QA sign-off. Five of the original seven failures are fixed. Elena Park owns the remaining fix, targeted for 2 November 2026. Lucas Reed will rerun all 120 cases on 3 November 2026. A duplicate callback can reset completed to pending; a delayed callback can overwrite the newest state. No production merchants are affected because the pilot has not started."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91109",
+        "key": "ATL-109",
+        "project": "ATL",
+        "summary": "Pilot QA sign-off",
+        "description": "Atlas QA sign-off is blocked by ATL-108. The 30 October 2026 run passed 118 of 120 required cases. Sign-off requires all 120 to pass, not just the two retested cases.",
+        "status": "Blocked",
+        "reporter": "daniel.pm",
+        "assignee": "lucas.qa",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "lucas.qa",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Atlas QA sign-off is blocked by ATL-108. The 30 October 2026 run passed 118 of 120 required cases. Sign-off requires all 120 to pass, not just the two retested cases."
+          }
+        ],
+        "links": [
+          "ATL-108"
+        ]
+      },
+      {
+        "id": "91110",
+        "key": "ATL-110",
+        "project": "ATL",
+        "summary": "Operations support SOP",
+        "description": "Leo Hartono has assembled the Atlas 10-merchant pilot cohort and drafted the support SOP. The daily exception owner must be confirmed before 3 November 2026.",
+        "status": "In Progress",
+        "reporter": "daniel.pm",
+        "assignee": "leo.ops",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "leo.ops",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Leo Hartono has assembled the Atlas 10-merchant pilot cohort and drafted the support SOP. The daily exception owner must be confirmed before 3 November 2026."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91111",
+        "key": "ATL-111",
+        "project": "ATL",
+        "summary": "Baseline funnel dashboard",
+        "description": "Mei Tan will build the Atlas baseline funnel dashboard after the event schema lands. No measured reduction in onboarding time can yet be claimed.",
+        "status": "To Do",
+        "reporter": "daniel.pm",
+        "assignee": "mei.data",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "mei.data",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Mei Tan will build the Atlas baseline funnel dashboard after the event schema lands. No measured reduction in onboarding time can yet be claimed."
+          }
+        ],
+        "links": []
+      },
+      {
+        "id": "91112",
+        "key": "ATL-112",
+        "project": "ATL",
+        "summary": "Shareable pilot access review",
+        "description": "Sara Lindqvist completed the Atlas role-access review on 27 October 2026. No release-blocking access findings remain in this shareable review. The final list of pilot users must still be checked before go/no-go.",
+        "status": "Done",
+        "reporter": "daniel.pm",
+        "assignee": "sara.sec",
+        "security_level": null,
+        "created": "2026-10-09T10:00:00+08:00",
+        "updated": "2026-10-30T11:00:00+08:00",
+        "comments": [
+          {
+            "author": "sara.sec",
+            "created": "2026-10-30T11:00:00+08:00",
+            "body": "Update for the 30 October Atlas handover: Sara Lindqvist completed the Atlas role-access review on 27 October 2026. No release-blocking access findings remain in this shareable review. The final list of pilot users must still be checked before go/no-go."
+          }
+        ],
+        "links": []
+      }
+    ]
+  },
+  "slack": {
+    "workspace": {
+      "id": "TATLAS",
+      "domain": "companya"
+    },
+    "channels": [
+      {
+        "id": "C0ATLAS",
+        "name": "proj-atlas",
+        "type": "private",
+        "members": [
+          "alex.product",
+          "ava.sponsor",
+          "daniel.pm",
+          "jdoe",
+          "elena.backend",
+          "samira.frontend",
+          "oliver.design",
+          "mei.data",
+          "lucas.qa",
+          "priya.sre",
+          "leo.ops",
+          "sara.sec"
+        ],
+        "archived": false,
+        "created": "2026-10-05T10:00:00+08:00"
+      },
+      {
+        "id": "C0VENDOR",
+        "name": "vendor-support",
+        "type": "connect",
+        "members": [
+          "ken.ext",
+          "jdoe"
+        ],
+        "archived": false,
+        "created": "2026-10-01T10:00:00+08:00"
+      }
+    ],
+    "threads": [
+      {
+        "channel": "C0ATLAS",
+        "ts": "1791165600.000100",
+        "messages": [
+          {
+            "ts": "1791165600.000100",
+            "user": "ava.sponsor",
+            "text": "Atlas kickoff: make Singapore merchant onboarding easier to understand and operate. Our goal is 5 business days down to 1; that is a target.",
+            "edited": false
+          },
+          {
+            "ts": "1791165690.000100",
+            "user": "daniel.pm",
+            "text": "I will own the PRD and handover; Jordan owns technical integration. First pilot is 10 invited merchants.",
+            "edited": false
+          },
+          {
+            "ts": "1791165780.000100",
+            "user": "jdoe",
+            "text": "I will document the API and callback contract before implementation.",
+            "edited": false
+          },
+          {
+            "ts": "1791165870.000100",
+            "user": "leo.ops",
+            "text": "Please keep operations review in the pilot; we are not automating approval.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1791525600.000100",
+        "messages": [
+          {
+            "ts": "1791525600.000100",
+            "user": "daniel.pm",
+            "text": "Atlas PRD ready: Singapore merchants, document upload, status screen and operations queue. Proposed pilot date is 6 November, subject to QA.",
+            "edited": false
+          },
+          {
+            "ts": "1791525690.000100",
+            "user": "ava.sponsor",
+            "text": "Scope approved. No overseas onboarding or automated approval in this pilot.",
+            "edited": false
+          },
+          {
+            "ts": "1791525780.000100",
+            "user": "oliver.design",
+            "text": "I will test the document-status language before design sign-off.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1792119600.000100",
+        "messages": [
+          {
+            "ts": "1792119600.000100",
+            "user": "oliver.design",
+            "text": "Atlas research: 4 of 6 synthetic participants could not tell whether documents needed resubmission. Revised copy makes the next required action explicit.",
+            "edited": false
+          },
+          {
+            "ts": "1792119690.000100",
+            "user": "samira.frontend",
+            "text": "Revised flow received. I will implement upload status and the action-needed state.",
+            "edited": false
+          },
+          {
+            "ts": "1792119780.000100",
+            "user": "mei.data",
+            "text": "These are prototype observations, not a measured production completion-rate improvement.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1792738800.000100",
+        "messages": [
+          {
+            "ts": "1792738800.000100",
+            "user": "jdoe",
+            "text": "Atlas frontend and API are integrated in staging. Jordan: API design; Elena: onboarding API; Samira: upload and status screens.",
+            "edited": false
+          },
+          {
+            "ts": "1792738890.000100",
+            "user": "priya.sre",
+            "text": "Staging alerts are connected. I will rehearse rollback tomorrow.",
+            "edited": false
+          },
+          {
+            "ts": "1792738980.000100",
+            "user": "lucas.qa",
+            "text": "Integration complete does not mean ready to pilot. I will run the full 120-case pack.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1793156400.000100",
+        "messages": [
+          {
+            "ts": "1793156400.000100",
+            "user": "lucas.qa",
+            "text": "Atlas QA found 7 failures in the initial 120-case run. They all involve duplicate or delayed verification callbacks. Filed ATL-108.",
+            "edited": false
+          },
+          {
+            "ts": "1793156490.000100",
+            "user": "elena.backend",
+            "text": "Reproduced: completed can revert to pending when a duplicate callback arrives. I am adding idempotency checks.",
+            "edited": false
+          },
+          {
+            "ts": "1793156580.000100",
+            "user": "samira.frontend",
+            "text": "The screen is reflecting the state returned by the API. Changing the label would hide the symptom, not fix it.",
+            "edited": false
+          },
+          {
+            "ts": "1793156670.000100",
+            "user": "jdoe",
+            "text": "Keep the blocker on ATL-108. Do not mark the pilot ready based on a green UI demo.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1793260800.000100",
+        "messages": [
+          {
+            "ts": "1793260800.000100",
+            "user": "ava.sponsor",
+            "text": "Atlas status and pilot decision: move the provisional date from 6 November to 12 November 2026. The earlier date is superseded; the new date is conditional on QA and support readiness.",
+            "edited": false
+          },
+          {
+            "ts": "1793260890.000100",
+            "user": "daniel.pm",
+            "text": "ADR-003 updated. Alex Morgan takes product ownership tomorrow. Handover email and team roster are in Drive.",
+            "edited": false
+          },
+          {
+            "ts": "1793260980.000100",
+            "user": "leo.ops",
+            "text": "The pilot remains 10 merchants. I need a named daily exception owner before go/no-go.",
+            "edited": false
+          },
+          {
+            "ts": "1793261070.000100",
+            "user": "lucas.qa",
+            "text": "QA sign-off remains blocked until all 120 required cases pass.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1793325600.000100",
+        "messages": [
+          {
+            "ts": "1793325600.000100",
+            "user": "lucas.qa",
+            "text": "Atlas current status at 10:00 on 30 October: 118 of 120 required regression cases pass; 2 still fail. Five of the original seven failures are fixed.",
+            "edited": false
+          },
+          {
+            "ts": "1793325690.000100",
+            "user": "elena.backend",
+            "text": "I own the remaining callback retry fixes in ATL-108, target 2 November. Please keep that as a target, not a promise.",
+            "edited": false
+          },
+          {
+            "ts": "1793325780.000100",
+            "user": "priya.sre",
+            "text": "I will validate alert recipients before the pilot. Rollback rehearsal is complete.",
+            "edited": false
+          },
+          {
+            "ts": "1793325870.000100",
+            "user": "lucas.qa",
+            "text": "Full rerun on 3 November, then the 16:00 SGT go/no-go. No QA approval yet.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1793332800.000100",
+        "messages": [
+          {
+            "ts": "1793332800.000100",
+            "user": "daniel.pm",
+            "text": "Atlas handover for Alex: team roles and completed contributions are in the Drive team roster. Please ask owners about their current focus.",
+            "edited": false
+          },
+          {
+            "ts": "1793332890.000100",
+            "user": "jdoe",
+            "text": "Alex, start with me for architecture and Elena for the callback fix.",
+            "edited": false
+          },
+          {
+            "ts": "1793332980.000100",
+            "user": "oliver.design",
+            "text": "Happy to walk you through the research and why the upload states changed.",
+            "edited": false
+          },
+          {
+            "ts": "1793333070.000100",
+            "user": "mei.data",
+            "text": "I own the event schema and upcoming baseline dashboard; we do not have measured production onboarding time yet.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1793340000.000100",
+        "messages": [
+          {
+            "ts": "1793340000.000100",
+            "user": "leo.ops",
+            "text": "Atlas support SOP draft is ready; the daily exception owner still needs Alex's confirmation.",
+            "edited": false
+          },
+          {
+            "ts": "1793340090.000100",
+            "user": "alex.product",
+            "text": "I will review it with you on 2 November before confirming pilot readiness.",
+            "edited": false
+          },
+          {
+            "ts": "1793340180.000100",
+            "user": "sara.sec",
+            "text": "My shareable access review is complete in ATL-112. We still need the final named pilot-user list.",
+            "edited": false
+          },
+          {
+            "ts": "1793340270.000100",
+            "user": "ava.sponsor",
+            "text": "Use the go/no-go to make the commitment. The 12 November date stays provisional until then.",
+            "edited": false
+          }
+        ]
+      },
+      {
+        "channel": "C0ATLAS",
+        "ts": "1793347200.000100",
+        "messages": [
+          {
+            "ts": "1793347200.000100",
+            "user": "alex.product",
+            "text": "For my first week on Atlas I will review the callback blocker, confirm pilot scope, settle support ownership and attend go/no-go.",
+            "edited": false
+          },
+          {
+            "ts": "1793347290.000100",
+            "user": "daniel.pm",
+            "text": "That matches the handover checklist. There is no approved budget figure in these project records; ask Ava rather than assume one.",
+            "edited": false
+          },
+          {
+            "ts": "1793347380.000100",
+            "user": "ava.sponsor",
+            "text": "Confirmed. Bring scope and acceptance questions to our 2 November check-in.",
+            "edited": false
+          }
+        ]
+      }
+    ]
+  },
+  "drive": {
+    "drives": [
+      {
+        "id": "0AAtlas",
+        "name": "Atlas project files",
+        "members": {
+          "users": [],
+          "groups": [
+            "grp-atlas"
+          ]
+        }
+      }
+    ],
+    "folders": [
+      {
+        "id": "fd-atlas",
+        "drive": "0AAtlas",
+        "parent": null,
+        "name": "Atlas",
+        "permissions": [],
+        "inherited_permissions_disabled": false
+      }
+    ],
+    "files": [
+      {
+        "id": "atlas-roster",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Atlas team roster and employee contributions",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-30T09:00:00+08:00",
+        "modified": "2026-10-30T17:00:00+08:00",
+        "content": "Atlas team roster: employees and contributions\nThe Atlas team roster lists all 12 project members, their roles, completed work and current responsibilities for the new product lead.\nName,Role,Completed,Next\nAlex Morgan,Product lead,Joined 30 Oct,Own scope\nAva Brooks,Sponsor,Approved pilot,Go/no-go\nDaniel Wu,Outgoing PM,Handover pack,Handover\nJordan Doe,Tech lead,API design,Integration\nElena Park,Backend,Retry fixes,ATL-108\nSamira Khan,Frontend,Status screen,QA support\nOliver Chen,Design,Tested flow,Copy review\nMei Tan,Data,Event schema,Dashboard\nLucas Reed,QA,120-case run,ATL-109\nPriya Raman,SRE,Staging setup,Alerts\nLeo Hartono,Operations,Pilot cohort,Support SOP\nSara Lindqvist,Security,Access review,Final check",
+        "permissions": []
+      },
+      {
+        "id": "atlas-research",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Atlas research notes",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-16T09:00:00+08:00",
+        "modified": "2026-10-16T17:00:00+08:00",
+        "content": "Atlas research notes — synthetic prototype sessions, 16 October 2026\nOliver Chen ran 6 synthetic prototype sessions; 4 participants could not tell if a document needed resubmission.\nThe revised design uses explicit Uploaded, Needs action and In review states.\nThere is no production conversion result in these notes. The 1-business-day goal remains unmeasured.",
+        "permissions": []
+      },
+      {
+        "id": "atlas-qa",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Atlas QA results 30 October",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-30T09:00:00+08:00",
+        "modified": "2026-10-30T17:00:00+08:00",
+        "content": "Atlas QA run — 30 October 2026, 10:00 SGT\nRequired cases: 120. Passed: 118. Failed: 2. Pilot QA sign-off: blocked.\nFailure A: duplicate callback returns a completed application to pending.\nFailure B: delayed callback overwrites a newer verified application state.\nOwner: Elena Park for fixes; Lucas Reed for rerun and sign-off.\nThe two remaining cases are not evidence of lost funds; Atlas is a pre-pilot onboarding workflow.",
+        "permissions": []
+      },
+      {
+        "id": "atlas-support",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Atlas support SOP draft",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-30T09:00:00+08:00",
+        "modified": "2026-10-30T17:00:00+08:00",
+        "content": "Atlas support SOP draft — not yet approved\nLeo Hartono has confirmed 10 invited Singapore merchants for the proposed pilot.\nSupport coverage is planned for 09:00–18:00 SGT on pilot business days.\nThe daily exception owner is unconfirmed; Alex Morgan and Leo Hartono must agree the owner before go/no-go.\nStep 1: Acknowledge a merchant's onboarding question.\nStep 2: Check the application record and ask the assigned operations reviewer.\nStep 3: Escalate callback-state inconsistencies to Elena Park; do not manually label an application approved.",
+        "permissions": []
+      },
+      {
+        "id": "atlas-email-decision",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Imported email: Atlas pilot date revision — approved conditionally",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-29T09:00:00+08:00",
+        "modified": "2026-10-29T17:00:00+08:00",
+        "content": "Imported email archive — synthetic, not a live email connector\nSubject: Atlas pilot date revision — approved conditionally\nFrom: ava.sponsor@companya.example\nTo: daniel.pm, jdoe, leo.ops\nSent: 2026-10-29T15:00:00+08:00\n\nI approve revising the provisional Atlas pilot from 6 November to 12 November 2026. This supersedes the earlier proposed date. The pilot is still conditional on all 120 QA cases passing and the support SOP being ready. Keep the cohort at 10 Singapore merchants. The go/no-go is 3 November at 16:00 SGT. Alex will take product ownership tomorrow. Ava.",
+        "permissions": []
+      },
+      {
+        "id": "atlas-email-handover",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Imported email: Atlas handover to Alex — owners and first-week priorities",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-30T09:00:00+08:00",
+        "modified": "2026-10-30T17:00:00+08:00",
+        "content": "Imported email archive — synthetic, not a live email connector\nSubject: Atlas handover to Alex — owners and first-week priorities\nFrom: daniel.pm@companya.example\nTo: alex.product, ava.sponsor\nSent: 2026-10-30T15:00:00+08:00\n\nAlex, welcome to Atlas. Please read the product overview, ADR-003, team roster and ATL-108/109. Start with Jordan and Lucas for the blocker, Ava for pilot scope and Leo for support ownership. Our old 6 November date is superseded; the conditional date is 12 November. Confirm acceptance criteria on 2 November before the 3 November go/no-go. There is no approved budget figure in this handover. The roster includes every current project member and what each has contributed. Daniel.",
+        "permissions": []
+      },
+      {
+        "id": "atlas-whatsapp",
+        "drive": "0AAtlas",
+        "folder": "fd-atlas",
+        "name": "Imported WhatsApp: Atlas pilot coordination",
+        "mimeType": "text/plain",
+        "version": 1,
+        "created": "2026-10-28T09:00:00+08:00",
+        "modified": "2026-10-28T17:00:00+08:00",
+        "content": "Imported WhatsApp export — synthetic; manually supplied to Drive, not a live WhatsApp connector\nGroup: Atlas pilot coordination; participants consented to this fictional shared archive.\n[28/10/2026, 18:10] Leo Hartono: Atlas pilot cohort is still 10. Can we review support ownership in the morning?\n[28/10/2026, 18:12] Daniel Wu: Yes. Please put any decision into the project Slack thread and SOP so the team has an official record.\n[28/10/2026, 18:14] Priya Raman: I can join at 09:30 SGT. My rollback rehearsal is complete.\n[28/10/2026, 18:16] Leo Hartono: Thanks. This chat only schedules the review; it is not a launch approval.",
+        "permissions": []
+      }
+    ]
+  },
+  "facts": [],
+  "questions": [],
+  "audit_replay": []
+}

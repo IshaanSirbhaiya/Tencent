@@ -1,0 +1,3 @@
+2026-10-30T16:00:00.000100+08:00 | alex.product: For my first week on Atlas I will review the callback blocker, confirm pilot scope, settle support ownership and attend go/no-go.
+2026-10-30T16:01:30.000100+08:00 | daniel.pm: That matches the handover checklist. There is no approved budget figure in these project records; ask Ava rather than assume one.
+2026-10-30T16:03:00.000100+08:00 | ava.sponsor: Confirmed. Bring scope and acceptance questions to our 2 November check-in.
