@@ -13,6 +13,8 @@ built, tested live against the real backend, reviewed by five models and fixed.
 | 4 | **Hallway test, Saturday**: 5 people × 20 min | The only Human-Centered Design evidence we can't produce ourselves. Protocol: [rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md). Put the real results in FIX_LOG.md and `databridge/apps/internal_brain_web/public/finals/fixlog.json`, and the proof slide shows the tester line | 2 h |
 | 5 | **Decide the stage roles.** The default is Ishaan speaking, Dev driving, Mehul as the compliance voice, Aaruni as the Tencent voice. Script: [rubric/demo_story/RUN_SHEET.md](rubric/demo_story/RUN_SHEET.md) | Rehearse twice before Monday | — |
 | 6 | **Set a demo passcode on the laptop** (`IB_DEMO_PASSCODE=...` before `demo_up.sh start`) | Security review: stops anyone on the venue network from signing in | 1 min |
+| 8 | **New cover image in Miora**: paste the prompt in [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md), then send me the best image. I'll make every size and swap it in | The cover and YouTube thumbnail should show the finals name and tagline | 10 min |
+| 9 | **Record the narration for the new video**: script and cues in `docs/finals/video/` and `submission/finals_video/` (being produced now); record like last time and send me the audio | The judges get the video; the new UI should be in it | 30 min |
 | 7 | Ask Xin Yi about the extra 5,000 credits, and whether they cover TokenHub | Only if step 1 needs a balance | 2 min |
 
 ### Activating Hy3 on TokenHub (international console)
