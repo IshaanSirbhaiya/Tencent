@@ -10,7 +10,7 @@ offline), and only when opted in: ``IB_CLAUDE=1`` and ``ANTHROPIC_API_KEY`` set,
 is the neutral ``standin/standin-1`` (answers, /ib/status, the ledger): never the provider name.
 
 It shares the page composer's spend cap (the same file, ``views/composer.Budget``) and has its own
-service-wide rate limit. The key is read from the environment and never logged.
+service-wide and per-person (``llm.for_person``) rate limits. The key is read from the environment and never logged.
 """
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ from typing import Any, Optional
 
 from databridge_harness.backends import RawCompletion
 
-from .llm import ModelChain
+from .llm import MODEL_SUB, ModelChain
 from .views.composer import (GLOBAL_RATE, MODEL, PRICE_IN, PRICE_OUT, PUBLIC_MODEL, PUBLIC_PROVIDER,
-                             Budget, _Window, claude_enabled, cost_usd)
+                             USER_RATE, WINDOW_S, Budget, _Window, claude_enabled, cost_usd)
 
 log = logging.getLogger("databridge_ib.claude")
 
@@ -41,7 +41,10 @@ class ClaudeBackend:
     def __init__(self, budget: Budget, *, client: Any = None, effort: str = "low"):
         self.budget, self.effort = budget, effort
         self._client = client
-        self._rate = _Window(GLOBAL_RATE, 60.0)
+        self._rate = _Window(GLOBAL_RATE, WINDOW_S)
+        #: per person (``llm.for_person``), like the page composer; a call made for nobody in
+        #: particular counts under one shared key
+        self._user = _Window(int(os.environ.get("IB_CLAUDE_USER_LIMIT", USER_RATE)), WINDOW_S)
         self._lock = threading.Lock()
 
     def _api(self):
@@ -60,6 +63,8 @@ class ClaudeBackend:
                  if m.get("role") in ("user", "assistant")]
         if json_mode:
             system += "\n\nReturn ONLY one JSON object, no prose and no markdown fence."
+        if not self._user.allow(MODEL_SUB.get() or "-"):
+            raise RuntimeError("per-person rate limit")
         if not self._rate.allow("*"):
             raise RuntimeError("claude rate limit")
         chars = len(system) + sum(len(m["content"]) for m in convo)
@@ -83,7 +88,10 @@ class ClaudeBackend:
                                  tokens_out=int(getattr(u, "output_tokens", 0) or 0),
                                  cost_usd=actual, model_used=PUBLIC_MODEL)
         finally:
-            self.budget.settle(worst, actual)
+            try:
+                self.budget.settle(worst, actual)
+            except Exception as exc:                                # noqa: BLE001
+                log.error("spend not recorded: %s", type(exc).__name__)
 
 
 def _config_for(model: str) -> dict:

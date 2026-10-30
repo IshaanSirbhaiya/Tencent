@@ -99,6 +99,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 
 from . import authz, narrate
 from .config import POLICY_VERSION
+from .llm import for_person
 from .models import (SCOPE_NOTE, ActionConfirmed, ActionExecuted, ActionFailed, ActionProposed,
                      ActionRejected, ActionRequested, DirectoryUser, ModelInfo)
 
@@ -650,7 +651,8 @@ class ActionService:
             self._requested(user, "decided", action, action_id, req_id=req_id,
                             doc_ids=list(dict.fromkeys(s.doc_id for s in ctx.cites.values())),
                             model_planned=True)
-            got = self._model_body(ctx, kind)
+            with for_person(user.id):
+                got = self._model_body(ctx, kind)
         if script:
             body, model = script, SCRIPT
         elif got is not None:

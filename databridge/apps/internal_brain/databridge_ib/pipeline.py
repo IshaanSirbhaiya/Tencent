@@ -33,7 +33,7 @@ from . import gates, narrate
 from .config import POLICY_VERSION, TOP_K
 from .connectors.base import SourceConnector
 from .index import Hit, Index, identifiers
-from .llm import ModelChain
+from .llm import ModelChain, for_person
 from .models import (REFUSAL_TEXT, AccessCheck, AnswerReleased, AskResponse, Citation,
                      DirectoryUser, Gate2Decision, ModelInfo, RequestAccepted, RetrievalDecided)
 from .timewin import parse as parse_window
@@ -192,8 +192,9 @@ class Pipeline:
         answer, model, dropped = REFUSAL_TEXT, EXTRACTIVE, 0
         if passages:
             context = narrate.build_context(passages)
-            text, info, _notes = (self.chain.answer(context, question) if self.chain
-                                  else (None, None, []))
+            with for_person(user.id):
+                text, info, _notes = (self.chain.answer(context, question) if self.chain
+                                      else (None, None, []))
             valid = {p.tag for p in passages}
             removed = 0
             if text and text.strip() != REFUSAL_TEXT:

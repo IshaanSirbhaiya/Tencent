@@ -43,6 +43,7 @@ from typing import Any, Callable, Mapping, Optional
 from .. import actions as actmod
 from .. import authz
 from ..config import POLICY_VERSION
+from ..llm import for_person
 from ..models import (SCOPE_NOTE, DeliverableCreated, DeliverableExported, DeliverableFailed,
                       DeliverableRequested, DirectoryUser, ModelInfo)
 from . import build, export, prompts
@@ -234,8 +235,9 @@ class DeliverableService:
         # round 3 I3: a builder or verifier error still closes the write-ahead record
         try:
             context = context_text(evidence, [f.text for f in ctx.facts])
-            content, title, generated, model, fallback, check = self._build(kind, chart, evidence,
-                                                                            context, ctx.question)
+            with for_person(user.id):
+                content, title, generated, model, fallback, check = self._build(
+                    kind, chart, evidence, context, ctx.question)
             cites = dict(ctx.cites)
             if self.chain is not None:      # a model call took time: authorise again (B4: always)
                 content, title, generated, model, fallback, cites, evidence = self._reauthorise(

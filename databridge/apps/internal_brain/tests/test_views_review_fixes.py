@@ -316,3 +316,67 @@ def test_a_view_chart_heading_uses_only_its_own_labels(tmp_path):
     v = _build(jd, rid, "a chart").json()
     charts = [b for b in v["a2ui"][2]["updateDataModel"]["value"]["blocks"] if b["type"] == "chart"]
     assert charts and charts[0]["heading"] == ""
+
+
+# ------------------------------------------------------------------------------------------------
+# 6. the spend cap fails closed; a settle error never leaks a slot; per-person limit on answers
+# ------------------------------------------------------------------------------------------------
+def _chat_fake():
+    return FakeClaude(lambda kind, text: json.dumps({"render": "chat", "title": "x", "reason": "y"}),
+                      usage=(10, 10))
+
+
+@pytest.mark.parametrize("content", ["{not json", '{"usd": "lots", "calls": 1}', '{"calls": 3}',
+                                     '{"usd": -5, "calls": 1}', "[]"])
+def test_a_corrupt_spend_file_fails_closed_and_is_not_overwritten(tmp_path, content):
+    (tmp_path / "claude_spend.json").write_text(content, encoding="utf-8")
+    fake = _chat_fake()
+    c = cmod.ClaudeComposer(state_dir=tmp_path, cap_usd=10, client=fake)
+    assert c.decide("jdoe", "q", "a", "ctx")[2] == "budget" and fake.calls == []
+    assert c.status()["available"] is False
+    assert (tmp_path / "claude_spend.json").read_text(encoding="utf-8") == content
+
+
+def test_an_unreadable_spend_file_fails_closed(tmp_path):
+    (tmp_path / "claude_spend.json").mkdir()                 # a directory: read_text raises OSError
+    fake = _chat_fake()
+    c = cmod.ClaudeComposer(state_dir=tmp_path, cap_usd=10, client=fake)
+    assert c.decide("jdoe", "q", "a", "ctx")[2] == "budget" and fake.calls == []
+
+
+def test_a_settle_write_error_never_leaks_a_slot_and_closes_the_cap(tmp_path, monkeypatch):
+    fake = _chat_fake()
+    c = cmod.ClaudeComposer(state_dir=tmp_path, cap_usd=10, client=fake)
+    real = cmod.os.replace
+
+    def broken(*a, **k):
+        raise OSError("disk full")
+    monkeypatch.setattr(cmod.os, "replace", broken)
+    for _ in range(cmod.MAX_INFLIGHT + 2):
+        c.decide("jdoe", "q", "a", "ctx")
+    monkeypatch.setattr(cmod.os, "replace", real)
+    # every slot came back (a leak would read "busy"), and the unrecorded spend closed the cap
+    assert c._slots.acquire(blocking=False) and c._slots._value == cmod.MAX_INFLIGHT - 1
+    c._slots.release()
+    assert len(fake.calls) == 1
+    assert c.decide("jdoe", "q", "a", "ctx")[2] == "budget" and c.status()["available"] is False
+
+
+def test_the_answer_backend_has_a_per_person_limit(tmp_path, monkeypatch):
+    from databridge_ib.claude import ClaudeBackend
+    from databridge_ib.llm import for_person
+    from databridge_ib.views.composer import Budget
+    monkeypatch.setenv("IB_CLAUDE_USER_LIMIT", "2")
+    fake = FakeClaude(lambda kind, text: "ok", usage=(10, 10))
+    be = ClaudeBackend(Budget(tmp_path / "s.json", 10), client=fake)
+    msgs = [{"role": "user", "content": "hi"}]
+
+    def call(sub):
+        with for_person(sub):
+            try:
+                be.generate(model="anthropic/x", messages=msgs)
+                return "ok"
+            except RuntimeError as exc:
+                return str(exc)
+    assert [call("jdoe") for _ in range(3)] == ["ok", "ok", "per-person rate limit"]
+    assert call("priya") == "ok"

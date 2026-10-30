@@ -11,6 +11,7 @@ Bounded, because it spends real money:
 * a hard spend cap (``IB_CLAUDE_BUDGET_USD``, default 10) kept in a file under the IB state
   directory, so it survives restarts. A call is refused unless its worst case (input + the
   ``max_tokens`` ceiling, at list price) still fits; the real usage is then added;
+* the spend file FAILS CLOSED: unreadable, corrupt or unwritable, no further call is reserved;
 * rate limits per person (12 a minute) and for the whole service (40 a minute), and at most 4
   calls in flight. Over any of them, or over the cap, the service falls back to the rules (plan.py);
 * one deadline per call; a timeout, an API error, a refusal or an invalid reply is a fallback,
@@ -87,21 +88,37 @@ class Budget:
         self.path, self.cap = Path(path), float(cap_usd)
         self._lock = threading.Lock()
         self._reserved = 0.0
+        #: a spend that could not be written: closed until a restart reads a good file
+        self._broken = False
 
-    def _read(self) -> Spend:
+    def _read(self) -> Optional[Spend]:
+        """The spend so far; no file yet is zero. A file that cannot be read or parsed is None:
+        the cap then FAILS CLOSED (no call is reserved, and the file is never overwritten, so a
+        corrupt file cannot reset the spend)."""
         try:
-            d = json.loads(self.path.read_text(encoding="utf-8"))
-            return Spend(float(d.get("usd", 0.0)), int(d.get("calls", 0)))
-        except (OSError, ValueError):
+            raw = self.path.read_text(encoding="utf-8")
+        except FileNotFoundError:
             return Spend(0.0, 0)
+        except OSError:
+            return None
+        try:
+            d = json.loads(raw)
+            s = Spend(float(d["usd"]), int(d["calls"]))
+        except (ValueError, TypeError, KeyError):
+            return None
+        if not (s.usd >= 0.0 and s.calls >= 0) or s.usd != s.usd:      # negative or NaN
+            return None
+        return s
 
     def spent(self) -> Spend:
+        """For status: an unreadable file reads as the whole cap spent (unavailable)."""
         with self._lock:
-            return self._read()
+            return self._read() or Spend(self.cap, 0)
 
     def reserve(self, worst_usd: float) -> bool:
         with self._lock:
-            if self._read().usd + self._reserved + worst_usd > self.cap:
+            s = self._read()
+            if s is None or self._broken or s.usd + self._reserved + worst_usd > self.cap:
                 return False
             self._reserved += worst_usd
             return True
@@ -110,13 +127,21 @@ class Budget:
         with self._lock:
             self._reserved = max(0.0, self._reserved - worst_usd)
             s = self._read()
+            if s is None:
+                log.error("spend file unreadable: the cap stays closed")
+                return
             s.usd += max(0.0, actual_usd)
             s.calls += 1
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"usd": round(s.usd, 6), "calls": s.calls,
-                                       "cap": self.cap, "model": PUBLIC_MODEL}), encoding="utf-8")
-            os.replace(tmp, self.path)
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = self.path.with_suffix(".tmp")
+                tmp.write_text(json.dumps({"usd": round(s.usd, 6), "calls": s.calls,
+                                           "cap": self.cap, "model": PUBLIC_MODEL}),
+                               encoding="utf-8")
+                os.replace(tmp, self.path)
+            except Exception:
+                self._broken = True             # a spend we could not record: fail closed
+                raise
 
 
 class _Window:
@@ -226,7 +251,7 @@ class ClaudeComposer:
         s = self.budget.spent()
         return {"provider": PUBLIC_PROVIDER, "model": PUBLIC_MODEL, "spent_usd": round(s.usd, 4),
                 "cap_usd": self.budget.cap, "calls": s.calls,
-                "available": s.usd < self.budget.cap}
+                "available": s.usd < self.budget.cap and not self.budget._broken}
 
     # -- one bounded call ----------------------------------------------------------------------
     def _call(self, sub: str, system: str, user_text: str, parse: Callable[[str], Any], *,
@@ -288,8 +313,12 @@ class ClaudeComposer:
             log.warning("claude call failed: %s", type(exc).__name__)   # never the message (key)
             return None, None, "timeout" if "Timeout" in type(exc).__name__ else "model_error"
         finally:
-            self.budget.settle(worst, actual)
-            self._slots.release()
+            try:
+                self.budget.settle(worst, actual)
+            except Exception as exc:                                # noqa: BLE001
+                log.error("spend not recorded: %s", type(exc).__name__)
+            finally:
+                self._slots.release()           # its own finally: a settle error never leaks a slot
 
     # -- the two jobs --------------------------------------------------------------------------
     def decide(self, sub: str, question: str, answer: str, context: str

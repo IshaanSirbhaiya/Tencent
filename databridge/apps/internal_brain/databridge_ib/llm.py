@@ -15,6 +15,8 @@ the grounding wall still applies; only the provider changes.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import copy
 import logging
 import os
@@ -27,6 +29,20 @@ from .narrate import IB_SYSTEM_PROMPT, TASK, IbGroundedNarrator, user_message
 log = logging.getLogger("databridge_ib.llm")
 
 TOKENHUB_BASE = "https://tokenhub-intl.tencentcloudmaas.com/v1"
+
+#: the person a model call is made for (a backend with a per-person limit reads it; never sent to
+#: a model, never logged). Unset: "" (the backend then counts the call under one shared key).
+MODEL_SUB: contextvars.ContextVar[str] = contextvars.ContextVar("ib_model_sub", default="")
+
+
+@contextlib.contextmanager
+def for_person(sub: str):
+    """Model calls inside this block are made for ``sub`` (per-person rate limits)."""
+    tok = MODEL_SUB.set(str(sub or ""))
+    try:
+        yield
+    finally:
+        MODEL_SUB.reset(tok)
 DEFAULT_CHAIN = ("hy3", "deepseek-v4.1-flash")
 
 

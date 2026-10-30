@@ -42,6 +42,7 @@ from typing import Any, Callable, Mapping, Optional
 from .. import actions as actmod
 from .. import authz
 from ..config import POLICY_VERSION
+from ..llm import for_person
 from ..deliverables.evidence import build_evidence, context_text
 from ..deliverables.model import structured
 from ..deliverables.service import (NotFound, RateLimited, Unavailable, DeliverableService,
@@ -225,7 +226,8 @@ class ViewService:
                 raise NotFound()
             cites = {t: s for t, s in cites.items() if t in evidence}
             context = context_text(evidence, [f.text for f in ctx.facts])
-            built = self._build(user, ctx, cites, evidence, layout, context)
+            with for_person(user.id):
+                built = self._build(user, ctx, cites, evidence, layout, context)
             resp, digest = self._respond(vid, req_id, ctx, layout, built)
         except (NotFound, Unavailable, RateLimited):
             raise
