@@ -173,7 +173,7 @@ const SCENES = {
     async run(page) {
       await goto(page, `${WEB}/compare?mode=person&p=ken.ext&q1=${encodeURIComponent(QV)}&q2=${encodeURIComponent(QB)}`, 1.0);
       seg(page, 2);
-      mark(page, 'Ken · a real restricted company vs a made-up one', 4.5);
+      mark(page, 'Ken · a restricted company in the fictional data vs a name we invented', 4.5);
       await read(page, page.getByTestId('compare-mode'), 1.2);
       await click(page, page.locator(`form:has(${tid('compare-mode')}) button[type="submit"]`), 0);
       await slow(page, page.locator(`${tid('compare-results')}[aria-busy="false"]`).waitFor({ timeout: 120000 }).catch(() => {}));
@@ -185,7 +185,7 @@ const SCENES = {
       await bringIntoView(page, page.getByTestId('compare-results'));
       await read(page, page.getByTestId('compare-results').getByTestId('refusal-card').first(), 2.5);
       await read(page, page.getByTestId('compare-results').getByTestId('refusal-card').last(), 2.5);
-      mark(page, 'Identical, word for word: restricted looks like nothing at all', 5);
+      mark(page, 'Identical refusals · word for word', 5);
       await hover(page, page.getByTestId('identical-marker'), 4);
     } },
 
