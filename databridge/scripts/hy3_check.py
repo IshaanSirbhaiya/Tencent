@@ -4,7 +4,8 @@
     .venv/Scripts/python scripts/hy3_check.py --quiet    # exit code only (used by scripts/demo_up.sh)
 
 Reads TOKENHUB_API_KEY (and optional IB_MODELS, TOKENHUB_BASE) from the environment, falling back to
-databridge/.env.ib.local. The key is never printed. Exit codes: 0 live, 1 not live, 2 no key.
+databridge/.env.ib.local. The key is never printed. Exit codes: 0 live, 1 not live, 2 no key or a
+TOKENHUB_BASE that is not https (plain http only to a loopback host, for tests).
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BASE = "https://tokenhub-intl.tencentcloudmaas.com/v1"
@@ -32,6 +34,23 @@ def _env() -> dict:
                 k, v = line.split("=", 1)
                 env.setdefault(k.strip(), v.strip().strip('"'))
     return env
+
+
+def base_error(base: str) -> str | None:
+    """Why this TokenHub base must not receive the key, or None. The key goes in an Authorization
+    header, so only https; plain http only to this machine's loopback (tests). Round-4 Opus #9."""
+    try:
+        u = urlsplit(base)
+        host = (u.hostname or "").lower()
+    except ValueError:
+        return "TOKENHUB_BASE is not a valid URL"
+    if u.username or u.password:
+        return "TOKENHUB_BASE must not carry credentials"
+    if u.scheme == "https" and host:
+        return None
+    if u.scheme == "http" and host in ("127.0.0.1", "localhost", "::1"):
+        return None
+    return "TOKENHUB_BASE must be an https:// URL (plain http only to a loopback host); the key was not sent"
 
 
 def completion_text(data: object) -> str:
@@ -81,7 +100,11 @@ def main() -> int:
         if not quiet:
             print("no TOKENHUB_API_KEY (environment or databridge/.env.ib.local)")
         return 2
-    base = env.get("TOKENHUB_BASE", DEFAULT_BASE)
+    base = env.get("TOKENHUB_BASE") or DEFAULT_BASE
+    err = base_error(base)
+    if err:
+        print(f"refusing: {err}", file=sys.stderr)
+        return 2
     models = [m.strip() for m in env.get("IB_MODELS", "").split(",") if m.strip()] or list(DEFAULT_CHAIN)
     results = [(m, *check(m, key, base)) for m in models]
     if not quiet:

@@ -85,6 +85,16 @@ class Client:
         code, _, _ = self.call("POST", "auth/demo-login", body, timeout=15)
         return code == 200
 
+    def page_ok(self, path: str, timeout: float = 20) -> tuple[bool, str]:
+        """GET a web page with this session's cookie (the preflight board needs a signed-in loopback visitor)."""
+        try:
+            with self.op.open(urllib.request.Request(f"{self.web}{path}", method="GET"), timeout=timeout) as r:
+                return 200 <= r.status < 400, f"HTTP {r.status}"
+        except urllib.error.HTTPError as e:
+            return False, f"HTTP {e.code}"
+        except Exception as e:                                       # noqa: BLE001
+            return False, type(e).__name__
+
     def sign_out(self) -> None:
         try:
             self.call("POST", "auth/logout", {}, timeout=10)
@@ -172,9 +182,6 @@ def main() -> int:
     print("Services")
     ok, why = http_ok(f"{web}/login", timeout=15)
     rep.add("services", "web", f"Web app {web}", "pass" if ok else "fail", why)
-    ok, why = http_ok(f"{web}/present/preflight", timeout=20)
-    rep.add("services", "preflight_page", "Preflight page /present/preflight", "pass" if ok else "warn",
-            why if ok else f"{why} (the web build is older than the demo kit: Stop, then Start, rebuilds it)")
     if a.offline:
         rep.add("services", "mode", "Mode", "info", "offline mock build: answers are recorded fixtures, no services used")
     else:
@@ -203,6 +210,10 @@ def main() -> int:
     if not maya.sign_in("maya.compliance"):
         rep.add("ledger", "signin", "Sign in as maya.compliance", "fail", "demo sign-in refused")
     else:
+        # The board is served only on loopback to a signed-in person (round-4 Opus #2), so check it as Maya.
+        ok, why = maya.page_ok("/present/preflight")
+        rep.add("services", "preflight_page", "Preflight page /present/preflight", "pass" if ok else "warn",
+                why if ok else f"{why} (the web build is older than the demo kit: Stop, then Start, rebuilds it)")
         if a.sim_reset:
             adm = Client(web)
             if adm.sign_in("admin.it"):

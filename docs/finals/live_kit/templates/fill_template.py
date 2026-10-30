@@ -9,8 +9,8 @@ with check_absent. Empty fields fall back to harmless defaults. Synthetic names 
 
 ``--name`` is a file name only (no folder, no "..", not absolute); the file is always written inside
 templates/out/ and an existing file is never overwritten unless ``--force``. CSV cells that a
-spreadsheet would run as a formula (starting with = + - @, a tab or a carriage return) get a leading
-apostrophe.
+spreadsheet would run as a formula (starting with = + - @ or their full-width forms, a tab, CR or LF,
+also after Unicode spaces or a leading double quote) get a leading apostrophe.
 """
 import argparse
 import re
@@ -20,13 +20,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 KINDS = {"md": "template_note.md", "txt": "template_whatsapp.txt", "csv": "template_tracker.csv"}
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+# Round-4 Opus #12: the same prefix set as the server's export guard (databridge_ib/deliverables/
+# export.py: ASCII and full-width = + - @, tab, CR, LF, after any Unicode spaces), plus a leading
+# CSV double quote, which a spreadsheet strips before it reads the cell.
+_SPACE = r"\s   -​  　﻿"
+_TRIGGER = re.compile(rf'^[{_SPACE}]*(?:"[{_SPACE}]*)?[=+\-@\t\r\n＝＋－＠]')
 
 
 def csv_cell(v: str) -> str:
     """One value for the CSV template: one line, no commas (the template is comma-separated), and
     never a formula (OWASP CSV injection: a leading apostrophe)."""
     v = v.replace(",", ";").replace("\r\n", " ").replace("\n", " ")
-    return "'" + v if v.startswith(FORMULA_START) or v.lstrip(" ").startswith(FORMULA_START) else v
+    return "'" + v if v.startswith(FORMULA_START) or _TRIGGER.match(v) else v
 
 
 def safe_name(name: str, out: Path) -> Path:

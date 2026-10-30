@@ -34,6 +34,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -106,6 +107,30 @@ class Client:
             return json.loads(r.read())
 
 
+#: /sim/check-absent allows 10 calls a minute per person (databridge_ib/sim.py CHECK_RATE_LIMIT), and
+#: --all --sim makes one per sample (12 today). STAGE_QA_30OCT #6: on a 429, wait for Retry-After
+#: (else 60 s, at most 65 s), say so, and retry ONCE.
+SIM_RETRY_MAX_S = 65.0
+_sleep = time.sleep
+
+
+def sim_check(client: "Client", phrase: str) -> dict:
+    """POST /sim/check-absent; one retry after the server's Retry-After when rate limited (429)."""
+    try:
+        return client.post("/sim/check-absent", {"phrase": phrase})
+    except urllib.error.HTTPError as e:
+        if e.code != 429:
+            raise
+        try:
+            wait = float(e.headers.get("Retry-After") or 60)
+        except (TypeError, ValueError):
+            wait = 60.0
+        wait = min(max(wait, 1.0), SIM_RETRY_MAX_S)
+        print(f"  /sim/check-absent is rate limited (10 a minute): waiting {wait:.0f} s, then one retry", flush=True)
+        _sleep(wait)
+        return client.post("/sim/check-absent", {"phrase": phrase})
+
+
 def sim_absent(r: dict) -> tuple[bool, str]:
     """Read ``/sim/check-absent``'s reply (``{"documents_containing": n, "index_size": m}``).
     Passes only when the count is present and exactly 0; a missing or non-integer count fails."""
@@ -164,7 +189,7 @@ def run_sample(s: dict, w: World, base: str | None, use_sim: bool, refusal: str)
     # 4 sim
     if use_sim:
         try:
-            r = Client(base, "admin.it").post("/sim/check-absent", {"phrase": s["proof_phrase"]})
+            r = sim_check(Client(base, "admin.it"), s["proof_phrase"])
             rec(*sim_absent(r))
         except Exception as e:  # noqa: BLE001
             rec(False, f"/sim/check-absent failed: {type(e).__name__}: {e}")

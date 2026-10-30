@@ -81,6 +81,40 @@ wait_http() { for _ in $(seq 1 "$2"); do curl -fsS -m 3 "$1" >/dev/null 2>&1 && 
 # second start never launches a duplicate (a duplicate Internal Brain races the live one for the
 # ledger). netstat can miss a listener (e.g. one started from another console); the probe cannot.
 need_start() { ! curl -fsS -m 3 "$2" >/dev/null 2>&1 && [ -z "$(port_pids "$1")" ]; }
+# The values the other processes must agree on with the Brain.
+SHARED_KEYS="IB_FORCE_OFFLINE IB_POLL_S IB_ENGINE_URL IB_ENGINE_TOKEN IB_DELIVERABLES IB_REPLAY_KEY \
+IB_DEMO_PASSCODE MOCK_SVC_TOKEN MOCK_ADMIN_TOKEN MOCK_WEBHOOK_SECRET"
+# Round-4 Opus #8: the whole file is sourced for a child only inside the Internal Brain's own subshell
+# (step 2), so the TokenHub key and the IB's signing keys in it never reach the mock platforms, the
+# seeder, the engine or Next. Round-5 Opus #2: the shared values are read by bash itself (the Brain
+# sources the same file with bash), in a throw-away subshell that prints only SHARED_KEYS as
+# NUL-separated KEY, value pairs. So a '#', quotes or an escape mean the same thing to every process;
+# a second parser (shlex) could disagree with bash. Nothing else from the file leaves the subshell.
+envfile_read() {
+  ( set +eu
+    for k in $SHARED_KEYS; do unset "$k"; done
+    set -a; . ./.env.ib.local </dev/null >/dev/null 2>&1; set +a
+    for k in $SHARED_KEYS; do printf '%s\0%s\0' "$k" "${!k-}"; done )
+}
+# The values this script settles on (forced switches, then the file, then defaults), copied into
+# private, unexported names _S_<KEY>, so the Brain's subshell can put them back after it sources the
+# file. A key that is unset stays unset (a child's own default then applies), never "".
+SETTLED_KEYS="IB_FORCE_OFFLINE IB_DEMO_LOGIN IB_POLL_S IB_VAR IB_DEMO_FEATURES IB_ENGINE_URL IB_ENGINE_TOKEN \
+IB_DELIVERABLES IB_REPLAY_KEY IB_DEMO_PASSCODE MOCK_SVC_TOKEN MOCK_ADMIN_TOKEN MOCK_WEBHOOK_SECRET"
+save_settled() {
+  local k
+  for k in $SETTLED_KEYS; do
+    if [ -n "${!k+x}" ]; then printf -v "_S_$k" '%s' "${!k}"; else unset "_S_$k"; fi
+  done
+}
+# Export the settled value of each named key (or unset it) in the current (sub)shell.
+export_settled() {
+  local k s
+  for k in "$@"; do
+    s="_S_$k"
+    if [ -n "${!s+x}" ]; then export "$k=${!s}"; else unset "$k"; fi
+  done
+}
 
 case "${1:-start}" in
   stop)
@@ -96,7 +130,15 @@ case "${1:-start}" in
 esac
 
 FRESH=0; [ "${2:-}" = "--fresh" ] && FRESH=1
-if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local; set +a
+if [ -f .env.ib.local ]; then
+  # Only the values the other processes must agree on with the Brain (as before, a non-empty value in
+  # the file wins). The IB_* ones are exported below and reach every child; the MOCK_* tokens and the
+  # passcode go only to the mock platforms, the seeder and the Brain (below), as the same strings.
+  while IFS= read -r -d '' k && IFS= read -r -d '' v; do
+    case " $SHARED_KEYS " in *" $k "*) ;; *) continue ;; esac
+    if [ -n "$v" ]; then printf -v "$k" '%s' "$v"; fi
+  done < <(envfile_read)
+  unset k v
 elif [ "${ALLOW_DEV_KEYS:-0}" != "1" ]; then
   # Without the local keys the Brain would start on its dev-default keys and could not append to the
   # demo ledger (sign-in 503, Verify fails). Usually the CodeBuddy runner has the file moved aside.
@@ -118,9 +160,23 @@ export IB_DEMO_FEATURES=1 IB_ENGINE_URL="${IB_ENGINE_URL:-http://127.0.0.1:8300}
 # it off, unset it and restart the IB (it is read at start-up).
 export IB_DELIVERABLES="${IB_DELIVERABLES:-1}"
 export IB_REPLAY_KEY="${IB_REPLAY_KEY:-$("$PY" -c 'import secrets; print(secrets.token_hex(16))')}"
+save_settled   # from here on, _S_<KEY> holds what every child must see
 
 if [ "$FRESH" = "1" ]; then
   for p in 8100 8200; do stop_port "$p"; done
+  # Round-4 Opus #11: stop_port leaves alone anything it cannot prove is ours. If a listener is still
+  # there, the old Brain may hold the ledger open: never wipe under it.
+  held=""
+  for _ in 1 2 3 4 5; do                       # a stopped listener can take a moment to let go
+    held=""
+    for p in 8100 8200; do [ -z "$(port_pids "$p")" ] || held="$held :$p"; done
+    [ -n "$held" ] || break
+    sleep 1
+  done
+  if [ -n "$held" ]; then
+    echo "refusing to wipe $STATE: a process still holds$held (see above). Stop it first, then run --fresh again." >&2
+    exit 4
+  fi
   # Only a plain path under var/: no "..", no absolute path, and it must still resolve inside var/.
   case "$STATE" in
     *..*|/*|*\\*) echo "refusing to wipe $STATE (not a plain path under var/)" >&2; exit 2 ;;
@@ -139,6 +195,8 @@ SEED=0; [ ! -d "$STATE/ledger" ] && SEED=1
 echo "[1/5] mock platforms :8200"
 if need_start 8200 http://127.0.0.1:8200/health; then
   ( exec </dev/null >"$LOGS/mock.log" 2>&1
+    unset TOKENHUB_API_KEY                     # SECURITY 15.15: even when the parent shell has it
+    export_settled MOCK_SVC_TOKEN MOCK_ADMIN_TOKEN MOCK_WEBHOOK_SECRET
     PYTHONPATH="apps/mock_platforms" MOCK_WEBHOOK_URL="http://127.0.0.1:8100" nohup "$PY" -m mock_platforms --port 8200 & )
 fi
 wait_http http://127.0.0.1:8200/health 60 || { echo "mock platforms did not start; see $LOGS/mock.log" >&2; exit 1; }
@@ -146,13 +204,21 @@ wait_http http://127.0.0.1:8200/health 60 || { echo "mock platforms did not star
 echo "[2/5] Internal Brain :8100 (IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE)"
 if need_start 8100 http://127.0.0.1:8100/health; then
   ( exec </dev/null >"$LOGS/ib.log" 2>&1
+    # The whole local key file, for the Brain only; then the values this script settled on win again
+    # (forced demo switches, then file, then defaults). They come from the private _S_* copies, not
+    # from the names the source just overwrote (round-5 Opus #2: an empty IB_POLL_S= in the file must
+    # not reach the Brain as ""), so the mocks, the seeder and the Brain hold the same strings.
+    if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local; set +a; fi
+    export_settled $SETTLED_KEYS
     PYTHONPATH="$IB_PATH" nohup "$PY" -m databridge_ib & )
 fi
 wait_http http://127.0.0.1:8100/health 180 || { echo "Internal Brain did not start; see $LOGS/ib.log" >&2; exit 1; }
 
 if [ "$SEED" = "1" ]; then
   echo "[3/5] seeding labelled demo history (about 2 minutes)"
-  "$PY" scripts/seed_demo_activity.py --base http://127.0.0.1:8100 >"$LOGS/seed.log" 2>&1 \
+  ( unset TOKENHUB_API_KEY
+    export_settled IB_DEMO_PASSCODE MOCK_ADMIN_TOKEN
+    "$PY" scripts/seed_demo_activity.py --base http://127.0.0.1:8100 >"$LOGS/seed.log" 2>&1 ) \
     || echo "  seeding reported a problem; see $LOGS/seed.log (the demo still works)"
   tail -n 3 "$LOGS/seed.log" || true
 else
@@ -160,13 +226,14 @@ else
 fi
 
 echo "[4/5] Walnut engine gateway :8300"
-bash scripts/run_walnut_original.sh start >"$LOGS/engine.log" 2>&1 || echo "  engine did not start; see $LOGS/engine.log (only /dev/brain needs it)"
+( unset TOKENHUB_API_KEY; exec bash scripts/run_walnut_original.sh start ) >"$LOGS/engine.log" 2>&1 || echo "  engine did not start; see $LOGS/engine.log (only /dev/brain needs it)"
 
 echo "[5/5] web app :3100"
 if need_start 3100 http://127.0.0.1:3100/login; then
-  ( cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 npx next build >"$ROOT/$LOGS/web-build.log" 2>&1 ) \
+  ( unset TOKENHUB_API_KEY; cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 npx next build >"$ROOT/$LOGS/web-build.log" 2>&1 ) \
     || { echo "web build failed; see $LOGS/web-build.log" >&2; exit 1; }
   ( exec </dev/null >"$LOGS/web.log" 2>&1
+    unset TOKENHUB_API_KEY
     cd "$WEB" && WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 nohup npx next start -H 127.0.0.1 -p 3100 & )
 fi
 wait_http http://127.0.0.1:3100/login 120 || { echo "web app did not start; see $LOGS/web.log" >&2; exit 1; }

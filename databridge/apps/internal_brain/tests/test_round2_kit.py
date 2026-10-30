@@ -139,3 +139,88 @@ def test_fill_template_cli_refuses_traversal_and_overwrite(ft, tmp_path, monkeyp
     assert "Second run." not in (tmp_path / "out" / "t.csv").read_text(encoding="utf-8")
     assert run("csv", "Second run.", "--name", "t.csv", "--force") == 0
     assert "Second run." in (tmp_path / "out" / "t.csv").read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------------------------------------
+# Round 4 (Opus web/kit review #9, #12)
+
+@pytest.mark.parametrize("base,ok", [
+    ("https://tokenhub-intl.tencentcloudmaas.com/v1", True),
+    ("http://127.0.0.1:9999/v1", True), ("http://localhost:9999/v1", True), ("http://[::1]:9999/v1", True),
+    ("http://tokenhub-intl.tencentcloudmaas.com/v1", False), ("http://10.0.0.5/v1", False),
+    ("ftp://x/v1", False), ("tokenhub/v1", False), ("https://user:pw@tokenhub.example/v1", False),
+])
+def test_hy3_check_base_must_be_https_unless_loopback(base, ok):
+    hy3 = _load(DB / "scripts" / "hy3_check.py", "hy3_check_base_under_test")
+    assert (hy3.base_error(base) is None) is ok
+
+
+def test_hy3_check_refuses_a_plain_http_base_before_sending_the_key(monkeypatch, capsys):
+    hy3 = _load(DB / "scripts" / "hy3_check.py", "hy3_check_http_under_test")
+    monkeypatch.setattr(hy3, "_env", lambda: {"TOKENHUB_API_KEY": "k-not-real-456",
+                                              "TOKENHUB_BASE": "http://tokenhub.example/v1"})
+    sent = []
+    monkeypatch.setattr(hy3.urllib.request, "urlopen", lambda req, timeout=30: sent.append(req))
+    monkeypatch.setattr(sys, "argv", ["hy3_check.py", "--quiet"])
+    assert hy3.main() == 2
+    assert sent == []
+    cap = capsys.readouterr()
+    assert "https" in cap.err and "k-not-real-456" not in cap.out + cap.err
+
+
+@pytest.mark.parametrize("cell", [
+    '"=HYPERLINK(""http://x"")"', '"+1', ' "-1', '"@SUM(A1)', '" =1',
+    "＝1+1", "＋1", "－1", "＠SUM(A1)", " =1", "　＝1", ' "=1',
+    "\t=1", "\r=1", "\tx", "\rx",
+])
+def test_fill_template_csv_guard_matches_the_server_guard(ft, cell):
+    assert ft.csv_cell(cell).startswith("'"), cell
+
+
+@pytest.mark.parametrize("cell", ['"quoted text"', "Vendor renewal", "Owner: Hana", "1+1"])
+def test_fill_template_csv_guard_leaves_plain_text(ft, cell):
+    assert not ft.csv_cell(cell).startswith("'"), cell
+
+
+# check_absent --all --sim: /sim/check-absent allows 10 calls a minute (STAGE_QA_30OCT #6)
+
+class _FakeClient:
+    def __init__(self, replies):
+        self.replies, self.calls = list(replies), 0
+
+    def post(self, path, body):
+        self.calls += 1
+        r = self.replies.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+
+
+def _http_429(retry_after):
+    import urllib.error
+    from email.message import Message
+    h = Message()
+    if retry_after is not None:
+        h["Retry-After"] = retry_after
+    return urllib.error.HTTPError("http://127.0.0.1:8100/sim/check-absent", 429, "Too Many Requests", h, None)
+
+
+@pytest.mark.parametrize("retry_after,want", [("7", 7.0), (None, 60.0), ("999", 65.0), ("soon", 60.0)])
+def test_check_absent_sim_waits_and_retries_once_on_429(monkeypatch, capsys, retry_after, want):
+    ca = _load(REPO / "docs" / "finals" / "live_kit" / "check_absent.py", "check_absent_retry_under_test")
+    slept = []
+    monkeypatch.setattr(ca, "_sleep", slept.append)
+    c = _FakeClient([_http_429(retry_after), {"documents_containing": 0, "index_size": 9}])
+    assert ca.sim_check(c, "phrase")["documents_containing"] == 0
+    assert c.calls == 2 and slept == [want]
+    assert f"waiting {want:.0f} s" in capsys.readouterr().out
+
+
+def test_check_absent_sim_retries_only_once(monkeypatch):
+    import urllib.error
+    ca = _load(REPO / "docs" / "finals" / "live_kit" / "check_absent.py", "check_absent_retry1_under_test")
+    monkeypatch.setattr(ca, "_sleep", lambda s: None)
+    c = _FakeClient([_http_429("1"), _http_429("1")])
+    with pytest.raises(urllib.error.HTTPError):
+        ca.sim_check(c, "phrase")
+    assert c.calls == 2

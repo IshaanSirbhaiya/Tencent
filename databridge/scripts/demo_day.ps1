@@ -111,13 +111,81 @@ function Test-Http([string]$Url, [int]$TimeoutSec = 4) {
   }
 }
 
+# Round-5 Opus: the passcode the Brain checks can live only in databridge\.env.ib.local. Read that ONE
+# key as data (never run as code), the way bash reads a plain assignment: quotes, backslashes, a '#'
+# inside a word kept, a ' #' comment dropped, the last assignment wins. As in demo_up.sh, a non-empty
+# value in the file wins over the environment. Anything bash would expand ($, backtick, ~, a line
+# continuation) is not guessed at: the environment value is used and Source says 'unreadable'.
+# The value is never printed. Returns @{ Value = <string or $null>; Source = 'file'|'env'|'none'|'unreadable' }.
+function Get-DemoPasscode([string]$Dir = $Db) {
+  $fromEnv = [string]$env:IB_DEMO_PASSCODE
+  $res = @{ Value = $null; Source = 'none' }
+  if ($fromEnv) { $res.Value = $fromEnv; $res.Source = 'env' }
+  $file = Join-Path $Dir '.env.ib.local'
+  if (-not (Test-Path -LiteralPath $file)) { return $res }
+  try { $bytes = [IO.File]::ReadAllBytes($file) } catch { return $res }
+  # No BOM stripping and no CR stripping: bash keeps both, so the Brain does too.
+  $text = (New-Object Text.UTF8Encoding $false).GetString($bytes)
+  $found = $false; $val = ''; $bad = $false
+  foreach ($line in $text.Split([char]10)) {
+    $s = $line.TrimStart([char]32, [char]9)
+    if ($s -match '^export[ \t]+') { $s = $s.Substring($Matches[0].Length) }
+    $key = 'IB_DEMO_PASSCODE='
+    if (-not $s.StartsWith($key, [StringComparison]::Ordinal)) { continue }
+    $w = $s.Substring($key.Length)
+    $sb = New-Object Text.StringBuilder
+    $i = 0; $n = $w.Length; $ok = $true
+    if ($n -gt 0 -and $w[0] -eq '~') { $ok = $false }
+    while ($ok -and $i -lt $n) {
+      $c = $w[$i]
+      if ($c -eq ' ' -or $c -eq "`t" -or $c -eq ';') { break }
+      if ('$`&|<>()'.IndexOf($c) -ge 0) { $ok = $false; break }
+      if ($c -eq '\') {
+        if ($i + 1 -ge $n) { $ok = $false; break }
+        [void]$sb.Append($w[$i + 1]); $i += 2; continue
+      }
+      if ($c -eq "'") {
+        $j = $w.IndexOf("'", $i + 1)
+        if ($j -lt 0) { $ok = $false; break }
+        [void]$sb.Append($w.Substring($i + 1, $j - $i - 1)); $i = $j + 1; continue
+      }
+      if ($c -eq '"') {
+        $i++; $closed = $false
+        while ($i -lt $n) {
+          $d = $w[$i]
+          if ($d -eq '"') { $closed = $true; $i++; break }
+          if ($d -eq '$' -or $d -eq '`') { $ok = $false; break }
+          if ($d -eq '\' -and $i + 1 -lt $n -and ('$`"\'.IndexOf($w[$i + 1]) -ge 0)) { [void]$sb.Append($w[$i + 1]); $i += 2; continue }
+          [void]$sb.Append($d); $i++
+        }
+        if (-not $closed) { $ok = $false }
+        continue
+      }
+      [void]$sb.Append($c); $i++
+    }
+    if ($ok) {
+      # After the word: only blanks, then nothing, a comment or ';'. Anything else makes the line a
+      # command with a one-off variable, which bash does not keep.
+      $tail = $w.Substring([Math]::Min($i, $n)).TrimStart([char]32, [char]9)
+      if ($tail.Length -gt 0 -and $tail[0] -ne '#' -and $tail[0] -ne ';') { $ok = $false }
+    }
+    $found = $true; $bad = -not $ok; $val = $(if ($ok) { $sb.ToString() } else { '' })
+  }
+  if ($found -and $bad) { $res.Source = 'unreadable' }
+  elseif ($found -and $val) { $res.Value = $val; $res.Source = 'file' }
+  return $res
+}
+
 function Test-SignIn {
   # One demo sign-in straight at the Internal Brain (ledgered as a sign-in, like any other).
   try {
     $req = [System.Net.HttpWebRequest]::Create('http://127.0.0.1:8100/auth/demo-login')
     $req.Method = 'POST'; $req.ContentType = 'application/json'; $req.Proxy = $null; $req.Timeout = 15000
-    $body = [Text.Encoding]::ASCII.GetBytes('{"persona":"maya.compliance"}')
-    if ($env:IB_DEMO_PASSCODE) { $body = [Text.Encoding]::ASCII.GetBytes("{`"persona`":`"maya.compliance`",`"passcode`":`"$env:IB_DEMO_PASSCODE`"}") }
+    # ConvertTo-Json escapes a passcode with " or \ (round-4 Opus #10); UTF-8 keeps any non-ASCII intact.
+    $payload = @{ persona = 'maya.compliance' }
+    $pc = Get-DemoPasscode
+    if ($pc.Value) { $payload['passcode'] = [string]$pc.Value }
+    $body = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $payload -Compress))
     $s = $req.GetRequestStream(); $s.Write($body, 0, $body.Length); $s.Close()
     $r = $req.GetResponse(); $ok = ([int]$r.StatusCode -eq 200); $r.Close()
     return $ok
@@ -327,6 +395,14 @@ function Test-Prereqs([bool]$NeedServices) {
     if (Test-Path (Join-Path $Db '.env.ib.local')) { Ok 'TokenHub settings file present (.env.ib.local): Hy3 is tried at start' }
     elseif ($env:TOKENHUB_API_KEY) { Ok 'TokenHub key in the environment: Hy3 is tried at start' }
     else { Warn 'No TokenHub key (databridge\.env.ib.local or TOKENHUB_API_KEY): answers will use the extractive fallback (no Hy3)' }
+    # Where the sign-in passcode comes from (never its value).
+    $pc = Get-DemoPasscode
+    switch ($pc.Source) {
+      'file' { Ok 'Sign-in passcode: read from .env.ib.local (the same value the Brain uses)' }
+      'env' { Ok 'Sign-in passcode: from the IB_DEMO_PASSCODE environment variable' }
+      'unreadable' { Warn 'Sign-in passcode in .env.ib.local uses shell syntax this kit does not read: set IB_DEMO_PASSCODE in the environment to the same value' }
+      default { Ok 'Sign-in passcode: none set (any demo sign-in is accepted)' }
+    }
   }
   $node = Get-Command node.exe -ErrorAction SilentlyContinue
   if ($node) { Ok "Node: $(& node.exe --version)" } else { Bad 'Node.js not found (https://nodejs.org)'; $fatal++ }
@@ -371,9 +447,18 @@ function Invoke-Preflight([string[]]$Extra) {
   if ($DryRun) { Dry "run scripts/demo_preflight.py $($Extra -join ' ')"; return 0 }
   Push-Location $Db
   $env:PYTHONUNBUFFERED = '1'
-  & $Py scripts/demo_preflight.py @Extra | Out-Host
-  $code = $LASTEXITCODE
-  Pop-Location
+  # demo_preflight.py reads the passcode from its environment: hand it the one the Brain uses (a
+  # passcode kept only in .env.ib.local included) for this call only, then put the old value back.
+  $hadPc = Test-Path Env:IB_DEMO_PASSCODE; $oldPc = $env:IB_DEMO_PASSCODE
+  $pc = Get-DemoPasscode
+  if ($pc.Value) { $env:IB_DEMO_PASSCODE = $pc.Value }
+  try {
+    & $Py scripts/demo_preflight.py @Extra | Out-Host
+    $code = $LASTEXITCODE
+  } finally {
+    if ($hadPc) { $env:IB_DEMO_PASSCODE = $oldPc } else { Remove-Item Env:IB_DEMO_PASSCODE -ErrorAction SilentlyContinue }
+    Pop-Location
+  }
   return $code
 }
 
@@ -392,7 +477,7 @@ function Show-Verdict([int]$Code, [string]$Base) {
   }
   if ($model) { Say "  $model" 'White' }
   Say "  Presenter:  $Base$PresentPath" 'White'
-  Say "  Preflight:  $Base/present/preflight   (big green/red board)" 'White'
+  Say "  Preflight:  $Base/present/preflight   (big green/red board; sign in first)" 'White'
   Say "  Log:        $LogDir" 'DarkGray'
   Say ''
   Show-Keys
@@ -415,11 +500,13 @@ function Start-Live([bool]$WarmAgain = $true, [string[]]$PreflightExtra = @()) {
       elseif (Test-Port $pp.port) { Bad "Port $($pp.port) is taken by $(Get-PortHolder $pp.port). Close that program, then Start again."; return 1 }
     } else { Ok "Port $($pp.port): free" }
   }
-  # A web app that runs an older build than the kit (no preflight page, clips not served) is rebuilt.
+  # A web app that runs an older build than the kit (clips not served) is rebuilt. The preflight board
+  # is not probed here: it answers 404 to anyone not signed in (round-4 Opus #2); demo_preflight.py
+  # checks it as Maya once the services are up.
   if ($s['web']) {
-    $stale = $Rebuild -or -not (Test-Http "$LiveUrl/present/preflight" 20) -or -not (Test-Http "$LiveUrl/clips/clipA_compare_amy_rachel_ken.mp4" 10)
+    $stale = $Rebuild -or -not (Test-Http "$LiveUrl/clips/clipA_compare_amy_rachel_ken.mp4" 10)
     if ($stale) {
-      Warn 'The running web app is an older build (no preflight page or clips): rebuilding it (about 2 minutes)'
+      Warn 'The running web app is an older build (clips not served): rebuilding it (about 2 minutes)'
       Stop-DemoPort 3100 | Out-Null
       Start-Sleep -Seconds 1
       $s['web'] = $false
@@ -543,7 +630,7 @@ function Start-Offline {
     $extra = @('--offline')
     if (-not $NoWarm) { $extra += '--warm' }
     $code = Invoke-Preflight $extra
-  } else { Warn 'No Python venv: skipping the scripted preflight; check /present/preflight in the browser' }
+  } else { Warn 'No Python venv: skipping the scripted preflight; sign in, then check /present/preflight in the browser' }
   Head 'Browser'
   Open-DemoBrowser "$MockUrl$PresentPath"
   Show-Verdict $code $MockUrl
