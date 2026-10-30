@@ -492,6 +492,8 @@ export interface IbStatus {
     /** "tencent-tokenhub" | "openai-compatible" | "standin" (neutral) | null */
     active_provider?: string | null;
     active_chain: string[];
+    /** IB_TOKENHUB_LIVE as the launcher set it from hy3_check (null: unset). */
+    primary_live?: boolean | null;
     fallback: { provider: string; model: string };
   };
   key_configured: boolean;

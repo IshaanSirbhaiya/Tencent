@@ -9,8 +9,9 @@
 # --fresh   wipe the demo state (var/ib-final) and seed ~300 labelled replay questions again.
 #           The model spend ledger (var/model_guard) is outside it and is never wiped (D-42).
 #
-# Live Tencent Hunyuan: set IB_FORCE_OFFLINE=0 (the key comes from databridge/.env.ib.local, which is
-# git-ignored). Without it the Brain answers with the honest extractive fallback.
+# The model: scripts/hy3_check.py decides IB_TOKENHUB_LIVE (1 only when TokenHub really answers; the
+# key comes from databridge/.env.ib.local, git-ignored, and may stay there when it is not live). Not
+# live: the opt-in stand-in (IB_CLAUDE=1) if on, else the honest extractive fallback.
 # Everything binds to 127.0.0.1. Set IB_DEMO_PASSCODE to require a passcode at sign-in.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -114,20 +115,20 @@ standin_state() {
     then echo on; else echo off; fi )
 }
 # Should the stand-in answer when TokenHub does not? Only when it is switched on (IB_CLAUDE=1 and its
-# key) AND no TokenHub / OpenAI-compatible key is set: a configured TokenHub key takes precedence in
-# the Brain (bootstrap.py), so forcing online with a dead TokenHub key would label quotes as Hy3's.
+# key). A TokenHub key may stay in .env.ib.local: the Brain builds the TokenHub chain only when
+# IB_TOKENHUB_LIVE=1 (set below from the real hy3_check result), so a key that answers 402 is never
+# tried per ask and never hides the stand-in.
 # Same throw-away subshell as above; prints "on" or "off", never a key or a value.
 standin_wanted() {
   ( set +eu
     if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local </dev/null >/dev/null 2>&1; set +a; fi
-    if [ "${IB_CLAUDE:-}" = "1" ] && [ -n "${ANTHROPIC_API_KEY:-}" ] && [ -z "${TOKENHUB_API_KEY:-}" ] \
-       && [ -z "${OPENAI_API_KEY:-}" ]
+    if [ "${IB_CLAUDE:-}" = "1" ] && [ -n "${ANTHROPIC_API_KEY:-}" ]
     then echo on; else echo off; fi )
 }
 # The values this script settles on (forced switches, then the file, then defaults), copied into
 # private, unexported names _S_<KEY>, so the Brain's subshell can put them back after it sources the
 # file. A key that is unset stays unset (a child's own default then applies), never "".
-SETTLED_KEYS="IB_FORCE_OFFLINE IB_DEMO_LOGIN IB_POLL_S IB_VAR IB_DEMO_FEATURES IB_ENGINE_URL IB_ENGINE_TOKEN \
+SETTLED_KEYS="IB_FORCE_OFFLINE IB_TOKENHUB_LIVE IB_DEMO_LOGIN IB_POLL_S IB_VAR IB_DEMO_FEATURES IB_ENGINE_URL IB_ENGINE_TOKEN \
 IB_DELIVERABLES IB_REPLAY_KEY IB_DEMO_PASSCODE MOCK_SVC_TOKEN MOCK_ADMIN_TOKEN MOCK_WEBHOOK_SECRET"
 save_settled() {
   local k
@@ -174,14 +175,20 @@ elif [ "${ALLOW_DEV_KEYS:-0}" != "1" ]; then
   echo "Wait for it to finish, or set ALLOW_DEV_KEYS=1 for a throwaway state dir." >&2
   exit 3
 fi
-if [ -z "${IB_FORCE_OFFLINE:-}" ]; then
-  # Live Tencent Hunyuan when TokenHub answers for this account; else the opt-in stand-in model when
-  # it is switched on and no TokenHub key is set; otherwise the honest fallback (quoted answers).
-  if "$PY" scripts/hy3_check.py --quiet; then IB_FORCE_OFFLINE=0
-  elif [ "$(standin_wanted)" = on ]; then IB_FORCE_OFFLINE=0
-  else IB_FORCE_OFFLINE=1; fi
+# IB_TOKENHUB_LIVE is ALWAYS the real hy3_check result (an inherited value is ignored): the Brain
+# builds the TokenHub chain only when it is 1, and Hy3/Hunyuan is called LIVE only then.
+IB_TOKENHUB_LIVE=0
+if [ "${IB_FORCE_OFFLINE:-}" != "1" ] && "$PY" scripts/hy3_check.py --quiet; then IB_TOKENHUB_LIVE=1; fi
+if [ "$IB_TOKENHUB_LIVE" = "1" ]; then
+  # Live Tencent Hunyuan: TokenHub answers for this account
+  IB_FORCE_OFFLINE="${IB_FORCE_OFFLINE:-0}"
+elif [ "$(standin_wanted)" = on ] && [ "${IB_FORCE_OFFLINE:-}" != "1" ]; then
+  # TokenHub not live (a key may still be set) and the opt-in stand-in is on: stay online for it
+  IB_FORCE_OFFLINE=0
+elif [ -z "${IB_FORCE_OFFLINE:-}" ]; then
+  IB_FORCE_OFFLINE=1      # the honest fallback: quoted answers
 fi
-export IB_FORCE_OFFLINE IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
+export IB_FORCE_OFFLINE IB_TOKENHUB_LIVE IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
 # Demo-proof features (D-24): live growth, "Add a document", the absence check and the engine
 # refresh. Set ONLY here, for this local demo stack (off by default everywhere else; never on a
 # deployment). Viewers still turn them on in Settings. The engine refresh asks the local gateway
@@ -234,7 +241,7 @@ if need_start 8200 http://127.0.0.1:8200/health; then
 fi
 wait_http http://127.0.0.1:8200/health 60 || { echo "mock platforms did not start; see $LOGS/mock.log" >&2; exit 1; }
 
-echo "[2/5] Internal Brain :8100 (IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE)"
+echo "[2/5] Internal Brain :8100 (IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE IB_TOKENHUB_LIVE=$IB_TOKENHUB_LIVE)"
 if need_start 8100 http://127.0.0.1:8100/health; then
   ( exec </dev/null >"$LOGS/ib.log" 2>&1
     # The whole local key file, for the Brain only; then the values this script settled on win again
@@ -277,7 +284,7 @@ Walnut DataBridge is up.
   App               http://127.0.0.1:3100            (User mode; switch to Developer top-left)
   Presenter         http://127.0.0.1:3100/compare?present=1
   Developer         http://127.0.0.1:3100/dev
-  Live AI           IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE (0 = a model may answer: Hy3 via TokenHub if its key is set, else the stand-in below; 1 = quoted)
+  Model             $( if [ "$IB_TOKENHUB_LIVE" = "1" ]; then echo "TokenHub answered the check (IB_TOKENHUB_LIVE=1); the preflight confirms what /ib/status shows"; elif [ "$IB_FORCE_OFFLINE" != "1" ] && [ "$(standin_state)" = on ]; then echo "AI model active (the stand-in; TokenHub not live, IB_TOKENHUB_LIVE=0)"; else echo "Quoted from sources (no model; IB_TOKENHUB_LIVE=0, IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE)"; fi )
   AI stand-in       $( [ "$(standin_state)" = on ] && echo "on (opt-in; spend-capped; check /ib/status)" || echo "off (opt-in only; pages are laid out by rules)")
   Logs              $LOGS/
 Stop with: bash scripts/demo_up.sh stop

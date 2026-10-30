@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { analyticsApi } from '@/lib/api';
 import { useMessages } from '@/lib/i18n';
 import { presenterMessages } from '@/lib/i18n/presenter';
+import { hunyuanLive } from '@/lib/modelLive';
 import type { EvalSummary } from '@/lib/types';
 import { BIG, SlideFrame, usePublicJson } from './SlideFrame';
 import { computeValue, minutesRounded, readInputs, usdCompact, usdExact, usdRounded } from './value';
@@ -31,7 +32,7 @@ function useModelLive(): boolean | null {
     let on = true;
     analyticsApi
       .status()
-      .then((s) => on && setLive(s?.models?.active === true && s.models.active_provider === 'tencent-tokenhub'))
+      .then((s) => on && setLive(hunyuanLive(s?.models)))
       .catch(() => on && setLive(null));
     return () => {
       on = false;

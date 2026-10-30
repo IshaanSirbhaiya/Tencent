@@ -5,11 +5,12 @@ The browser keys off ``/ib/status``: ``models.active`` (any model) and ``models.
 
 1. ``/ib/status`` and the answer name only the neutral ``standin`` / ``standin-1`` (and the
    answer is never labelled extractive while the stand-in wrote it);
-2. the preflight script says "AI model active" for the stand-in, Hy3 only for TokenHub, and
-   "quoted (no model)" only when no model is active;
-3. demo_up.sh turns the Brain online for the stand-in only when no TokenHub key is set (a configured
-   TokenHub key takes precedence in the Brain, so a dead one would be labelled as Hy3);
-4. the web sources: Hy3/TokenHub lines and labels key off ``active_provider === 'tencent-tokenhub'``,
+2. the preflight script says "AI model active" for the stand-in, Hy3 only for a TokenHub chain that
+   is live (``primary_live``, IB_TOKENHUB_LIVE=1), and "quoted (no model)" only when no model is active;
+3. demo_up.sh turns the Brain online for the stand-in whenever it is opted in and TokenHub is not
+   live, even with a TokenHub key set (the Brain builds TokenHub only when IB_TOKENHUB_LIVE=1);
+4. the web sources: Hy3/TokenHub lines and labels key off ``hunyuanLive`` (active TokenHub AND
+   ``primary_live === true``),
    "no model" lines off ``!active``; the stand-in's labels are neutral in English and Chinese.
 These are source checks for the web (Playwright is not run here): they prove the conditions in the
 code, not a rendered page.
@@ -80,10 +81,20 @@ def _preflight():
 @pytest.mark.parametrize("models,label,status,live,ai", [
     ({"active": True, "active_provider": "standin", "active_chain": ["standin-1"]},
      "Model: AI model active", "pass", False, True),
-    ({"active": True, "active_provider": "tencent-tokenhub", "active_chain": ["hy3"]},
+    ({"active": True, "active_provider": "tencent-tokenhub", "active_chain": ["hy3"], "primary_live": True},
      "Model: Tencent Hunyuan LIVE via TokenHub", "pass", True, False),
+    # TokenHub active but not found live by the launcher (or unset): never LIVE
+    ({"active": True, "active_provider": "tencent-tokenhub", "active_chain": ["hy3"], "primary_live": False},
+     "Model: AI model active", "pass", False, True),
+    ({"active": True, "active_provider": "tencent-tokenhub", "active_chain": ["hy3"]},
+     "Model: AI model active", "pass", False, True),
+    # live flag set but the active chain is the stand-in: never LIVE
+    ({"active": True, "active_provider": "standin", "active_chain": ["standin-1"], "primary_live": True},
+     "Model: AI model active", "pass", False, True),
+    ({"active": False, "active_provider": None, "active_chain": [], "primary_live": True},
+     "Model: Quoted from sources (no model)", "warn", False, False),
     ({"active": False, "active_provider": None, "active_chain": []},
-     "Model: extractive fallback (quoted from the sources)", "warn", False, False),
+     "Model: Quoted from sources (no model)", "warn", False, False),
 ])
 def test_preflight_model_line(models, label, status, live, ai):
     info, (lab, stat, detail) = _preflight().model_line({"models": models}, offline=False)
@@ -113,17 +124,18 @@ def _standin_wanted(tmp_path: Path, env_file: str) -> str:
     ("IB_CLAUDE=1\nANTHROPIC_API_KEY=sk-test-not-real\n", "on"),
     ("IB_CLAUDE=0\nANTHROPIC_API_KEY=sk-test-not-real\n", "off"),
     ("IB_CLAUDE=1\n", "off"),
-    # a TokenHub key takes precedence in the Brain: never force online for a dead TokenHub chain
-    ("IB_CLAUDE=1\nANTHROPIC_API_KEY=sk-test-not-real\nTOKENHUB_API_KEY=x\n", "off"),
+    # a TokenHub key may stay set: the Brain uses it only when IB_TOKENHUB_LIVE=1
+    ("IB_CLAUDE=1\nANTHROPIC_API_KEY=sk-test-not-real\nTOKENHUB_API_KEY=x\n", "on"),
 ])
-def test_demo_up_forces_online_for_the_standin_only_without_tokenhub(tmp_path, env_file, want):
+def test_demo_up_forces_online_for_the_standin_when_opted_in(tmp_path, env_file, want):
     assert _standin_wanted(tmp_path, env_file) == want
 
 
 def test_demo_up_uses_standin_wanted_after_the_hy3_check():
     sh = (ROOT / "scripts" / "demo_up.sh").read_text(encoding="utf-8")
-    assert re.search(r'hy3_check\.py --quiet; then IB_FORCE_OFFLINE=0\n\s*elif \[ "\$\(standin_wanted\)" = on \]; '
-                     r'then IB_FORCE_OFFLINE=0\n\s*else IB_FORCE_OFFLINE=1; fi', sh)
+    assert re.search(r'hy3_check\.py --quiet; then IB_TOKENHUB_LIVE=1; fi', sh)
+    assert re.search(r'elif \[ "\$\(standin_wanted\)" = on \] && \[ "\$\{IB_FORCE_OFFLINE:-\}" != "1" \]; then\n'
+                     r'(\s*#.*\n)*\s*IB_FORCE_OFFLINE=0', sh)
     banner = sh[sh.index("Walnut DataBridge is up."):]
     assert not PROVIDER.search(banner)
 
@@ -148,12 +160,15 @@ def test_presenter_hud_says_quoting_only_without_a_model_and_slides_name_hy3_onl
     assert "'pr.status.live': 'live'" in pr and "'pr.status.live': '在线'" in pr
     assert not HY3.search(re.search(r"'pr\.status\.live': '[^']*'", pr).group(0))
     slides = _read("components/presenter/slides/Slides.tsx")
-    assert ("s?.models?.active === true && s.models.active_provider === 'tencent-tokenhub'") in slides
+    assert "setLive(hunyuanLive(s?.models))" in slides
+    live = _read("lib/modelLive.ts")
+    assert ("m?.active === true && m.active_provider === 'tencent-tokenhub' && m.primary_live === true"
+            in live)
 
 
 def test_preflight_board_names_hy3_only_for_tokenhub():
     board = _read("components/preflight/PreflightBoard.tsx")
-    assert "const hy3 = live && s.models?.active_provider === 'tencent-tokenhub';" in board
+    assert "const hy3 = hunyuanLive(s.models);" in board
     assert "hy3 ? 'Model now: Tencent Hunyuan live' : live ? 'Model now: AI model active'" in board
 
 

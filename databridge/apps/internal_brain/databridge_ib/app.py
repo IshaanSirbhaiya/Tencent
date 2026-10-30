@@ -229,6 +229,11 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                            # never the stand-in's provider name) | None
                            "active_provider": getattr(chain, "provider", None) if chain is not None else None,
                            "active_chain": list(chain.models) if chain is not None else [],
+                           # IB_TOKENHUB_LIVE as the launcher set it from hy3_check (None: unset).
+                           # Hy3/Hunyuan may be called LIVE only when this is true AND the
+                           # active provider is TokenHub.
+                           "primary_live": (None if not os.environ.get("IB_TOKENHUB_LIVE", "").strip()
+                                             else os.environ.get("IB_TOKENHUB_LIVE", "").strip() == "1"),
                            "fallback": {"provider": "deterministic", "model": "extractive-v1"}},
                 "key_configured": configured,
                 "force_offline": os.environ.get("IB_FORCE_OFFLINE") == "1",

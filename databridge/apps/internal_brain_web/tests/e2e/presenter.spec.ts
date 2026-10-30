@@ -213,7 +213,7 @@ test('P then Space walks the whole script from the keyboard', async ({ page }) =
   await expect(page.getByTestId('business-break-even-exact')).toContainText('7.0');
   // Hy3 and TokenHub are named only while /ib/status says the TokenHub chain is live (read at view time).
   const st = (await (await page.request.get('/api/ib/ib/status')).json())?.models;
-  const live = st?.active === true && st?.active_provider === 'tencent-tokenhub';
+  const live = st?.active === true && st?.active_provider === 'tencent-tokenhub' && st?.primary_live === true;
   await expect(page.getByTestId('business-stack')).toHaveText(
     live ? 'Tencent stack: Hunyuan Hy3 through TokenHub · WorkBuddy · CodeBuddy' : 'Tencent stack: WorkBuddy · CodeBuddy',
   );
@@ -313,7 +313,7 @@ test('slides name Hy3 and TokenHub only while the TokenHub chain is live', async
   await page.route('**/api/ib/ib/status', async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    await route.fulfill({ response: res, json: { ...body, models: { ...body.models, active, active_provider: provider } } });
+    await route.fulfill({ response: res, json: { ...body, models: { ...body.models, active, active_provider: provider, primary_live: provider === 'tencent-tokenhub' } } });
   });
   await page.goto('/present/proof');
   await expect(page.getByTestId('proof-codebuddy')).toContainText('Nine CodeBuddy sessions, transcripts in the repo.');

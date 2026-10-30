@@ -10,6 +10,7 @@ import { budgetLine } from '@/lib/budget';
 import { cn } from '@/lib/cn';
 import { translate } from '@/lib/i18n';
 import { budgetMessages } from '@/lib/i18n/budget';
+import { hunyuanLive } from '@/lib/modelLive';
 import type { ModelBudget } from '@/lib/types';
 
 export type Status = 'pass' | 'fail' | 'warn' | 'info';
@@ -130,13 +131,13 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
     try {
       const r = await fetch('/api/ib/ib/status', { cache: 'no-store', headers: { accept: 'application/json' } });
       if (r.ok) {
-        const s = (await r.json()) as { models?: { active?: boolean; active_provider?: string | null; active_chain?: string[] }; ledger?: { ok?: boolean | null }; model_budget?: ModelBudget };
+        const s = (await r.json()) as { models?: { active?: boolean; active_provider?: string | null; active_chain?: string[]; primary_live?: boolean | null }; ledger?: { ok?: boolean | null }; model_budget?: ModelBudget };
         const live = !!s.models?.active;
-        // Hy3 is named only when the active chain IS TokenHub/Hy3; any other model is neutral
-        const hy3 = live && s.models?.active_provider === 'tencent-tokenhub';
+        // Hy3 is named only when the active chain IS TokenHub AND IB_TOKENHUB_LIVE=1; else neutral
+        const hy3 = hunyuanLive(s.models);
         setModelLive({
           key: 'model-now',
-          label: mock ? 'Model now: mock fixtures' : hy3 ? 'Model now: Tencent Hunyuan live' : live ? 'Model now: AI model active' : 'Model now: extractive fallback',
+          label: mock ? 'Model now: mock fixtures' : hy3 ? 'Model now: Tencent Hunyuan live' : live ? 'Model now: AI model active' : 'Model now: quoted from sources (no model)',
           status: mock ? 'info' : live ? 'pass' : 'warn',
           detail: mock
             ? 'offline build'
