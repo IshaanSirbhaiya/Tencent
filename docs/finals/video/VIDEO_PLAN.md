@@ -4,16 +4,16 @@
 
 **The video in one line:** the 16 Oct video's spine, beat for beat and in its order, re-shot on the new UI, with
 every new feature attached to the beat it strengthens ("and now it also..."), never as a block of its own
-(founder's principle, 30 Oct evening). Main cut 7:56 (under the 8:00 limit of the 5 to 8 minute range), short cut
-6:18, full cut 9:43. The first video was 6:28.
+(founder's principle, 30 Oct evening). Main cut 7:58 (under the 8:00 limit of the 5 to 8 minute range), short cut
+6:31, full cut 9:52. The first video was 6:28.
 
 1. **Camera intro (0:32).** Ishaan, the same file as before. Stay quiet. [16 Oct beat 1]
 2. **Title (9 s).** "Walnut DataBridge. Answers you can prove." Spoken: built with Tencent CodeBuddy, wired for Tencent's
    Hunyuan (true per `DEV_PROCESS.md` and the model chain; Hy3 is not live). Tencent is named 38 s in, as on 16 Oct. [beat 1]
 3. **One question, every sentence sourced (34 s).** Rachel asks Aspire's question; every sentence opens to its exact
    passage, checked live seconds ago; and now the user screens work in 简体中文. [beat 3]
-4. **The map (20 s).** Everything Jordan can open, as one graph; Ken's corner beside it, no greyed-out boxes: for Ken
-   the rest isn't there. [beat 4]
+4. **The map (20 s).** A map of what Jordan can open, built from the same permission checks (a view, not how answers
+   are found); Ken's corner beside it, no greyed-out boxes: for Ken the rest isn't there. [beat 4]
 5. **Same question, two people (38 s).** Amy and Rachel, side by side: the approved script vs the case; tipping-off is a
    crime, so the system never hints. [beats 5 and 7]
 6. **Restricted looks like nothing (25 s).** Ken, a real customer vs a made-up one: identical; 400 pairs, zero
@@ -26,17 +26,20 @@ every new feature attached to the beat it strengthens ("and now it also..."), ne
 9. **The compliance side (1:44).** Maya: Rachel's request as a waterfall, three sealed records, every verdict (35 s) · the
    audit log in plain English, Verify, the tamper demo on a copy (43 s) · analytics from the verified log (12 s) · Trust
    centre, seven controls, each proved by a test (14 s). [beat 9]
-10. **WorkBuddy (15 s), the Walnut engine (18 s), how it fits together and Hy3 (14 s).** Same captures, same engine lines,
-    Hy3 wired but not live, said plainly. [beats 10 to 12]
+10. **WorkBuddy (16 s), what's underneath (26 s), how it fits together and Hy3 (15 s).** WorkBuddy stills (an MCP agent,
+    same gates, same sealed log; re-capture on the laptop); the original Walnut screens as "the platform" (adapter agents,
+    builder, connectors, data tools, the federated engine on the gateway), then the engine graph inside DataBridge, shown,
+    not used to answer; the model chain, Hy3 wired but not live, said plainly, and the Tencent Cloud deploy kit card.
+    [beats 10 to 12]
 11. **Teammates' features (placeholders, 22 s in the main cut).** Voice, just-in-time UI, dots: added after the merge;
     left out until their clips exist.
 12. **The numbers, how we built it, thanks (1:14).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,274
     backend and 185 browser tests, none failing (20 s) · about US$1.3M a year, an estimate, break-even about 7 minutes a
-    week, Tencent Cloud as the target host (21 s) · built with CodeBuddy, nine sessions (12 s) · Miora (8 s) · "Answers
+    week, Tencent Cloud as the target host (21 s) · built with CodeBuddy, nine recorded sessions (11 s) · the cover, designed in Tencent Miora (5 s) · "Answers
     you can prove", one pilot team, thanks (13 s). [beats 13 and 14]
 
-**The short cut (6:18)** drops live growth, add a file, the new-here beat, Miora and the slots, and uses only the
-base spoken lines. **The full cut (9:43)** gives every scene its longest slot and adds the **[FULL]** lines.
+**The short cut (6:31)** drops live growth, add a file, the new-here beat, Miora and the slots, and uses only the
+base spoken lines. **The full cut (9:52)** gives every scene its longest slot and adds the **[FULL]** lines.
 
 **Recording order** is unchanged (it is about stack state, not the edit): `record_finals.cjs cards`, then 02, 03, 04,
 05, 06, 07, 08, 09, 10, 13, then the scenes that write to the stack (06b, 17, 18, 19), then 21, then the teammates'
@@ -110,7 +113,7 @@ normalisation). The pacing rules are the same table ("Pacing" in
 
 ## The new timeline: core story first, then everything new
 
-<!-- generated from SEGMENTS in assemble_finals.py by the build of 30 Oct; if you change a length there, change it here -->
+<!-- generated from SEGMENTS in assemble_finals.py (31 Oct); if you change a length there, change it here -->
 
 Founder's direction (30 Oct): the video may be longer than the first, because there is more to show. Show
 everything, give the most time and emphasis to what matters most, keep each secondary feature short (10 to 25 s),
@@ -122,11 +125,11 @@ or not, and a clip is stretched or trimmed to its slot (never sped up more than 
 `ORGANISER_UPDATE.md`, `PLAN.md`, the finalist notes; D-01 only says the old video stays unless the new UI is
 ready). The only stated range is **5 to 8 minutes**, for the 16 Oct submission form
 (`docs/tencent/SUBMISSION.md:253`). So the **main cut stays under 8:00 even with every teammate slot filled**
-(7:56); the full cut (9:43) is for YouTube or anyone who asks for the whole tour. Confirm with the
+(7:58); the full cut (9:52) is for YouTube or anyone who asks for the whole tour. Confirm with the
 organisers whether a limit applies.
 
-Seconds on screen: S = short cut (6:18), M = main cut (7:56 with the three teammate slots,
-7:35 without them), F = full cut (9:43, 8:49 without the slots). A dash means the
+Seconds on screen: S = short cut (6:31), M = main cut (7:58 with the three teammate slots,
+7:37 without them), F = full cut (9:52, 8:58 without the slots). A dash means the
 scene is left out of that cut. Crossfades (0.35 s each) are allowed for in the totals.
 
 | # | Scene | 16 Oct beat | S | M | F | Status |
@@ -134,37 +137,38 @@ scene is left out of that cut. Crossfades (0.35 s each) are allowed for in the t
 | 00 | Camera intro | 1 | 31 | 31 | 31 | recorded |
 | 01 | Title | 1 | 9 | 9 | 9 | card; re-run cards (new pill) |
 | | **THE 16 OCT SPINE, UPGRADED: one question, then who sees what** | | | | | |
-| 04 | One question, checked live | 3 | 30 | 34 | 38 | recorder ready; re-record |
-| 06 | The map of what you can see | 4 | 20 | 20 | 26 | recorder ready; re-record |
+| 04 | One question, checked live (+ "each source read through its own connector") | 3 | 36 | 37 | 40 | recorder ready; re-record |
+| 06 | The map of what each person can open (a view) | 4 | 20 | 20 | 26 | recorder ready; re-record (new caption) |
 | 02 | Same question, two people | 5 + 7 | 36 | 38 | 43 | recorder ready; re-record |
 | 03 | Restricted looks like nothing | 6 | 23 | 25 | 28 | recorder ready; re-record |
 | | **ENHANCEMENTS NEXT TO THE BEAT THEY STRENGTHEN** | | | | | |
-| 17 | Act: a draft and a ticket | +7, +3 | 18 | 22 | 26 | **recorder rewritten** (Amy, then Jordan) |
-| 18 | Deliverables: a table, a chart, a file | +3 | 10 | 15 | 20 | new recorder scene |
-| 21 | New here: tour, dictation, value calculator | 5b | - | 12 | 16 | **recorder rewritten** (one beat) |
+| 17 | Act: a draft and a ticket | +7, +3 | 18 | 22 | 26 | recorder ready |
+| 18 | Deliverables: a table, a chart, a file | +3 | 10 | 13 | 18 | recorder ready |
+| 21 | New here: tour, dictation, value calculator | 5b | - | 10 | 15 | recorder ready |
 | | **NOTHING STALE (16 Oct beat 8)** | | | | | |
-| 06b | Watch the brain grow | 8 | - | 22 | 28 | recorder rewritten |
-| 19 | Add a file | +8 | - | 10 | 15 | new recorder scene |
+| 06b | Watch the brain grow | 8 | - | 22 | 28 | recorder ready |
+| 19 | Add a file | +8 | - | 9 | 13 | recorder ready |
 | | **THE COMPLIANCE SIDE (16 Oct beat 9)** | | | | | |
 | 05 | Developer mode: the journey | 9 | 30 | 35 | 40 | recorder ready; re-record |
-| 08 | Audit, Verify and the tamper demo | 9 | 40 | 43 | 50 | recorder ready; re-record |
+| 08 | Audit, Verify and the tamper demo | 9 | 40 | 42 | 50 | recorder ready; re-record |
 | 07 | Analytics | +9 | 12 | 12 | 15 | recorder ready; re-record |
-| 09 | The Trust centre | +9, +12 | 14 | 14 | 14 | recorder ready; re-record |
-| | **WORKBUDDY, THE ENGINE, HOW IT FITS (16 Oct beats 10 to 12)** | | | | | |
-| 12 | WorkBuddy: the connectors | 10 | 13 | 15 | 18 | stills |
-| 10 | The Walnut engine | 11 | 20 | 18 | 25 | recorder ready; re-record |
-| 13 | Tencent Hy3 | 12 | 14 | 14 | 17 | recorder ready; re-record |
-| | **TEAMMATES' FEATURES: placeholders until the merge** | | | | | |
+| 09 | The Trust centre | +9, +12 | 13 | 13 | 14 | recorder ready; re-record |
+| | **WORKBUDDY, WHAT'S UNDERNEATH, HOW IT FITS (16 Oct beats 10 to 12)** | | | | | |
+| 12 | WorkBuddy: an MCP agent, same gates, same sealed log | 10 | 15 | 16 | 19 | stills; **re-capture on the laptop** |
+| 10 | The platform (original Walnut screens, :3300 + gateway :8300) | 11 | 16 | 16 | 18 | **new recorder scene `10a_platform`, unrecorded** |
+| 10 | The Walnut engine graph inside DataBridge (shown, not used to answer) | 11 | 10 | 10 | 18 | recorder ready; re-record (new caption) |
+| 13 | Tencent Hy3: the model chain, then the deploy kit card | 12 | 15 | 15 | 19 | recorder ready (record with `IB_MODELS=hy3`); new card `13b_deploy.png` |
+| | **TEAMMATES' FEATURES** | | | | | |
 | S1 | Voice | slot | - | 8 | 20 | slot, TODO |
-| S2 | Just-in-time UI | slot | - | 8 | 20 | slot, TODO |
+| S2 | Pages beside the chat | slot | - | 8 | 20 | slot, lines written; record after verification |
 | S3 | Dots | slot | - | 6 | 15 | slot, TODO |
 | | **THE NUMBERS, HOW WE BUILT IT, THANKS (16 Oct beats 13 and 14)** | | | | | |
 | 14 | The proof | 13 | 20 | 20 | 20 | slide |
 | 15 | What it's worth | new | 21 | 21 | 21 | slide (+ host pill) |
-| 11 | Built with CodeBuddy | 14 | 10 | 12 | 14 | card; re-run cards |
-| 20 | Miora: the cover art | +14 | - | 8 | 10 | card |
+| 11 | Built with CodeBuddy (CB7 session evidence) | 14 | 10 | 11 | 14 | card; re-run cards |
+| 20 | Designed in Tencent Miora (the finals cover) | +14 | - | 5 | 8 | card; re-run cards |
 | 16 | Close | 14 | 13 | 13 | 13 | slide |
-| | **Total, with crossfades** | | **6:18** | **7:56** | **9:43** | |
+| | **Total, with crossfades** | | **6:31** | **7:58** | **9:52** | |
 
 Where the time goes: the 16 Oct spine (04, 06, 02, 03, 05, 08, 12, 10, 13, 14, 11, 16) is 4:31 of the 5:47 of demo in the
 main cut; no enhancement scene is over 22 s, and each sits next to the beat it strengthens. EN and 简体中文 is a beat inside
@@ -182,6 +186,21 @@ recorded. Cue sheets for each cut, from the planned lengths:
 test behind every claim (repo rule 8). Then three edits: a `SCENES` entry in `record_finals.cjs` named like the
 clip file (`S1_voice`, `S2_jit_ui`, `S3_dots`), the `### S1 ·` section in `VIDEO_SCRIPT_FINALS.md` (replace the
 TODO lines), and nothing in the assembler (the rows are already there).
+
+## How the 16 Oct video showed the platform and the Tencent tools, and how the new one does (31 Oct)
+
+Founder's direction: show the platform pieces and the Tencent tools the same way the 16 Oct video did (the same
+kind of shot, order, caption style and pacing), upgrading only the screens. Sources: `docs/tencent/VIDEO_SCRIPT.md`,
+`submission/05_video/timeline.json`, `submission/05_video/cards/`, `docs/tencent/video/assemble.py`.
+
+| 16 Oct beat | How it was shown (16 Oct) | How the new one shows it |
+|---|---|---|
+| 1 Hello (Tencent named) | Title card with the product name; CodeBuddy and Hy3 named in the first line | **01** the same kind of title card, pills "Built with Tencent CodeBuddy" and "Wired for Tencent Hunyuan (Hy3)"; the first line names both |
+| 10 Ask from WorkBuddy (23 s) | Three real WorkBuddy window stills (connectors 5 s, two people 11 s, compliance 8 s), a caption pill on each | **12** the same stills pattern, connectors then two people (the compliance still is dropped: D-30 changed that connector); to be re-captured on the laptop. New words: an MCP agent, same gates, same sealed log |
+| 11 What's underneath (36 s) | A screen recording of the ORIGINAL Walnut screens on :3300 (graph with a node opened, brain + time slider, evidence chain, ontology), small captions | **10** the same kind of recording of the original screens (`10a_platform`: Builder adapter agents and agents, Connectors, Data, the engine gateway :8300 with the federated engine, the graph), every caption "The platform: …"; then the engine's graph inside DataBridge (`10_engine`), captioned "shown here, not used to answer" |
+| 12 How it fits together (22 s) | The architecture / trust-boundary card, Hy3 line ("[otherwise] quoted until a TokenHub key is added") | **13** the live model chain on Mission control (Hy3 through TokenHub, then the quoted fallback), then a still card in the same card style: the Tencent Cloud Lighthouse deploy kit ("written; no live instance yet") |
+| 13 The numbers (11 s) | The results card | **14** the app's proof slide (+ **15** the business slide with the "Target host: Tencent Cloud" pill) |
+| 14 How we built it, thanks (16 s) | The closing card; CodeBuddy named over it (six sessions, security review found real bugs) | **11** a still card with a CodeBuddy session screenshot (CB7, the finals security review) and what it built, "nine recorded sessions"; **20** a still card with the Miora finals cover and the Miora session screenshot; **16** the close slide |
 
 ## Scene by scene (first video vs the 30 Oct test assembly)
 
@@ -209,7 +228,7 @@ after it). New times are from the latest test assembly; they move a little with 
 | — | (no equivalent) | | → | **09** Trust centre (3:55–4:09) | Seven controls, the frameworks they map to, the tests that prove them | Each control enforced in code, mapped to Singapore's AI and data rules, proved by a named test | **New** |
 | 4:41–5:04 | 10 WorkBuddy: three stills (connectors, two people, compliance) | People don't want another app; each connector has its own signed token | → | **12** Ask from WorkBuddy (4:51–5:08) | The same real window captures (connectors; two people) | "A second front door… Jordan's connector gets Jordan's answer, and Ken's gets Ken's" | **Keep** (same captures; the compliance still is dropped for time) |
 | 5:04–5:41 | 11 What's underneath: the original Walnut screens at :3300 (graph, brain + time slider, evidence chain, ontology) | Every fact has a source; drag the slider and the knowledge rewinds; follow a value to the exact row | → | **10** The Walnut engine (4:09–4:39) | The same engine, now inside DataBridge (Developer → Walnut engine): snapshot counts, Company brain time slider, Provenance chain | Same lines, mostly verbatim | **Changed** (re-shot in the new UI; the old clip `05_video/clips/11_walnut_original.webm` still works as a fallback) |
-| 5:41–6:02 | 12 How it fits together: trust-boundary card; Hy3 line | Two checks, grounding, audit; [otherwise] answers quoted until a TokenHub key is added | → | **05** + **09** (live), and **13** Tencent Hy3 (5:07–5:21) | Mission control's model chain: Hy3 → DeepSeek → quoted fallback, "Extractive only" | "Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks" | **Changed** (live status instead of a card; honest wording kept) |
+| 5:41–6:02 | 12 How it fits together: trust-boundary card; Hy3 line | Two checks, grounding, audit; [otherwise] answers quoted until a TokenHub key is added | → | **05** + **09** (live), and **13** Tencent Hy3 (5:07–5:21) | Mission control's model chain: Hy3 through TokenHub, then the quoted fallback (recorded with `IB_MODELS=hy3`, so no other model is named), "Extractive only"; then the Tencent Cloud deploy kit card | "Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks" | **Changed** (live status instead of a card; honest wording kept) |
 | 6:02–6:12 | 13 The numbers card | ~6,000 adversarial requests, 0 leaks; 400 pairs, 0 differences | → | **14** The proof (5:20–5:38) | The app's proof slide (0 / 7,374; 0 / 400; 0 / 1,152) + label: 1,274 backend and 185 browser tests (30 Oct evening, cloud clean checkout) | Exact numbers plus the test counts | **Changed** (new slide, updated numbers) |
 | — | (no equivalent) | | → | **15** What it's worth (5:38–5:57) | The app's business slide: ≈ US$1.3M a year (estimate), break-even about 7 min/week | Estimate, not a measurement; pays for itself at about seven minutes a week | **New** |
 | 6:12–6:28 | 14 Built with, thanks: closing card | CodeBuddy mapped boundaries, built the connector, reviewed security; thanks | → | **11** Built with CodeBuddy (4:38–4:51) and **16** Close (5:57–6:08) | CodeBuddy card (the security-review session); the app's close slide with the QR code | CodeBuddy lines moved next to the other Tencent beats; close with the tagline and the ask | **Changed** |

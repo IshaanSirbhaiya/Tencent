@@ -3,6 +3,7 @@
     python docs/finals/video/assemble_finals.py                      picture + cue sheet + subtitles
     python docs/finals/video/assemble_finals.py --voice voice.m4a    ... and lay the voice-over under it
     python docs/finals/video/assemble_finals.py --cues-only [--hy3]  only re-write the cue sheet / .srt
+                                                    (--model-off: the [IF MODEL OFF] lines; default: the model is on)
     python docs/finals/video/assemble_finals.py --self-test          check the take checks (no ffmpeg)
     python docs/finals/video/assemble_finals.py --cut short|main|full   which cut (default main; see below)
     python docs/finals/video/assemble_finals.py --cues-only --plan --cut full   cue sheet from the PLANNED
@@ -36,8 +37,8 @@ Adapted from docs/tencent/video/assemble.py (the first video); the edit follows 
 - ``--voice`` lines the voice-over up with the cue sheet (its first spoken word lands on the first cue),
   cleans it (high-pass, loudness-normalised to -16 LUFS) and mixes it under the picture after the intro.
 
-Three cuts are built from the same takes (``--cut``): short (about 6:00), main (about 7:55, the default, kept
-under the 8:00 of the 5 to 8 minute range in docs/tencent/SUBMISSION.md) and full (about 9:15). Each SEGMENTS row
+Three cuts are built from the same takes (``--cut``): short (about 6:31), main (about 7:58, the default, kept
+under the 8:00 of the 5 to 8 minute range in docs/tencent/SUBMISSION.md) and full (about 9:52). Each SEGMENTS row
 gives its seconds for the three cuts; 0 leaves the scene out of that cut. Main writes the usual file names; the
 others add ``_short`` / ``_full`` (``..._short_SILENT.mp4``, ``timeline_short.json``, ``narration_cues_short.md``).
 Narration lines in VIDEO_SCRIPT_FINALS.md tagged ``**[MAIN]**`` are read in main and full, ``**[FULL]**`` only in
@@ -73,6 +74,7 @@ CUTS = ("short", "main", "full")
 CUT, SUF = "main", ""                       # set by set_cut(); main keeps the original file names
 SILENT = V / "walnut_databridge_finals_SILENT.mp4"
 FINAL = V / "walnut_databridge_finals.mp4"
+MODEL_OFF = False                           # --model-off: read the [IF MODEL OFF] lines instead of [IF MODEL ON]
 INTRO_SECONDS = 31.8                        # the camera intro's length, used for planned timings only
 
 
@@ -155,7 +157,7 @@ SEGMENTS = [
     ("camera", "intro_final.mp4", 0, "00 Camera intro", {}),
     ("card", "01_title.png", 9, "01 Title", {}),                   # [1] 9 s: Tencent is named in the first line
     # [3] one question, every sentence sourced, checked live (+ 简体中文)
-    ("clip", "04_source_live.webm", (36, 36, 40), "04 One question, checked live", {}),
+    ("clip", "04_source_live.webm", (36, 37, 40), "04 One question, checked live", {}),
     # [4] the map: Jordan's everything, Ken's corner
     ("clip", "06_graph.webm", (20, 20, 26), "06 The map of what you can see", {}),
     # [5] + [7] same question, two people; the fintech part
@@ -169,21 +171,21 @@ SEGMENTS = [
     ("clip", "21_extras.webm", (0, 10, 15), "21 New here: tour, dictation, value calculator", {"optional": True}),
     # [8] nothing stale: live growth and uploads
     ("clip", "06b_brain_grow.webm", (0, 22, 28), "06b Watch the brain grow", {"optional": True}),
-    ("clip", "19_upload.webm", (0, 8, 13), "19 Add a file", {"optional": True}),
+    ("clip", "19_upload.webm", (0, 9, 13), "19 Add a file", {"optional": True}),
     # [9] the compliance side: the journey, the audit log and the tamper demo (+ analytics, Trust centre)
     ("clip", "05_journey.webm", (30, 35, 40), "05 Developer mode: the journey", {}),
-    ("clip", "08_audit.webm", (40, 41, 50), "08 Audit, Verify and the tamper demo", {}),
+    ("clip", "08_audit.webm", (40, 42, 50), "08 Audit, Verify and the tamper demo", {}),
     ("clip", "07_analytics.webm", (12, 12, 15), "07 Analytics", {}),
     ("clip", "09_trust.webm", (13, 13, 14), "09 The Trust centre", {}),
     # [10] WorkBuddy
     ("still", "workbuddy_mcp_panel.png", (6, 6, 6), "12 WorkBuddy: the connectors",
      {"pills": [(0.6, 4.0, "Tencent WorkBuddy · real window capture (15 Oct)")]}),
-    ("still", "workbuddy_compare.png", (9, 9, 12), "12 WorkBuddy: two people",
+    ("still", "workbuddy_compare.png", (9, 10, 13), "12 WorkBuddy: two people",
      {"pills": [(1.0, 4.0, "One question, Jordan's and Ken's connectors: two answers")]}),
     # [11] what's underneath: shown as on 16 Oct (a recording of the ORIGINAL Walnut screens, :3300 and the
     # gateway :8300, captioned "the platform"), then the same engine's graph inside DataBridge (shown, not used)
     ("clip", "10a_platform.webm", (16, 16, 18), "10 The platform", {}),
-    ("clip", "10_engine.webm", (8, 10, 18), "10 The Walnut engine", {}),
+    ("clip", "10_engine.webm", (10, 10, 18), "10 The Walnut engine", {}),
     # [12] how it fits together, and Hy3 (+ the Tencent Cloud deploy kit, a still card as on 16 Oct)
     ("clip", "13_hy3_status.webm", (11, 11, 14), "13 Tencent Hy3", {}),
     ("card", "13b_deploy.png", (4, 4, 5), "13 Deploy kit: Tencent Cloud", {}),
@@ -197,7 +199,7 @@ SEGMENTS = [
     ("card", "15_business.png", 21, "15 What it's worth",
      {"pills": [(12.0, 7.0, "Target host: Tencent Cloud. One-command deploy kit in the repo; no live instance yet")]}),
     ("card", "11_codebuddy.png", (10, 11, 14), "11 Built with CodeBuddy", {}),
-    ("card", "20_miora.png", (0, 5, 7), "20 Miora: the cover", {"optional": True}),
+    ("card", "20_miora.png", (0, 5, 8), "20 Miora: the cover", {"optional": True}),
     ("card", "16_close.png", 13, "16 Close", {}),
 ]
 
@@ -472,11 +474,16 @@ def self_test() -> int:
     # product "runs on" a Tencent tool, or calls a view (the graphs) how an answer is found
     banned = ("deepseek", "written by hy3", "hy3 answered", "runs on codebuddy", "runs on workbuddy",
               "runs on tencent cloud", "how the answer is found", "how answers are found")
+    global MODEL_OFF
+    banned_on = ("no model", "quoted from the sources", "quoted from sources", "claude")   # untrue with the model on
     for c in CUTS:
         for h in (False, True):
-            spoken = " ".join(x for v in scenes_from_script(h, c).values() for x in v).lower()
-            hit = [b for b in banned if b in spoken]
-            assert not hit, f"spoken lines ({c}, hy3={h}) say {hit}"
+            for off in (False, True):
+                MODEL_OFF = off
+                spoken = " ".join(x for v in scenes_from_script(h, c).values() for x in v).lower()
+                hit = [b for b in banned + (() if off else banned_on) if b in spoken]
+                assert not hit, f"spoken lines ({c}, hy3={h}, model_off={off}) say {hit}"
+    MODEL_OFF = False
     problems = check_script_numbers()                                  # the spoken numbers vs eval_summary.json
     assert not problems, "script vs evidence: " + "; ".join(problems)
     assert words(1131) == "one thousand one hundred and thirty-one" and words(7374) ==         "seven thousand three hundred and seventy-four" and words(166) == "one hundred and sixty-six"
@@ -552,6 +559,10 @@ def scenes_from_script(hy3: bool, cut: str = "main") -> dict[str, list[str]]:
                 continue
             if "[otherwise]" in text and hy3:
                 continue
+            if "[IF MODEL OFF]" in text and not MODEL_OFF:     # founder, 31 Oct: the stand-in model is on
+                continue
+            if "[IF MODEL ON]" in text and MODEL_OFF:
+                continue
             text = re.sub(r"\*\*\[[^\]]+\]\*\*\s*", "", text).replace("*", "")
             if out[cur] and not text:
                 continue
@@ -596,7 +607,9 @@ def write_cues(timeline: list[dict], hy3: bool, cut: str | None = None, planned:
           f"`narration{SUF}.srt` loaded as subtitles (VLC: Subtitle → Add Subtitle File) and read each line as it "
           "appears. Relaxed pace, about 150 words a minute; pauses are fine. "
           + ("These are the **Hy3 is on** lines." if hy3 else
-             "These are the default lines (Hy3 not switched on yet)."), "",
+             "These are the default lines (Hy3 not switched on yet).")
+          + (" The model is off: these are the **[IF MODEL OFF]** lines." if MODEL_OFF else
+             " The model is on (the stand-in, labelled \"AI-generated from your cited sources\")."), "",
           "The camera intro (0:00 to the first cue) already has your voice: stay quiet until the title card.", ""]
     for scene, (a, b) in spans.items():
         said = lines.get(scene, [])
@@ -676,11 +689,13 @@ def main() -> int:
     ap.add_argument("--voice-skip", type=float, default=0.0,
                     help="seconds to drop from the start of the voice file (a count-in, a cough)")
     ap.add_argument("--hy3", action="store_true", help="use the [if Hy3 is on] lines in the cue sheet")
+    ap.add_argument("--model-off", action="store_true",
+                    help="read the [IF MODEL OFF] lines (no model; quoted answers) instead of the default [IF MODEL ON] ones")
     ap.add_argument("--cues-only", action="store_true", help="only re-write the cue sheet from timeline.json")
     ap.add_argument("--plan", action="store_true",
                     help="with --cues-only: use the planned slot lengths instead of timeline.json (nothing recorded yet)")
     ap.add_argument("--cut", choices=CUTS, default="main",
-                    help="short (about 6:00), main (about 7:55, default) or full (about 9:15), from the same takes")
+                    help="short (about 6:31), main (about 7:58, default) or full (about 9:52), from the same takes")
     ap.add_argument("--no-intro", action="store_true", help="leave the camera intro out")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--self-test", action="store_true", help="check the take checks on made-up takes, then stop")
@@ -688,6 +703,8 @@ def main() -> int:
 
     if args.self_test:
         return self_test()
+    global MODEL_OFF
+    MODEL_OFF = args.model_off
 
     set_cut(args.cut)
     if args.cues_only:

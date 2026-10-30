@@ -113,6 +113,12 @@ points at a file (nine transcripts, real captures, the Miora session PNGs, the m
 over-claims. Two weaknesses: Tencent is first named at about 5:15, and the WorkBuddy evidence is two stills from
 before the rename. §4.1 and §4.4.
 
+31 Oct update: CodeBuddy 11 s ("nine recorded sessions, including security reviews that found real bugs", CB7
+screenshot on the card), WorkBuddy 16 s (an MCP agent, same gates, same sealed log; re-capture still pending),
+Hy3 and Tencent Cloud 15 s ("wired for Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud", the
+deploy kit card), Miora 5 s ("The cover was designed in Tencent Miora", the finals cover and session screenshot).
+Tencent is named at 0:38 (§4.1, done).
+
 ### 3.6 Close
 
 Now: a last thought ("Every company's AI will be asked to prove itself"), the name, the tagline, a six-word ask,
@@ -125,12 +131,12 @@ against the clock.
 |---|---|---|---|
 | 1 | Impact & Relevance | 02 (Aspire's question), 17 (the draft reply), 15 (what it's worth) | none |
 | 2 | Human-Centered Design | 02, 04 (persona screens, plain answers, source sheet), 21 (tour) | No tester line: the hallway test has not happened. Do not add one until `FIX_LOG.md` has a real row |
-| 3 | AI Interaction | 04 (cited answer), 05 (model card), 13 (Hy3 chain), 12 (WorkBuddy agent) | Honest "no model" throughout; only Hy3 live changes this |
-| 4 | Technical Execution | 05 (real timings, sealed records), 08 (chain), 10 (engine), 14 (tests) | none |
-| 5 | Feasibility | 15 (break-even), 07 (live analytics), 09 | Tencent Cloud as the target host and the deploy kit are not mentioned (the run sheet says it). One clause in 15 if the slot grows by 2 s |
+| 3 | AI Interaction | 04 (cited answer, "AI-generated from your cited sources"), 05 (model card), 13 (the model chain, Hy3 first), 12 (WorkBuddy: an MCP agent, same gates, same sealed log) | 31 Oct: the stand-in model is on, so answers are AI-generated inside the same gates and grounding check; no line says Hy3 answered or names another model. Only Hy3 live changes this |
+| 4 | Technical Execution | 04 (each source read through its own connector, permissions checked live), 05 (real timings: index filter, live source checks, sealed records), 08 (chain), 10 (the platform: adapter agents, builder, connectors, data tools, federated engine, as "the platform"; then the engine graph, shown, not used to answer), 14 (tests) | none. 31 Oct: 06 is now "a map of what each person can open" (a view, never how answers are found) |
+| 5 | Feasibility | 15 (break-even, Tencent Cloud host pill), 13 ("packaged to deploy on Tencent Cloud" + the Lighthouse deploy kit card), 07 (live analytics), 09 | Closed 31 Oct: the deploy kit is shown (13b card) and said in 13; it says "no live instance yet" |
 | 6 | Demo & Storytelling | the whole arc; 21 (presenter) | see §1 |
 | 7 | Innovation & Creativity | 03 (identical refusals), 08 (tamper on a copy), 06b (Ken's side: nothing) | none |
-| 8 | UX & Accessibility | 04 (简体中文), 21 (dictation, keyboard-only presenter) | Settings (text size, contrast, reduce motion) and axe-in-every-test are never shown or said. One caption in 21 would do it |
+| 8 | UX & Accessibility | 04 (简体中文), 21 (dictation, the accessibility-settings caption), S2 (pages beside the chat) | Closed 30 Oct: one caption in 21 names the settings and "accessibility checks run in the browser tests" |
 | 9 | Responsible AI & Ethics | 02 (tipping-off), 03, 05 (Maya never sees the answer), 08, 09 (Trust centre) | none |
 | 10 | Overall Quality | 14, 15, 16; the one design system across every scene | none |
 

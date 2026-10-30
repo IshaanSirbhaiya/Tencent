@@ -14,8 +14,8 @@ dropped on 16 Oct's own advice (2 "Why this matters": the camera intro says it; 
 just-in-time UI, dots) are TODO placeholders until they are merged. Written for what exists **today**.
 
 **Three cuts from the same takes** (`assemble_finals.py --cut short|main|full`; main is the default):
-short about 6:18, **main about 7:56** (under the 8:00 of the 5 to 8 minute range in `docs/tencent/SUBMISSION.md`),
-full about 9:43. Each scene below lists its seconds in the three cuts. Narration lines tagged **[MAIN]** are read
+short about 6:31, **main about 7:58** (under the 8:00 of the 5 to 8 minute range in `docs/tencent/SUBMISSION.md`),
+full about 9:52 (planned slot lengths, every teammate slot counted; `--self-test` prints them). Each scene below lists its seconds in the three cuts. Narration lines tagged **[MAIN]** are read
 in main and full, **[FULL]** only in full. The exact time of every line is in
 `submission/finals_video/narration_cues.md` (and `_short`, `_full`), generated from the picture.
 **Format:** 1920×1080, dark theme.
@@ -33,19 +33,23 @@ one feels stiff, say it your own way, but keep the facts and the numbers.
 person, action) · Caption (the small label at the lower left) · Proof (the test or file behind what is claimed) ·
 then the voice-over, in `>` lines. Only `>` lines are spoken; `TODO` lines are placeholders and are never read.
 
-**Hy3 lines.** Hy3 is wired in but not live (TokenHub activation is pending; as of 30 Oct it has not answered
-live), so the app labels every answer "Quoted from sources (no model)". A line marked **[ONLY IF HY3 LIVE]** is
-read only after Hy3 has answered live in this app; otherwise read the **[otherwise]** line. (The assembler also
-still accepts the old spelling "[if Hy3 is on]".) Keep each marked line on one line: `assemble_finals.py` reads
-the script line by line. If Hy3 goes live, scenes 02, 04, 05 and 13 must also be re-shot, because the answer label
-changes on screen. No line ever says Hy3 answered, and no line or caption names any other model: a stand-in
-model exists in the code but is off by default, so the video never mentions it.
+**Model lines (founder, 31 Oct: the stand-in model is ON for the demo and the video).** Hy3 is wired in through
+TokenHub but not live (as of 30 Oct it has not answered live). With the stand-in on (D-41, `IB_CLAUDE=1`), the app
+labels every answer "AI-generated from your cited sources": the model sees only passages that passed Gate 1 and
+Gate 2, and the grounding check runs on what it writes. Say it that way. Never say an answer was "quoted from the
+sources (no model)" (that is the model-OFF label), never say Hy3 or Hunyuan answered, and never name the stand-in's
+maker or any other model: on screen it is only "AI model". Lines marked **[IF MODEL OFF]** are kept for a model-off
+take only (`assemble_finals.py --model-off`); **[IF MODEL ON]** lines are the default. A line marked
+**[ONLY IF HY3 LIVE]** is read only after Hy3 has answered live in this app; otherwise read the **[otherwise]**
+line. (The assembler also still accepts the old spelling "[if Hy3 is on]".) Keep each marked line on one line:
+`assemble_finals.py` reads the script line by line. Scenes 02, 04, 05, 13 and 06b show the answer label, so record
+them with the stand-in on (`FINALS_MODEL=1` makes the recorder refuse a scene-13 take that disagrees).
 
 ## What each piece does (every line must agree with this)
 
 | Role | Pieces | How the video may describe it |
 |---|---|---|
-| **Used to make every answer** | the signed token (who you are); the search index; Gate 1, the index permission filter; the connectors for Slack, Confluence, Jira and Drive (Gate 2: each source is read through its own connector, with permissions checked live); the model step (today: quoted from the sources); the Walnut engine's grounding wall and source pointers; the write-ahead sealed ledger | "each source is read through its own connector, with permissions checked live"; "two permission checks first"; "the record is sealed before you see a word" |
+| **Used to make every answer** | the signed token (who you are); the search index; Gate 1, the index permission filter; the connectors for Slack, Confluence, Jira and Drive (Gate 2: each source is read through its own connector, with permissions checked live); the model step (today: the stand-in, "AI-generated from your cited sources", only from passages that passed both gates); the Walnut engine's grounding wall and source pointers; the write-ahead sealed ledger | "each source is read through its own connector, with permissions checked live"; "two permission checks first"; "the record is sealed before you see a word" |
 | **Another way to ask, through the same pipeline** | WorkBuddy (an MCP agent: same gates, written to the same sealed log); Compare | "the same gates, the same sealed log" |
 | **Views that do not answer** | the knowledge graph (a map of what each person can open, built from the same permission checks); the Walnut engine graph (Dev → Brain); the journey; audit; analytics; the Trust centre | "a map of what each person can open"; the engine graph is "shown, not used to answer". Never "how the answer is found" |
 | **On top of an answer** | Act; Deliverables; the page beside the chat (slot S2) | "the answer can become a reply / a file / a page" |
@@ -97,7 +101,7 @@ and "Wired for Tencent Hunyuan (Hy3)" (made by `record_finals.cjs cards`).
 > Aspire's own question.
 
 ### 04 · One question, every sentence sourced and checked live
-**Cuts:** short 36 s · main 36 s · full 40 s.
+**Cuts:** short 36 s · main 37 s · full 40 s.
 **Original beat:** 3 "One question, three platforms" (one plain question, one answer, every sentence linked to its
 source, only sources the asker can open, each re-checked with the source system). Upgraded: the asker is Rachel
 with Aspire's question, the source sheet shows "Checked live at", and (new) the user screens work in 简体中文.
@@ -139,8 +143,7 @@ answer is found.
 no greyed-out boxes".
 **Proof:** `tests/e2e/graph.spec.ts`, `graph-screens.spec.ts`; the map totals are permission-correct (rule 1).
 
-> This is a map of what each person can open, built from the same permission checks. Here is Jordan's, a
-> backend engineer.
+> Here is a map of what Jordan, a backend engineer, can open, built from the same permission checks.
 > **[FULL]** Company A is a synthetic company; every name here is made up.
 > Compare two people, and Ken, an outside contractor, has a small corner of the company, with no greyed-out
 > boxes.
@@ -225,7 +228,7 @@ figure pointing at its sources; the pointer rests on **.pptx** (hovered, not dow
 
 > Answers can also become files: a table whose figures point at their sources, and a chart from the same facts.
 > **[MAIN]** Or a PowerPoint file, built without a model.
-> **[FULL]** The table is built straight from the cited facts, with no model.
+> **[FULL]** The table's figures come straight from the cited facts.
 
 ### 21 · New here: a tour, dictation, the value calculator
 **Cuts:** not in the short cut · main 10 s · full 15 s.
@@ -272,7 +275,7 @@ take if Ken's feed gets any item. Needs demo features on (D-24). It writes a rea
 > **[FULL]** The post is checked with Slack and written to the audit log, like everything else.
 
 ### 19 · Add a file
-**Cuts:** not in the short cut · main 8 s · full 13 s.
+**Cuts:** not in the short cut · main 9 s · full 13 s.
 **Original beat:** enhancement to 8 (new content goes through the same checks and into the same log).
 **On screen:** `/dev/graph?add=1`, Leo (product and operations, who may add files to "Pricing & Offers"; Jordan may add to no
 folder). In the Add sheet, the file tab: a sample file is chosen, the folder **Pricing & Offers** is picked from the
@@ -313,7 +316,7 @@ write-ahead ledger rule 3 (`test_audit_ledger.py`). Maya sees verdicts and reaso
 > Maya sees every decision. She never sees the answer itself.
 
 ### 08 · The sealed audit log, and the tamper demo
-**Cuts:** short 40 s · main 41 s · full 50 s.
+**Cuts:** short 40 s · main 42 s · full 50 s.
 **Original beat:** 9 "The audit trail", second half (plain-English search, the chained and sealed log, Verify, and
 "if someone edits a single line on disk, verification catches it"). Upgraded: the tamper demo now runs live on a
 copy, and Verify points at the exact entry.
@@ -366,7 +369,7 @@ tests that prove it.
 # Part 5 · WorkBuddy, what's underneath, how it fits together (16 Oct beats 10 to 12)
 
 ### 12 · Ask from Tencent WorkBuddy
-**Cuts:** short 15 s · main 15 s · full 18 s.
+**Cuts:** short 15 s · main 16 s · full 19 s.
 **Original beat:** 10 "Ask from WorkBuddy" (people don't want another app; each connector carries its own signed
 token, so the AI in the middle can't decide who you are). Shown as in the first video: real WorkBuddy window
 stills, the connector list first, then one question through two people's connectors, with small captions.
@@ -387,7 +390,7 @@ captures, so nothing is said about it over these stills (READINESS_30OCT.md, sce
 > **[FULL]** The agent never decides who you are.
 
 ### 10 · What's underneath: the platform, and the Walnut engine
-**Cuts:** short 24 s · main 26 s · full 36 s (two clips: the platform, then the engine).
+**Cuts:** short 26 s · main 26 s · full 36 s (two clips: the platform, then the engine).
 **Original beat:** 11 "What's underneath". Shown as in the first video: a screen recording of the ORIGINAL Walnut
 screens (`databridge/apps/frontend` on :3300, the engine gateway on :8300) running on Company A, one quick shot per
 screen, small captions, the pointer resting on each; then (new) the same engine inside DataBridge.
@@ -425,21 +428,24 @@ record it with `node docs/finals/video/record_finals.cjs 10a_platform`.
 written before anything is shown; Hy3 through TokenHub, or quoted answers until then). Upgraded: the live model
 chain on Mission control instead of a card, then a still card of the Tencent Cloud deploy kit in the same card
 style as the first video's.
-**On screen:** Maya, **Mission control** (`/dev`) → the model chain: Hy3 through TokenHub, then the quoted
-fallback. **[otherwise]** The badge reads "Extractive only". Record with `IB_MODELS=hy3` so the chain on screen
-names no other model; the recorder refuses a take whose chain does. Then the card `13b_deploy.png`
+**On screen:** Maya, **Mission control** (`/dev`) → the model chain: Hy3 through TokenHub first, then the fallbacks
+(the stand-in shows only as "AI model", then the quoted answer). Record with the stand-in on; the chain on screen
+must name no third-party model, and the recorder refuses a take whose chain does.
+**[IF MODEL OFF]** take: the badge reads "Extractive only". Then the card `13b_deploy.png`
 (`record_finals.cjs cards`): the Lighthouse deploy kit in `deploy/lighthouse/` (its files and the one-VM diagram),
 "written; no live instance yet".
-**Caption:** "Tencent Hy3 via TokenHub, then a quoted fallback", then a line that follows the live status ("Hy3 not
-switched on yet: answers are quoted from the sources"). The card says "Packaged for Tencent Cloud Lighthouse".
+**Caption:** "The model chain: Tencent Hy3 via TokenHub first, then the fallbacks", then a line that follows the
+live status ("Hy3 not switched on yet: answers are AI-generated from the cited sources, through the same checks";
+model-off take: "…answers are quoted from the sources"). The card says "Packaged for Tencent Cloud Lighthouse".
 **Proof:** the model-chain tests (`test_model_config.py`); the recorder reads `/ib/status`, and `FINALS_HY3=0|1`
-makes it refuse a take that disagrees. The frame line is rules 1, 3 and 5 of `CLAUDE.md`. The deploy kit:
+makes it refuse a take that disagrees (`FINALS_MODEL=0|1` the same for the stand-in). The frame line is rules 1, 3 and 5 of `CLAUDE.md`. The deploy kit:
 `deploy/lighthouse/README.md` (status: written, no live instance).
 
 > **[FULL]** Two checks before any model, a grounding check after, the record written first.
 > **[otherwise]** And it's wired for Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
 > **[ONLY IF HY3 LIVE]** And it runs on Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
-> **[otherwise]** Until Hy3 is switched on, answers are quoted from the sources, through the same checks.
+> **[otherwise]** **[IF MODEL ON]** Until Hy3 is switched on, answers are AI-generated from your cited sources, through the same checks.
+> **[otherwise]** **[IF MODEL OFF]** Until Hy3 is switched on, answers are quoted from the sources, through the same checks.
 
 ---
 
@@ -535,7 +541,7 @@ the count is in `video_constants.json`.
 > **[FULL]** Every transcript is in the repo.
 
 ### 20 · Made with Tencent Miora
-**Cuts:** not in the short cut · main 5 s · full 7 s.
+**Cuts:** not in the short cut · main 5 s · full 8 s.
 **Original beat:** enhancement to 14 (how we built it). One still card, as in the first video.
 **On screen:** card: the finals cover (`submission/06_cover/finals/cover_finals_1920x1080.png`, Miora output 2,
 the chosen one) beside the Miora session screenshot (`miora_session_finals.png`) as the evidence.
@@ -566,20 +572,20 @@ screenshot with the prompt; both outputs; Miora's "Generated by Miora" mark kept
 | 1 Hello | name, challenge, Tencent named | 00, 01 | the tagline |
 | 2 Why this matters | dropped on 16 Oct's own advice | (the camera intro says it) | |
 | 3 One question, three platforms | one answer, every sentence sourced, only what you can open | 04 | 简体中文 (04), Act (17), Deliverables (18) |
-| 4 The map | Jordan's map vs Ken's; no "hidden" count | 06 | Compare two people |
+| 4 The map | Jordan's map vs Ken's; no "hidden" count | 06 (a map of what each person can open: a view, not how answers are found) | Compare two people |
 | 5 Same question, two people | Compare side by side | 02 | Amy and Rachel |
 | 5b Guided tour | for anyone new | 21 | dictation, accessibility caption, value calculator |
 | 6 Restricted looks like non-existent | identical, 400 pairs | 03 | the live marker |
 | 7 The fintech part | what can I tell this customer | 02, 17 | the draft reply |
 | 8 Access changes | checked with the source every time; nothing stale | 06b, 19 | live growth, uploads |
 | 9 The audit trail | Maya, plain English, Verify, tamper | 05, 08 | the journey, analytics (07), Trust centre (09) |
-| 10 WorkBuddy | another front door, signed tokens | 12 | |
-| 11 What's underneath | the Walnut engine | 10 | |
-| 12 How it fits together | two checks, grounding, audit; Hy3 | 13 | the live model chain |
+| 10 WorkBuddy | another front door, signed tokens | 12 (same stills pattern; re-capture on the laptop) | an MCP agent: same gates, same sealed log |
+| 11 What's underneath | the Walnut engine (a recording of the original Walnut screens) | 10 (the same kind of recording: the original screens as "the platform", then the engine graph inside DataBridge, shown, not used to answer) | adapter agents, builder, connectors, data tools, federated engine via the gateway |
+| 12 How it fits together | two checks, grounding, audit; Hy3 | 13 | the live model chain; the Tencent Cloud deploy kit card |
 | 13 The numbers | attacked on purpose | 14 | the business case (15) |
-| 14 Built with, thanks | CodeBuddy; thanks | 11, 20, 16 | Miora; the ask |
+| 14 Built with, thanks | CodeBuddy; thanks | 11, 20, 16 | CodeBuddy session evidence; the Miora cover; the ask |
 
-## Which scenes the short cut (about 6:18) drops
+## Which scenes the short cut (about 6:31) drops
 
 06b live growth, 19 add a file, 21 new here (tour / dictation / value calculator), 20 Miora, and the three slots
 S1 to S3. It also uses the shorter spoken lines (no **[MAIN]** or **[FULL]** lines) and shorter holds. The spine
@@ -589,9 +595,9 @@ S1 to S3. It also uses the shorter spoken lines (no **[MAIN]** or **[FULL]** lin
 
 | Scene | Line | Also re-shoot |
 |---|---|---|
-| 13 | "Until it is switched on, answers are quoted from the sources…" becomes "The answers you saw were written by Hy3…" | Scene 13 (the badge becomes "Live models") |
-| 02, 04 | No spoken change, but the answer label on screen changes from "Quoted from sources (no model)" to the model's name | Scenes 02 and 04 |
-| 05 | No spoken change ("two permission checks first" is true either way); the Model card shows Hy3 instead of "Extractive (no model)" | Scene 05 |
+| 13 | "And it's wired for Tencent Hunyuan through TokenHub…" becomes "And it runs on Tencent Hunyuan through TokenHub…"; the "Until Hy3 is switched on…" line is dropped. No line ever says Hy3 wrote the answers | Scene 13 (the badge becomes "Live models") |
+| 02, 04 | No spoken change, but the answer label on screen changes from "AI-generated from your cited sources" to "Tencent Hunyuan Hy3" | Scenes 02 and 04 |
+| 05 | No spoken change ("the index filter and the live source checks first" is true either way); the Model card shows Hy3 instead of the neutral stand-in label | Scene 05 |
 
 Then run `python docs/finals/video/assemble_finals.py --hy3` so the cue sheet uses the Hy3 lines.
 
@@ -605,7 +611,11 @@ Then run `python docs/finals/video/assemble_finals.py --hy3` so the cue sheet us
 | Graph and engine counts | Not spoken (the world is growing); the screen shows them | Nothing to change |
 | US$1.3M, 7 minutes | `docs/finals/rubric/impact_feasibility/value_calculator.spec.json` | Match the slide |
 | "Tipping off" line | Run sheet, beat 0:15 | Keep the wording as written |
+| "AI-generated from your cited sources" (13) | the answer label `answer.model.ai` in `lib/i18n/user.ts`; the stand-in on (D-41, `IB_CLAUDE=1`), named only `standin/standin-1` | If the model is off for the take, run the cue sheet with `--model-off` |
 | "Wired for Tencent's Hunyuan" (01), "wired in through TokenHub" (13) | `STATUS.md`, `/ib/status`; Hy3 not live as of 30 Oct | If Hy3 answers live, say "running on Tencent's Hunyuan" in 01 and read the [ONLY IF HY3 LIVE] line in 13 |
+| "nine recorded sessions, including security reviews that found real bugs" (11) | `README.md` CodeBuddy table (CB1–CB9); `DEV_PROCESS.md` (CB5: 7 findings, fixed; CB7: F7 fixed with tests) | Match the README |
+| "The cover was designed in Tencent Miora" (20) | `submission/06_cover/finals/README.md` (made in Miora, 30 Oct) | If the cover changes, update the card |
+| "packaged to deploy on Tencent Cloud" (13) | `deploy/lighthouse/README.md` (written; no live instance) | Never say it is deployed until an instance is live |
 | "Target host: Tencent Cloud … no live instance yet" (15, pill) | run sheet 3:50; `rubric/README.md` row 5 | If an instance goes live, change the pill text in `assemble_finals.py` |
 
 **Fallback:** every scene is its own clip; if one breaks, re-shoot just that one

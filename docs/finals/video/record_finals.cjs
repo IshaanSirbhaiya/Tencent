@@ -3,8 +3,10 @@
 //
 //   node docs/finals/video/record_finals.cjs                 all scenes, then the cards
 //   node docs/finals/video/record_finals.cjs 08_audit        one scene (any order)
-//   node docs/finals/video/record_finals.cjs cards           only the still cards and slides (title, CodeBuddy, Miora + the app's slides)
+//   node docs/finals/video/record_finals.cjs cards           only the still cards and slides (title, CodeBuddy, Miora, deploy kit + the app's slides)
 //   node docs/finals/video/record_finals.cjs --self-test     check the take handling (no browser, no stack)
+//   node docs/finals/video/record_finals.cjs 10a_platform    the ORIGINAL Walnut screens (start them first:
+//        bash databridge/scripts/run_walnut_original.sh  -> web :3300, engine gateway :8300); no Brain sign-in
 //
 // Every take is kept in its own folder, submission/finals_video/clips/takes/<scene>/<take>/: the video
 // (<scene>.webm, or <scene>.FAILED.webm) and take.json, which holds the marks: when each on-screen label
@@ -33,6 +35,9 @@ const webDir = path.join(repo, 'databridge/apps/internal_brain_web');
 let chromium;                                         // loaded when recording, not for --self-test
 
 const WEB = process.env.IB_WEB || 'http://127.0.0.1:3100';
+// the original Walnut screens and their engine gateway (scene 10a only; databridge/apps/frontend/README.md)
+const WALNUT = process.env.WALNUT_ORIGINAL_WEB || 'http://localhost:3300';
+const GATEWAY = process.env.WALNUT_ORIGINAL_GATEWAY || 'http://127.0.0.1:8300';
 const OUTV = path.join(repo, 'submission/finals_video');
 const OUT = path.join(OUTV, 'clips');
 const CARDS = path.join(OUTV, 'cards');
@@ -279,11 +284,26 @@ async function hy3Live(page) {
   }
   return live;
 }
-const hy3Mark = (live) => (live === true
+// Founder, 31 Oct: the stand-in model is ON for the video (D-41; /ib/status names it only as the neutral
+// standin/standin-1, "AI model" on screen). FINALS_MODEL=1 or 0, when set, must agree with the status.
+async function standinOn(page) {
+  const r = await page.request.get(`${WEB}/api/ib/ib/status`).catch(() => null);
+  const st = r && r.ok() ? await r.json().catch(() => null) : null;
+  const m = st && st.models;
+  const on = m ? (/standin/i.test(String(m.provider || '')) || (m.active_chain || []).some((x) => /standin/i.test(String(x)))) : null;
+  const want = process.env.FINALS_MODEL;
+  if ((want === '1' || want === '0') && on !== (want === '1')) {
+    throw new Error(`FINALS_MODEL=${want} but /ib/status says the stand-in is on=${on}; not recording 13_hy3_status`);
+  }
+  return on;
+}
+const hy3Mark = (live, model) => (live === true
   ? 'Hy3 switched on via TokenHub: answers still pass the same source checks'
-  : live === false
-    ? 'Hy3 not switched on yet: answers are quoted from the sources'
-    : 'The model chain as this backend reports it');
+  : live === false && model === true
+    ? 'Hy3 not switched on yet: answers are AI-generated from the cited sources, through the same checks'
+    : live === false
+      ? 'Hy3 not switched on yet: answers are quoted from the sources'
+      : 'The model chain as this backend reports it');
 
 const SCENES = {
   '02_compare_amy_rachel': { who: 'amy.am', mode: 'user', async run(page) {               // ~40 s
@@ -375,7 +395,7 @@ const SCENES = {
     await goto(page, `${WEB}/dev/graph`, 0);
     await slow(page, page.getByTestId('graph-legend').waitFor({ timeout: 90000 }));
     await pause(page, 1.2);
-    mark(page, 'Jordan · backend engineer: everything he can open', 4);
+    mark(page, 'Jordan · backend engineer: a map of what he can open', 4);
     await hover(page, page.getByText(/\d[\d,]* items|items · /).first(), 2);   // the count is whatever the world has now
     await hover(page, page.getByTestId('graph-legend'), 1.5);
     const search = page.getByTestId('graph-main-search').locator('input').or(page.getByPlaceholder(/Search titles/)).first();
@@ -495,11 +515,57 @@ const SCENES = {
     await pause(page, 0.4);
     await read(page, cards.nth(4), 3);
   } },
+  // Scene 10a (31 Oct): "what's underneath", shown the way the 16 Oct video showed it (beat 11: a screen
+  // recording of the ORIGINAL Walnut screens, databridge/apps/frontend on :3300, running on Company A), now
+  // with the platform pieces: the adapter builder and agents (Builder), the connectors, the data tools, the
+  // engine gateway on :8300 with its federated engine, and the evidence graph. Every caption says "The
+  // platform:"; none says these answer a question: the Internal Brain's answers never go through the adapter
+  // agents, the builder or the federated engine (VIDEO_SCRIPT_FINALS.md, "What each piece does").
+  // Read-only: an example chip fills the composer box and nothing is submitted. Selectors come from the pages'
+  // own data-testids (apps/frontend/e2e/builder.spec.ts, sources-list.tsx, data/page.tsx,
+  // tests/showcase/capture_company_a.cjs). NOT RECORDED YET (31 Oct): needs the original screens running.
+  '10a_platform': { who: null, mode: 'user', async run(page) {                         // ~17 s
+    // the original sign-in only labels the terminal (README "Start it"); done before the clip starts
+    await page.goto(`${WALNUT}/builder?tab=adapter`).catch(() => {});
+    const roster = page.locator('[data-testid=roster-jdoe]');
+    if (await roster.waitFor({ timeout: 20000 }).then(() => true, () => false)) await roster.click();
+    await goto(page, `${WALNUT}/builder?tab=adapter`, 0.6);
+    await slow(page, page.getByTestId('builder-tab-adapter').waitFor({ timeout: 30000 }));
+    mark(page, 'The platform: agents that build new adapters', 3);
+    const ex = page.getByTestId('adapter-composer-box-example-0');
+    if (await ex.count()) await click(page, ex, 0.9);                       // fills the box; never submitted
+    else await hover(page, page.getByTestId('builder-tab-adapter'), 0.9);
+    await click(page, page.getByTestId('builder-tab-agents'), 0.4);
+    await slow(page, page.getByTestId('agent-composer-box-text').waitFor({ timeout: 15000 }).catch(() => {}));
+    mark(page, 'The platform: agents, built from a plain request', 2.5);
+    await hover(page, page.getByTestId('agent-composer-box-text'), 1.0);
+    await goto(page, `${WALNUT}/connectors`, 0.4);
+    mark(page, 'The platform: a connector for each source', 2.5);
+    await read(page, page.getByTestId('sources-table').or(page.getByTestId('sources-empty')).first(), 1.4);
+    await goto(page, `${WALNUT}/data#convert`, 0.4);
+    await slow(page, page.getByTestId('data-convert-section').waitFor({ timeout: 20000 }).catch(() => {}));
+    mark(page, 'The platform: data tools', 2.5);
+    await hover(page, page.getByTestId('data-agent-section'), 0.8);
+    await hover(page, page.getByTestId('data-convert-section'), 0.6);
+    // the engine gateway's own API page (FastAPI /docs); /health if the API page is not served
+    await goto(page, `${GATEWAY}/docs`, 0.4);
+    const fed = page.getByText('/federated/ask').first();
+    const fedShown = await fed.waitFor({ timeout: 10000 }).then(() => true, () => false);
+    if (!fedShown) await goto(page, `${GATEWAY}/health`, 0.2);
+    // one mark() call per label: checkTake counts the calls in this function's source
+    mark(page, 'The platform: the engine gateway, with its federated engine across systems', 3);
+    if (fedShown) await hover(page, fed, 1.6); else await read(page, page.locator('body'), 1.6);
+    await goto(page, `${WALNUT}/graph`, 0);
+    await slow(page, page.waitForSelector("[data-testid^='rf__node-']", { timeout: 30000 }));
+    await pause(page, 0.6);
+    mark(page, 'The platform: the evidence graph of Company A', 3);
+    for (const n of (await page.locator("[data-testid^='rf__node-']").all()).slice(2, 5)) await hover(page, n, 0.4);
+  } },
   '10_engine': { who: 'jdoe', mode: 'dev', async run(page) {                             // ~26 s
     await goto(page, `${WEB}/dev/brain`, 0);
     await slow(page, page.getByTestId('engine-snapshot-banner').waitFor({ timeout: 60000 }));
     await pause(page, 1.2);
-    mark(page, 'The Walnut engine: Company A as Jordan sees it', 4);
+    mark(page, "The Walnut engine's graph, inside DataBridge: shown here, not used to answer", 4);
     await hover(page, page.getByText(/\d[\d,]*\s*entities/).first(), 2.2);
     await click(page, page.getByTestId('engine-tab-brain'), 0);
     await slow(page, page.waitForFunction(() => /\d+ of the \d+/.test(document.querySelector('[data-testid=engine-asof-count]')?.textContent || '')
@@ -650,13 +716,11 @@ const SCENES = {
     await page.evaluate(() => { try { localStorage.removeItem('ib-tour-offer'); } catch (e) {} });
     await page.reload(); await page.waitForLoadState('networkidle').catch(() => {});
     await pause(page, 0.8);
-    if (await page.getByTestId('tour-offer').count()) {
-      mark(page, 'New here? A guided tour: a User track and a Developer track', 3.0);
-      await hover(page, page.getByTestId('tour-offer'), 1.8);
-    } else {
-      mark(page, 'A guided tour is offered on first visit, and any time after', 3.0);
-      await pause(page, 1.8);
-    }
+    const offer = (await page.getByTestId('tour-offer').count()) > 0;
+    // one mark() call per label: checkTake counts the calls in this function's source
+    mark(page, offer ? 'New here? A guided tour: a User track and a Developer track'
+      : 'A guided tour is offered on first visit, and any time after', 3.0);
+    if (offer) await hover(page, page.getByTestId('tour-offer'), 1.8); else await pause(page, 1.8);
     if (!(await page.getByTestId('dictate').count())) throw new Error('no microphone button here (browser has no speech API?)');
     mark(page, 'Dictate a question: it types into the box; nothing is asked until Ask is pressed', 3.5);
     await hover(page, page.getByTestId('dictate'), 2.0);                  // hovered, never pressed
@@ -675,9 +739,13 @@ const SCENES = {
     await pause(page, 0.8);
     const ms = page.getByTestId('model-status');
     await bringIntoView(page, ms);
-    mark(page, 'Tencent Hy3 via TokenHub → DeepSeek → quoted fallback', 4.5);
+    // founder, 31 Oct: no third-party model is named in the video (the stand-in shows only as "AI model");
+    // a chain that names one refuses the take instead of filming it.
+    const chainText = await ms.innerText();
+    if (/deepseek|claude|anthropic/i.test(chainText)) throw new Error('the model chain on screen names a third-party model; set IB_MODELS so only Hy3 and the stand-in ("AI model") are listed');
+    mark(page, 'The model chain: Tencent Hy3 via TokenHub first, then the fallbacks', 4.5);
     await read(page, ms.getByRole('list'), 4);
-    mark(page, hy3Mark(await hy3Live(page)), 5);
+    mark(page, hy3Mark(await hy3Live(page), await standinOn(page)), 5);
     await hover(page, ms.locator('p').last(), 3);
     await hover(page, ms.getByText(/Extractive only|Live models/).first(), 2.5);
   } },
@@ -712,7 +780,8 @@ function titleHtml() {
   </div><div class="foot"><span>Tencent Cloud AI CAN DO IT Hackathon Singapore 2026</span><span>Made-up demo data for "Company A"</span></div></body></html>`;
 }
 function codebuddyHtml() {
-  const img = imgData(path.join(repo, 'submission/01_codebuddy/cb5_session_overview.png'));
+  // the finals security review (CB7); README.md's CodeBuddy table and docs/tencent/DEV_PROCESS.md are the source
+  const img = imgData(path.join(repo, 'submission/01_codebuddy/cb7_session_overview.png'));
   return `<html><head><style>${fontCss()}${BASE}
   h2{font-size:72px;letter-spacing:-.03em;font-weight:700;margin-top:26px;line-height:1.05}
   .grid{display:grid;grid-template-columns:600px 1fr;gap:70px;margin-top:56px;align-items:start}
@@ -726,16 +795,17 @@ function codebuddyHtml() {
   <p class="eyebrow">Tencent CodeBuddy</p>
   <h2>How we built it</h2>
   <div class="grid"><div><ul>
-   <li>Built the WorkBuddy connector</li>
-   <li>Built the token tool and the model-chain tests</li>
-   <li>Ran a security review of the gates and the audit log, and found real issues</li>
+   <li>Built the WorkBuddy connectors and the token tool</li>
+   <li>Wrote the model-chain tests</li>
+   <li>Two security reviews (CB5, and CB7 on the finals backend) that found real bugs; the fixes and their tests are in the repo</li>
   </ul><p class="note muted">${cap(NUM_WORD[CONST.codebuddy_sessions] || String(CONST.codebuddy_sessions))} CodeBuddy sessions. Every transcript is in the repo: docs/tencent/evidence/</p></div>
   <div class="shot"><img src="${img}"></div></div>
   </div></body></html>`;
 }
 function mioraHtml() {
-  const cover = imgData(path.join(repo, 'submission/06_cover/cover_1920x1080.png'));
-  const sess = imgData(path.join(repo, 'submission/06_cover/miora_session1.png'));
+  // the finals cover (Miora output 2, chosen) and the Miora session screenshot: submission/06_cover/finals/README.md
+  const cover = imgData(path.join(repo, 'submission/06_cover/finals/cover_finals_1920x1080.png'));
+  const sess = imgData(path.join(repo, 'submission/06_cover/finals/miora_session_finals.png'));
   return `<html><head><style>${fontCss()}${BASE}
   h2{font-size:72px;letter-spacing:-.03em;font-weight:700;margin-top:26px;line-height:1.05}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:50px;align-items:start}
@@ -743,17 +813,38 @@ function mioraHtml() {
   .shot img{width:100%;height:100%;object-fit:cover;display:block}
   .note{font-size:26px;margin-top:36px;line-height:1.45}
   </style></head><body><div class="wrap" style="padding-top:96px">
-  <p class="eyebrow">Miora</p>
-  <h2>The cover art</h2>
+  <p class="eyebrow">Tencent Miora</p>
+  <h2>The cover</h2>
   <div class="grid"><div class="shot"><img src="${cover}"></div><div class="shot"><img src="${sess}"></div></div>
-  <p class="note muted">Made in Miora from our written brief. The prompts and the results are in the repo: submission/06_cover/</p>
+  <p class="note muted">Designed in Tencent Miora from our written brief. The prompt, both results and the session are in the repo: submission/06_cover/finals/</p>
+  </div></body></html>`;
+}
+function deployHtml() {
+  // deploy/lighthouse/README.md: the kit is written; there is no live instance (capacity was sold out)
+  const files = fs.readdirSync(path.join(repo, 'deploy/lighthouse')).filter((f) => !f.endsWith('.dockerignore')).sort();
+  return `<html><head><style>${fontCss()}${BASE}
+  h2{font-size:72px;letter-spacing:-.03em;font-weight:700;margin-top:26px;line-height:1.05}
+  .grid{display:grid;grid-template-columns:520px 1fr;gap:70px;margin-top:56px;align-items:start}
+  ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:12px;font:500 26px ui-monospace,Menlo,Consolas,monospace;color:#d4d4d8}
+  pre{font:500 25px/1.55 ui-monospace,Menlo,Consolas,monospace;color:#d4d4d8;background:#131417;border:1px solid #2e2f35;border-radius:16px;padding:34px 38px;margin:0}
+  .note{font-size:26px;margin-top:40px}
+  </style></head><body><div class="wrap" style="padding-top:96px">
+  <p class="eyebrow">Tencent Cloud</p>
+  <h2>Packaged for Tencent Cloud Lighthouse</h2>
+  <div class="grid"><ul>${files.map((f) => `<li>deploy/lighthouse/${f}</li>`).join('')}</ul>
+  <pre>internet ─ 80/443 ─▶ caddy (TLS)
+              └─▶ web :3100
+                    └─▶ ib :8100  (ledger in a volume)
+                          └─▶ mock :8200 (synthetic platforms)
+  ib reaches the internet only for TokenHub</pre></div>
+  <p class="note muted">One small VM in Singapore. The kit is written; no live instance yet.</p>
   </div></body></html>`;
 }
 async function makeCards(browser) {
   fs.mkdirSync(CARDS, { recursive: true });
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
-  for (const [name, html] of [['01_title.png', titleHtml()], ['11_codebuddy.png', codebuddyHtml()], ['20_miora.png', mioraHtml()]]) {
+  for (const [name, html] of [['01_title.png', titleHtml()], ['11_codebuddy.png', codebuddyHtml()], ['20_miora.png', mioraHtml()], ['13b_deploy.png', deployHtml()]]) {
     await p.setContent(html, { waitUntil: 'load' });
     await p.evaluate(() => document.fonts.ready);
     await p.waitForTimeout(300);
@@ -910,7 +1001,7 @@ function selfTest() {
     MARKS.set(page, { t0, list: [] });
     POS.set(page, [770, 500]);
     let ok = true, error = null;
-    try { await login(page, sc.who); await sc.run(page); }
+    try { if (sc.who) await login(page, sc.who); await sc.run(page); }   // who: null = not the Brain (10a)
     catch (e) { ok = false; error = e.message.split('\n')[0]; }
     const vid = page.video();
     await ctx.close();
