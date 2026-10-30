@@ -3,8 +3,8 @@
 This is Walnut DataBridge.
 
 2
-00:00:33,750 --> 00:00:36,550
-And we'll start with Aspire's own question.
+00:00:33,750 --> 00:00:36,150
+Let's start with Aspire's own question.
 
 3
 00:00:37,600 --> 00:00:46,800
@@ -43,20 +43,20 @@ Now Ken, an outside contractor.
 On the left, he asks about Velquarry.
 
 12
-00:01:22,050 --> 00:01:26,450
-On the right, about a company that doesn't exist at all.
+00:01:22,050 --> 00:01:25,650
+On the right, about a company that doesn't exist.
 
 13
-00:01:26,450 --> 00:01:29,250
+00:01:25,650 --> 00:01:28,450
 The answers are identical, word for word.
 
 14
-00:01:29,250 --> 00:01:32,050
+00:01:28,450 --> 00:01:31,250
 A restricted file looks exactly like nothing.
 
 15
-00:01:32,050 --> 00:01:36,450
-We tested that on four hundred pairs of questions: zero differences.
+00:01:31,250 --> 00:01:34,850
+We ran four hundred pairs like this: zero differences.
 
 16
 00:01:39,900 --> 00:01:41,700
@@ -71,8 +71,8 @@ Every sentence points at a passage she can open right now.
 Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
 
 19
-00:01:54,100 --> 00:01:57,700
-And the screens you ask from speak Chinese too.
+00:01:54,100 --> 00:01:58,100
+And the screens you ask from work in Chinese too.
 
 20
 00:02:04,550 --> 00:02:07,750
@@ -84,7 +84,7 @@ This is Rachel's request, end to end.
 
 22
 00:02:10,550 --> 00:02:16,950
-Each bar is a real timing: two permission checks before anything is composed, then the answer.
+Each bar is a real timing: two permission checks first, then the answer is put together.
 
 23
 00:02:16,950 --> 00:02:21,750
@@ -95,161 +95,173 @@ These three records were sealed and chained before Rachel saw a word.
 And below, every document that was considered, with its verdict and the reason.
 
 25
-00:02:26,950 --> 00:02:29,350
-Maya never sees the answer itself.
+00:02:26,950 --> 00:02:28,750
+Maya sees every decision.
 
 26
+00:02:28,750 --> 00:02:31,150
+She never sees the answer itself.
+
+27
 00:02:34,200 --> 00:02:41,400
 Maya can also ask the audit log in plain English: everything Rachel accessed in the last seven days.
 
-27
+28
 00:02:41,400 --> 00:02:44,600
 She sees the filter first, then the rows.
 
-28
+29
 00:02:44,600 --> 00:02:47,800
 Verify re-checks every link in the chain: intact.
 
-29
+30
 00:02:47,800 --> 00:02:49,600
 Now the fun part.
 
-30
+31
 00:02:49,600 --> 00:02:53,600
 The tamper demo copies the log and attacks the copy.
 
-31
+32
 00:02:53,600 --> 00:02:59,000
 It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
 
-32
+33
 00:02:59,000 --> 00:03:03,200
 Deleting or rolling back records is caught too.
 
-33
+34
 00:03:03,200 --> 00:03:05,600
 The real log was never touched.
 
-34
+35
+00:03:05,600 --> 00:03:09,200
+That's what we mean by answers you can prove.
+
+36
 00:03:13,850 --> 00:03:16,250
 From an answer to an action.
 
-35
+37
 00:03:16,250 --> 00:03:21,050
 Jordan asks for a draft reply, built only from the cited facts.
 
-36
+38
 00:03:21,050 --> 00:03:24,650
 A ticket is only a proposal until he confirms.
 
-37
+39
 00:03:28,500 --> 00:03:36,100
 Answers can become files: a table whose figures point at their sources, and a chart from the same facts.
 
-38
-00:03:40,150 --> 00:03:46,150
-Everything Jordan can open, as one graph: four platforms, each item checked with its source.
-
-39
-00:03:46,150 --> 00:03:52,950
-Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
-
 40
-00:03:52,950 --> 00:03:55,750
-For Ken, the rest simply isn't there.
+00:03:40,150 --> 00:03:45,350
+Everything Jordan can open, as one graph, each item checked with its source.
 
 41
+00:03:45,350 --> 00:03:52,150
+Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+
+42
+00:03:52,150 --> 00:03:54,950
+For Ken, the rest simply isn't there.
+
+43
 00:03:59,800 --> 00:04:03,000
 Underneath it all is Walnut, the evidence engine.
 
-42
+44
 00:04:03,000 --> 00:04:08,200
 Drag the time slider, and the company's knowledge rewinds to any past date.
 
-43
+45
 00:04:08,200 --> 00:04:13,800
 And any value can be traced to the exact row in the exact file.
 
-44
+46
 00:04:19,450 --> 00:04:25,850
 Maya's analytics come straight from the verified log: how many questions, how many answered, how fast.
 
-45
+47
 00:04:25,850 --> 00:04:29,850
 Seeded history is labelled, and one click leaves it out.
 
-46
+48
 00:04:31,100 --> 00:04:35,500
 The Trust centre lists the seven controls behind all of this.
 
-47
+49
 00:04:35,500 --> 00:04:43,100
 Each one is enforced in code, mapped to Singapore's AI and data rules, and proved by a named test.
 
-48
+50
 00:04:44,750 --> 00:04:48,750
 We built this with Tencent CodeBuddy, nine sessions in all.
 
-49
+51
 00:04:54,400 --> 00:04:56,800
 It also lives inside Tencent WorkBuddy.
 
-50
+52
 00:04:56,800 --> 00:05:03,600
 Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
 
-51
+53
 00:05:05,700 --> 00:05:10,100
 Tencent Hy3 is wired in through TokenHub, with a safe fallback.
 
-52
+54
 00:05:10,100 --> 00:05:16,100
 Until it is switched on, answers are quoted from the sources, through the same checks.
 
-53
+55
 00:05:17,350 --> 00:05:20,550
 We didn't just demo it, we attacked it.
 
-54
+56
 00:05:20,550 --> 00:05:24,550
 Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 
-55
+57
 00:05:24,550 --> 00:05:26,950
 Four hundred paired questions: zero differences.
 
-56
+58
 00:05:26,950 --> 00:05:34,150
 And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
 
-57
+59
 00:05:35,000 --> 00:05:36,800
 What's it worth?
 
-58
+60
 00:05:36,800 --> 00:05:45,600
 For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
 
-59
+61
 00:05:45,600 --> 00:05:48,000
 It's an estimate, not a measurement.
 
-60
+62
 00:05:48,000 --> 00:05:52,400
 And it pays for itself at about seven minutes a week.
 
-61
-00:05:53,650 --> 00:05:55,450
-Walnut DataBridge.
-
-62
-00:05:55,450 --> 00:05:57,250
-Answers you can prove.
-
 63
-00:05:57,250 --> 00:06:00,850
-We'd love one pilot team at one regulated company.
+00:05:53,650 --> 00:05:57,250
+Every company's AI will be asked to prove itself.
 
 64
-00:06:00,850 --> 00:06:02,650
+00:05:57,250 --> 00:05:59,050
+Walnut DataBridge.
+
+65
+00:05:59,050 --> 00:06:00,850
+Answers you can prove.
+
+66
+00:06:00,850 --> 00:06:03,250
+One pilot team, one regulated company.
+
+67
+00:06:03,250 --> 00:06:03,950
 Thanks for watching!

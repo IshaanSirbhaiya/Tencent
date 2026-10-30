@@ -7,7 +7,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 0:31–0:37 · 01 Title
 
 - **0:31** This is Walnut DataBridge.
-- **0:33** And we'll start with Aspire's own question.
+- **0:33** Let's start with Aspire's own question.
 
 ## 0:37–1:27 · 02 Same question, two people
 
@@ -16,22 +16,22 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **0:52** Rachel is the money-laundering reporting officer.
 - **0:55** She gets the actual case: the flagged transfers, and the review.
 - **0:59** Same system, two different truths.
-- **1:01** The question is word for word the same.
-- **1:04** Only who is signed in is different.
-- **1:07** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
-- **1:13** So the system never does.
-- **1:15** Who you are comes only from your signed sign-in, never from the question.
+- **1:01** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+- **1:07** So the system never does.
+- **1:09** The question is word for word the same.
+- **1:12** Only who is signed in is different.
+- **1:15** Who you are comes from your signed sign-in, never from the question.
 
 ## 1:26–1:54 · 03 Restricted looks like nothing
 
 - **1:27** Now Ken, an outside contractor.
 - **1:29** On the left, he asks about Velquarry.
-- **1:32** On the right, about a company that doesn't exist at all.
-- **1:36** The answers are identical, word for word.
-- **1:39** A restricted file looks exactly like nothing.
+- **1:32** On the right, about a company that doesn't exist.
+- **1:35** The answers are identical, word for word.
+- **1:38** A restricted file looks exactly like nothing.
 - **1:41** No count, and no hint that anything is hidden.
-- **1:45** We tested that on four hundred pairs of questions: zero differences.
-- **1:49** So nobody can find out which customers exist just by asking.
+- **1:44** We ran four hundred pairs like this: zero differences.
+- **1:48** So nobody can find out which customers exist just by asking.
 
 ## 1:54–2:29 · 04 A source, checked live
 
@@ -39,19 +39,20 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **1:56** Every sentence points at a passage she can open right now.
 - **2:01** Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
 - **2:09** Anything she cannot open at that moment is left out of the answer.
-- **2:14** And the screens you ask from speak Chinese too.
-- **2:17** Developer pages stay in English, and say so.
+- **2:14** And the screens you ask from work in Chinese too.
+- **2:18** Developer pages stay in English, and say so.
 
 ## 2:29–3:09 · 05 Developer mode: the journey
 
 - **2:29** Now the developer side, as Maya from compliance.
 - **2:32** The app has two modes: User, for asking, and Developer, for seeing how an answer was made.
 - **2:39** This is Rachel's request, end to end.
-- **2:42** Each bar is a real timing: two permission checks before anything is composed, then the answer.
+- **2:42** Each bar is a real timing: two permission checks first, then the answer is put together.
 - **2:48** Those timings are measured, not drawn.
 - **2:51** These three records were sealed and chained before Rachel saw a word.
 - **2:55** And below, every document that was considered, with its verdict and the reason.
-- **3:01** Maya never sees the answer itself.
+- **3:01** Maya sees every decision.
+- **3:02** She never sees the answer itself.
 
 ## 3:08–3:58 · 08 Audit, Verify and the tamper demo
 
@@ -65,14 +66,15 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **3:40** Deleting or rolling back records is caught too.
 - **3:43** And if the log cannot be written, there is no answer at all.
 - **3:48** The real log was never touched.
+- **3:51** That's what we mean by answers you can prove.
 
 ## 3:58–4:20 · 17 Act: a draft and a ticket
 
 - **3:58** From an answer to an action.
 - **4:01** Jordan asks for a draft reply, built only from the cited facts.
 - **4:06** A ticket is only a proposal until he confirms.
-- **4:09** Once he confirms, the ticket is created, with a link to it.
-- **4:14** If a draft strays from the facts, it falls back to the cited sentences.
+- **4:09** He confirms, and the ticket exists, with a link.
+- **4:13** If a draft strays from the facts, the cited sentences are used instead.
 
 ## 4:20–4:42 · 18 Deliverables: a table, a chart, a file
 
@@ -96,18 +98,19 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 5:23–5:48 · 21 Tour, dictation, value calculator, presenter
 
 - **5:24** New here?
-- **5:26** A guided tour is offered on first visit.
-- **5:29** You can dictate a question too; nothing is sent until you press Ask.
-- **5:34** The value calculator lets you change every input.
-- **5:37** And one person can run the whole stage demo from the keyboard.
-- **5:42** The tour has a User track and a Developer track.
+- **5:26** There's a guided tour.
+- **5:28** You can dictate a question; nothing is sent until you press Ask.
+- **5:32** The value calculator lets you change every input.
+- **5:36** And one person can run the whole stage demo from the keyboard.
+- **5:40** The tour has a User track and a Developer track.
 
 ## 5:48–6:12 · 06 The knowledge graph
 
-- **5:49** Everything Jordan can open, as one graph: four platforms, each item checked with its source.
-- **5:55** Search a word, and the item opens to its passage.
-- **5:59** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
-- **6:05** For Ken, the rest simply isn't there.
+- **5:49** Everything Jordan can open, as one graph, each item checked with its source.
+- **5:54** Company A is a synthetic company; every name here is made up.
+- **5:59** Search a word, and the item opens.
+- **6:01** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+- **6:08** For Ken, the rest simply isn't there.
 
 ## 6:12–6:37 · 10 The Walnut engine
 
@@ -130,15 +133,15 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 7:05–7:19 · 11 Built with CodeBuddy
 
 - **7:05** We built this with Tencent CodeBuddy, nine sessions in all.
-- **7:09** It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
-- **7:16** All in the repo.
+- **7:09** It built the WorkBuddy connectors, wrote tests, and its security review found real bugs.
+- **7:15** All in the repo.
 
 ## 7:18–7:35 · 12 WorkBuddy: the connectors
 
 - **7:19** It also lives inside Tencent WorkBuddy.
 - **7:21** Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
 - **7:28** Same gates, same audit log.
-- **7:30** The compliance connector is kept separate from the user ones.
+- **7:30** The agent in the middle never decides who you are.
 
 ## 7:35–7:45 · 20 Miora: the cover art
 
@@ -166,7 +169,8 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 
 ## 8:34–8:45 · 16 Close
 
-- **8:35** Walnut DataBridge.
-- **8:37** Answers you can prove.
-- **8:38** We'd love one pilot team at one regulated company.
-- **8:42** Thanks for watching!
+- **8:35** Every company's AI will be asked to prove itself.
+- **8:38** Walnut DataBridge.
+- **8:40** Answers you can prove.
+- **8:42** One pilot team, one regulated company.
+- **8:44** Thanks for watching!

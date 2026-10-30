@@ -7,7 +7,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 0:31–0:37 · 01 Title
 
 - **0:31** This is Walnut DataBridge.
-- **0:33** And we'll start with Aspire's own question.
+- **0:33** Let's start with Aspire's own question.
 
 ## 0:37–1:17 · 02 Same question, two people
 
@@ -23,26 +23,27 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 
 - **1:17** Now Ken, an outside contractor.
 - **1:19** On the left, he asks about Velquarry.
-- **1:22** On the right, about a company that doesn't exist at all.
-- **1:26** The answers are identical, word for word.
-- **1:29** A restricted file looks exactly like nothing.
-- **1:32** We tested that on four hundred pairs of questions: zero differences.
+- **1:22** On the right, about a company that doesn't exist.
+- **1:25** The answers are identical, word for word.
+- **1:28** A restricted file looks exactly like nothing.
+- **1:31** We ran four hundred pairs like this: zero differences.
 
 ## 1:39–2:04 · 04 A source, checked live
 
 - **1:39** Here's Rachel's own screen.
 - **1:41** Every sentence points at a passage she can open right now.
 - **1:46** Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
-- **1:54** And the screens you ask from speak Chinese too.
+- **1:54** And the screens you ask from work in Chinese too.
 
 ## 2:04–2:34 · 05 Developer mode: the journey
 
 - **2:04** Now the developer side, as Maya from compliance.
 - **2:07** This is Rachel's request, end to end.
-- **2:10** Each bar is a real timing: two permission checks before anything is composed, then the answer.
+- **2:10** Each bar is a real timing: two permission checks first, then the answer is put together.
 - **2:16** These three records were sealed and chained before Rachel saw a word.
 - **2:21** And below, every document that was considered, with its verdict and the reason.
-- **2:26** Maya never sees the answer itself.
+- **2:26** Maya sees every decision.
+- **2:28** She never sees the answer itself.
 
 ## 2:33–3:13 · 08 Audit, Verify and the tamper demo
 
@@ -54,6 +55,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **2:53** It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
 - **2:59** Deleting or rolling back records is caught too.
 - **3:03** The real log was never touched.
+- **3:05** That's what we mean by answers you can prove.
 
 ## 3:13–3:28 · 17 Act: a draft and a ticket
 
@@ -67,8 +69,8 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 
 ## 3:39–3:59 · 06 The knowledge graph
 
-- **3:40** Everything Jordan can open, as one graph: four platforms, each item checked with its source.
-- **3:46** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+- **3:40** Everything Jordan can open, as one graph, each item checked with its source.
+- **3:45** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
 - **3:52** For Ken, the rest simply isn't there.
 
 ## 3:59–4:19 · 10 The Walnut engine
@@ -117,7 +119,8 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 
 ## 5:53–6:04 · 16 Close
 
-- **5:53** Walnut DataBridge.
-- **5:55** Answers you can prove.
-- **5:57** We'd love one pilot team at one regulated company.
-- **6:00** Thanks for watching!
+- **5:53** Every company's AI will be asked to prove itself.
+- **5:57** Walnut DataBridge.
+- **5:59** Answers you can prove.
+- **6:00** One pilot team, one regulated company.
+- **6:03** Thanks for watching!

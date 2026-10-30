@@ -7,7 +7,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 0:31–0:37 · 01 Title
 
 - **0:31** This is Walnut DataBridge.
-- **0:33** And we'll start with Aspire's own question.
+- **0:33** Let's start with Aspire's own question.
 
 ## 0:37–1:22 · 02 Same question, two people
 
@@ -16,20 +16,20 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **0:52** Rachel is the money-laundering reporting officer.
 - **0:55** She gets the actual case: the flagged transfers, and the review.
 - **0:59** Same system, two different truths.
-- **1:01** The question is word for word the same.
-- **1:04** Only who is signed in is different.
-- **1:07** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
-- **1:13** So the system never does.
+- **1:01** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+- **1:07** So the system never does.
+- **1:09** The question is word for word the same.
+- **1:12** Only who is signed in is different.
 
 ## 1:21–1:46 · 03 Restricted looks like nothing
 
 - **1:22** Now Ken, an outside contractor.
 - **1:24** On the left, he asks about Velquarry.
-- **1:27** On the right, about a company that doesn't exist at all.
-- **1:31** The answers are identical, word for word.
-- **1:34** A restricted file looks exactly like nothing.
-- **1:37** No count, and no hint that anything is hidden.
-- **1:40** We tested that on four hundred pairs of questions: zero differences.
+- **1:27** On the right, about a company that doesn't exist.
+- **1:30** The answers are identical, word for word.
+- **1:33** A restricted file looks exactly like nothing.
+- **1:36** No count, and no hint that anything is hidden.
+- **1:39** We ran four hundred pairs like this: zero differences.
 
 ## 1:46–2:16 · 04 A source, checked live
 
@@ -37,17 +37,18 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **1:48** Every sentence points at a passage she can open right now.
 - **1:53** Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
 - **2:01** Anything she cannot open at that moment is left out of the answer.
-- **2:06** And the screens you ask from speak Chinese too.
+- **2:06** And the screens you ask from work in Chinese too.
 
 ## 2:16–2:51 · 05 Developer mode: the journey
 
 - **2:16** Now the developer side, as Maya from compliance.
 - **2:19** The app has two modes: User, for asking, and Developer, for seeing how an answer was made.
 - **2:26** This is Rachel's request, end to end.
-- **2:29** Each bar is a real timing: two permission checks before anything is composed, then the answer.
+- **2:29** Each bar is a real timing: two permission checks first, then the answer is put together.
 - **2:35** These three records were sealed and chained before Rachel saw a word.
 - **2:40** And below, every document that was considered, with its verdict and the reason.
-- **2:45** Maya never sees the answer itself.
+- **2:45** Maya sees every decision.
+- **2:47** She never sees the answer itself.
 
 ## 2:50–3:35 · 08 Audit, Verify and the tamper demo
 
@@ -60,13 +61,14 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **3:16** It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
 - **3:22** Deleting or rolling back records is caught too.
 - **3:25** The real log was never touched.
+- **3:28** That's what we mean by answers you can prove.
 
 ## 3:35–3:53 · 17 Act: a draft and a ticket
 
 - **3:35** From an answer to an action.
 - **3:38** Jordan asks for a draft reply, built only from the cited facts.
 - **3:43** A ticket is only a proposal until he confirms.
-- **3:46** Once he confirms, the ticket is created, with a link to it.
+- **3:46** He confirms, and the ticket exists, with a link.
 
 ## 3:53–4:11 · 18 Deliverables: a table, a chart, a file
 
@@ -87,15 +89,15 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 4:41–4:59 · 21 Tour, dictation, value calculator, presenter
 
 - **4:42** New here?
-- **4:44** A guided tour is offered on first visit.
-- **4:47** You can dictate a question too; nothing is sent until you press Ask.
-- **4:52** The value calculator lets you change every input.
-- **4:55** And one person can run the whole stage demo from the keyboard.
+- **4:44** There's a guided tour.
+- **4:46** You can dictate a question; nothing is sent until you press Ask.
+- **4:50** The value calculator lets you change every input.
+- **4:54** And one person can run the whole stage demo from the keyboard.
 
 ## 4:59–5:19 · 06 The knowledge graph
 
-- **5:00** Everything Jordan can open, as one graph: four platforms, each item checked with its source.
-- **5:06** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+- **5:00** Everything Jordan can open, as one graph, each item checked with its source.
+- **5:05** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
 - **5:12** For Ken, the rest simply isn't there.
 
 ## 5:19–5:39 · 10 The Walnut engine
@@ -117,7 +119,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 6:04–6:16 · 11 Built with CodeBuddy
 
 - **6:04** We built this with Tencent CodeBuddy, nine sessions in all.
-- **6:08** It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
+- **6:08** It built the WorkBuddy connectors, wrote tests, and its security review found real bugs.
 
 ## 6:15–6:29 · 12 WorkBuddy: the connectors
 
@@ -150,7 +152,8 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 
 ## 7:24–7:35 · 16 Close
 
-- **7:25** Walnut DataBridge.
-- **7:27** Answers you can prove.
-- **7:28** We'd love one pilot team at one regulated company.
-- **7:32** Thanks for watching!
+- **7:25** Every company's AI will be asked to prove itself.
+- **7:28** Walnut DataBridge.
+- **7:30** Answers you can prove.
+- **7:32** One pilot team, one regulated company.
+- **7:34** Thanks for watching!

@@ -3,8 +3,8 @@
 This is Walnut DataBridge.
 
 2
-00:00:33,750 --> 00:00:36,550
-And we'll start with Aspire's own question.
+00:00:33,750 --> 00:00:36,150
+Let's start with Aspire's own question.
 
 3
 00:00:37,600 --> 00:00:46,800
@@ -27,55 +27,55 @@ She gets the actual case: the flagged transfers, and the review.
 Same system, two different truths.
 
 8
-00:01:01,600 --> 00:01:04,800
-The question is word for word the same.
-
-9
-00:01:04,800 --> 00:01:07,600
-Only who is signed in is different.
-
-10
-00:01:07,600 --> 00:01:13,200
+00:01:01,600 --> 00:01:07,200
 In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
 
-11
-00:01:13,200 --> 00:01:15,200
+9
+00:01:07,200 --> 00:01:09,200
 So the system never does.
 
+10
+00:01:09,200 --> 00:01:12,400
+The question is word for word the same.
+
+11
+00:01:12,400 --> 00:01:15,200
+Only who is signed in is different.
+
 12
-00:01:15,200 --> 00:01:20,400
-Who you are comes only from your signed sign-in, never from the question.
+00:01:15,200 --> 00:01:19,000
+Who you are comes from your signed sign-in, never from the question.
 
 13
-00:01:27,250 --> 00:01:29,243
+00:01:27,250 --> 00:01:29,250
 Now Ken, an outside contractor.
 
 14
-00:01:29,243 --> 00:01:32,032
+00:01:29,250 --> 00:01:32,050
 On the left, he asks about Velquarry.
 
 15
-00:01:32,032 --> 00:01:36,416
-On the right, about a company that doesn't exist at all.
+00:01:32,050 --> 00:01:35,650
+On the right, about a company that doesn't exist.
 
 16
-00:01:36,416 --> 00:01:39,206
+00:01:35,650 --> 00:01:38,450
 The answers are identical, word for word.
 
 17
-00:01:39,206 --> 00:01:41,996
+00:01:38,450 --> 00:01:41,250
 A restricted file looks exactly like nothing.
 
 18
-00:01:41,996 --> 00:01:45,582
+00:01:41,250 --> 00:01:44,850
 No count, and no hint that anything is hidden.
 
 19
-00:01:45,582 --> 00:01:49,966
-We tested that on four hundred pairs of questions: zero differences.
+00:01:44,850 --> 00:01:48,450
+We ran four hundred pairs like this: zero differences.
 
 20
-00:01:49,966 --> 00:01:54,350
+00:01:48,450 --> 00:01:52,850
 So nobody can find out which customers exist just by asking.
 
 21
@@ -95,11 +95,11 @@ Click one, and you see the exact lines, the version, and when it was checked wit
 Anything she cannot open at that moment is left out of the answer.
 
 25
-00:02:14,300 --> 00:02:17,900
-And the screens you ask from speak Chinese too.
+00:02:14,300 --> 00:02:18,300
+And the screens you ask from work in Chinese too.
 
 26
-00:02:17,900 --> 00:02:21,100
+00:02:18,300 --> 00:02:21,500
 Developer pages stay in English, and say so.
 
 27
@@ -116,7 +116,7 @@ This is Rachel's request, end to end.
 
 30
 00:02:42,350 --> 00:02:48,750
-Each bar is a real timing: two permission checks before anything is composed, then the answer.
+Each bar is a real timing: two permission checks first, then the answer is put together.
 
 31
 00:02:48,750 --> 00:02:51,150
@@ -131,273 +131,289 @@ These three records were sealed and chained before Rachel saw a word.
 And below, every document that was considered, with its verdict and the reason.
 
 34
-00:03:01,150 --> 00:03:03,550
-Maya never sees the answer itself.
+00:03:01,150 --> 00:03:02,950
+Maya sees every decision.
 
 35
+00:03:02,950 --> 00:03:05,350
+She never sees the answer itself.
+
+36
 00:03:09,200 --> 00:03:16,400
 Maya can also ask the audit log in plain English: everything Rachel accessed in the last seven days.
 
-36
+37
 00:03:16,400 --> 00:03:19,600
 She sees the filter first, then the rows.
 
-37
+38
 00:03:19,600 --> 00:03:25,200
 Every question anyone asks is written to this chain before the answer is released.
 
-38
+39
 00:03:25,200 --> 00:03:28,400
 Verify re-checks every link in the chain: intact.
 
-39
+40
 00:03:28,400 --> 00:03:30,200
 Now the fun part.
 
-40
+41
 00:03:30,200 --> 00:03:34,200
 The tamper demo copies the log and attacks the copy.
 
-41
+42
 00:03:34,200 --> 00:03:40,600
 It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
 
-42
+43
 00:03:40,600 --> 00:03:43,800
 Deleting or rolling back records is caught too.
 
-43
+44
 00:03:43,800 --> 00:03:48,000
 And if the log cannot be written, there is no answer at all.
 
-44
+45
 00:03:48,000 --> 00:03:51,400
 The real log was never touched.
 
-45
-00:03:58,850 --> 00:04:01,239
-From an answer to an action.
-
 46
-00:04:01,239 --> 00:04:06,016
-Jordan asks for a draft reply, built only from the cited facts.
+00:03:51,400 --> 00:03:54,000
+That's what we mean by answers you can prove.
 
 47
-00:04:06,016 --> 00:04:09,599
-A ticket is only a proposal until he confirms.
+00:03:58,850 --> 00:04:01,250
+From an answer to an action.
 
 48
-00:04:09,599 --> 00:04:14,376
-Once he confirms, the ticket is created, with a link to it.
+00:04:01,250 --> 00:04:06,050
+Jordan asks for a draft reply, built only from the cited facts.
 
 49
-00:04:14,376 --> 00:04:19,950
-If a draft strays from the facts, it falls back to the cited sentences.
+00:04:06,050 --> 00:04:09,650
+A ticket is only a proposal until he confirms.
 
 50
+00:04:09,650 --> 00:04:13,250
+He confirms, and the ticket exists, with a link.
+
+51
+00:04:13,250 --> 00:04:18,450
+If a draft strays from the facts, the cited sentences are used instead.
+
+52
 00:04:20,500 --> 00:04:28,100
 Answers can become files: a table whose figures point at their sources, and a chart from the same facts.
 
-51
+53
 00:04:28,100 --> 00:04:31,300
 Or a PowerPoint file, built without a model.
 
-52
+54
 00:04:31,300 --> 00:04:36,100
 The table is built straight from the cited facts, with no model.
 
-53
+55
 00:04:42,150 --> 00:04:44,150
 And the brain keeps up.
 
-54
+56
 00:04:44,150 --> 00:04:49,750
 Jordan posts a note in Slack, and it is in his graph straight away.
 
-55
+57
 00:04:49,750 --> 00:04:54,950
 Ken's graph, right beside it, shows nothing new: he cannot open that channel.
 
-56
+58
 00:04:54,950 --> 00:05:01,350
 A moment later Jordan asks about the note, and the answer quotes it, with its source.
 
-57
+59
 00:05:01,350 --> 00:05:07,350
 The post is checked with Slack and written to the audit log, like everything else.
 
-58
+60
 00:05:09,800 --> 00:05:17,000
 New files can be added too, into a folder, and the upload is written to the audit log.
 
-59
+61
 00:05:17,000 --> 00:05:19,800
 PDF, Office and text files are accepted.
 
-60
+62
 00:05:24,450 --> 00:05:26,250
 New here?
 
-61
-00:05:26,250 --> 00:05:29,450
-A guided tour is offered on first visit.
-
-62
-00:05:29,450 --> 00:05:34,650
-You can dictate a question too; nothing is sent until you press Ask.
-
 63
-00:05:34,650 --> 00:05:37,850
-The value calculator lets you change every input.
+00:05:26,250 --> 00:05:28,050
+There's a guided tour.
 
 64
-00:05:37,850 --> 00:05:42,650
-And one person can run the whole stage demo from the keyboard.
+00:05:28,050 --> 00:05:32,850
+You can dictate a question; nothing is sent until you press Ask.
 
 65
-00:05:42,650 --> 00:05:46,650
-The tour has a User track and a Developer track.
+00:05:32,850 --> 00:05:36,050
+The value calculator lets you change every input.
 
 66
-00:05:49,100 --> 00:05:55,100
-Everything Jordan can open, as one graph: four platforms, each item checked with its source.
+00:05:36,050 --> 00:05:40,850
+And one person can run the whole stage demo from the keyboard.
 
 67
-00:05:55,100 --> 00:05:59,100
-Search a word, and the item opens to its passage.
+00:05:40,850 --> 00:05:44,850
+The tour has a User track and a Developer track.
 
 68
-00:05:59,100 --> 00:06:05,900
-Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+00:05:49,100 --> 00:05:54,300
+Everything Jordan can open, as one graph, each item checked with its source.
 
 69
-00:06:05,900 --> 00:06:08,700
-For Ken, the rest simply isn't there.
+00:05:54,300 --> 00:05:59,100
+Company A is a synthetic company; every name here is made up.
 
 70
+00:05:59,100 --> 00:06:01,900
+Search a word, and the item opens.
+
+71
+00:06:01,900 --> 00:06:08,700
+Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+
+72
+00:06:08,700 --> 00:06:11,500
+For Ken, the rest simply isn't there.
+
+73
 00:06:12,750 --> 00:06:15,950
 Underneath it all is Walnut, the evidence engine.
 
-71
+74
 00:06:15,950 --> 00:06:22,750
 Here is Company A as Jordan sees it: every entity, every link, every value with a pointer.
 
-72
+75
 00:06:22,750 --> 00:06:27,950
 Drag the time slider, and the company's knowledge rewinds to any past date.
 
-73
+76
 00:06:27,950 --> 00:06:33,550
 And any value can be traced to the exact row in the exact file.
 
-74
+77
 00:06:37,400 --> 00:06:43,800
 Maya's analytics come straight from the verified log: how many questions, how many answered, how fast.
 
-75
+78
 00:06:43,800 --> 00:06:47,800
 Seeded history is labelled, and one click leaves it out.
 
-76
+79
 00:06:47,800 --> 00:06:50,000
 And how often the live check said no.
 
-77
+80
 00:06:52,050 --> 00:06:56,450
 The Trust centre lists the seven controls behind all of this.
 
-78
+81
 00:06:56,450 --> 00:07:04,050
 Each one is enforced in code, mapped to Singapore's AI and data rules, and proved by a named test.
 
-79
+82
 00:07:05,700 --> 00:07:09,700
 We built this with Tencent CodeBuddy, nine sessions in all.
 
-80
-00:07:09,700 --> 00:07:16,900
-It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
+83
+00:07:09,700 --> 00:07:15,300
+It built the WorkBuddy connectors, wrote tests, and its security review found real bugs.
 
-81
-00:07:16,900 --> 00:07:18,700
+84
+00:07:15,300 --> 00:07:17,100
 All in the repo.
 
-82
+85
 00:07:19,350 --> 00:07:21,750
 It also lives inside Tencent WorkBuddy.
 
-83
+86
 00:07:21,750 --> 00:07:28,550
 Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
 
-84
+87
 00:07:28,550 --> 00:07:30,550
 Same gates, same audit log.
 
-85
+88
 00:07:30,550 --> 00:07:34,550
-The compliance connector is kept separate from the user ones.
+The agent in the middle never decides who you are.
 
-86
+89
 00:07:35,650 --> 00:07:40,050
 The cover art was made in Miora, from a written brief.
 
-87
+90
 00:07:40,050 --> 00:07:42,450
 The prompts are in the repo.
 
-88
+91
 00:07:45,300 --> 00:07:49,700
 Tencent Hy3 is wired in through TokenHub, with a safe fallback.
 
-89
+92
 00:07:49,700 --> 00:07:55,700
 Until it is switched on, answers are quoted from the sources, through the same checks.
 
-90
+93
 00:07:58,950 --> 00:08:02,150
 We didn't just demo it, we attacked it.
 
-91
+94
 00:08:02,150 --> 00:08:06,150
 Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 
-92
+95
 00:08:06,150 --> 00:08:08,550
 Four hundred paired questions: zero differences.
 
-93
+96
 00:08:08,550 --> 00:08:15,750
 And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
 
-94
+97
 00:08:16,600 --> 00:08:18,400
 What's it worth?
 
-95
+98
 00:08:18,400 --> 00:08:27,200
 For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
 
-96
+99
 00:08:27,200 --> 00:08:29,600
 It's an estimate, not a measurement.
 
-97
+100
 00:08:29,600 --> 00:08:34,000
 And it pays for itself at about seven minutes a week.
 
-98
-00:08:35,250 --> 00:08:37,050
+101
+00:08:35,250 --> 00:08:38,850
+Every company's AI will be asked to prove itself.
+
+102
+00:08:38,850 --> 00:08:40,650
 Walnut DataBridge.
 
-99
-00:08:37,050 --> 00:08:38,850
+103
+00:08:40,650 --> 00:08:42,450
 Answers you can prove.
 
-100
-00:08:38,850 --> 00:08:42,450
-We'd love one pilot team at one regulated company.
+104
+00:08:42,450 --> 00:08:44,850
+One pilot team, one regulated company.
 
-101
-00:08:42,450 --> 00:08:44,250
+105
+00:08:44,850 --> 00:08:45,550
 Thanks for watching!

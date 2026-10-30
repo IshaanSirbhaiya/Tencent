@@ -75,7 +75,7 @@ so we built one that only answers from what you're allowed to see. "Let me show 
 **Caption:** none.
 **Proof:** the product name and tagline from `docs/finals/DECISIONS.md` and the run sheet.
 
-> This is Walnut DataBridge. And we'll start with Aspire's own question.
+> This is Walnut DataBridge. Let's start with Aspire's own question.
 
 ### 02 · Same question, two people
 **Cuts:** short 40 s · main 45 s · full 50 s.
@@ -94,10 +94,10 @@ approved script, cited, nothing else", then "Rachel · MLRO: the case itself".
 > Rachel is the money-laundering reporting officer. She gets the actual case: the flagged transfers, and the
 > review.
 > Same system, two different truths.
-> **[MAIN]** The question is word for word the same. Only who is signed in is different.
 > In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence. So the
 > system never does.
-> **[FULL]** Who you are comes only from your signed sign-in, never from the question.
+> **[MAIN]** The question is word for word the same. Only who is signed in is different.
+> **[FULL]** Who you are comes from your signed sign-in, never from the question.
 
 ### 03 · Restricted looks exactly like nothing
 **Cuts:** short 23 s · main 25 s · full 28 s.
@@ -110,10 +110,10 @@ restricted looks like nothing".
 `eval_summary.json` `differential`: 400 pairs, 0 mismatches.
 
 > Now Ken, an outside contractor. On the left, he asks about Velquarry. On the right, about a company that
-> doesn't exist at all.
+> doesn't exist.
 > The answers are identical, word for word. A restricted file looks exactly like nothing.
 > **[MAIN]** No count, and no hint that anything is hidden.
-> We tested that on four hundred pairs of questions: zero differences.
+> We ran four hundred pairs like this: zero differences.
 > **[FULL]** So nobody can find out which customers exist just by asking.
 
 ### 04 · Every sentence has a source, checked live
@@ -131,7 +131,7 @@ English and say so (D-32), which is why the line says "the screens you ask from"
 > Here's Rachel's own screen. Every sentence points at a passage she can open right now.
 > Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
 > **[MAIN]** Anything she cannot open at that moment is left out of the answer.
-> And the screens you ask from speak Chinese too.
+> And the screens you ask from work in Chinese too.
 > **[FULL]** Developer pages stay in English, and say so.
 
 ### 05 · Developer mode: one request, end to end
@@ -148,11 +148,11 @@ write-ahead ledger rule 3 (`test_audit_ledger.py`). Maya sees verdicts and reaso
 > Now the developer side, as Maya from compliance.
 > **[MAIN]** The app has two modes: User, for asking, and Developer, for seeing how an answer was made.
 > This is Rachel's request, end to end.
-> Each bar is a real timing: two permission checks before anything is composed, then the answer.
+> Each bar is a real timing: two permission checks first, then the answer is put together.
 > **[FULL]** Those timings are measured, not drawn.
 > These three records were sealed and chained before Rachel saw a word.
 > And below, every document that was considered, with its verdict and the reason.
-> Maya never sees the answer itself.
+> Maya sees every decision. She never sees the answer itself.
 
 ### 08 · The sealed audit log, and the tamper demo
 **Cuts:** short 40 s · main 45 s · full 50 s.
@@ -174,6 +174,7 @@ real log is never written by the demo (D-19).
 > Deleting or rolling back records is caught too.
 > **[FULL]** And if the log cannot be written, there is no answer at all.
 > The real log was never touched.
+> That's what we mean by answers you can prove.
 
 ---
 
@@ -191,8 +192,8 @@ cited sentences). It writes a ticket into the mock Jira, so it is recorded late.
 
 > From an answer to an action. Jordan asks for a draft reply, built only from the cited facts.
 > A ticket is only a proposal until he confirms.
-> **[MAIN]** Once he confirms, the ticket is created, with a link to it.
-> **[FULL]** If a draft strays from the facts, it falls back to the cited sentences.
+> **[MAIN]** He confirms, and the ticket exists, with a link.
+> **[FULL]** If a draft strays from the facts, the cited sentences are used instead.
 
 ### 18 · Deliverables: a table, a chart, a file
 **Cuts:** short 12 s · main 18 s · full 22 s.
@@ -247,8 +248,8 @@ box, nothing is asked until Ask is pressed", "The value calculator: every input 
 **Proof:** `tests/e2e/tour.spec.ts`; `voice.spec.ts` (text goes in the box and nothing is asked, Esc stops, button
 hidden without the speech API); `value.spec.ts`; `presenter.spec.ts` (keys off unless armed, Space-only walk).
 
-> New here? A guided tour is offered on first visit.
-> You can dictate a question too; nothing is sent until you press Ask.
+> New here? There's a guided tour.
+> You can dictate a question; nothing is sent until you press Ask.
 > The value calculator lets you change every input.
 > And one person can run the whole stage demo from the keyboard.
 > **[FULL]** The tour has a User track and a Developer track.
@@ -261,8 +262,9 @@ hidden without the speech API); `value.spec.ts`; `presenter.spec.ts` (keys off u
 greyed-out boxes". The counts (867 and 24 on 30 Oct) are on screen, not spoken: the world is growing.
 **Proof:** `tests/e2e/graph.spec.ts`, `graph-screens.spec.ts`; the map totals are permission-correct (rule 1).
 
-> Everything Jordan can open, as one graph: four platforms, each item checked with its source.
-> **[FULL]** Search a word, and the item opens to its passage.
+> Everything Jordan can open, as one graph, each item checked with its source.
+> **[FULL]** Company A is a synthetic company; every name here is made up.
+> **[FULL]** Search a word, and the item opens.
 > Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
 > For Ken, the rest simply isn't there.
 
@@ -314,7 +316,7 @@ built.
 `video_constants.json`.
 
 > We built this with Tencent CodeBuddy, nine sessions in all.
-> **[MAIN]** It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
+> **[MAIN]** It built the WorkBuddy connectors, wrote tests, and its security review found real bugs.
 > **[FULL]** All in the repo.
 
 ### 12 · Ask from Tencent WorkBuddy
@@ -323,13 +325,14 @@ built.
 through Jordan's and Ken's connectors with two different answers.
 **Caption:** "Tencent WorkBuddy · real window capture (15 Oct)", "One question, Jordan's and Ken's connectors: two
 answers".
-**Proof:** `submission/02_workbuddy/`, `test_mcp_untrusted_frame.py`, D-30 (the compliance connector is kept
-separate).
+**Proof:** `submission/02_workbuddy/`, `test_mcp_untrusted_frame.py` (identity comes only from the signed
+token, never from the agent's arguments). D-30 changed the compliance connector after these captures, so nothing
+is said about it over these stills (READINESS_30OCT.md, scene 12).
 
 > It also lives inside Tencent WorkBuddy. Each connector carries its own signed token, so Jordan's connector gets
 > Jordan's answer, and Ken's gets Ken's.
 > **[MAIN]** Same gates, same audit log.
-> **[FULL]** The compliance connector is kept separate from the user ones.
+> **[FULL]** The agent in the middle never decides who you are.
 
 ### 20 · Made with Miora
 **Cuts:** not in the short cut · main 8 s · full 10 s.
@@ -416,8 +419,8 @@ minutes per person per week, and the inputs.
 **Caption:** none.
 **Proof:** the repo link on the slide is `https://github.com/IshaanSirbhaiya/Tencent` (public).
 
-> Walnut DataBridge. Answers you can prove. We'd love one pilot team at one regulated company. Thanks for
-> watching!
+> Every company's AI will be asked to prove itself. Walnut DataBridge. Answers you can prove. One pilot
+> team, one regulated company. Thanks for watching!
 
 ---
 
