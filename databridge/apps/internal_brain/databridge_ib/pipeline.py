@@ -39,6 +39,8 @@ from .models import (REFUSAL_TEXT, AccessCheck, AnswerReleased, AskResponse, Cit
 from .timewin import parse as parse_window
 from .timewin import strip as strip_window
 from .sensitive import mask_doc
+from .subject import scope as scope_subject
+from .subject import within as within_subject
 
 EXTRACTIVE = ModelInfo(provider="deterministic", model="extractive-v1")
 #: progress stage names, in order (``on_stage``)
@@ -138,6 +140,7 @@ class Pipeline:
         # 3 — window (ranking preference)
         window = parse_window(question, now)
         search_q = strip_window(question)       # time phrases rank by date, not as content words
+        search_q = scope_subject(search_q)      # a briefing on a named project asks about it
         # 4 — GATE 1 + rank over the permitted corpus only
         t_g1 = time.perf_counter()
         readable = self.index.readable(user, epoch)
@@ -151,6 +154,7 @@ class Pipeline:
                 if h.chunk_id not in seen:
                     hits.append(h)
                     seen.add(h.chunk_id)
+        hits = within_subject(question, hits, self.index)     # a named project's own docs
         cand_docs = list(dict.fromkeys(h.doc_id for h in hits))
         _emit(on_stage, "gate1")
         t_g2 = time.perf_counter()
@@ -204,7 +208,7 @@ class Pipeline:
                 answer, model = text, info
                 dropped = removed
             else:                           # no model, or an answer citing no permitted passage
-                answer = narrate.extractive_answer(passages, question)
+                answer = narrate.extractive_answer(passages, scope_subject(question))
                 if self.chain is not None:      # the model was tried and did not produce a usable answer
                     model = ModelInfo(provider="deterministic", model="extractive-v1",
                                       fallback_used=True)

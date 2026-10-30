@@ -36,6 +36,7 @@ import hashlib
 import json
 import re
 import uuid
+from itertools import zip_longest
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Optional
 
@@ -50,6 +51,9 @@ from ..deliverables.service import (NotFound, RateLimited, Unavailable, Delivera
 from ..deliverables.verify import Check, words
 from ..models import (SCOPE_NOTE, DeliverableCreated, DeliverableFailed, DeliverableRequested,
                       DirectoryUser, ModelInfo)
+from ..subject import sections as section_queries
+from ..subject import subject as subject_of
+from ..subject import within as within_subject
 from ..timewin import strip as strip_window
 from . import a2ui, blocks, pagecheck, plan, prompts
 from .spec import MView
@@ -221,7 +225,9 @@ class ViewService:
         try:
             layout = plan.clean_instruction(instruction)
             cites = dict(ctx.cites)
-            if self.composer is not None:
+            # a model page, or a briefing on a named project (``subject``), rests on more of the
+            # asker's own evidence than the answer quoted; both go through Gate 1 + Gate 2 below
+            if self.composer is not None or subject_of(ctx.question):
                 cites = self._expand(user, cites, ctx.question, req_id=req_id, vid=vid)
             evidence = build_evidence(cites, question=ctx.question, facts=ctx.facts,
                                       max_chars=PAGE_CONTEXT_CHARS if self.composer else 12_000)
@@ -271,10 +277,23 @@ class ViewService:
                     if d in readable and d not in have]
             near.sort(key=lambda d: str((self.index.doc(d) or {}).get("updated_at", "")),
                       reverse=True)
-            topic = " ".join([*(s.title for s in cites.values()), strip_window(question)])
-            hits = self.index.search(topic, readable, k=80)
-            ids = list(dict.fromkeys(near[:MAX_EXTRA * 2 // 3]
-                                     + [h.doc_id for h in hits if h.doc_id not in have]))
+            parts = section_queries(strip_window(question))
+            if parts:
+                # a briefing on a named project: that project's documents only. Each requested
+                # section (status, decisions, team, ...) brings its own best documents in turn,
+                # alternating with the most recent documents in the same places
+                per = [[h.doc_id for h in within_subject(question, self.index.search(
+                            part, readable, k=6, relevant_only=True), self.index)
+                        if h.doc_id not in have] for part in parts]
+                ranked = [d for row in zip_longest(*per) for d in row if d]
+                recent = within_subject(question, near, self.index)
+                ids = list(dict.fromkeys(d for pair in zip_longest(ranked, recent)
+                                         for d in pair if d))
+            else:
+                topic = " ".join([*(s.title for s in cites.values()), strip_window(question)])
+                hits = self.index.search(topic, readable, k=80)
+                ids = list(dict.fromkeys(near[:MAX_EXTRA * 2 // 3]
+                                         + [h.doc_id for h in hits if h.doc_id not in have]))
             ids = ids[:MAX_EXTRA]
         except Exception:                                           # noqa: BLE001
             return cites                                            # the answer's own sources
