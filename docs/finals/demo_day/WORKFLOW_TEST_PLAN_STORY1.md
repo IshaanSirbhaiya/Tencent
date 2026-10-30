@@ -25,7 +25,7 @@ and the stage until it is fixed.
 | F1 | Case FC-2026-0147 | Yes (4 mentions) | none |
 | F2 | 37 inbound transfers just under SGD 20,000 in nine days | Yes ("37 inbound transfers of just under SGD 20,000 each … within nine days") | none |
 | F3 | 11 of the 37 accounts share one device fingerprint | Yes ("links 11 of the 37 remitting accounts to a single device fingerprint") | none |
-| F4 | The director couldn't explain the source of funds on a due-diligence call | Yes ("could not explain the source of the third-party deposits on the enhanced due diligence call") | **Check the "6 October" date.** The fact is in the world, but the date wasn't found next to it. If it isn't there, drop the date from the script |
+| F4 | The director couldn't explain the source of funds on a due-diligence call | Yes ("could not explain the source of the third-party deposits on the enhanced due diligence call") | **Checked (cloud, 30 Oct):** the source is the #fincrime Slack message by mlro.tan in `fixtures/enterprise/world.json` `slack.threads[170]`, ts 1791256800 = **6 Oct 2026, 11:20 SGT**. The date is in the message timestamp (shown on the citation), not in its text, so the answer may not say "6 October" unless it quotes the source date. Pass rule: the cited source is that message and its date reads 6 Oct. The fact is in the world, but the date wasn't found next to it. If it isn't there, drop the date from the script |
 | F5 | The STR is filed | Yes ("lodged with STRO under the synthetic reference STRO-SYN-2026-0912") | none |
 | F6 | The approved customer script, "routine review in line with our regulatory obligations…" | Yes ("routine review", 2 mentions) | Check that the exact wording matches the world text. The script must quote the world, not the story |
 | F7 | "Bayfront Spice Traders" does not exist | Yes, only in the demo questions | none |
@@ -62,7 +62,7 @@ Each check runs through the API (scripted, repeatable) **and** once through the 
 |---|---|---|
 | C1 | `ken.ext` asks about Velquarry | The constant refusal |
 | C2 | `ken.ext` asks about "Bayfront Spice Traders" | The constant refusal |
-| C3 | Identical | C1 and C2 are **byte-identical** after stripping request_id, as_of and *_checked_at (the same rule as the P2 eval); the UI shows "Identical responses" (**verify this exact label exists**) |
+| C3 | Identical | C1 and C2 are **byte-identical** after stripping request_id, as_of and *_checked_at (the same rule as the P2 eval); the UI shows "Identical responses" (**verified:** `cmp.identical` = "Identical responses", zh 回答完全相同, sub-line "Same text, same sources"; rendered by `components/compare/EqualityMarker.tsx`; lib/i18n/presenter.ts:39) |
 | C4 | No model leak | With the model on, the model received **no** Velquarry passage for Ken (the Gate-1/Gate-2 decision row shows 0 permitted docs) |
 
 ### Beat D: the regulator (Maya)
@@ -104,7 +104,7 @@ Each check runs through the API (scripted, repeatable) **and** once through the 
 
 ## 4. Open points for the founder
 
-1. F4: the story says the due-diligence call was "on 6 October". Keep it only if the world shows that date.
+1. F4: the story says the due-diligence call was "on 6 October". **Resolved:** the world dates that message 6 Oct 2026 11:20 SGT (timestamp only, not in the text); say "on 6 October" in the story only as the source's date.
 2. F8: the stage line becomes "a **projected** US$1.3M a year".
 3. F9: say "0 leaks" with the model on only after the model-on eval passes.
 4. Voice on stage uses the browser's speech service (honest limit #9). A typed fallback is ready.
