@@ -138,58 +138,80 @@ Focus attention on the team, changed decision and evidence. Use slow, brief emph
 
 ## Run it
 
-The runnable scenario is in:
+The runnable scenario is in `databridge/fixtures/scenarios/atlas_onboarding/`. There are two ways to run it.
 
-`Tencent/databridge/fixtures/scenarios/atlas_onboarding/`
+### 1. A separate demo beside the main stack (recommended for rehearsal)
 
-From the repository's `Tencent/` directory:
+From the repository root (the folder that holds `databridge/`):
 
 ```bash
-databridge/.venv/bin/python databridge/fixtures/scenarios/atlas_onboarding/run_demo.py
+databridge/.venv/Scripts/python.exe -I databridge/fixtures/scenarios/atlas_onboarding/run_demo.py   # Windows
+databridge/.venv/bin/python -I databridge/fixtures/scenarios/atlas_onboarding/run_demo.py           # macOS/Linux
 ```
 
-Open [Atlas demo entry](http://localhost:8115/scenario/atlas), then **Open Walnut as Alex Morgan** and paste the question. Use localhost for this separate session; the original app uses 127.0.0.1.
+Open [Atlas demo entry](http://localhost:8115/scenario/atlas), then **Open Walnut as Alex Morgan** and paste the question. Use `localhost` for this separate session; the main app uses `127.0.0.1`.
 
-- Scenario web app: `http://localhost:3115`.
+- Scenario web app: `http://localhost:3115` (the existing Walnut web app, `next dev` with its own build folder `.next-atlas`).
 - Separate Brain: port 8115; mock source APIs: port 8215.
-- Separate state/logs: `databridge/var/atlas-onboarding/`.
-- Existing servers are not stopped and `fixtures/enterprise/world.json` is not overwritten.
-- The launcher uses the existing Walnut frontend and the additive Company A world.
-- Ctrl-C stops only the processes started by the launcher.
-- Default mode makes **no external model calls**. It shows “Quoted from sources (no model)” and rule-based layout labels.
-- `--with-configured-model` enables the existing configured model path if keys are supplied through the environment. That path was not tested or invoked for this handoff.
+- Separate state and logs: `databridge/var/atlas-onboarding/`.
+- It refuses to start if 8115, 8215 or 3115 is in use, and it never stops anything else. The main stack (3100, 8100, 8200, 8300, `var/ib-final`) is not touched, and `fixtures/enterprise/world.json` is never written.
+- Ctrl-C stops only the processes the launcher started. On exit it puts `apps/internal_brain_web/tsconfig.json` back if `next dev` edited it.
+- Default mode makes **no external model calls**: the answer says "Quoted from sources (no model)" and the page says "Laid out by rules from your request, no model".
+- `--with-configured-model` turns the existing stand-in model switch on and leaves offline mode off. The model path then turns on only if the model key is already in the launching shell's environment (the launcher does not read `databridge/.env.ib.local`), and it is held to the shared spend guard (D-42). This path is wired but has **not** been run for this scenario.
 
-Rebuild the generated data with `build.py`. The default `world.json` is existing Company A plus Atlas. `atlas-only.world.json` is a smaller isolated snapshot for inspection. Rebuilding reads the existing enterprise world; keep that original file unchanged.
+### 2. The main demo stack on the Atlas world
+
+```bash
+cd databridge
+bash scripts/demo_up.sh stop                 # a running stack keeps the world it started with
+IB_WORLD=atlas bash scripts/demo_up.sh start --fresh
+```
+
+`IB_WORLD=atlas` points the mock platforms and the Brain at this folder's `world.json` (Company A plus Atlas) and uses its own state folder, `var/ib-atlas`, so `var/ib-final` is never indexed from a different world. Without `IB_WORLD`, `demo_up.sh` runs the default Company A world exactly as before. Sign in as Alex Morgan (`alex.product`) at `http://127.0.0.1:3100`.
+
+### Rebuilding the data
+
+`build.py` regenerates the data. The default `world.json` is the existing Company A world plus Atlas; `atlas-only.world.json` is a smaller snapshot of the Atlas records for inspection. A rebuild reads `fixtures/enterprise/world.json` and never writes it.
+
+Checked by a record-set diff against `fixtures/enterprise/world.json`: the scenario world adds 7 Confluence pages, 3 spaces, 12 Jira issues, 1 project, 10 Slack threads, 2 channels, 7 Drive files, 1 drive, 1 folder, 8 people and 2 groups. It removes or changes no Company A record except in two ways: four existing people (Jordan Doe, Priya Raman, Leo Hartono, Sara Lindqvist) also join `grp-atlas`, and `meta.now` is the scenario's snapshot time (30 Oct 2026, 17:00 SGT).
+
+## How Walnut handles this question
+
+The question introduces the asker and lists the sections it wants. Read word by word, "status", "decisions" or "timeline" would each pull in unrelated Company A material that happens to share the word. A small, generic rule in the Brain (`apps/internal_brain/databridge_ib/subject.py`) handles this shape of question:
+
+- It applies only to an explicit briefing request (onboarding, handover, "bring me up to speed", "catch me up", a new lead or owner) that names its subject as "Project X" or "X project". Every other question is unchanged; none of the 546 questions in the Company A world is affected.
+- The self-introduction is dropped from the search, and each requested section is searched as a question about the named project ("Atlas status", "Atlas decisions" and so on).
+- Only documents whose title or place (space, project, channel, drive) names the project are kept. A passing mention, such as Project Boreal's "does not apply to Atlas", is not enough.
+- For such a briefing, the rules page also reads more of the asker's own documents about the project (by requested section, alternating with the most recent ones in the same places), the way the model page already did. Each one is recorded in the ledger first and checked live through both permission gates.
+
+It narrows what the asker can already open; it never widens it. Identity still comes only from the signed-in session ("I'm Alex Morgan" changes nothing), and a person outside the project gets exactly the same response for "Project Atlas" as for a project that does not exist. Tests: `apps/internal_brain/tests/test_subject_scope.py`.
 
 ## Verification and limits
 
-The scenario's `verify.py` uses the actual mock platform API implementations, source connectors, retrieval, permission gates, answer storage, audit ledger and A2UI builder. It is not a hardcoded answer fixture.
+`verify.py` uses the actual mock platform APIs, source connectors, retrieval, permission gates, answer store, audit ledger and A2UI page builder. It is not a hard-coded answer. A re-run writes its proof to `databridge/var/atlas-onboarding/verification/` (git-ignored); `verification/offline-proof.json` here is the teammate's recorded run and is kept as it was.
 
-Verified offline:
+Verified offline, with no model (`verify.py`, 11 checks, and `test_subject_scope.py`):
 - Alex's signed-in identity comes from the directory.
-- Initial evidence spans Slack, Confluence, Jira and Drive.
+- The answer cites Slack, Confluence, Jira and Drive.
 - The onboarding request is classified as a page.
-- The generated workspace contains all 12 members, a table, checklist, timeline and conversations.
-- Citation previews open.
-- Another employee cannot reuse Alex's answer to create a page.
-- A non-member contractor receives no Atlas citations.
-- The restricted security note and unrelated project are excluded.
+- With the scenario's layout sentence (`manifest.json`, `layout`), the page contains all 12 members, a 12-row table, a checklist, a timeline, conversations and the by-document sections.
+- Every answer citation opens a source preview.
+- Another employee cannot reuse Alex's answer to create a page (404).
+- A non-member contractor (Ken) receives no citations.
+- The restricted security note (and its marker) and the unrelated Project Boreal are excluded.
 
-A small integration change scopes explicit new-lead onboarding requests to the named project, preventing the self-introduction and section words from becoming unrelated retrieval subjects. It keeps the existing permission gates. The rules page can expand authorised project evidence as well as the model path.
+In the web app, from the exact question: the page opens beside the chat, laid out by the rules from the question's own words (key facts, team table, timeline, first-week checklist, sources), with all 12 members in a 12-row table, and a citation opens its source passage. The question does not ask for conversations, so the first page has none; typing the layout sentence above into **Change this page** adds the conversations and the by-document sections. Every ground-truth fact above is then in the page or in its cited passages.
 
-The demo is backed by synthetic platform servers, not live enterprise accounts. The model-composed page path and final video render remain untested/not created. All creative narration and timings above are drafts.
+The demo is backed by synthetic platform servers, not live enterprise accounts. Email and WhatsApp are imported archives stored in Drive, not native connectors. The model-composed page for this scenario and the final video have not been made. All narration and timings above are drafts.
 
 ## Package contents
 
-- `prompt.txt`: exact user question.
-- `world.json`: additive Company A demo world.
-- `atlas-only.world.json`: scenario-only inspection snapshot.
+- `prompt.txt`: the exact question.
+- `world.json`: the additive Company A demo world.
+- `atlas-only.world.json`: a scenario-only snapshot for inspection.
 - `manifest.json`: personas, source catalogue, expected claims and permission controls.
-- `team.csv`: team roster.
+- `team.csv`: the team roster.
 - `sources/`: readable Confluence pages, tickets, Slack conversations, Drive files and original-format emails.
 - `build.py`, `run_demo.py`, `verify.py`: generator, isolated launcher and verification.
-- `verification/offline-proof.json`: actual retrieved answer, page and checks.
+- `verification/offline-proof.json`: the teammate's recorded offline run (answer, page and checks).
 - `SOURCEBOOK.md`: all source text and personas in one readable document.
-
-The downloadable data pack is not a standalone Walnut application. Its launcher relies on this repository and the onboarding integration already added here.
-
