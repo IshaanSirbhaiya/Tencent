@@ -1,6 +1,6 @@
 # Finals demo video: script and shot list
 
-**What it is:** the new demo video for the finals build of **Walnut DataBridge** (branch `final_v1.2`). It
+**What it is:** the new demo video for the finals build of **Walnut DataBridge** (branch `final_v1.4`). It
 replaces the 16 Oct video (https://youtu.be/fr9wqHWsijY, 6:28, made from the old UI) and keeps its pattern
 exactly: Ishaan's camera intro, then a narrated screen demo of the real app, then the proof, the business case
 and a short close, in the same friendly voice. Source of the pattern: `docs/tencent/VIDEO_SCRIPT.md`.
@@ -50,7 +50,7 @@ them with the stand-in on (`FINALS_MODEL=1` makes the recorder refuse a scene-13
 | Role | Pieces | How the video may describe it |
 |---|---|---|
 | **Used to make every answer** | the signed token (who you are); the search index; Gate 1, the index permission filter; the connectors for Slack, Confluence, Jira and Drive (Gate 2: each source is read through its own connector, with permissions checked live); the model step (today: the stand-in, "AI-generated from your cited sources", only from passages that passed both gates); the Walnut engine's grounding wall and source pointers; the write-ahead sealed ledger | "each source is read through its own connector, with permissions checked live"; "two permission checks first"; "the record is sealed before you see a word" |
-| **Another way to ask, through the same pipeline** | WorkBuddy (an MCP agent: same gates, written to the same sealed log); Compare | "the same gates, the same sealed log" |
+| **Another way to ask, through the same pipeline** | WorkBuddy (the host; it uses our MCP server through per-person connectors: same gates, written to the same sealed log); Compare | "the same gates, the same sealed log" |
 | **Views that do not answer** | the knowledge graph (a map of what each person can open, built from the same permission checks); the Walnut engine graph (Dev → Brain); the journey; audit; analytics; the Trust centre | "a map of what each person can open"; the engine graph is "shown, not used to answer". Never "how the answer is found" |
 | **On top of an answer** | Act; Deliverables; the page beside the chat (slot S2) | "the answer can become a reply / a file / a page" |
 | **The wider platform, not used to answer** | the original POC's adapter agents and adapter builder, the federated engine, the original Walnut screens, the engine gateway | scene 10 only, captioned "the platform", never "answering this question" |
@@ -168,7 +168,7 @@ approved script, cited, nothing else", then "Rachel · MLRO: the case itself".
 > Amy gets the approved customer script, with its sources, and nothing else.
 > Rachel gets the actual case: the flagged transfers, and the review.
 > Same system, two different truths.
-> In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence. So the
+> In Singapore, telling Amy that a suspicious-transaction report even exists can be a criminal offence. So the
 > system never does.
 > **[MAIN]** The question is word for word the same. Only who is signed in is different.
 > **[FULL]** Who you are comes from your signed sign-in, never from the question.
@@ -181,7 +181,7 @@ live "Identical responses" marker.
 **On screen:** `/compare?mode=person&p=ken.ext`, "Same person · two questions". Ken (outside contractor) asks
 about Velquarry on the left and about "Bayfront Spice Traders", a company that does not exist, on the right. Two
 refusal cards, then the marker "Identical responses: same text, same sources".
-**Caption:** "Ken · outside contractor: a real customer vs a made-up one", then "Identical, word for word:
+**Caption:** "Ken · outside contractor: a customer in the demo data vs a made-up one", then "Identical, word for word:
 restricted looks like nothing".
 **Proof:** `tests/e2e/compare.spec.ts` and `user.spec.ts` ("restricted and made-up subjects render identically");
 `eval_summary.json` `differential`: 400 pairs, 0 mismatches.
@@ -282,7 +282,7 @@ folder). In the Add sheet, the file tab: a sample file is chosen, the folder **P
 list by name (never Vendor share, which Ken can read), **Upload**; the status line confirms.
 **Caption:** "Add a file: it goes into a folder, through the same checks", "Uploaded and written to the audit log
 like everything else".
-**Proof:** `test_uploads.py`, `test_upload_folders.py`, `test_extract_files.py`; Opus L5 (successful source writes
+**Proof:** `test_uploads.py`, `test_upload_folders.py`, `test_extract_files.py`; review L5 (successful source writes
 are ledgered, round-3 dispositions). Writes a file into the mock Drive.
 
 > New files can be added too, into a folder, and the upload is written to the audit log.
@@ -313,7 +313,7 @@ write-ahead ledger rule 3 (`test_audit_ledger.py`). Maya sees verdicts and reaso
 > **[FULL]** Those timings are measured, not drawn.
 > These three records were sealed and chained before Rachel saw a word.
 > And below, every document that was considered, with its verdict and the reason.
-> Maya sees every decision. She never sees the answer itself.
+> Maya sees every decision. The answer itself, only with a logged reason.
 
 ### 08 · The sealed audit log, and the tamper demo
 **Cuts:** short 40 s · main 42 s · full 50 s.
@@ -377,7 +377,7 @@ stills, the connector list first, then one question through two people's connect
 through Jordan's and Ken's connectors with two different answers. **TODO(laptop): re-capture both stills (or a
 short clip) in WorkBuddy on the laptop, same two shots, and save them over `submission/02_workbuddy/workbuddy_mcp_panel.png`
 and `workbuddy_compare.png`; until then the 15 Oct stills are used.** WorkBuddy is another way to ask through the
-same pipeline: an MCP agent, the same two gates, every question written to the same sealed log.
+same pipeline: WorkBuddy uses our MCP server through per-person connectors, the same two gates, every question written to the same sealed log.
 **Caption:** "Tencent WorkBuddy · real window capture (15 Oct)" (change the date when re-captured), "One question,
 Jordan's and Ken's connectors: two answers".
 **Proof:** `submission/02_workbuddy/`, `databridge/apps/mcp_server/`, `test_mcp_untrusted_frame.py` (identity comes
@@ -385,7 +385,7 @@ only from the signed token, never from the agent's arguments). D-30 changed the 
 captures, so nothing is said about it over these stills (READINESS_30OCT.md, scene 12).
 
 > It plugs into Tencent WorkBuddy, so people can ask from where they already work.
-> It's an MCP agent: each connector carries one person's signed token, so Jordan's gets Jordan's answer.
+> WorkBuddy uses our MCP server; each person's connector carries their own signed token, so Jordan's gets Jordan's answer.
 > **[MAIN]** Same gates, same sealed log.
 > **[FULL]** The agent never decides who you are.
 
@@ -415,8 +415,8 @@ Internal Brain uses from the engine: the grounding wall, the source pointers and
 unchanged (`docs/tencent/DEV_PROCESS.md`, "Foundation"). **Unrecorded:** clip 1 needs the original screens running;
 record it with `node docs/finals/video/record_finals.cjs 10a_platform`.
 
-> We built the whole platform: connectors to every source, AI agents that build new adapters, a federated engine
-> across systems, and an evidence graph.
+> We built the whole platform: connectors to Slack, Confluence, Jira and Drive, agents that build new adapters, a
+> federated engine, and an evidence graph. None of it answers a question.
 > The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
 > Inside DataBridge, Jordan can look at the engine's own graph. It's shown here; it isn't used to answer.
 > **[FULL]** Drag the time slider, and the company's knowledge rewinds to any past date.
@@ -531,7 +531,7 @@ review, beside CB5, the first one), and what CodeBuddy built. The full transcrip
 `submission/01_codebuddy/conversation_history_codebuddy_workbuddy_miora.pdf`.
 **Caption:** none (the card says "Nine CodeBuddy sessions. Every transcript is in the repo").
 **Proof:** `README.md` ("CodeBuddy | Nine build sessions (CB1–CB9)"), `docs/tencent/DEV_PROCESS.md` (two security
-reviews by CodeBuddy: CB5, 7 findings, fixed in CB6 and by Claude, `SECURITY.md` §10; CB7 on the finals backend,
+reviews by CodeBuddy: CB5, 7 findings, fixed in CB6 and by the team, `SECURITY.md` §10; CB7 on the finals backend,
 F7 "Real, small", fixed with tests, `docs/tencent/reviews/codebuddy_finals_review.md`), the transcripts in
 `docs/tencent/evidence/` (`codebuddy_cb1.jsonl` to `codebuddy_cb9.jsonl`), screenshots in `submission/01_codebuddy/`;
 the count is in `video_constants.json`.
@@ -579,7 +579,7 @@ screenshot with the prompt; both outputs; Miora's "Generated by Miora" mark kept
 | 7 The fintech part | what can I tell this customer | 02, 17 | the draft reply |
 | 8 Access changes | checked with the source every time; nothing stale | 06b, 19 | live growth, uploads |
 | 9 The audit trail | Maya, plain English, Verify, tamper | 05, 08 | the journey, analytics (07), Trust centre (09) |
-| 10 WorkBuddy | another front door, signed tokens | 12 (same stills pattern; re-capture on the laptop) | an MCP agent: same gates, same sealed log |
+| 10 WorkBuddy | another front door, signed tokens | 12 (same stills pattern; re-capture on the laptop) | WorkBuddy uses our MCP server: same gates, same sealed log |
 | 11 What's underneath | the Walnut engine (a recording of the original Walnut screens) | 10 (the same kind of recording: the original screens as "the platform", then the engine graph inside DataBridge, shown, not used to answer) | adapter agents, builder, connectors, data tools, federated engine via the gateway |
 | 12 How it fits together | two checks, grounding, audit; Hy3 | 13 | the live model chain; the Tencent Cloud deploy kit card |
 | 13 The numbers | attacked on purpose | 14 | the business case (15) |

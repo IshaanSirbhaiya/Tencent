@@ -75,23 +75,23 @@ Rachel gets the actual case: the flagged transfers, and the review.
 Same system, two different truths.
 
 20
-00:02:05,500 --> 00:02:11,100
-In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+00:02:05,500 --> 00:02:11,500
+In Singapore, telling Amy that a suspicious-transaction report even exists can be a criminal offence.
 
 21
-00:02:11,100 --> 00:02:13,100
+00:02:11,500 --> 00:02:13,500
 So the system never does.
 
 22
-00:02:13,100 --> 00:02:16,300
+00:02:13,500 --> 00:02:16,700
 The question is word for word the same.
 
 23
-00:02:16,300 --> 00:02:19,100
+00:02:16,700 --> 00:02:19,500
 Only who is signed in is different.
 
 24
-00:02:19,100 --> 00:02:23,900
+00:02:19,500 --> 00:02:24,300
 Who you are comes from your signed sign-in, never from the question.
 
 25
@@ -231,8 +231,8 @@ And below, every document that was considered, with its verdict and the reason.
 Maya sees every decision.
 
 59
-00:05:07,850 --> 00:05:10,250
-She never sees the answer itself.
+00:05:07,850 --> 00:05:11,050
+The answer itself, only with a logged reason.
 
 60
 00:05:14,100 --> 00:05:21,300
@@ -303,121 +303,125 @@ Each one is enforced in code, mapped to Singapore's AI and data rules, and prove
 It plugs into Tencent WorkBuddy, so people can ask from where they already work.
 
 77
-00:06:37,650 --> 00:06:44,050
-It's an MCP agent: each connector carries one person's signed token, so Jordan's gets Jordan's answer.
+00:06:37,650 --> 00:06:44,850
+WorkBuddy uses our MCP server; each person's connector carries their own signed token, so Jordan's gets Jordan's answer.
 
 78
-00:06:44,050 --> 00:06:46,050
+00:06:44,850 --> 00:06:46,850
 Same gates, same sealed log.
 
 79
-00:06:46,050 --> 00:06:48,850
+00:06:46,850 --> 00:06:49,650
 The agent never decides who you are.
 
 80
-00:06:50,350 --> 00:06:59,950
-We built the whole platform: connectors to every source, AI agents that build new adapters, a federated engine across systems, and an evidence graph.
+00:06:50,350 --> 00:06:59,617
+We built the whole platform: connectors to Slack, Confluence, Jira and Drive, agents that build new adapters, a federated engine, and an evidence graph.
 
 81
-00:06:59,950 --> 00:07:05,950
-The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
+00:06:59,617 --> 00:07:01,933
+None of it answers a question.
 
 82
-00:07:05,950 --> 00:07:09,950
-Inside DataBridge, Jordan can look at the engine's own graph.
+00:07:01,933 --> 00:07:07,725
+The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
 
 83
-00:07:09,950 --> 00:07:13,150
-It's shown here; it isn't used to answer.
+00:07:07,725 --> 00:07:11,586
+Inside DataBridge, Jordan can look at the engine's own graph.
 
 84
-00:07:13,150 --> 00:07:18,350
-Drag the time slider, and the company's knowledge rewinds to any past date.
+00:07:11,586 --> 00:07:14,675
+It's shown here; it isn't used to answer.
 
 85
-00:07:18,350 --> 00:07:23,950
-And any value can be traced to the exact row in the exact file.
+00:07:14,675 --> 00:07:19,694
+Drag the time slider, and the company's knowledge rewinds to any past date.
 
 86
+00:07:19,694 --> 00:07:25,100
+And any value can be traced to the exact row in the exact file.
+
+87
 00:07:25,650 --> 00:07:30,850
 Two checks before any model, a grounding check after, the record written first.
 
-87
+88
 00:07:30,850 --> 00:07:36,450
 And it's wired for Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
 
-88
+89
 00:07:36,450 --> 00:07:42,850
 Until Hy3 is switched on, answers are AI-generated from your cited sources, through the same checks.
 
-89
+90
 00:07:43,950 --> 00:07:47,150
 We didn't just demo it, we attacked it.
 
-90
+91
 00:07:47,150 --> 00:07:51,150
 Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 
-91
+92
 00:07:51,150 --> 00:07:53,550
 Four hundred paired questions: zero differences.
 
-92
+93
 00:07:53,550 --> 00:08:00,750
 And one thousand two hundred and seventy-eight backend tests, plus one hundred and eighty-five browser tests, none failing.
 
-93
+94
 00:08:03,600 --> 00:08:05,400
 What's it worth?
 
-94
+95
 00:08:05,400 --> 00:08:14,200
 For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
 
-95
+96
 00:08:14,200 --> 00:08:16,600
 It's an estimate, not a measurement.
 
-96
+97
 00:08:16,600 --> 00:08:21,000
 And it pays for itself at about seven minutes a week.
 
-97
+98
 00:08:24,250 --> 00:08:30,650
 We built it with Tencent CodeBuddy: nine recorded sessions, including security reviews that found real bugs.
 
-98
+99
 00:08:30,650 --> 00:08:34,250
 It also built the WorkBuddy connectors and wrote tests.
 
-99
+100
 00:08:34,250 --> 00:08:36,650
 Every transcript is in the repo.
 
-100
+101
 00:08:37,900 --> 00:08:40,700
 The cover was designed in Tencent Miora.
 
-101
+102
 00:08:40,700 --> 00:08:44,300
 The prompt and both results are in the repo.
 
-102
+103
 00:08:45,550 --> 00:08:49,150
 Every company's AI will be asked to prove itself.
 
-103
+104
 00:08:49,150 --> 00:08:50,950
 Walnut DataBridge.
 
-104
+105
 00:08:50,950 --> 00:08:52,750
 Answers you can prove.
 
-105
+106
 00:08:52,750 --> 00:08:56,350
 We'd love one pilot team at one regulated company.
 
-106
+107
 00:08:56,350 --> 00:08:57,850
 Thanks for watching!

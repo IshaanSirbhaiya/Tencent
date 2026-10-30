@@ -1,6 +1,6 @@
 # Status
 
-**Date:** 30 Oct 2026. Branch `final_v1.3`. Team Walnut is a FinTech finalist; Demo Day is Tue 3 Nov 2026.
+**Date:** 30 Oct 2026. Branch `final_v1.3` (the verified lock); `final_v1.4` adds the teammate's pages beside the chat and an optional stand-in model for the answers (off by default); it is not on the lock. Team Walnut is a FinTech finalist; Demo Day is Tue 3 Nov 2026.
 Product: **Walnut DataBridge**, with **Internal Brain** as the ask product inside it.
 Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals/PLAN.md](docs/finals/PLAN.md).
 Every feature and its test: [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since

@@ -16,7 +16,7 @@ every new feature attached to the beat it strengthens ("and now it also..."), ne
    are found); Ken's corner beside it, no greyed-out boxes: for Ken the rest isn't there. [beat 4]
 5. **Same question, two people (38 s).** Amy and Rachel, side by side: the approved script vs the case; tipping-off is a
    crime, so the system never hints. [beats 5 and 7]
-6. **Restricted looks like nothing (25 s).** Ken, a real customer vs a made-up one: identical; 400 pairs, zero
+6. **Restricted looks like nothing (25 s).** Ken, a customer in the demo data vs a made-up one: identical; 400 pairs, zero
    differences. [beat 6]
 7. **And now it also... (49 s in the main cut).** Act: Amy's answer becomes the reply draft, never sent; Jordan's a ticket
    with confirm (22 s) · Deliverables: table, chart, .pptx (15 s) · new here: tour, dictation, accessibility caption, value
@@ -26,15 +26,15 @@ every new feature attached to the beat it strengthens ("and now it also..."), ne
 9. **The compliance side (1:44).** Maya: Rachel's request as a waterfall, three sealed records, every verdict (35 s) · the
    audit log in plain English, Verify, the tamper demo on a copy (43 s) · analytics from the verified log (12 s) · Trust
    centre, seven controls, each proved by a test (14 s). [beat 9]
-10. **WorkBuddy (16 s), what's underneath (26 s), how it fits together and Hy3 (15 s).** WorkBuddy stills (an MCP agent,
+10. **WorkBuddy (16 s), what's underneath (26 s), how it fits together and Hy3 (15 s).** WorkBuddy stills (it uses our MCP server,
     same gates, same sealed log; re-capture on the laptop); the original Walnut screens as "the platform" (adapter agents,
     builder, connectors, data tools, the federated engine on the gateway), then the engine graph inside DataBridge, shown,
     not used to answer; the model chain, Hy3 wired but not live, said plainly, and the Tencent Cloud deploy kit card.
     [beats 10 to 12]
 11. **Teammates' features (placeholders, 22 s in the main cut).** Voice, just-in-time UI, dots: added after the merge;
     left out until their clips exist.
-12. **The numbers, how we built it, thanks (1:14).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,274
-    backend and 185 browser tests, none failing (20 s) · about US$1.3M a year, an estimate, break-even about 7 minutes a
+12. **The numbers, how we built it, thanks (1:14).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,278
+    backend tests and 185 browser tests, none failing (20 s) · about US$1.3M a year, an estimate, break-even about 7 minutes a
     week, Tencent Cloud as the target host (21 s) · built with CodeBuddy, nine recorded sessions (11 s) · the cover, designed in Tencent Miora (5 s) · "Answers
     you can prove", one pilot team, thanks (13 s). [beats 13 and 14]
 
@@ -64,7 +64,7 @@ sound), but it uses the same stack the team is using, so it needs the founder's 
       use `FINALS_HY3=1`, re-shoot 02, 04, 05 and 13, and run the assembler with `--hy3`.
 - [ ] **Truth check:** `python docs/finals/video/assemble_finals.py --self-test` passes (it compares every
       number the script says with `eval_summary.json`: 7,374 requests / 0 leaks; 400 pairs / 0 differences;
-      1,152 injection attempts / 0 hard failures; 1,274 backend and 185 browser tests; nine CodeBuddy sessions).
+      1,152 injection attempts / 0 hard failures; 1,278 backend and 185 browser tests, none failing; nine CodeBuddy sessions).
 - [ ] **Display** at 1920×1080, 100% scaling (Windows Settings → Display). The recorder is headless at
       1536×864 and does not depend on the screen, but ffmpeg, the playback check and the voice-over session
       do. Close other windows.
@@ -87,9 +87,9 @@ sound), but it uses the same stack the team is using, so it needs the founder's 
    `--cut full`; play each SILENT file once end to end. Then Ishaan's voice-over from the matching
    `narration_cues*.md`, then `--voice` with the same `--cut`.
 
-**Expected length.** Today's test assembly is 6:08 (intro 0:32 + demo 5:36) against **6:28** for the first video.
+**Expected length.** The planned cuts (cue sheet from the planned slot lengths, `--cues-only --plan`) are short 6:31, main 7:58 and full 9:52, against **6:28** for the first video.
 The founder's direction (30 Oct) is that the new video may be **longer** than the first, because there is more to
-show: see "The new timeline" below (short cut about 6:00, main cut about 7:55, full cut about 9:15). The assembler
+show: see "The new timeline" below (short cut about 6:30, main cut about 8:00, full cut about 9:50). The assembler
 prints each scene's real length; if a clip runs well over its slot, re-shoot that scene.
 
 ---
@@ -105,7 +105,7 @@ normalisation). The pacing rules are the same table ("Pacing" in
 | | First video (16 Oct) | New video (finals) |
 |---|---|---|
 | Link | https://youtu.be/fr9wqHWsijY | `submission/finals_video/walnut_databridge_finals.mp4` (after the voice-over) |
-| Length | 6:28 (intro 0:32 + demo 5:56) | 6:08 in the test assembly (intro 0:32 + demo 5:36); about 6:35 with the optional scene |
+| Length | 6:28 (intro 0:32 + demo 5:56) | Planned: short 6:31, main 7:58, full 9:52 (`assemble_finals.py --self-test`); nothing is recorded yet |
 | Name on screen | Walnut Internal Brain | Walnut DataBridge ("Internal Brain" is the ask product inside it) |
 | Opening story | Jordan asks about the DB migration | Aspire's own question: why is Velquarry's account restricted? Amy vs Rachel |
 | Tagline | none | "Answers you can prove." |
@@ -154,7 +154,7 @@ scene is left out of that cut. Crossfades (0.35 s each) are allowed for in the t
 | 07 | Analytics | +9 | 12 | 12 | 15 | recorder ready; re-record |
 | 09 | The Trust centre | +9, +12 | 13 | 13 | 14 | recorder ready; re-record |
 | | **WORKBUDDY, WHAT'S UNDERNEATH, HOW IT FITS (16 Oct beats 10 to 12)** | | | | | |
-| 12 | WorkBuddy: an MCP agent, same gates, same sealed log | 10 | 15 | 16 | 19 | stills; **re-capture on the laptop** |
+| 12 | WorkBuddy uses our MCP server: same gates, same sealed log | 10 | 15 | 16 | 19 | stills; **re-capture on the laptop** |
 | 10 | The platform (original Walnut screens, :3300 + gateway :8300) | 11 | 16 | 16 | 18 | **new recorder scene `10a_platform`, unrecorded** |
 | 10 | The Walnut engine graph inside DataBridge (shown, not used to answer) | 11 | 10 | 10 | 18 | recorder ready; re-record (new caption) |
 | 13 | Tencent Hy3: the model chain, then the deploy kit card | 12 | 15 | 15 | 19 | recorder ready (record with `IB_MODELS=hy3`); new card `13b_deploy.png` |
@@ -200,7 +200,7 @@ kind of shot, order, caption style and pacing), upgrading only the screens. Sour
 | 11 What's underneath (36 s) | A screen recording of the ORIGINAL Walnut screens on :3300 (graph with a node opened, brain + time slider, evidence chain, ontology), small captions | **10** the same kind of recording of the original screens (`10a_platform`: Builder adapter agents and agents, Connectors, Data, the engine gateway :8300 with the federated engine, the graph), every caption "The platform: …"; then the engine's graph inside DataBridge (`10_engine`), captioned "shown here, not used to answer" |
 | 12 How it fits together (22 s) | The architecture / trust-boundary card, Hy3 line ("[otherwise] quoted until a TokenHub key is added") | **13** the live model chain on Mission control (Hy3 through TokenHub, then the quoted fallback), then a still card in the same card style: the Tencent Cloud Lighthouse deploy kit ("written; no live instance yet") |
 | 13 The numbers (11 s) | The results card | **14** the app's proof slide (+ **15** the business slide with the "Target host: Tencent Cloud" pill) |
-| 14 How we built it, thanks (16 s) | The closing card; CodeBuddy named over it (six sessions, security review found real bugs) | **11** a still card with a CodeBuddy session screenshot (CB7, the finals security review) and what it built, "nine recorded sessions"; **20** a still card with the Miora finals cover and the Miora session screenshot; **16** the close slide |
+| 14 How we built it, thanks (16 s) | The closing card; CodeBuddy named over it (nine sessions, security reviews found real bugs) | **11** a still card with a CodeBuddy session screenshot (CB7, the finals security review) and what it built, "nine recorded sessions"; **20** a still card with the Miora finals cover and the Miora session screenshot; **16** the close slide |
 
 ## Scene by scene (first video vs the 30 Oct test assembly)
 
@@ -228,8 +228,8 @@ after it). New times are from the latest test assembly; they move a little with 
 | — | (no equivalent) | | → | **09** Trust centre (3:55–4:09) | Seven controls, the frameworks they map to, the tests that prove them | Each control enforced in code, mapped to Singapore's AI and data rules, proved by a named test | **New** |
 | 4:41–5:04 | 10 WorkBuddy: three stills (connectors, two people, compliance) | People don't want another app; each connector has its own signed token | → | **12** Ask from WorkBuddy (4:51–5:08) | The same real window captures (connectors; two people) | "A second front door… Jordan's connector gets Jordan's answer, and Ken's gets Ken's" | **Keep** (same captures; the compliance still is dropped for time) |
 | 5:04–5:41 | 11 What's underneath: the original Walnut screens at :3300 (graph, brain + time slider, evidence chain, ontology) | Every fact has a source; drag the slider and the knowledge rewinds; follow a value to the exact row | → | **10** The Walnut engine (4:09–4:39) | The same engine, now inside DataBridge (Developer → Walnut engine): snapshot counts, Company brain time slider, Provenance chain | Same lines, mostly verbatim | **Changed** (re-shot in the new UI; the old clip `05_video/clips/11_walnut_original.webm` still works as a fallback) |
-| 5:41–6:02 | 12 How it fits together: trust-boundary card; Hy3 line | Two checks, grounding, audit; [otherwise] answers quoted until a TokenHub key is added | → | **05** + **09** (live), and **13** Tencent Hy3 (5:07–5:21) | Mission control's model chain: Hy3 through TokenHub, then the quoted fallback (recorded with `IB_MODELS=hy3`, so no other model is named), "Extractive only"; then the Tencent Cloud deploy kit card | "Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks" | **Changed** (live status instead of a card; honest wording kept) |
-| 6:02–6:12 | 13 The numbers card | ~6,000 adversarial requests, 0 leaks; 400 pairs, 0 differences | → | **14** The proof (5:20–5:38) | The app's proof slide (0 / 7,374; 0 / 400; 0 / 1,152) + label: 1,274 backend and 185 browser tests (30 Oct evening, cloud clean checkout) | Exact numbers plus the test counts | **Changed** (new slide, updated numbers) |
+| 5:41–6:02 | 12 How it fits together: trust-boundary card; Hy3 line | Two checks, grounding, audit; Hy3 wired, not live: with the stand-in model on, "answers are AI-generated from your cited sources" ([IF MODEL OFF] variant: quoted from the sources) | → | **05** + **09** (live), and **13** Tencent Hy3 (5:07–5:21) | Mission control's model chain: Hy3 through TokenHub, then the quoted fallback (recorded with `IB_MODELS=hy3`, so no other model is named), "Extractive only"; then the Tencent Cloud deploy kit card | "Until Hy3 is switched on, answers are AI-generated from your cited sources, through the same checks" ([IF MODEL OFF]: quoted from the sources) | **Changed** (live status instead of a card; honest wording kept) |
+| 6:02–6:12 | 13 The numbers card | ~6,000 adversarial requests, 0 leaks; 400 pairs, 0 differences | → | **14** The proof (5:20–5:38) | The app's proof slide (0 / 7,374; 0 / 400; 0 / 1,152) + label: 1,278 backend and 185 browser tests, none failing (30 Oct evening, cloud clean checkout: 1,278 collected, 1,274 passed, 4 skipped) | Exact numbers plus the test counts | **Changed** (new slide, updated numbers) |
 | — | (no equivalent) | | → | **15** What it's worth (5:38–5:57) | The app's business slide: ≈ US$1.3M a year (estimate), break-even about 7 min/week | Estimate, not a measurement; pays for itself at about seven minutes a week | **New** |
 | 6:12–6:28 | 14 Built with, thanks: closing card | CodeBuddy mapped boundaries, built the connector, reviewed security; thanks | → | **11** Built with CodeBuddy (4:38–4:51) and **16** Close (5:57–6:08) | CodeBuddy card (the security-review session); the app's close slide with the QR code | CodeBuddy lines moved next to the other Tencent beats; close with the tagline and the ask | **Changed** |
 
@@ -245,10 +245,9 @@ Lines that are the same as, or nearly the same as, the first video (easy to read
 | New scene | Line | First video |
 |---|---|---|
 | 06 | "For Ken, the rest simply isn't there." | Scene 4: "for Ken, the rest simply doesn't exist" |
-| 10 | "Underneath it all is Walnut, the evidence engine." | Scene 11, verbatim |
 | 10 | "Drag the time slider, and the company's knowledge rewinds to any past date." | Scene 11, verbatim |
-| 12 | "Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's." | Scene 10, nearly verbatim |
-| 13 | "…through exactly the same checks." | Scene 12 [otherwise], same ending |
+| 12 | "…each person's connector carries their own signed token, so Jordan's gets Jordan's answer." | Scene 10, nearly verbatim |
+| 13 | "…through the same checks." | Scene 12 [otherwise], same ending |
 
 Everything else is new wording for the new screens: scenes 01–05, 06b, 07–09, 11, 13–16.
 

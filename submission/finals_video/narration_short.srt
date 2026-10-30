@@ -63,11 +63,11 @@ Rachel gets the actual case: the flagged transfers, and the review.
 Same system, two different truths.
 
 17
-00:01:55,500 --> 00:02:01,100
-In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+00:01:55,500 --> 00:02:01,500
+In Singapore, telling Amy that a suspicious-transaction report even exists can be a criminal offence.
 
 18
-00:02:01,100 --> 00:02:03,100
+00:02:01,500 --> 00:02:03,500
 So the system never does.
 
 19
@@ -135,8 +135,8 @@ And below, every document that was considered, with its verdict and the reason.
 Maya sees every decision.
 
 35
-00:03:25,700 --> 00:03:28,100
-She never sees the answer itself.
+00:03:25,700 --> 00:03:28,900
+The answer itself, only with a logged reason.
 
 36
 00:03:31,150 --> 00:03:38,350
@@ -195,85 +195,89 @@ Each one is enforced in code, mapped to Singapore's AI and data rules, and prove
 It plugs into Tencent WorkBuddy, so people can ask from where they already work.
 
 50
-00:04:40,700 --> 00:04:47,100
-It's an MCP agent: each connector carries one person's signed token, so Jordan's gets Jordan's answer.
+00:04:40,700 --> 00:04:47,900
+WorkBuddy uses our MCP server; each person's connector carries their own signed token, so Jordan's gets Jordan's answer.
 
 51
-00:04:49,400 --> 00:04:59,000
-We built the whole platform: connectors to every source, AI agents that build new adapters, a federated engine across systems, and an evidence graph.
+00:04:49,400 --> 00:04:58,829
+We built the whole platform: connectors to Slack, Confluence, Jira and Drive, agents that build new adapters, a federated engine, and an evidence graph.
 
 52
-00:04:59,000 --> 00:05:05,000
-The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
+00:04:58,829 --> 00:05:01,186
+None of it answers a question.
 
 53
-00:05:05,000 --> 00:05:09,000
-Inside DataBridge, Jordan can look at the engine's own graph.
+00:05:01,186 --> 00:05:07,079
+The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
 
 54
-00:05:09,000 --> 00:05:12,200
-It's shown here; it isn't used to answer.
+00:05:07,079 --> 00:05:11,007
+Inside DataBridge, Jordan can look at the engine's own graph.
 
 55
+00:05:11,007 --> 00:05:14,150
+It's shown here; it isn't used to answer.
+
+56
 00:05:14,700 --> 00:05:20,300
 And it's wired for Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
 
-56
+57
 00:05:20,300 --> 00:05:26,700
 Until Hy3 is switched on, answers are AI-generated from your cited sources, through the same checks.
 
-57
+58
 00:05:29,000 --> 00:05:32,200
 We didn't just demo it, we attacked it.
 
-58
+59
 00:05:32,200 --> 00:05:36,200
 Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 
-59
+60
 00:05:36,200 --> 00:05:38,600
 Four hundred paired questions: zero differences.
 
-60
+61
 00:05:38,600 --> 00:05:45,800
 And one thousand two hundred and seventy-eight backend tests, plus one hundred and eighty-five browser tests, none failing.
 
-61
+62
 00:05:48,650 --> 00:05:50,450
 What's it worth?
 
-62
+63
 00:05:50,450 --> 00:05:59,250
 For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
 
-63
+64
 00:05:59,250 --> 00:06:01,650
 It's an estimate, not a measurement.
 
-64
+65
 00:06:01,650 --> 00:06:06,050
 And it pays for itself at about seven minutes a week.
 
-65
+66
 00:06:09,300 --> 00:06:15,700
 We built it with Tencent CodeBuddy: nine recorded sessions, including security reviews that found real bugs.
 
-66
+67
 00:06:18,950 --> 00:06:22,550
 Every company's AI will be asked to prove itself.
 
-67
+68
 00:06:22,550 --> 00:06:24,350
 Walnut DataBridge.
 
-68
+69
 00:06:24,350 --> 00:06:26,150
 Answers you can prove.
 
-69
+70
 00:06:26,150 --> 00:06:29,750
 We'd love one pilot team at one regulated company.
 
-70
+71
 00:06:29,750 --> 00:06:31,250
 Thanks for watching!

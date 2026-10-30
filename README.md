@@ -23,7 +23,7 @@ platform capabilities shown in the original screens. Full inventory, with file:l
 **[docs/PLATFORM.md](docs/PLATFORM.md)**.
 
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech track (Aspire) · Team Walnut, finalist.
-This is the **finals build** (branch `final_v1.3`) for Demo Day, 3 Nov 2026. The judge's guide is
+This is the **finals build** (branch `final_v1.3`, the verified lock; `final_v1.4` adds the teammate's pages beside the chat and an optional stand-in model for the answers (off by default); it is not on the lock.) for Demo Day, 3 Nov 2026. The judge's guide is
 [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). Every feature, who can use it, and the test behind it:
 [docs/finals/FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). What changed since the 16 Oct
 submission, commit by commit: [docs/finals/CHANGELOG.md](docs/finals/CHANGELOG.md).

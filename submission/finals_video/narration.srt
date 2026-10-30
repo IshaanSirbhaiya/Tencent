@@ -67,19 +67,19 @@ Rachel gets the actual case: the flagged transfers, and the review.
 Same system, two different truths.
 
 18
-00:01:56,500 --> 00:02:02,100
-In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+00:01:56,500 --> 00:02:02,500
+In Singapore, telling Amy that a suspicious-transaction report even exists can be a criminal offence.
 
 19
-00:02:02,100 --> 00:02:04,100
+00:02:02,500 --> 00:02:04,500
 So the system never does.
 
 20
-00:02:04,100 --> 00:02:07,300
+00:02:04,500 --> 00:02:07,700
 The question is word for word the same.
 
 21
-00:02:07,300 --> 00:02:10,100
+00:02:07,700 --> 00:02:10,500
 Only who is signed in is different.
 
 22
@@ -191,8 +191,8 @@ And below, every document that was considered, with its verdict and the reason.
 Maya sees every decision.
 
 49
-00:04:24,450 --> 00:04:26,850
-She never sees the answer itself.
+00:04:24,450 --> 00:04:27,650
+The answer itself, only with a logged reason.
 
 50
 00:04:28,100 --> 00:04:35,300
@@ -251,101 +251,105 @@ The Trust centre lists the seven controls behind all of this.
 Each one is enforced in code, mapped to Singapore's AI and data rules, and proved by a named test.
 
 64
-00:05:34,050 --> 00:05:39,650
+00:05:34,050 --> 00:05:39,631
 It plugs into Tencent WorkBuddy, so people can ask from where they already work.
 
 65
-00:05:39,650 --> 00:05:46,050
-It's an MCP agent: each connector carries one person's signed token, so Jordan's gets Jordan's answer.
+00:05:39,631 --> 00:05:46,807
+WorkBuddy uses our MCP server; each person's connector carries their own signed token, so Jordan's gets Jordan's answer.
 
 66
-00:05:46,050 --> 00:05:48,050
+00:05:46,807 --> 00:05:48,800
 Same gates, same sealed log.
 
 67
-00:05:49,350 --> 00:05:58,950
-We built the whole platform: connectors to every source, AI agents that build new adapters, a federated engine across systems, and an evidence graph.
+00:05:49,350 --> 00:05:58,779
+We built the whole platform: connectors to Slack, Confluence, Jira and Drive, agents that build new adapters, a federated engine, and an evidence graph.
 
 68
-00:05:58,950 --> 00:06:04,950
-The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
+00:05:58,779 --> 00:06:01,136
+None of it answers a question.
 
 69
-00:06:04,950 --> 00:06:08,950
-Inside DataBridge, Jordan can look at the engine's own graph.
+00:06:01,136 --> 00:06:07,029
+The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
 
 70
-00:06:08,950 --> 00:06:12,150
-It's shown here; it isn't used to answer.
+00:06:07,029 --> 00:06:10,957
+Inside DataBridge, Jordan can look at the engine's own graph.
 
 71
+00:06:10,957 --> 00:06:14,100
+It's shown here; it isn't used to answer.
+
+72
 00:06:14,650 --> 00:06:20,250
 And it's wired for Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
 
-72
+73
 00:06:20,250 --> 00:06:26,650
 Until Hy3 is switched on, answers are AI-generated from your cited sources, through the same checks.
 
-73
+74
 00:06:28,950 --> 00:06:32,150
 We didn't just demo it, we attacked it.
 
-74
+75
 00:06:32,150 --> 00:06:36,150
 Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 
-75
+76
 00:06:36,150 --> 00:06:38,550
 Four hundred paired questions: zero differences.
 
-76
+77
 00:06:38,550 --> 00:06:45,750
 And one thousand two hundred and seventy-eight backend tests, plus one hundred and eighty-five browser tests, none failing.
 
-77
+78
 00:06:48,600 --> 00:06:50,400
 What's it worth?
 
-78
+79
 00:06:50,400 --> 00:06:59,200
 For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
 
-79
+80
 00:06:59,200 --> 00:07:01,600
 It's an estimate, not a measurement.
 
-80
+81
 00:07:01,600 --> 00:07:06,000
 And it pays for itself at about seven minutes a week.
 
-81
+82
 00:07:09,250 --> 00:07:15,650
 We built it with Tencent CodeBuddy: nine recorded sessions, including security reviews that found real bugs.
 
-82
+83
 00:07:15,650 --> 00:07:19,250
 It also built the WorkBuddy connectors and wrote tests.
 
-83
+84
 00:07:19,900 --> 00:07:22,700
 The cover was designed in Tencent Miora.
 
-84
+85
 00:07:24,550 --> 00:07:28,150
 Every company's AI will be asked to prove itself.
 
-85
+86
 00:07:28,150 --> 00:07:29,950
 Walnut DataBridge.
 
-86
+87
 00:07:29,950 --> 00:07:31,750
 Answers you can prove.
 
-87
+88
 00:07:31,750 --> 00:07:35,350
 We'd love one pilot team at one regulated company.
 
-88
+89
 00:07:35,350 --> 00:07:36,850
 Thanks for watching!

@@ -1,7 +1,7 @@
 # Merge analysis: `final_mehulupdates` into `final_v1.4`
 
 Written Fri 30 Oct 2026. Status: **WIP, not verified.** The `onboarding.py` blocker (§5) was resolved upstream
-by `e740215` (merged in `e47069a`); the suites have not been run on the merged tree.
+by `e740215` (merged in `e47069a`); the suites had not been run on the merged tree when this was written *(update 30 Oct: the Playwright run on `final_v1.4` has since refreshed the act and deliverables screens, `75a0aa8`, `2c5aae3`; no pass count is recorded)*.
 
 | Item | Value |
 |---|---|

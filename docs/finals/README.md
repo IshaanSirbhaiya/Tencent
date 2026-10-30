@@ -4,7 +4,7 @@
 
 Everything written for the finals of the Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 (FinTech
 track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product inside it. Demo Day is
-3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are now committed on `final_v1.2-cloud`, locked as `final_v1.3`, and covered by the clean-checkout cloud test run on the evening of 30 Oct). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
+3 Nov 2026. Branch `final_v1.3` (the verified lock; `final_v1.0` is frozen; `final_v1.4` adds the teammate's pages beside the chat and an optional stand-in model for the answers (off by default); it is not on the lock.); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are now committed on `final_v1.2-cloud`, locked as `final_v1.3`, and covered by the clean-checkout cloud test run on the evening of 30 Oct). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
 
 | Start here | What it is |
 |---|---|

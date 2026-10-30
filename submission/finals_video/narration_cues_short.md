@@ -31,7 +31,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **1:44** Amy gets the approved customer script, with its sources, and nothing else.
 - **1:49** Rachel gets the actual case: the flagged transfers, and the review.
 - **1:53** Same system, two different truths.
-- **1:55** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+- **1:55** In Singapore, telling Amy that a suspicious-transaction report even exists can be a criminal offence.
 - **2:01** So the system never does.
 
 ## 2:11–2:34 · 03 Restricted looks like nothing
@@ -61,7 +61,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **3:13** These three records were sealed and chained before Rachel saw a word.
 - **3:18** And below, every document that was considered, with its verdict and the reason.
 - **3:23** Maya sees every decision.
-- **3:25** She never sees the answer itself.
+- **3:25** The answer itself, only with a logged reason.
 
 ## 3:30–4:10 · 08 Audit, Verify and the tamper demo
 
@@ -88,14 +88,15 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 4:34–4:49 · 12 WorkBuddy: the connectors
 
 - **4:35** It plugs into Tencent WorkBuddy, so people can ask from where they already work.
-- **4:40** It's an MCP agent: each connector carries one person's signed token, so Jordan's gets Jordan's answer.
+- **4:40** WorkBuddy uses our MCP server; each person's connector carries their own signed token, so Jordan's gets Jordan's answer.
 
 ## 4:48–5:14 · 10 The platform
 
-- **4:49** We built the whole platform: connectors to every source, AI agents that build new adapters, a federated engine across systems, and an evidence graph.
-- **4:59** The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
-- **5:05** Inside DataBridge, Jordan can look at the engine's own graph.
-- **5:09** It's shown here; it isn't used to answer.
+- **4:49** We built the whole platform: connectors to Slack, Confluence, Jira and Drive, agents that build new adapters, a federated engine, and an evidence graph.
+- **4:58** None of it answers a question.
+- **5:01** The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
+- **5:07** Inside DataBridge, Jordan can look at the engine's own graph.
+- **5:11** It's shown here; it isn't used to answer.
 
 ## 5:14–5:28 · 13 Tencent Hy3
 
