@@ -11,19 +11,24 @@ Items marked **PROPOSED** are names or query strings chosen in this spec because
 Single-key shortcuts are a WCAG 2.1.4 risk. So:
 - Presenter keys are **off by default**. They are active only when presenter mode is armed: `NEXT_PUBLIC_IB_PRESENTER=1` at build or start, or `localStorage["ib.presenter"]="1"` (built; `components/presenter/controller.ts`).
 - They are ignored whenever focus is in an input, textarea, select or contenteditable, and whenever Ctrl, Alt or Meta is held.
-- A small visible HUD (bottom-right, outside the 5% safe margin) shows the armed state, the step number and four status dots: API, model (TokenHub), ledger, WorkBuddy. HUD text is also in the accessibility tree.
+- A small visible HUD (bottom-right, outside the 5% safe margin) shows the armed state, the step number and three status dots: API, model, ledger (`refreshHealth` in `controller.ts`). HUD text is also in the accessibility tree.
 - Normal users never see the HUD or any shortcut.
 
 ## 2. Keys
 
 | Key | Action |
 |---|---|
-| `P` | Arm and start. Applies the Stage theme, navigates to Step 1, warms the app (see §5). Pressed again: returns to Step 1 without resetting the sandbox |
+| `P` | Arm and start. Applies the Stage theme, goes to step 00, warms the app (see §5). Pressed again: returns to step 00 without resetting the sandbox |
 | `Space` | Run the next step. The HUD shows what the next step will do. Debounce: ignore a second press within 400 ms |
 | `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end |
-| `R` | Reset: restores the tamper sandbox copy, clears the ask boxes, re-warms the model, returns to Step 0. Never edits the real ledger |
-| `Esc` | Closes the sources sheet and returns focus to the chip that opened it. Normal app behaviour, not presenter-only |
-| `L` | (PROPOSED extra) Toggles English and 简体中文 and back. Needed so the driver never uses the mouse |
+| `R` | Reset: restores the tamper sandbox copy, clears the ask boxes, re-warms the model, returns to step 00. Never edits the real ledger |
+| `Esc` | Hides or shows the HUD (`controller.ts`). While a dialog is open (sources sheet, reset confirm) presenter keys are ignored, so `Esc` closes the sheet through the sheet's own handler |
+| `ArrowLeft` | Back one step. `ArrowRight` skips a failed step |
+| `L` | Toggles English and 简体中文. Needed so the driver never uses the mouse |
+| `S` | Stage theme on or off |
+| `D` | Opens Deliverables |
+| `2` | Opens citation [2] on the current Compare page |
+| `?` | Key legend |
 
 Everything on the run sheet must be reachable by these keys alone.
 
@@ -43,7 +48,7 @@ Presenter mode switches identity by minting a signed demo token for each persona
 ## 5. Warm-up on `P`
 
 1. One throwaway ask per persona used, to warm caches and the model call.
-2. Check the four status dots: API, model, ledger, WorkBuddy reachability (the last may be "unknown").
+2. Check the three status dots: API, model, ledger. WorkBuddy has no dot; check it by hand before the run.
 3. Ask timeout: if the model call exceeds 4 seconds, serve the deterministic extractive answer (the product's own behaviour, repo rule 5). No dead air.
 4. No token streaming (D-08). The staged status line may show (D-20 SSE stage events if built): accepted, checked, composing, verified. Text appears only after grounding passes.
 
@@ -51,44 +56,42 @@ Acceptance test: from a cold browser, `P` then `Space` x N (N = steps in §6 tha
 
 ## 6. Steps: exact app action and URL
 
-Route names for Developer pages come from the plan (`/dev/journey/<req>`, `/dev/audit`). The Compare route `/compare` exists today; the query strings below are **PROPOSED**.
+Route names for Developer pages come from the plan (`/dev/journey/<req>`, `/dev/audit`). The Compare route `/compare` exists today.
 
 Questions (exact strings, from `lib/personas.ts`):
 - Q-V: `Why has Velquarry Trading's account been restricted, and what should I tell the customer?`
 - Q-B: `Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?`
 
-| Step | Trigger | Run sheet time | URL | App action |
-|---|---|---|---|---|
-| 0 | `P` | before 0:00 | `/compare?mode=people&left=amy.am&right=mlro.tan` | Stage theme on. Two columns labelled Amy (Account manager) and Rachel (MLRO). Boxes pre-filled with Q-V but not submitted. HUD ready |
-| 1 | `Space` | 0:07 | same | Both columns submit Q-V at once, each with its own persona token. Staged status line, then both verified answers. There is no classification pill in the app. Save Rachel's `req_id` in presenter state for step 5 |
-| 2 | `Space` | 0:45 | `/compare?mode=person&person=ken.ext` | Mode "same person, two questions". Both columns are Ken. Left submits Q-V; right submits Q-B. Both show the same refusal card. Optional (P1): a line "Responses identical" computed from the two user-visible refusal bodies only. It must never state or imply anything about hidden documents (D-07). Hold |
-| 3 | `Space` | 1:10 | `/compare?mode=people&left=amy.am&right=mlro.tan` | Returns to step 1's results (restored, not re-asked). Focus on Rachel's answer. `Space` itself opens citation [2], i.e. the **sources sheet** (no second key) |
-| 3b | (none; same `Space` as step 3) | 1:12 | same, sheet open | Sheet shows: document title, the cited passage highlighted, "checked live" age, version. `Esc` closes it and returns focus to chip [2] |
-| 4 | `Space` | 1:40 | `/dev/journey/<req>` where `<req>` is Rachel's `req_id` from step 1 | Session switches to `maya.compliance`. Journey opens in under 2 seconds: waterfall with real milliseconds per stage, model name, three ledger records with sequence and hash. Full ms waterfall shows only to the compliance role (D-16) |
-| 5 | `Space` | 2:10 | `/dev/audit` | Opens the audit view as Maya |
-| 5b | `Space` | 2:15 | `/dev/audit` | **Verify** on the live ledger. Green: intact |
-| 6 | `Space` | 2:20 | `/dev/audit` | **Tamper**: calls the compliance endpoint `POST /audit/tamper-demo` (B11), which changes one decision ("forbidden" to "verified"; the backend scenario is being changed to exactly this) in a temporary **copy** of the ledger and returns the verify report. The real chain is never edited (D-19) |
-| 6b | `Space` | 2:25 | `/dev/audit` | **Verify** on the tampered copy. Red: "broken at entry N" with the exact sequence number. Ishaan or Mehul reads the number off the screen |
-| 7 | `Space` | 2:35 | HUD card "WorkBuddy" | App stays open. HUD says "Switch to WorkBuddy". Dev switches window (Alt+Tab) to the WorkBuddy window (**off-app**; see §7) |
-| 8 | `Space` | 3:12 | `/dev/audit` | Back in the app. Shows the real ledger (not the sandbox copy). The newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus (Alt-Tab back; `?latest=1`), not on a key. Then `L` flips to 简体中文 and `L` back (3 s) |
-| 9 | `Space` | 3:20 | `/present/proof` (PROPOSED) | **Proof slide** |
-| 10 | `Space` | 3:50 | `/present/business` (PROPOSED) | **Business slide** |
-| 11 | `Space` | 4:30 | `/present/close` (PROPOSED) | **Close slide** |
-| Q&A | none | 5:00 | `/dev/journey/<req>` | Driver goes back to the journey page and leaves it up |
+This is the live order. Step ids and URLs are copied from `components/presenter/script.ts` (`STEPS`, 11 entries); the HUD numbers them 00 to 10.
+
+| Step | Id (`script.ts`) | Trigger | Run sheet time | URL | App action |
+|---|---|---|---|---|---|
+| 00 | `title` | `P` | 0:00 | `/present` | Stage theme on; main session signed in as Rachel (`mlro.tan`). HUD ready |
+| 01 | `compare-people` | `Space` | 0:07 | `/compare?mode=people` (Amy left, Rachel right, Q-V) | Both columns submit Q-V at once, each with its own persona token. Staged status line, then both verified answers. There is no classification pill in the app. Rachel's `req_id` is kept for step 04 |
+| 02 | `compare-person` | `Space` | 0:45 | `/compare?mode=person` (Ken; Q-V left, Q-B right) | Both columns are Ken. Both show the same refusal card. Nothing is said or shown about hidden documents (D-07). Hold |
+| 03 | `citation` | `Space` | 1:10 | `/compare?mode=people` (as step 01) | Returns to step 01's results and opens citation [2] on Rachel's answer (the **sources sheet**). `Esc` closes it (the sheet's own handler) |
+| 04 | `journey` | `Space` | 1:40 | `/dev/journey/<req>` (Rachel's `req_id`) | Session switches to `maya.compliance`. Opens on the waterfall: real milliseconds per stage, model name, three ledger records with sequence and hash (D-16) |
+| 05 | `verify` | `Space` | 2:10 | `/dev/audit?verify=1` | **Verify** on the live ledger. Green: intact |
+| 06 | `tamper` | `Space` | 2:20 | `/dev/audit?tamper=1` | **Sandbox tamper, then Verify**: one Gate-2 decision changes in a temporary **copy** of the log, 'forbidden' to 'verified' (spoken: "denied to allowed"), and the copy is verified. Red: "broken at entry N". The real chain is never edited (D-19) |
+| 07 | `workbuddy` | `Space` | 2:35 | `/dev/audit` | **Off-app** (see §7). The bar shows the WorkBuddy card; Dev switches window (Alt+Tab). Back in the app, the newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus, not on a key. Then `L` flips to 简体中文 and `L` back (3 s) |
+| 08 | `proof` | `Space` | 3:20 | `/present/proof` | **Proof slide** |
+| 09 | `business` | `Space` | 3:50 | `/present/business` | **Business slide** |
+| 10 | `close` | `Space` | 4:30 | `/present/close` | **Close slide** |
+| Q&A | none | none | 5:00 | `/dev/journey/<req>` | Driver goes back to the journey page (`ArrowLeft`) and leaves it up |
 
 **Live growth is never on the Space path.** The three grow steps (`grow`, `grow-post`, `grow-ask`,
 after the Ken beat) are added only when demo features are on (D-24) **and** the tab was opened with
 `?grow=1` (stored for this tab; `?grow=0` turns it off). Without `?grow=1` the HUD counts `/ 10`;
 with it, `/ 13`. Use it for a Q&A walk-up only (round-2 Fable #1; test in `presenter.spec.ts`).
 
-Note: the run sheet's Ken step happens before the passage step. The tamper in step 6 writes only to the sandbox copy, so the WorkBuddy beat in step 7 writes a real record to the real chain afterwards (D-19), which step 8 shows.
+Note: the run sheet's Ken step happens before the passage step. The tamper in step 06 writes only to the sandbox copy, so the WorkBuddy beat in step 07 writes a real record to the real chain afterwards (D-19), which the audit page shows when Dev returns to the app.
 
 ## 7. The WorkBuddy beat (off-app)
 
 - Not controlled by the app. WorkBuddy is a separate window, already open, warm, configured as Jordan with the Internal Brain connector (`scripts/workbuddy_setup.py`).
 - Aaruni starts the action by pasting the one exact prompt used everywhere (it is Jordan's canonical question in `personas.ts`): `What's the status of the database migration project and were there any blockers raised in Slack last week?`
 - Expected: a cited answer stitched from Jira, Slack and Confluence.
-- Step 8 then shows the new ledger row. This is the live proof that WorkBuddy used the same gates.
+- Back in the app (still step 07), the audit page shows the new ledger row. This is the live proof that WorkBuddy used the same gates.
 - If the network fails: `B` plays clip C.
 
 ## 8. Slides
@@ -127,9 +130,9 @@ Three full-screen slides rendered by the app so the Stage theme and fonts match.
 
 1. Armed off: pressing P, B, R, L or Space does nothing special.
 2. In a text field: keys type normally.
-3. Steps 0 to 11 in order, using only keyboard.
-4. `R` after step 6b restores a clean sandbox; step 6 repeats.
+3. Steps 00 to 10 in order, using only keyboard.
+4. `R` after step 06 restores a clean sandbox; step 06 repeats.
 5. `B` at each step plays the right clip and returns.
-6. Step 4 opens in under 2 seconds with the correct `req_id`.
+6. Step 04 opens in under 2 seconds with the correct `req_id`.
 7. Axe and contrast pass on the Stage theme.
 8. With the model timeout forced, the extractive answer appears and the run is not blocked.

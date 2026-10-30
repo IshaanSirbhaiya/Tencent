@@ -3,7 +3,7 @@
 Each item is marked **Planned**, **In progress** or **Built** and moves to **Done** only when its tests pass
 and it runs in the demo. Do not show or describe a Planned item as done.
 
-Status on 30 Oct 2026: §1 **Act is Built, with tests** (draft a reply, create a follow-up ticket; details
+Status on 30 Oct 2026: §1 **Act is built, tested and committed** (`8312864` on `final_v1.2`; draft a reply, create a follow-up ticket; `test_act.py`, `test_act_e2e.py`, e2e `act.spec.ts`; details
 and the differences from the plan below). §2 voice is still **Planned**. Neither appeared in the priority
 list of `docs/finals/PLAN.md` §9 (P0-P2). Research: `../research/C_ai_interaction_innovation.md` §1.3, §2.3 C-D.
 

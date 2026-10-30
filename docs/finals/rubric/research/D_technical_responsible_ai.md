@@ -14,7 +14,7 @@ Repo facts come from `INTERNAL_BRAIN.md`, `docs/tencent/{SECURITY,RESPONSIBLE_AI
 ## 0. Summary in ten lines
 
 1. Technical judges score three things: does it run live, is the architecture sound and legible, and is there evidence beyond the demo (tests, evals, reviews).
-2. We have unusually strong evidence: 0 leaks in 5,958 requests, 0 of 400 differential mismatches, 0 injection failures in 976 requests, 733 backend tests, a Playwright suite (see docs/finals/TEST_REPORT.md), and recorded security reviews (Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds) with written dispositions for all but Codex track 1.
+2. We have unusually strong evidence: 0 leaks in 7,374 requests, 0 of 400 differential mismatches, 0 injection failures in 1,152 requests, 733 backend tests, a Playwright suite (see docs/finals/TEST_REPORT.md), and recorded security reviews (Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds) with written dispositions for all but Codex track 1.
 3. Our biggest technical gap is that **Hy3 has never run live**. Every number comes from a capturing fake model or the extractive path. Close this before 3 Nov if TokenHub verification has cleared. If it has not, say so first, in one sentence.
 4. Other gaps: a CI workflow exists (`.github/workflows/ci.yml`) but its first GitHub run is not yet recorded, no live deployment (the Lighthouse kit exists but has never run), no real SSO, retrieval is lexical only, and there is no human review queue or feedback loop.
 5. For Responsible AI, Singapore judges will think in **AI Verify (11 principles)**, **IMDA's GenAI framework (2024)**, the **agentic framework (Jan 2026)**, the **IMDA Starter Kit's four risks**, **MAS FEAT/Veritas** and the new **MAS AI Risk Management Guidelines (7 Oct 2026)**.
@@ -73,7 +73,7 @@ Status key: **Done** = built and tested. **Partial** = built with a stated limit
 | 11 | Audit and observability | Who saw what; tamper evidence; metrics and alerts | **Partial** | Write-ahead sealed ledger; external head; content hash check; `/audit/verify` | No metrics, tracing or alerting; no service-account monitoring (TRM 9.2.2); timing is not controlled |
 | 12 | Deployment | Reproducible deploy, HTTPS, secrets | **Partial** | `deploy/lighthouse/` (Caddy, Docker Compose, `smoke.sh`); `assert_deployable` refuses dev keys | **No live instance** (Lighthouse capacity was sold out) |
 | 13 | CI | Tests on every push | **Missing** | No `.github/workflows/` | Add a GitHub Action running pytest, the `--limit 60` eval and Playwright in mock mode. About 1 hour of work |
-| 14 | Cost control | Token caps, no-call paths, budgets, rate limits | **Partial** | Refusals make **no model call** (2,296 of 2,979 eval requests needed none); ≤ 14 passages, 2 per document; fallback chain | No per-user rate limit or budget; no token accounting in the ledger |
+| 14 | Cost control | Token caps, no-call paths, budgets, rate limits | **Partial** | Refusals make **no model call** (2,640 of 3,687 fake-capture eval requests needed none); ≤ 14 passages, 2 per document; fallback chain | No per-user rate limit or budget; no token accounting in the ledger |
 | 15 | Fallbacks and kill switch | Degrade safely | **Done** | Extractive fallback; `IB_FORCE_OFFLINE=1`; any ledger failure is a 503 | The kill switch needs a restart and is global only |
 | 16 | Sensitive data | PAN, NRIC and IBAN masked before index and model | **Done** | `sensitive.py`; `test_sens_raw_values_appear_nowhere_in_the_index` | Other personal data is not redacted |
 | 17 | Accessibility | WCAG checks | **Done** (automated) | axe on 5 screens at desktop and phone width; keyboard tests | No testing with assistive technology |
@@ -105,7 +105,7 @@ All paths below are new files under `docs/finals/rubric/` unless shown otherwise
 
 1. "Everything you see is running on this laptop now: four platforms, the Brain and the web app. Nothing is pre-recorded."
 2. "Two checks run before the model sees a word. The second asks Slack, Confluence, Jira or Drive live. If they don't answer in two seconds, the answer is no."
-3. "We attacked it 5,958 times. Zero leaks. And we proved the test can fail: switch the checks off and it catches 18 of 20 leaks."
+3. "We attacked it 7,374 times. Zero leaks. And we proved the test can fail: switch the checks off and it catches 18 of 20 leaks."
 4. "733 backend tests, a browser suite, and ten security review passes, including one CodeBuddy ran on Hunyuan Hy3. Every finding is written down with its fix."
 5. "If the audit log can't be written, you get no answer. Watch." (T7)
 6. "Same connector code for mock and real: only the base URL changes."
@@ -148,7 +148,7 @@ Tool** generates a summary report, and **Project Moonshot** is the technical tes
 | Explainability | Meets | Per-answer citations; the "How this was checked" strip; ledger `retrieval.decided` lists considered and released documents with each Gate 2 verdict (compliance only) | A "why this answer" panel for the asker (R8) |
 | Reproducibility | Meets | Deterministic gates, ranking, time parsing and extractive answer; fixed seed; world sha256 and seed 7 in RESULTS.md; `PROMPT_VERSION` logged | Model ids are aliases, not pinned builds |
 | Safety | Meets | Constant refusal; no model call when nothing is relevant; grounding wall; extractive fallback | Relations between facts are not verified |
-| Security | Meets | `SECURITY.md` threat model; Codex tracks 1-7, CodeBuddy and two Claude review rounds; 0 injection failures in 976 requests | Track 1 disposition; rate limits; timing side channel |
+| Security | Meets | `SECURITY.md` threat model; Codex tracks 1-7, CodeBuddy and two Claude review rounds; 0 injection failures in 1,152 requests | Track 1 disposition; rate limits; timing side channel |
 | Robustness | Partial | Fail closed on every error (PageGuard, Gate 2 timeouts, ledger 503) | No load tests; no real-model robustness run |
 | Fairness | Partial | Same gates for every role; per-persona utility table in RESULTS.md | No written fairness note (R5); English only |
 | Data governance | Meets | Synthetic data only; PAN, CVV, NRIC and IBAN masked at ingest; ids and hashes, not text, in the ledger | Retention policy; a data card (R3) |
@@ -202,8 +202,8 @@ Tests are progressively added to Project Moonshot
 
 | Starter Kit risk | Our test | Result |
 |---|---|---|
-| Data disclosure | Leak eval: P1 transport capture, fingerprints in payload, answer and response; P2 differential | 0 / 5,958; 0 / 400 |
-| Adversarial prompts | Injection probes on all four platforms (`INJ-*`), forged citations, base64, tool text | 0 hard failures / 976 |
+| Data disclosure | Leak eval: P1 transport capture, fingerprints in payload, answer and response; P2 differential | 0 / 7,374; 0 / 400 |
+| Adversarial prompts | Injection probes on all four platforms (`INJ-*`), forged citations, base64, tool text | 0 hard failures / 1,152 |
 | Hallucination | Grounding wall; uncited-answer count; cited recall | 0 uncited; cited recall 87.8-96.4% |
 | Undesirable content | Not tested (internal content, no generation beyond cited sentences) | Gap; state it as low-risk by design |
 
@@ -286,8 +286,8 @@ red-team report (R4).
 
 | ID | Risk | Our control | Evidence | Residual |
 |---|---|---|---|---|
-| LLM01 | Prompt injection | Containment: access before content; no tools; delimited "untrusted data" passages; citation-tag neutralisation; addressed-to-AI sentences dropped; no arbitrary fetch | `SECURITY.md` §4; 0 / 976 injection failures | Delimiting is not datamarking; real-model behaviour not yet measured |
-| LLM02 | Sensitive information disclosure | Two gates before the model; PAN, CVV, NRIC and IBAN masked at ingest; one response shape | 0 leaks / 5,958; `test_sensitive.py` | Other personal data in permitted passages; timing not controlled |
+| LLM01 | Prompt injection | Containment: access before content; no tools; delimited "untrusted data" passages; citation-tag neutralisation; addressed-to-AI sentences dropped; no arbitrary fetch | `SECURITY.md` §4; 0 / 1,152 injection failures | Delimiting is not datamarking; real-model behaviour not yet measured |
+| LLM02 | Sensitive information disclosure | Two gates before the model; PAN, CVV, NRIC and IBAN masked at ingest; one response shape | 0 leaks / 7,374; `test_sensitive.py` | Other personal data in permitted passages; timing not controlled |
 | LLM03 | Supply chain | `requirements-lock.txt`; vendor SDKs only through the harness; model aliases | `ARCHITECTURE.md` §6 | No SBOM; no pinned model builds; gitleaks not run |
 | LLM04 | Data and model poisoning | No training; poisoned docs can only reach someone who can already read them; grounding wall | Injection fixtures | A malicious author can still mislead readers of their own page (by design; the citation shows who wrote it) |
 | LLM05 | Improper output handling | Markdown stripped; links rendered only for http(s); answer text never executed | `codex_track6` #4 | — |
@@ -337,13 +337,13 @@ are reused.
 | R1 | **AI Verify-style self-assessment** | `AI_VERIFY_SELF_ASSESSMENT.md` (+ the official tool's summary PDF if produced) | For each of the 11 principles: outcome; our process (Yes/No/N/A); evidence path; gap. Header: "self-assessed, not certified; synthetic data". Counts: X of 106 process checks evidenced | 3-4 h | Q&A; Trust center tab |
 | R2 | **System card** (doubles as MAS AIRG inventory entry) | `SYSTEM_CARD.md` | 1 Intended use and out-of-scope uses ("not a decision-maker"). 2 Users and roles. 3 Model(s): Hy3 → deepseek → extractive; prompt version; kill switch. 4 Data: sources, masking, synthetic world. 5 Controls: two gates, grounding, ledger. 6 Evaluation summary (RESULTS.md headline incl. 95% bounds). 7 Known limits (copy "Honest limits"). 8 **Risk materiality** (impact, complexity, reliance). 9 Inventory fields per MAS AIRG §4.7 (owner, scope, jurisdiction SG/ID, model type, third parties). 10 Change log. Format follows [Model Cards (Mitchell et al.)](https://arxiv.org/abs/1810.03993) adapted to a system | 2 h | One appendix slide; Trust center |
 | R3 | **Data card for Company A** | `DATA_CARD_COMPANY_A.md` | Motivation; composition (32 people, 209 pages, 251 issues, 602 threads, 81 files; personas; planted facts: FinCrime, market policies, draft fee schedule, INJ-*, SENS-*); generation (seed 7, generator v1, world sha256); what is *not* in it (no real people or companies; only published test card numbers); known biases (English only; SG/ID markets only; one org shape); intended use (eval and demo only); PDPC synthetic-data note (not derived from real records) | 1.5 h | Q&A ("where did your data come from?") |
-| R4 | **OWASP LLM Top 10 red-team report** | `OWASP_LLM_REDTEAM.md` | Section 2.9 table expanded. For each risk: attack tried; test or probe id; result; residual; fix. Include the first-run failures (6 forged citations, 102 uncited answers) and their fixes. **Showing what broke is the credibility.** Appendix: the probe taxonomy (16 types × 11 personas) from RESULTS.md | 2-3 h | A slide titled "We attacked it 5,958 ways" |
+| R4 | **OWASP LLM Top 10 red-team report** | `OWASP_LLM_REDTEAM.md` | Section 2.9 table expanded. For each risk: attack tried; test or probe id; result; residual; fix. Include the first-run failures (6 forged citations, 102 uncited answers) and their fixes. **Showing what broke is the credibility.** Appendix: the probe taxonomy (16 types × 11 personas) from RESULTS.md | 2-3 h | A slide titled "We attacked it 7,374 ways" |
 | R4b | (Optional) **Moonshot run** | `MOONSHOT_RUN.md` | Point AI Verify's Moonshot at `/ib/ask` through a custom connector with a jdoe token; run its prompt-injection and data-disclosure cookbooks; report as is | 0.5-1 day, risky | Only if it finishes by 2 Nov; otherwise list it as next step |
 | R5 | **Fairness note** | `FAIRNESS_NOTE.md` | (a) Why classic fairness metrics (Veritas, demographic parity) don't apply: no decision about individuals. (b) What does apply: **equal quality of service** across roles. Cite our per-persona cited recall (e.g. fake-capture 95.5-100% across personas; extractive 80-100%; mlro.tan world must-cite 71.4% on the model path) and say where it is uneven. (c) **Exposure fairness across sources**: results are interleaved across platforms so one platform can't crowd out the others (`pipeline.py` re-rank). RAG exposure bias is a known issue ([Dehghan & McDonald 2026](https://arxiv.org/abs/2603.24218); [Does RAG introduce unfairness?](https://arxiv.org/pdf/2409.19804)). (d) **Denial is not unfairness**: a contractor seeing less is the source system's policy, mirrored, not created. (e) Inclusion gaps: English only; Aspire's ID, TH and VN markets | 1.5 h | Q&A only |
 | R6 | **Human oversight design + incident runbook** | `HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md` | Oversight: who can do what (`RESPONSIBLE_AI.md` §2); automatic escalation triggers (grounding violation, model error, uncited answer → extractive); what is *not* built (review queue, dual control). Runbook for 5 incidents: (1) suspected leak → find recipients with `/audit/doc/{id}/accessors`, revoke at the source (honoured on the next question), preserve the ledger, verify the chain; (2) model misbehaviour → `IB_FORCE_OFFLINE=1`; (3) ledger tamper alert → compare with the external head, freeze, escalate; (4) prompt-injection doc found → restrict at source, search the ledger for answers citing it; (5) key compromise → rotate `IB_TOKEN_KEY` (all sessions die), re-publish the head. Each step names the command or route, owner and the MAS/PDPC notification consideration | 2 h | One slide "If something goes wrong" + live revocation demo |
 | R7 | **Privacy impact summary** | `PRIVACY_IMPACT_SUMMARY.md` | Data inventory (questions, answer text, ids, hashes: where each lives, from `DATA_FLOWS.md`); purposes; who can see what; transfers (TokenHub: passages only; retention unverified); retention (none defined → proposal); minimisation (≤ 14 passages; no text in ledger; local embeddings); masking; PDPA ss.18/20/24/25/26 table; staff notice text for the login screen | 1.5 h | Q&A |
 | R8 | **"Why this answer" explainability view** | Web app (`components/AnswerPanel.tsx`); doc `EXPLAINABILITY.md` | Expand the existing "How this was checked" strip: for *this* answer show passages released, each source's version, `authz_checked_at`, "checked live with Slack at 14:02:07", model and prompt version, fallback used. **Never show denied or considered-but-denied counts to the asker** (that would leak); the full `retrieval.decided` view stays in the compliance console. Explaining the asymmetry is itself a Responsible AI point | 2-4 h (UI) | Ask screen, step 3 of the tour |
-| R9 | **Trust center page** | `databridge/apps/internal_brain_web/app/dev/trust/page.tsx` (built) + read-only `/ib/trust` or a static `results.json` import | Tiles: Leaks 0 / 5,958 (95% UB 0.10%); P2 0 / 400; injection 0 / 976; canaries valid; tests 639 + 38; last eval date; "Verify audit chain" button (compliance only, or a public read of `ok` + `seq`); framework crosswalk table (AI Verify, MGF-GenAI, agentic MGF, Starter Kit, FEAT, MAS AIRG, PDPA, OWASP) with links to R1-R7; "Honest limits" box | 0.5-1 day | 20 seconds at the end of the demo; open during Q&A |
+| R9 | **Trust center page** | `databridge/apps/internal_brain_web/app/dev/trust/page.tsx` (built) + read-only `/ib/trust` or a static `results.json` import | Tiles: Leaks 0 / 7,374 (95% UB 0.08% per path); P2 0 / 400; injection 0 / 1,152; canaries valid; tests 639 + 38; last eval date; "Verify audit chain" button (compliance only, or a public read of `ok` + `seq`); framework crosswalk table (AI Verify, MGF-GenAI, agentic MGF, Starter Kit, FEAT, MAS AIRG, PDPA, OWASP) with links to R1-R7; "Honest limits" box | 0.5-1 day | 20 seconds at the end of the demo; open during Q&A |
 | R10 | **Framework crosswalk** | `FRAMEWORK_CROSSWALK.md` | One matrix: rows = our controls (two gates, grounding, ledger, masking, no-tools, constant refusal, kill switch, eval); columns = AI Verify principle, MGF-GenAI dimension, agentic MGF dimension, Starter Kit risk, FEAT, MAS AIRG para, PDPA section, ISO 42001 clause, NIST function, OWASP id | 1.5 h | The Trust center table; one slide |
 
 ### 4.1 Priority with four days left
@@ -360,7 +360,7 @@ are reused.
 2. "A contractor asking about a report that exists gets exactly the same bytes as one asking about a report that doesn't. In a bank, confirming a suspicious-transaction file exists can itself be an offence."
 3. "Every question is written to a sealed log *before* it's answered. If the log can't be written, there is no answer."
 4. "Change one byte of the log and verification fails. Watch." (live tamper)
-5. "We planted attacks in all four platforms: a fake approval, a hidden base64 command, a request to call audit tools. Zero worked in 976 tries. When our first run found six failures, we published them and fixed them."
+5. "We planted attacks in all four platforms: a fake approval, a hidden base64 command, a request to call audit tools. Zero worked in 1,152 tries. When our first run found six failures, we published them and fixed them."
 6. "The model has no tools. It can't act, can't fetch, can't pick who you are. That bounds what any agent built on it, including WorkBuddy, can reach."
 7. "We map to AI Verify's eleven principles, IMDA's Starter Kit and MAS's new AI guidelines from October, and we list what we *don't* do yet."
 
@@ -414,7 +414,7 @@ Optional fourth (already in the tour): **revocation on the next question** (Simu
 
 - "Compliant with MAS / PDPA / AI Verify." Say "mapped to" or "aligned with", plus the gap list.
 - "Certified" or "audited." All our reviews are by AI models and the team; no human third party.
-- "Zero risk" or "unhackable." Say "0 in 5,958, with a 95% upper bound of 0.10% per request."
+- "Zero risk" or "unhackable." Say "0 in 7,374, with a 95% upper bound of 0.08% per request on each answer path."
 - "Runs on Hy3" without the live caveat.
 - Any count of Aspire customers or a licence status (see `05_competition_pitch.md` §2 **[verify]**).
 
@@ -447,7 +447,7 @@ model".
 | 0:40-0:55 | Architecture one-pager (T1) | Two gates, ledger, Tencent stack | "Filter what goes in" |
 | 0:55-2:40 | Live demo: Ask (R8 strip), Compare (L1), revocation, injection (L2) | Live, end to end | Explainability, anti-tipping-off, injection |
 | 2:40-3:20 | Audit + tamper (L3) | Write-ahead, 503 on failure (T7) | Accountability |
-| 3:20-4:10 | Evidence slide (T2) + Trust center glimpse (R9) | 5,958 / 0, canaries, 733 backend tests, CI badge | Crosswalk: AI Verify, Starter Kit, MAS AIRG |
+| 3:20-4:10 | Evidence slide (T2) + Trust center glimpse (R9) | 7,374 / 0, canaries, 733 backend tests, CI badge | Crosswalk: AI Verify, Starter Kit, MAS AIRG |
 | 4:10-5:00 | Honest limits + rollout with Aspire | Mocked tenants, Hy3 status | "What we don't do yet" |
 
 ---

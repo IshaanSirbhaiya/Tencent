@@ -41,7 +41,7 @@ Since submission we have added:
 - An **evidence pack** for every rubric criterion.
 
 Test and eval status (30 Oct): 754 backend tests and 124 browser end-to-end tests pass (commit 7bf3246); the leak evaluation, re-run on the finals build,
-found 0 leaks in 5,958 adversarial requests and 0 differences in 400 paired questions. Hy3 via TokenHub
+found 0 leaks in 7,374 adversarial requests and 0 differences in 400 paired questions. Hy3 via TokenHub
 is wired in; the live run is pending activation, so today's answers are quoted from the sources with the
 same checks. The platforms are mock servers that use the real APIs' shapes, and all data is synthetic.
 

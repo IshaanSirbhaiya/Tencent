@@ -45,7 +45,7 @@ Order matters: freeze the build, record the clips, then rehearse. Tick every box
 ## Tue 3 Nov morning
 
 - [ ] Charge everything; battery above 90%
-- [ ] Pre-warm: press `P`, run the path once, check the four status dots
+- [ ] Pre-warm: press `P`, run the path once, check the three status dots (API, model, ledger)
 - [ ] Re-check every [V] number against the latest repo output; delete anything untraceable
 - [ ] Final playback test of clips A, B, C and the full video
 - [ ] Read the script aloud once, then stop practising

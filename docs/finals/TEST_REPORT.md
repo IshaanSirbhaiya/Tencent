@@ -9,6 +9,9 @@ Three consecutive full runs from a fresh build, no retries: **124 passed, 0 fail
 (17.0 min, 11.4 min, 9.9 min; the first was slowed by other agents using the machine). No flaky test seen in those
 three runs. `tsc` is clean for the app (`npx tsc -p tsconfig.json --noEmit`) and for the test files.
 
+Not in this count (added after these runs; re-run pending): `voice.spec.ts`, `act.spec.ts` (5), `grow.spec.ts` (6) and
+`deliverables*.spec.ts` (5).
+
 Note: `tsconfig.json` excludes `tests/`, so the command in the brief never checks test files. I checked them with a
 throw-away tsconfig that extends it and includes `tests/**` and `playwright.config.ts` (deleted afterwards).
 

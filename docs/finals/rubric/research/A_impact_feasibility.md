@@ -72,7 +72,7 @@ What published rubrics and judges say:
 | Auntie AI, 1st at Tencent Singapore station, May 2026 (05 doc §3) | One person you can picture (an elderly auntie), a real local harm (scams), local language | Open on one person: Maya, the compliance officer facing a MAS inspection, or Priya, the new account manager |
 | EyeDentify, 2nd, same event | A disability made concrete, with a device in hand | Show the harm concretely: a chatbot leaking a salary or an STR, then ours refusing |
 | MAS Hackcelerator 2025 winners (ActuaViz, Claimsio, Oxford Risk) | One workflow and one buyer each, e.g. "debt collection for SMEs" ([MAS](https://www.mas.gov.sg/news/media-releases/2025/mas-and-sfa-announce-fintech-award-winners-at-singapore-fintech-festival-2025)) | Name the buyer: "the AI lead at a MAS-regulated fintech who can't switch on Copilot" |
-| Glean's pitch pattern (industry, not a hackathon) | "Search that respects permissions" became a category. We beat it on proof, not on features | Lead with *measured* proof (0 / 5,958) instead of a feature list |
+| Glean's pitch pattern (industry, not a hackathon) | "Search that respects permissions" became a category. We beat it on proof, not on features | Lead with *measured* proof (0 / 7,374) instead of a feature list |
 
 No public write-ups of the AISG or Tencent global-final judging rationale were found **[verify]**.
 
@@ -135,7 +135,7 @@ Outline (one page, numbered, every number with its source):
 2. The problem in three numbers: Gartner 47%; APQC 2.8 h/week; Copilot CW1226324 (Jan 2026).
 3. Why now: MAS AIRM issued 7 Oct 2026, Sections 3-4 apply from 7 Oct 2027; PDPA 10% of turnover.
 4. What we change: "answers only from what you're allowed to open, and proof afterwards". Two gates, sealed audit.
-5. Measured proof: 0 / 5,958 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 733 backend tests; browser run: see docs/finals/TEST_REPORT.md.
+5. Measured proof: 0 / 7,374 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 733 backend tests; browser run: see docs/finals/TEST_REPORT.md.
 6. Value (projection): break-even 7 min/person/week; base US$1.3M/yr; range US$0.44M-4.1M; assumptions in one line.
 7. Relevance to Aspire: covers all five scenarios; matches Aspire's own MCP permission promise; extends to AspireOS bank clients.
 8. Limits: synthetic data, mock platforms with real API shapes, no live tenant yet.
@@ -165,13 +165,13 @@ Content: Aspire's MCP quote next to ours ("same promise, internal knowledge, wit
 3. "MAS issued its AI risk guidelines three weeks ago. From October 2027, every FI needs an AI inventory and controls. We built the controls."
 4. "Same question, three people, three different answers, and each of them correct for that person."
 5. "It pays for itself if each person saves seven minutes a week. APQC measured nearly three hours a week spent searching."
-6. "Aspire already promises customers its AI only sees what the user may see. We make that promise for Aspire's own staff, and we measured it: zero leaks in 5,958 attacks."
+6. "Aspire already promises customers its AI only sees what the user may see. We make that promise for Aspire's own staff, and we measured it: zero leaks in 7,374 attacks."
 
 ### 2.6 Likely judge questions (Impact), with crisp answers
 
 | Question | Answer (about 20 s) |
 |---|---|
-| Isn't this just Glean or Copilot? | "They inherit permissions and trust the index. Copilot still summarised Confidential emails this year. We re-check the source live on every answer, prove it with 5,958 attacks, and seal the audit trail for a regulator. Glean is also around US$45-50 a seat by third-party estimates; we target US$10." (Glean price **[verify]**: [GoSearch, a competitor](https://www.gosearch.ai/blog/glean-pricing-explained).) |
+| Isn't this just Glean or Copilot? | "They inherit permissions and trust the index. Copilot still summarised Confidential emails this year. We re-check the source live on every answer, prove it with 7,374 attacks, and seal the audit trail for a regulator. Glean is also around US$45-50 a seat by third-party estimates; we target US$10." (Glean price **[verify]**: [GoSearch, a competitor](https://www.gosearch.ai/blog/glean-pricing-explained).) |
 | Who exactly is the user? | "Three people: the account manager who needs a market-specific answer now, the on-call engineer at 3 a.m., and the compliance officer who has to prove afterwards who saw what." |
 | Is US$1.3M real? | "It's a projection. 600 people × 1.5 h/week × 46 weeks × US$31/h. US$31 is close to Singapore's median pay including employer CPF (S$5,775 a month, about US$29/h), so it's conservative for fintech. Break-even is 7 minutes a week, and the pilot measures the real figure." (MOM figure via secondary sources **[verify]** at [stats.mom.gov.sg](https://stats.mom.gov.sg/Pages/IncomeTimeSeries.aspx); FX 1.30 SGD/USD **[estimate]**.) |
 | Why should Aspire care beyond the hackathon? | "Three reasons. Internal speed. MAS AIRM readiness by 2027. And AspireOS sells to banks, which will ask Aspire exactly these questions." |
@@ -398,7 +398,7 @@ Without these, cost and latency remain estimates. Say so.
 - "Aspire is a licensed neobank": Aspire states PSA *exemptions* (05 doc flags this too).
 - Glean's price as fact: competitor-sourced estimates.
 - Any Hy3 latency figure until it has run live (D9).
-- "95% upper bound 0.10%" for 0 / 5,958: check the method. The standard one-sided 95% bound for 0 events (rule of three) is about 3 / 5,958 ≈ **0.05%**; two-sided Clopper-Pearson is about 0.06%. 0.10% is conservative, but be ready to say how it was computed.
+- "95% upper bound 0.08%" for 0 / 7,374: the bound is per answer path (rule of three, 3 / 3,687 ≈ **0.08%**, `RESULTS.md`). Pooled over all 7,374 requests it would be about 0.04%. Be ready to say how it was computed.
 
 ---
 

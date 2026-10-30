@@ -70,7 +70,7 @@ knowledge graph and analytics.
 | 16 | 9:30 | Jordan | **Walnut engine**, then **Trust centre** | The engine underneath (932 entities, 2,246 links, 4,710 pointers; read-only). The Trust centre lists seven controls, each with the test that proves it |
 
 **Optional.** Presenter mode: open http://127.0.0.1:3100/compare?present=1, press `P`, then `Space` for
-each of the 10 steps ([PRESENTER_KEYS.md](docs/finals/rubric/demo_story/PRESENTER_KEYS.md)); `B` plays
+each of the 11 steps ([PRESENTER_KEYS.md](docs/finals/rubric/demo_story/PRESENTER_KEYS.md)); `B` plays
 the step's backup clip, always labelled "Recording · not live". The
 tours: **Take the tour** in the header (User mode 4 steps, Developer mode 5 steps). Simulator as
 `admin.it`: see [Aspire's five scenarios](#aspires-five-scenarios), and note that Reset now reconciles revocations (fixed in 8582f4b; see
@@ -161,7 +161,7 @@ can't see; and compliance can reconstruct any access, with proof the record hasn
 | Developer | **Simulator** (`/dev/sim`) | `admin.it` | Change access live (remove someone from a channel, restrict a page, edit a runbook) and watch the next answer change |
 | Developer | **Trust centre** (`/dev/trust`) | anyone | Seven controls, their framework mappings and the tests that prove them |
 | Both | **Take the tour** | header button | A guided walk: 4 steps in User mode, 5 in Developer mode |
-| Presenter | **Presenter mode** (`/compare?present=1`, then `P`) | the script signs in | The 10-step Demo Day script on the keyboard, with a Stage theme for projectors |
+| Presenter | **Presenter mode** (`/compare?present=1`, then `P`) | the script signs in | The 11-step Demo Day script (HUD 00 to 10) on the keyboard, with a Stage theme for projectors |
 | Outside the app | **WorkBuddy** | three ready-made workspaces | Ask the Brain from Tencent WorkBuddy, as an engineer, a contractor, or the compliance officer |
 | Outside the app | **Original Walnut screens** (http://localhost:3300) | started by `demo_up.sh` | The Walnut engine's own views on Company A, with Walnut's guided demo |
 
@@ -328,7 +328,7 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Live stage events never time the permission checks (Gate 1 and Gate 2 are sent only once the decision is sealed); a foreign `Host` header is refused before any route | tests | `test_final_review_fixes.py::test_gate1_and_gate2_are_held_until_the_checks_are_sealed`, `::test_a_foreign_host_header_is_refused_before_any_route` |
 | The engine snapshot is readable only by the persona it was built for | tests | `internal_brain_web/tests/e2e/engine-proxy.spec.ts`, `engine.spec.ts` |
 | Automated tests, Internal Brain | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
-| Web end-to-end tests (Playwright, including axe accessibility checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)); `voice.spec.ts` (2 tests) came later and is not in the count | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Web end-to-end tests (Playwright, including axe accessibility checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)); `voice.spec.ts` (2 tests) came later and is not in the count; `act.spec.ts` (5), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | `databridge/apps/internal_brain_web/tests/e2e/` |
 | Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 4 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks

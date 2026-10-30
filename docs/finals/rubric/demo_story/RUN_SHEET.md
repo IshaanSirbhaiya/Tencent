@@ -39,6 +39,8 @@ Lines marked **[V]** depend on a fact to re-check on the morning of 3 Nov. If th
 
 Times are minutes:seconds from the first word. "Press" means Dev on the laptop (see `PRESENTER_KEYS.md`). Every line is spoken as written unless a tag applies.
 
+The 5:00 path is the 11 steps in `script.ts` (HUD 00 to 10). The live-growth beat ("the brain grows") is not on this path: it is a Q&A walk-up only, in a tab opened with `?grow=1` (see `PRESENTER_KEYS.md` §6).
+
 | Time | Beat | Who | Exact spoken line | Screen and action |
 |---|---|---|---|---|
 | 0:00–0:07 | Hook | Ishaan | "Two people at a fintech ask their company AI the same question: *Why has Velquarry Trading's account been restricted?*" | `/compare` already open, Stage theme: Amy (account manager) left, Rachel (MLRO) right. No greeting |
@@ -52,10 +54,10 @@ Times are minutes:seconds from the first word. "Press" means Dev on the laptop (
 | 1:15–1:40 | | Ishaan | "Re-checked at the source seconds before release. Anything they cannot open never reached the model." | Sources sheet: highlighted passage, "checked live" age, version. `Esc` closes it and returns focus to [2] |
 | 1:40–1:45 | Developer mode: the journey | Ishaan → Mehul | Ishaan: "Mehul, over to the compliance officer's chair." Dev: "Space." | `Space`: session switches to Maya; `/dev/journey/<req>` for Rachel's request |
 | 1:45–2:10 | | Mehul | "Here is what happened inside, for that one request. Two permission gates before the model. The answer is quoted from the sources, with the same checks. [ONLY IF HY3 LIVE: say "Hy3 wrote the text" instead.] Three sealed records, chained, written before Rachel saw a word." | Waterfall with real milliseconds per stage, model name, three ledger records with sequence and hash. Mehul points at each |
-| 2:10–2:20 | The chain breaks | Mehul | "I am the compliance officer. Verify: intact." Dev: "Space." | `/dev/audit`; `Space` runs Verify; green |
-| 2:20–2:28 | | Mehul | "I change one decision in a copy of the log, from 'forbidden' to 'verified'. Verify." Dev: "Space." | `Space` runs the sandbox tamper, then `Space` runs Verify |
+| 2:10–2:20 | The chain breaks | Mehul | "I am the compliance officer. Verify: intact." Dev: "Space." | `/dev/audit`; `Space` runs Verify (step 05, `verify`); green |
+| 2:20–2:28 | | Mehul | "Now I change one word in a copy of the log, denied to allowed. Verify." Dev: "Space." | One `Space` runs the sandbox tamper and then Verify on the copy (step 06, `tamper`). The screen names the change in the log's own words: a Gate-2 decision from 'forbidden' to 'verified' (`audit/tamper.py`); "denied to allowed" is the spoken form (`script.ts`) |
 | 2:28–2:35 | | Mehul | (beat) "Broken at entry [ENTRY]. A key holder cannot rewrite history unseen either: the head hash is published off-host." **T2:** "Answers you can prove." | Red result at the exact sequence number. Say the number on the screen |
-| 2:35–2:40 | Tencent, live | Mehul → Aaruni | Mehul: "Aaruni, Tencent." Aaruni: "Tencent is inside the product." | Dev presses `Space`: HUD says "WorkBuddy"; Dev switches window to WorkBuddy (off-app) |
+| 2:35–2:40 | Tencent, off-app | Mehul → Aaruni | Mehul: "Aaruni, Tencent." Aaruni: "Tencent is inside the product." | Dev presses `Space`: HUD says "WorkBuddy"; Dev switches window to WorkBuddy (off-app) |
 | 2:40–2:55 | | Aaruni | "Jordan is on call at 3 a.m. and asks from WorkBuddy." (beat while the agent runs) | WorkBuddy window: Aaruni starts the action: "What's the status of the database migration project and were there any blockers raised in Slack last week?" |
 | 2:55–3:12 | | Aaruni | "WorkBuddy's agent calls our tool with Jordan's signed token, not a name it chose. Same gates, same ledger, channel 'WorkBuddy'. Both answers are quoted from the sources, with the same checks. [ONLY IF HY3 LIVE: say "Hy3 wrote both answers" instead.] [CB] CodeBuddy built the connector and ran our security review." | Cited answer stitched from Jira, Slack and Confluence appears |
 | 3:12–3:20 | | Aaruni | "Dev has not touched the mouse all demo; and the UI speaks the room's languages." | Dev switches back to the app (Alt-Tab): `/dev/audit`. The newest row, channel `workbuddy-mcp`, appears when the window regains focus (`?latest=1`), not on a key. `L` flips to 简体中文 and back (3 s). Delete the "mouse" clause if Dev used the mouse |

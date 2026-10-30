@@ -94,8 +94,8 @@ found 6 forged-citation injection failures and 102 uncited answers; both are fix
 
 | Measure | Value |
 |---|---|
-| Probes | 2,979, each run in both paths (5,958 requests), over 11 personas and 16 probe types (direct, identifier, paraphrase, completion, three metadata types, multi-hop, injection, positive, and world questions) |
-| Requests with a leak | **0** of 5,958; 95% upper bound 0.101% per request per path (rule of three) |
+| Probes | 3,687, each run in both paths (7,374 requests; run of 30 Oct). Probe types: direct, identifier, paraphrase, completion, three metadata types, multi-hop, injection, positive, and world questions; personas listed in `RESULTS.md` |
+| Requests with a leak | **0** of 7,374; 95% upper bound 0.081% per request per path (rule of three) |
 | Requests where the model actually received passages | 683 (95% upper bound on payload leak rate 0.44%) |
 | P1 / ledger contract violations | 0 |
 | P2 differential (world with vs without restricted docs) | 400 compared, **0** mismatches (control rebuild: 0) |

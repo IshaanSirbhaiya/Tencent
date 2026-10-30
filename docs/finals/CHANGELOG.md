@@ -7,19 +7,24 @@ on `final_v1.0`. What each feature does and how it is tested: [FEATURE_CATALOGUE
 
 All 44 commits after the submission (`acb18f0`), up to `f0f84bd`, were made on 30 Oct 2026 (SGT). Times are SGT.
 
+Current evaluation numbers (run 30 Oct 11:27 SGT, final world, `eval_summary.json`): **0 leaks in 7,374 adversarial
+requests**, 0 of 400 differential pairs, 0 injection hard failures in 1,152, recall 100% on both paths. A commit row
+below quotes the numbers of the run made at that commit.
+
 ## In progress
 
-Being built now. **Not committed, not counted in any number on this page, not claimed anywhere else.**
+Being built or under review now. Each row says what is committed (the `final_v1.2` checkpoint is `8312864`); work not yet
+committed is **not counted in any number on this page and not claimed anywhere else.**
 Each line moves to the right area below when it lands.
 
 | Work | What it will be | What exists in the tree today |
 |---|---|---|
-| **Act** | Draft a reply, or a follow-up Jira ticket, from an answer; never revealing anything the asker cannot open | Uncommitted `databridge_ib/actions.py`, `tests/test_act.py`, `tests/test_act_e2e.py`, mock Jira create (`mock_platforms/tests/test_mock_jira_create.py`) |
-| **Watch the brain grow** | The knowledge graph grows live as documents arrive; add a document and see it appear | Committed: the web proxy allows `GET /ib/graph/changes` ([1079bd2](https://github.com/IshaanSirbhaiya/Tencent/commit/1079bd2)) and a 7 MB body for `POST /sim/upload-file` ([8e53a0b](https://github.com/IshaanSirbhaiya/Tencent/commit/8e53a0b)). The backend routes are not committed yet (uncommitted `databridge_ib/live.py`). Research: [live_growth/RESEARCH.md](live_growth/RESEARCH.md) (uncommitted) |
-| **One-click demo kit** | "Start Walnut Demo" and a preflight check | Research only: [demo_day/LIVE_DEMO_RESEARCH.md](demo_day/LIVE_DEMO_RESEARCH.md) (uncommitted) |
-| **Tencent tools upgrade** | CodeBuddy sessions CB7 to CB9; new WorkBuddy MCP tools; a WorkBuddy GUI test | Uncommitted prompts and transcripts in `docs/tencent/evidence/`, [WORKBUDDY_GUI_TEST.md](rubric/ai_innovation/WORKBUDDY_GUI_TEST.md), edits to the WorkBuddy guide |
+| **Act** | Draft a reply, or a follow-up Jira ticket, from an answer; never revealing anything the asker cannot open | Committed in `8312864` (final_v1.2 checkpoint): `databridge_ib/actions.py`, `tests/test_act.py`, `tests/test_act_e2e.py`, mock Jira create (`mock_platforms/tests/test_mock_jira_create.py`); round-2 review fixes in progress |
+| **Watch the brain grow** | The knowledge graph grows live as documents arrive; add a document and see it appear | Committed: the web proxy allows `GET /ib/graph/changes` ([1079bd2](https://github.com/IshaanSirbhaiya/Tencent/commit/1079bd2)) and a 7 MB body for `POST /sim/upload-file` ([8e53a0b](https://github.com/IshaanSirbhaiya/Tencent/commit/8e53a0b)). The backend routes (`databridge_ib/live.py`) are committed in `8312864`, demo-only (`IB_DEMO_FEATURES=1`). Research: [live_growth/RESEARCH.md](live_growth/RESEARCH.md) (uncommitted) |
+| **One-click demo kit** | "Start Walnut Demo" and a preflight check | Committed ([a1ccc6c](https://github.com/IshaanSirbhaiya/Tencent/commit/a1ccc6c)): Start/Stop/Reset/offline launchers and the preflight board. Research: [demo_day/LIVE_DEMO_RESEARCH.md](demo_day/LIVE_DEMO_RESEARCH.md) |
+| **Tencent tools upgrade** | CodeBuddy sessions CB7 to CB9; new WorkBuddy MCP tools; a WorkBuddy GUI test | CB7 to CB9 and the new MCP tools committed ([9afd1bd](https://github.com/IshaanSirbhaiya/Tencent/commit/9afd1bd)); prompts and transcripts in `docs/tencent/evidence/`. The WorkBuddy GUI retest is open: [WORKBUDDY_GUI_TEST.md](rubric/ai_innovation/WORKBUDDY_GUI_TEST.md), edits to the WorkBuddy guide |
 | **New demo video** | The finals walk-through, narrated by the team | Uncommitted script and recorder in [video/](video/VIDEO_SCRIPT_FINALS.md); raw clips and cards in `submission/finals_video/` |
-| **Everyday company content** | The world gains an employee handbook, Finance Ops, an IT helpdesk project, three public Slack channels and a People folder (leave, expenses, payday, holidays, onboarding, VPN), open to every employee, plus People-only salary bands. Append-only: every earlier document, fact and question answer is unchanged | Uncommitted `fixtures/enterprise/workplace.py`, regenerated `world.json` / `manifest.json` / `graph_rows`, `tests/test_workplace_layer.py`; extractive tie-break fix in `databridge_ib/narrate.py` with `tests/test_narrate_determinism.py`; eval re-run 30 Oct 11:27 SGT: 0 leaks in 7,374, 0 of 400 pairs differ |
+| **Everyday company content** | The world gains an employee handbook, Finance Ops, an IT helpdesk project, three public Slack channels and a People folder (leave, expenses, payday, holidays, onboarding, VPN), open to every employee, plus People-only salary bands. Append-only: every earlier document, fact and question answer is unchanged | Committed in `8312864`: `fixtures/enterprise/workplace.py`, regenerated `world.json` / `manifest.json` / `graph_rows`, `tests/test_workplace_layer.py`; extractive tie-break fix in `databridge_ib/narrate.py` with `tests/test_narrate_determinism.py`; eval re-run 30 Oct 11:27 SGT: 0 leaks in 7,374, 0 of 400 pairs differ |
 | **Live Hy3** | Hy3 answers through TokenHub | Waits on TokenHub activation (a person). `demo_up.sh` will switch it on by itself once [`hy3_check.py`](../../databridge/scripts/hy3_check.py) gets an answer |
 | **Hallway test** | 5 people × 20 min; results into the fix log and the proof slide | Protocol ready ([HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)); Sat 31 Oct |
 

@@ -4,6 +4,10 @@ Made in **Miora** (a Tencent tool, so it counts as Tencent product use). Generat
 and send it to me. I'll make the 380×216 form size and the 1920×1080 and 1280×720 thumbnails, and
 check the text at small sizes.
 
+**Name.** The product name on stage and in every document is **Walnut DataBridge**. The prompt below
+is kept as sent to Miora, so the cover's small label reads "DATABRIDGE BY WALNUT" (walnut.sg's form).
+The image is not regenerated; say "Walnut DataBridge" everywhere else.
+
 ## What the cover must say, and why
 
 | Requirement | From | How the image shows it |

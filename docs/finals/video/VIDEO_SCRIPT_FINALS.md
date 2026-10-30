@@ -153,7 +153,7 @@ file.
 > And any value can be traced, step by step, to the exact row in the exact file.
 
 ### 11 · Built with Tencent CodeBuddy (4:38–4:51)
-**On screen:** card: one of the six CodeBuddy session transcripts (the security review), and what
+**On screen:** card: one of the nine CodeBuddy session transcripts (the security review), and what
 CodeBuddy built.
 
 > We built this with Tencent CodeBuddy. It built our WorkBuddy connector and the model tests, and ran a
@@ -175,8 +175,8 @@ question through Jordan's and Ken's connectors with two different answers.
 > **[if Hy3 is on]** The answers you saw were written by Hy3, inside exactly the same checks.
 
 ### 14 · The proof (5:20–5:38)
-**On screen:** the app's proof slide: 0 leaks in 5,958 adversarial requests, 0 differences in 400 paired
-questions, 0 hard failures in 976 prompt-injection attempts. Label: 754 backend + 124 browser tests.
+**On screen:** the app's proof slide: 0 leaks in 7,374 adversarial requests, 0 differences in 400 paired
+questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 754 backend + 124 browser tests.
 
 > We didn't just demo it, we attacked it. Five thousand nine hundred and fifty-eight adversarial
 > requests: zero leaks. Four hundred paired questions: zero differences. And seven hundred and fifty-four
@@ -212,7 +212,7 @@ Then run `python docs/finals/video/assemble_finals.py --hy3` so the cue sheet us
 
 | Line | Source | If it changed |
 |---|---|---|
-| 5,958 / 0 leaks; 400 / 0 differences; 976 injection attempts | `databridge/apps/internal_brain_web/public/eval_summary.json` (run 29–30 Oct) | Read the new numbers; the slide updates itself |
+| 7,374 / 0 leaks; 400 / 0 differences; 1,152 injection attempts | `databridge/apps/internal_brain_web/public/eval_summary.json` (run 29–30 Oct) | Read the new numbers; the slide updates itself |
 | 754 backend, 124 browser tests | `eval_summary.json` `tests.backend`; `docs/finals/TEST_REPORT.md` (124 passed, 0 failed) | Say the new counts and edit the scene 14 label in `assemble_finals.py` |
 | Graph and engine counts | Not spoken any more (the world is growing); the screen shows them | Nothing to change |
 | US$1.3M, 7 minutes | `docs/finals/rubric/impact_feasibility/value_calculator.spec.json` (600 people, 90 min/week, US$31/h, 46 weeks, US$100,000/yr) | Match the slide |

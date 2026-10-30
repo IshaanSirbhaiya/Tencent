@@ -102,22 +102,24 @@ for (let i = 0; i < cards.length; i += 4) sheets.push(`<section class="sheet">${
 const judge = page('Judge cards', sheets.join(''));
 
 // ---- 3. presenter cheat sheet ----
-const keys = [['P','Arm presenter mode, Stage theme, go to step 0'],['Space','Run the next step'],['←','Back one step'],['B','Play fallback clip (again = back to live)'],['R','Reset: restore tamper copy, clear boxes, step 0'],['L','Flip English / 简体中文'],['S','Slides: proof, business, close'],['?','Show key help'],['Esc','Close source sheet, focus returns']];
+const keys = [['P','Arm presenter mode, Stage theme, go to step 00'],['Space','Run the next step'],['←','Back one step'],['B','Play fallback clip (again = back to live)'],['R','Reset: restore tamper copy, clear boxes, step 00'],['L','Flip English / 简体中文'],['S','Stage theme on / off'],['?','Show key help'],['Esc','Close the source sheet; with no sheet open, hide / show the HUD']];
+// Mirrors STEPS in databridge/apps/internal_brain_web/components/presenter/script.ts (HUD 00 to 10;
+// P gives 00, the title). The grow steps (?grow=1) are a Q&A walk-up, never on this path.
 const steps = [
- ['1','0:07','Same question, two truths','"Watch."  Both asks run.  "Amy gets the approved script. Rachel gets the case. Same brain."'],
- ['2','0:45','Ken, identical refusals','"Now Ken, a contractor. Velquarry on the left; a company that does not exist on the right."'],
- ['3','1:10','Passage, checked live','"Every sentence points at a passage the asker can open right now."'],
- ['4','1:40','Journey','"Mehul, over to the compliance officer\'s chair."'],
- ['5','2:10','Verify: intact','"I am the compliance officer. Verify: intact."'],
- ['6','2:20','Tamper a copy','"I change one decision in a copy of the log. Verify."  Read the entry number off the screen.'],
- ['7','2:35','WorkBuddy (off-app)','"Aaruni, Tencent."  Alt+Tab to WorkBuddy; paste the one exact question.'],
- ['8','3:12','Back to the audit row','"Dev has not touched the mouse all demo."  L flips language and back.'],
- ['9','3:20','Proof slide','"' + N.req + ' adversarial requests, zero leaks. ' + N.pairs + ' paired questions, zero differences."'],
- ['10','3:50','Business, then Close','"About 1.3 million US dollars a year, an estimate."  Then: "Answers you can prove. We want one pilot team. Scan to try it."'],
+ ['01','0:07','Same question, two truths','"Watch."  Both asks run.  "Amy gets the approved script. Rachel gets the case. Same brain."'],
+ ['02','0:45','Ken, identical refusals','"Now Ken, a contractor. Velquarry on the left; a company that does not exist on the right."'],
+ ['03','1:10','Passage, checked live','"Every sentence points at a passage the asker can open right now."'],
+ ['04','1:40','Journey','"Mehul, over to the compliance officer\'s chair."'],
+ ['05','2:10','Verify: intact','"I am the compliance officer. Verify: intact."'],
+ ['06','2:20','Tamper a copy','"Now I change one word in a copy of the log, denied to allowed. Verify."  Read the entry number off the screen.'],
+ ['07','2:35','WorkBuddy (off-app)','"Aaruni, Tencent."  Alt+Tab to WorkBuddy; paste the one exact question. At 3:12 Alt+Tab back: the newest audit row appears; L flips language and back.'],
+ ['08','3:20','Proof','"' + N.req + ' adversarial requests, zero leaks. ' + N.pairs + ' paired questions, zero differences."'],
+ ['09','3:50','Business','"About 1.3 million US dollars a year, an estimate."'],
+ ['10','4:30','Close','"Answers you can prove. We want one pilot team. Scan to try it." Stop.'],
 ];
 const ladder = [
  ['App stalls','Ishaan says the next line\'s first four words; Dev presses B (clip plays).'],
- ['Wrong state','Press R: restores the tamper copy, clears boxes, back to step 0. Never edits the real ledger.'],
+ ['Wrong state','Press R: restores the tamper copy, clears boxes, back to step 00. Never edits the real ledger.'],
  ['Network fails in the WorkBuddy beat','Play clip C and say in one clause that it is a recording.'],
  ['Running long','Cut in order: language flip, CodeBuddy line, Hy3 open-weight line, audit-row cut. Never cut the tamper or the identical refusals.'],
  ['Hy3 not live','Keep the default line: "quoted from the sources, with the same checks".'],
@@ -127,14 +129,17 @@ const cheat = page('Presenter cheat sheet', `<main class="ch">
 <section class="chtop"><div><h2>Keys</h2><table class="keys">${keys.map(k=>`<tr><td><kbd>${esc(k[0])}</kbd></td><td>${esc(k[1])}</td></tr>`).join('')}</table></div>
 <div><h2>Recovery ladder</h2><ol class="lad">${ladder.map(l=>`<li><b>${esc(l[0])}.</b> ${esc(l[1])}</li>`).join('')}</ol>
 <p class="fine">A recording is never presented as live. If a judge interrupts: one sentence, then "let me finish this step, then I will come back."</p></div></section>
-<h2>The 10 steps (Space for each)</h2>
+<h2>Steps 01 to 10 (Space for each; P gives step 00, the title)</h2>
 <table class="steps"><tr><th>#</th><th>Time</th><th>Beat</th><th>Spoken cue</th></tr>${steps.map(s=>`<tr><td>${s[0]}</td><td>${s[1]}</td><td><b>${esc(s[2])}</b></td><td>${esc(s[3])}</td></tr>`).join('')}</table>
-<p class="fine">Morning checks: re-run the proof numbers; Hy3 is wired but the live run is pending, so say "quoted from the sources"; platforms are mocks; data is synthetic. WorkBuddy question: What's the status of the database migration project and were there any blockers raised in Slack last week?</p>
+<p class="fine">Morning checks: re-run the proof numbers; Hy3 is wired but the live run is pending, so say "quoted from the sources"; platforms are mocks; data is synthetic. The grow beat (?grow=1) is a Q&amp;A walk-up only, never on the Space path. WorkBuddy question: What's the status of the database migration project and were there any blockers raised in Slack last week?</p>
 </main>`);
 
 fs.mkdirSync(path.join(here, 'html'), { recursive: true });
 const jobs = [['leave_behind_A4', leave], ['judge_cards', judge], ['presenter_cheatsheet', cheat]];
-const browser = await chromium.launch();
+// CHROMIUM_PATH (optional): use this Chromium binary instead of Playwright's own download
+// (e.g. a container with a preinstalled browser). Unset = the previous behaviour.
+const launchOpts = process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH, args: ['--no-sandbox'] } : {};
+const browser = await chromium.launch(launchOpts);
 for (const [name, html] of jobs) {
   const f = path.join(here, 'html', name + '.html');
   fs.writeFileSync(f, html);

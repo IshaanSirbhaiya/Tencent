@@ -39,11 +39,11 @@ every commit since the submission: [CHANGELOG.md](CHANGELOG.md).
 |---|---|
 | **User mode** | Persona sign-in; Ask with real stage-by-stage progress and **voice dictation** (English / 简体中文, never sends by itself); cited answers with sources checked live; honest refusals; history; settings (text size, contrast, motion, theme); English / 简体中文 |
 | **Compare** | Two people, same question; one person, two questions; "Identical responses" marker |
-| **Presenter mode** | The 10-step demo script on the keyboard, Stage theme for the projector, proof / business / close slides with a QR code. **Backup clips A, B, C** play on `B`, labelled "Recording · not live" (interim; clip C is an in-app stand-in for WorkBuddy) |
+| **Presenter mode** | The 11-step demo script on the keyboard, Stage theme for the projector, proof / business / close slides with a QR code. **Backup clips A, B, C** play on `B`, labelled "Recording · not live" (interim; clip C is an in-app stand-in for WorkBuddy) |
 | **Developer mode** | Mission control (live pipeline); request journey (compliance waterfall + employee receipt); permission-aware **knowledge graph** (two people side by side); **Walnut engine** (graph, time slider, provenance, ontology; Jordan only); **analytics**; **audit** (plain-English search, Verify chain, **sandbox tamper demo**); simulator; **Trust centre**; value calculator |
 | **Tours** | User "Try it" (45 s) and Developer tours, with "Do it for me" |
 | **Hy3** | Wired, not live (401006). `scripts/hy3_check.py` checks TokenHub; `demo_up.sh` turns Hy3 on by itself as soon as it answers |
-| **Backend** | **754 tests pass**; full eval re-run on the final code: **0 leaks / 5,958**, **0 / 400** differential, 0 injection failures |
+| **Backend** | **754 tests pass**; full eval re-run on the final code: **0 leaks / 7,374**, **0 / 400** differential, 0 injection failures in 1,152 |
 | **Web e2e** | **124 passed, 0 failed**, 38 environment-gated skips, three runs in a row ([TEST_REPORT.md](TEST_REPORT.md)); `voice.spec.ts` added since |
 | **Security** | Five-model final review: no high or critical issue left; all findings fixed (Host allowlist against DNS rebinding, held gate events in the stream, stale graph edges, engine view only for its own persona, and more) |
 | **Evidence** | Every one of the 10 rubric criteria has deliverables: [rubric/README.md](rubric/README.md). Printable handouts (leave-behind, judge cards, presenter cheat-sheet) in `submission/finals/` |
