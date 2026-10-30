@@ -1,0 +1,4 @@
+2026-10-29T16:00:00.000100+08:00 | ava.sponsor: Atlas status and pilot decision: move the provisional date from 6 November to 12 November 2026. The earlier date is superseded; the new date is conditional on QA and support readiness.
+2026-10-29T16:01:30.000100+08:00 | daniel.pm: ADR-003 updated. Alex Morgan takes product ownership tomorrow. Handover email and team roster are in Drive.
+2026-10-29T16:03:00.000100+08:00 | leo.ops: The pilot remains 10 merchants. I need a named daily exception owner before go/no-go.
+2026-10-29T16:04:30.000100+08:00 | lucas.qa: QA sign-off remains blocked until all 120 required cases pass.

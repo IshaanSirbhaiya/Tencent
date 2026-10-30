@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meet Amy Lim</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --line: #e6e7eb;
+    --ink: #1d1d1f;
+    --ink-2: #9a9ca3;
+    --muted: #6e7076;
+    --accent: #3b7a5b;
+    --accent-soft: #eaf3ee;
+    --blue: #4a63b8;
+    --blue-soft: #eef1fa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    cursor: default;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+    padding: 4.5vh 4.2vw;
+  }
+
+  header { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+  .brand svg { width: 38px; height: 38px; }
+  .kicker { font-size: 13px; letter-spacing: 0.18em; color: var(--muted); }
+
+  main { display: grid; place-items: center; }
+  .stage { width: min(1040px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; }
+
+  .who { display: inline-flex; align-items: center; gap: 14px; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue); font-weight: 600; font-size: 15px; }
+  .tag { font-size: 18px; color: var(--accent); font-weight: 500; }
+
+  h1 { margin-top: 26px; font-size: clamp(52px, 6.2vw, 96px); line-height: 1; letter-spacing: -0.05em; font-weight: 700; }
+  h1 span { display: block; color: var(--ink-2); }
+  .lede { margin-top: 26px; max-width: 44ch; font-size: clamp(19px, 1.6vw, 24px); line-height: 1.45; color: var(--muted); }
+
+  .hunt { margin-top: 40px; display: flex; flex-direction: column; align-items: center; }
+  .hunt-label { font-size: 15px; color: var(--ink-2); }
+  .chips { margin-top: 14px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 900px; }
+  .chips span { font-size: 15px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; text-decoration: line-through; text-decoration-color: rgba(110, 112, 118, 0.45); }
+  .hunt-then { margin-top: 16px; font-size: 19px; font-weight: 600; color: var(--blue); }
+
+  ul { list-style: none; margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%; text-align: left; }
+  li { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; box-shadow: 0 20px 40px -28px rgba(30, 35, 50, 0.18); }
+  li strong { display: block; font-size: 16px; font-weight: 600; }
+  li p { margin-top: 6px; font-size: 15px; line-height: 1.45; color: var(--muted); }
+
+  footer { text-align: center; font-size: 13px; color: var(--ink-2); }
+
+  @media (max-width: 860px) {
+    ul { grid-template-columns: 1fr; }
+    .kicker { display: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .stage > * { animation: rise 700ms cubic-bezier(.2,.7,.2,1) both; }
+    .stage > .hunt { animation-delay: 150ms; }
+    .stage > ul { animation-delay: 300ms; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M20 6c-3.2 0-5 2-5.4 4.2C11.6 10.6 9.5 13 9.8 16c-2.6 1.4-3.4 4.4-2.2 7-1.2 2.6-.3 5.6 2.4 6.8.6 3 3.4 4.6 6.2 4 1 .8 2.4 1.2 3.8 1.2"/>
+        <path d="M20 6c3.2 0 5 2 5.4 4.2 3 .4 5.1 2.8 4.8 5.8 2.6 1.4 3.4 4.4 2.2 7 1.2 2.6.3 5.6-2.4 6.8-.6 3-3.4 4.6-6.2 4-1 .8-2.4 1.2-3.8 1.2"/>
+        <path d="M20 6v29"/>
+        <path d="M14.6 10.2c.4 2 1.8 3.2 3.6 3.4M25.4 10.2c-.4 2-1.8 3.2-3.6 3.4M9.8 16c1.6.6 3.4.4 4.6-.8M30.2 16c-1.6.6-3.4.4-4.6-.8M10 29.8c1.4-1.4 3.6-1.8 5.4-.8M30 29.8c-1.4-1.4-3.6-1.8-5.4-.8"/>
+      </svg>
+      walnut
+    </div>
+    <div class="kicker">A COMPANY BRAIN, EXPLAINED</div>
+  </header>
+
+  <main>
+    <div class="stage">
+      <div class="who">
+        <div class="avatar" aria-hidden="true">AL</div>
+        <div class="tag">Amy Lim · Account manager</div>
+      </div>
+      <h1>Meet Amy.<span>A customer is on the line.</span></h1>
+      <p class="lede">“Velquarry Trading's account has been frozen. The director is angry and wants to know why. And I don't know.”</p>
+      <div class="hunt">
+        <p class="hunt-label">Instead of putting the customer on hold and searching</p>
+        <div class="chips">
+          <span>Slack messages</span><span>Emails</span><span>Jira tickets</span><span>Confluence pages</span><span>Shared drives</span><span>SharePoint</span><span>Databases</span><span>Asking compliance</span>
+        </div>
+        <p class="hunt-then">Amy asks Walnut once.</p>
+      </div>
+      <ul>
+        <li><strong>Needs to know</strong><p>Why the account is restricted, and what she is allowed to say</p></li>
+        <li><strong>Must not do</strong><p>Hint at an investigation. That is tipping-off, and it's a crime</p></li>
+        <li><strong>Can open</strong><p>Only what an account manager is allowed to see</p></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>Fictional people, company and case · synthetic Company A data</footer>
+<script>
+  // Click anywhere or press F to present full screen; Esc leaves.
+  function present() {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(function () {});
+    }
+  }
+  document.addEventListener('click', present);
+  document.addEventListener('keydown', function (e) { if (e.key === 'f' || e.key === 'F') present(); });
+</script>
+</body>
+</html>

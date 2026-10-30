@@ -1,0 +1,4 @@
+ATL-102: Onboarding API and application events
+Status: Done
+Assignee: elena.backend
+Elena Park implemented the Atlas application API and event publication. Integration completed on 23 October 2026; callback edge-case fixes are tracked separately in ATL-108.

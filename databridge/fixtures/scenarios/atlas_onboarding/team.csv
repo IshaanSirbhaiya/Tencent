@@ -1,0 +1,13 @@
+Name,Role,Completed,Next
+Alex Morgan,Product lead,Joined 30 Oct,Own scope
+Ava Brooks,Sponsor,Approved pilot,Go/no-go
+Daniel Wu,Outgoing PM,Handover pack,Handover
+Jordan Doe,Tech lead,API design,Integration
+Elena Park,Backend,Retry fixes,ATL-108
+Samira Khan,Frontend,Status screen,QA support
+Oliver Chen,Design,Tested flow,Copy review
+Mei Tan,Data,Event schema,Dashboard
+Lucas Reed,QA,120-case run,ATL-109
+Priya Raman,SRE,Staging setup,Alerts
+Leo Hartono,Operations,Pilot cohort,Support SOP
+Sara Lindqvist,Security,Access review,Final check

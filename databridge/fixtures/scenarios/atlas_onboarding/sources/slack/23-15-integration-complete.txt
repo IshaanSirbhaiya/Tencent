@@ -1,0 +1,3 @@
+2026-10-23T15:00:00.000100+08:00 | jdoe: Atlas frontend and API are integrated in staging. Jordan: API design; Elena: onboarding API; Samira: upload and status screens.
+2026-10-23T15:01:30.000100+08:00 | priya.sre: Staging alerts are connected. I will rehearse rollback tomorrow.
+2026-10-23T15:03:00.000100+08:00 | lucas.qa: Integration complete does not mean ready to pilot. I will run the full 120-case pack.

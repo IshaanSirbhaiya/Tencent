@@ -1,0 +1,4 @@
+ATL-107: Initial regression run
+Status: Done
+Assignee: lucas.qa
+Lucas Reed completed the Atlas 120-case regression run on 28 October 2026. Seven callback failures were opened; five were fixed and two remain on 30 October 2026. Completing this test-run task does not mean pilot sign-off.

@@ -1,0 +1,4 @@
+ATL-105: Funnel event schema
+Status: Done
+Assignee: mei.data
+Mei Tan delivered the Atlas event schema on 23 October 2026. Production baseline measurement is not yet available.

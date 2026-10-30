@@ -1,0 +1,4 @@
+ATL-109: Pilot QA sign-off
+Status: Blocked
+Assignee: lucas.qa
+Atlas QA sign-off is blocked by ATL-108. The 30 October 2026 run passed 118 of 120 required cases. Sign-off requires all 120 to pass, not just the two retested cases.

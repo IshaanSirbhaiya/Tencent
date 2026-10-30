@@ -50,8 +50,12 @@ from ..deliverables.verify import Check, words
 from ..models import (SCOPE_NOTE, DeliverableCreated, DeliverableFailed, DeliverableRequested,
                       DirectoryUser, ModelInfo)
 from ..timewin import strip as strip_window
+from ..onboarding import in_project, project_topic
 from . import a2ui, blocks, pagecheck, plan, prompts
 from .spec import MView
+
+import logging
+log = logging.getLogger("databridge_ib.views")
 
 LABEL = "Draft for your review"
 RATE_N, RATE_WINDOW_S = 10, 60.0
@@ -207,10 +211,11 @@ class ViewService:
         try:
             layout = plan.clean_instruction(instruction)
             cites = dict(ctx.cites)
-            if self.composer is not None:
+            onboarding = project_topic(ctx.question)
+            if self.composer is not None or onboarding:
                 cites = self._expand(user, cites, ctx.question)
             evidence = build_evidence(cites, question=ctx.question, facts=ctx.facts,
-                                      max_chars=PAGE_CONTEXT_CHARS if self.composer else 12_000)
+                                      max_chars=PAGE_CONTEXT_CHARS if self.composer or onboarding else 12_000)
             if not evidence:
                 self._fail(user, "lookup", "not_found", req_id=req_id, view_id=vid)
                 raise NotFound()
@@ -221,6 +226,12 @@ class ViewService:
         except (NotFound, Unavailable, RateLimited):
             raise
         except Exception as exc:                                    # noqa: BLE001
+            # the type and where it was raised, never the message (it may quote a source)
+            tb = exc.__traceback__
+            while tb is not None and tb.tb_next is not None:
+                tb = tb.tb_next
+            where = f"{tb.tb_frame.f_code.co_filename.rsplit('/', 1)[-1]}:{tb.tb_lineno}" if tb else "?"
+            log.error("view build failed: %s at %s", type(exc).__name__, where)
             try:
                 self._fail(user, "generate", "build_" + type(exc).__name__, req_id=req_id,
                            view_id=vid)
@@ -245,6 +256,9 @@ class ViewService:
         try:
             epoch = getattr(self.directory, "epoch", 0)
             readable = self.index.readable(user, epoch)
+            project = project_topic(question)
+            if project:
+                readable = frozenset(d for d in readable if in_project(self.index.doc(d), project))
             have = {s.doc_id for s in cites.values()}
             places = list(dict.fromkeys((s.platform, s.container) for s in cites.values()))
             near = [d for p, c in places for d in self.index.docs_in_container(p, c)
@@ -297,6 +311,9 @@ class ViewService:
         title_of = {t: str(getattr(s, "title", "") or "") for t, s in cites.items()}
         kinds, explicit = plan.plan(layout)
         terms = blocks._terms(ctx.question, layout)
+        onboarding = project_topic(ctx.question)
+        if onboarding:
+            terms = blocks._terms(onboarding, "merchant onboarding pilot scope conditional callback failures sign-off")
         check = Check()
         fallback = "no_model"
         if self.composer is not None:
@@ -341,7 +358,7 @@ class ViewService:
                 else:
                     fallback = "nothing_passed"
         out = self._rules(kinds, explicit, evidence, cites, title_of, ctx.question, terms)
-        return {"blocks": out, "title": None, "accent": "blue", "generated": "rules",
+        return {"blocks": out, "title": f"Project {onboarding} · Onboarding brief" if onboarding else None, "accent": "blue", "generated": "rules",
                 "model": ModelInfo(provider=RULES.provider, model=RULES.model,
                                    fallback_used=fallback not in ("none", "no_model")),
                 "fallback": fallback, "check": check if fallback == "nothing_passed" else Check(),

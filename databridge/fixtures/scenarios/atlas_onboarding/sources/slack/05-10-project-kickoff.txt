@@ -1,0 +1,4 @@
+2026-10-05T10:00:00.000100+08:00 | ava.sponsor: Atlas kickoff: make Singapore merchant onboarding easier to understand and operate. Our goal is 5 business days down to 1; that is a target.
+2026-10-05T10:01:30.000100+08:00 | daniel.pm: I will own the PRD and handover; Jordan owns technical integration. First pilot is 10 invited merchants.
+2026-10-05T10:03:00.000100+08:00 | jdoe: I will document the API and callback contract before implementation.
+2026-10-05T10:04:30.000100+08:00 | leo.ops: Please keep operations review in the pilot; we are not automating approval.

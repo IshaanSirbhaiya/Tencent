@@ -20,6 +20,20 @@ export interface Persona {
 // The presenter's questions (Amy's two, presenter.spec.ts) are unchanged.
 export const PERSONAS: Persona[] = [
   {
+    // Project Atlas onboarding (fixtures/scenarios/atlas_onboarding; signs in only on a stack
+    // started with that world, e.g. IB_WORLD=…/atlas_onboarding/world.json)
+    id: 'alex.product',
+    name: 'Alex Morgan',
+    fullName: 'Alex Morgan',
+    role: 'Product lead, Project Atlas',
+    note: 'Project Atlas spaces, tickets, channels and files',
+    suggestions: [
+      "Hi, I'm Alex Morgan, the new product lead for Project Atlas. Bring me up to speed with an onboarding brief: purpose, status, team table and contributions, decisions, blockers, timeline and first-week checklist. Use all connected sources, cite every claim and flag outdated or missing information.",
+      'What is the current pilot plan for Project Atlas?',
+      'Who owns the remaining callback fixes on Atlas, and when are they due?',
+    ],
+  },
+  {
     id: 'jdoe',
     name: 'Jordan Doe',
     fullName: 'Jordan Doe',
@@ -132,8 +146,9 @@ export const PERSONAS: Persona[] = [
 export const SAMPLE_QUESTION = "What's the status of the database migration project and were there any blockers raised in Slack last week?";
 
 export const AUDIT_SUGGESTIONS = [
-  'What did jdoe access in the payment-gateway space over the last 30 days?',
-  'Who retrieved the Q3 breach report?',
+  // the Velquarry audit story (docs/finals/workflows/WORKFLOWS.md, workflow 3)
+  'Who accessed the Velquarry STR decision record in the last 30 days?',
+  'Show me everything amy.am accessed in the last 7 days',
   'Show every denied retrieval last week.',
 ];
 

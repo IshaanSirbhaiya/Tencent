@@ -1,0 +1,4 @@
+ATL-111: Baseline funnel dashboard
+Status: To Do
+Assignee: mei.data
+Mei Tan will build the Atlas baseline funnel dashboard after the event schema lands. No measured reduction in onboarding time can yet be claimed.

@@ -1,0 +1,4 @@
+ATL-108: Atlas callback retry blocker and current status
+Status: In Progress
+Assignee: elena.backend
+Atlas has two remaining callback-state failures blocking QA sign-off. Five of the original seven failures are fixed. Elena Park owns the remaining fix, targeted for 2 November 2026. Lucas Reed will rerun all 120 cases on 3 November 2026. A duplicate callback can reset completed to pending; a delayed callback can overwrite the newest state. No production merchants are affected because the pilot has not started.

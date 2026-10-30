@@ -1,0 +1,6 @@
+Atlas QA run — 30 October 2026, 10:00 SGT
+Required cases: 120. Passed: 118. Failed: 2. Pilot QA sign-off: blocked.
+Failure A: duplicate callback returns a completed application to pending.
+Failure B: delayed callback overwrites a newer verified application state.
+Owner: Elena Park for fixes; Lucas Reed for rerun and sign-off.
+The two remaining cases are not evidence of lost funds; Atlas is a pre-pilot onboarding workflow.

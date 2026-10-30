@@ -1,0 +1,7 @@
+Imported email archive — synthetic, not a live email connector
+Subject: Atlas handover to Alex — owners and first-week priorities
+From: daniel.pm@companya.example
+To: alex.product, ava.sponsor
+Sent: 2026-10-30T15:00:00+08:00
+
+Alex, welcome to Atlas. Please read the product overview, ADR-003, team roster and ATL-108/109. Start with Jordan and Lucas for the blocker, Ava for pilot scope and Leo for support ownership. Our old 6 November date is superseded; the conditional date is 12 November. Confirm acceptance criteria on 2 November before the 3 November go/no-go. There is no approved budget figure in this handover. The roster includes every current project member and what each has contributed. Daniel.

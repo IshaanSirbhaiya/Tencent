@@ -1,0 +1,4 @@
+2026-10-30T14:00:00.000100+08:00 | leo.ops: Atlas support SOP draft is ready; the daily exception owner still needs Alex's confirmation.
+2026-10-30T14:01:30.000100+08:00 | alex.product: I will review it with you on 2 November before confirming pilot readiness.
+2026-10-30T14:03:00.000100+08:00 | sara.sec: My shareable access review is complete in ATL-112. We still need the final named pilot-user list.
+2026-10-30T14:04:30.000100+08:00 | ava.sponsor: Use the go/no-go to make the commitment. The 12 November date stays provisional until then.
