@@ -51,3 +51,15 @@ The clips must be a real recording of the real system on the real seed. Do not e
 ## Decision rule
 
 If a step has not shown its result 8 seconds after the key press, Dev presses `B`. Do not wait longer; dead air costs more than a labelled clip.
+
+## Recorded clips, status (30 Oct 2026)
+
+Interim clips recorded 30 Oct with Playwright (1920x1080, 30 fps, H.264, no audio) against the live production stack (web :3100, IB :8100), driven by the presenter keys (`P`, then `Space`). They are in `databridge/apps/internal_brain_web/public/clips/`, which is where `B` plays them from (names as in `components/presenter/script.ts`). The browser pane shows the presenter bar (it is the presenter path); the Stage theme and cursor highlight are not applied.
+
+| Clip | File | Duration | Size | Content |
+|---|---|---|---|---|
+| A | `clipA_compare_amy_rachel_ken.mp4` | 23.5 s | 3.2 MB | Steps 0 to 3: Amy vs Rachel, Ken's identical refusals, citation [2] highlighted |
+| B | `clipB_journey_audit_tamper.mp4` | 14.1 s | 3.3 MB | Steps 4 to 6: Maya's journey waterfall, Verify green, sandbox tamper with "Chain broken at entry 938" in view |
+| C | `clipC_workbuddy_jordan.mp4` | 25.4 s | 1.9 MB | **In-app stand-in.** WorkBuddy is an external app, so this is jdoe in User mode asking the headline question, with the cited answer and source [1] open. Replace with the real WorkBuddy clip once captured on the stage laptop |
+
+Re-record all three after the Monday freeze (the entry number and timings can change). `full_5min_run.mp4` and the stills are not yet recorded.
