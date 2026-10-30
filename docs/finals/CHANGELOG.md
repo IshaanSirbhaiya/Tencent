@@ -11,6 +11,33 @@ Current evaluation numbers (run 30 Oct 11:27 SGT, final world, `eval_summary.jso
 requests**, 0 of 400 differential pairs, 0 injection hard failures in 1,152, recall 100% on both paths. A commit row
 below quotes the numbers of the run made at that commit.
 
+## 30 Oct 2026, night: final product on `main` (branch `final_v1.5`)
+
+`final_v1.5` = `feat/atlas-workflow` + `feat/story1-fixes` + `feat/video-v3`, published as `main`, the competition branch. Project description added: [PROJECT_DESCRIPTION_FINAL.md](PROJECT_DESCRIPTION_FINAL.md).
+
+**Three workflows**
+
+| # | Workflow | Who | What it proves |
+|---|---|---|---|
+| 1 | **Atlas onboarding**: "Your first day leading Project Atlas" | A new project lead | A briefing on a named project is scoped to that project's own documents, through both permission gates (`fixtures/scenarios/atlas_onboarding/`, `databridge_ib/subject.py`; run with `IB_WORLD=atlas bash scripts/demo_up.sh start`) |
+| 2 | **The Call**: Amy vs Rachel | Amy (account manager) and Rachel ask the same question about Velquarry Trading | Each gets only what they may open; Amy gets the approved customer script and the constant refusal, never a hint that a case exists |
+| 3 | **Maya the regulator**: audit and tamper | Maya (compliance) | The request end to end (journey, Gate-2 verdicts), **Verify audit chain**, and the tamper demo on a copy: any edit, deletion or restore breaks the chain |
+
+**Adapters and agents**
+
+- **Source connectors** for Slack, Confluence, Jira and Google Drive (`databridge_ib/connectors/`): each re-checks the asker's access live, per document, before a passage is used.
+- **Adapter contract and policy** (`packages/adapter`), **AI adapter agents and the adapter builder** (`packages/adapter_agents`), **MCP ingest** (`packages/mcp_ingest`).
+- **Federated engine** (`packages/federated`): one read-only agent per source; results combined with exact decimal arithmetic.
+- **Orchestrator, agent definitions and agent runtime** (`orchestrator`, `agentdef`, `agent_runtime`): an agent runs only under compiled grants; every write is a proposal a named human approves.
+- **WorkBuddy MCP connectors** (`ib-as-jdoe`, `ib-as-ken`, `ib-compliance`): the same two gates, every call ledgered.
+
+**Model chain**: Tencent Hunyuan **Hy3** first, then **DeepSeek V4 Flash**, both on Tencent **TokenHub**, then the
+deterministic **extractive answer** (quoted from the sources, same checks). Hunyuan is **wired, not live**: TokenHub
+activation is pending, so today's answers come from the extractive path, and every answer says which path served it.
+
+**Evaluation**: **0 leaks in 7,374** adversarial requests; **0 of 400** differential pairs differ; **0 injection hard
+failures in 1,152**. Results: [`databridge/evals/internal_brain/RESULTS.md`](../../databridge/evals/internal_brain/RESULTS.md).
+
 ## In progress
 
 Not finished yet. Each row says what is committed (everything below is on `final_v1.3`, `1076517`); work not yet

@@ -4,7 +4,7 @@ Only from real notes. A cell not measured stays "not measured". Nothing is inven
 
 ## 1. What to send (Saturday evening, within 30 minutes of the last session)
 
-Send to Claude, in one private place:
+Send to the team, in one private place:
 1. A photo or scan of every filled [NOTES_FORM.md](NOTES_FORM.md). Use U1 to U5 only; no real names in file names.
 2. The screen recordings, only for testers who said yes.
 3. This message, filled in:

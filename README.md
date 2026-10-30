@@ -1,10 +1,44 @@
 # Walnut DataBridge
 
+> **🏆 Competition branch (`main`).** Tencent Cloud AI CAN DO IT Hackathon Singapore 2026, FinTech track (Aspire), **Finalist**.
+> **Walnut DataBridge: answers you can prove.**
+>
+> - Judge's guide: **[INTERNAL_BRAIN.md](INTERNAL_BRAIN.md)**
+> - Project description: **[docs/finals/PROJECT_DESCRIPTION_FINAL.md](docs/finals/PROJECT_DESCRIPTION_FINAL.md)**
+> - How to run it: **[Try it in 5 minutes](#1-try-it-in-5-minutes)** (one command: `bash databridge/scripts/demo_up.sh start`)
+> - What changed: [docs/finals/CHANGELOG.md](docs/finals/CHANGELOG.md) · the platform: [docs/PLATFORM.md](docs/PLATFORM.md)
+
+
 **Answers you can prove.**
 
 Walnut DataBridge gives staff at a regulated fintech one place to ask a question across Confluence,
 Jira, Slack and Google Drive. **Internal Brain**, the ask product inside it, answers only from what the
 asker may open, checks each source live, and writes every step to a tamper-evident audit log.
+
+### Final product at a glance (Demo Day, 3 Nov 2026)
+
+**Three workflows**
+
+| # | Workflow | Who | What it proves |
+|---|---|---|---|
+| 1 | **Atlas onboarding**: "Your first day leading Project Atlas" | A new project lead | A briefing on a named project is scoped to that project's own documents, through both permission gates (`fixtures/scenarios/atlas_onboarding/`, `databridge_ib/subject.py`; run with `IB_WORLD=atlas bash scripts/demo_up.sh start`) |
+| 2 | **The Call**: Amy vs Rachel | Amy (account manager) and Rachel ask the same question about Velquarry Trading | Each gets only what they may open; Amy gets the approved customer script and the constant refusal, never a hint that a case exists |
+| 3 | **Maya the regulator**: audit and tamper | Maya (compliance) | The request end to end (journey, Gate-2 verdicts), **Verify audit chain**, and the tamper demo on a copy: any edit, deletion or restore breaks the chain |
+
+**Adapters and agents**
+
+- **Source connectors** for Slack, Confluence, Jira and Google Drive (`databridge_ib/connectors/`): each re-checks the asker's access live, per document, before a passage is used.
+- **Adapter contract and policy** (`packages/adapter`), **AI adapter agents and the adapter builder** (`packages/adapter_agents`), **MCP ingest** (`packages/mcp_ingest`).
+- **Federated engine** (`packages/federated`): one read-only agent per source; results combined with exact decimal arithmetic.
+- **Orchestrator, agent definitions and agent runtime** (`orchestrator`, `agentdef`, `agent_runtime`): an agent runs only under compiled grants; every write is a proposal a named human approves.
+- **WorkBuddy MCP connectors** (`ib-as-jdoe`, `ib-as-ken`, `ib-compliance`): the same two gates, every call ledgered.
+
+**Model chain**: Tencent Hunyuan **Hy3** first, then **DeepSeek V4 Flash**, both on Tencent **TokenHub**, then the
+deterministic **extractive answer** (quoted from the sources, same checks). Hunyuan is **wired, not live**: TokenHub
+activation is pending, so today's answers come from the extractive path, and every answer says which path served it.
+
+**Evaluation**: **0 leaks in 7,374** adversarial requests; **0 of 400** differential pairs differ; **0 injection hard
+failures in 1,152**. Results: [`databridge/evals/internal_brain/RESULTS.md`](databridge/evals/internal_brain/RESULTS.md).
 
 ### The platform underneath
 
@@ -62,7 +96,7 @@ flowchart TB
 | **Tencent Cloud Lighthouse** | A hardened one-command deploy kit: Caddy HTTPS, passcode-gated demo, ports 80 and 443 only. No live instance (Lighthouse capacity was sold out); the demo runs locally | [`deploy/lighthouse/`](deploy/lighthouse/README.md) |
 
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech track (Aspire) · Team Walnut, finalist.
-This is the **finals build** (branch `final_v1.3`, the verified lock; `final_v1.4` adds the teammate's pages beside the chat and an optional stand-in model for the answers (off by default); it is not on the lock.) for Demo Day, 3 Nov 2026. The judge's guide is
+This is the **finals build** on `main` (the competition branch, from `final_v1.5`: `final_v1.4` plus the Atlas onboarding workflow, the Story 1 fixes and the finals video tooling; `final_v1.3` remains the earlier verified lock) for Demo Day, 3 Nov 2026. The judge's guide is
 [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). Every feature, who can use it, and the test behind it:
 [docs/finals/FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). What changed since the 16 Oct
 submission, commit by commit: [docs/finals/CHANGELOG.md](docs/finals/CHANGELOG.md).

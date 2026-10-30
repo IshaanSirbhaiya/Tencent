@@ -105,7 +105,7 @@ export function AdapterBuilder() {
         <p className="max-w-2xl text-xs text-subtle">
           An MCP is configured only from inside an adapter — there is no standalone connector
           route. Select a server and the config dialog opens over this builder, the way it does in
-          Claude Desktop or ChatGPT.
+          desktop AI assistants such as ChatGPT.
         </p>
         {selected ? (
           <button
