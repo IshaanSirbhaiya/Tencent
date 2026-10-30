@@ -8,13 +8,15 @@ asker may open, checks each source live, and writes every step to a tamper-evide
 
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech track (Aspire) · Team Walnut, finalist.
 This is the **finals build** (branch `final_v1.0`) for Demo Day, 3 Nov 2026. The judge's guide is
-[INTERNAL_BRAIN.md](INTERNAL_BRAIN.md).
+[INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). Every feature, who can use it, and the test behind it:
+[docs/finals/FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). What changed since the 16 Oct
+submission, commit by commit: [docs/finals/CHANGELOG.md](docs/finals/CHANGELOG.md).
 
 | Read this first | Fact |
 |---|---|
 | Data | Synthetic only: a made-up fintech, "Company A" (32 people; 209 Confluence pages, 251 Jira issues, 602 Slack threads, 81 Drive files) |
 | Platforms | Mock servers that use the real APIs' shapes, permission models and webhooks. Not run against a live tenant |
-| Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Live run pending** (TokenHub activation). Until then, answers are quoted from the sources, with the same checks, and every answer says so |
+| Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Live run pending** (TokenHub activation; `scripts/hy3_check.py` reports 401006 today). Until then, answers are quoted from the sources, with the same checks, and every answer says so |
 
 ## 1. Try it in 5 minutes
 
@@ -62,9 +64,13 @@ Sign in by picking a person. There is no password; the demo sign-in stands in fo
 `bash databridge/scripts/demo_up.sh status` shows the ports; `... stop` stops everything. Logs are in
 `databridge/var/ib-final/logs/`. Without `--fresh`, an existing demo history is kept.
 
-**Live Tencent AI.** Put `TOKENHUB_API_KEY=<key>` in `databridge/.env.ib.local` (git-ignored) and start
-with `IB_FORCE_OFFLINE=0`. The chain is Hy3, then DeepSeek V4 Flash, then the quoted answer. This has
-not yet run live (see the table above).
+**Live Tencent AI.** Put `TOKENHUB_API_KEY=<key>` in `databridge/.env.ib.local` (git-ignored). On start,
+`demo_up.sh` runs [`scripts/hy3_check.py`](databridge/scripts/hy3_check.py) `--quiet` and turns the model
+on by itself (`IB_FORCE_OFFLINE=0`) only if TokenHub answers; otherwise it keeps the quoted answer. Set
+`IB_FORCE_OFFLINE` yourself to override. Check by hand from `databridge/`:
+`.venv/Scripts/python scripts/hy3_check.py` (exit 0 live, 1 not live, 2 no key; the key is never
+printed). The chain is Hy3, then DeepSeek V4 Flash, then the quoted answer. This has not yet run live
+(see the table above).
 
 ### Fallback: start each part by hand
 
@@ -100,7 +106,7 @@ other people see a lock card that explains why.
 
 | Mode | Page | URL | Sign in as | What it shows |
 |---|---|---|---|---|
-| User | **Ask** | `/` | anyone | One composer. Live stage events while the request runs, then a cited answer with `[n]` chips. A source opens a sheet with the passage, version and "checked live" time. Refusals are one constant text |
+| User | **Ask** | `/` | anyone | One composer, with optional voice dictation (browser speech, English / 简体中文, never sends by itself). Live stage events while the request runs, then a cited answer with `[n]` chips. A source opens a sheet with the passage, version and "checked live" time. Refusals are one constant text |
 | User | **Compare** | `/compare` | anyone | Same question, two people (Amy vs Rachel on Velquarry); or one person, two questions (Ken: a real company vs a made-up one, marked "Identical responses") |
 | User | **History** | `/history` | anyone | Your own questions by day; a row opens your request receipt |
 | User | **Settings** | `/settings` | anyone | English / 简体中文, theme, text size, reduce motion, high contrast, replay tour |
@@ -108,12 +114,12 @@ other people see a lock card that explains why.
 | Developer | **Mission control** | `/dev` | anyone; numbers need `maya.compliance` | The pipeline with live p50 per stage, source freshness, ledger head, model status |
 | Developer | **Journey** | `/dev/journey` | `maya.compliance` (any request) or yourself (own receipt) | Compliance: millisecond waterfall, Gate-2 verdicts with reason codes, three sealed records. Everyone else: a receipt of their own request |
 | Developer | **Knowledge graph** | `/dev/graph` | anyone (try `jdoe`) | Everything you can open, as one WebGL graph (Jordan 867 items, Ken 24). Search, expand, a node panel with passage and lineage, a table view, and "Compare two people" as two separately signed-in graphs |
-| Developer | **Walnut engine** | `/dev/brain` | `jdoe` or `maya.compliance` | The evidence engine underneath: entity graph (932 entities, 2,246 links, 4,710 pointers), time slider, provenance to the row, ontology. Read-only |
+| Developer | **Walnut engine** | `/dev/brain` | `jdoe` only (the snapshot is his view; everyone else, compliance included, sees a lock card) | The evidence engine underneath: entity graph (932 entities, 2,246 links, 4,710 pointers), time slider, provenance to the row, ontology. Read-only |
 | Developer | **Analytics** | `/dev/analytics` | `maya.compliance` | Requests, answer rate, latency p50/p95, Gate-2 reasons, grounding drops, model fallback, from the verified ledger. Replay history is labelled; "Live only" removes it |
 | Developer | **Audit** | `/dev/audit` | `maya.compliance` | Plain-English audit search, reveal-with-reason, **Verify chain**, and the **sandbox tamper demo**: attacks run on a copy of the log, the real log is re-verified and shown unmodified |
 | Developer | **Simulator** | `/dev/sim` | `admin.it` | Change access at the source (revoke a channel, restrict a page, edit a runbook) and watch the next answer change |
 | Developer | **Trust centre** | `/dev/trust` | anyone | Seven controls, each with what it is, why it matters, the framework mapping and the test that proves it |
-| Presenter | **Presenter mode** | `/compare?present=1` | the script signs in for you | The 10-step Demo Day script on the keyboard (`Space` next, `B` recording, `R` reset, `L` 中文, `S` Stage theme), plus `/present` slides |
+| Presenter | **Presenter mode** | `/compare?present=1` | the script signs in for you | The 10-step Demo Day script on the keyboard (`Space` next, `B` recording, `R` reset, `L` 中文, `S` Stage theme), plus `/present` slides. `B` plays a recorded clip of the step from `public/clips/`, labelled "Recording · not live" |
 | Both | **Tours** | "Take the tour" in the header | anyone | User tour: 4 steps and a checklist (sign in, ask, open a source, Ken's identical refusals). Developer tour: 5 steps (pipeline, journey, graph, trust, analytics or the lock card) |
 
 The pre-finals Map (`/map`) is still in the User menu. The old `/audit` and `/sim` addresses redirect to
@@ -143,7 +149,7 @@ The whole finals folder (plan, decisions, research, reviews, contracts, QA, scre
 ## 4. Numbers
 
 Evaluation numbers come from [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), run on
-30 Oct 2026 03:27 SGT on the finals pipeline, and its summary
+30 Oct 2026 06:09 SGT (29 Oct 22:09 UTC) on the finals pipeline, and its summary
 [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) (`stale: false`).
 They use a capturing test model and the quoted-answer path, not live Hy3.
 
@@ -155,7 +161,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 87.8% (quoted) to 96.4% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
 | Backend tests (Internal Brain) | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
-| Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
+| Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added after that run and is not in the count |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits
@@ -166,6 +172,10 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 - **Demo history is replay.** About 300 questions were asked through the real pipeline by a script, with
   past dates, and are labelled `replay` in the ledger and the UI.
 - **Sign-in is a demo login** standing in for SSO.
+- **The backup clips are interim recordings** (30 Oct, no Stage theme), and clip C is an in-app stand-in
+  for the WorkBuddy step. They are re-recorded after the Monday freeze.
+- **Voice dictation uses the browser's own speech service** (Chrome, Edge). The button is hidden where
+  the browser has none.
 - **The audit log has a key-holder window**: records after the last off-host head publication can be
   rewritten by someone with the sealing key ([SECURITY.md](docs/tencent/SECURITY.md) §3). The tamper
   demo shows this row as "Not detectable: the stated window".
@@ -193,7 +203,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | `databridge/apps/mock_platforms/` | Mock Slack, Confluence, Jira and Drive, port 8200 |
 | `databridge/evals/internal_brain/` | The leak and injection evaluation |
 | `databridge/packages/`, `databridge/packs/` | The Walnut engine and its domain packs (used by import, not modified) |
-| [`docs/finals/`](docs/finals/README.md) | The finals plan, decisions, research, reviews, rubric evidence, contracts, QA and screenshots |
+| [`docs/finals/`](docs/finals/README.md) | The finals plan, decisions, feature catalogue, changelog, research, reviews, rubric evidence, contracts, QA and screenshots |
 | [`docs/tencent/`](docs/tencent/) | Architecture, security, responsible AI, and the MAS mapping |
 | `submission/` | The 16 Oct submission: screenshots, video and deck |
 | `deploy/lighthouse/` | The cloud deploy kit |
@@ -433,6 +443,8 @@ databridge/
 - [`INTERNAL_BRAIN.md`](INTERNAL_BRAIN.md): the judge's guide. The 10-minute walk-through, how to run
   it, how it works, and the evidence for every claim.
 - [`STATUS.md`](STATUS.md): the current state of the build.
+- [`docs/finals/FEATURE_CATALOGUE.md`](docs/finals/FEATURE_CATALOGUE.md): every feature and its test.
+- [`docs/finals/CHANGELOG.md`](docs/finals/CHANGELOG.md): every change since the submission.
 - [`docs/finals/README.md`](docs/finals/README.md): everything written for the finals.
 - [`docs/tencent/`](docs/tencent/): architecture, security, responsible AI and the MAS mapping.
 

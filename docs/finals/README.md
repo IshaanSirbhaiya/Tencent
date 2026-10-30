@@ -4,6 +4,11 @@ Everything written for the finals of the Tencent Cloud AI CAN DO IT Hackathon Si
 track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product inside it. Demo Day is
 3 Nov 2026. Branch `final_v1.0`. Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
 
+| Start here | What it is |
+|---|---|
+| [FEATURE_CATALOGUE.md](FEATURE_CATALOGUE.md) | Every user-visible feature and backend capability: who can use it, where, how, the rules it keeps, its tests and screenshots |
+| [CHANGELOG.md](CHANGELOG.md) | Every change since the 16 Oct submission, newest first, by area, with commit links; plus what is in progress |
+
 ## 1. Plan and decisions
 
 | File | What it is |
@@ -12,6 +17,11 @@ track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product insi
 | [DECISIONS.md](DECISIONS.md) | Decisions D-01 to D-23, each with its reason |
 | [MORNING_BRIEF.md](MORNING_BRIEF.md) | 30 Oct brief for the team: what only a person can do (Hy3 activation, hallway test), what was built overnight |
 | [ORGANISER_UPDATE.md](ORGANISER_UPDATE.md) | The update email to the organisers: project link, description, what shipped since submission |
+| [../../submission/finals/](../../submission/README.md) | Printable handouts: A4 leave-behind with QR, judge cards per criterion, presenter cheat-sheet (PDF, with their generator) |
+| [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md) | The prompt for the new finals cover in Miora (Tencent's AI design agent) |
+| [demo_day/](demo_day/LIVE_DEMO_RESEARCH.md) | *In progress, not committed.* Live-demo research for the one-click demo kit |
+| [live_growth/](live_growth/RESEARCH.md) | *In progress, not committed.* Research for "watch the brain grow" (live graph growth, add a document) |
+| [video/](video/VIDEO_SCRIPT_FINALS.md) | *In progress, not committed.* The finals video script and its recorder; raw clips in `submission/finals_video/` |
 
 ## 2. Research
 
@@ -59,6 +69,7 @@ and the live Hy3 run.
 
 | File | What it holds |
 |---|---|
+| [TEST_REPORT.md](TEST_REPORT.md) | The Playwright e2e suite on the finals UI: 124 passed, 0 failed, 38 environment-gated skips, three consecutive runs; per-spec table and what changed in the tests |
 | [QA_LIVE.md](QA_LIVE.md) | Every page × persona run against the live backend: 32 checks, 11 bugs fixed, 4 open issues (§4; two more fixed in 8582f4b) |
 | [../../databridge/evals/internal_brain/RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md) | The leak and injection evaluation, re-run 30 Oct on the finals pipeline |
 
@@ -74,3 +85,7 @@ and the live Hy3 run.
 | [screens/graph/](screens/graph/) | 12 | Knowledge graph: galaxy, focus panel, compare two people, mobile |
 | [screens/presenter/](screens/presenter/) | 22 | Presenter mode, every step in the Stage theme, slides |
 | [screens/tour/](screens/tour/) | 36 | Both tours, step by step, dark and light |
+| [screens/a11y/](screens/a11y/) | 22 | Accessibility fixes: reflow at 130% text and 200% zoom, 简体中文 skip link and Developer-mode note, 24 px citation chips, journey seals, settings, slow-session message |
+
+The presenter's backup clips (A, B, C) are videos, not screenshots: they live in
+`databridge/apps/internal_brain_web/public/clips/` ([BACKUP_PLAN.md](rubric/demo_story/BACKUP_PLAN.md#recorded-clips-status-30-oct-2026)).

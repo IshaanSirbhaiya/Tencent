@@ -98,6 +98,10 @@ Already correct and not touched: `user.spec.ts`, `tour.spec.ts`, `sim.spec.ts` (
 
 ## 4. App bugs for the coordinator
 
+**Status update:** items 1 and 2 are fixed in commit `810ddbb` (the tour offer moves to the top on phones;
+`AnswerPanel.tsx` and `SourcesPanel.tsx` are removed). Later, `voice.spec.ts` (2 tests, commit `1bc6b4c`) was added;
+it is not in the counts above.
+
 None of these block the suite. Items 3 to 5 come from `a11y-shell.spec.ts` (accessibility pass, unfinished) and are
 unverified.
 

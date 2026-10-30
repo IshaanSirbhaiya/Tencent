@@ -13,6 +13,8 @@ https://github.com/IshaanSirbhaiya/Tencent.
 | `05_video/` | `walnut_internal_brain_demo.mp4` (6:28: camera intro, then the narrated demo), `narration_cues.md`, `narration.srt`, `timeline.json`, `cards/` (still cards), `clips/` (one recording per scene, with `.marks.json`). | The video to upload. |
 | `06_cover/` | `cover_380x216.png` (the form's size) and `cover_1920x1080.png`; `cover_master_miora.png` is Miora's raw art, `miora_session1.png` / `miora_session2.png` show the Miora prompts and results; `youtube_thumbnail_miora.png` (and a 1280-wide copy) is the YouTube thumbnail, also made in Miora | The form's cover field; proof of Miora use |
 | `07_deck/` | `walnut_internal_brain_deck.pdf` and `.pptx` (23 slides, speaker notes in the PPTX), plus `html/` and `png/`. | The submission and Demo Day. |
+| `finals/` | Finals (30 Oct): `leave_behind_A4.pdf` (with a QR code to the repo), `judge_cards.pdf` (one card per rubric criterion), `presenter_cheatsheet.pdf`; `handouts_src/` holds the HTML and the generator, which reads the numbers from `eval_summary.json`, `STATUS.md` and `ROI_MODEL.md` | Print for Demo Day |
+| `finals_video/` | *In progress, not committed:* cards and raw clips for the new finals video ([script](../docs/finals/video/VIDEO_SCRIPT_FINALS.md)) | The new video, when finished |
 
 ## Regenerate
 
@@ -25,6 +27,7 @@ Run from the repo root.
 | Video clips (the stack must be running) | `node docs/tencent/video/record_scenes.cjs [scene ...]` |
 | Video | `python docs/tencent/video/assemble.py [--voice narration.m4a]` |
 | Narration cues and subtitles | `python docs/tencent/video/narration.py` |
+| Finals handouts | `node submission/finals/handouts_src/build_handouts.mjs` (needs the web app's `node_modules`) |
 | Deck | `python docs/tencent/deck/make_deck.py html`, then `node docs/tencent/deck/shoot_deck.cjs`, then `python docs/tencent/deck/make_deck.py pack` |
 
 The WorkBuddy screenshots are real window captures. They are not regenerated; see

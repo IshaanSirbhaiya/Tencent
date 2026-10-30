@@ -7,6 +7,10 @@ Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech Track · Aspire: 
 a context-aware enterprise knowledge system with RBAC, security logging and an audit trail."*
 **Walnut DataBridge** is the product; **Internal Brain** is the ask product inside it.
 
+Every feature, who can use it, where it is and the test that proves it:
+[FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since the 16 Oct submission:
+[CHANGELOG.md](docs/finals/CHANGELOG.md).
+
 ---
 
 ## Finals build
@@ -14,10 +18,12 @@ a context-aware enterprise knowledge system with RBAC, security logging and an a
 This is the build for Demo Day (3 Nov 2026), on branch `final_v1.0`. Since the 16 Oct submission, one
 web app now has two modes, switched at the top left:
 
-- **User mode** for staff: Ask, Compare, History, Settings and the Value calculator.
+- **User mode** for staff: Ask (with optional voice dictation), Compare, History, Settings and the
+  Value calculator.
 - **Developer mode** for engineers and compliance: Mission control, Request journey, Knowledge graph,
   Walnut engine, Analytics, Audit (with a sandbox tamper demo), Simulator and Trust centre.
-- **Presenter mode** runs the Demo Day script from the keyboard, and **tours** teach each mode.
+- **Presenter mode** runs the Demo Day script from the keyboard, with a recorded backup clip for each
+  live step (`B`), and **tours** teach each mode.
 
 The backend rules did not change: two permission gates before any model, identity only from the signed
 token, a write-ahead sealed log, and one response shape. The new developer views follow the same rules
@@ -64,7 +70,8 @@ knowledge graph and analytics.
 | 16 | 9:30 | Jordan | **Walnut engine**, then **Trust centre** | The engine underneath (932 entities, 2,246 links, 4,710 pointers; read-only). The Trust centre lists seven controls, each with the test that proves it |
 
 **Optional.** Presenter mode: open http://127.0.0.1:3100/compare?present=1, press `P`, then `Space` for
-each of the 10 steps ([PRESENTER_KEYS.md](docs/finals/rubric/demo_story/PRESENTER_KEYS.md)). The
+each of the 10 steps ([PRESENTER_KEYS.md](docs/finals/rubric/demo_story/PRESENTER_KEYS.md)); `B` plays
+the step's backup clip, always labelled "Recording · not live". The
 tours: **Take the tour** in the header (User mode 4 steps, Developer mode 5 steps). Simulator as
 `admin.it`: see [Aspire's five scenarios](#aspires-five-scenarios), and note that Reset now reconciles revocations (fixed in 8582f4b; see
 [Honest limits](#honest-limits)).
@@ -139,7 +146,7 @@ can't see; and compliance can reconstruct any access, with proof the record hasn
 
 | Mode | Screen | Who to sign in as | What it shows |
 |---|---|---|---|
-| User | **Ask** (`/`) | anyone (try `jdoe` or `amy.am`) | One cited answer from several platforms, live stage events while it runs, and a source sheet with each source's version and "checked live" time |
+| User | **Ask** (`/`) | anyone (try `jdoe` or `amy.am`) | One cited answer from several platforms, live stage events while it runs, and a source sheet with each source's version and "checked live" time. A microphone button dictates the question (browser speech; you still press Ask) |
 | User | **Compare** (`/compare`) | anyone | The same question asked by two people side by side, or one person asking two questions, each in its own signed session |
 | User | **History** (`/history`) | anyone | Your own questions by day; a row opens your receipt |
 | User | **Settings** (`/settings`) | anyone | English / 简体中文, theme, text size, reduce motion, high contrast, replay the tour |
@@ -148,7 +155,7 @@ can't see; and compliance can reconstruct any access, with proof the record hasn
 | Developer | **Mission control** (`/dev`) | anyone; organisation numbers need `maya.compliance` | The pipeline with live p50 per stage, source freshness, ledger head, model status |
 | Developer | **Journey** (`/dev/journey`) | `maya.compliance` for any request; anyone for their own | Compliance: the full waterfall with Gate-2 reasons. Everyone else: a receipt of their own request |
 | Developer | **Knowledge graph** (`/dev/graph`) | anyone | Your permitted documents, places, people and links as one graph; compare two separately signed-in people |
-| Developer | **Walnut engine** (`/dev/brain`) | `jdoe` or `maya.compliance` | The engine's entity graph of Company A as `jdoe` sees it, the time slider, provenance to the row, the ontology. Read-only |
+| Developer | **Walnut engine** (`/dev/brain`) | `jdoe` only | The engine's entity graph of Company A as `jdoe` sees it, the time slider, provenance to the row, the ontology. Read-only. The snapshot is not re-checked live and its reads are not logged, so everyone else, compliance included, sees a lock card |
 | Developer | **Analytics** (`/dev/analytics`) | `maya.compliance` | End-to-end numbers from the verified ledger; replay history labelled |
 | Developer | **Audit** (`/dev/audit`) | `maya.compliance` | Plain-English audit search, reveal-with-reason, **Verify audit chain**, and the sandbox tamper demo |
 | Developer | **Simulator** (`/dev/sim`) | `admin.it` | Change access live (remove someone from a channel, restrict a page, edit a runbook) and watch the next answer change |
@@ -243,8 +250,12 @@ bash; the commands are in [README.md → Fallback](README.md#fallback-start-each
   ```bash
   # Tencent TokenHub: Hy3, with deepseek-v4.1-flash as backup
   TOKENHUB_API_KEY=<your TokenHub key>
-  IB_FORCE_OFFLINE=0
   ```
+
+  With a TokenHub key, `demo_up.sh` checks TokenHub first (`scripts/hy3_check.py --quiet`) and turns
+  the model on by itself only if it answers; set `IB_FORCE_OFFLINE=0` or `1` to decide yourself. To
+  check by hand: `PY scripts/hy3_check.py` (exit 0 live, 1 not live, 2 no key; today it reports
+  401006, "not activated").
 
   ```bash
   # Any OpenAI-compatible endpoint: OpenAI, or a local Ollama / vLLM server
@@ -300,7 +311,7 @@ Diagrams: [the request path](docs/tencent/ARCHITECTURE.md) and
 ## Proof
 
 All evaluation numbers are from [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), re-run on
-30 Oct 2026 (03:27 SGT) on the finals pipeline. Test paths are
+30 Oct 2026 (06:09 SGT; 29 Oct 22:09 UTC) on the finals pipeline. Test paths are
 under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 
 | What | Result | Where |
@@ -314,8 +325,10 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Knowledge graph and document view identical with and without restricted documents; restricted and unknown documents give the same 404 | tests | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_doc_restricted_and_unknown_are_the_same_404` |
 | Employee receipt lists only cited sources still openable; journey and stats are compliance-only | tests | `test_graph_doc.py::test_trace_lists_only_cited_docs_still_openable`, `test_dev_views.py::test_journey_is_compliance_only_and_has_no_answer_text` |
 | Tamper demo runs on a copy; the live log's bytes are unchanged | tests | `test_tamper_demo_route.py` |
+| Live stage events never time the permission checks (Gate 1 and Gate 2 are sent only once the decision is sealed); a foreign `Host` header is refused before any route | tests | `test_final_review_fixes.py::test_gate1_and_gate2_are_held_until_the_checks_are_sealed`, `::test_a_foreign_host_header_is_refused_before_any_route` |
+| The engine snapshot is readable only by the persona it was built for | tests | `internal_brain_web/tests/e2e/engine-proxy.spec.ts`, `engine.spec.ts` |
 | Automated tests, Internal Brain | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13; 639 at submission) | `databridge/apps/internal_brain/tests/` |
-| Web end-to-end tests (Playwright, including axe accessibility checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Web end-to-end tests (Playwright, including axe accessibility checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)); `voice.spec.ts` (2 tests) came later and is not in the count | `databridge/apps/internal_brain_web/tests/e2e/` |
 | Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 4 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks
@@ -363,6 +376,11 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 - **Plain-English audit search (offline)** now resolves document titles from the local index (fixed in
   8582f4b). Hy3 is wired as the model fallback parser and has not run live.
 - **Sign-in is a demo login** standing in for SSO. A deployed build refuses to start without a passcode.
+- **The backup clips are interim.** Recorded 30 Oct without the Stage theme; clip C is an in-app
+  stand-in for the WorkBuddy step. They are re-recorded after the Monday freeze
+  ([BACKUP_PLAN.md](docs/finals/rubric/demo_story/BACKUP_PLAN.md)).
+- **Voice dictation uses the browser's own speech service** (Chrome, Edge); the button is hidden
+  elsewhere. The app stores no audio.
 - **The grounding check verifies values and names, not the relations between them.**
 - **The audit log has a key holder window.** It detects tampering by anyone who doesn't hold its sealing
   key; beyond the last off-host published head, a key holder could rewrite records (see
@@ -398,6 +416,8 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 
 | Doc | What it covers |
 |---|---|
+| [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md) | Every feature and backend capability: who, where, how, guarantees, tests, screenshots |
+| [CHANGELOG.md](docs/finals/CHANGELOG.md) | Every change since the 16 Oct submission, by area, with commit links, and what is in progress |
 | [docs/finals/README.md](docs/finals/README.md) | Everything written for the finals: plan, decisions, research, reviews, rubric evidence, contracts, QA, screenshots |
 | [Rubric evidence](docs/finals/rubric/README.md) | Each of the 10 judging criteria: what is seen live, what to open, what to read |
 | [Pitch deck](submission/07_deck/walnut_internal_brain_deck.pdf) | 23 slides: the problem, the idea, how it works, proof, the fintech layer, the rollout path |
