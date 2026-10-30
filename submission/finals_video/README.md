@@ -89,7 +89,7 @@ with the project link and description.
 
 ## Scenes (test assembly, 30 Oct)
 
-> Plan (founder, 30 Oct): the video may be longer than the first. Three cuts from the same takes: short about 6:00, main about 7:55, full about 9:15, with new scenes 17 to 20 (Act, Deliverables, Uploads, Miora) and slots for the teammates' voice, just-in-time UI and dots. See "The new timeline" in `docs/finals/video/VIDEO_PLAN.md`. The table below is what is assembled today.
+> Plan (founder, 30 Oct): the video may be longer than the first. Three cuts from the same takes (`assemble_finals.py --cut short|main|full`, main by default): short about 6:04, main about 7:56 (under the 8:00 of the 5 to 8 minute range), full about 9:39, with new scenes 17 to 21 and slots for the teammates' voice, just-in-time UI and dots. Shot list and timeline: `docs/finals/video/VIDEO_PLAN.md`. Cue sheets per cut: `narration_cues.md` (main), `narration_cues_short.md`, `narration_cues_full.md` (planned timings until the picture is assembled). The table below is what was assembled in the old test run.
 
 | Time | Scene |
 |---|---|

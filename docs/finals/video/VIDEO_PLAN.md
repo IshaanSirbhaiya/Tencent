@@ -1,5 +1,39 @@
 # Finals video plan: the first video, side by side with the new one
 
+## Shot list (a two-minute read)
+
+**The video in one line:** the same pattern as the 16 Oct video (Ishaan's camera intro, then a narrated demo of the
+real app, then proof, business case and close), but starting with Aspire's own question, giving the most time to
+the core story, and showing every new feature briefly. Main cut 7:56 (under the 8:00 limit of the 5 to 8
+minute range), short cut 6:04, full cut 9:39. The first video was 6:28.
+
+1. **Camera intro (0:32).** Ishaan, the same file as before. Stay quiet.
+2. **Title (6 s).** "Walnut DataBridge. Answers you can prove."
+3. **The core story (3:00 in the main cut).**
+   - 02 Amy and Rachel ask the same question and get different, cited answers (45 s).
+   - 03 Ken asks about a real and a made-up customer and gets the identical refusal (25 s).
+   - 04 Every sentence opens to its exact passage, checked live; the user screens also speak Chinese (30 s).
+   - 05 Developer mode: Rachel's request as a waterfall, three sealed records, every document and verdict (35 s).
+   - 08 The audit log in plain English, Verify, and the tamper demo that catches an edit (45 s).
+4. **Everything new, each brief (about 2:30 in the main cut).**
+   Act: draft and ticket with confirm (18 s) · Deliverables: table, chart, .pptx (18 s) · live growth: Jordan posts, Ken
+   sees nothing (22 s) · add a file (10 s) · tour, dictation, value calculator, presenter (18 s) · knowledge graph
+   (20 s) · Walnut engine (20 s) · analytics (12 s) · Trust centre (14 s).
+5. **The Tencent tools (about 46 s).** CodeBuddy, nine sessions (12 s) · WorkBuddy (14 s) · Miora cover (8 s) · Hy3,
+   wired but not live, said plainly (12 s).
+6. **Teammates' features (placeholders, 22 s in the main cut).** Voice, just-in-time UI, dots: added after the merge;
+   left out until their clips exist.
+7. **Proof, business, close (48 s).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,131 backend and 166
+   browser tests, none failing · about US$1.3M a year, an estimate, break-even about 7 minutes a week · "Answers you
+   can prove", one pilot team, thanks.
+
+**The short cut (6:04)** drops live growth, add a file, the tour/dictation/value/presenter beat, Miora and the
+slots, and uses only the base spoken lines. **The full cut (9:39)** gives every scene its longest slot and adds the
+**[FULL]** lines.
+
+**Recording order:** `record_finals.cjs cards`, then 02, 03, 04, 05, 06, 07, 08, 09, 10, 13, then the scenes that write
+to the stack (06b, 17, 18, 19), then 21, then the teammates' slots. Details in the checklist below.
+
 ## Pre-record checklist (tonight, after 18:30 SGT)
 
 Tick top to bottom. Nothing here is automatic: the recorder is headless (it never opens a window or plays a
@@ -28,17 +62,19 @@ sound), but it uses the same stack the team is using, so it needs the founder's 
 - [ ] **Voice-over room:** quiet, headphones on, mic tested (README in `submission/finals_video/`, section 2).
 
 **Which scenes, in which order.** Order matters: scene 02 creates Rachel's request that scene 05 clicks, and
-03 to 05 give scenes 07 and 08 something to show.
+02 to 05 give scenes 07 and 08 something to show. Scenes that write to the stack come last.
 
-1. Cards first: `node docs/finals/video/record_finals.cjs cards` (the CodeBuddy card must say "Nine
-   CodeBuddy sessions"; the proof, business and close slides are the app's own pages).
-2. Scenes: `FINALS_HY3=0 node docs/finals/video/record_finals.cjs 02_compare_amy_rachel 03_ken_identical
-   04_source_live 05_journey 06_graph 07_analytics 08_audit 09_trust 10_engine 13_hy3_status`
-3. Last: `06b_brain_grow` (it posts a real note into the mock Slack of the stack; reset afterwards with the
-   step above). Then Act, Deliverables and Uploads (scenes 17 to 19, once their `SCENES` entries exist; they also
-   change the stack's data) and any teammate slot.
-4. `databridge\.venv\Scripts\python docs/finals/video/assemble_finals.py`, then play the SILENT file once
-   end to end. Then Ishaan's voice-over, then `--voice`.
+1. Cards first: `node docs/finals/video/record_finals.cjs cards` (title, the CodeBuddy card that must say "Nine
+   CodeBuddy sessions", the Miora card, and the app's proof, business and close slides).
+2. Core and read-only scenes: `FINALS_HY3=0 node docs/finals/video/record_finals.cjs 02_compare_amy_rachel
+   03_ken_identical 04_source_live 05_journey 06_graph 07_analytics 08_audit 09_trust 10_engine 13_hy3_status`
+3. Scenes that write to the stack (mock Jira ticket, mock Slack note, mock Drive file): `node
+   docs/finals/video/record_finals.cjs 17_act 18_deliverables 06b_brain_grow 19_upload`, then `21_extras`. Reset
+   afterwards (step 1 of this checklist) and tell the founder.
+4. The teammates' slots, once merged: add their `SCENES` entries (`S1_voice`, `S2_jit_ui`, `S3_dots`), then record them.
+5. Assemble: `databridge\.venv\Scripts\python docs/finals/video/assemble_finals.py` (main), then `--cut short` and
+   `--cut full`; play each SILENT file once end to end. Then Ishaan's voice-over from the matching
+   `narration_cues*.md`, then `--voice` with the same `--cut`.
 
 **Expected length.** Today's test assembly is 6:08 (intro 0:32 + demo 5:36) against **6:28** for the first video.
 The founder's direction (30 Oct) is that the new video may be **longer** than the first, because there is more to
@@ -64,69 +100,78 @@ normalisation). The pacing rules are the same table ("Pacing" in
 | Tagline | none | "Answers you can prove." |
 | Scripts | `docs/tencent/video/record_scenes.cjs`, `assemble.py`, `narration.py` | `docs/finals/video/record_finals.cjs`, `assemble_finals.py` (cue sheet built in) |
 
-## The new timeline: core story first, then the new value
+## The new timeline: core story first, then everything new
 
-Founder's direction (30 Oct): show everything, give the most time and emphasis to what matters most, keep each
-secondary feature short (10 to 25 s), same pattern as the first video (camera intro, then a narrated screen
-demo; same toolchain). Three cuts are built from the **same takes**: a scene is either in a cut or not, and a
-clip is stretched or trimmed to its slot (never sped up more than 1.2x, see the Pacing table in the script).
+<!-- generated from SEGMENTS in assemble_finals.py by the build of 30 Oct; if you change a length there, change it here -->
+
+Founder's direction (30 Oct): the video may be longer than the first, because there is more to show. Show
+everything, give the most time and emphasis to what matters most, keep each secondary feature short (10 to 25 s),
+same pattern as the first video (camera intro, then a narrated screen demo; same toolchain). Three cuts are built
+from the **same takes** with `assemble_finals.py --cut short|main|full` (main is the default); a scene is in a cut
+or not, and a clip is stretched or trimmed to its slot (never sped up more than 1.2x).
 
 **Length limit.** No video length limit for the finals was found in the repo (`docs/finals/*`,
 `ORGANISER_UPDATE.md`, `PLAN.md`, the finalist notes; D-01 only says the old video stays unless the new UI is
 ready). The only stated range is **5 to 8 minutes**, for the 16 Oct submission form
-(`docs/tencent/SUBMISSION.md:253`). So the **main cut is built to stay at or under 8:00**; the full cut is for
-YouTube or anyone who asks for the whole tour. Confirm with the organisers whether a limit applies.
+(`docs/tencent/SUBMISSION.md:253`). So the **main cut stays under 8:00 even with every teammate slot filled**
+(7:56); the full cut (9:39) is for YouTube or anyone who asks for the whole tour. Confirm with the
+organisers whether a limit applies.
 
-Seconds on screen: S = short cut (about 6:00), M = main cut (about 7:55), F = full cut (about 9:15); a dash
-means the scene is left out of that cut. Crossfades (0.35 s each) are already allowed for in the totals.
+Seconds on screen: S = short cut (6:04), M = main cut (7:56 with the three teammate slots,
+7:35 without them), F = full cut (9:39, 8:45 without the slots). A dash means the
+scene is left out of that cut. Crossfades (0.35 s each) are allowed for in the totals.
 
-| # | Scene | What it proves | S | M | F | Status |
-|---|---|---|---|---|---|---|
-| 00 | Camera intro (reused) | | 32 | 32 | 32 | recorded |
-| 01 | Title card | | 6 | 6 | 6 | card |
-| | **CORE: the most screen time** | | **158** | **180** | **203** | |
-| 02 | Same question, different people: Amy vs Rachel | different people, different answers | 40 | 45 | 50 | recorded (test take) |
-| 03 | Ken: a restricted file looks exactly like nothing | restricted equals non-existent | 23 | 25 | 28 | recorded |
-| 04 | Every value cited: the source sheet, checked live; then EN / 简体中文 | no value without a pointer | 25 | 30 | 35 | recorded |
-| 05 | Developer mode: the request journey | how it was decided | 30 | 35 | 40 | recorded |
-| 08 | The sealed audit log, Verify, the tamper demo | it cannot be edited unseen | 40 | 45 | 50 | recorded |
-| | **NEW VALUE: short and sharp (10 to 25 s each)** | | | | | |
-| 17 | Act: a cited draft reply and a ticket, with confirm | the AI does work, safely | 15 | 18 | 22 | **to record** (test ids `act-draft`, `act-ticket`, `act-sources` exist) |
-| 18 | Deliverables: a cited table, a chart, a .pptx | answers become files | 12 | 18 | 22 | **to record** |
-| 06b | Live growth: Jordan posts a Slack note, it appears; Ken's graph stays empty | the brain keeps up, permissions hold | - | 22 | 28 | **to record**; the Ken half is new |
-| 19 | Uploads: a file added, checked, searchable | | - | 10 | 15 | **to record** |
-| 06 | The knowledge graph (Jordan; Compare two people) | | 20 | 20 | 24 | recorded |
-| 10 | The Walnut engine: time slider, provenance | the evidence engine underneath | 20 | 22 | 25 | recorded |
-| 07 | Analytics (Live only) | | 12 | 12 | 15 | recorded |
-| 09 | Trust centre | seven controls, each proved by a test | 14 | 14 | 14 | recorded |
-| | **TENCENT TOOLS** | | | | | |
-| 11 | Built with CodeBuddy (nine sessions) | | 10 | 12 | 13 | card (re-run) |
-| 12 | Ask from WorkBuddy | | 12 | 14 | 17 | stills (15 Oct) |
-| 20 | Miora: the cover art and its brief | | - | 8 | 10 | **to make**: a card from `submission/06_cover/` and the Miora sessions |
-| 13 | Tencent Hy3 (wired, not live) | honest status | 10 | 12 | 14 | recorded |
-| | **TEAMMATE SLOTS** (merge before recording; left out if not landed) | | | | | |
-| S1 | Voice | | - | 12 | 20 | **slot** |
-| S2 | Just-in-time UI | | - | 12 | 20 | **slot** |
-| S3 | "Dots" | | - | 10 | 15 | **slot** |
-| 14 | The proof (7,374 / 400 / 1,152; 1,131 + 166 tests) | | 18 | 18 | 18 | slide |
-| 15 | What it's worth | | 19 | 19 | 19 | slide |
-| 16 | Close | | 11 | 11 | 11 | slide |
-| | **Total, with crossfades** | | **about 6:03** | **about 7:55** | **about 9:15** | |
+| # | Scene | S | M | F | Status |
+|---|---|---|---|---|---|
+| 00 | Camera intro: Ishaan to camera (reused) | 31 | 31 | 31 | recorded |
+| 01 | Title card | 6 | 6 | 6 | card |
+| | **CORE STORY: the most screen time** | | | | |
+| 02 | Amy vs Rachel: the same question, two answers | 40 | 45 | 50 | recorder ready; re-record |
+| 03 | Ken: a restricted file looks exactly like nothing | 23 | 25 | 28 | recorder ready; re-record |
+| 04 | Every sentence cited, checked live; then 简体中文 | 25 | 30 | 35 | recorder ready; re-record |
+| 05 | Developer mode: the request journey | 30 | 35 | 40 | recorder ready; re-record |
+| 08 | The sealed audit log, Verify, the tamper demo | 40 | 45 | 50 | recorder ready; re-record |
+| | **EVERYTHING NEW SINCE 16 OCT: short and sharp** | | | | |
+| 17 | Act: a cited draft and a ticket, with confirm | 15 | 18 | 22 | **new recorder scene** |
+| 18 | Deliverables: a cited table, a chart, a .pptx | 12 | 18 | 22 | **new recorder scene** |
+| 06b | Live growth: Jordan posts, Ken sees nothing | - | 22 | 28 | recorder rewritten |
+| 19 | Add a file (upload) | - | 10 | 15 | **new recorder scene** |
+| 21 | Tour, dictation, value calculator, presenter | - | 18 | 25 | **new recorder scene** |
+| 06 | The knowledge graph (Jordan; Compare two people) | 20 | 20 | 24 | recorder ready; re-record |
+| 10 | The Walnut engine: time slider, provenance | 20 | 20 | 25 | recorder ready; re-record |
+| 07 | Analytics (Live only) | 12 | 12 | 15 | recorder ready; re-record |
+| 09 | Trust centre | 14 | 14 | 14 | recorder ready; re-record |
+| | **THE TENCENT TOOLS** | | | | |
+| 11 | Built with CodeBuddy (nine sessions) | 10 | 12 | 14 | card; re-run cards |
+| 12 | Ask from WorkBuddy (15 Oct captures) | 12 | 14 | 17 | stills |
+| 20 | Miora: the cover art | - | 8 | 10 | **new card**; re-run cards |
+| 13 | Tencent Hy3 (wired, not live) | 12 | 12 | 14 | recorder ready; re-record |
+| | **TEAMMATES' FEATURES: placeholders until the merge** | | | | |
+| S1 | Voice (teammate) | - | 8 | 20 | slot, TODO |
+| S2 | Just-in-time UI (teammate) | - | 8 | 20 | slot, TODO |
+| S3 | Dots (teammate) | - | 6 | 15 | slot, TODO |
+| | **PROOF, BUSINESS, CLOSE** | | | | |
+| 14 | The proof slide | 18 | 18 | 18 | slide |
+| 15 | What it's worth | 19 | 19 | 19 | slide |
+| 16 | Close | 11 | 11 | 11 | slide |
+| | **Total, with crossfades** | **6:04** | **7:56** | **9:39** | |
 
-Where the time goes: the core story (02 to 05 and 08) is 2:38 in the short cut, 3:00 in the main cut and 3:23 in
-the full cut, which is the largest block in every cut. No new-value scene is over 28 s. EN and 简体中文 is a beat
-inside scene 04 (user screens only, D-32), not a scene of its own.
+Where the time goes: the core story (02, 03, 04, 05, 08) is 2:38 in the short cut, 3:00 in the main cut and 3:23 in
+the full cut, the largest block in every cut. No new-value scene is over 28 s. EN and 简体中文 is a beat inside
+scene 04 (user screens only, D-32).
 
-Order: core first (02, 03, 04, 05, 08), then the new value, the Tencent tools, and the proof, business and close
-slides. In the current assembler the audit scene (08) still sits after the graph and analytics. Moving it up,
-adding scenes 17 to 20 and the three slots, and a `--cut short|main|full` choice are **not built yet**: each is a
-`SEGMENTS` change in `assemble_finals.py` (each row gets its three lengths), a `SCENES` entry in the recorder,
-and a `### NN` section with `>` lines in `VIDEO_SCRIPT_FINALS.md`. The longer core scenes need extra spoken lines
-(about 5 to 12 s each), to be written with the first re-shoot.
+**What is built (30 Oct).** The recorder has scenes 17, 18, 19, 21 and a rewritten 06b, and a Miora card (20);
+the assembler has `--cut`, the new order (audit before the graph), optional rows for every new scene and the three
+teammate slots (`S1_voice.webm`, `S2_jit_ui.webm`, `S3_dots.webm`: skipped, with a printed line, until the clip
+exists); the script has all the lines, with **[MAIN]** and **[FULL]** extras for the longer cuts. Nothing has been
+recorded. Cue sheets for each cut, from the planned lengths:
+`python docs/finals/video/assemble_finals.py --cues-only --plan --cut short|main|full` (main writes
+`narration_cues.md`, the others `narration_cues_short.md` / `_full.md`).
 
-**Teammate slots.** Each slot is a `SEGMENTS` row marked optional plus a `SCENES` entry; until its clip exists the
-assembler leaves it out (the main cut is then about 7:20). Get the feature name, route and exact on-screen strings
-from the teammate before writing the scene's lines, and do not say anything a test does not prove (repo rule 8).
+**Teammate slots.** Each slot needs: the feature name, the page, the person, the exact on-screen strings, and the
+test behind every claim (repo rule 8). Then three edits: a `SCENES` entry in `record_finals.cjs` named like the
+clip file (`S1_voice`, `S2_jit_ui`, `S3_dots`), the `### S1 ·` section in `VIDEO_SCRIPT_FINALS.md` (replace the
+TODO lines), and nothing in the assembler (the rows are already there).
 
 ## Scene by scene (first video vs the 30 Oct test assembly)
 

@@ -3,7 +3,7 @@
 //
 //   node docs/finals/video/record_finals.cjs                 all scenes, then the cards
 //   node docs/finals/video/record_finals.cjs 08_audit        one scene (any order)
-//   node docs/finals/video/record_finals.cjs cards           only the still cards and slides
+//   node docs/finals/video/record_finals.cjs cards           only the still cards and slides (title, CodeBuddy, Miora + the app's slides)
 //   node docs/finals/video/record_finals.cjs --self-test     check the take handling (no browser, no stack)
 //
 // Every take is kept in its own folder, submission/finals_video/clips/takes/<scene>/<take>/: the video
@@ -253,6 +253,13 @@ async function waitCompare(page) {
   }, null, { timeout: 120000 }));
 }
 const col = (page, i) => page.locator('[data-compare-col]').nth(i);
+/** Wait for the first of several test ids to appear; returns which one (null if none is found after the wait). */
+async function oneOf(page, ids, timeout) {
+  const sel = ids.map((i) => `[data-testid="${i}"]`).join(', ');
+  await slow(page, page.locator(sel).first().waitFor({ timeout }));
+  for (const i of ids) if (await page.getByTestId(i).count()) return i;
+  return null;
+}
 
 // Each scene is sized to its narration (VIDEO_SCRIPT_FINALS.md); the target length is in the comment.
 // `mode` is the app mode the scene starts in ('user' or 'dev'); `who` the persona signed in first.
@@ -393,30 +400,35 @@ const SCENES = {
     await hover(page, page.getByText(/Ken can open \d+/).first(), 2.2);
     await hover(page, page.getByText('SECOND PERSON', { exact: false }).first(), 2.5, { dx: 0.3 });
   } },
-  // OPTIONAL, being built (30 Oct): Jordan posts a Slack note from /dev/graph?add=1, it appears in his
-  // graph, and he asks about it and gets it back with a citation. The feature has landed (needs demo features
-  // on, D-24; it WRITES a real note into the mock Slack of the stack); if the "add" form is not there the scene fails cleanly, is saved as
-  // 06b_brain_grow.FAILED.webm, and assemble_finals.py leaves the optional segment out.
+  // OPTIONAL (30 Oct): live growth. Compare view (Jordan left, Ken right): Jordan posts a Slack note from
+  // the left Add sheet, it shows in HIS live feed, and Ken's feed (right) stays empty. The recorder refuses
+  // the take if Ken's feed gets an item, so the line "Ken's graph shows nothing new" is never filmed false.
+  // Needs demo features on (D-24). It WRITES a real note into the mock Slack of the stack: record it late.
+  // Only data-testid selectors from components/graph + components/sim/AddDocumentSheet (testId graph-left-addsheet).
   '06b_brain_grow': { who: 'jdoe', mode: 'dev', async run(page) {                       // ~28 s
     const NOTE = 'Heads-up: the ledger cutover dry run moves to Thursday 9am, owner Priya.';
-    await goto(page, `${WEB}/dev/graph?add=1`, 0);
-    await slow(page, page.getByTestId('graph-legend').waitFor({ timeout: 90000 }));
-    await pause(page, 1.0);
-    // the Add sheet (components/sim/AddDocumentSheet.tsx, testId graph-main-addsheet): note textarea + 'Post to Slack'
-    const box = page.getByTestId('graph-main-addsheet-text');
-    if (!(await box.waitFor({ timeout: 10000 }).then(() => true, () => false))) throw new Error('the "add a Slack note" form is not in this build yet');
-    mark(page, 'Jordan posts a Slack note: watch the brain grow', 4);
+    await goto(page, `${WEB}/dev/graph?compare=ken.ext`, 0);
+    await slow(page, page.getByTestId('graph-left-live').waitFor({ timeout: 120000 }));
+    await slow(page, page.getByTestId('graph-right-live').waitFor({ timeout: 120000 }));
+    await pause(page, 2.0);
+    mark(page, 'Jordan (left) and Ken (right): Jordan posts a Slack note', 4);
+    await click(page, page.getByTestId('graph-left-add'), 0.6);
+    const box = page.getByTestId('graph-left-addsheet-text');
+    if (!(await box.waitFor({ timeout: 10000 }).then(() => true, () => false))) throw new Error('the "add a Slack note" form is not in this build (demo features off?)');
     await click(page, box, 0.2);
     await type(page, NOTE);
     await pause(page, 0.4);
-    await click(page, page.getByTestId('graph-main-addsheet-post'), 0);
-    await slow(page, page.getByText(/Posted to Slack/).first().waitFor({ timeout: 20000 }).catch(() => {}));
+    await click(page, page.getByTestId('graph-left-addsheet-post'), 0);
+    await slow(page, page.getByTestId('graph-left-addsheet-status').waitFor({ timeout: 20000 }));
     await pause(page, 1.2);
-    await page.keyboard.press('Escape'); await pause(page, 0.6);          // close the sheet before the mode switch
-    await slow(page, page.waitForFunction(() => /cutover dry run/i.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {}));
-    await pause(page, 1.2);
-    mark(page, 'The new message is in his graph, checked with Slack', 4);
-    await hover(page, page.getByText(/cutover dry run/i).first(), 2.5);
+    await page.keyboard.press('Escape'); await pause(page, 0.6);          // close the sheet
+    await slow(page, page.getByTestId('graph-left-live-item').first().waitFor({ timeout: 40000 }));
+    mark(page, "It appears in Jordan's graph, checked with Slack", 4);
+    await hover(page, page.getByTestId('graph-left-live-item').first(), 2.5);
+    await pause(page, 3.5);                                                // give Ken's side its poll interval
+    if (await page.getByTestId('graph-right-live-item').count()) throw new Error("Ken's live feed received an item: the line \"Ken sees nothing\" would be false; not recording");
+    mark(page, "Ken's side: nothing new, he cannot open that channel", 4);
+    await hover(page, page.getByTestId('graph-right-live'), 2.5);
     await click(page, page.getByTestId('mode-switch').getByText('User'), 0);
     await slow(page, page.waitForURL((u) => !u.pathname.startsWith('/dev'), { timeout: 20000 }).catch(() => {}));
     await pause(page, 0.8);
@@ -515,6 +527,127 @@ const SCENES = {
     mark(page, 'One value traced to the exact row in the exact file', 4);
     await read(page, page.getByTestId('engine-chain'), 4.5);
   } },
+  // ---- scenes 17 to 19 (30 Oct): Act, Deliverables, Uploads. data-testid selectors ONLY, never visible text:
+  // the copy of ActSheet / DeliverSheet / AddDocumentSheet is still being edited. A state the scene cannot
+  // film (feature off, no data, an error) throws, so the take is kept as FAILED and nothing false is shown.
+  // They WRITE to the stack (a mock Jira ticket, an uploaded file): record them last, and reset after.
+  '17_act': { who: 'jdoe', mode: 'user', async run(page) {                                  // ~22 s
+    await goto(page, WEB, 0.8);
+    const starter = page.getByTestId('starter').first();            // Jordan's first starter: the migration status
+    mark(page, 'Jordan · backend engineer: from an answer to an action', 3.5);
+    await hover(page, starter, 0.5);
+    await click(page, starter, 0);
+    await waitAnswer(page);
+    await pause(page, 0.5);
+    await read(page, page.getByTestId('answer-text'), 2.5);
+    await hover(page, page.getByTestId('act-row'), 1.0, { dx: 0.3 });
+    await click(page, page.getByTestId('act-draft'), 0);
+    const draft = await oneOf(page, ['act-draft-view', 'act-unavailable', 'act-nothing', 'act-error'], 60000);
+    if (draft !== 'act-draft-view') throw new Error(`Act draft not available on this build: ${draft}`);
+    await pause(page, 0.6);
+    mark(page, 'A draft reply: every sentence from the cited facts', 4.5);
+    await hover(page, page.getByTestId('act-draft-label').first(), 1.0);
+    await read(page, page.getByTestId('act-draft-text'), 4);
+    await hover(page, page.getByTestId('act-sources'), 1.5);
+    await page.keyboard.press('Escape'); await pause(page, 0.8);
+    await click(page, page.getByTestId('act-ticket'), 0);
+    const ticket = await oneOf(page, ['act-ticket-view', 'act-unavailable', 'act-nothing', 'act-error'], 60000);
+    if (ticket !== 'act-ticket-view') throw new Error(`Act ticket not available on this build: ${ticket}`);
+    await pause(page, 0.6);
+    mark(page, 'A ticket proposal: nothing is created until he confirms', 4.5);
+    await read(page, page.getByTestId('act-ticket-summary'), 2.5);
+    await hover(page, page.getByTestId('act-ticket-description'), 1.5);
+    await click(page, page.getByTestId('act-ticket-confirm'), 0);
+    const made = await oneOf(page, ['act-created', 'act-confirm-error', 'act-expired'], 60000);
+    if (made !== 'act-created') throw new Error(`Act ticket was not created: ${made}`);
+    await pause(page, 0.6);
+    mark(page, 'Confirmed: the ticket exists, with a link', 3.5);
+    await hover(page, page.getByTestId('act-created-link'), 2.2);
+    await page.keyboard.press('Escape'); await pause(page, 0.5);
+  } },
+  '18_deliverables': { who: 'jdoe', mode: 'user', async run(page) {                         // ~22 s
+    await goto(page, WEB, 0.8);
+    const starter = page.getByTestId('starter').first();
+    mark(page, 'Jordan · backend engineer: an answer becomes a file', 3.5);
+    await hover(page, starter, 0.5);
+    await click(page, starter, 0);
+    await waitAnswer(page);
+    await pause(page, 0.5);
+    await read(page, page.getByTestId('answer-text'), 2);
+    await hover(page, page.getByTestId('deliver-row'), 1.0, { dx: 0.3 });
+    if (!(await page.getByTestId('deliver-table').count())) throw new Error('Deliverables offers no table on this build');
+    await click(page, page.getByTestId('deliver-table'), 0);
+    const table = await oneOf(page, ['deliver-view', 'deliver-nothing', 'deliver-error', 'deliver-insufficient', 'deliver-needs-model'], 60000);
+    if (table !== 'deliver-view') throw new Error(`Deliverables table not available: ${table}`);
+    await pause(page, 0.6);
+    mark(page, 'A table whose figures point at their sources', 4.5);
+    const sheet = page.getByTestId('deliver-sheet');                  // 'deliver-table' is also the row's button
+    await read(page, sheet.getByTestId('deliver-table'), 4);
+    await hover(page, page.getByTestId('deliver-sources'), 1.5);
+    mark(page, 'A .pptx of it, built with no model', 3.5);
+    await hover(page, page.getByTestId('deliver-pptx'), 2.0);          // hovered, never clicked: no download
+    if (await page.getByTestId('deliver-tab-chart').count()) {
+      await click(page, page.getByTestId('deliver-tab-chart'), 0);
+      await slow(page, sheet.getByTestId('deliver-chart').waitFor({ timeout: 60000 }));
+      await pause(page, 0.6);
+      await hover(page, sheet.getByTestId('deliver-chart'), 3);
+    }
+    await page.keyboard.press('Escape'); await pause(page, 0.5);
+  } },
+  '19_upload': { who: 'jdoe', mode: 'dev', async run(page) {                                // ~15 s
+    const FILE = path.join(repo, 'docs/finals/live_kit/files/Onboarding buddy guide.md');
+    if (!fs.existsSync(FILE)) throw new Error(`upload sample missing: ${FILE}`);
+    await goto(page, `${WEB}/dev/graph?add=1`, 0);
+    await slow(page, page.getByTestId('graph-legend').waitFor({ timeout: 90000 }));
+    const sheet = page.getByTestId('graph-main-addsheet');
+    if (!(await sheet.waitFor({ timeout: 15000 }).then(() => true, () => false))) throw new Error('the Add sheet is not in this build (demo features off?)');
+    await pause(page, 0.8);
+    mark(page, 'Add a file: it goes into a folder, through the same checks', 4);
+    await click(page, sheet.getByRole('tab').nth(1), 0.6);               // the second tab is the file tab
+    await page.getByTestId('graph-main-addsheet-file').setInputFiles(FILE);
+    await pause(page, 0.8);
+    await hover(page, page.getByTestId('graph-main-addsheet-picked'), 1.2);
+    const folders = page.getByTestId('graph-main-addsheet-folders');
+    if (!(await folders.waitFor({ timeout: 20000 }).then(() => true, () => false))) throw new Error('no upload folder list in this build');
+    await folders.selectOption({ index: 1 });
+    await pause(page, 0.6);
+    await click(page, page.getByTestId('graph-main-addsheet-upload'), 0);
+    await slow(page, page.getByTestId('graph-main-addsheet-upload-status').waitFor({ timeout: 60000 }));
+    await pause(page, 0.5);
+    mark(page, 'Uploaded and written to the audit log like everything else', 4);
+    await hover(page, page.getByTestId('graph-main-addsheet-upload-status'), 2.5);
+    await page.keyboard.press('Escape'); await pause(page, 0.5);
+  } },
+  // Scene 21 (30 Oct): three small things that exist today, one beat each: the first-visit tour offer, the
+  // microphone button in the composer (dictation; hovered, never pressed, so no mic is used and nothing is
+  // asked), the value calculator and the stage presenter's landing page (/present). Test ids only, except the
+  // landing page's `main` element (components/tour/Tour.tsx, user/Composer.tsx, value/).
+  '21_extras': { who: 'jdoe', mode: 'user', async run(page) {                              // ~19 s
+    await goto(page, WEB, 0.8);
+    await page.evaluate(() => { try { localStorage.removeItem('ib-tour-offer'); } catch (e) {} });
+    await page.reload(); await page.waitForLoadState('networkidle').catch(() => {});
+    await pause(page, 1.0);
+    if (await page.getByTestId('tour-offer').count()) {
+      mark(page, 'New here? A guided tour is offered once, and any time after', 3.5);
+      await hover(page, page.getByTestId('tour-offer'), 2.0);
+    } else {
+      mark(page, 'A guided tour is offered on first visit, and any time after', 3.5);
+      await pause(page, 2.0);
+    }
+    if (!(await page.getByTestId('dictate').count())) throw new Error('no microphone button here (browser has no speech API?)');
+    mark(page, 'Dictate a question: it types into the box, nothing is asked until Ask is pressed', 4.5);
+    await hover(page, page.getByTestId('dictate'), 2.5);                  // hovered, never pressed
+    await goto(page, `${WEB}/value`, 0.8);
+    await slow(page, page.getByTestId('value-calculator').waitFor({ timeout: 30000 }));
+    await pause(page, 0.6);
+    mark(page, 'The value calculator: every input editable, the result an estimate', 4.5);
+    await read(page, page.getByTestId('value-calculator'), 3);
+    await hover(page, page.getByTestId('out-annual'), 1.8);
+    await hover(page, page.getByTestId('out-break-even'), 1.8);
+    await goto(page, `${WEB}/present`, 0.8);                               // the stage presenter's landing page
+    mark(page, 'The stage presenter: one person runs the whole demo from the keyboard', 3.5);
+    await read(page, page.locator('main').first(), 2.5);
+  } },
   '13_hy3_status': { who: 'maya.compliance', mode: 'dev', async run(page) {              // ~13 s
     await goto(page, `${WEB}/dev`, 0);
     await slow(page, page.getByTestId('model-status').waitFor({ timeout: 60000 }));
@@ -579,11 +712,27 @@ function codebuddyHtml() {
   <div class="shot"><img src="${img}"></div></div>
   </div></body></html>`;
 }
+function mioraHtml() {
+  const cover = imgData(path.join(repo, 'submission/06_cover/cover_1920x1080.png'));
+  const sess = imgData(path.join(repo, 'submission/06_cover/miora_session1.png'));
+  return `<html><head><style>${fontCss()}${BASE}
+  h2{font-size:72px;letter-spacing:-.03em;font-weight:700;margin-top:26px;line-height:1.05}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:50px;margin-top:50px;align-items:start}
+  .shot{border:1px solid #2e2f35;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55);height:520px;background:#111}
+  .shot img{width:100%;height:100%;object-fit:cover;display:block}
+  .note{font-size:26px;margin-top:36px;line-height:1.45}
+  </style></head><body><div class="wrap" style="padding-top:96px">
+  <p class="eyebrow">Miora</p>
+  <h2>The cover art</h2>
+  <div class="grid"><div class="shot"><img src="${cover}"></div><div class="shot"><img src="${sess}"></div></div>
+  <p class="note muted">Made in Miora from our written brief. The prompts and the results are in the repo: submission/06_cover/</p>
+  </div></body></html>`;
+}
 async function makeCards(browser) {
   fs.mkdirSync(CARDS, { recursive: true });
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
-  for (const [name, html] of [['01_title.png', titleHtml()], ['11_codebuddy.png', codebuddyHtml()]]) {
+  for (const [name, html] of [['01_title.png', titleHtml()], ['11_codebuddy.png', codebuddyHtml()], ['20_miora.png', mioraHtml()]]) {
     await p.setContent(html, { waitUntil: 'load' });
     await p.evaluate(() => document.fonts.ready);
     await p.waitForTimeout(300);

@@ -1,6 +1,6 @@
-# Voice-over cue sheet (finals video)
+# Voice-over cue sheet (finals video, main cut)
 
-Picture: `walnut_databridge_finals_SILENT.mp4` (6:08). Play it with `narration.srt` loaded as subtitles (VLC: Subtitle → Add Subtitle File) and read each line as it appears. Relaxed pace, about 150 words a minute; pauses are fine. These are the default lines (Hy3 not switched on yet).
+**PLANNED timings** from the nominal slot lengths in `assemble_finals.py`; the real ones are written when the picture is assembled from the new takes. Picture: `walnut_databridge_finals_SILENT.mp4` (7:35). Play it with `narration.srt` loaded as subtitles (VLC: Subtitle → Add Subtitle File) and read each line as it appears. Relaxed pace, about 150 words a minute; pauses are fine. These are the default lines (Hy3 not switched on yet).
 
 The camera intro (0:00 to the first cue) already has your voice: stay quiet until the title card.
 
@@ -9,108 +9,148 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **0:31** This is Walnut DataBridge.
 - **0:33** And we'll start with Aspire's own question.
 
-## 0:37–1:16 · 02 Same question, two people
+## 0:37–1:22 · 02 Same question, two people
 
 - **0:37** Two people at a fintech ask the same thing: why has Velquarry Trading's account been restricted, and what should I tell the customer?
 - **0:46** Amy, an account manager, gets the approved customer script, with its sources, and nothing else.
 - **0:52** Rachel is the money-laundering reporting officer.
 - **0:55** She gets the actual case: the flagged transfers, and the review.
 - **0:59** Same system, two different truths.
-- **1:01** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
-- **1:07** So the system never does.
+- **1:01** The question is word for word the same.
+- **1:04** Only who is signed in is different.
+- **1:07** In Singapore, telling Amy that a suspicious-transaction report even exists is a criminal offence.
+- **1:13** So the system never does.
 
-## 1:16–1:38 · 03 Restricted looks like nothing
+## 1:21–1:46 · 03 Restricted looks like nothing
 
-- **1:16** Now Ken, an outside contractor.
-- **1:18** On the left, he asks about Velquarry.
-- **1:21** On the right, about a company that doesn't exist at all.
-- **1:25** The answers are identical, word for word.
-- **1:28** A restricted file looks exactly like nothing.
-- **1:31** We tested that on four hundred pairs of questions: zero differences.
+- **1:22** Now Ken, an outside contractor.
+- **1:24** On the left, he asks about Velquarry.
+- **1:27** On the right, about a company that doesn't exist at all.
+- **1:31** The answers are identical, word for word.
+- **1:34** A restricted file looks exactly like nothing.
+- **1:37** No count, and no hint that anything is hidden.
+- **1:40** We tested that on four hundred pairs of questions: zero differences.
 
-## 1:37–2:04 · 04 A source, checked live
+## 1:46–2:16 · 04 A source, checked live
 
-- **1:38** Here's Rachel's own screen.
-- **1:40** Every sentence points at a passage she can open right now.
-- **1:44** Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
-- **1:52** And the screens you ask from speak Chinese too.
+- **1:46** Here's Rachel's own screen.
+- **1:48** Every sentence points at a passage she can open right now.
+- **1:53** Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
+- **2:01** Anything she cannot open at that moment is left out of the answer.
+- **2:06** And the screens you ask from speak Chinese too.
 
-## 2:03–2:37 · 05 Developer mode: the journey
+## 2:16–2:51 · 05 Developer mode: the journey
 
-- **2:04** Now the developer side, as Maya from compliance.
-- **2:07** This is Rachel's request, end to end.
-- **2:10** Each bar is a real timing: two permission checks before anything is composed, then the answer.
-- **2:16** These three records were sealed and chained before Rachel saw a word.
-- **2:21** And below, every document that was considered, with its verdict and the reason.
-- **2:26** Maya never sees the answer itself.
+- **2:16** Now the developer side, as Maya from compliance.
+- **2:19** The app has two modes: User, for asking, and Developer, for seeing how an answer was made.
+- **2:26** This is Rachel's request, end to end.
+- **2:29** Each bar is a real timing: two permission checks before anything is composed, then the answer.
+- **2:35** These three records were sealed and chained before Rachel saw a word.
+- **2:40** And below, every document that was considered, with its verdict and the reason.
+- **2:45** Maya never sees the answer itself.
 
-## 2:37–3:01 · 06 The knowledge graph
+## 2:50–3:35 · 08 Audit, Verify and the tamper demo
 
-- **2:37** This is everything Jordan, a backend engineer, can open, as one graph: every item on four platforms, each one checked with its source.
-- **2:47** Compare two people, and Ken's graph sits right beside it: a small corner of the company, and no greyed-out boxes for the rest.
-- **2:56** For Ken, the rest simply isn't there.
+- **2:51** Maya can also ask the audit log in plain English: everything Rachel accessed in the last seven days.
+- **2:58** She sees the filter first, then the rows.
+- **3:01** Every question anyone asks is written to this chain before the answer is released.
+- **3:07** Verify re-checks every link in the chain: intact.
+- **3:10** Now the fun part.
+- **3:12** The tamper demo copies the log and attacks the copy.
+- **3:16** It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
+- **3:22** Deleting or rolling back records is caught too.
+- **3:25** The real log was never touched.
 
-## 3:00–3:19 · 07 Analytics
+## 3:35–3:53 · 17 Act: a draft and a ticket
 
-- **3:01** Maya's analytics come straight from the verified log: how many questions, how many were answered, how fast, and how often the live check said no.
-- **3:11** Seeded history is labelled, and one click leaves it out.
+- **3:35** From an answer to an action.
+- **3:38** Jordan asks for a draft reply, built only from the cited facts.
+- **3:43** A ticket is only a proposal until he confirms.
+- **3:46** Once he confirms, the ticket is created, with a link to it.
 
-## 3:18–3:55 · 08 Audit, Verify and the tamper demo
+## 3:53–4:11 · 18 Deliverables: a table, a chart, a file
 
-- **3:19** Maya can also ask the audit log in plain English: everything Rachel accessed in the last seven days.
-- **3:26** She sees the filter first, then the rows.
-- **3:29** Verify re-checks every link in the chain: intact.
-- **3:32** Now the fun part.
-- **3:34** The tamper demo copies the log and attacks the copy.
-- **3:38** It changes one old decision, from "forbidden" to "verified", and Verify points at the exact entry.
-- **3:45** Deleting or rolling back records is caught too.
-- **3:48** And the real log was never touched.
+- **3:53** Answers can become files: a table whose figures point at their sources, and a chart from the same facts.
+- **4:01** Or a PowerPoint file, built without a model.
 
-## 3:55–4:09 · 09 The Trust centre
+## 4:10–4:32 · 06b Watch the brain grow
 
-- **3:56** The Trust centre lists the seven controls behind all of this.
-- **4:00** Each one is enforced in code, mapped to Singapore's AI and data rules, and proved by a named test.
+- **4:11** And the brain keeps up.
+- **4:13** Jordan posts a note in Slack, and it is in his graph straight away.
+- **4:18** Ken's graph, right beside it, shows nothing new: he cannot open that channel.
+- **4:23** A moment later Jordan asks about the note, and the answer quotes it, with its source.
 
-## 4:09–4:39 · 10 The Walnut engine
+## 4:32–4:42 · 19 Add a file
 
-- **4:09** Underneath it all is Walnut, the evidence engine.
-- **4:12** Here's Company A as Jordan sees it: every entity, every link, and every value with a pointer back to its source.
-- **4:21** Drag the time slider, and the company's knowledge rewinds to any past date.
-- **4:26** And any value can be traced, step by step, to the exact row in the exact file.
+- **4:32** New files can be added too, into a folder, and the upload is written to the audit log.
 
-## 4:38–4:51 · 11 Built with CodeBuddy
+## 4:41–4:59 · 21 Tour, dictation, value calculator, presenter
 
-- **4:39** We built this with Tencent CodeBuddy.
-- **4:41** It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
-- **4:48** Nine sessions, all in the repo.
+- **4:42** New here?
+- **4:44** A guided tour is offered on first visit.
+- **4:47** You can dictate a question too; nothing is sent until you press Ask.
+- **4:52** The value calculator lets you change every input.
+- **4:55** And one person can run the whole stage demo from the keyboard.
 
-## 4:51–5:08 · 12 WorkBuddy: the connectors
+## 4:59–5:19 · 06 The knowledge graph
 
-- **4:51** And it lives inside Tencent WorkBuddy too, as a second front door.
-- **4:56** Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
+- **5:00** Everything Jordan can open, as one graph: four platforms, each item checked with its source.
+- **5:06** Compare two people, and Ken's graph is a small corner of the company, with no greyed-out boxes.
+- **5:12** For Ken, the rest simply isn't there.
 
-## 5:07–5:21 · 13 Tencent Hy3
+## 5:19–5:39 · 10 The Walnut engine
 
-- **5:08** Tencent Hy3 is wired in through TokenHub, with a backup model and a safe fallback.
-- **5:14** Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks.
+- **5:19** Underneath it all is Walnut, the evidence engine.
+- **5:22** Drag the time slider, and the company's knowledge rewinds to any past date.
+- **5:28** And any value can be traced to the exact row in the exact file.
 
-## 5:20–5:38 · 14 The proof
+## 5:38–5:50 · 07 Analytics
 
-- **5:21** We didn't just demo it, we attacked it.
-- **5:24** Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
-- **5:28** Four hundred paired questions: zero differences.
-- **5:30** And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
+- **5:39** Maya's analytics come straight from the verified log: how many questions, how many answered, how fast.
+- **5:45** Seeded history is labelled, and one click leaves it out.
 
-## 5:38–5:57 · 15 What it's worth
+## 5:50–6:04 · 09 The Trust centre
 
-- **5:38** What's it worth?
-- **5:40** For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
-- **5:49** It's an estimate, not a measurement.
-- **5:51** And it pays for itself at about seven minutes a week.
+- **5:51** The Trust centre lists the seven controls behind all of this.
+- **5:55** Each one is enforced in code, mapped to Singapore's AI and data rules, and proved by a named test.
 
-## 5:57–6:08 · 16 Close
+## 6:04–6:16 · 11 Built with CodeBuddy
 
-- **5:57** Walnut DataBridge.
-- **5:59** Answers you can prove.
-- **6:01** We'd love one pilot team at one regulated company.
-- **6:04** Thanks for watching!
+- **6:04** We built this with Tencent CodeBuddy, nine sessions in all.
+- **6:08** It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
+
+## 6:15–6:29 · 12 WorkBuddy: the connectors
+
+- **6:16** It also lives inside Tencent WorkBuddy.
+- **6:18** Each connector carries its own signed token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
+- **6:25** Same gates, same audit log.
+
+## 6:29–6:37 · 20 Miora: the cover art
+
+- **6:29** The cover art was made in Miora, from a written brief.
+
+## 6:36–6:48 · 13 Tencent Hy3
+
+- **6:37** Tencent Hy3 is wired in through TokenHub, with a safe fallback.
+- **6:41** Until it is switched on, answers are quoted from the sources, through the same checks.
+
+## 6:48–7:06 · 14 The proof
+
+- **6:48** We didn't just demo it, we attacked it.
+- **6:52** Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
+- **6:56** Four hundred paired questions: zero differences.
+- **6:58** And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
+
+## 7:06–7:25 · 15 What it's worth
+
+- **7:06** What's it worth?
+- **7:08** For a six-hundred-person fintech, if each person saves ninety minutes a week, that's about one point three million US dollars a year.
+- **7:17** It's an estimate, not a measurement.
+- **7:19** And it pays for itself at about seven minutes a week.
+
+## 7:24–7:35 · 16 Close
+
+- **7:25** Walnut DataBridge.
+- **7:27** Answers you can prove.
+- **7:28** We'd love one pilot team at one regulated company.
+- **7:32** Thanks for watching!

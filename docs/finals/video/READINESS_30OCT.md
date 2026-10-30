@@ -77,15 +77,36 @@ finalist notes (D-01 says only that the old video stays unless the new UI is rea
 `VIDEO_PLAN.md` ("The new timeline") is therefore planned at about 7:55, the short cut at about 6:03 and the full cut
 at about 9:15 (over 8:00; use it only if no limit applies). Ask the organisers to confirm.
 
-## New timeline: what is and is not built
+## New timeline: what is built (30 Oct, evening)
 
-- Planned in `VIDEO_PLAN.md`: core story first (2:38 / 3:00 / 3:23 in the short / main / full cuts), new-value scenes
-  of 10 to 28 s each (Act 17, Deliverables 18, live growth with Ken seeing nothing 06b, Uploads 19, graph, engine,
-  analytics, Trust centre), Tencent tools (CodeBuddy, WorkBuddy, Miora 20, Hy3), and three teammate slots (voice, just-in-time UI, dots).
-- **Not built yet:** recorder scenes 17 to 19, the Miora card, the three slots, the longer spoken lines for the
-  core scenes, the reorder in `SEGMENTS` (audit before graph) and a `--cut short|main|full` flag. The assembler and
-  recorder as they stand still produce today's 6:08 cut, and both self-tests pass.
-- Needs the teammates: names, routes and on-screen strings for voice, just-in-time UI and dots.
+Built, no recording done: recorder scenes `17_act`, `18_deliverables`, `19_upload`, `21_extras` (tour offer,
+dictation button, value calculator, presenter landing) and a rewritten `06b_brain_grow` (Compare view: Jordan posts,
+Ken's feed must stay empty or the take is refused); the Miora card (`20_miora.png`, made by `record_finals.cjs cards`);
+in the assembler, `--cut short|main|full` (main is the default; other cuts add `_short` / `_full` to file names),
+the new order (audit before graph and analytics), optional rows for every new scene and the teammate slots
+`S1_voice`, `S2_jit_ui`, `S3_dots`, `--cues-only --plan` for cue sheets before anything is recorded; in the script,
+every scene with cuts, on screen, caption, proof and voice-over, **[MAIN]** / **[FULL]** extras, and TODO
+placeholders for the slots. Cuts: short 6:04, main 7:56 (with all slots), full 9:39. Both self-tests pass and now
+also check the cut totals, the script sections and that TODO lines are never read; `node --check` and `py_compile` pass.
+
+New scenes use `data-testid` selectors only (no visible text), because ActSheet, DeliverSheet and AddDocumentSheet
+copy is being edited. Exceptions that already existed: the mode-switch "User" text and the "Compare two people"
+text in scenes 06 and 06b's return to User mode; scene 21 uses the landing page's `main` element.
+
+Risks for the first take of the new scenes (nothing could be checked without a browser):
+- 17 Act: assumes Jordan's first starter gives a released answer with the Act row, and that the ticket proposal
+  is allowed for him; it writes a mock Jira ticket. Any other state (`act-unavailable`, `act-error`, ...) fails the take.
+- 18 Deliverables: assumes the table kind is offered (`deliver-table` row button) for that answer; `deliver-table` and
+  `deliver-chart` are both a row button and a view element, so the recorder scopes them to `deliver-sheet`.
+- 19 Upload: sets the file on the hidden input and picks the first listed folder; writes a file into the mock Drive.
+- 06b: needs demo features on; `graph-left-add`, `graph-left-addsheet-*`, `graph-left-live-item`, `graph-right-live`.
+- 21: the tour offer only shows if the stack has not been marked dismissed in this browser profile; the scene removes
+  `ib-tour-offer` and reloads; the mic button needs the browser's speech API (Chromium headless may not have it, then
+  the take fails cleanly: drop the dictation beat or record it headed).
+- Tight spoken lines (about equal to the picture): scene 21 (main), scene 11 (main), scene 03 and 17 (full).
+
+Needs the teammates: names, routes, on-screen strings and tests for voice, just-in-time UI and dots (the script has
+TODO lines; the rows are in the assembler and skipped until a clip exists).
 
 ## Still needs the founder (or a teammate)
 

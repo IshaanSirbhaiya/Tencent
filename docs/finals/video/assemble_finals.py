@@ -4,6 +4,9 @@
     python docs/finals/video/assemble_finals.py --voice voice.m4a    ... and lay the voice-over under it
     python docs/finals/video/assemble_finals.py --cues-only [--hy3]  only re-write the cue sheet / .srt
     python docs/finals/video/assemble_finals.py --self-test          check the take checks (no ffmpeg)
+    python docs/finals/video/assemble_finals.py --cut short|main|full   which cut (default main; see below)
+    python docs/finals/video/assemble_finals.py --cues-only --plan --cut full   cue sheet from the PLANNED
+                                                                       slot lengths, before anything is recorded
 
 (Use a Python with Pillow, e.g. ``databridge\\.venv\\Scripts\\python``; ffmpeg and ffprobe on PATH.)
 
@@ -33,6 +36,14 @@ Adapted from docs/tencent/video/assemble.py (the first video); the edit follows 
 - ``--voice`` lines the voice-over up with the cue sheet (its first spoken word lands on the first cue),
   cleans it (high-pass, loudness-normalised to -16 LUFS) and mixes it under the picture after the intro.
 
+Three cuts are built from the same takes (``--cut``): short (about 6:00), main (about 7:55, the default, kept
+under the 8:00 of the 5 to 8 minute range in docs/tencent/SUBMISSION.md) and full (about 9:15). Each SEGMENTS row
+gives its seconds for the three cuts; 0 leaves the scene out of that cut. Main writes the usual file names; the
+others add ``_short`` / ``_full`` (``..._short_SILENT.mp4``, ``timeline_short.json``, ``narration_cues_short.md``).
+Narration lines in VIDEO_SCRIPT_FINALS.md tagged ``**[MAIN]**`` are read in main and full, ``**[FULL]**`` only in
+full; ``TODO`` lines (the teammates' slots) are never read. A segment marked optional is skipped, with a printed
+line, when its clip or card does not exist yet.
+
 Missing inputs are replaced by a labelled placeholder and reported, never silently skipped; a segment
 marked optional is left out instead. A clip whose current take fails ``check_take`` (a failed or
 unfinished take, a missing label, a zero duration, a video that is not the one the marks were made with,
@@ -58,8 +69,24 @@ INTRO = REPO / "submission" / "05_video" / "voice" / "intro_final.mp4"
 SCRIPT = REPO / "docs" / "finals" / "video" / "VIDEO_SCRIPT_FINALS.md"
 EVAL_SUMMARY = REPO / "databridge" / "apps" / "internal_brain_web" / "public" / "eval_summary.json"
 CONSTANTS = HERE / "video_constants.json"
+CUTS = ("short", "main", "full")
+CUT, SUF = "main", ""                       # set by set_cut(); main keeps the original file names
 SILENT = V / "walnut_databridge_finals_SILENT.mp4"
 FINAL = V / "walnut_databridge_finals.mp4"
+INTRO_SECONDS = 31.8                        # the camera intro's length, used for planned timings only
+
+
+def set_cut(cut: str) -> None:
+    """Choose the cut: the output file names follow it (main = the original names)."""
+    global CUT, SUF, SILENT, FINAL
+    CUT, SUF = cut, ("" if cut == "main" else f"_{cut}")
+    SILENT = V / f"walnut_databridge_finals{SUF}_SILENT.mp4"
+    FINAL = V / f"walnut_databridge_finals{SUF}.mp4"
+
+
+def secs_for(secs, cut: str | None = None) -> float:
+    """A SEGMENTS length: one number for every cut, or (short, main, full). 0 = left out of that cut."""
+    return float(secs[CUTS.index(cut or CUT)] if isinstance(secs, (tuple, list)) else secs)
 W, H, FPS = 1920, 1080, 30
 XFADE = 0.35
 WPS = 2.5                                   # relaxed speaking pace: about 150 words a minute
@@ -117,34 +144,70 @@ def check_script_numbers() -> list[str]:
     return bad
 
 
-# (kind, file, target seconds, label, extra). The label's first word is the VIDEO_SCRIPT_FINALS.md scene
-# number. extra: {"optional": True} leaves a missing segment out; {"pills": [(at, seconds, text)]} puts
-# label pills on a still. kind: camera (the intro, kept whole with its sound), card (cards/), clip
-# (clips/), still (submission/02_workbuddy/).
+# (kind, file, seconds, label, extra). seconds: one number, or (short, main, full) with 0 = left out of that cut.
+# The label's first word is the VIDEO_SCRIPT_FINALS.md scene id. extra: {"optional": True} leaves a missing
+# segment out (printed); {"slot": True} is a teammate's slot (optional, and left out of planned cue sheets until
+# its clip exists); {"pills": [(at, seconds, text)]} puts label pills on a still. kind: camera (the intro, kept
+# whole with its sound), card (cards/), clip (clips/), still (submission/02_workbuddy/).
+# Order (VIDEO_PLAN.md, "The new timeline"): the core story first, then the new value, the Tencent tools,
+# the teammates' slots, and the proof, business and close slides.
 SEGMENTS = [
     ("camera", "intro_final.mp4", 0, "00 Camera intro", {}),
     ("card", "01_title.png", 6, "01 Title", {}),
-    ("clip", "02_compare_amy_rachel.webm", 40, "02 Same question, two people", {}),
-    ("clip", "03_ken_identical.webm", 23, "03 Restricted looks like nothing", {}),
-    ("clip", "04_source_live.webm", 25, "04 A source, checked live", {}),
-    ("clip", "05_journey.webm", 30, "05 Developer mode: the journey", {}),
-    ("clip", "06_graph.webm", 25, "06 The knowledge graph", {}),
-    ("clip", "06b_brain_grow.webm", 28, "06b Watch the brain grow", {"optional": True}),
-    ("clip", "07_analytics.webm", 17, "07 Analytics", {}),
-    ("clip", "08_audit.webm", 40, "08 Audit, Verify and the tamper demo", {}),
-    ("clip", "09_trust.webm", 15, "09 The Trust centre", {}),
-    ("clip", "10_engine.webm", 26, "10 The Walnut engine", {}),
-    ("card", "11_codebuddy.png", 13, "11 Built with CodeBuddy", {}),
-    ("still", "workbuddy_mcp_panel.png", 6, "12 WorkBuddy: the connectors",
-     {"pills": [(0.6, 5.0, "Tencent WorkBuddy · real window capture (15 Oct)")]}),
-    ("still", "workbuddy_compare.png", 11, "12 WorkBuddy: two people",
-     {"pills": [(1.0, 5.0, "One question, Jordan's and Ken's connectors: two answers")]}),
-    ("clip", "13_hy3_status.webm", 15, "13 Tencent Hy3", {}),
+    # core: the most screen time
+    ("clip", "02_compare_amy_rachel.webm", (40, 45, 50), "02 Same question, two people", {}),
+    ("clip", "03_ken_identical.webm", (23, 25, 28), "03 Restricted looks like nothing", {}),
+    ("clip", "04_source_live.webm", (25, 30, 35), "04 A source, checked live", {}),
+    ("clip", "05_journey.webm", (30, 35, 40), "05 Developer mode: the journey", {}),
+    ("clip", "08_audit.webm", (40, 45, 50), "08 Audit, Verify and the tamper demo", {}),
+    # new value: short and sharp
+    ("clip", "17_act.webm", (15, 18, 22), "17 Act: a draft and a ticket", {"optional": True}),
+    ("clip", "18_deliverables.webm", (12, 18, 22), "18 Deliverables: a table, a chart, a file", {"optional": True}),
+    ("clip", "06b_brain_grow.webm", (0, 22, 28), "06b Watch the brain grow", {"optional": True}),
+    ("clip", "19_upload.webm", (0, 10, 15), "19 Add a file", {"optional": True}),
+    ("clip", "21_extras.webm", (0, 18, 25), "21 Tour, dictation, value calculator, presenter", {"optional": True}),
+    ("clip", "06_graph.webm", (20, 20, 24), "06 The knowledge graph", {}),
+    ("clip", "10_engine.webm", (20, 20, 25), "10 The Walnut engine", {}),
+    ("clip", "07_analytics.webm", (12, 12, 15), "07 Analytics", {}),
+    ("clip", "09_trust.webm", 14, "09 The Trust centre", {}),
+    # Tencent tools
+    ("card", "11_codebuddy.png", (10, 12, 14), "11 Built with CodeBuddy", {}),
+    ("still", "workbuddy_mcp_panel.png", (5, 6, 6), "12 WorkBuddy: the connectors",
+     {"pills": [(0.6, 4.0, "Tencent WorkBuddy · real window capture (15 Oct)")]}),
+    ("still", "workbuddy_compare.png", (7, 8, 11), "12 WorkBuddy: two people",
+     {"pills": [(1.0, 4.0, "One question, Jordan's and Ken's connectors: two answers")]}),
+    ("card", "20_miora.png", (0, 8, 10), "20 Miora: the cover art", {"optional": True}),
+    ("clip", "13_hy3_status.webm", (12, 12, 14), "13 Tencent Hy3", {}),
+    # the teammates' slots: names, routes and lines come after the merge (TODO in the script)
+    ("clip", "S1_voice.webm", (0, 8, 20), "S1 Voice", {"optional": True, "slot": True}),
+    ("clip", "S2_jit_ui.webm", (0, 8, 20), "S2 Just-in-time UI", {"optional": True, "slot": True}),
+    ("clip", "S3_dots.webm", (0, 6, 15), "S3 Dots", {"optional": True, "slot": True}),
+    # the app's own slides
     ("card", "14_proof.png", 18, "14 The proof",
      {"pills": [(9.5, 7.0, "PROOF_PILL")]}),
     ("card", "15_business.png", 19, "15 What it's worth", {}),
     ("card", "16_close.png", 11, "16 Close", {}),
 ]
+
+
+def nominal_total(cut: str, slots: bool) -> float:
+    """Length of a cut from the planned slot lengths, with or without the teammates' slots."""
+    ns = [INTRO_SECONDS if k == "camera" else secs_for(sec, cut) for k, _, sec, _, e in SEGMENTS
+          if (k == "camera" or secs_for(sec, cut) > 0) and (slots or not e.get("slot"))]
+    return sum(ns) - XFADE * (len(ns) - 1)
+
+
+def plan_timeline(cut: str) -> list[dict]:
+    """The timeline a cut would have with the planned slot lengths (no clips needed): for cue sheets before
+    anything is recorded. Teammate slots are left out until their clip exists."""
+    out, start = [], 0.0
+    for kind, name, secs, label, extra in SEGMENTS:
+        n = INTRO_SECONDS if kind == "camera" else secs_for(secs, cut)
+        if n <= 0 or (extra.get("slot") and not (CLIPS / f"{Path(name).stem}.marks.json").exists()):
+            continue
+        out.append({"label": label, "start": round(start, 2), "end": round(start + n, 2)})
+        start += n - XFADE
+    return out
 
 
 def proof_pill() -> str:
@@ -372,11 +435,29 @@ def self_test() -> int:
             assert "unreadable" in str(e), e
     finally:
         shutil.rmtree(d, ignore_errors=True)
+    # the three cuts: ordered, main under the 8:00 of the 5 to 8 minute range even with every slot filled
+    t = {c: nominal_total(c, True) for c in CUTS}
+    assert t["short"] < t["main"] < t["full"], t
+    assert 330 <= t["short"] <= 400 and t["main"] < 480, t
+    order = [Path(n).stem for _, n, _, _, _ in SEGMENTS]
+    assert order.index("02_compare_amy_rachel") < order.index("08_audit") < order.index("06_graph") < order.index("07_analytics")
+    # the script: every scene of the plan has a section; cuts add lines, never remove; TODO placeholders are never read
+    TODO_SCENES.clear()
+    lines = {c: scenes_from_script(False, c) for c in CUTS}
+    for _, _, _, label, _ in SEGMENTS[1:]:
+        sc = label.split()[0]
+        assert sc in lines["main"], f"no '### {sc} ·' section in VIDEO_SCRIPT_FINALS.md"
+        assert len(lines["short"][sc]) <= len(lines["main"][sc]) <= len(lines["full"][sc]), sc
+        assert not any(x.startswith("TODO") for c in CUTS for x in lines[c][sc]), sc
+    assert {"S1", "S2", "S3"} <= TODO_SCENES and not any(lines["full"][x] for x in ("S1", "S2", "S3"))
+    assert lines["short"]["02"] != lines["full"]["02"]
+    assert not any(secs_for(sec, "short") for _, _, sec, _, e in SEGMENTS if e.get("slot"))
     problems = check_script_numbers()                                  # the spoken numbers vs eval_summary.json
     assert not problems, "script vs evidence: " + "; ".join(problems)
     assert words(1131) == "one thousand one hundred and thirty-one" and words(7374) ==         "seven thousand three hundred and seventy-four" and words(166) == "one hundred and sixty-six"
     print(f"self-test ok: {len(cases)} bad takes refused, the good take accepted; "
-          f"the script's numbers match eval_summary.json ({proof_pill()})")
+          f"the script's numbers match eval_summary.json ({proof_pill()}); cuts "
+          + ", ".join(f"{c} {int(t[c] // 60)}:{int(t[c] % 60):02d}" for c in CUTS))
     return 0
 
 
@@ -415,9 +496,14 @@ def clip(src: Path, target: float, out: Path, work: Path, raw: list[dict]) -> tu
 
 
 # ---- narration: cue sheet and subtitles -------------------------------------------------------
-def scenes_from_script(hy3: bool) -> dict[str, list[str]]:
+TODO_SCENES: set[str] = set()
+
+
+def scenes_from_script(hy3: bool, cut: str = "main") -> dict[str, list[str]]:
     """Narration per scene from VIDEO_SCRIPT_FINALS.md ('### NN · Title' then '> ' lines), one entry per
-    sentence. '[ONLY IF HY3 LIVE]' (old spelling '[if Hy3 is on]') / '[otherwise]' lines are picked by --hy3."""
+    sentence. '[ONLY IF HY3 LIVE]' (old spelling '[if Hy3 is on]') / '[otherwise]' lines are picked by --hy3;
+    '[MAIN]' lines are read in the main and full cuts, '[FULL]' lines in the full cut only; a line that starts
+    with TODO is a placeholder (the teammates' slots) and is never read (the scene is noted in TODO_SCENES)."""
     out: dict[str, list[str]] = {}
     cur = None
     for line in SCRIPT.read_text(encoding="utf-8").splitlines():
@@ -430,6 +516,13 @@ def scenes_from_script(hy3: bool) -> dict[str, list[str]]:
             cur = None
         if cur and line.startswith(">"):
             text = line[1:].strip()
+            if text.startswith("TODO"):
+                TODO_SCENES.add(cur)
+                continue
+            if "[MAIN]" in text and cut == "short":
+                continue
+            if "[FULL]" in text and cut != "full":
+                continue
             if ("[ONLY IF HY3 LIVE]" in text or "[if Hy3 is on]" in text) and not hy3:
                 continue
             if "[otherwise]" in text and hy3:
@@ -461,16 +554,21 @@ def stamp(sec: float, srt: bool = True) -> str:
             else f"{int(m)}:{int(s):02d}")
 
 
-def write_cues(timeline: list[dict], hy3: bool) -> list[dict]:
+def write_cues(timeline: list[dict], hy3: bool, cut: str | None = None, planned: bool = False) -> list[dict]:
     """narration_cues.md and narration.srt from the script and the real timeline; returns the cues."""
     for problem in check_script_numbers():
         print("TRUTH CHECK:", problem)
-    lines, spans = scenes_from_script(hy3), scene_spans(timeline)
+    cut = cut or CUT
+    lines, spans = scenes_from_script(hy3, cut), scene_spans(timeline)
+    for sc in sorted(TODO_SCENES & set(spans)):
+        print(f"TODO: scene {sc} is in this cut but its lines in VIDEO_SCRIPT_FINALS.md are still a placeholder")
     total = timeline[-1]["end"] if timeline else 0
     srt, cues, warn, n = [], [], [], 1
-    md = ["# Voice-over cue sheet (finals video)", "",
-          f"Picture: `walnut_databridge_finals_SILENT.mp4` ({stamp(total, False)}). Play it with "
-          "`narration.srt` loaded as subtitles (VLC: Subtitle → Add Subtitle File) and read each line as it "
+    md = [f"# Voice-over cue sheet (finals video, {cut} cut)", "",
+          ("**PLANNED timings** from the nominal slot lengths in `assemble_finals.py`; the real ones are written when "
+           "the picture is assembled from the new takes. " if planned else "")
+          + f"Picture: `{SILENT.name}` ({stamp(total, False)}). Play it with "
+          f"`narration{SUF}.srt` loaded as subtitles (VLC: Subtitle → Add Subtitle File) and read each line as it "
           "appears. Relaxed pace, about 150 words a minute; pauses are fine. "
           + ("These are the **Hy3 is on** lines." if hy3 else
              "These are the default lines (Hy3 not switched on yet)."), "",
@@ -497,9 +595,9 @@ def write_cues(timeline: list[dict], hy3: bool) -> list[dict]:
             n, t = n + 1, t + d
         md.append("")
     V.mkdir(parents=True, exist_ok=True)
-    (V / "narration.srt").write_text("\n".join(srt), encoding="utf-8")
-    (V / "narration_cues.md").write_text("\n".join(md), encoding="utf-8")
-    print(f"{n - 1} cues -> {V / 'narration_cues.md'} and narration.srt")
+    (V / f"narration{SUF}.srt").write_text("\n".join(srt), encoding="utf-8")
+    (V / f"narration_cues{SUF}.md").write_text("\n".join(md), encoding="utf-8")
+    print(f"{n - 1} cues ({cut} cut) -> {V / f'narration_cues{SUF}.md'} and narration{SUF}.srt")
     for w in warn:
         print("TIGHT:", w)
     return cues
@@ -554,6 +652,10 @@ def main() -> int:
                     help="seconds to drop from the start of the voice file (a count-in, a cough)")
     ap.add_argument("--hy3", action="store_true", help="use the [if Hy3 is on] lines in the cue sheet")
     ap.add_argument("--cues-only", action="store_true", help="only re-write the cue sheet from timeline.json")
+    ap.add_argument("--plan", action="store_true",
+                    help="with --cues-only: use the planned slot lengths instead of timeline.json (nothing recorded yet)")
+    ap.add_argument("--cut", choices=CUTS, default="main",
+                    help="short (about 6:00), main (about 7:55, default) or full (about 9:15), from the same takes")
     ap.add_argument("--no-intro", action="store_true", help="leave the camera intro out")
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--self-test", action="store_true", help="check the take checks on made-up takes, then stop")
@@ -562,16 +664,19 @@ def main() -> int:
     if args.self_test:
         return self_test()
 
+    set_cut(args.cut)
     if args.cues_only:
-        timeline = json.loads((V / "timeline.json").read_text(encoding="utf-8"))
-        write_cues(timeline, args.hy3)
+        if args.plan:
+            write_cues(plan_timeline(args.cut), args.hy3, planned=True)
+        else:
+            write_cues(json.loads((V / f"timeline{SUF}.json").read_text(encoding="utf-8")), args.hy3)
         return 0
 
     # every clip's current take is checked before anything is rendered (Codex round 2b #3)
     takes: dict[str, tuple[Path, list[dict]] | None] = {}
     refused, unusable = [], set()
-    for kind, name, _, label, extra in SEGMENTS:
-        if kind != "clip":
+    for kind, name, secs, label, extra in SEGMENTS:
+        if kind != "clip" or secs_for(secs) <= 0:
             continue
         try:
             takes[name] = current_take(CLIPS, Path(name).stem)
@@ -593,6 +698,9 @@ def main() -> int:
     for i, (kind, name, secs, label, extra) in enumerate(SEGMENTS):
         if kind == "camera" and args.no_intro:
             continue
+        if kind != "camera" and secs_for(secs) <= 0:
+            continue                                   # not in this cut
+        secs = secs_for(secs)
         if name in unusable:
             continue                                   # optional, reported above
         src = {"camera": INTRO, "card": CARDS, "clip": CLIPS, "still": WB}[kind]
@@ -644,7 +752,7 @@ def main() -> int:
              "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", "-t", f"{total:.2f}", str(SILENT)])
     else:
         run(["ffmpeg", "-y", "-i", str(joined), "-c", "copy", "-movflags", "+faststart", str(SILENT)])
-    (V / "timeline.json").write_text(json.dumps(timeline, indent=1), encoding="utf-8")
+    (V / f"timeline{SUF}.json").write_text(json.dumps(timeline, indent=1), encoding="utf-8")
     cues = write_cues(timeline, args.hy3)
     for (_, length, label, note), seg in zip(parts, timeline):
         s = seg["start"]
