@@ -49,7 +49,6 @@ from ..deliverables.service import (NotFound, RateLimited, Unavailable, Delivera
 from ..deliverables.verify import Check, words
 from ..models import (SCOPE_NOTE, DeliverableCreated, DeliverableFailed, DeliverableRequested,
                       DirectoryUser, ModelInfo)
-from ..onboarding import in_project, project_topic
 from ..timewin import strip as strip_window
 from . import a2ui, blocks, pagecheck, plan, prompts
 from .spec import MView
@@ -208,11 +207,10 @@ class ViewService:
         try:
             layout = plan.clean_instruction(instruction)
             cites = dict(ctx.cites)
-            onboarding = project_topic(ctx.question)
-            if self.composer is not None or onboarding:
+            if self.composer is not None:
                 cites = self._expand(user, cites, ctx.question)
             evidence = build_evidence(cites, question=ctx.question, facts=ctx.facts,
-                                      max_chars=PAGE_CONTEXT_CHARS if self.composer or onboarding else 12_000)
+                                      max_chars=PAGE_CONTEXT_CHARS if self.composer else 12_000)
             if not evidence:
                 self._fail(user, "lookup", "not_found", req_id=req_id, view_id=vid)
                 raise NotFound()
@@ -247,9 +245,6 @@ class ViewService:
         try:
             epoch = getattr(self.directory, "epoch", 0)
             readable = self.index.readable(user, epoch)
-            project = project_topic(question)
-            if project:
-                readable = frozenset(d for d in readable if in_project(self.index.doc(d), project))
             have = {s.doc_id for s in cites.values()}
             places = list(dict.fromkeys((s.platform, s.container) for s in cites.values()))
             near = [d for p, c in places for d in self.index.docs_in_container(p, c)
