@@ -5,6 +5,8 @@ built, tested live against the real backend, reviewed by five models and fixed.
 
 ## Things only you can do
 
+**Your full to-do list, with checkboxes and dates: [FOUNDER_TODO.md](FOUNDER_TODO.md).**
+
 Demo-day laptop steps, with the reason for each: [demo_day/FOUNDER_CHECKLIST.md](demo_day/FOUNDER_CHECKLIST.md).
  (in this order)
 

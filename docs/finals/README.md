@@ -1,5 +1,7 @@
 # docs/finals: index
 
+> **Ishaan's to-do list:** [FOUNDER_TODO.md](FOUNDER_TODO.md)
+
 Everything written for the finals of the Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 (FinTech
 track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product inside it. Demo Day is
 3 Nov 2026. Branch `final_v1.0`. Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
