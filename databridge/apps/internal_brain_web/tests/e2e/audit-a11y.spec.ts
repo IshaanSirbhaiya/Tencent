@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectAccessible, login } from './helpers';
+import { expectAccessible, login, quietTourOffer } from './helpers';
 
 // axe on the governance pages in their populated states: dark and light, desktop and phone.
 for (const theme of ['dark', 'light'] as const) {
@@ -11,6 +11,8 @@ for (const theme of ['dark', 'light'] as const) {
       test.use({ viewport: { width: vp.width, height: vp.height } });
       test.beforeEach(async ({ page }) => {
         await page.addInitScript((t) => localStorage.setItem('ib-theme', t), theme);
+        // Developer pages offer the Developer tour on first entry (D-36); its toast would cover page controls.
+        await quietTourOffer(page);
       });
 
       test('audit: verified, tamper results, drawer', async ({ page }) => {

@@ -46,6 +46,7 @@ for (const vp of [
     });
 
     test('5 simulator', async ({ page }) => {
+      await quietTourOffer(page); // the Developer tour's first-visit toast (D-36) sits over "Reset demo" at desktop width
       await login(page, 'admin.it');
       await page.goto('/dev/sim');
       await page.getByRole('button', { name: 'Reset demo' }).click();
