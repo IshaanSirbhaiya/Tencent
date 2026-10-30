@@ -144,8 +144,8 @@ first in the `/sim/reset` hooks (no `sim.py` change needed). SECURITY.md §15.12
 - Full IB suite, run 1: 944 passed, 2 failed (`test_connector_drive.py::test_markdown_and_csv`,
   `::test_crawl_full_then_quiet`: the fake Drive's `df-7` is a header-only CSV, `a,b`, which extraction
   turned into "no text", so the file was skipped). FIXED: a header-only CSV is indexed as its cleaned text
-  (`DriveConnector._extracted`); `test_connector_drive.py` now 65 passed. Full-suite run 2 was at 90 % with
-  no failure when the session stopped; re-run it to confirm.
+  (`DriveConnector._extracted`); `test_connector_drive.py` now 65 passed. Full-suite run 2 (after the fix):
+  1040 passed, 0 failed.
 
 **Left / gotchas.**
 - `python-pptx` and `pypdfium2` are installed in `.venv` but NOT in `requirements-lock.txt`. A fresh install

@@ -257,6 +257,22 @@ cloud on `git diff 7bf3246..final_v1.2 -- databridge/`; Codex waits for the lapt
    - voice;
    - `demo_day.ps1`, `demo_preflight.py`, the `.cmd` launchers.
 
+**Codex round-2 (`reviews/round2_codex_act_tools_kit.md`, added after the cloud move).** 8 findings:
+0 critical, 2 high, 5 medium, 1 low. Codex hit its usage limit partway, so it is partial.
+- **HIGH:** if the Jira create response is lost, a retry can create a duplicate issue. Use an
+  idempotency key, or look the issue up before retrying.
+- **HIGH:** the Windows cleanup in the demo kit can force-kill unrelated python/node processes. Kill
+  only the PIDs listening on our ports.
+- **MED:** confirm does not re-check access to the cited docs (same as Opus #5).
+- The rest are in the file.
+- **Round 2b (partial):**
+  - the proxies are OK;
+  - `hy3_check.py` treats an empty JSON reply as success;
+  - `fill_template.py` path escape (same as Opus).
+- **Not reviewed:** secret leakage into generated files (handouts, conversation PDF, workbuddy test,
+  video scripts); `check_absent.py` and `make_files.py`; the presenter and `personas.ts`. This is a
+  Codex TODO for the laptop.
+
 **Scripts/video/evidence review (a4b24bb):** the agent may not have written
 `reviews/round2_scripts_video_evidence.md` before hand-off. If it is missing, fold that scope into
 the Opus re-run.
