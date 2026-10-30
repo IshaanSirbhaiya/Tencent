@@ -4,11 +4,16 @@
 //   node docs/finals/video/record_finals.cjs                 all scenes, then the cards
 //   node docs/finals/video/record_finals.cjs 08_audit        one scene (any order)
 //   node docs/finals/video/record_finals.cjs cards           only the still cards and slides
+//   node docs/finals/video/record_finals.cjs --self-test     check the take handling (no browser, no stack)
 //
-// Clips land in submission/finals_video/clips/<scene>.webm, plus <scene>.marks.json: when each on-screen
-// label should appear, and which slow waits to cut, in seconds from the clip's start
-// (assemble_finals.py applies both). Cards and slides land in submission/finals_video/cards/*.png at
-// 1920x1080. Nothing is faked: each clip is the real app answering, live.
+// Every take is kept in its own folder, submission/finals_video/clips/takes/<scene>/<take>/: the video
+// (<scene>.webm, or <scene>.FAILED.webm) and take.json, which holds the marks: when each on-screen label
+// should appear, and which slow waits to cut, in seconds from the clip's start (assemble_finals.py applies
+// both). Only a take that finished and passes checkTake (every label of the scene, one start mark,
+// durations > 0, the video on disk) becomes the current good take: clips/<scene>.marks.json, replaced in
+// one rename, names that take's video and carries its marks. A failed or rejected take never touches it,
+// and the process exits 1. Cards and slides land in submission/finals_video/cards/*.png at 1920x1080.
+// Nothing is faked: each clip is the real app answering, live.
 //
 // Adapted from docs/tencent/video/record_scenes.cjs (the first video). The same rules make it look like a
 // person at the keyboard (VIDEO_SCRIPT_FINALS.md, "Pacing"):
@@ -25,7 +30,7 @@ const fs = require('fs');
 const path = require('path');
 const repo = path.resolve(__dirname, '../../..');
 const webDir = path.join(repo, 'databridge/apps/internal_brain_web');
-const { chromium } = require(path.join(webDir, 'node_modules/playwright'));
+let chromium;                                         // loaded when recording, not for --self-test
 
 const WEB = process.env.IB_WEB || 'http://127.0.0.1:3100';
 const OUTV = path.join(repo, 'submission/finals_video');
@@ -591,7 +596,104 @@ async function makeCards(browser) {
   await sctx.close();
 }
 
+// ---- takes: a fresh folder each time; the current good take is replaced only after a clean run ----
+// Codex round 2b #3: a failed re-record used to overwrite the marks of the previous good take.
+const takeId = () => new Date().toISOString().replace(/[-:]/g, '').replace('.', '-');   // 20261030T071530-123Z
+/** How many labels a scene puts on screen: its mark(page, ...) calls. A take must show every one. */
+const expectedLabels = (sc) => (sc.run.toString().match(/\bmark\(page,/g) || []).length;
+/** Problems that keep a take from becoming the current good take (an empty list: it is fine).
+ *  assemble_finals.py check_take() runs the same checks again before it uses a take. */
+function checkTake(t, clipsDir) {
+  const bad = [];
+  if (!t.ok) bad.push(`the take failed${t.error ? `: ${t.error}` : ''}`);
+  if (!(t.duration > 0)) bad.push(`duration ${t.duration}`);
+  const video = path.join(clipsDir, t.video || '');
+  if (!t.video || !fs.existsSync(video)) bad.push(`video ${t.video} missing`);
+  else if (!(t.bytes > 0) || fs.statSync(video).size !== t.bytes) bad.push(`video ${t.video} is not ${t.bytes} bytes`);
+  const marks = Array.isArray(t.marks) ? t.marks : [];
+  const starts = marks.filter((m) => 'start' in m);
+  if (starts.length !== 1 || !(starts[0].start >= 0 && starts[0].start < t.duration)) bad.push('no single start mark inside the clip');
+  const labels = marks.filter((m) => 'text' in m);
+  if (!(t.expected_labels > 0) || labels.length !== t.expected_labels) bad.push(`${labels.length} of ${t.expected_labels} labels`);
+  for (const m of labels) {
+    if (!(m.at >= 0 && m.at <= t.duration) || !(m.seconds > 0)) bad.push(`label "${m.text}" at ${m.at}s for ${m.seconds}s`);
+  }
+  for (const m of marks.filter((x) => 'cut' in x)) {
+    const [a, b] = m.cut || [];
+    if (!(a >= 0 && b > a && b <= t.duration + 0.5)) bad.push(`cut ${JSON.stringify(m.cut)}`);
+  }
+  return bad;
+}
+/** Write a file in one step: a temp file next to it, flushed, then renamed over the old one. */
+function writeAtomic(file, text) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  const fd = fs.openSync(tmp, 'w');
+  try { fs.writeSync(fd, text); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  fs.renameSync(tmp, file);
+}
+/** File a finished take under clips/takes/<scene>/<take>/ and, only if it is good, make it current. */
+function finishTake(clipsDir, { scene, take, ok, error, duration, expected, marks, rawVideo }) {
+  const dir = path.join(clipsDir, 'takes', scene, take);
+  fs.mkdirSync(dir, { recursive: true });
+  const name = `${scene}${ok ? '' : '.FAILED'}.webm`;
+  if (rawVideo && fs.existsSync(rawVideo)) fs.renameSync(rawVideo, path.join(dir, name));
+  const video = path.posix.join('takes', scene, take, name);
+  const file = path.join(clipsDir, video);
+  const t = { scene, take, ok, error: error || null, recorded_at: new Date().toISOString(), duration: +duration.toFixed(2),
+              expected_labels: expected, video, bytes: fs.existsSync(file) ? fs.statSync(file).size : 0, marks };
+  const problems = checkTake(t, clipsDir);
+  if (problems.length) t.rejected = problems;
+  fs.writeFileSync(path.join(dir, 'take.json'), JSON.stringify(t, null, 1));
+  if (!problems.length) writeAtomic(path.join(clipsDir, `${scene}.marks.json`), JSON.stringify(t, null, 1));
+  return { published: !problems.length, problems, dir };
+}
+
+/** --self-test: simulate good, failed and incomplete takes in a temp folder; no browser, no stack. */
+function selfTest() {
+  const os = require('os');
+  const assert = require('assert');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'finals-takes-'));
+  let k = 0;
+  const raw = (bytes) => { const f = path.join(dir, `raw${k++}.webm`); fs.writeFileSync(f, Buffer.alloc(bytes, 1)); return f; };
+  const good = [{ start: 1.2 }, { at: 2, seconds: 4, text: 'one' }, { cut: [3, 6] }, { at: 7, seconds: 3.5, text: 'two' }];
+  const cur = path.join(dir, 's1.marks.json');
+  try {
+    let r = finishTake(dir, { scene: 's1', take: 'A', ok: true, duration: 20, expected: 2, marks: good, rawVideo: raw(500) });
+    assert.ok(r.published, `good take refused: ${r.problems}`);
+    const before = fs.readFileSync(cur, 'utf8');
+    assert.strictEqual(JSON.parse(before).take, 'A');
+    // a failed re-record (an error after navigation and a slow wait): filed as FAILED, current untouched
+    r = finishTake(dir, { scene: 's1', take: 'B', ok: false, error: 'timeout', duration: 9, expected: 2,
+                          marks: [{ start: 0.8 }, { cut: [1, 8] }], rawVideo: raw(300) });
+    assert.ok(!r.published && fs.existsSync(path.join(r.dir, 's1.FAILED.webm')) && fs.existsSync(path.join(r.dir, 'take.json')));
+    assert.strictEqual(fs.readFileSync(cur, 'utf8'), before, 'a failed take changed the current marks');
+    // a take that "finished" but skipped a label, has no length, no start mark or no video: rejected too
+    for (const [why, bad] of [
+      ['missing-label', { ok: true, duration: 20, expected: 2, marks: good.slice(0, 3), rawVideo: raw(500) }],
+      ['zero-duration', { ok: true, duration: 0, expected: 2, marks: good, rawVideo: raw(500) }],
+      ['no-start', { ok: true, duration: 20, expected: 2, marks: good.slice(1), rawVideo: raw(500) }],
+      ['no-video', { ok: true, duration: 20, expected: 2, marks: good, rawVideo: null }],
+    ]) {
+      r = finishTake(dir, { scene: 's1', take: `C-${why}`, ...bad });
+      assert.ok(!r.published, `${why}: published`);
+      assert.strictEqual(fs.readFileSync(cur, 'utf8'), before, `${why}: changed the current marks`);
+    }
+    // the next good take replaces it in one rename and leaves no temp file behind
+    r = finishTake(dir, { scene: 's1', take: 'D', ok: true, duration: 21, expected: 2, marks: good, rawVideo: raw(700) });
+    assert.ok(r.published, `good take refused: ${r.problems}`);
+    const now = JSON.parse(fs.readFileSync(cur, 'utf8'));
+    assert.strictEqual(now.take, 'D'); assert.strictEqual(now.bytes, 700); assert.strictEqual(now.video, 'takes/s1/D/s1.webm');
+    assert.deepStrictEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
+    // every real scene shows at least one label, so the label check is never vacuous
+    for (const [n, sc] of Object.entries(SCENES)) assert.ok(expectedLabels(sc) > 0, `${n} has no labels`);
+    console.log(`self-test ok: a failed or incomplete take leaves the current marks untouched; `
+      + `labels per scene: ${Object.entries(SCENES).map(([n, sc]) => `${n}=${expectedLabels(sc)}`).join(' ')}`);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+}
+
 (async () => {
+  if (process.argv.includes('--self-test')) { selfTest(); return; }
+  ({ chromium } = require(path.join(webDir, 'node_modules/playwright')));
   fs.mkdirSync(OUT, { recursive: true });
   const args = process.argv.slice(2);
   const want = args.length ? args.filter((a) => a !== 'cards') : Object.keys(SCENES);
@@ -609,10 +711,14 @@ async function makeCards(browser) {
     } catch (e) { console.log(`warm-up skipped: ${e.message}`); }
     await warm.close();
   }
+  const failed = [];
   for (const name of want) {
     const sc = SCENES[name];
     seed = 20261103 + name.length * 7919 + name.charCodeAt(1) * 31;   // same moves on every re-shoot
-    const ctx = await browser.newContext({ viewport: VIEW, recordVideo: { dir: OUT, size: SIZE },
+    const take = takeId();
+    const tdir = path.join(OUT, 'takes', name, take);             // a fresh folder: never over a good take
+    fs.mkdirSync(tdir, { recursive: true });
+    const ctx = await browser.newContext({ viewport: VIEW, recordVideo: { dir: tdir, size: SIZE },
                                            colorScheme: 'dark', deviceScaleFactor: 1 });
     // no first-visit tour offer in the clips; start in the scene's mode; English UI
     await ctx.addInitScript((mode) => { try {
@@ -623,14 +729,21 @@ async function makeCards(browser) {
     const t0 = Date.now();
     MARKS.set(page, { t0, list: [] });
     POS.set(page, [770, 500]);
-    let ok = true;
-    try { await login(page, sc.who); await sc.run(page); console.log(`ok   ${name} ${((Date.now() - t0) / 1000).toFixed(1)}s`); }
-    catch (e) { ok = false; console.log(`FAIL ${name}: ${e.message.split('\n')[0]}`); }
+    let ok = true, error = null;
+    try { await login(page, sc.who); await sc.run(page); }
+    catch (e) { ok = false; error = e.message.split('\n')[0]; }
     const vid = page.video();
     await ctx.close();
-    if (vid) fs.renameSync(await vid.path(), path.join(OUT, `${name}${ok ? '' : '.FAILED'}.webm`));
-    fs.writeFileSync(path.join(OUT, `${name}.marks.json`), JSON.stringify(MARKS.get(page).list, null, 1));
+    const duration = (Date.now() - t0) / 1000;
+    const r = finishTake(OUT, { scene: name, take, ok, error, duration, expected: expectedLabels(sc),
+                                marks: MARKS.get(page).list, rawVideo: vid ? await vid.path() : null });
+    if (r.published) console.log(`ok   ${name} ${duration.toFixed(1)}s (take ${take} is now current)`);
+    else {
+      failed.push(name);
+      console.log(`FAIL ${name}: ${r.problems.join('; ')}\n     kept in ${path.relative(repo, r.dir)}; the current take is unchanged`);
+    }
   }
   if (cards) await makeCards(browser);
   await browser.close();
+  if (failed.length) { console.log(`not recorded: ${failed.join(' ')}`); process.exitCode = 1; }
 })();

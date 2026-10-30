@@ -3,6 +3,7 @@
     python docs/finals/video/assemble_finals.py                      picture + cue sheet + subtitles
     python docs/finals/video/assemble_finals.py --voice voice.m4a    ... and lay the voice-over under it
     python docs/finals/video/assemble_finals.py --cues-only [--hy3]  only re-write the cue sheet / .srt
+    python docs/finals/video/assemble_finals.py --self-test          check the take checks (no ffmpeg)
 
 (Use a Python with Pillow, e.g. ``databridge\\.venv\\Scripts\\python``; ffmpeg and ffprobe on PATH.)
 
@@ -24,14 +25,19 @@ Adapted from docs/tencent/video/assemble.py (the first video); the edit follows 
   shorter one holds its last frame only up to the -10% mark;
 - still cards and slides drift in very slowly (2.5% over the card) instead of sitting frozen;
 - segments join with a short cross-fade (0.35 s);
-- each clip's ``<scene>.marks.json`` (written by record_finals.cjs) becomes a small label pill at the
-  lower left, faded in and out when the action happens; slow waits it marked are cut to about a second,
-  and the blank frames before the first page are dropped. Answers themselves are never cut;
+- each clip comes from its current good take: ``clips/<scene>.marks.json`` (written by record_finals.cjs
+  only after a clean take) names the take's video under ``clips/takes/`` and carries its marks. Each
+  label becomes a small pill at the lower left, faded in and out when the action happens; slow waits it
+  marked are cut to about a second, and the blank frames before the first page are dropped. Answers
+  themselves are never cut;
 - ``--voice`` lines the voice-over up with the cue sheet (its first spoken word lands on the first cue),
   cleans it (high-pass, loudness-normalised to -16 LUFS) and mixes it under the picture after the intro.
 
 Missing inputs are replaced by a labelled placeholder and reported, never silently skipped; a segment
-marked optional is left out instead.
+marked optional is left out instead. A clip whose current take fails ``check_take`` (a failed or
+unfinished take, a missing label, a zero duration, a video that is not the one the marks were made with,
+or an old-style marks list with no take) stops the whole assembly before anything is rendered: re-record
+that scene. An optional scene with such a take is left out, with the reason printed.
 """
 from __future__ import annotations
 
@@ -200,9 +206,117 @@ def _shift(at: float, cuts: list[list[float]]) -> float:
     return at - gone
 
 
-def clip(src: Path, target: float, out: Path, work: Path) -> tuple[float, str]:
-    marks_file = src.with_suffix(".marks.json")
-    raw = json.loads(marks_file.read_text(encoding="utf-8")) if marks_file.exists() else []
+# ---- takes: only the current good take of a scene is ever used ---------------------------------
+class TakeError(Exception):
+    """The scene's current take cannot be trusted; the message says why."""
+
+
+def check_take(t: object, clips: Path, scene: str) -> list[str]:
+    """Problems with a take record (empty: it is fine). The same checks as record_finals.cjs checkTake()."""
+    if isinstance(t, list):
+        return ["an old-style marks list with no take id (written before takes were kept): re-record it"]
+    if not isinstance(t, dict):
+        return ["not a take record"]
+    bad: list[str] = []
+    num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)  # noqa: E731
+    dur = t.get("duration")
+    if t.get("scene") != scene:
+        bad.append(f"it is a take of {t.get('scene')!r}")
+    if t.get("ok") is not True or t.get("rejected"):
+        bad.append(f"the take failed: {t.get('error') or t.get('rejected')}")
+    if not num(dur) or dur <= 0:
+        bad.append(f"duration {dur}")
+        dur = 0.0
+    video = clips / str(t.get("video") or "")
+    if not t.get("video") or not video.is_file():
+        bad.append(f"video {t.get('video')} missing")
+    elif not num(t.get("bytes")) or t["bytes"] <= 0 or video.stat().st_size != t["bytes"]:
+        bad.append(f"video {t.get('video')} is not the {t.get('bytes')} bytes the marks were made with")
+    marks = t.get("marks") if isinstance(t.get("marks"), list) else []
+    starts = [m["start"] for m in marks if isinstance(m, dict) and "start" in m]
+    if len(starts) != 1 or not num(starts[0]) or not 0 <= starts[0] < dur:
+        bad.append("no single start mark inside the clip")
+    labels = [m for m in marks if isinstance(m, dict) and "text" in m]
+    want = t.get("expected_labels")
+    if not isinstance(want, int) or want <= 0 or len(labels) != want:
+        bad.append(f"{len(labels)} of {want} labels")
+    for m in labels:
+        if not (num(m.get("at")) and 0 <= m["at"] <= dur and num(m.get("seconds")) and m["seconds"] > 0):
+            bad.append(f"label {m.get('text')!r} at {m.get('at')}s for {m.get('seconds')}s")
+    for m in marks:
+        if isinstance(m, dict) and "cut" in m:
+            c = m["cut"]
+            if not (isinstance(c, list) and len(c) == 2 and all(num(x) for x in c) and 0 <= c[0] < c[1] <= dur + 0.5):
+                bad.append(f"cut {c}")
+    return bad
+
+
+def current_take(clips: Path, scene: str) -> tuple[Path, list[dict]] | None:
+    """The video and marks of the scene's current good take; None if it was never recorded."""
+    pointer = clips / f"{scene}.marks.json"
+    if not pointer.exists():
+        return None
+    try:
+        t = json.loads(pointer.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise TakeError(f"{pointer.name}: unreadable ({e})") from e
+    problems = check_take(t, clips, scene)
+    if problems:
+        raise TakeError(f"{pointer.name}: " + "; ".join(problems))
+    return clips / t["video"], t["marks"]
+
+
+def self_test() -> int:
+    """Simulate good, failed and incomplete takes in a temp folder and check each is judged right."""
+    d = Path(tempfile.mkdtemp(prefix="finals-takes-"))
+    try:
+        (d / "takes" / "s1" / "A").mkdir(parents=True)
+        (d / "takes" / "s1" / "A" / "s1.webm").write_bytes(b"\1" * 500)
+        good = {"scene": "s1", "take": "A", "ok": True, "duration": 20.0, "expected_labels": 2,
+                "video": "takes/s1/A/s1.webm", "bytes": 500,
+                "marks": [{"start": 1.2}, {"at": 2, "seconds": 4, "text": "one"}, {"cut": [3, 6]},
+                          {"at": 7, "seconds": 3.5, "text": "two"}]}
+        pointer = d / "s1.marks.json"
+
+        def judge(t: object) -> str:
+            pointer.write_text(json.dumps(t), encoding="utf-8")
+            try:
+                current_take(d, "s1")
+                return ""
+            except TakeError as e:
+                return str(e)
+
+        assert current_take(d, "nothing") is None
+        assert judge(good) == "", judge(good)
+        video, marks = current_take(d, "s1")
+        assert video == d / "takes/s1/A/s1.webm" and len(marks) == 4
+        cases = {
+            "the take failed": {**good, "ok": False, "error": "timeout"},
+            "1 of 2 labels": {**good, "marks": good["marks"][:3]},
+            "duration 0": {**good, "duration": 0},
+            "no single start mark": {**good, "marks": good["marks"][1:]},
+            "is not the 400 bytes": {**good, "bytes": 400},           # marks of another take's video
+            "takes/s1/B/s1.webm missing": {**good, "video": "takes/s1/B/s1.webm"},
+            "old-style marks list": good["marks"],                      # what the old recorder wrote
+            "label 'two' at 7s for 0s": {**good, "marks": good["marks"][:3] + [{"at": 7, "seconds": 0, "text": "two"}]},
+            "a take of 's2'": {**good, "scene": "s2"},
+        }
+        for want, t in cases.items():
+            got = judge(t)
+            assert want in got, f"{want!r} not in {got!r}"
+        pointer.write_text("{", encoding="utf-8")                      # cut off mid-write
+        try:
+            current_take(d, "s1")
+            raise AssertionError("a truncated marks file was accepted")
+        except TakeError as e:
+            assert "unreadable" in str(e), e
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    print(f"self-test ok: {len(cases)} bad takes refused, the good take accepted")
+    return 0
+
+
+def clip(src: Path, target: float, out: Path, work: Path, raw: list[dict]) -> tuple[float, str]:
     cuts = [m["cut"] for m in raw if "cut" in m and m["cut"][1] - m["cut"][0] > 0.2]
     start = max([m["start"] for m in raw if "start" in m] or [0.0])
     if start > 0.05:
@@ -376,12 +490,36 @@ def main() -> int:
     ap.add_argument("--cues-only", action="store_true", help="only re-write the cue sheet from timeline.json")
     ap.add_argument("--no-intro", action="store_true", help="leave the camera intro out")
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--self-test", action="store_true", help="check the take checks on made-up takes, then stop")
     args = ap.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     if args.cues_only:
         timeline = json.loads((V / "timeline.json").read_text(encoding="utf-8"))
         write_cues(timeline, args.hy3)
         return 0
+
+    # every clip's current take is checked before anything is rendered (Codex round 2b #3)
+    takes: dict[str, tuple[Path, list[dict]] | None] = {}
+    refused, unusable = [], set()
+    for kind, name, _, label, extra in SEGMENTS:
+        if kind != "clip":
+            continue
+        try:
+            takes[name] = current_take(CLIPS, Path(name).stem)
+        except TakeError as e:
+            if extra.get("optional"):
+                unusable.add(name)
+                print(f"skip  {label} (optional; its take is not usable: {e})")
+            else:
+                refused.append(f"{label}: {e}")
+    if refused:
+        print("REFUSED: these scenes have no complete good take; re-record them with record_finals.cjs:")
+        for r in refused:
+            print("  -", r)
+        return 1
 
     work = Path(tempfile.mkdtemp(prefix="finalsvideo-"))
     parts: list[tuple[Path, float, str, str]] = []
@@ -389,10 +527,15 @@ def main() -> int:
     for i, (kind, name, secs, label, extra) in enumerate(SEGMENTS):
         if kind == "camera" and args.no_intro:
             continue
+        if name in unusable:
+            continue                                   # optional, reported above
         src = {"camera": INTRO, "card": CARDS, "clip": CLIPS, "still": WB}[kind]
         src = src if kind == "camera" else src / name
+        take = takes.get(name)
+        if take:
+            src = take[0]                              # the current good take's own video
         out = work / f"{i:02d}.mp4"
-        if not src.exists():
+        if (kind == "clip" and not take) or not src.exists():
             if extra.get("optional"):
                 print(f"skip  {label} (optional; {name} not recorded)")
                 continue
@@ -403,7 +546,7 @@ def main() -> int:
             length = camera(src, out)
             parts.append((out, length, label, "camera intro, own sound"))
         elif kind == "clip":
-            length, note = clip(src, secs, out, work)
+            length, note = clip(src, secs, out, work, take[1])
             parts.append((out, length, label, note))
         else:
             still(src, secs, out, work, extra.get("pills", ()))

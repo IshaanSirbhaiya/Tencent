@@ -71,6 +71,16 @@ Everything else is new wording for the new screens: scenes 01–05, 06b, 07–09
 
 - One clip per scene; re-shoot one with `node docs/finals/video/record_finals.cjs <scene>` and re-run
   `assemble_finals.py`. The edit adapts each clip to its target length (±10–15%) without visible speed-up.
+- **How takes are kept** (fix for Codex round 2b #3). Each recording goes into its own folder,
+  `submission/finals_video/clips/takes/<scene>/<take>/` (the video plus `take.json` with its marks); a
+  failed take is kept there as `<scene>.FAILED.webm`. Only a take that finished and passes the check
+  (every label the scene shows, one start mark, durations above 0, the video on disk) replaces the
+  current good take, `clips/<scene>.marks.json`, in one rename; that file names the take's video, so
+  the video and its marks always come from the same take. A failed re-record leaves the previous good
+  take untouched, and the recorder exits 1. `assemble_finals.py` uses only the current good take and
+  refuses, before rendering anything, if a scene's take is incomplete or is an old-style marks list (all
+  clips recorded before 30 Oct are, so re-record them). Old takes are not deleted automatically.
+  `--self-test` on either script checks this without a browser or ffmpeg.
 - Teammates may add features before the freeze. A new scene is three edits: a `SCENES` entry in
   `record_finals.cjs`, a `SEGMENTS` row in `assemble_finals.py` (mark it `{"optional": True}` while it is
   unfinished), and a `### NN · Title` section with `>` lines in `VIDEO_SCRIPT_FINALS.md`.

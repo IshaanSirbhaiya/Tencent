@@ -24,8 +24,8 @@ Updated by the cloud session, Fri 30 Oct 2026 (started ~11:45 SGT).
    - the Summary deliverable is not built;
    - the compliance connector stays out of the shared WorkBuddy config. This may change the WorkBuddy GUI
      test prompts that name `ib-compliance`: see `WORKBUDDY_GUI_TEST.md`.
-9. **Codex 2b #3 (video):** a failed re-record overwrites the marks of the previous good take. Fix it before
-   the next recording (`record_finals.cjs`, `assemble_finals.py`).
+9. **Codex 2b #3 (video): FIXED on the laptop, 30 Oct.** Takes are kept per folder and only a validated take
+   becomes current. The existing clips use the old marks format, so re-record the scenes before assembling.
 10. **Upload folder by name:** the upload sheet takes a Drive folder id (no folder-list route exists).
     A name picker needs a small backend route; that is your call.
 

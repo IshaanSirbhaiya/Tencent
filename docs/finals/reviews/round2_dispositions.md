@@ -48,7 +48,7 @@ formula guard, T15) was built in this session and fails when the guard is remove
 | Opus: `check_absent.py` reads `count` | **Fixed:** it reads `documents_containing` (`test_round2_kit.py`) |
 | Opus smaller items | **Fixed:** `--fresh` refuses `..` and paths outside `var/`; `fill_template` takes a basename only, won't overwrite, and guards CSV formulas; `*.tok` is ignored; `hy3_check` needs real reply text (Codex 2b #1); the default summary is neutral. The presenter-P docstring was already correct |
 | Codex 2b #2: `fill_template` path traversal | **Fixed** (same as above) |
-| Codex 2b #3: a failed video re-record overwrites marks | **Not fixed.** The video is on hold; listed for the laptop session |
+| Codex 2b #3: a failed video re-record overwrites marks | **Fixed (laptop, 30 Oct).** Each take goes to `clips/takes/<scene>/<ts>/`; the current marks are replaced in one rename only after a validated take; `assemble_finals.py` refuses incomplete or old-format marks. Self-tests in both scripts. Old clips must be re-recorded |
 
 ## 6. Round-2b Opus (`round2b_opus_unreviewed.md`)
 
