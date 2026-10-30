@@ -35,6 +35,10 @@ stop_port() {
   done
 }
 wait_http() { for _ in $(seq 1 "$2"); do curl -fsS -m 3 "$1" >/dev/null 2>&1 && return 0; sleep 1; done; return 1; }
+# Start a service only when nothing answers on its health URL AND nothing listens on its port, so a
+# second start never launches a duplicate (a duplicate Internal Brain races the live one for the
+# ledger). netstat can miss a listener (e.g. one started from another console); the probe cannot.
+need_start() { ! curl -fsS -m 3 "$2" >/dev/null 2>&1 && [ -z "$(port_pids "$1")" ]; }
 
 case "${1:-start}" in
   stop)
@@ -66,14 +70,14 @@ mkdir -p "$LOGS"
 SEED=0; [ ! -d "$STATE/ledger" ] && SEED=1
 
 echo "[1/5] mock platforms :8200"
-if [ -z "$(port_pids 8200)" ]; then
+if need_start 8200 http://127.0.0.1:8200/health; then
   ( exec </dev/null >"$LOGS/mock.log" 2>&1
     PYTHONPATH="apps/mock_platforms" MOCK_WEBHOOK_URL="http://127.0.0.1:8100" nohup "$PY" -m mock_platforms --port 8200 & )
 fi
 wait_http http://127.0.0.1:8200/health 60 || { echo "mock platforms did not start; see $LOGS/mock.log" >&2; exit 1; }
 
 echo "[2/5] Internal Brain :8100 (IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE)"
-if [ -z "$(port_pids 8100)" ]; then
+if need_start 8100 http://127.0.0.1:8100/health; then
   ( exec </dev/null >"$LOGS/ib.log" 2>&1
     PYTHONPATH="$IB_PATH" nohup "$PY" -m databridge_ib & )
 fi
@@ -92,7 +96,7 @@ echo "[4/5] Walnut engine gateway :8300"
 bash scripts/run_walnut_original.sh start >"$LOGS/engine.log" 2>&1 || echo "  engine did not start; see $LOGS/engine.log (only /dev/brain needs it)"
 
 echo "[5/5] web app :3100"
-if [ -z "$(port_pids 3100)" ]; then
+if need_start 3100 http://127.0.0.1:3100/login; then
   ( cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 npx next build >"$ROOT/$LOGS/web-build.log" 2>&1 ) \
     || { echo "web build failed; see $LOGS/web-build.log" >&2; exit 1; }
   ( exec </dev/null >"$LOGS/web.log" 2>&1
