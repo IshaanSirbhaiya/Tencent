@@ -27,6 +27,7 @@ import datetime as dt
 import http.cookiejar
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -60,6 +61,8 @@ def model_called(model: Optional[dict]) -> bool:
     """Whether a model was called for an /ib/ask answer, from its ``model`` field alone: any
     non-deterministic provider, or a deterministic answer that is a fallback after a model try."""
     m = model or {}
+    if not m:                                   # no model field: nothing says a model was called
+        return False
     if m.get("provider") != "deterministic" and not str(m.get("model", "")).startswith("extractive"):
         return True
     return bool(m.get("fallback_used"))
@@ -69,6 +72,71 @@ def ask_limit_s(model: Optional[dict], quoted_max_s: float = QUOTED_MAX_S,
                 model_max_s: float = MODEL_MAX_S) -> float:
     """The slowest acceptable time for one ask, given the answer's ``model`` field."""
     return model_max_s if model_called(model) else quoted_max_s
+
+
+#: why a quoted answer was served (``model.reason_code``, docs/finals/backend_v1.md)
+_QUOTED_WHY = {"quoted_approved_script": "approved wording, quoted",
+               "model_rejected_evidence": "quoted, the model's draft failed the evidence check",
+               "model_unavailable": "quoted, the model did not reply in time"}
+
+
+def answer_by(model: Optional[dict]) -> str:
+    """Who wrote a warm-up answer, for the row's text: never a raw stand-in id or a provider key.
+    Hy3 is the one model named on stage; any other model is "AI model"."""
+    m = model or {}
+    mid = str(m.get("model", ""))
+    if m.get("provider") == "deterministic" or mid.startswith("extractive"):
+        why = _QUOTED_WHY.get(str(m.get("reason_code") or ""))
+        if why:
+            return why
+        return "quoted after a model try" if m.get("fallback_used") else "quoted (no model)"
+    return "Hy3" if "hy3" in mid.lower() else "AI model"
+
+
+WORLD = ROOT / "fixtures" / "enterprise" / "world.json"
+#: Rachel's three stage facts, by their fact ids in the world's fact manifest (never written down
+#: here as answers): the case trigger (its count), the device link (its "X of Y"), the STR filing
+RACHEL_FACTS = ("FINCRIME-case-confluence", "FINCRIME-case-drive", "FINCRIME-str-confluence")
+_FILED = re.compile(r"\b(filed|filing|lodged|submitted|reported to)\b", re.I)
+
+
+def _facts(world_path: Path = WORLD) -> dict[str, dict]:
+    try:
+        w = json.loads(Path(world_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {f.get("id"): f for f in w.get("facts") or []}
+
+
+def rachel_facts(body: Optional[dict], world_path: Path = WORLD) -> list[tuple[str, bool]]:
+    """``[(label, present)]`` for Rachel's three stage facts in her answer, derived from the world's
+    fact manifest. A fact counts only when its own document is cited:
+    * the STR filing: the answer says it was filed/lodged and cites the STR decision record;
+    * the count: the trigger's first number (e.g. the number of transfers) is in the answer;
+    * the "X of Y" device link: both of its numbers are in the answer.
+    An empty list when the manifest cannot be read."""
+    facts = _facts(world_path)
+    if not all(k in facts for k in RACHEL_FACTS):
+        return []
+    b = body or {}
+    text = " ".join(str(b.get("answer") or "").split())
+    cited = {str(c.get("doc_id")) for c in b.get("citations") or []}
+    nums = lambda s: re.findall(r"(?<![\d.,])\d+(?![\d.,]*\d)", s)        # noqa: E731
+    have = set(nums(text))
+    trig, dev, strf = (facts[k] for k in RACHEL_FACTS)
+    t_num = (nums(trig["statement"]) or ["?"])[0]
+    d_nums = nums(dev["statement"])[:2]
+    # the filing must be said in a sentence that cites the STR record itself (a generic rule
+    # sentence such as "telling anyone a report has been filed is an offence" does not count)
+    str_tags = {str(c.get("tag")) for c in b.get("citations") or [] if c.get("doc_id") == strf["doc"]}
+    str_said = any(_FILED.search(sent) and any(f"[{t}]" in sent or f"{t}]" in sent for t in str_tags)
+                   for sent in re.split(r"(?<=[.!?])\s+", text))
+    return [
+        ("STR filed", str_said),
+        (f"{t_num} (the trigger count)", trig["doc"] in cited and t_num in have),
+        (f"{' of '.join(d_nums)} (the device link)", dev["doc"] in cited and len(d_nums) == 2
+         and all(n in have for n in d_nums)),
+    ]
 
 
 class Client:
@@ -366,7 +434,7 @@ def main() -> int:
             model = (body.get("model") or {}).get("model", "?")
             outcome = "refused" if refused else f"answered, {len(cites)} citations"
             status = "pass" if right and fast else "fail"
-            detail = f"{secs:.1f}s, {outcome}, model {model}"
+            detail = f"{secs:.1f}s, {outcome}, by {answer_by(body.get('model'))}"
             if not right:
                 detail += " (NOT what the script expects)"
             if not fast:
@@ -392,6 +460,17 @@ def main() -> int:
             rep.add("warm", "ken_identical", "Ken's two refusals are identical", "pass" if same else "fail",
                     "same text, citations, scope note and model" if same else "the two refusals differ")
         ask("jordan", "jdoe", "Jordan (WorkBuddy question, in-app)", Q_WORKBUDDY, "answer")
+        if rachel:
+            # Story 1 fix #1: the three facts the stage story says aloud. A WARN, never a fail: the
+            # answer is still right without them; the presenter re-asks or uses the recorded clip.
+            got = rachel_facts(rachel)
+            if got:
+                missing = [lab for lab, ok in got if not ok]
+                rep.add("warm", "rachel_facts", "Rachel's answer states the stage facts",
+                        "warn" if missing else "pass",
+                        ("missing: " + ", ".join(missing) + ". Ask again, or play the recorded clip"
+                         if missing else "STR filed, the count and the device link are all stated"),
+                        facts={lab: ok for lab, ok in got})
         if rachel and maya.jar:
             rid = rachel.get("request_id", "")
             code, _, secs = maya.call("GET", f"audit/journey/{rid}", timeout=30)
