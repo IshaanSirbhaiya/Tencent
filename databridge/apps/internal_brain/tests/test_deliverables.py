@@ -534,6 +534,14 @@ def test_bodies_carry_no_identity_and_flag_off_is_404(tmp_path, monkeypatch):
     r = _deliver(jd2, rid2, "table")
     assert r.status_code == 404 and r.json() == {"detail": "not found"}
     assert _export(jd2, "f" * 32).status_code == 404
+    # round 3 I1: with the switch off an INVALID body is the same 404, not a 422
+    for body in ({"req_id": rid2, "kind": "pie"}, {"req_id": rid2, "kind": "table", "user": "x"}, {}):
+        r = jd2.post("/ib/deliverables", json=body)
+        assert r.status_code == 404 and r.json() == {"detail": "not found"}, body
+    r = jd2.post("/ib/deliverables/export", json={"deliverable_id": "x"})
+    assert r.status_code == 404 and r.json() == {"detail": "not found"}
+    r = jd2.post("/ib/deliverables", content=b"not json", headers={"content-type": "application/json"})
+    assert r.status_code == 404 and r.json() == {"detail": "not found"}
     assert len(_events(svc2)) == n
     assert jd2.get("/ib/status").json()["deliverables"]["enabled"] is False
     assert jd2.get("/ib/status").json()["deliverables"]["kinds"] == []
@@ -695,9 +703,25 @@ def _pptx_strings(data: bytes) -> tuple[list[str], list[str]]:
     return out, formulas
 
 
+def _chart_xlsx_blobs(data: bytes) -> list[bytes]:
+    pptx = pytest.importorskip("pptx")
+    prs = pptx.Presentation(io.BytesIO(data))
+    return [sh.chart.part.chart_workbook.xlsx_part.blob for sl in prs.slides for sh in sl.shapes
+            if getattr(sh, "has_chart", False) and sh.has_chart]
+
+
+def _zip_xml(blob: bytes) -> str:
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        return "".join(z.read(n).decode("utf-8", "replace") for n in z.namelist())
+
+
 _EVIL_LABELS = _d("slack:p1", "SME pricing by market",
                   "market,plan,price\n=cmd|' /C calc'!A0 SG,Growth,0.35% FX margin\n"
                   "@SUM(A1) HK,Growth,0.35% FX margin\n+ID,Growth,0.4% FX margin\n"
+                  "{=cmd|' /C calc'!A0 market},Growth,0.35% FX margin\n"
+                  "external:c:\\temp\\x.xlsx market,Growth,0.35% FX margin\n"
+                  "mailto:a market,Growth,0.4% FX margin\n"
                   "Notes: Multi-currency accounts for Indonesian SME customers are priced at a 0.4% FX "
                   "margin.", container="pricing", author="priya", kind="file")
 
@@ -721,10 +745,15 @@ def test_pptx_embedded_workbook_has_no_formulas(tmp_path):
         assert r.headers["x-content-type-options"] == "nosniff"
         strings, formulas = _pptx_strings(r.content)
         assert formulas == []
+        for blob in _chart_xlsx_blobs(r.content):           # round 3 M1: raw workbook XML
+            xml = _zip_xml(blob)
+            assert not re.search(r"<f[\s>/]", xml) and "<hyperlink" not in xml and "relationships/hyperlink" not in xml, kind
         for s in strings:
             for line in s.splitlines():
                 assert not X._TRIGGER.match(line) or X._PLAIN_NUMBER.match(line.strip()), (kind, line)
         assert "'=cmd|' /C calc'!A0 SG" in strings and "'@SUM(A1) HK" in strings
+        assert "'{=cmd|' /C calc'!A0 market}" in strings and "'mailto:a market" in strings
+        assert "'external:c:\\temp\\x.xlsx market" in strings
         ex = _events(svc, "deliverable.exported")[-1]
         assert ex.format == "pptx" and ex.bytes == len(r.content)
         assert ex.digest == hashlib.sha256(r.content).hexdigest()
@@ -778,3 +807,48 @@ def test_pptx_export_rechecks_a_revoked_source_and_records_failures(tmp_path, mo
     monkeypatch.setenv("IB_DELIVERABLES", "1")
     svc.connectors["slack"].readers["slack:p1"].discard("jdoe")           # revoked at the source
     assert _export(jd, d["deliverable_id"], "pptx").status_code == 404
+
+
+# ------------------------------------------------------------------------------------------------
+# Round 3 L1: deterministic source_table column labels pass the same check as on export
+# ------------------------------------------------------------------------------------------------
+_PII_HEADERS = _d("slack:p1", "SME pricing by market",
+                  "market,contact ops@walnut-bank.example now,phone +65 6123 4567 x\n"
+                  "SG,Growth,0.35% FX margin\nHK,Growth,0.35% FX margin\nID,Growth,0.4% FX margin\n"
+                  "Notes: Multi-currency accounts for Indonesian SME customers are priced at a 0.4% "
+                  "FX margin.", container="pricing", author="priya", kind="file")
+
+
+def test_source_table_headers_are_checked_so_create_equals_export(tmp_path):
+    app, svc = _world(tmp_path, [_PII_HEADERS, FEES])
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    d = _deliver(jd, rid, "table").json()
+    assert d["status"] == "ready" and d["content"]["source"] == "source_table", d
+    cols = d["content"]["columns"]
+    assert cols == ["market", "Column 2", "Column 3"]
+    assert not any("@" in c or "6123" in c for c in cols)
+    r = _export(jd, d["deliverable_id"])
+    assert r.status_code == 200
+    head = next(csv.reader(io.StringIO(r.content.decode("utf-8-sig"))))
+    assert head[:-1] == cols
+
+
+def test_a_build_error_writes_failed_after_requested_and_answers_503(tmp_path, monkeypatch):
+    """Round 3 I3: an exception inside the build closes the write-ahead ``deliverable.requested``
+    with a ``deliverable.failed`` and answers the generic 503 (no detail)."""
+    from databridge_ib.deliverables import build as B
+
+    def boom(*a, **k):
+        raise RuntimeError("builder bug")
+    monkeypatch.setattr(B, "source_table", boom)
+    app, svc = _world(tmp_path)
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    r = _deliver(jd, rid, "table")
+    assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+    req = _events(svc, "deliverable.requested")[-1]
+    fail = _events(svc, "deliverable.failed")[-1]
+    assert fail.deliverable_id == req.deliverable_id and fail.reason_code == "build_RuntimeError"
+    assert fail.stage == "generate" and not _events(svc, "deliverable.created")
+    assert "builder bug" not in r.text

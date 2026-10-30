@@ -89,12 +89,22 @@ EXTRACT_MIME_KIND = {DOCX_MIME: "docx", XLSX_MIME: "xlsx", PPTX_MIME: "pptx", PD
 BINARY_MIME_KIND = {m: k for m, k in EXTRACT_MIME_KIND.items() if k not in ("csv",)}
 TEXT_KINDS = frozenset({"csv", "md", "txt"})
 _OOXML_PART = {"docx": "word/", "xlsx": "xl/", "pptx": "ppt/"}
-_XML_MEMBER = (".xml", ".rels", ".vml")
-
-#: an HTML / XML tag or comment (a lone "<" in "a < b" is left alone)
-_TAG = re.compile(r"<!--.{0,2000}?-->|</?[A-Za-z][^<>]{0,2000}>", re.S)
+#: an HTML / XML tag (a lone "<" in "a < b" is left alone). Comments are stripped by
+#: ``_strip_comments`` in one linear pass (round 3 L6: a lazy ``<!--.{0,2000}?-->`` regex took
+#: ~25 s on 5 MiB of unclosed ``<!--``)
+_TAG = re.compile(r"</?[A-Za-z][^<>]{0,2000}>")
+_COMMENT_MAX = 2000
 _CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f​-‏‪-‮⁦-⁩﻿]")
 _DTD = re.compile(rb"<!\s*(doctype|entity)", re.I)
+#: round 3 L2: the XML encodings a part may use. UTF-16/32 parts are scanned with their NUL bytes
+#: removed (so an ASCII ``<!DOCTYPE`` is found in any byte order); any other declared encoding
+#: (UTF-7, EBCDIC, Latin-1 ...) could hide a DTD from a byte scan, so it is refused.
+_XML_DECL_ENC = re.compile(rb"^<\?xml[^>]{0,200}?encoding\s*=\s*[\"']([A-Za-z0-9._\-]{1,40})[\"']", re.I)
+_XML_OK_ENC = frozenset({b"utf-8", b"utf8", b"utf-16", b"utf16", b"utf-16le", b"utf-16be",
+                         b"utf-32", b"utf-32le", b"utf-32be", b"ucs-2", b"ucs-4", b"iso-10646-ucs-2",
+                         b"iso-10646-ucs-4"})
+_BOMS = (b"\x00\x00\xfe\xff", b"\xff\xfe\x00\x00", b"\xef\xbb\xbf", b"\xff\xfe", b"\xfe\xff")
+_EBCDIC_XML = b"\x4c\x6f\xa7\x94"                  # "<?xm" in EBCDIC (libxml2 autodetects it)
 _CONVERT = Path(__file__).resolve().parents[3] / "packages" / "convert"
 
 
@@ -118,11 +128,38 @@ def kind_for_filename(name: str) -> Optional[str]:
 # ------------------------------------------------------------------------------------------
 # byte-level checks (cheap; no reader involved; run in the Internal Brain process)
 # ------------------------------------------------------------------------------------------
+_XML_NAME = (".xml", ".rels", ".vml")
+
+
+def _xml_head(head: bytes) -> bool:
+    """Whether a member's first bytes can start an XML document in any encoding libxml2 detects:
+    after a BOM, NUL bytes (UTF-16/32) and whitespace, a ``<``; or EBCDIC ``<?xm``. A member that
+    does not start like this is not well-formed XML, so no (non-recovering) XML reader parses it.
+    Refuses a declared encoding the DTD scan cannot see through (``xml_encoding``)."""
+    if head.startswith(_EBCDIC_XML):
+        raise Refused("xml_encoding")
+    h = head
+    for bom in _BOMS:
+        if h.startswith(bom):
+            h = h[len(bom):]
+            break
+    h = h.replace(b"\x00", b"").lstrip()
+    m = _XML_DECL_ENC.match(h)
+    if m and m.group(1).lower() not in _XML_OK_ENC:
+        raise Refused("xml_encoding")
+    return h.startswith(b"<")
+
+
 def _scan_member(z: zipfile.ZipFile, info: zipfile.ZipInfo, running: int) -> int:
-    """Stream one member (its declared size can lie) and refuse a DTD / entity in an XML part.
-    Returns the running uncompressed total."""
-    xml = info.filename.lower().endswith(_XML_MEMBER) or info.filename == "[Content_Types].xml"
+    """Stream one member (its declared size can lie) and refuse a DTD / entity in an XML-bearing
+    member. Round 3 L2: XML-bearing is decided by the name (``.xml``, ``.rels``, ``.vml``) OR by
+    the first bytes (``_xml_head``), so a main part renamed ``.dat`` is still scanned; the scan
+    runs on the bytes and again with NUL bytes removed (a UTF-16 or UTF-32 part, with or without
+    a BOM). Binary members (images, printer settings) are counted but not DTD-scanned. Returns
+    the running uncompressed total."""
+    xml = info.filename.lower().endswith(_XML_NAME)
     tail = b""
+    first = True
     try:
         with z.open(info) as fh:
             while True:
@@ -132,9 +169,14 @@ def _scan_member(z: zipfile.ZipFile, info: zipfile.ZipInfo, running: int) -> int
                 running += len(chunk)
                 if running > ZIP_MAX_TOTAL:
                     raise Refused("zip_bomb_actual")
-                if xml and _DTD.search(tail + chunk):
-                    raise Refused("xml_dtd")
-                tail = chunk[-32:]
+                if first:
+                    xml = _xml_head(chunk[:512]) or xml
+                    first = False
+                if xml:
+                    buf = tail + chunk
+                    if _DTD.search(buf) or _DTD.search(buf.replace(b"\x00", b"")):
+                        raise Refused("xml_dtd")
+                    tail = chunk[-128:]
     except Refused:
         raise
     except Exception:                                      # noqa: BLE001 — corrupt member
@@ -208,11 +250,37 @@ def check_bytes(kind: str, data: bytes) -> None:
 # ------------------------------------------------------------------------------------------
 # text: cleaning and the WhatsApp chat export (pure functions)
 # ------------------------------------------------------------------------------------------
+def _strip_comments(text: str) -> str:
+    """``<!-- ... -->`` out (body up to 2,000 characters, as before), in one linear pass: the
+    closing ``-->`` is searched once per position it can serve, and when none is left the scan
+    stops (round 3 L6)."""
+    if "<!--" not in text:
+        return text
+    out, pos, close = [], 0, -1
+    n = len(text)
+    while pos < n:
+        i = text.find("<!--", pos)
+        if i < 0:
+            break
+        if close < i + 4:
+            close = text.find("-->", i + 4)
+            if close < 0:
+                break                                  # no comment after here can close
+        if close - (i + 4) <= _COMMENT_MAX:
+            out.append(text[pos:i])
+            pos = close + 3
+        else:
+            out.append(text[pos:i + 1])                # too long: leave this "<", go on
+            pos = i + 1
+    out.append(text[pos:])
+    return "".join(out)
+
+
 def clean_text(text: str) -> str:
     """NFC, control / bidi characters out, HTML tags out, whitespace tidied, capped."""
     text = unicodedata.normalize("NFC", text or "").replace("\r\n", "\n").replace("\r", "\n")
     text = _CTRL.sub("", text.replace(" ", " ").replace(" ", " "))
-    text = _TAG.sub("", text)
+    text = _TAG.sub("", _strip_comments(text))
     text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text[:MAX_TEXT_CHARS]

@@ -9,6 +9,7 @@ import csv
 import io
 import json
 import math
+import re
 from datetime import datetime, timezone
 from types import SimpleNamespace as NS
 
@@ -342,3 +343,52 @@ def test_pptx_writer_guards_planted_hyperlink_in_categories_series_and_text():
     assert "'[1] =evil title" not in texts and "javascript" not in texts      # link dropped
     assert "request 00000000" in texts                                        # non-hex req id
     assert X.ptext("a\x00b\x0bc") == "abc"
+
+
+# -- Round 3 M1: array formulas and XlsxWriter's automatic links never reach the chart workbook ---
+_M1_LABELS = ["{=cmd|' /C calc'!A0 market}", '{=HYPERLINK("file:///C:/x","Open market")}',
+              "external:c:\\temp\\x.xlsx market", "mailto:a market", "file:///etc/passwd market",
+              "internal:Sheet2!A1 market", "ftp://x.example market", "https://x.example market",
+              " {=1+1}", "\uff5b=1+1}"]
+
+
+def _xlsx_xml(blob: bytes) -> str:
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        return "".join(z.read(n).decode("utf-8", "replace") for n in z.namelist()
+                       if n.endswith((".xml", ".rels")))
+
+
+@pytest.mark.parametrize("label", _M1_LABELS)
+def test_ptext_quotes_array_formulas_and_link_prefixes(label):
+    assert X.ptext(label).startswith("'")
+    assert X.ptext("'already") == "'already" and X.ptext("market {x}") == "market {x}"
+
+
+def test_pptx_chart_workbook_has_no_formula_and_no_hyperlink_for_m1_labels():
+    pytest.importorskip("pptx")
+    from pptx import Presentation
+    content = {"type": "bar", "unit": "percent", "currency": None,
+               "series": [{"name": lab, "points": [
+                   {"x": l2, "value": 0.35, "raw": "0.35%", "tag": "C1"} for l2 in _M1_LABELS]}
+                   for lab in _M1_LABELS[:4]]}
+    cites = [{"tag": "C1", "n": 1, "doc_id": "d", "title": "t", "platform": "drive",
+              "container_name": "x", "version": "1", "checked_at": "t", "deep_link": ""}]
+    data = X.build_pptx("chart", content, cites, title="t", req_id="ab", as_of=datetime(2026, 10, 30))
+    prs = Presentation(io.BytesIO(data))
+    chart = next(sh.chart for sh in prs.slides[1].shapes if sh.has_chart)
+    xml = _xlsx_xml(chart.part.chart_workbook.xlsx_part.blob)
+    assert not re.search(r"<f[\s>/]", xml) and "<hyperlink" not in xml and "relationships/hyperlink" not in xml
+    assert list(chart.plots[0].categories) == [X.ptext(x) for x in _M1_LABELS]
+
+
+def test_safe_chart_workbook_writes_formula_and_link_strings_as_text_even_unguarded():
+    """Defence in depth: the workbook writer itself has XlsxWriter's conversions off, so a string
+    that reached it without ``ptext`` is text (the ``{=...}`` array form is the only one XlsxWriter
+    converts regardless, which is why ``ptext`` quotes a leading ``{``)."""
+    pytest.importorskip("pptx")
+    data = X._safe_chart_data(number_format="General")
+    data.categories = ["=1+1", "mailto:a", "external:c:\\x.xlsx", "https://x.example"]
+    data.add_series("=SUM(A1)", [1, 2, 3, 4])
+    xml = _xlsx_xml(data.xlsx_blob)
+    assert not re.search(r"<f[\s>/]", xml) and "<hyperlink" not in xml and "relationships/hyperlink" not in xml

@@ -11,7 +11,9 @@ from the folder). This route NEVER writes the index.
 Rules (contract: ``docs/finals/contracts/uploads.md``; ``docs/tencent/SECURITY.md`` §15.12):
 
 * **When.** Demo only: ``IB_DEMO_LOGIN=1`` AND ``IB_DEMO_FEATURES=1``, and never when
-  ``IB_DEPLOYED=1``. Otherwise every call is the refusal below, for every person.
+  ``IB_DEPLOYED=1``. Otherwise ``mount_uploads_router`` does not mount the route at all (round 3
+  L3), so it answers what an unknown route answers (404, also without a session) and writes
+  nothing. A router built directly with ``make_uploads_router`` still refuses every call.
 * **Who.** Identity only from the session (the body names no person; an extra field is a refusal).
   An active person with an employee role.
 * **Where.** The folder must exist in Drive now. An employee must hold WRITE on it (``writer``,
@@ -27,7 +29,12 @@ Rules (contract: ``docs/finals/contracts/uploads.md``; ``docs/tencent/SECURITY.m
   Office/PDF files are stored as the original bytes and cleaned after extraction. The original
   filename is display-only (path parts dropped, sanitised, capped); the platform stores the bytes
   under a generated id, and no name is ever used as a path.
-* **Abuse.** At most ``RATE_LIMIT`` attempts per person per minute (in memory).
+* **Abuse.** At most ``RATE_LIMIT`` attempts per person per minute (in memory), checked FIRST;
+  only the first over-limit refusal per person per window is ledgered (round 3 L3).
+* **Ledger.** An accepted upload is recorded write-ahead (round 3 L5) as ``ingest.sync`` with
+  ``detail.reason = "sim.upload-file"``, ``phase="requested"`` (person, folder, kind, byte length
+  and SHA-256 of the stored bytes; never the bytes or the file name) before the Drive call; a
+  ledger failure is a ``503`` and nothing is uploaded. ``phase="written"`` adds the doc id after.
 * **One refusal.** EVERY refusal (when, who, where, what, rate, malformed body) is the same
   ``404 {"detail": "not found"}``; the reason is written to the access ledger only, as
   ``request.failed`` with ``stage="sim.upload-file"``. No session is the usual 401.
@@ -39,6 +46,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import logging
 import os
 import re
@@ -54,7 +62,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from . import extract_files as X
-from .sim import EMPLOYEE_ROLES, _RateLimiter
+from .sim import EMPLOYEE_ROLES, _RateLimiter, write_ahead
 
 log = logging.getLogger("databridge_ib.uploads")
 
@@ -86,6 +94,10 @@ class _Refused(Exception):
         self.reason = reason
 
 
+class _Unavailable(Exception):
+    """The write-ahead record could not be written: 503, nothing uploaded."""
+
+
 class _State:
     """Per-app upload state: the rate limiter and the documents uploaded since the last reset."""
 
@@ -93,6 +105,18 @@ class _State:
         self.limiter = limiter
         self.lock = threading.Lock()
         self.doc_ids: set[str] = set()
+        self.over: dict[str, float] = {}         # person -> when their last over-limit row was written
+
+    def note_over_limit(self, sub: str) -> bool:
+        """True for the first over-limit refusal of ``sub`` in a rate window (ledger it), False
+        for the rest (not ledgered)."""
+        now = self.limiter.clock()
+        with self.lock:
+            last = self.over.get(sub)
+            if last is not None and now - last < self.limiter.window_s:
+                return False
+            self.over[sub] = now
+            return True
 
 
 _STATES: dict[int, _State] = {}
@@ -257,6 +281,16 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
         payload = {"folder": body.folder, "name": display_name(body.filename, body.title, kind),
                    "mime": X.KIND_MIME[kind], "content_b64": base64.b64encode(data).decode("ascii"),
                    "owner": account}
+        # round 3 L5: write-ahead record of the write (never the bytes or the name); a ledger
+        # failure is a 503 and nothing is uploaded
+        wrote = {"platform": "drive", "container": body.folder, "kind": label,
+                 "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        try:
+            write_ahead(getattr(svc, "ledger", None), getattr(user, "id", "?"), STAGE,
+                        "requested", wrote)
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("ledger append for an upload failed: %s", type(exc).__name__)
+            raise _Unavailable() from None
         try:
             with _client() as c:
                 r = c.post("/admin/drive/files/upload", json=payload)
@@ -272,6 +306,11 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
         doc_id = f"drive:{fid}"
         with state.lock:
             state.doc_ids.add(doc_id)
+        try:
+            write_ahead(getattr(svc, "ledger", None), getattr(user, "id", "?"), STAGE,
+                        "written", {**wrote, "doc_id": doc_id})
+        except Exception as exc:                                    # noqa: BLE001 — written
+            log.warning("ledger append for an upload result failed: %s", type(exc).__name__)
         return {"ok": True, "doc_id": doc_id, "platform": "drive",
                 "container": str(out.get("drive") or "my-drive"), "kind": label,
                 "at": datetime.now(timezone.utc).isoformat()}
@@ -292,16 +331,22 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
 
     @router.post("/upload-file")
     async def upload_file(request: Request, user=Depends(current)):
+        # round 3 L3: the rate limit comes FIRST, and only the first refusal over the limit in a
+        # window is ledgered, so no person can append unbounded ledger rows
+        if not state.limiter.allow(getattr(user, "id", "?")):
+            if state.note_over_limit(getattr(user, "id", "?")):
+                await run_in_threadpool(_ledger_refusal, user, "rate_limited")
+            return _refusal()
         try:
             reason = _who(user)
             if reason:
                 raise _Refused(reason)
-            if not state.limiter.allow(getattr(user, "id", "?")):
-                raise _Refused("rate_limited")
             raw = await _read_capped(request)
             if raw is None:
                 raise _Refused("body_too_large")
             return await run_in_threadpool(_upload, raw, user)
+        except _Unavailable:
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         except _Refused as exc:
             await run_in_threadpool(_ledger_refusal, user, exc.reason)
             return _refusal()
@@ -336,6 +381,8 @@ def reset_uploads(svc: Any) -> int:
         ids, state.doc_ids = sorted(state.doc_ids), set()
     with state.limiter._lock:
         state.limiter._hits.clear()
+    with state.lock:
+        state.over.clear()
     index = getattr(svc, "index", None)
     dropped = 0
     for doc_id in ids:
@@ -349,6 +396,8 @@ def mount_uploads_router(app, svc: Any, reset_hooks: Optional[list] = None) -> N
     """Mount ``POST /sim/upload-file`` on a built app (``bootstrap.build_app``), with the app's
     own principal dependency. ``reset_hooks`` is ``build_app``'s list of ``/sim/reset`` hooks:
     ``reset_uploads`` is put FIRST, so the uploads are gone before the live tracker rebaselines."""
+    if _enabled(svc.cfg) is not None:
+        return          # round 3 L3: off (deployed, demo sign-in off or demo features off) = not a route
     from .app import principal_dependency
     app.include_router(make_uploads_router(svc, principal_dependency(lambda: app.state.svc)))
     if reset_hooks is not None:

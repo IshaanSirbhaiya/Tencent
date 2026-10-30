@@ -53,8 +53,12 @@ title or an id. Each check is ledgered write-ahead as ``audit.query`` (``filter.
 count; a ledger failure is a 503); refusals are ``request.failed`` (``stage="sim.check-absent"``)
 and the same 404.
 
-Ledger: a successful post writes NOTHING to the access ledger here (writing to a source is not a
-read, and the existing simulator actions write nothing either). The note reaches the index through
+Ledger: a post is recorded write-ahead (round 3 L5) as ``ingest.sync`` with ``detail.reason =
+"sim.add-document"``, ``phase="requested"`` (the person, platform, container, kind, the text's
+byte length and SHA-256; never the text or the title) after every check and before the source
+call; a ledger failure is a ``503`` and nothing is posted. After the source call a second record
+(``phase="written"``) adds the doc id (its failure is logged; the post already happened). The
+note reaches the index through
 the mock platform's signed ``content.changed`` webhook, applied by ``Ingestor.apply_event`` (which
 ledgers ACL and membership changes only); every later READ of it (``/ib/graph``, ``/ib/graph/changes``,
 ``/ib/doc``, an answer) is ledgered by that read path.
@@ -177,6 +181,20 @@ def _manifest(world_path: Path) -> dict:
         return {}
 
 
+def write_ahead(led: Any, sub: str, stage: str, phase: str, detail: dict) -> None:
+    """Record a write to a source made on ``sub``'s behalf (``/sim/add-document``,
+    ``/sim/upload-file``; round 3 L5) as ``ingest.sync`` with ``detail.reason = stage``,
+    ``detail.phase`` (``requested`` before the source call, ``written`` with the doc id after) and
+    ``detail.by = sub``. Never the text, title or file name. No ledger configured: nothing to do.
+    A ledger error propagates (the caller answers 503 before the write)."""
+    if led is None:
+        return
+    from .models import SourceChangeEvent
+    led.append(SourceChangeEvent(kind="ingest.sync", platform=detail.get("platform"),
+                                 event_time=datetime.now(timezone.utc),
+                                 detail={"reason": stage, "phase": phase, "by": sub, **detail}))
+
+
 def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
                     client_factory: Callable[[], httpx.Client] | None = None,
                     ingestor=None, current: Optional[Callable] = None, ledger: Any = None,
@@ -263,6 +281,15 @@ def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
             log.warning("ledger append for an add-document refusal failed: %s",
                         type(exc).__name__)
 
+    class _Unavailable(Exception):
+        """The write-ahead record could not be written: 503, nothing posted."""
+
+    def _ledger_write(user, stage: str, phase: str, detail: dict) -> None:
+        """A write to a source on the person's behalf (round 3 L5), as ``ingest.sync`` with
+        ``detail.reason = stage``; raises when the ledger fails (the caller decides)."""
+        write_ahead(ledger if ledger is not None else getattr(ingestor, "ledger", None),
+                    getattr(user, "id", "?"), stage, phase, detail)
+
     def _may_add(user, platform: str) -> Optional[str]:
         """None when allowed, else the (ledger-only) reason."""
         if bool(getattr(cfg, "deployed", False)):
@@ -321,6 +348,17 @@ def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
                                                         "author": account}
         if not limiter.allow(getattr(user, "id", "?")):
             raise _Refused("rate_limited")
+        # round 3 L5: the write is recorded write-ahead (who, where, what kind, the text's length
+        # and SHA-256, never the text or title); a ledger failure is a 503 and nothing is posted
+        wrote = {"platform": body.platform, "container": body.target,
+                 "kind": "thread" if body.platform == "slack" else "page",
+                 "bytes": len(body.text.encode("utf-8")),
+                 "sha256": hashlib.sha256(body.text.encode("utf-8")).hexdigest()}
+        try:
+            _ledger_write(user, "sim.add-document", "requested", wrote)
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("ledger append for add-document failed: %s", type(exc).__name__)
+            raise _Unavailable() from None
         try:
             with _client() as c:
                 r = c.post(path, json=payload)
@@ -333,12 +371,18 @@ def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
             doc_id = f"slack:{data['channel']}:{data['thread_ts']}"
         else:
             doc_id = f"confluence:{data['id']}"
+        try:
+            _ledger_write(user, "sim.add-document", "written", {**wrote, "doc_id": doc_id})
+        except Exception as exc:                                    # noqa: BLE001 — written
+            log.warning("ledger append for add-document result failed: %s", type(exc).__name__)
         return {"ok": True, "doc_id": doc_id, "platform": body.platform, "container": body.target,
                 "at": datetime.now(timezone.utc).isoformat()}
 
     def add_document(body: AddDocumentBody, user):
         try:
             return _add(body, user)
+        except _Unavailable:
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         except _Refused as exc:
             _ledger_refusal(user, exc.reason)
             if exc.reason == "rate_limited":
@@ -451,7 +495,9 @@ def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
             if reason:
                 _ledger_refusal(user, reason, stage="sim.engine-refresh")
                 return JSONResponse(status_code=404, content={"detail": NOT_FOUND})
-            verdict = refresher.may_start()
+            # round 3 L4: claim the job slot atomically, THEN record, THEN run, so two
+            # concurrent starts write one "started" record for the one build
+            verdict = refresher.reserve()
             if verdict == "running":
                 return refresher.status()                           # single flight: same job
             if verdict == "rate_limited":
@@ -460,9 +506,10 @@ def make_sim_router(cfg, require_role: Callable[[str], Callable], *,
             try:                                                    # write-ahead
                 _ledger_engine(user.id, "started")
             except Exception as exc:                                # noqa: BLE001
+                refresher.release()
                 log.error("ledger append for an engine refresh failed: %s", type(exc).__name__)
                 return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
-            refresher.start(on_end=_end(user.id))
+            refresher.run(on_end=_end(user.id))
             return refresher.status()
 
     return router

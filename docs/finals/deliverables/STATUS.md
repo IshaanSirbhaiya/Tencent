@@ -145,3 +145,12 @@ was editing it; the final run, after that edit landed, is clean). Hy3/TokenHub i
   `pptx` (unchanged), so the new button is not reachable in the mock.
 - Still open from §3: the live UI run (`deliverables.live.spec.ts`), the stage-laptop rehearsal of D then
   R, a live Hy3 run of the model path, `PRESENTER_KEYS.md`, Q7/Q18 clauses (Fable §4).
+
+### 5.5 Round 3 security review fixes (`docs/finals/reviews/round3_opus_security.md`)
+
+| Finding | Change | Test(s) |
+|---|---|---|
+| M1 `.pptx` guard missed `{=...}` and XlsxWriter auto-links | `export.py`: `ptext` also quotes a leading `{` (also after Unicode spaces, full-width too) and `http(s)://`, `ftp(s)://`, `mailto:`, `internal:`, `external:`, `file://`; the chart workbook is written by a `CategoryWorkbookWriter` subclass with `strings_to_formulas=False, strings_to_urls=False` (`_safe_chart_data`). XlsxWriter still converts `{=...}` regardless of options, so the `ptext` quote is what stops that one | `test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas` (source labels `{=cmd|' /C calc'!A0 market}`, `external:...`, `mailto:a market`; raw embedded XLSX XML has no `<f` element, no `<hyperlink>`, no hyperlink relationship), `test_deliverables_verify.py::test_ptext_quotes_array_formulas_and_link_prefixes`, `::test_pptx_chart_workbook_has_no_formula_and_no_hyperlink_for_m1_labels`, `::test_safe_chart_workbook_writes_formula_and_link_strings_as_text_even_unguarded` |
+| L1 deterministic headers skipped the check | `build.py` `source_table`: each column label passes `check_short_text` against the cited units (as `check_table` does on export), else `Column n` | `test_deliverables.py::test_source_table_headers_are_checked_so_create_equals_export` |
+| I1 switch off + invalid body gave 422 | `routes.py`: the body is read and validated after the kill switch (async handler, service call in the threadpool; the same 422 shape when on; OpenAPI body schema kept via `openapi_extra`) | `::test_bodies_carry_no_identity_and_flag_off_is_404` (invalid, extra-field, empty and malformed bodies give the 404 when off) |
+| I3 build exception left `requested` open | `service.py` `create`: the build/verify/seal block is in a try; an unexpected exception writes `deliverable.failed` (stage `generate`, reason `build_<Type>`) and raises the generic 503 | `::test_a_build_error_writes_failed_after_requested_and_answers_503` |

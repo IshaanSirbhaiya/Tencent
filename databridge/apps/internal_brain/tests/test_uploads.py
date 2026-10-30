@@ -593,6 +593,66 @@ def test_rate_limit_five_per_minute(world, tmp_path):
     assert _up(c, "n6.txt", b"a minute later").status_code == 200
 
 
+def test_refusals_over_the_rate_limit_write_one_ledger_row_per_window(world, tmp_path):
+    """Round 3 L3: the limit is checked first, and only the first over-limit refusal per person
+    per window is ledgered, so a loop cannot append unbounded rows."""
+    t = [0.0]
+    app, svc = _app(world, tmp_path, limiter=_RateLimiter(n=2, clock=lambda: t[0]))
+    c = _as(app, svc, WRITER)
+    for _ in range(2):
+        assert _up(c, *REFUSED_FILES["empty"]).status_code == 404
+    n = len(_refusals(world))
+    for _ in range(30):
+        assert _up(c, *REFUSED_FILES["empty"]).json() == REFUSAL
+    rows = _refusals(world)[n:]
+    assert [r.error_code for r in rows] == ["rate_limited"]
+    t[0] += 61
+    assert _up(c, *REFUSED_FILES["empty"]).status_code == 404               # a new window
+    for _ in range(3):
+        _up(c, *REFUSED_FILES["empty"])
+    assert [r.error_code for r in _refusals(world)[n:]].count("rate_limited") == 2
+
+
+def _writes(e, stage="sim.upload-file"):
+    return [ev for ev in e.ledger.events if ev.kind == "ingest.sync"
+            and ev.detail.get("reason") == stage]
+
+
+def test_a_successful_upload_is_ledgered_write_ahead(env):
+    """Round 3 L5: one ``requested`` record before the Drive call and one ``written`` record with
+    the doc id after, both naming the signed-in person; never the bytes or the file name."""
+    e, app, svc = env
+    import hashlib
+    filename, data = "Galbraith ledger note.txt", b"Ledger note for code name Galbraith-L5"
+    n = len(_writes(e))
+    r = _up(_as(app, svc, WRITER), filename, data)
+    assert r.status_code == 200, r.text
+    req, done = _writes(e)[n:]
+    assert req.detail["phase"] == "requested" and done.detail["phase"] == "written"
+    assert req.detail["by"] == done.detail["by"] == WRITER
+    assert req.detail["container"] == FOLDER and req.detail["platform"] == "drive"
+    assert req.detail["bytes"] == len(data)
+    assert req.detail["sha256"] == hashlib.sha256(data).hexdigest()
+    assert done.detail["doc_id"] == r.json()["doc_id"] and "doc_id" not in req.detail
+    dumped = repr(req.detail) + repr(done.detail)
+    assert "Galbraith" not in dumped and filename not in dumped
+
+
+def test_upload_ledger_down_is_503_and_nothing_is_uploaded(env, monkeypatch):
+    e, app, svc = env
+    real = e.ledger.append
+
+    def boom(ev):
+        if ev.kind == "ingest.sync":
+            raise RuntimeError("ledger down")
+        return real(ev)
+    monkeypatch.setattr(e.ledger, "append", boom)
+    hooks = len(e.hooks)
+    r = _up(_as(app, svc, WRITER), "x.txt", b"Ledger down note for Galbraith-503")
+    assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+    assert len(e.hooks) == hooks
+
+
 # ---------------------------------------------------------------------------------------------
 # reset
 # ---------------------------------------------------------------------------------------------

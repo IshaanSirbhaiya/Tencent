@@ -16,6 +16,7 @@ import sqlite3
 import time
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from databridge_ib import auth as authmod
@@ -27,7 +28,7 @@ from databridge_ib.sim import make_sim_router
 
 DEMO_ROUTES = [("GET", "/ib/graph/changes"), ("POST", "/sim/add-document"),
                ("POST", "/sim/check-absent"), ("POST", "/sim/engine-refresh"),
-               ("POST", "/sim/engine-status")]
+               ("POST", "/sim/engine-status"), ("POST", "/sim/upload-file")]
 UNKNOWN = {"GET": "/ib/graph/no-such-route", "POST": "/sim/no-such-route"}
 PUBLIC_ROUTES = {"/health", "/auth/demo-login", "/webhooks/{platform}"}
 
@@ -252,3 +253,78 @@ def test_background_job_is_single_flight(tmp_path):
             break
         time.sleep(0.05)
     assert eng.status()["state"] == "done" and eng.status()["reloaded"] is False
+
+
+def test_concurrent_engine_refreshes_write_one_started_record(tmp_path):
+    """Round 3 L4: the job slot is claimed atomically before the write-ahead record, so two
+    simultaneous starts with a slow ledger give one build and ONE "started" record."""
+    import threading
+    app, svc, eng, clock, builds, reloads = _engine_app(tmp_path)
+    real = svc.ledger.append
+    seen = []
+
+    def slow(ev):
+        if ev.kind == "ingest.sync" and ev.detail.get("phase") == "started":
+            time.sleep(0.3)
+        seen.append(ev)
+        return real(ev)
+    svc.ledger.append = slow                                # type: ignore[method-assign]
+    jd, adm = _client(app, svc, "jdoe"), _client(app, svc, "admin.it")
+    codes = []
+    ts = [threading.Thread(target=lambda c=c: codes.append(c.post("/sim/engine-refresh").status_code))
+          for c in (jd, adm)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert sorted(codes) == [200, 200] and len(builds) == 1
+    phases = [e.detail.get("phase") for e in seen
+              if e.kind == "ingest.sync" and e.detail.get("reason") == "engine.refresh"]
+    assert phases == ["started", "done"]
+
+
+def test_engine_refresh_ledger_down_releases_the_slot(tmp_path):
+    app, svc, eng, clock, builds, reloads = _engine_app(tmp_path)
+    real = svc.ledger.append
+
+    def boom(ev):
+        raise RuntimeError("ledger down")
+    svc.ledger.append = boom                                # type: ignore[method-assign]
+    jd = _client(app, svc, "jdoe")
+    assert jd.post("/sim/engine-refresh").status_code == 503
+    assert eng.status()["state"] == "idle" and eng.may_start() == "ok"
+    svc.ledger.append = real                                # type: ignore[method-assign]
+    assert jd.post("/sim/engine-refresh").status_code == 200 and len(builds) == 1
+
+
+def test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login(tmp_path):
+    """Round 3 L3: ``/sim/upload-file`` follows D-24 like the other demo-only routes: not a route
+    (the unknown-route 404, signed in or not, nothing ledgered) unless demo features are on AND
+    demo sign-in is on AND not deployed."""
+    from types import SimpleNamespace
+
+    from databridge_ib.uploads import mount_uploads_router
+    on = build_app(_cfg(tmp_path / "on", demo_features=True), sync=False)
+    assert "/sim/upload-file" in mounted_paths(on)
+    # a deployment (build_app refuses dev keys there, so the mount step is called directly)
+    dep = FastAPI()
+    deployed = SimpleNamespace(cfg=SimpleNamespace(deployed=True, demo_login=True,
+                                                   demo_features=True))
+    mount_uploads_router(dep, deployed, [])
+    assert dep.routes == [] or "/sim/upload-file" not in mounted_paths(dep)
+    for i, kw in enumerate(({"demo_features": True, "demo_login": False},
+                            {"demo_features": False})):
+        app = build_app(_cfg(tmp_path / str(i), **kw), sync=False)
+        svc = app.state.svc
+        assert "/sim/upload-file" not in mounted_paths(app)
+        n = len(list(svc.ledger.events()))
+        clients = [TestClient(app)]
+        if kw.get("demo_login", True):
+            clients.append(_client(app, svc, "jdoe"))
+        for c in clients:
+            for _ in range(3):
+                r = c.post("/sim/upload-file", json={"filename": "a.txt", "folder": "f",
+                                                     "content_b64": "eA=="})
+                u = c.post(UNKNOWN["POST"], json={})
+                assert r.status_code == u.status_code == 404 and r.content == u.content, kw
+        assert len(list(svc.ledger.events())) == n

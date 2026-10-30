@@ -182,7 +182,15 @@ def test_foreign_forged_garbage_or_expired_cursor_starts_a_new_window(env):
     for c, since in ((ken, cur), (priya, flipped), (priya, "garbage"), (priya, "a.b.c")):
         body = _poll(c, since).json()
         assert body["nodes"] == [] and body["edges"] == []
-    assert len([x for x in e.ledger.events if x.kind == "graph.viewed"]) == n + 4   # each a window
+    # each starts a window; round 3 I2: at most one new-window row per person per 5 s (priya
+    # opened one 2 s ago, so only ken's is ledgered)
+    assert len([x for x in e.ledger.events if x.kind == "graph.viewed"]) == n + 1
+    clock.t += 5
+    assert _poll(priya, "garbage").json()["nodes"] == []
+    assert len([x for x in e.ledger.events if x.kind == "graph.viewed"]) == n + 2
+    for _ in range(20):                                             # a tight loop adds nothing
+        _poll(priya)
+    assert len([x for x in e.ledger.events if x.kind == "graph.viewed"]) == n + 2
     clock.t += IDLE_S + 1
     assert _poll(priya, cur).json()["nodes"] == []                  # expired: no back-fill
 

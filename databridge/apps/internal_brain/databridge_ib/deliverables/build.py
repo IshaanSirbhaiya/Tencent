@@ -81,7 +81,14 @@ def source_table(evidence: Mapping[str, Evidence]) -> Optional[dict[str, Any]]:
             cells.append({"text": text, "tags": [tag] if text else [],
                           "numeric": bool(text) and cell_numeric(text)})
         rows.append(cells)
-    return {"source": "source_table", "from_tag": tag, "columns": [nfkc(c) for c in cols],
+    # Round 3 L1: the column labels pass the SAME check as on export (``check_table``), so the
+    # table shown and sealed at create time equals the exported one ("Column n" when a label fails)
+    hay = ev.units if any(c["tags"] for r in rows for c in r) else []
+    columns = []
+    for i, c in enumerate(cols, 1):
+        col = nfkc(c)
+        columns.append(col if check_short_text(col, hay) else f"Column {i}")
+    return {"source": "source_table", "from_tag": tag, "columns": columns,
             "rows": rows, "truncated": truncated}
 
 

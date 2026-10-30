@@ -65,14 +65,15 @@ header is ordinary text. Not accepted: `.doc`, `.xls`, `.ppt`, macro-enabled fil
 
 | Rule | How | Test |
 |---|---|---|
-| Demo only | Needs `IB_DEMO_LOGIN=1` AND `IB_DEMO_FEATURES=1`; refused when `IB_DEPLOYED=1`. Applies to every person, `admin_it` included. | `test_uploads.py::test_demo_only_switches_refuse_everyone_including_admin_it`, `::test_demo_features_switch_is_read_like_the_other_switches` |
+| Demo only | Needs `IB_DEMO_LOGIN=1` AND `IB_DEMO_FEATURES=1`, never with `IB_DEPLOYED=1`. Otherwise `build_app` does not mount the route (round 3 L3): it answers what an unknown route answers (404, also without a session) and writes nothing. A router built directly refuses every person, `admin_it` included. | `test_demo_features.py::test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login`, `test_uploads.py::test_demo_only_switches_refuse_everyone_including_admin_it`, `::test_demo_features_switch_is_read_like_the_other_switches` |
 | Identity | From the session only; an extra body field is refused; Drive records the person's own account as the uploader. | `::test_the_body_names_no_person_and_the_owner_is_the_signed_in_person` |
 | Write permission | An employee needs `writer`, `fileOrganizer`, `organizer` or `owner` on the folder (to them, a group they are in, or the company domain), read LIVE from Drive at upload time, one attempt; any source error is a refusal. Read access is not enough. `admin_it` may upload into any existing folder. | `::test_write_permission_is_required_and_read_is_not_enough`, `::test_write_permission_is_read_live_from_drive`, `::test_a_source_error_on_the_live_check_is_a_refusal`, `::test_admin_it_may_upload_into_any_folder` |
 | Body limit | Over 7 MiB is refused from `Content-Length` or while streaming, before JSON parsing or base64 decoding. | `::test_oversized_body_is_refused_before_decoding` |
-| File checks | Extension whitelist; bytes must match (OOXML zip with its own part folder, `%PDF-`, strict UTF-8 without NUL); at most 5 MiB; zip at most 2,000 entries and 64 MiB uncompressed (declared and streamed), ratio cap; no DTD or entity in any XML part; no `vbaProject.bin` or macro-enabled content type; PDF at most 50 pages; 15 s time budget in a worker process that is killed on overrun; text capped at 200,000 characters; a file with no text is refused. | `test_extract_files.py` (all), `test_uploads.py::test_bad_files_are_refused_with_the_one_response`, `::test_macro_and_bomb_reasons_are_ledgered` |
-| Clean and mask | NFC; control, zero-width and bidi-override characters removed; HTML tags removed; then masked like any ingest. | `::test_text_is_cleaned_and_the_name_is_display_only`, `::test_card_and_nric_inside_a_docx_are_masked`, `::test_card_number_inside_an_xlsx_is_masked` |
+| File checks | Extension whitelist; bytes must match (OOXML zip with its own part folder, `%PDF-`, strict UTF-8 without NUL); at most 5 MiB; zip at most 2,000 entries and 64 MiB uncompressed (declared and streamed), ratio cap; no DTD or entity in any XML-bearing member (named `.xml`/`.rels`/`.vml` OR starting like XML after a BOM, NULs and whitespace, whatever its name; scanned as bytes and with NULs removed, so UTF-16/32 is covered; any other declared encoding is refused as `xml_encoding`; binary members are not scanned, and python-docx/python-pptx parse with `resolve_entities=False` as a second layer, round 3 L2); no `vbaProject.bin` or macro-enabled content type; PDF at most 50 pages; 15 s time budget in a worker process that is killed on overrun; text capped at 200,000 characters; a file with no text is refused. | `test_extract_files.py` (all, incl. `::test_xml_dtd_bypasses_from_round3_l2_are_refused`), `test_uploads.py::test_bad_files_are_refused_with_the_one_response`, `::test_macro_and_bomb_reasons_are_ledgered` |
+| Clean and mask | NFC; control, zero-width and bidi-override characters removed; HTML tags and comments removed in linear time (round 3 L6); then masked like any ingest. | `test_extract_files.py::test_clean_text_is_linear_on_unclosed_comments`, `::test_text_is_cleaned_and_the_name_is_display_only`, `::test_card_and_nric_inside_a_docx_are_masked`, `::test_card_number_inside_an_xlsx_is_masked` |
 | Filename | Tags and path parts dropped, reserved and control characters removed, capped at 120 characters with the extension kept; display only. Drive keeps the bytes under a generated id. | `::test_text_is_cleaned_and_the_name_is_display_only` |
-| Rate | At most 5 attempts per person per minute (in memory). | `::test_rate_limit_five_per_minute` |
+| Rate | At most 5 attempts per person per minute (in memory), checked first; only the first over-limit refusal per person per window is ledgered (round 3 L3). | `::test_rate_limit_five_per_minute`, `::test_refusals_over_the_rate_limit_write_one_ledger_row_per_window` |
+| Ledger | A successful upload is recorded write-ahead (round 3 L5): `ingest.sync`, `detail.reason="sim.upload-file"`, `phase="requested"` (person, folder, kind, byte length, SHA-256; never the bytes or name) before the Drive call, `phase="written"` with the doc id after. Ledger down: 503, nothing uploaded. | `::test_a_successful_upload_is_ledgered_write_ahead`, `::test_upload_ledger_down_is_503_and_nothing_is_uploaded` |
 | Reset | `/sim/reset` reloads the platforms (the files are gone), reconciles the index, then `uploads.reset_uploads` drops any uploaded row still indexed and clears the rate window. | `::test_sim_reset_removes_uploads`, `::test_reset_hook_drops_a_lingering_upload_and_clears_the_rate_window` |
 
 ## 5. Responses
@@ -100,7 +101,10 @@ reason is in the access ledger only: `request.failed` with `stage="sim.upload-fi
 `rate_limited`, `file_macros`, `file_xml_dtd`, `file_zip_bomb_total`, `file_pdf_pages`,
 `file_time_budget`. The UI shows one message, for example "That file can't be added here."
 
-**401** without a session, as everywhere.
+**503 `{"error": "temporarily unavailable"}`** when the write-ahead ledger record cannot be written;
+nothing is uploaded.
+
+**401** without a session while the route is mounted; when it is not mounted, the unknown-route 404.
 
 ## 6. Running it
 

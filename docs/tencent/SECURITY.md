@@ -764,8 +764,11 @@ webhook, like any Drive change (`uploads.py`, `extract_files.py`, `connectors/dr
 Tests: `tests/test_uploads.py`, `tests/test_extract_files.py`,
 `databridge/apps/mock_platforms/tests/test_mock_drive_upload.py`.
 
-**Switched off unless both demo switches are on.** `IB_DEMO_LOGIN=1` and `IB_DEMO_FEATURES=1`; refused when
-`IB_DEPLOYED=1`, for every person, `admin_it` included
+**Switched off unless both demo switches are on.** `IB_DEMO_LOGIN=1` and `IB_DEMO_FEATURES=1`, and never
+when `IB_DEPLOYED=1`. Otherwise `build_app` does not mount the route at all (round 3 L3), so it answers
+what an unknown route answers, signed in or not, and writes no ledger row
+(`test_demo_features.py::test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login`). A router
+built directly still refuses every person, `admin_it` included
 (`test_uploads.py::test_demo_only_switches_refuse_everyone_including_admin_it`).
 
 **Identity and permission.** The uploader is the session's person; the body is a closed schema (an
@@ -789,8 +792,15 @@ checks the vendor guest gets the file only where the folder lets him read,
 3. zip limits for docx / xlsx / pptx: at most 2,000 entries, 64 MiB uncompressed (declared sizes AND
    streamed, so a member that lies is caught), a ratio cap, no encrypted members, no absolute or `..`
    names;
-4. no `<!DOCTYPE` or `<!ENTITY` in any XML part, so no reader sees an external entity (XXE) or an
-   entity-expansion bomb (`test_extract_files.py::test_xml_dtd_and_entities_are_refused_before_any_reader`);
+4. no `<!DOCTYPE` or `<!ENTITY` in any XML-bearing member: a member is scanned when its name ends in
+   `.xml`, `.rels` or `.vml` OR its first bytes start like XML (after a BOM, NUL bytes and whitespace, a
+   `<`), whatever its name; the scan runs on the bytes and again with NUL bytes removed, so a UTF-16 or
+   UTF-32 part is covered; a part declaring another encoding (UTF-7, EBCDIC, Latin-1 ...) is refused
+   (`test_extract_files.py::test_xml_dtd_and_entities_are_refused_before_any_reader`,
+   `::test_xml_dtd_bypasses_from_round3_l2_are_refused`). What this guarantees: a member that a
+   non-recovering XML parser could read never carries a DTD. A binary member (an image, Mac printer
+   settings with an embedded plist) is not scanned; python-docx and python-pptx also parse with
+   `resolve_entities=False` (round 3 review), which is a second, independent layer;
 5. macros: a `vbaProject.bin` member or a macro-enabled content type is refused; nothing is ever executed
    (the readers only read text);
 6. PDF: at most 50 pages; no OCR;
@@ -798,7 +808,10 @@ checks the vendor guest gets the file only where the folder lets him read,
    so a runaway parse cannot keep using CPU or memory in the Brain
    (`::test_a_read_past_the_time_budget_is_killed_with_its_worker`);
 8. the text is NFC-normalised, control, zero-width and bidi-override characters and HTML tags are
-   removed, it is capped at 200,000 characters, and a file without text is refused.
+   removed, it is capped at 200,000 characters, and a file without text is refused. Cleaning is linear
+   in the text length: comments are stripped in one pass (round 3 L6; 5 MiB of unclosed `<!--` took
+   ~25 s before, `::test_clean_text_is_linear_on_unclosed_comments` bounds it at 2 s). It runs in the
+   IB process, outside the worker's budget.
 The readers are Walnut's own convert readers, imported, not changed (`packages/convert`). The connector runs
 the same checks again when it fetches an Office, PDF or CSV file; a Markdown or text file is stored
 already cleaned and is read as text, like every other Drive text file.
@@ -815,7 +828,15 @@ generated id (`up-<hex>`); no name is ever used as a path (`::test_text_is_clean
 **One refusal, ledgered.** Every refusal is the same `404 {"detail": "not found"}` bytes, whatever the
 reason (`::test_every_refusal_is_byte_identical`); the reason is in the access ledger only, as
 `request.failed` with `stage="sim.upload-file"`. At most 5 attempts per person per minute
-(`::test_rate_limit_five_per_minute`).
+(`::test_rate_limit_five_per_minute`); the limit is checked first and only the first over-limit refusal
+per person per window is ledgered (`::test_refusals_over_the_rate_limit_write_one_ledger_row_per_window`).
+
+**A successful upload is ledgered write-ahead (round 3 L5).** `ingest.sync` with
+`detail.reason="sim.upload-file"`, `phase="requested"` (person, folder, kind, byte length and SHA-256 of
+the stored bytes; never the bytes or the file name) before the Drive call; a ledger failure is a 503 and
+nothing is uploaded. `phase="written"` adds the doc id after the call (its failure is logged only: the
+file is already stored) (`::test_a_successful_upload_is_ledgered_write_ahead`,
+`::test_upload_ledger_down_is_503_and_nothing_is_uploaded`).
 
 **Reset.** `/sim/reset` reloads the platforms, so the files are gone; the index is reconciled, and the
 reset hook `uploads.reset_uploads` drops any uploaded row still indexed and clears the rate window
@@ -870,8 +891,10 @@ check in `create_app` never saw `/sim/*` or `/audit/*` (all of them were on allo
   A cursor that is someone else's, forged, garbage or older than 10 minutes starts a new empty window with
   no back-fill (`::test_foreign_forged_garbage_or_expired_cursor_starts_a_new_window`). The cap is after
   the live check (`::test_cap_applies_after_the_live_check`).
-- Write-ahead ledger, counts only: `graph.viewed` with `mode="changes"` when a window opens and for every
-  non-empty reply. An empty poll inside a window returned nothing and is not ledgered. A ledger failure
+- Write-ahead ledger, counts only: `graph.viewed` with `mode="changes"` when a window opens (at most one
+  such row per person per 5 s, round 3 I2: a cursor-less or garbage-cursor loop returns only a cursor and
+  adds no rows) and for every non-empty reply. An empty poll inside a window returned nothing and is not
+  ledgered. A ledger failure
   is a 503 (`::test_polls_are_ledgered_as_changes_not_focus`, `::test_ledger_down_on_a_non_empty_poll_is_503`).
 - `/sim/reset` re-baselines the tracker after its full reconciliation, so a reset is not a burst of
   "updated" documents, and the note is gone from the source, the index and `/ib/doc`
@@ -886,7 +909,11 @@ channel must already be in the poster's Gate-1 set, and the poster must be a mem
 time (`::test_live_membership_is_checked_at_post_time`); employees post to Slack only. Every refusal is
 the same `404 {"detail": "not found"}`, with the reason in the ledger only
 (`::test_unreadable_channel_is_the_same_404_as_an_unknown_one`, `::test_a1_ken_refusals_are_byte_identical`).
-At most 5 posts per person per minute, then 429 (`::test_rate_limit_five_per_minute`). The IB never
+At most 5 posts per person per minute, then 429 (`::test_rate_limit_five_per_minute`). A post is ledgered
+write-ahead (round 3 L5) as `ingest.sync`, `detail.reason="sim.add-document"`, `phase="requested"`
+(person, container, kind, the text's length and SHA-256, never the text) before the source call, and
+`phase="written"` with the doc id after; a ledger failure is a 503 and nothing is posted
+(`::test_a_successful_post_is_ledgered_write_ahead`, `::test_add_document_ledger_down_is_503_and_nothing_is_posted`). The IB never
 indexes the posted text directly: the mock's signed webhook makes the ingestor re-fetch and mask it, so
 card numbers and NRIC are masked in the index, the excerpt and the answer, and never reach the ledger
 (`test_live_growth.py::test_sensitive_values_in_a_note_are_masked_everywhere`). The note is answerable at
@@ -907,7 +934,9 @@ or the snapshot's own person (jdoe), demo sign-in on; anyone else gets the simul
 and at most one start per 2 minutes, then 429 (`::test_engine_refresh_once_per_two_minutes_and_ledgered_write_ahead`,
 `::test_background_job_is_single_flight`). A start is ledgered write-ahead as `ingest.sync`
 (`detail.reason="engine.refresh"`); a ledger failure is a 503 and nothing runs
-(`::test_engine_refresh_ledger_down_is_503_and_nothing_runs`). The stock build script runs into a side
+(`::test_engine_refresh_ledger_down_is_503_and_nothing_runs`). The job slot is claimed atomically before
+that record (round 3 L4), so two simultaneous starts write one `started` record for the one build
+(`::test_concurrent_engine_refreshes_write_one_started_record`). The stock build script runs into a side
 file, and the result is copied INTO the live snapshot with SQLite's online backup, which works while the
 gateway holds the file open; a failed build never touches the live snapshot
 (`::test_engine_refresh_rebuilds_publishes_in_place_and_reloads`,
@@ -975,7 +1004,9 @@ version and check time) and passes the checks:
 - a sentence is checked against its own tags only (numbers with their unit marker, capitalised terms,
   CJK runs, no URL, e-mail, phone, identity assertion or text addressed to an AI); titles, series names,
   column and axis labels must consist of words in the cited lines, else fixed text is used.
-Deterministic builds (no model) pass the same checks. Tests: `test_deliverables_verify.py` (T14,
+Deterministic builds (no model) pass the same checks; a deterministic table's column labels too
+(round 3 L1: a label that fails becomes "Column n", so create and export agree,
+`test_deliverables.py::test_source_table_headers_are_checked_so_create_equals_export`). Tests: `test_deliverables_verify.py` (T14,
 70 tests in all, including `::test_adversarial_points_are_dropped`), `test_deliverables.py::test_model_invents_values_and_names`,
 `::test_chart_number_not_in_source_is_dropped_everywhere`. Opus items 1-5 are mapped to code and tests in
 `docs/finals/deliverables/STATUS.md` §5.2.
@@ -995,7 +1026,12 @@ categories and series names, which python-pptx writes into the chart's embedded 
 XlsxWriter `write()`) passes the formula guard: a leading `= + - @`, tab, CR, LF or full-width form,
 also after Unicode spaces, gets a `'` unless the cell is a plain number
 (`test_deliverables_verify.py::test_csv_formula_guard`, T15
-`test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas`). Links only `http(s)` from our
+`test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas`). For the `.pptx` (round 3 M1) a
+leading `{` (XlsxWriter writes `{=...}` as an array formula whatever its options) and the link prefixes
+`http(s)://`, `ftp(s)://`, `mailto:`, `internal:`, `external:`, `file://` also get the `'`, and the chart
+workbook is written with XlsxWriter's `strings_to_formulas` and `strings_to_urls` off. T15 and
+`::test_pptx_chart_workbook_has_no_formula_and_no_hyperlink_for_m1_labels` open the embedded XLSX and
+find no `<f>` element and no hyperlink. Links only `http(s)` from our
 citation metadata. File names from fixed parts only (`walnut-<kind>-<hex8>-<yyyymmdd>.<ext>`);
 `content-disposition`, `X-Content-Type-Options: nosniff` and `Cache-Control: no-store` are set, and the web
 proxy relays the disposition only for this route and only in that exact shape. Caps: CSV 256 KB, `.pptx`
@@ -1008,11 +1044,15 @@ SHA-256, proposed/kept/dropped counts, fallback reason, SHA-256 of the canonical
 response; `deliverable.exported` (format, bytes, SHA-256 of the file, items dropped on re-check) before
 the bytes; `deliverable.failed` (stage `lookup`, `rate`, `generate` or `export`, reason code). Never a
 title, cell, label or sentence (`::test_write_ahead_order_and_no_text_in_ledger`). A ledger failure is a
-503 and nothing is shown or exported (`::test_ledger_outage_is_503_and_nothing_happens`).
+503 and nothing is shown or exported (`::test_ledger_outage_is_503_and_nothing_happens`). An exception
+inside the build or the verifier closes `deliverable.requested` with `deliverable.failed` (stage
+`generate`, reason `build_<ExceptionType>`) and answers the generic 503 (round 3 I3,
+`::test_a_build_error_writes_failed_after_requested_and_answers_503`).
 
 **Kill switch.** `IB_DELIVERABLES=1` turns the feature on; it is off by default in code and on in
 `scripts/demo_up.sh` and `scripts/run_local_demo.sh`. The routes stay mounted; off, they answer the same
-`404 {"detail": "not found"}` as not-found and record nothing (`::test_bodies_carry_no_identity_and_flag_off_is_404`).
+`404 {"detail": "not found"}` as not-found and record nothing, for any body, invalid or malformed included:
+the body is validated only after the switch (round 3 I1) (`::test_bodies_carry_no_identity_and_flag_off_is_404`).
 The flag is global, so its state reveals nothing about any document. It is read at start-up: to turn it
 off, unset it and restart the IB. It is a kill switch, not a demo-only switch: the feature writes nothing
 to any source.

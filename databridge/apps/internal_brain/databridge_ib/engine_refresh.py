@@ -104,6 +104,7 @@ class EngineRefresher:
         self._finished: Optional[float] = None
         self._reloaded: Optional[bool] = None
         self._last_start: Optional[float] = None
+        self._prev: Optional[tuple] = None
 
     # -- status ---------------------------------------------------------------------------------
     def status(self) -> dict:
@@ -125,22 +126,46 @@ class EngineRefresher:
                 return "rate_limited"
             return "ok"
 
-    def start(self, on_end: Optional[Callable[[str], None]] = None) -> bool:
-        """Start a job; False when one runs or the 2-minute window is not over."""
+    def reserve(self) -> str:
+        """Atomically claim the single job slot (round 3 L4): ``"running"``, ``"rate_limited"``
+        or ``"ok"``; on ``"ok"`` the state is already ``running`` under the lock, so a second
+        caller sees ``"running"`` and records nothing. Follow with ``run`` or ``release``."""
         with self._lock:
             if self._state == "running":
-                return False
+                return "running"
             now = self.clock()
             if self._last_start is not None and now - self._last_start < self.min_interval_s:
-                return False
+                return "rate_limited"
+            self._prev = (self._state, self._step, self._started, self._finished, self._reloaded,
+                          self._last_start)
             self._state, self._step = "running", "building"
             self._started, self._finished, self._reloaded = now, None, None
             self._last_start = now
+            return "ok"
+
+    def release(self) -> None:
+        """Give back a reservation that will not run (its write-ahead record failed)."""
+        with self._lock:
+            prev = getattr(self, "_prev", None)
+            if self._state == "running" and prev is not None:
+                (self._state, self._step, self._started, self._finished, self._reloaded,
+                 self._last_start) = prev
+            self._prev = None
+
+    def run(self, on_end: Optional[Callable[[str], None]] = None) -> None:
+        """Run the job a successful ``reserve`` claimed."""
+        self._prev = None
         if self.run_inline:
             self._run(on_end)
         else:
             threading.Thread(target=self._run, args=(on_end,), name="ib-engine-refresh",
                              daemon=True).start()
+
+    def start(self, on_end: Optional[Callable[[str], None]] = None) -> bool:
+        """Start a job; False when one runs or the 2-minute window is not over."""
+        if self.reserve() != "ok":
+            return False
+        self.run(on_end)
         return True
 
     # -- the job --------------------------------------------------------------------------------

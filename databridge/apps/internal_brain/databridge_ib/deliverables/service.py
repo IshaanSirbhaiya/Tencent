@@ -218,32 +218,43 @@ class DeliverableService:
         if not evidence:
             self._fail(user, "lookup", "not_found", req_id=req_id, deliverable_id=did, kind=kind)
             raise NotFound()
-        context = context_text(evidence, [f.text for f in ctx.facts])
-        content, title, generated, model, fallback, check = self._build(kind, chart, evidence,
-                                                                        context, ctx.question)
-        cites = dict(ctx.cites)
-        if generated == "model":                    # a model call took time: authorise again
-            content, cites, evidence = self._reauthorise(user, kind, content, cites, evidence,
-                                                         check)
-            if content is None:
-                content, title, generated, model, fallback = self._deterministic(
-                    kind, evidence, ctx.question, fallback="nothing_passed")
-        status = ("ready" if content is not None
-                  else "needs_model" if kind == "analysis" else "insufficient")
-        now = self.clock()
-        tags = build.content_tags(kind, content)
-        citations = self._citations(tags, cites, self._answer_citations(req_id),
-                                    now.isoformat())
-        resp = {"deliverable_id": did, "req_id": req_id, "kind": kind, "status": status,
-                "label": LABEL, "title": title, "generated": generated if content else "none",
-                "model": model.model_dump(mode="json") if model else None,
-                "check": check.public() if generated == "model" else Check().public(),
-                "content": content, "citations": citations,
-                "exports": self._exports(status, kind),
-                "fallback": fallback, "prompt_version": prompts.PROMPT_VERSION,
-                "scope_note": SCOPE_NOTE, "as_of": now.isoformat()}
-        resp = json.loads(canonical(resp))            # one private, immutable copy
-        digest = response_digest(resp)
+        # round 3 I3: a builder or verifier error still closes the write-ahead record
+        try:
+            context = context_text(evidence, [f.text for f in ctx.facts])
+            content, title, generated, model, fallback, check = self._build(kind, chart, evidence,
+                                                                            context, ctx.question)
+            cites = dict(ctx.cites)
+            if generated == "model":                    # a model call took time: authorise again
+                content, cites, evidence = self._reauthorise(user, kind, content, cites, evidence,
+                                                             check)
+                if content is None:
+                    content, title, generated, model, fallback = self._deterministic(
+                        kind, evidence, ctx.question, fallback="nothing_passed")
+            status = ("ready" if content is not None
+                      else "needs_model" if kind == "analysis" else "insufficient")
+            now = self.clock()
+            tags = build.content_tags(kind, content)
+            citations = self._citations(tags, cites, self._answer_citations(req_id),
+                                        now.isoformat())
+            resp = {"deliverable_id": did, "req_id": req_id, "kind": kind, "status": status,
+                    "label": LABEL, "title": title, "generated": generated if content else "none",
+                    "model": model.model_dump(mode="json") if model else None,
+                    "check": check.public() if generated == "model" else Check().public(),
+                    "content": content, "citations": citations,
+                    "exports": self._exports(status, kind),
+                    "fallback": fallback, "prompt_version": prompts.PROMPT_VERSION,
+                    "scope_note": SCOPE_NOTE, "as_of": now.isoformat()}
+            resp = json.loads(canonical(resp))            # one private, immutable copy
+            digest = response_digest(resp)
+        except (NotFound, Unavailable, RateLimited, Invalid):
+            raise
+        except Exception as exc:                                    # noqa: BLE001
+            try:
+                self._fail(user, "generate", "build_" + type(exc).__name__, req_id=req_id,
+                           deliverable_id=did, kind=kind)
+            except Unavailable:
+                pass
+            raise Unavailable(type(exc).__name__) from None
         c = resp["check"]
         self._append(DeliverableCreated(
             sub=user.id, req_id=req_id, deliverable_id=did, deliverable=kind, status=status,

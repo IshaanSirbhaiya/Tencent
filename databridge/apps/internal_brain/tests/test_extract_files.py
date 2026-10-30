@@ -131,6 +131,20 @@ def test_text_is_capped_and_cleaned():
     assert X.clean_text(dirty) == "Café bold a < b  end"
 
 
+
+def test_clean_text_is_linear_on_unclosed_comments():
+    """Round 3 L6: 5 MiB of unclosed ``<!--`` took ~25 s with the old lazy regex."""
+    for evil in ("<!--" * 1_310_720, "<!--" * 1_310_720 + "-->", "<!--" + "x" * 5_000_000 + "-->",
+                 "<a" * 2_621_440):
+        t0 = time.monotonic()
+        X.clean_text(evil)
+        assert time.monotonic() - t0 < 2.0
+    assert X.clean_text("a<!-- x -->b<!---->c<!-- " + "y" * 2001 + " -->d") == \
+        "abc<!-- " + "y" * 2001 + " -->d"
+    assert X.clean_text("a <!-- unclosed b") == "a <!-- unclosed b"
+    assert X.clean_text("<!-- one --> x <!-- two -->") == "x"
+
+
 # ---------------------------------------------------------------------------------------------
 # refusals
 # ---------------------------------------------------------------------------------------------
@@ -142,6 +156,44 @@ def test_xml_dtd_and_entities_are_refused_before_any_reader():
     lol = head + b'?><!DOCTYPE w [<!ENTITY a "aaaaaaaa"><!ENTITY b "&a;&a;&a;&a;">]>' + rest
     for payload in (xxe, lol):
         assert _reason("docx", _replace_member(base, "word/document.xml", payload)) == "xml_dtd"
+
+
+
+def _rename_member(data: bytes, old: str, new: str) -> bytes:
+    src = zipfile.ZipFile(io.BytesIO(data))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for i in src.infolist():
+            body = src.read(i)
+            if i.filename in ("[Content_Types].xml", "word/_rels/document.xml.rels", "_rels/.rels"):
+                body = body.replace(old.split("/")[-1].encode(), new.split("/")[-1].encode())
+            z.writestr(new if i.filename == old else i.filename, body)
+    return buf.getvalue()
+
+
+def test_xml_dtd_bypasses_from_round3_l2_are_refused():
+    """Round 3 L2: a DTD in a UTF-16 part (with or without a BOM, either byte order), in a part not
+    named ``.xml``, or behind a non-UTF encoding declaration never reaches a reader."""
+    base = _docx("Plain paragraph")
+    doc = zipfile.ZipFile(io.BytesIO(base)).read("word/document.xml").decode("utf-8")
+    body = doc.split("?>", 1)[1]
+    dtd = '<!DOCTYPE w [<!ENTITY xxe SYSTEM "file:///etc/hostname">]>'
+    u16 = '<?xml version="1.0" encoding="UTF-16" standalone="yes"?>' + dtd + body
+    for payload in (b"\xff\xfe" + u16.encode("utf-16-le"), b"\xfe\xff" + u16.encode("utf-16-be"),
+                    u16.encode("utf-16-le"), u16.encode("utf-32")):
+        assert _reason("docx", _replace_member(base, "word/document.xml", payload)) == "xml_dtd"
+    renamed = _rename_member(base, "word/document.xml", "word/document.dat")
+    assert "word/document.dat" in zipfile.ZipFile(io.BytesIO(renamed)).namelist()
+    with_dtd = doc.replace("?>", "?>" + dtd, 1).encode("utf-8")
+    assert _reason("docx", _replace_member(renamed, "word/document.dat", with_dtd)) == "xml_dtd"
+    utf7 = ('<?xml version="1.0" encoding="UTF-7"?>' + body).encode("utf-8")
+    assert _reason("docx", _replace_member(base, "word/document.xml", utf7)) == "xml_encoding"
+    ebcdic = '<?xml version="1.0" encoding="IBM037"?><w/>'.encode("cp037")
+    assert _reason("docx", _replace_member(base, "word/document.xml", ebcdic)) == "xml_encoding"
+    # a UTF-16 part with no DTD is still read
+    clean16 = b"\xff\xfe" + ('<?xml version="1.0" encoding="UTF-16" standalone="yes"?>' + body
+                              ).encode("utf-16-le")
+    X.check_bytes("docx", _replace_member(base, "word/document.xml", clean16))
 
 
 def test_zip_entry_count_cap():

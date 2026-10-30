@@ -382,3 +382,39 @@ def test_check_absent_refused_when_demo_login_off_or_deployed(world, tmp_path):
     r = adm.post("/sim/check-absent", json={"phrase": PHRASE})
     u = adm.post("/sim/no-such-route", json={"phrase": PHRASE})
     assert r.status_code == u.status_code == 404 and r.content == u.content
+
+
+
+def test_a_successful_post_is_ledgered_write_ahead(env):
+    """Round 3 L5: ``requested`` (person, container, kind, length and SHA-256 of the text) before
+    the source call, ``written`` with the doc id after; never the text."""
+    import hashlib
+    e, app, svc = env
+    text = "Write-ahead note: replica lag cleared at 21:05 SGT"
+    n = len([ev for ev in e.ledger.events if ev.kind == "ingest.sync"])
+    r = _note(_as(app, svc, AUTHOR), text=text)
+    assert r.status_code == 200, r.text
+    rows = [ev for ev in e.ledger.events if ev.kind == "ingest.sync"
+            and ev.detail.get("reason") == "sim.add-document"]
+    req, done = rows[-2:]
+    assert len([ev for ev in e.ledger.events if ev.kind == "ingest.sync"]) >= n + 2
+    assert (req.detail["phase"], done.detail["phase"]) == ("requested", "written")
+    assert req.detail["by"] == AUTHOR and req.detail["container"] == CHANNEL
+    assert req.detail["sha256"] == hashlib.sha256(text.encode()).hexdigest()
+    assert done.detail["doc_id"] == r.json()["doc_id"]
+    assert "replica lag" not in repr(req.detail) + repr(done.detail)
+
+
+def test_add_document_ledger_down_is_503_and_nothing_is_posted(env, monkeypatch):
+    e, app, svc = env
+    real = e.ledger.append
+
+    def boom(ev):
+        if ev.kind == "ingest.sync":
+            raise RuntimeError("ledger down")
+        return real(ev)
+    monkeypatch.setattr(e.ledger, "append", boom)
+    hooks = len(e.hooks)
+    r = _note(_as(app, svc, AUTHOR), text="this must not be posted")
+    assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+    assert len(e.hooks) == hooks

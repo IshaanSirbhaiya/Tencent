@@ -2,10 +2,14 @@
 from the signed token (P8), and fails closed (503) when the pipeline cannot ledger."""
 from __future__ import annotations
 
+import re
+
+import pytest
 from fastapi.testclient import TestClient
 
 from databridge_ib import auth as authmod
-from databridge_ib.app import ALLOWED_PREFIXES, Services, create_app, mounted_paths
+from databridge_ib.app import ALLOWED_PREFIXES, Services, create_app, iter_routes, mounted_paths
+from databridge_ib.bootstrap import build_app
 from databridge_ib.config import IbConfig
 from databridge_ib.index import Index
 from databridge_ib.ingest import Ingestor
@@ -43,18 +47,43 @@ def test_only_allowlisted_routes(tmp_path):
     app = create_app(_svc(tmp_path))
     for path in mounted_paths(app):
         assert path == "/health" or path.startswith(ALLOWED_PREFIXES), path
+    assert {getattr(r, "path", None) for r in iter_routes(app)} >= set(mounted_paths(app))
+
+
+def _probe_all(app) -> list[str]:
+    """Every route of the app, INCLUDED ROUTERS TOO (round 3 L7: FastAPI 0.143 hides them from
+    ``app.routes``), every method, without a session: 401. Returns the probed paths."""
+    c = TestClient(app)
+    probed = []
+    for r in iter_routes(app):
+        path, methods = getattr(r, "path", ""), getattr(r, "methods", set()) or set()
+        if path in PUBLIC_ROUTES or not methods:
+            continue
+        url = re.sub(r"\{[^}]+\}", "x", path.replace("{platform}", "slack"))
+        for m in sorted(methods - {"HEAD", "OPTIONS"}):
+            resp = c.request(m, url, json={"question": "x"})
+            assert resp.status_code == 401, (m, path, resp.status_code)
+        probed.append(path)
+    return probed
 
 
 def test_every_non_public_route_requires_auth(tmp_path):
-    app = create_app(_svc(tmp_path))
-    c = TestClient(app)
-    for r in app.routes:
-        path, methods = getattr(r, "path", ""), getattr(r, "methods", set())
-        if path in PUBLIC_ROUTES or not methods:
-            continue
-        m = sorted(methods)[0]
-        resp = c.request(m, path.replace("{platform}", "slack"), json={"question": "x"})
-        assert resp.status_code == 401, (m, path, resp.status_code)
+    _probe_all(create_app(_svc(tmp_path)))
+
+
+@pytest.mark.parametrize("demo_features", [False, True])
+def test_every_sim_and_audit_route_of_the_built_app_requires_auth(tmp_path, demo_features):
+    """The app as ``bootstrap.build_app`` builds it (audit console, simulator, and with the demo
+    features on the live router, add-document, upload-file, check-absent, engine refresh)."""
+    cfg = IbConfig(var_root=tmp_path / "var", demo_login=True, demo_features=demo_features,
+                   engine_graph_db=tmp_path / "graph" / "enterprise.db", engine_token="")
+    app = build_app(cfg, sync=False)
+    probed = set(_probe_all(app))
+    assert {"/sim/reset", "/sim/revoke-channel"} <= probed
+    assert any(p.startswith("/audit/") for p in probed)
+    demo = {"/sim/add-document", "/sim/upload-file", "/sim/check-absent", "/sim/engine-refresh",
+            "/sim/engine-status", "/ib/graph/changes"}
+    assert (demo <= probed) if demo_features else probed.isdisjoint(demo)
 
 
 def test_identity_from_token_only(tmp_path):

@@ -27,8 +27,9 @@ each has a "Demo" badge.
 - `config.py`: `demo_features`, `engine_graph_db`, `engine_url`, `engine_token`.
 - `app.py`: `/ib/status` `demo_features`; NEW `iter_routes()` used by `mounted_paths()`. FastAPI 0.143
   keeps included routers as lazy `_IncludedRouter` entries, so the old allowlist check never saw `/sim/*`
-  or `/audit/*` (pre-existing gap; all were on allowed prefixes). `tests/test_app_routes.py` still iterates
-  `app.routes` and so still skips included routers (not changed; my L-5 test uses `iter_routes`).
+  or `/audit/*` (pre-existing gap; all were on allowed prefixes). Round 3 L7: `tests/test_app_routes.py`
+  now walks `iter_routes` and probes every route of the `bootstrap.build_app` app (demo features off and
+  on) for 401 without a session; it found no unauthenticated route.
 - The upload line in `bootstrap.py` (`mount_uploads_router(app, svc, reset_hooks)`) is kept (upload agent).
 
 **Web** (`databridge/apps/internal_brain_web/`): `components/graph/useLiveChanges.ts`, `LiveFeed.tsx`
@@ -76,11 +77,14 @@ changes queue, add-document, engine refresh).
 
 ## 3. Left (exact next steps)
 
-1. Upload agent: fix the 2 Drive connector failures; decide whether `/sim/upload-file` should also be
-   UNMOUNTED when the toggle is off (today it is mounted and refuses with its own 404, so with no session
-   it answers 401, not the unknown-route 404).
-2. `tests/test_app_routes.py`: switch its two loops to `app.iter_routes(app)` (owner: whoever owns that
-   file) so the auth check covers included routers.
+1. DONE (round 3 L3): `/sim/upload-file` is mounted only when demo features are on, demo sign-in is on
+   and not deployed; otherwise it is the unknown-route 404 and writes nothing. Its rate limit is checked
+   first and only one over-limit refusal per person per window is ledgered.
+2. DONE (round 3 L7): `tests/test_app_routes.py` uses `iter_routes`.
+- Round 3 also: L4 the engine refresh claims its job slot atomically before the write-ahead record (two
+  concurrent starts: one `started`); L5 add-document and upload-file successes are ledgered write-ahead
+  (`ingest.sync`, `phase` `requested`/`written`, hash and length only; ledger down is 503); I2 new-window
+  `graph.viewed` rows are at most one per person per 5 s; L6 `clean_text` is linear.
 3. `demo_up.sh stop`/`status` cannot see listeners on this laptop (netstat shows none); I stopped the
    stack by PID tree. Worth switching `port_pids` to PowerShell `Get-NetTCPConnection` or a health probe.
 4. Demo machine: the stack came up with `IB_FORCE_OFFLINE=1` (hy3_check failed at 11:20 SGT), so answers

@@ -18,6 +18,12 @@ from typing import Any, Mapping, Sequence
 
 CSV_CAP = 256 * 1024
 _TRIGGER = re.compile(r"^[\s\u00a0\u1680\u2000-\u200b\u202f\u205f\u3000\ufeff]*[=+\-@\t\r\n\uff1d\uff0b\uff0d\uff20]")
+#: .pptx only (round 3 M1): XlsxWriter ``write()`` turns ``{=...}`` into an array formula whatever
+#: its options say, and (with ``strings_to_urls``) a link prefix into a hyperlink. ``ptext`` quotes
+#: these too; the chart workbook is also written with both conversions off (``_SafeChartData``).
+_PPTX_TRIGGER = re.compile(r"^[\s\u00a0\u1680\u2000-\u200b\u202f\u205f\u3000\ufeff]*"
+                           r"(?:[{\uff5b]|(?:ftp|http)s?://|mailto:|(?:in|ex)ternal:|file://)",
+                           re.IGNORECASE)
 _PLAIN_NUMBER = re.compile(r"^-?\d[\d,]*(?:\.\d+)?%?$")
 FILENAME_RE = re.compile(r"^walnut-[a-z]+-[0-9a-f]{8}-\d{8}\.(?:pptx|csv)$")
 CONTENT_TYPES = {"csv": "text/csv; charset=utf-8",
@@ -116,8 +122,43 @@ def ptext(s: Any) -> str:
     """Every string written into the deck, its chart's embedded workbook included: the CSV formula
     guard (Opus review #4 / T15: python-pptx writes chart categories and series names with
     XlsxWriter ``write()``, which turns a leading ``=`` into a formula), then XML-invalid control
-    characters removed (lxml refuses them)."""
-    return _XML_BAD.sub("", guard(s))
+    characters removed (lxml refuses them). Round 3 M1: a leading ``{`` (XlsxWriter writes
+    ``{=...}`` as an array formula) or a link prefix (``http(s)://``, ``ftp(s)://``, ``mailto:``,
+    ``internal:``, ``external:``, ``file://``) also gets the leading ``'``."""
+    g = guard(s)
+    if not g.startswith("'") and _PPTX_TRIGGER.match(g):
+        g = "'" + g
+    return _XML_BAD.sub("", g)
+
+
+def _safe_chart_data(**kw: Any):
+    """A python-pptx ``CategoryChartData`` whose embedded workbook is written by XlsxWriter with
+    ``strings_to_formulas=False`` and ``strings_to_urls=False`` (round 3 M1), so no category or
+    series name becomes a formula or a hyperlink even if a string slips past ``ptext``."""
+    from contextlib import contextmanager
+
+    from pptx.chart.data import CategoryChartData
+    from pptx.chart.xlsx import CategoryWorkbookWriter
+    from xlsxwriter import Workbook
+
+    class _Writer(CategoryWorkbookWriter):
+        @contextmanager
+        def _open_worksheet(self, xlsx_file):
+            workbook = Workbook(xlsx_file, {"in_memory": True, "strings_to_formulas": False,
+                                            "strings_to_urls": False})
+            worksheet = workbook.add_worksheet()
+            yield workbook, worksheet
+            workbook.close()
+
+    class _Data(CategoryChartData):
+        @property
+        def _workbook_writer(self):
+            w = self.__dict__.get("_safe_writer")
+            if w is None:
+                w = self.__dict__["_safe_writer"] = _Writer(self)
+            return w
+
+    return _Data(**kw)
 
 
 def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mapping[str, Any]], *,
@@ -125,7 +166,6 @@ def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mappin
     """A 16:9 deck: a title slide, the table (native, 10 rows per slide) or the chart (a native,
     editable column or line chart from the checked points), then a Sources slide."""
     from pptx import Presentation
-    from pptx.chart.data import CategoryChartData
     from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
     from pptx.util import Inches, Pt
 
@@ -181,7 +221,7 @@ def build_pptx(kind: str, content: Mapping[str, Any], citations: Sequence[Mappin
             for p in se["points"]:
                 if p["x"] not in cats:
                     cats.append(p["x"])
-        data = CategoryChartData(number_format="General")
+        data = _safe_chart_data(number_format="General")
         data.categories = [ptext(x) for x in cats]
         for se in content["series"]:
             by_x = {p["x"]: p["value"] for p in se["points"]}

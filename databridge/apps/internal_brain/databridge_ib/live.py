@@ -68,6 +68,7 @@ log = logging.getLogger("databridge_ib.live")
 
 EMPLOYEE_ROLES = frozenset({"employee", "compliance_officer", "admin_it"})
 IDLE_S = 600.0                      # a cursor older than this starts a new (ledgered) window
+WINDOW_LEDGER_S = 5.0               # at most one new-window ledger row per person per 5 s (round 3 I2)
 MAX_DOCS = 25                       # authorised documents returned per poll
 MAX_CHECK = 200                     # Gate-1 candidates checked live per poll (newest first)
 MAX_LINKED = 20                     # linked documents checked live per poll (edges to the old graph)
@@ -91,6 +92,17 @@ class ChangeTracker:
         self._seen: dict[str, tuple[str, float]] = {}
         self._gen: Optional[int] = None
         self._last_mark = 0.0
+        self._opened: dict[str, float] = {}
+
+    def window_opened(self, sub: str) -> bool:
+        """True when ``sub``'s new window should be ledgered: the first in ``WINDOW_LEDGER_S``."""
+        now = float(self.clock())
+        with self._lock:
+            last = self._opened.get(sub)
+            if last is not None and 0 <= now - last < WINDOW_LEDGER_S:
+                return False
+            self._opened[sub] = now
+            return True
 
     def mark(self) -> float:
         with self._lock:
@@ -217,7 +229,11 @@ def changes(user, *, index, directory, ledger, connectors, tracker: ChangeTracke
     t = codec.decode(user.id, since)
     empty = {"cursor": codec.encode(user.id, t_now), "nodes": [], "edges": []}
     if t is None or t_now - t > idle_s or t > t_now:
-        _ledger(ledger, user, 0, 0, 0, 0)                  # a new window: once, with zero counts
+        # a new window: ledgered with zero counts, at most once per person per WINDOW_LEDGER_S
+        # (round 3 I2: cursor-less or garbage-cursor polls cannot append unbounded rows; the
+        # reply carries a cursor only, no node, edge or count)
+        if tracker.window_opened(user.id):
+            _ledger(ledger, user, 0, 0, 0, 0)
         return empty
     readable = index.readable(user, getattr(directory, "epoch", 0))         # GATE 1
     cands = [d for _s, d in tracker.window(t, t_now) if d in readable][:max_check]
