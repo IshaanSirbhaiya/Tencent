@@ -53,7 +53,11 @@ estate: aldermoor-government-mcp-synthetic
 mcp:
   server_ref: "oci://registry.internal/aldermoor-permits-mcp:1.4.2"
   vendored_path: fixtures/mcp/permits_mcp/server.py
-  digest: "sha256:0c9f07be34f395f2cbfd8aac762d3c5e24468b049b8db3bfd904a261f5e28dc1"
+  # Re-pinned 30 Oct 2026: the previous pin (sha256:0c9f07be34f3...) was the digest of a CRLF
+  # working copy. The repository stores this file with LF endings (.gitattributes eol=lf), and
+  # converting today's LF bytes to CRLF reproduces the old pin exactly, so the content is
+  # unchanged; only the line endings differed. Reviewed: docs/finals/reviews/platform_claims_check.md.
+  digest: "sha256:5697b8d89541bdd8cf8bf662b40460550d4d8d20363912724224addaedded2fb"
   declaration_digest: "sha256:29c7124e0a31e856ad60896a0f57a7c03f3b0862bd9d1f28f4f054e92415bfb8"
   transport: stdio
   protocol_version: "2026-07-28"

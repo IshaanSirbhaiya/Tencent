@@ -12,6 +12,11 @@ track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product insi
 | [CHANGELOG.md](CHANGELOG.md) | Every change since the 16 Oct submission, newest first, by area, with commit links; plus what is in progress |
 | [../PLATFORM.md](../PLATFORM.md) | The Walnut platform in this repo: all 21 packages, what each does, its tests and screens, and which ones the Internal Brain uses to answer |
 
+**Platform and Tencent.** What the Internal Brain uses to answer, what is a way to ask, what is a view,
+and what is a platform capability only, with re-run test figures: [../PLATFORM.md](../PLATFORM.md). The
+Tencent tools in the build (CodeBuddy, WorkBuddy, Miora, Hunyuan via TokenHub, the Lighthouse kit) and
+their evidence: [README, Built with Tencent](../../README.md#built-with-tencent).
+
 ## 1. Plan and decisions
 
 | File | What it is |
