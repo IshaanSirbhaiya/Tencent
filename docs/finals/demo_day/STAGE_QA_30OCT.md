@@ -144,3 +144,132 @@ Notes:
 - Screenshots (`docs/finals/screens/stage_qa_30oct/`): `run1_01_compare-people.png`, `run1_02_compare-person.png`, `run1_03_citation.png`, `run1_04_journey.png`, `run1_06_tamper.png`, `run1_08_proof.png`, `B_07_clipC_frame.png`, `keys_D_deliverables.png`, `grow_03_addsheet.png`, `grow_04_posted_ken_empty.png`, `grow_05_ask_jdoe_vs_ken.png`, `grow_sim_reset_done.png`, `preflight_board.png`.
 - `docs/finals/live_kit/ABSENCE_PROOF.txt` was rewritten (12/12 PASS, 16:33:53).
 - Nothing was committed. No services were started, stopped or restarted. `.env.ib.local` was not read.
+
+
+---
+
+## Re-run after round-4 fixes (30 Oct 2026, 17:25 to 17:41 SGT)
+
+What was tested: the stack the coordinator restarted with `demo_day.ps1` (stop, then start -Rebuild -NoBrowser) on branch `final_v1.2` at `54c80fb` plus the uncommitted presenter, preflight, persona and graph edits. The web build is `.next/BUILD_ID` from 17:22:36 and `var/demo-day/preflight.json` from 17:22:57. All three services answered 200 from 17:23:12 and stayed up; QA started at 17:25:38.
+
+How: same as above. Headless Google Chrome (`channel: 'chrome'`) at 1920 x 1080, a fresh context for every run, opened signed out at `/present?present=1`. No visible windows and no sounds. No ticket was confirmed and nothing was sent. The scripts are throwaway files in the session scratchpad (`walk2.js`, `mouse.js`, `exitnav.js`, `keys2.js`, `grow2.js`, `preflight2.js`, `starters.js`, `hallway.js`, `tamper.js`).
+
+### R1. Pass/fail
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| 1 | Two timed keyboard walks (`P`, then `Space` to 10) | **PASS.** Every step was `ready`, with no failed step in 4 keyboard walks and 1 mouse walk | R2 |
+| 2 | `P` shows the title card immediately | **PASS.** The title appeared 53 to 183 ms after `P` (by mouse Start: 175 ms). The bar was ready in 0.34 to 0.70 s, down from 1.7 to 6.5 s | `r2_run1_00_title.png` |
+| 3 | Mouse walk using the bar buttons only, 00 to 10 | **PASS, with one dead click.** At step 03, ▶ Next does nothing while the sources sheet is open (issue N1). After the sheet's X, Next works | R3 |
+| 4 | Back / Next / Start / Recording / Reset / Hide / Exit buttons | **PASS** | R3 |
+| 5 | Side buttons 3 and 4 (real CDP input) | **PASS.** 06 → 05 → 06; the page URL followed the step and the browser did not navigate on its own | R3 |
+| 6 | Browser Back | **PASS.** `history.back()` from step 08 went to step 07 (`/dev/audit`), and ▶ returned to 08 | R3 |
+| 7 | Exit presenter, then a normal nav click | **PASS.** The bar was gone, Stage was off, `Space` and `P` did nothing, and clicking the nav link "Walnut DataBridge" went to `/dev`. On a slide, see N6 | `r2_mouse_exit_navclick.png` |
+| 8 | `B` at every step (00 to 07) | **PASS.** The right clip played at each step (A, A, A, A, B, B, B, C). The overlay opened in 32 to 103 ms and playback started in 0.38 to 0.84 s; `B` again closed it and the HUD stayed | R4 |
+| 9 | `B` over the sources sheet at step 03 | **PASS (fixed).** The sheet closed, clipA played, and after `B` the sheet stayed closed | `r2_B_03_citation.png` |
+| 10 | `B` on a slide (08, 09, 10) | **PASS (fixed).** "No recording for this step" showed for about 2.5 s, there was no overlay, and the slide stayed up | `r2_B_09_business.png` |
+| 11 | Steps 05 and 06 ready only after the result | **PASS, mostly.** In all 5 walks the result was in the page when the bar turned ready. But at 05 it is still below the fold at that moment (issue N3) | R2, `r2_step05_at2s.png`, `r2_step06_at2s.png` |
+| 12 | HUD says "quoting (no model)" | **PASS.** "API ok · Model quoting (no model) · Ledger ok" on every step of every walk | `r2_B_09_business.png` |
+| 13 | Keys per `PRESENTER_KEYS.md` (Esc before and after `P`, H, ←, Space with the sheet open, D and Esc) | **PASS**, 18 of 18, same as before. `D` opened in 0.40 s (was 0.83 s) | R5, `r2_keys_D_deliverables.png` |
+| 14 | Grow walk-up `?grow=1`, first try within 60 s | **PASS (fixed).** Step 03 was ready at the first attempt in **18.1 s**, with no graph warm-up. Steps 04 and 05 also passed | R6 |
+| 15 | Simulator reset as `admin.it` afterwards | **PASS.** "Done Reset demo /admin/reset 17:32:24 SGT" in 15.9 s, and Jordan gets only the original blocker message again | `r2_grow_sim_reset_done.png` |
+| 16 | Preflight is gated (sign in first) | **PASS.** Signed out the board returns HTTP 404; signed in as `jdoe` it returns 200 | R7 |
+| 17 | Preflight is all green except the model line | **PASS.** READY. The only two amber rows are both about the model: "Model: extractive fallback" and "Model now" | R7, `r2_preflight_board.png` |
+| 18 | Preflight fits at 390 px | **PASS.** `scrollWidth` is 390 and no element overflows | `r2_preflight_390.png` |
+| 19 | `check_absent.py --all --sim` | **PASS 12/12** in 94 s (it waited out the 429 once). `ABSENCE_PROOF.txt` was rewritten at 17:35:08 | R8 |
+| 20 | Login chips are role-only | **PASS** for the content: no chip names a channel, space, project, drive or folder. The label is wrong (issue N4) | `r2_login_chips.png` |
+| 21 | New starters get a cited answer | **PASS.** Each of the 4 new starters gets an answer with citations. Leo's new one is never shown (issue N5) | R9 |
+| 22 | Hallway task cards 1 to 6 (coordinator add-on) | **PASS, 6 of 6** | `hallway_kit/TASK_CARDS.md` "Hallway task check", `r2_hallway_*.png` |
+
+### R2. Timed walks: settle time in seconds (key press until the room sees the result)
+
+| Step | Run 1 | Run 2 | Run 3 (15 s after `P`) | B walk | Mouse | Before (16:02 build) |
+|---|---|---|---|---|---|---|
+| 00 title (`P`) | 0.34 | 0.70 | 0.56 | 0.53 | 0.68 | 1.8 to 2.1 |
+| 01 compare-people | 3.47 | 3.78 | 2.73 | **5.76** | 2.92 | 1.5 to 1.9 |
+| 02 compare-person | 1.21 | 1.96 | 2.29 | 2.12 | 2.81 | 1.4 to 1.7 |
+| 03 citation | 1.10 | 0.25 | 0.42 | 0.44 | 1.18 | 0.3 to 1.0 |
+| 04 journey (Maya) | 0.67 | 2.29 | 1.12 | 0.97 | 1.27 | 0.7 to 1.1 |
+| 05 verify | 0.75 | 1.50 | 0.83 | 0.98 | 2.03 | 0.9 to 1.0 |
+| 06 tamper | 3.11 | **5.86** | 3.64 | **4.74** | **5.58** | 2.5 to 3.7 |
+| 07 to 10 | 0.07 to 0.11 | 0.09 to 0.16 | 0.09 to 0.15 | 0.08 to 0.15 | 0.07 to 0.13 | 0.08 to 0.15 |
+| **Total** | **11.0** | **16.8** | **12.1** | **15.9** | | 9.7 to 12.7 |
+
+- In every walk the bar reached `ready` within 50 ms of the result settling, so "Working" now covers the whole wait at 05 and 06. Step 06 now counts the full tamper time (3.1 to 5.9 s). The run sheet gives it 7 to 15 s of speech, so that is fine.
+- Step 01 is slower than in the 16:02 build: 2.7 to 3.8 s, and 5.8 s once, against 1.5 to 1.9 s before. Waiting 15 s after `P` (run 3) did not bring it back down. See issue N2.
+- Verify read "Chain intact". The tamper read "Chain broken at entry 1,112" (`r2_step06_at2s.png`); the entry number still changes as the ledger grows. The journey was opened as `maya.compliance` with the waterfall in view.
+- Console in every run: three 401 errors (`/ib/status`, `/auth/whoami` before `P`) and one 404 (favicon), as before. Nothing shows on screen.
+
+### R3. Mouse walk (bar buttons only, real mouse clicks)
+
+- Before `P`, Start, Reset, Hide and Exit are visible. After Start, the legend row stays open in Stage, so More, Back, Next, Recording, Reset, Hide and Exit are on screen; More was never needed. Back is disabled at 00, and Next is disabled at 10.
+- **Back** at 02 went to 01 in 69 ms, with Amy and Rachel restored and not asked again. Next went back to 02.
+- **Step 03:** ▶ Next with the sources sheet open: the step stayed `03` and the sheet stayed open, so the click did nothing at all (N1). The sheet's X closed it, and Next then went to 04.
+- **Recording** at 04 played clipB (t = 1.1 s after 1.2 s). The overlay's own close button closed it, and the step stayed 04. Recording is not shown on the slides (08 to 10).
+- **Hide** at 05 hid the bar and showed the "Show the presenter bar" handle; clicking the handle brought the bar back.
+- **Side buttons** (CDP `back` and `forward`) at 06 went 06 → 05 (`/dev/audit?verify=1`) and then 05 → 06 (`/dev/audit?tamper=1`).
+- **Browser Back** at 08 (`/present/proof`) went to step 07 at `/dev/audit` in 0.2 s; ▶ went back to 08.
+- **Reset** at 10 opened the confirm; Cancel closed it and the step stayed at 10. The reset was not confirmed.
+- **Exit presenter** at 10: the bar was gone, `data-theme` was back to dark, and `Space` and `P` did nothing. But `/present/close` has no links (N6). Repeated by exiting at step 07 (`/dev/audit`): the 11 nav links were visible, and clicking "Walnut DataBridge" went to `/dev` with no bar.
+
+### R4. `B` per step (headless Chrome)
+
+| Step | Result | Overlay open / playing | `B` again closes, HUD kept |
+|---|---|---|---|
+| 00, 01, 02 | clipA plays, muted | 103 / 835, 40 / 382, 32 / 377 ms | yes |
+| 03 **with the sheet open** | **the sheet closes, clipA plays** | 47 / 385 ms | yes; the sheet stays closed |
+| 04, 05, 06 | clipB plays | 39 / 371, 49 / 508, 73 / 403 ms | yes |
+| 07 | clipC plays | 103 / 564 ms | yes |
+| 08, 09, 10 | "No recording for this step" for about 2.9 s; no overlay; the slide stays visible | note shown in under 100 ms | n/a |
+
+### R5. Keys
+
+Pass: `Esc` before `P` hides and then shows the HUD. After `P`, `Esc` keeps it. `H` hides it, `Esc` brings it back, and `H H` toggles it. `←` 02 → 01 takes 62 ms with 0 new asks, and going forward again also makes 0 asks. `Space` with the sheet open is ignored (stays 03). `Esc` closes the sheet and keeps the HUD. `D` at 04 opens Leo's panel in 0.40 s, as `leo.ops`, built "Copied cell by cell from source [2]". `Esc` closes it, signs `maya.compliance` back in and keeps the waterfall. `←` 05 → 04 returns to the journey as Maya with the waterfall and no "Request not found".
+
+### R6. Grow walk-up (`?grow=1`, signed in as `jdoe` first, no graph warm-up)
+
+| Step | Result |
+|---|---|
+| Before and after `P` | HUD `/ 13` |
+| 01, 02 | ready, 2.5 s and 2.9 s |
+| 03 `grow` | **ready at the first attempt in 18.1 s** (was "failed after 20 s" 2 of 2). The sheet is open and focused, and the note is pre-filled (`r2_grow_03_addsheet.png`) |
+| 04 `grow-post` | ready in 1.1 s. The sheet closed by itself; "Just added" has 1 item on Jordan's side and 0 on Ken's |
+| 05 `grow-ask` | ready in 2.5 s. Jordan gets the note quoted and cited ("the copy job resumes Thursday 5 Nov 2026, 21:00 SGT"); Ken gets the constant refusal (`r2_grow_05_ask_jdoe_vs_ken.png`) |
+
+18.1 s is inside the new 60 s limit, but it is still 18 s of "Working" in front of a judge (issue N7). After the reset, the stage is clean: the reset finished at 17:32:24, `check_absent --sim` reports 0 indexed documents for every sample phrase, and every later check only asks questions (they add audit records, as any use does).
+
+### R7. Preflight (`/present/preflight`)
+
+- Signed out: HTTP **404**. Signed in (`jdoe`): HTTP 200.
+- Verdict **READY**, "2 to check". The amber rows are "Model: extractive fallback (quoted from the sources), IB_FORCE_OFFLINE=1" and "Model now: extractive fallback answers are quoted from the sources; say so, never claim Hy3". Both are the model line, as expected.
+- Green rows: web; IB :8100 (83 ms); mock :8200; engine :8300; Verify as Maya (intact, 2,316 records, 0.4 s); seeded history (505 requests); Amy; Rachel; Rachel citation [2]; Ken V; Ken B; Ken identical; Jordan; Maya journey; screen 1920 x 1080; zoom 100 %; UTC+8; skew 0.3 s; clips A, B and C. (There is no "Simulator reset" row this time, because the coordinator's start did not include `reset -Fresh`.)
+- At 390 px: no horizontal scroll, and long labels wrap (`r2_preflight_390.png`).
+
+### R8. Absence proof
+
+`databridge/.venv/Scripts/python.exe docs/finals/live_kit/check_absent.py --all --sim` (17:33:34 to 17:35:08) printed "rate limited (10 a minute): waiting 60 s, then one retry" once, then **12 PASS, 0 FAIL, "RESULT: all checks passed"**, with `documents_containing=0 of 1204 indexed docs` for every sample. The script rewrote **`docs/finals/live_kit/ABSENCE_PROOF.txt`**, which now includes the `--sim` lines. The `world.json` sha256 is unchanged (`e3381d7122570db7`). Earlier risk 8 is **fixed**.
+
+### R9. Login chips and starters
+
+- Login chips: none of the 9 notes names a place, but each still starts with the label "Can open:" (N4).
+- New starters, each asked through the API as its own persona: Maya "Do I need to declare a gift from a supplier?" (1 citation); Leo "Can we offer yield on idle balances to a Hong Kong SME?" (1); Rachel "What does a new joiner do in week 1?" (4); admin.it "Who approves spend above SGD 500?" (2). Every answer is cited.
+- Home page starters: Maya shows 2 and Rachel and admin.it show their new ones. **Leo shows 4 of his 5**, and the new "yield" starter is the 5th, so it never shows (N5).
+
+### R10. New and remaining issues, ranked
+
+1. **N1. Mouse path: ▶ Next is a dead click at step 03 while the sources sheet is open.** The sheet stays open, the step stays 03, and nothing explains why. A mouse-only presenter must find the sheet's X first. (`Space` is ignored there too, as specified, but the keyboard run sheet says `Esc` first.) Fix: treat the step-03 sheet like the grow Add sheet (`data-presenter-owned`), so that Next or `Space` closes it and advances. Or add "close the sheet (X), then Next" to the mouse lines of `RUN_SHEET.md` and `PRESENTER_KEYS.md` §2a.
+2. **N2. Step 01 (Amy vs Rachel) is about twice as slow as in the 16:02 build:** 2.7 to 3.8 s, and 5.8 s once (it was 1.5 to 1.9 s). It is the first live step after the hook. Waiting 15 s after `P` did not help, so it is not the background warm-up. The ledger has also grown from about 1,100 to about 2,900 records today. Worth a profile before Demo Day, and Rachel's line should cover up to 6 s.
+3. **N3. Step 05's "ready" comes before the room can see the result.** When the bar turns ready, `verify-status` is in the page but below the fold (top at y = 1262 in a 1080 viewport). The page scrolls it into view 0.5 to 2 s later. At step 06 the "Chain broken" row is in view about 0.5 s after ready. A quick `Space` at 05 can still leave before "Chain intact" is seen. Fix: in `script.ts`, the verify and tamper actions should `ctx.reveal(...)` (scroll, then wait) rather than `ctx.waitFor(...)`.
+4. **N4. The login chip label still says "Can open:"** in front of role-only text: "Can open: Platform SRE lead", "Can open: Partner manager, external vendor", "Can open: Leads financial crime reviews". This now reads wrong. Fix: rename `login.canOpen` (`app/login/page.tsx:161`) to "Role" or "About", or drop the label.
+5. **N5. Leo's new starter never appears.** "Can we offer yield on idle balances to a Hong Kong SME?" is the 5th item in `lib/personas.ts`, and the home page shows 4. Fix: move it up or drop one.
+6. **N6. Exit presenter on a slide (08 to 10) leaves a page with no links.** `/present/*` has no nav, so after Exit there is nothing to click and the driver needs the address bar. On the app's own pages, Exit followed by a nav click works. Fix (optional): the slides could show a small "Open the app" link once the presenter has exited.
+7. **N7. Grow step 03 now passes, but takes 18 s of "Working" from a cold start** (it is building Jordan's graph). For a judge walk-up, press `P` early or open `/dev/graph` as `jdoe` beforehand, or warm `jdoe`'s graph during `P` when `?grow=1` is set.
+8. Carried over, not re-checked in this run: clip C is the in-app stand-in (old risk 3); clip B's HUD reads "unknown" (old risk 9); the 401s before `P` and the favicon 404 (old risk 11).
+
+Earlier risks now **fixed**: 1 (grow timeout), 2 (rebuilt and re-run), 4 (`B` over the sheet), 5 (05/06 ready early, apart from N3), 6 (`P` warm-up), 7 ("quoting (no model)"), 8 (`--sim` 429), and 10 (`B` on a slide).
+
+### R11. Artefacts (this run)
+
+- Screenshots in `docs/finals/screens/stage_qa_30oct/`: `r2_run1_00_title.png`, `r2_B_03_citation.png`, `r2_B_09_business.png`, `r2_step05_at2s.png`, `r2_step06_at2s.png`, `r2_mouse_00_bar.png`, `r2_mouse_10_more_row.png`, `r2_mouse_exit_navclick.png`, `r2_keys_D_deliverables.png`, `r2_grow_03_addsheet.png`, `r2_grow_04_posted_ken_empty.png`, `r2_grow_05_ask_jdoe_vs_ken.png`, `r2_grow_sim_reset_done.png`, `r2_preflight_board.png`, `r2_preflight_390.png`, `r2_login_chips.png`, `r2_hallway_1_jordan_spend.png` to `r2_hallway_6_leo_table.png`.
+- `docs/finals/live_kit/ABSENCE_PROOF.txt` was rewritten by the script (12/12, 17:35:08).
+- Nothing was committed. No services were started, stopped or restarted (apart from the Simulator's in-app Reset demo). `.env.ib.local` was not read.

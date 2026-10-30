@@ -1,6 +1,6 @@
-ABSENCE PROOF  2026-10-30T16:33:53+08:00
+ABSENCE PROOF  2026-10-30T17:33:34+08:00
 world.json sha256 e3381d7122570db7   samples live_samples.json
-mode: HTTP http://127.0.0.1:8100
+mode: HTTP http://127.0.0.1:8100  + /sim/check-absent
 refusal text: I couldn't find an answer to that in the sources you can access.
 
 [PASS] shard3-resume  (slack-note, extends)
@@ -14,6 +14,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'When does the ledger-shard-3 copy job resume?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] wellness-day  (slack-note, new-topic)
     ok   channel #hr-announcements (C0HRANN) exists in world.json
@@ -26,6 +27,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'When is the company wellness day, and do I need to apply for leave?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] mfa-authenticator  (slack-note, extends)
     ok   channel #it-helpdesk (C0ITHELP) exists in world.json
@@ -38,6 +40,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'When does MFA move to Authenticator Pro, and when do SMS codes stop working?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] deepavali-bridge  (slack-note, changes-a-fact)
     ok   channel #hr-announcements (C0HRANN) exists in world.json
@@ -50,6 +53,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'Is the office closed on Tuesday 10 November 2026?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] fincrime-twist  (slack-note, permission-twist)
     ok   channel #fincrime-cases (C0FINCRIME) exists in world.json
@@ -64,6 +68,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   KEN (before): answer does not contain the proof phrase
     ok   OUTSIDER (before): amy.am asks 'Is enhanced due diligence on Nightjar Logistics complete?' -> constant refusal, 0 citations
     ok   OUTSIDER (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] vendor-review  (slack-note, permission-twist)
     ok   channel #vendor-acme (C0VACME) exists in world.json
@@ -74,6 +79,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   proof_phrase 'business review is booked' is absent from world.json
     ok   BEFORE: leo.ops asks 'When is the quarterly business review with the vendor?' -> constant refusal, 0 citations
     ok   BEFORE: answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] up-cutover-docx  (upload, changes-a-fact)
     ok   folder 'DB Migration' (fd-3) exists in world.json
@@ -85,6 +91,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'When is the wave 4 ledger cutover now, and what is the fallback date?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] up-fx-xlsx  (upload, new-topic)
     ok   folder 'Pricing & Offers' (fd-6) exists in world.json
@@ -96,6 +103,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'What does the Q4 draft propose for the SG FX conversion fee on the Growth SME plan, and when is it approved?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] up-postmortem-pptx  (upload, extends)
     ok   folder 'Postmortems' (fd-1) exists in world.json
@@ -107,6 +115,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'What did the post-incident review decide about the deadline for PAY-201 to PAY-205?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] up-whatsapp-oncall  (upload, extends)
     ok   folder 'SRE Ops' (fd-4) exists in world.json
@@ -118,6 +127,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'What caused the PAY-204 success-rate alert on 24 October?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] up-vendor-csv  (upload, permission-twist)
     ok   folder 'Vendor share' (fd-7) exists in world.json
@@ -127,6 +137,7 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   proof_phrase 'SLA credit of SGD 1,800' is absent from world.json
     ok   BEFORE: leo.ops asks 'Who is owed an SLA credit by Acme Vendor for October?' -> constant refusal, 0 citations
     ok   BEFORE: answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 [PASS] up-buddy-md  (upload, new-topic)
     ok   folder 'People' (fd-13) exists in world.json
@@ -138,5 +149,6 @@ refusal text: I couldn't find an answer to that in the sources you can access.
     ok   BEFORE: answer does not contain the proof phrase
     ok   KEN (before): ken.ext asks 'How much is the buddy coffee allowance, and who do I message to volunteer?' -> constant refusal, 0 citations
     ok   KEN (before): answer does not contain the proof phrase
+    ok   /sim/check-absent: documents_containing=0 of 1204 indexed docs
 
 RESULT: all checks passed
