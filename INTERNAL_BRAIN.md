@@ -278,8 +278,10 @@ bash; the commands are in [README.md → Fallback](README.md#fallback-start-each
 In the commands below, `PY` is `.venv\Scripts\python` on Windows and `.venv/bin/python` on macOS/Linux,
 run from `databridge/`:
 
-- **WorkBuddy:** `PY scripts/workbuddy_setup.py --user-config` adds three Internal Brain connectors to
-  WorkBuddy (as Jordan, as Ken, and for compliance). Restart WorkBuddy and press **Trust** on each
+- **WorkBuddy:** `PY scripts/workbuddy_setup.py --user-config` adds the two employee Internal Brain
+  connectors to WorkBuddy (as Jordan and as Ken). The compliance connector never goes in the same list:
+  use the `IB compliance` workspace folder, or `--compliance-user-config` on the compliance seat.
+  Restart WorkBuddy and press **Trust** on each
   (guide: [docs/tencent/workbuddy/README.md](docs/tencent/workbuddy/README.md)).
 - **Tests:** `PY -m pytest apps/internal_brain/tests -q`
 - **Leak evaluation:** `PY -m evals.internal_brain.run` (about 1 to 10 minutes depending on the machine;

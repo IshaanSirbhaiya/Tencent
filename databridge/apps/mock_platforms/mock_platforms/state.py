@@ -60,6 +60,16 @@ class World:
             self.levels: dict[str, dict] = {lv["id"]: lv for lv in jr.get("security_levels", [])}
             self.issues: dict[str, dict] = {i["key"]: i for i in jr.get("issues", [])}
             self.issue_by_id: dict[str, str] = {str(i["id"]): i["key"] for i in self.issues.values()}
+            # The calling service account (round 2b finding 3). Real Jira authorises POST /issue for
+            # the CALLER: "Create issues" in the project, plus "Modify reporter" to set someone else
+            # as reporter. It never checks the reporter's own permissions. ``create``: True (every
+            # project), False, or a list of project keys.
+            sa = jr.get("service_account") or {}
+            self.jira_service: dict[str, Any] = {
+                "account_id": sa.get("account_id", "acc-svc-internal-brain"),
+                "name": sa.get("name", "Internal Brain (service account)"),
+                "create": sa.get("create", True),
+                "modify_reporter": sa.get("modify_reporter", True)}
             sl = w.get("slack", {})
             self.workspace: dict[str, Any] = sl.get("workspace", {"id": "T0MOCK", "domain": "mock"})
             self.channels: dict[str, dict] = {c["id"]: c for c in sl.get("channels", [])}
@@ -271,6 +281,14 @@ class World:
         if self._in_roles(uid, project_key, c.get("roles", [])):
             return True
         return self.in_principals(uid, c.get("users", []), c.get("groups", []))
+
+    def jira_service_can_create(self, project_key: str) -> bool:
+        """"Create issues" for the calling service account (what real Jira checks on POST /issue)."""
+        c = self.jira_service.get("create", True)
+        return project_key in self.projects and (c is True or (isinstance(c, list) and project_key in c))
+
+    def jira_service_can_modify_reporter(self) -> bool:
+        return bool(self.jira_service.get("modify_reporter", True))
 
     def next_issue(self, project_key: str) -> tuple[str, str]:
         """``(key, id)`` for a new issue in ``project_key``: the next number and the next id."""

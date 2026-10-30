@@ -23,8 +23,12 @@ From the repo root, in Git Bash:
 databridge/.venv/Scripts/python.exe databridge/scripts/workbuddy_setup.py --user-config
 ```
 
-This mints three fresh 8-hour tokens and writes three connectors into `~/.workbuddy-ai/mcp.json` (other
-servers in that file are kept). It never prints a token. Tokens also land in the three workspace
+This mints three fresh 8-hour tokens and writes the two employee connectors (`ib-as-jdoe`, `ib-as-ken`)
+into `~/.workbuddy-ai/mcp.json` (other servers in that file are kept; a stale `ib-compliance` entry is
+removed). The compliance connector is never written into the same list as the employee connectors
+(round 2b review, finding 2): run prompts 5 and 6 from the `IB compliance` workspace folder in
+`../workbuddy-demo/` (its own `.workbuddy/mcp.json`, server name `internal-brain-audit`), or on a
+separate compliance seat with `--compliance-user-config`. It never prints a token. Tokens also land in the three workspace
 folders next to the repo (`../workbuddy-demo/`), outside git.
 
 What each connector is (all three use the same command; only the module and the token differ):
@@ -33,7 +37,7 @@ What each connector is (all three use the same command; only the module and the 
 |---|---|---|---|---|
 | `ib-as-jdoe` | `<repo>/databridge/.venv/Scripts/python.exe` | `["-m", "databridge_ib.mcp_server"]` | `<repo>/databridge` | `PYTHONPATH=<repo>/databridge/apps/internal_brain`, `IB_URL=http://127.0.0.1:8100`, `IB_TOKEN=<fresh token for jdoe>` |
 | `ib-as-ken` | same | `["-m", "databridge_ib.mcp_server"]` | same | same, `IB_TOKEN=<fresh token for ken.ext>` |
-| `ib-compliance` | same | `["-m", "databridge_ib.audit_mcp_server"]` | same | same, `IB_TOKEN=<fresh token for maya.compliance>` |
+| `ib-compliance` (compliance seat or `IB compliance` workspace only) | same | `["-m", "databridge_ib.audit_mcp_server"]` | same | same, `IB_TOKEN=<fresh token for maya.compliance>` |
 
 To make one by hand instead: `databridge/.venv/Scripts/python.exe databridge/scripts/ib_mint_token.py jdoe --out <file outside the repo>`, then paste the file's contents into `IB_TOKEN`.
 
@@ -41,14 +45,14 @@ Then:
 
 1. Start WorkBuddy.
 2. Open **Experts · Skills · Connectors → Custom connectors**.
-3. Press **Trust** on `ib-as-jdoe`, `ib-as-ken` and `ib-compliance`.
+3. Press **Trust** on `ib-as-jdoe` and `ib-as-ken` (and, in the compliance workspace, on its audit connector).
 4. Expand each one and check its tool list:
    - `ib-as-jdoe` and `ib-as-ken`: `ask_internal_brain`, `my_recent_questions`, `my_answer_receipt`, `what_can_i_open`;
    - `ib-compliance`: `audit_events`, `audit_doc_accessors`, `audit_verify`, `org_activity_summary`, `run_tamper_demo`.
 5. Add the Walnut skill: paste the body of [`docs/tencent/workbuddy/WALNUT_SKILL.md`](../../../tencent/workbuddy/WALNUT_SKILL.md)
    as a new skill (or custom expert) named **Walnut** and switch it on for the chat.
 
-**Screenshot S1**: the connector panel with all three connectors trusted and the tool list of `ib-compliance` expanded.
+**Screenshot S1**: the connector panel with the two employee connectors trusted; take the compliance tool list from the `IB compliance` workspace.
 Save as `submission/02_workbuddy/finals/wb_s1_connectors.png`.
 
 ## 3. The six prompts
@@ -62,7 +66,7 @@ agent to finish before the next one.
 | 2 | `Show me the receipt for that answer.` | `ib-as-jdoe` → `my_answer_receipt` with the request id from #1 | The question, status `answered`, the model, the stages (accept, gate1, gate2, seal, compose, release), the cited documents Jordan can still open, and the sealed record kinds with short hashes | **S3** `wb_s3_receipt.png` |
 | 3 | `Using the ib-as-ken connector: Why is Velquarry Trading's account restricted?` | `ib-as-ken` → `ask_internal_brain` | The constant reply "I couldn't find an answer to that in the sources you can access.", `(no citations)`, `answered as ken.ext`. The agent must not guess why or retry with other words | **S4** `wb_s4_ken_velquarry.png` |
 | 4 | `Using the ib-as-ken connector: Why is Bayfront Spice Traders' account restricted?` | `ib-as-ken` → `ask_internal_brain` | **The same reply as #3** apart from the request id: a made-up company looks exactly like a restricted one | **S5** `wb_s5_ken_bayfront.png` (put #3 and #4 in one shot if they fit) |
-| 5 | `Using the ib-compliance connector: Summarise this month's activity and verify the audit chain.` | `ib-compliance` → `org_activity_summary` then `audit_verify` | Headline numbers (requests, answered, refused, the document funnel, latency, models) with **`workbuddy-mcp` in the channels**, then `Audit ledger verification: OK` with the stored-answer check intact | **S6** `wb_s6_compliance_summary.png` |
+| 5 | (in the `IB compliance` workspace, a new task) `Using the ib-compliance connector: Summarise this month's activity and verify the audit chain.` | `ib-compliance` → `org_activity_summary` then `audit_verify` | Headline numbers (requests, answered, refused, the document funnel, latency, models) with **`workbuddy-mcp` in the channels**, then `Audit ledger verification: OK` with the stored-answer check intact | **S6** `wb_s6_compliance_summary.png` |
 | 6 | `Using the ib-compliance connector: Run the tamper demo.` | `ib-compliance` → `run_tamper_demo` | One line per scenario, every one "as expected"; **real log modified: no**. Then ask `Verify the audit chain again.`: still OK | **S7** `wb_s7_tamper.png` |
 
 ## 4. Cross-check in the web app (one screenshot)

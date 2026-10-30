@@ -16,7 +16,7 @@
 | Web deps | `cd databridge/apps/internal_brain_web && npm install` | no errors |
 | Tests green | `cd databridge && PY -m pytest apps/internal_brain/tests -q` | 754 passed on 30 Oct at commit 7bf3246 |
 | Optional: Hy3 | Create `databridge/.env.ib.local` (git-ignored) with `TOKENHUB_API_KEY=<key>` and `IB_FORCE_OFFLINE=0` | See §4, failure 1 |
-| Optional: WorkBuddy | `cd databridge && PY scripts/workbuddy_setup.py --user-config`; restart WorkBuddy; press **Trust** on each connector | Three connectors appear (`docs/tencent/workbuddy/README.md`) |
+| Optional: WorkBuddy | `cd databridge && PY scripts/workbuddy_setup.py --user-config`; restart WorkBuddy; press **Trust** on each connector | Two employee connectors appear; compliance runs from the `IB compliance` workspace folder (`docs/tencent/workbuddy/README.md`) |
 
 Source: `INTERNAL_BRAIN.md:78-175`; `CLAUDE.md:75-89`.
 

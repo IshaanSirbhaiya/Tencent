@@ -5,6 +5,9 @@
     .venv/Scripts/python scripts/demo_preflight.py --offline       # the mock build on :3101
     .venv/Scripts/python scripts/demo_preflight.py --sim-reset     # admin.it -> Simulator reset first
 
+A non-loopback --web is refused unless --allow-remote, and then only over https (the demo sign-in
+and IB_DEMO_PASSCODE go to that origin).
+
 Everything goes through the web app's own proxy (/api/ib/*), the path the stage browser uses, so a
 green line means the browser path works, not only the Python service behind it. The services are
 also probed directly (/health on :8100, :8200, :8300).
@@ -30,6 +33,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]                     # databridge/
 WEB_DIR = ROOT / "apps" / "internal_brain_web"
@@ -119,6 +123,30 @@ def same_refusal(a: dict, b: dict) -> bool:
     return all(a.get(k) == b.get(k) for k in keys)
 
 
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def origin_error(url: str, allow_remote: bool) -> str | None:
+    """Why *url* must not receive the demo sign-in (and IB_DEMO_PASSCODE), or None when it may.
+
+    Round 2b finding 6: loopback only by default. A non-loopback host needs --allow-remote, and even
+    then plain http is refused, so the passcode never crosses a network in clear text.
+    """
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.hostname:
+        return f"{url!r} is not an http(s) origin"
+    if p.username or p.password:
+        return "the origin must not contain credentials"
+    if p.hostname.lower() in _LOOPBACK:
+        return None
+    if not allow_remote:
+        return (f"{p.hostname} is not a loopback host; the demo sign-in (and IB_DEMO_PASSCODE) is sent "
+                "only to 127.0.0.1, localhost or ::1 unless you pass --allow-remote")
+    if p.scheme != "https":
+        return f"{p.hostname} is remote: use https:// (the passcode is never sent over plain http off this machine)"
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--offline", action="store_true", help="check the mock build on :3101 (no services)")
@@ -127,9 +155,15 @@ def main() -> int:
     ap.add_argument("--sim-reset", action="store_true", help="as admin.it, reset the platform simulator first")
     ap.add_argument("--max-s", type=float, default=8.0, help="slowest acceptable ask, seconds (default 8)")
     ap.add_argument("--out", default=str(OUT_DEFAULT))
+    ap.add_argument("--allow-remote", action="store_true",
+                    help="allow a non-loopback https --web (the demo sign-in and passcode go there)")
     a = ap.parse_args()
 
     web = (a.web or ("http://127.0.0.1:3101" if a.offline else "http://127.0.0.1:3100")).rstrip("/")
+    err = origin_error(web, a.allow_remote)
+    if err:
+        print(f"refusing --web: {err}", file=sys.stderr)
+        return 2
     rep = Report()
     started = dt.datetime.now().astimezone()
     print(f"Walnut DataBridge preflight  {started:%Y-%m-%d %H:%M:%S %Z}  ({'OFFLINE mock' if a.offline else 'live'} {web})")

@@ -1,15 +1,21 @@
 """Write the three WorkBuddy demo workspaces, each with a project-level .workbuddy/mcp.json.
 
-    python databridge/scripts/workbuddy_setup.py [--out DIR] [--hours N] [--ib-url URL] [--user-config]
+    python databridge/scripts/workbuddy_setup.py [--out DIR] [--hours N] [--ib-url URL]
+                                                 [--user-config | --compliance-user-config]
 
 Each workspace acts as ONE persona: its MCP server runs databridge_ib.mcp_server (or the audit
 server for compliance) with that persona's short-lived bearer token, minted by ib_mint_token.py
 from IB_TOKEN_KEY in databridge/.env.ib.local. Tokens are secrets, so the default output folder
 is OUTSIDE the repository (<repo>/../workbuddy-demo). Re-run it to refresh tokens (max 8 h).
 
-``--user-config`` also writes all three as WorkBuddy's own connector list
-(``~/.workbuddy-ai/mcp.json``: ib-as-jdoe, ib-as-ken, ib-compliance), so one WorkBuddy chat can use
-them without opening a folder. Restart WorkBuddy, then press Trust on each in
+``--user-config`` also writes the two EMPLOYEE connectors as WorkBuddy's own connector list
+(``~/.workbuddy-ai/mcp.json``: ib-as-jdoe, ib-as-ken), so one WorkBuddy chat can use them without
+opening a folder. It never writes the compliance connector there, and it removes an ``ib-compliance``
+entry an older run left behind (round 2b finding 2: source text an employee connector returns must
+not be able to steer the same agent into the audit tools). The compliance seat uses its own
+workspace folder ("IB compliance"), or ``--compliance-user-config`` on a separate machine or user
+account: that writes ONLY ib-compliance and removes the employee connectors from that list. The two
+flags cannot be combined. Restart WorkBuddy, then press Trust on each in
 Experts · Skills · Connectors > Custom connectors. Any other servers already in that file are kept.
 """
 from __future__ import annotations
@@ -42,6 +48,23 @@ WORKSPACES = (
 
 #: names of the connectors in WorkBuddy's own connector list (--user-config)
 USER_NAMES = {"jdoe": "ib-as-jdoe", "ken.ext": "ib-as-ken", "maya.compliance": "ib-compliance"}
+#: the compliance connector is never written next to the employee connectors
+COMPLIANCE_NAMES = frozenset({"ib-compliance"})
+EMPLOYEE_NAMES = frozenset(USER_NAMES.values()) - COMPLIANCE_NAMES
+
+
+def merge_user_servers(current: dict, user_servers: dict, *, compliance: bool) -> dict:
+    """Return the new ``mcpServers`` map for WorkBuddy's own connector list.
+
+    Employee mode (``compliance=False``) adds only the employee connectors and drops any compliance
+    connector; compliance mode adds only the compliance connector and drops the employee ones. So one
+    WorkBuddy connector list never holds both an employee identity and the audit identity. Servers
+    that are not ours are kept untouched.
+    """
+    keep, drop = (COMPLIANCE_NAMES, EMPLOYEE_NAMES) if compliance else (EMPLOYEE_NAMES, COMPLIANCE_NAMES)
+    servers = {k: v for k, v in (current.get("mcpServers") or {}).items() if k not in drop}
+    servers.update({k: v for k, v in user_servers.items() if k in keep})
+    return servers
 
 
 def _python() -> Path:
@@ -84,8 +107,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, default=REPO.parent / "workbuddy-demo")
     ap.add_argument("--hours", type=int, default=8)
     ap.add_argument("--ib-url", default="http://127.0.0.1:8100")
-    ap.add_argument("--user-config", action="store_true",
-                    help="also write the three connectors to ~/.workbuddy-ai/mcp.json")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--user-config", action="store_true",
+                      help="also write the two employee connectors (ib-as-jdoe, ib-as-ken) to "
+                           "~/.workbuddy-ai/mcp.json; never the compliance connector")
+    mode.add_argument("--compliance-user-config", action="store_true",
+                      help="compliance seat only (a separate machine or account): write ONLY "
+                           "ib-compliance to ~/.workbuddy-ai/mcp.json and remove the employee connectors")
     args = ap.parse_args(argv)
     out = args.out.resolve()
     if out == REPO or REPO in out.parents:          # tokens are secrets: never inside the repo
@@ -111,17 +139,25 @@ def main(argv: list[str] | None = None) -> int:
             f"This WorkBuddy workspace talks to the Walnut Internal Brain as '{persona}'.\n"
             f"Ask:\n{question}\n", encoding="utf-8")
         print(f"wrote {ws / '.workbuddy' / 'mcp.json'}  (persona {persona}, {module})")
-    if args.user_config:
+    if args.user_config or args.compliance_user_config:
+        compliance = bool(args.compliance_user_config)
         user_cfg = Path.home() / ".workbuddy-ai" / "mcp.json"
         user_cfg.parent.mkdir(parents=True, exist_ok=True)
         current = json.loads(user_cfg.read_text(encoding="utf-8")) if user_cfg.exists() else {}
         if not isinstance(current, dict) or not isinstance(current.get("mcpServers", {}), dict):
             ap.error(f"{user_cfg} is not a WorkBuddy MCP config; fix or move it first")
-        current.setdefault("mcpServers", {}).update(user_servers)
+        current["mcpServers"] = merge_user_servers(current, user_servers, compliance=compliance)
         _write_private(user_cfg, json.dumps(current, indent=2))
-        print(f"wrote {user_cfg}  ({', '.join(user_servers)}); restart WorkBuddy and press Trust on each")
-        print("note: these connectors are visible in every WorkBuddy chat for up to 8 h. Each one only ever "
-              "answers as its own person, but pick the connector you mean, and remove them after the demo.")
+        written = sorted(COMPLIANCE_NAMES if compliance else EMPLOYEE_NAMES)
+        print(f"wrote {user_cfg}  ({', '.join(written)}); restart WorkBuddy and press Trust on each")
+        if compliance:
+            print("note: this connector list now holds only the compliance connector; keep it on the "
+                  "compliance seat, never on an employee's WorkBuddy.")
+        else:
+            print("note: the compliance connector is NOT in this list (use the 'IB compliance' workspace "
+                  "folder, or --compliance-user-config on the compliance seat). These connectors are "
+                  "visible in every WorkBuddy chat for up to 8 h; each only ever answers as its own "
+                  "person. Remove them after the demo.")
     print(f"tokens expire in {min(args.hours, 8)} h; re-run this script to refresh them")
     return 0
 

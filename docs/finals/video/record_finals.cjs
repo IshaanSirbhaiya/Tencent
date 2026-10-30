@@ -245,6 +245,28 @@ const col = (page, i) => page.locator('[data-compare-col]').nth(i);
 
 // Each scene is sized to its narration (VIDEO_SCRIPT_FINALS.md); the target length is in the comment.
 // `mode` is the app mode the scene starts in ('user' or 'dev'); `who` the persona signed in first.
+// Round 2b finding 7: the Hy3 overlay follows what this backend's /ib/status reports, never a fixed
+// string. Live = the active chain includes a hy3 model on Tencent TokenHub (configured and switched on;
+// the status does not prove a call succeeded). Unknown (status unreadable) gets a neutral line.
+// FINALS_HY3=1 or 0, when set, must agree with the status, or the take is refused.
+async function hy3Live(page) {
+  const r = await page.request.get(`${WEB}/api/ib/ib/status`).catch(() => null);
+  const st = r && r.ok() ? await r.json().catch(() => null) : null;
+  const m = st && st.models;
+  const live = m ? !!(m.active && m.provider === 'tencent-tokenhub' &&
+    (m.active_chain || []).some((x) => /^hy3/i.test(String(x)))) : null;
+  const want = process.env.FINALS_HY3;
+  if ((want === '1' || want === '0') && live !== (want === '1')) {
+    throw new Error(`FINALS_HY3=${want} but /ib/status says Hy3 live=${live}; not recording 13_hy3_status`);
+  }
+  return live;
+}
+const hy3Mark = (live) => (live === true
+  ? 'Hy3 switched on via TokenHub: answers still pass the same source checks'
+  : live === false
+    ? 'Hy3 not switched on yet: answers are quoted from the sources'
+    : 'The model chain as this backend reports it');
+
 const SCENES = {
   '02_compare_amy_rachel': { who: 'amy.am', mode: 'user', async run(page) {               // ~40 s
     await goto(page, `${WEB}/compare?a=amy.am&b=mlro.tan`, 1.0);
@@ -486,7 +508,7 @@ const SCENES = {
     await bringIntoView(page, ms);
     mark(page, 'Tencent Hy3 via TokenHub → DeepSeek → quoted fallback', 4.5);
     await read(page, ms.getByRole('list'), 4);
-    mark(page, 'Hy3 not switched on yet: answers are quoted from the sources', 5);
+    mark(page, hy3Mark(await hy3Live(page)), 5);
     await hover(page, ms.locator('p').last(), 3);
     await hover(page, ms.getByText(/Extractive only|Live models/).first(), 2.5);
   } },

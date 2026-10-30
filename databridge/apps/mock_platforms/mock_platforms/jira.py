@@ -52,6 +52,13 @@ def user_ref(w: World, uid: Optional[str]) -> Optional[dict[str, Any]]:
             "displayName": u.get("name", uid), "active": bool(u.get("active", True))}
 
 
+def _service_ref(w: World) -> dict[str, Any]:
+    """The calling service account as Jira shows it (creator of every issue the IB creates)."""
+    sa = w.jira_service
+    return {"accountId": sa["account_id"], "accountType": "app", "displayName": sa["name"],
+            "active": True}
+
+
 def role_ids(w: World) -> dict[str, int]:
     names = sorted({r for p in w.projects.values() for r in (p.get("roles") or {})})
     return {n: 10002 + i for i, n in enumerate(names)}
@@ -104,8 +111,9 @@ def issue_obj(w: World, request: Request, i: dict, fields: Optional[str] = None
         "project": {"id": str(proj.get("id")), "key": proj["key"],
                     "name": proj.get("name", proj["key"])},
         "issuetype": {"name": i.get("issuetype", "Task")},
-        "reporter": user_ref(w, i.get("reporter")),
-        "creator": user_ref(w, i.get("reporter")),
+        "reporter": (_service_ref(w) if i.get("reporter") is None and i.get("reporter_is_service")
+                     else user_ref(w, i.get("reporter"))),
+        "creator": (_service_ref(w) if i.get("created_by_service") else user_ref(w, i.get("reporter"))),
         "assignee": user_ref(w, i.get("assignee")),
         "security": ({"id": str(lvl["id"]), "name": lvl.get("name"),
                       "self": f"{base}/securitylevel/{lvl['id']}"} if lvl else None),
@@ -271,8 +279,14 @@ def _field_error(field: str, message: str) -> PlatformError:
 
 @router.post("/issue", status_code=201)
 def create_issue(request: Request, body: dict = Body(...)):
-    """Jira Cloud ``POST /rest/api/3/issue`` (subset). The issue is created for ``reporter`` (the
-    Internal Brain passes the asker's own account id); that account must hold Create issues."""
+    """Jira Cloud ``POST /rest/api/3/issue`` (subset), authorised like real Jira: for the CALLER.
+
+    The caller is the token's service account. It needs "Create issues" in the project (else 403) and
+    "Modify reporter" to set ``reporter`` (else 400 on ``reporter``). The reporter's OWN permissions are
+    never checked, exactly as in Jira Cloud: so the Internal Brain's live ``creatable`` re-check is the
+    only thing that stops an issue for someone who may not create one (round 2b finding 3). The reporter
+    must be a known, active account (else 400 on ``reporter``); with no reporter, the caller is the
+    reporter. ``creator`` is always the service account."""
     w = world(request)
     f = body.get("fields") if isinstance(body, dict) else None
     if not isinstance(f, dict):
@@ -294,17 +308,25 @@ def create_issue(request: Request, body: dict = Body(...)):
             proj = _project(w, str(proj_ref.get("key") or proj_ref.get("id") or ""))
         except PlatformError:
             raise _field_error("project", "valid project is required") from None
-        rep = f.get("reporter")
-        account = rep.get("accountId") if isinstance(rep, dict) else None
-        uid = w.ib_id(P, account) if account else None
-        if uid is None or not w.jira_can_create(uid, proj["key"]):
+        if not w.jira_service_can_create(proj["key"]):
             raise PlatformError(P, 403, "forbidden",
                                 "You do not have permission to create issues in this project.")
+        rep = f.get("reporter")
+        account = rep.get("accountId") if isinstance(rep, dict) else None
+        uid = None
+        if account:
+            if not w.jira_service_can_modify_reporter():
+                raise _field_error("reporter", "Field 'reporter' cannot be set. It is not on the "
+                                               "appropriate screen, or unknown.")
+            uid = w.ib_id(P, account)
+            if uid is None or not w.active(uid):
+                raise _field_error("reporter", "Specified reporter is not a user.")
         key, iid = w.next_issue(proj["key"])
         now = w.now_iso()
         issue = {"id": iid, "key": key, "project": proj["key"], "summary": summary.strip(),
                  "description": _adf_to_text(f.get("description")), "status": "To Do",
-                 "issuetype": itype, "reporter": uid, "assignee": None, "security_level": None,
+                 "issuetype": itype, "reporter": uid, "reporter_is_service": uid is None,
+                 "created_by_service": True, "assignee": None, "security_level": None,
                  "labels": list(labels), "comments": [], "links": [], "created": now,
                  "updated": now}
         w.issues[key] = issue

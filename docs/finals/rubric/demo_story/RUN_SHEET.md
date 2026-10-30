@@ -18,7 +18,7 @@ Rules: one speaker at a time; hand-offs by name ("Mehul, over to the compliance 
 ## 0b. Stage setup notes
 
 - **One browser window only** on stage. No second pre-opened window; WorkBuddy is the only other window.
-- **`R` is the recovery key**: it restores the tamper copy, clears the ask boxes and returns to step 0 (never edits the real ledger).
+- **`R` is the recovery key**: after a confirm it signs every demo session in the browser out, clears the presenter state and returns to step 0. It restores nothing and never edits the real ledger (the tamper step only ever changes a copy).
 - **WorkBuddy question, one exact string everywhere:** `What's the status of the database migration project and were there any blockers raised in Slack last week?`
 - Every line that names Hy3 as the author of an answer is tagged [ONLY IF HY3 LIVE] and has a default alternative ("quoted from the sources, with the same checks").
 

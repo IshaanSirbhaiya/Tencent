@@ -122,3 +122,36 @@ def test_follow_up_ticket_is_created_on_the_mock_jira_after_confirm(env):
     assert f"jira:{key}" in env.index.readable(jdoe, getattr(env.directory, "epoch", 0))
     kinds = [e.kind for e in env.ledger.events() if e.data.get("req_id") == resp.request_id]
     assert kinds[-3:] == ["action.proposed", "action.confirmed", "action.executed"]
+
+
+def test_revoked_create_permission_is_refused_by_the_ib_recheck_alone(env):
+    """Round 2b finding 3. The mock Jira now authorises the CALLER (the service account), like Jira
+    Cloud, so it accepts any active reporter. A "Create issues" permission revoked between propose and
+    confirm is therefore stopped by the Internal Brain's live ``creatable`` re-check ALONE: nothing is
+    created, and the same create sent straight to the mock is accepted."""
+    q, resp = _ask(env, "S1-q1")
+    jdoe = env.user(q["persona"])
+    p = env.acts.propose_ticket(jdoe, resp.request_id)
+    target = p["project"]["key"]
+    world = env.mock.state.world
+    proj = world.projects[target]
+    saved = proj.get("create")
+    proj["create"] = {"roles": [], "users": [], "groups": []}         # revoked at the source
+    try:
+        assert not world.jira_can_create(jdoe.id, target)
+        before = set(world.issues)
+        with pytest.raises(Unavailable):
+            env.acts.confirm_ticket(jdoe, p["proposal_id"])
+        assert set(world.issues) == before                             # nothing created
+        failed = [e for e in env.ledger.events() if e.kind == "action.failed"][-1].event
+        assert failed.stage == "confirm" and failed.action_id == p["proposal_id"]
+        # the mock is not a second layer: it accepts the same reporter from the service account
+        r = env.svc.post("/jira/rest/api/3/issue", json={"fields": {
+            "project": {"key": target}, "summary": "direct create, reporter lacks Create issues",
+            "issuetype": {"name": "Task"}, "reporter": {"accountId": jdoe.platform_ids["jira"]}}})
+        assert r.status_code == 201, r.text
+    finally:
+        if saved is None:
+            proj.pop("create", None)
+        else:
+            proj["create"] = saved

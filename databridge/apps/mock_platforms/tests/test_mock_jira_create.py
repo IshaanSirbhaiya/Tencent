@@ -2,7 +2,8 @@
 (the Internal Brain's follow-up ticket action, AGENTIC_ROADMAP.md §1).
 
 Mini world: PAY's Developers role is grp-payments-eng (jdoe, old.timer deactivated); leo.ops is a PAY
-Viewer (browse, not create); SEC has no Developers role, so nobody may create there by default."""
+Viewer (browse, not create); SEC has no Developers role, so nobody may create there by default.
+``POST /issue`` itself authorises the CALLER (the service account), like Jira Cloud."""
 from __future__ import annotations
 
 import json
@@ -84,19 +85,52 @@ def test_create_issue_validation_is_jira_shaped(client, svc, over, field):
     assert r.json()["errorMessages"] == [] and field in r.json()["errors"]
 
 
-@pytest.mark.parametrize("project,account", [("PAY", "acc-leo"), ("SEC", "acc-jdoe"),
-                                             ("PAY", "acc-old"), ("PAY", None)])
-def test_create_issue_without_create_permission_is_403_and_changes_nothing(client, svc, sink,
-                                                                           project, account):
-    before = client.get(f"{J}/search/jql", headers=svc,
-                        params={"jql": f"project = {project}", "maxResults": 100}).json()
-    rep = {"reporter": {"accountId": account}} if account else {"reporter": None}
-    r = client.post(f"{J}/issue", headers=svc, json=_fields(project={"key": project}, **rep))
+@pytest.mark.parametrize("account", ["acc-leo", "acc-jdoe"])
+def test_create_issue_authorises_the_caller_not_the_reporter(client, svc, account):
+    """Like Jira Cloud (round 2b finding 3): the reporter's own Create issues is never checked. leo.ops
+    (a PAY Viewer) is accepted as reporter because the calling service account may create and set the
+    reporter. So only the Internal Brain's live ``creatable`` re-check stops such an issue."""
+    r = client.post(f"{J}/issue", headers=svc, json=_fields(reporter={"accountId": account}))
+    assert r.status_code == 201, r.text
+    f = client.get(f"{J}/issue/{r.json()['key']}", headers=svc).json()["fields"]
+    assert f["reporter"]["accountId"] == account
+    assert f["creator"]["accountId"] == "acc-svc-internal-brain"      # the caller, as in Jira
+
+
+def test_create_issue_without_a_reporter_reports_as_the_caller(client, svc):
+    r = client.post(f"{J}/issue", headers=svc, json=_fields(reporter=None))
+    assert r.status_code == 201, r.text
+    f = client.get(f"{J}/issue/{r.json()['key']}", headers=svc).json()["fields"]
+    assert f["reporter"]["accountId"] == f["creator"]["accountId"] == "acc-svc-internal-brain"
+
+
+def _count(client, svc, project):
+    return len(client.get(f"{J}/search/jql", headers=svc,
+                          params={"jql": f"project = {project}", "maxResults": 100}).json()["issues"])
+
+
+def test_caller_without_create_issues_is_403_and_changes_nothing(client, svc, sink):
+    client.app.state.world.jira_service["create"] = ["SEC"]                  # the caller may not create in PAY
+    before = _count(client, svc, "PAY")
+    r = client.post(f"{J}/issue", headers=svc, json=_fields())       # jdoe, a PAY Developer, as reporter
     assert r.status_code == 403
-    after = client.get(f"{J}/search/jql", headers=svc,
-                       params={"jql": f"project = {project}", "maxResults": 100}).json()
-    assert len(after["issues"]) == len(before["issues"])
-    assert not sink.calls
+    assert _count(client, svc, "PAY") == before and not sink.calls
+
+
+def test_caller_without_modify_reporter_cannot_set_a_reporter(client, svc, sink):
+    client.app.state.world.jira_service["modify_reporter"] = False
+    before = _count(client, svc, "PAY")
+    r = client.post(f"{J}/issue", headers=svc, json=_fields())
+    assert r.status_code == 400 and "reporter" in r.json()["errors"]
+    assert _count(client, svc, "PAY") == before and not sink.calls
+
+
+@pytest.mark.parametrize("account", ["acc-old", "acc-nobody"])
+def test_unknown_or_deactivated_reporter_is_400_and_changes_nothing(client, svc, sink, account):
+    before = _count(client, svc, "PAY")
+    r = client.post(f"{J}/issue", headers=svc, json=_fields(reporter={"accountId": account}))
+    assert r.status_code == 400 and "reporter" in r.json()["errors"]
+    assert _count(client, svc, "PAY") == before and not sink.calls
 
 
 def test_create_issue_needs_a_token(client):

@@ -102,7 +102,11 @@ for (let i = 0; i < cards.length; i += 4) sheets.push(`<section class="sheet">${
 const judge = page('Judge cards', sheets.join(''));
 
 // ---- 3. presenter cheat sheet ----
-const keys = [['P','Arm presenter mode, Stage theme, go to step 00'],['Space','Run the next step'],['←','Back one step'],['B','Play fallback clip (again = back to live)'],['R','Reset: restore tamper copy, clear boxes, step 00'],['L','Flip English / 简体中文'],['S','Stage theme on / off'],['?','Show key help'],['Esc','Close the source sheet; with no sheet open, hide / show the HUD']];
+// Mirrors onKeyDown in databridge/apps/internal_brain_web/components/presenter/controller.ts (checked
+// 30 Oct, round 2b finding 5). R asks to confirm, then signs every demo session out and goes to step 00;
+// it restores nothing. While a dialog (source sheet, reset confirm) is open the presenter keys are off
+// and Esc closes the dialog; otherwise Esc hides or shows the bar.
+const keys = [['P','Start: Stage on, step 00'],['Space','Next step (failed step: retry)'],['→','Skip to the next step'],['←','Back one step'],['B','Fallback clip (again = live)'],['R','Reset, after a confirm: all demo sessions signed out, step 00'],['L','English / 简体中文'],['S','Stage theme on / off'],['D','Deliverables: Leo, his panel'],['2','Open citation 2 (Compare)'],['?','Key help'],['Esc','Close a sheet or dialog; else hide / show the bar']];
 // Mirrors STEPS in databridge/apps/internal_brain_web/components/presenter/script.ts (HUD 00 to 10;
 // P gives 00, the title). The grow steps (?grow=1) are a Q&A walk-up, never on this path.
 const steps = [
@@ -119,13 +123,13 @@ const steps = [
 ];
 const ladder = [
  ['App stalls','Ishaan says the next line\'s first four words; Dev presses B (clip plays).'],
- ['Wrong state','Press R: restores the tamper copy, clears boxes, back to step 00. Never edits the real ledger.'],
+ ['Wrong state','Press R, then confirm: signs every demo session out and goes back to step 00. It restores nothing and never edits the real ledger (the tamper step only ever changes a copy).'],
  ['Network fails in the WorkBuddy beat','Play clip C and say in one clause that it is a recording.'],
  ['Running long','Cut in order: language flip, CodeBuddy line, Hy3 open-weight line, audit-row cut. Never cut the tamper or the identical refusals.'],
  ['Hy3 not live','Keep the default line: "quoted from the sources, with the same checks".'],
 ];
 const cheat = page('Presenter cheat sheet', `<main class="ch">
-<header><div class="brand"><span class="dot"></span>Presenter cheat sheet</div><div class="meta">Keys work only when armed (P) and not inside text fields. Source: RUN_SHEET.md, PRESENTER_KEYS.md</div></header>
+<header><div class="brand"><span class="dot"></span>Presenter cheat sheet</div><div class="meta">Keys work only when armed (?present=1 or Ctrl+Shift+P) and not inside text fields. Source: RUN_SHEET.md, PRESENTER_KEYS.md</div></header>
 <section class="chtop"><div><h2>Keys</h2><table class="keys">${keys.map(k=>`<tr><td><kbd>${esc(k[0])}</kbd></td><td>${esc(k[1])}</td></tr>`).join('')}</table></div>
 <div><h2>Recovery ladder</h2><ol class="lad">${ladder.map(l=>`<li><b>${esc(l[0])}.</b> ${esc(l[1])}</li>`).join('')}</ol>
 <p class="fine">A recording is never presented as live. If a judge interrupts: one sentence, then "let me finish this step, then I will come back."</p></div></section>

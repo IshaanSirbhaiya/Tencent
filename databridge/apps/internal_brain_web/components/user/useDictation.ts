@@ -75,6 +75,9 @@ export function useDictation({ lang, getValue, onText }: { lang: string; getValu
     r.continuous = true;
     r.interimResults = true;
     r.onresult = (e) => {
+      // A result that arrives after this session was stopped (Send, typing, Escape) is dropped, so it can
+      // never write an old question back into a box that was cleared or edited.
+      if (rec.current !== r) return;
       let text = '';
       for (let i = 0; i < e.results.length; i++) text += e.results[i][0]?.transcript ?? '';
       const sep = base && !/\s$/.test(base) && text && !/^[\s，。,.]/.test(text) ? ' ' : '';
