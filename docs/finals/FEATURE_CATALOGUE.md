@@ -5,7 +5,7 @@
 Every user-visible feature and every backend capability of the finals build, with who can use it,
 where it is, how to try it, the rules it keeps, the tests that prove it, and its screenshots.
 
-Branch `final_v1.0`, as of commit `f0f84bd` (30 Oct 2026). What changed and when:
+Branch `final_v1.3`, as of commit `1076517` (30 Oct 2026). What changed and when:
 [CHANGELOG.md](CHANGELOG.md). Work that is not committed yet is listed only in
 [CHANGELOG.md → In progress](CHANGELOG.md#in-progress), not here.
 

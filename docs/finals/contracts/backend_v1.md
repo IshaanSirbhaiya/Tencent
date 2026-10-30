@@ -274,7 +274,8 @@ They appear in `/audit/events` (filter `kind`) and in `/audit/stats` `kinds` and
   `channel: "replay"`, `synthetic_replay: true`, spread over the last 30 days. The seeder's audit
   queries, reveals, Verify runs and simulator steps are real calls at seed time (not replay-labelled).
 - `databridge/apps/internal_brain_web/public/eval_summary.json`, written by
-  `databridge/scripts/eval_summary.py`:
+  `databridge/scripts/eval_summary.py` (the example below is the shape, with values from the 14 Oct run;
+  the current file says 0 leaks in 7,374 requests and 1,152 injection-relevant requests):
 
 ```json
 {

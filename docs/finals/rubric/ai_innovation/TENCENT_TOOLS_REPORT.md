@@ -52,7 +52,7 @@ Written 30 Oct 2026. Every row points to a file, a test or a transcript.
 | The finals UI (Next.js) was built without CodeBuddy | Say it plainly if asked: CodeBuddy built and reviewed the Tencent-facing parts (both connectors, the skill) and reviewed the finals backend; Claude built the UI. DEV_PROCESS.md says the same | Presenter |
 | CodeBuddy quota (429, code 14003) hits after bursts of turns | Short, single-purpose prompts; resume the same session after a pause (as done for CB5 and CB8) | Coordinator |
 | The runner parks `databridge/.env.ib.local` during a session; a demo-stack restart in that window starts the Brain on dev keys (happened once on 30 Oct; no damage, fixed by the next restart) | Never start or restart the stack while a CodeBuddy session runs. Better: `demo_up.sh` should refuse to start when `.env.ib.local` is missing (a one-line guard; not changed here because another agent owns the demo scripts) | Coordinator |
-| CB7 finding F2 (unbounded stream threads) is open | Apply the ready patch once the Act work on `app.py` lands (the patch and its test are in the triage file) | Coordinator |
+| CB7 finding F2 (unbounded stream threads) is open | The Act work on `app.py` has landed (30 Oct); the ready patch is still not applied (no stream cap in `app.py` at `1076517`). Apply it with its test (both in the triage file) | Coordinator |
 
 ## 3. WorkBuddy
 

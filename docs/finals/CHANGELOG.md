@@ -3,9 +3,9 @@
 **Answers you can prove.**
 
 Every change since the 16 Oct 2026 submission, newest first, grouped by area. Each line links its commit
-(the Tencent repo; branch `final_v1.2`, `final_v1.0` frozen). What each feature does and how it is tested: [FEATURE_CATALOGUE.md](FEATURE_CATALOGUE.md).
+(the Tencent repo; branch `final_v1.3`, cut from `final_v1.2` at `1076517`; `final_v1.0` frozen). What each feature does and how it is tested: [FEATURE_CATALOGUE.md](FEATURE_CATALOGUE.md).
 
-All 44 commits after the submission (`acb18f0`), up to `f0f84bd`, were made on 30 Oct 2026 (SGT). Times are SGT.
+All 93 commits after the submission (`acb18f0`), up to `1076517`, were made on 30 Oct 2026 (SGT). Times are SGT.
 
 Current evaluation numbers (run 30 Oct 11:27 SGT, final world, `eval_summary.json`): **0 leaks in 7,374 adversarial
 requests**, 0 of 400 differential pairs, 0 injection hard failures in 1,152, recall 100% on both paths. A commit row
@@ -13,19 +13,18 @@ below quotes the numbers of the run made at that commit.
 
 ## In progress
 
-Being built or under review now. Each row says what is committed (the `final_v1.2` checkpoint is `8312864`); work not yet
+Not finished yet. Each row says what is committed (everything below is on `final_v1.3`, `1076517`); work not yet
 committed is **not counted in any number on this page and not claimed anywhere else.**
-Each line moves to the right area below when it lands.
+Each line moves to the right area below when it lands. Landed on 30 Oct and reviewed (rounds 2, 2b and 3; dispositions
+in `reviews/round2_dispositions.md` and `reviews/round3_dispositions.md`): Act, Deliverables (Table, Chart, Analysis,
+Slides .pptx; Summary not built, D-29), live growth and add-document (demo-only), uploads (demo-only) and the
+everyday-company world. Their rows are in the areas below.
 
 | Work | What it will be | What exists in the tree today |
 |---|---|---|
-| **Act** | Draft a reply, or a follow-up Jira ticket, from an answer; never revealing anything the asker cannot open | Committed in `8312864` (final_v1.2 checkpoint): `databridge_ib/actions.py`, `tests/test_act.py`, `tests/test_act_e2e.py`, mock Jira create (`mock_platforms/tests/test_mock_jira_create.py`); round-2 review fixes in progress |
-| **Watch the brain grow** | The knowledge graph grows live as documents arrive; add a document and see it appear | Committed: the web proxy allows `GET /ib/graph/changes` ([1079bd2](https://github.com/IshaanSirbhaiya/Tencent/commit/1079bd2)) and a 7 MB body for `POST /sim/upload-file` ([8e53a0b](https://github.com/IshaanSirbhaiya/Tencent/commit/8e53a0b)). The backend routes (`databridge_ib/live.py`) are committed in `8312864`, demo-only (`IB_DEMO_FEATURES=1`). Research: [live_growth/RESEARCH.md](live_growth/RESEARCH.md) (uncommitted) |
-| **One-click demo kit** | "Start Walnut Demo" and a preflight check | Committed ([a1ccc6c](https://github.com/IshaanSirbhaiya/Tencent/commit/a1ccc6c)): Start/Stop/Reset/offline launchers and the preflight board. Research: [demo_day/LIVE_DEMO_RESEARCH.md](demo_day/LIVE_DEMO_RESEARCH.md) |
-| **Tencent tools upgrade** | CodeBuddy sessions CB7 to CB9; new WorkBuddy MCP tools; a WorkBuddy GUI test | CB7 to CB9 and the new MCP tools committed ([9afd1bd](https://github.com/IshaanSirbhaiya/Tencent/commit/9afd1bd)); prompts and transcripts in `docs/tencent/evidence/`. The WorkBuddy GUI retest is open: [WORKBUDDY_GUI_TEST.md](rubric/ai_innovation/WORKBUDDY_GUI_TEST.md), edits to the WorkBuddy guide |
-| **New demo video** | The finals walk-through, narrated by the team | Uncommitted script and recorder in [video/](video/VIDEO_SCRIPT_FINALS.md); raw clips and cards in `submission/finals_video/` |
-| **Everyday company content** | The world gains an employee handbook, Finance Ops, an IT helpdesk project, three public Slack channels and a People folder (leave, expenses, payday, holidays, onboarding, VPN), open to every employee, plus People-only salary bands. Append-only: every earlier document, fact and question answer is unchanged | Committed in `8312864`: `fixtures/enterprise/workplace.py`, regenerated `world.json` / `manifest.json` / `graph_rows`, `databridge/fixtures/enterprise/tests/test_workplace_layer.py`; extractive tie-break fix in `databridge_ib/narrate.py` with `tests/test_narrate_determinism.py`; eval re-run 30 Oct 11:27 SGT: 0 leaks in 7,374, 0 of 400 pairs differ |
-| **Live Hy3** | Hy3 answers through TokenHub | Waits on TokenHub activation (a person). `demo_up.sh` will switch it on by itself once [`hy3_check.py`](../../databridge/scripts/hy3_check.py) gets an answer |
+| **WorkBuddy GUI retest** | The finals MCP tools shown in the real WorkBuddy app | CB7 to CB9 and the new MCP tools are committed ([9afd1bd](https://github.com/IshaanSirbhaiya/Tencent/commit/9afd1bd)). The GUI retest is open (needs the stage laptop): [WORKBUDDY_GUI_TEST.md](rubric/ai_innovation/WORKBUDDY_GUI_TEST.md). The compliance connector is set up apart from the employee connectors (D-30) |
+| **New demo video** | The finals walk-through, narrated by the team | **On hold** until the founder says so. Script, recorder and assembler are committed in [video/](video/VIDEO_SCRIPT_FINALS.md); raw clips and the test cut in `submission/finals_video/` are not committed (74 MB) |
+| **Live Hy3** | Hy3 answers through TokenHub | Wired, **not live**: TokenHub answers 402 until activation (a person). `demo_up.sh` will switch it on by itself once [`hy3_check.py`](../../databridge/scripts/hy3_check.py) gets an answer |
 | **Hallway test** | 5 people × 20 min; results into the fix log and the proof slide | Protocol ready ([HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)); Sat 31 Oct |
 
 ## 30 Oct 2026: the finals build
@@ -34,6 +33,7 @@ Each line moves to the right area below when it lands.
 
 | Commit | Time | Change |
 |---|---|---|
+| [d8f8de7](https://github.com/IshaanSirbhaiya/Tencent/commit/d8f8de7) | 13:15 | Presenter (round-3 Fable): once `P` has started, `Esc` never hides the HUD and `H` does (D-33); `Space` drives the grow walk-up in a `?grow=1` tab; `Esc` on the `D` panel signs the previous person back in; Analysis says "Needs the model (Hy3)" with no model; the 简体中文 `L` flip cut from the 5:00 (D-32); handout PDFs rebuilt |
 | [90393b2](https://github.com/IshaanSirbhaiya/Tencent/commit/90393b2) | 11:56 | Presenter grow steps need `?grow=1` on the tab (never on the Space path; demo features alone no longer add them); `opencv-python-headless` pinned so a fresh install keeps PDF and PPTX uploads |
 | [f0f84bd](https://github.com/IshaanSirbhaiya/Tencent/commit/f0f84bd) | 10:16 | Printable handouts in `submission/finals/`: A4 leave-behind with QR, judge cards per rubric criterion, presenter cheat-sheet, with a generator that reads the numbers from the repo; `eval_summary.json` now records 124 e2e tests (it said 38) |
 | [baf8a07](https://github.com/IshaanSirbhaiya/Tencent/commit/baf8a07) | 09:52 | Backup clips A (Compare, Ken, source), B (journey, Verify, tamper) and C (in-app stand-in for WorkBuddy) in `public/clips/` for the **B** key; status table in [BACKUP_PLAN.md](rubric/demo_story/BACKUP_PLAN.md#recorded-clips-status-30-oct-2026) |
@@ -45,6 +45,7 @@ Each line moves to the right area below when it lands.
 
 | Commit | Time | Change |
 |---|---|---|
+| [19603c8](https://github.com/IshaanSirbhaiya/Tencent/commit/19603c8) | 12:51 | Round-3 web UX fixes for Deliverables, live growth and the engine refresh: focus return, no duplicate post, step-only announcements, `lang=en` on server text in 简体中文, 390 px layout, "Live updates stopped" state |
 | [6de5cd6](https://github.com/IshaanSirbhaiya/Tencent/commit/6de5cd6) | 12:25 | Round-2 web UX and honesty fixes: mock labels default to "Quoted from sources (no model)" everywhere; login notes and starters no longer hint at hidden content (rule 4); HUD re-reads status after sign-in; Act sheet fixes (zh `lang=en` on server text, sticky confirm at 390 px, `outcome_unknown` and 503 after Confirm worded honestly); Leo cache cleared on sign-out |
 | [1bc6b4c](https://github.com/IshaanSirbhaiya/Tencent/commit/1bc6b4c) | 09:47 | Voice dictation in the Ask composer: browser speech, English / 简体中文, never auto-sends, accessible, hidden when unsupported (`voice.spec.ts`) |
 | [ac94931](https://github.com/IshaanSirbhaiya/Tencent/commit/ac94931) | 04:42 | Interactive tours: User "Try it" (sign in, ask, open a source, Ken's identical refusals, checklist) and Developer (pipeline, journey, graph, trust, analytics / Verify); spotlight and "Do it for me"; English / 简体中文 |
@@ -67,10 +68,12 @@ Each line moves to the right area below when it lands.
 
 | Commit | Time | Change |
 |---|---|---|
+| [7a8f709](https://github.com/IshaanSirbhaiya/Tencent/commit/7a8f709) | 13:03 | Round-3 Opus fixes: the `.pptx` formula guard also quotes array formulas and link prefixes; `/sim/upload-file` mounted only with demo features and demo sign-in; add-document and upload write ledger records before and after the source call (503 if the ledger is down); route-auth test walks included routers |
 | [2b339c8](https://github.com/IshaanSirbhaiya/Tencent/commit/2b339c8) | 12:22 | Round-2b fixes: WorkBuddy MCP tools frame answers, titles, citations and container names as data, never instructions, and neutralise forged markers (tested that the frame is there, not that an agent obeys it); compliance MCP config kept apart; `check_absent` and `demo_preflight` refuse non-loopback hosts unless `--allow-remote`; mock Jira checks the caller like real Jira |
 | [7fa6319](https://github.com/IshaanSirbhaiya/Tencent/commit/7fa6319) | 12:20 | Act draft grounding: a model draft sentence must take 80% of its content words from its own cited sources, else it is dropped; with nothing left the draft falls back to the cited sentences (round-2b Opus #1) |
 | [ca014cd](https://github.com/IshaanSirbhaiya/Tencent/commit/ca014cd) | 12:19 | Act v3.1: per-person rate limit and pending-proposal cap, opaque gated source links in tickets (`/ib/open/<hmac>` runs Gate 1 + Gate 2 for the clicker), confirm re-checks the cited sources, Jira timeouts and 5xx are `outcome_unknown` (never "nothing changed"); kit fixes |
 | [1701515](https://github.com/IshaanSirbhaiya/Tencent/commit/1701515) | 12:08 | **Deliverables from an answer** (table, chart, analysis; `.csv` and `.pptx` export; kill switch `IB_DELIVERABLES`, D-25). P0 confirmed and P1 Slides: `.pptx` export of a ready table or chart, no model, same live re-check as the CSV, every string through the formula guard (T15), offered only when `python-pptx` and `XlsxWriter` are installed. Built and tested offline (model path with a fake chain only). Analysis says "Needs the model" until Hy3 is live; Summary not built. Live UI run not done. First landed in `8312864`; see `git log -- databridge/apps/internal_brain/databridge_ib/deliverables` |
+| [8312864](https://github.com/IshaanSirbhaiya/Tencent/commit/8312864) | 11:39 | `final_v1.2` checkpoint: **Act** (draft a reply or a follow-up Jira ticket, created only after the person confirms; `actions.py`), Deliverables P0, **live graph growth and add-document** (demo-only, `IB_DEMO_FEATURES=1` plus the Settings switch; `live.py`, `engine_refresh.py`), **file uploads** (demo-only; `uploads.py`, `extract_files.py`) and the **everyday-company world** (append-only: 34 people, 1,207 docs, 72 facts, 546 questions; `fixtures/enterprise/workplace.py`), plus the `narrate.py` tie-break fix. All reviewed afterwards in rounds 2, 2b and 3 |
 | [7bf3246](https://github.com/IshaanSirbhaiya/Tencent/commit/7bf3246) | 06:19 | Final-review fixes: graph edges from authorised current versions; SSE gate events held until sealed; caps after live auth; one deadline through read-through; tamper lock safety; map via the authz helper; trace failure ledgered; Host allowlist on the Brain and the mock; trace sync TTL; graph re-search after denials; edit-record flips a decision; neutral fixture disclaimer. Fresh full eval 0 / 5,958 and 0 / 400. **754 tests pass** (`test_final_review_fixes.py`) |
 | [8582f4b](https://github.com/IshaanSirbhaiya/Tencent/commit/8582f4b) | 05:03 | Simulator reset runs a full reconciliation (revocations undone at once); offline plain-English audit search resolves document titles; plain-English window notes; `limit` no longer echoed as a filter |
 | [e9ce768](https://github.com/IshaanSirbhaiya/Tencent/commit/e9ce768) | 03:36 | Round 2: sandbox tamper-demo endpoint, SSE stage events (`/ib/ask/stream`), Hy3 for plain-English audit search with rule fallback, silent-revocation seeding, fresh full eval, SECURITY §15 |
@@ -98,6 +101,8 @@ Each line moves to the right area below when it lands.
 
 | Commit | Time | Change |
 |---|---|---|
+| [1076517](https://github.com/IshaanSirbhaiya/Tencent/commit/1076517) | 13:32 | Cloud test run written into every doc: 1,131 backend passed, 0 failed; e2e 166 passed, 0 failed, 41 skipped; mock platforms 154; fixtures 47; `tsc` clean |
+| [9819855](https://github.com/IshaanSirbhaiya/Tencent/commit/9819855) | 13:31 | Full eval re-run on the tree after the day's backend changes: unchanged (0 leaks / 7,374, 0 / 400 pairs, 0 hard failures in 1,152 injection-relevant requests) |
 | [ddadaa1](https://github.com/IshaanSirbhaiya/Tencent/commit/ddadaa1) | 06:40 | e2e results written up: [TEST_REPORT.md](TEST_REPORT.md) |
 | [810ddbb](https://github.com/IshaanSirbhaiya/Tencent/commit/810ddbb) | 06:40 | Full e2e suite ported to the finals UI: **124 passed, 0 failed**, 38 env-gated skips (three consecutive runs); tour offer moves to the top on phones; dead `AnswerPanel` / `SourcesPanel` removed |
 
@@ -105,6 +110,9 @@ Each line moves to the right area below when it lands.
 
 | Commit | Time | Change |
 |---|---|---|
+| [831297e](https://github.com/IshaanSirbhaiya/Tencent/commit/831297e) | 13:16 | Live kit: a `/sim` 404 is reported as "one of the three demo switches is wrong" |
+| [9afd1bd](https://github.com/IshaanSirbhaiya/Tencent/commit/9afd1bd) | 11:12 | Tencent tools: CodeBuddy CB7 (finals security review on Hy3), CB8 (WorkBuddy connector upgrade), CB9 (Walnut WorkBuddy skill); new MCP tools (answer receipt, what I can open, org summary, tamper demo); live WorkBuddy MCP test 33/33 |
+| [a1ccc6c](https://github.com/IshaanSirbhaiya/Tencent/commit/a1ccc6c) | 10:55 | One-click demo kit: Start/Stop/Reset/offline launchers, preflight board with pre-warm, duplicate-safe `demo_up` |
 | [8b69cbd](https://github.com/IshaanSirbhaiya/Tencent/commit/8b69cbd) | 09:43 | `hy3_check.py` (is Hy3 live on TokenHub?); `demo_up.sh` turns live Hy3 on by itself when it answers |
 | [dda470b](https://github.com/IshaanSirbhaiya/Tencent/commit/dda470b) | 03:46 | `demo_up.sh` starts the whole Demo Day stack (mock, Brain, seed, engine, web) on localhost |
 
@@ -112,6 +120,7 @@ Each line moves to the right area below when it lands.
 
 | Commit | Time | Change |
 |---|---|---|
+| [b74e010](https://github.com/IshaanSirbhaiya/Tencent/commit/b74e010) | 12:26 | Decisions D-26 to D-31 from the cloud session (D-32, D-33 in [d8f8de7](https://github.com/IshaanSirbhaiya/Tencent/commit/d8f8de7)) |
 | [d7e461e](https://github.com/IshaanSirbhaiya/Tencent/commit/d7e461e) | 12:06 | One number set for current claims: 0 leaks / 7,374, 0 / 400 differential pairs, 0 / 1,152 injection; dated history keeps its old numbers; handouts rebuilt |
 | [fdbdec2](https://github.com/IshaanSirbhaiya/Tencent/commit/fdbdec2) | 09:47 | Miora prompt for the new cover ([COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md)); the brief lists the cover and narration tasks |
 | [1da9dae](https://github.com/IshaanSirbhaiya/Tencent/commit/1da9dae) | 06:24 | Morning brief rewritten for the finished build |

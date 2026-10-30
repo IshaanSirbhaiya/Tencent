@@ -3,6 +3,13 @@
 **30 Oct 2026, ~11:45 SGT.** Branch `final_v1.1`. Nothing here is committed. The world files on disk are the
 **expanded, verified** version (not HEAD).
 
+> **Update (30 Oct, end of the cloud session).** Committed in `8312864` (on `final_v1.2`, now `final_v1.3`).
+> §5 items 1, 2, 5, 6 and 7 are done: the full IB suite is 1,131 passed, 0 failed (`831297e`); STATUS and
+> FEATURE_CATALOGUE carry it; the eval was re-run on the final tree, unchanged (`9819855`); current docs say
+> 7,374 / 1,152 (dated history keeps the old numbers); `eval_summary.json` records e2e 166. Item 3 (restart with
+> `--fresh`, refresh `ABSENCE_PROOF.txt`) is laptop-only and still open; item 4 only if the graph DB is used.
+> The rest of this file is the 11:45 checkpoint, kept as written.
+
 ## 1. Diagnosis of the inherited change
 
 The stopped session left `generate.py` (modified), `workplace.py` (new), `tests/test_workplace_layer.py`

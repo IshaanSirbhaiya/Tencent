@@ -1,6 +1,6 @@
 # Test report: Playwright suite (mock mode)
 
-30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0`. Config: `playwright.config.ts`
+30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0` for the earlier run (the current run below is on `final_v1.2`, now `final_v1.3`). Config: `playwright.config.ts`
 (builds with `npm run build:mock`, serves on 127.0.0.1:3101, one worker).
 
 ## Current result (30 Oct 2026, cloud)

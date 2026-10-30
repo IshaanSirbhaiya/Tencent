@@ -106,16 +106,18 @@ The founder's working rules:
 
 ## 3. State of the work
 
-### Done, committed and pushed (on final_v1.1 / final_v1.2)
+### Done, committed and pushed (on final_v1.1 / final_v1.2 / final_v1.3)
 
 - **Backend:** developer views (stats, journey, trace receipt, graph, doc, status, SSE stages,
   tamper demo, the Hy3 audit parser), simulator reconcile, the version-bound authz helper, Host
   allowlist. **1,131 passed, 0 failed** (cloud run, 30 Oct, Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, commit `831297e`).
-- **Eval:** full eval re-run, 0 leaks / 5,958, 0/400 differential, 0 injection failures.
+- **Eval:** full eval re-run on the expanded world and again on the final tree (`9819855`): 0 leaks / 7,374,
+  0/400 differential, 0 hard failures in 1,152 injection-relevant requests, recall 100%.
 - **Web:**
   - User mode;
   - Compare;
-  - Presenter (10-step keyboard script, Stage theme, slides);
+  - Presenter (11-step keyboard script, HUD 00–10; the 3 grow steps only in a `?grow=1` tab, D-26;
+    Stage theme, slides);
   - Developer mode: Mission control, Journey, Knowledge graph, Walnut engine, Analytics, Audit with
     the sandbox tamper demo, Simulator, Trust centre, Value calculator;
   - tours, voice dictation, preflight board. **Playwright e2e (mock mode): 166 passed, 0 failed, 41 skipped** (cloud run, 30 Oct, `831297e`; skipped = needs the live stack, the engine proxy or Hy3).
@@ -129,6 +131,11 @@ The founder's working rules:
   founder's teammates' updates; the founder records narration later.
 
 ### In this WIP snapshot (final_v1.2): finish, review, test, then integrate
+
+**Update (30 Oct, end of the cloud session):** all six tracks below are committed (checkpoint `8312864`,
+fixes up to `7a8f709`/`d8f8de7`) and reviewed in rounds 2, 2b and 3 (`reviews/round2_dispositions.md`,
+`reviews/round3_dispositions.md`), and the suites above pass on that tree. The table is the hand-off
+state, kept as history. Still open: the Codex review (laptop) and the live checks in "Questions for Ishaan".
 
 Each has its own STATUS file written at checkpoint. Read it first.
 
@@ -178,10 +185,10 @@ Not committed on purpose: `submission/finals_video/walnut_databridge_finals_SILE
   (9afd1bd, a1ccc6c, 1079bd2).
 - AGENTIC_ROADMAP/AI_USAGE_MAP say Act is "built, with tests". It was uncommitted until this commit;
   update to the final state.
-- PRESENTER_KEYS and REHEARSAL_CHECKLIST say four HUD dots; the HUD has three.
+- PRESENTER_KEYS and REHEARSAL_CHECKLIST say four HUD dots; the HUD has three. *(Fixed: both say three.)*
 - RUN_SHEET 2:35 says "Tencent, live"; make it "Tencent, off-app" (Hy3 is not live).
-- Stale "733 backend tests" in rubric/research A, C, D; the current count is 754+.
-- "10-step" presenter script: script.ts has 11 steps (14 with live growth).
+- Stale "733 backend tests" in rubric/research A, C, D; the current count is 754+. *(Fixed; the count is now 1,131.)*
+- "10-step" presenter script: script.ts has 11 steps (14 with live growth). *(Fixed: 11 steps, 00–10; 14 only in a `?grow=1` tab, D-26.)*
 - RUN_SHEET lacks the 3 optional grow steps.
 - PRESENTER_KEYS §6 ids don't match script.ts.
 - Tamper wording differs between RUN_SHEET and script.ts.
@@ -206,7 +213,7 @@ items land; 87–89 with Hy3 live and a real hallway line. Top items, by points 
 2. **One number set everywhere:**
    - 7,374 (run sheet, QA bank, eval_summary.json) vs 0/5,958 (leave-behind, judge cards, cheat
      sheet, CHANGELOG);
-   - slides.json says "Six CodeBuddy sessions" (it is nine);
+   - slides.json says "Six CodeBuddy sessions" (it is nine) *(fixed: "Nine")*;
    - the cheat sheet says S = Slides (S is the Stage theme).
    Then rebuild the handout PDFs.
 3. Hallway test (founder, Sat). Otherwise delete the `[TESTER]` line.
@@ -258,10 +265,12 @@ ArrowLeft after a stuck step dropped to /present with no HUD.
 - **New counts:** 34 people, 17 groups; 231 pages; 261 issues; 628 threads / 3,133 messages; 87
   files; 1,207 docs (1,204 indexed); 72 facts; 546 questions. Docs updated to them.
 - **Next:**
-  - re-run the full IB suite and put the count in STATUS and FEATURE_CATALOGUE (they still say 754);
+  - re-run the full IB suite and put the count in STATUS and FEATURE_CATALOGUE (they still say 754)
+    *(done: 1,131 at `831297e`)*;
   - on the laptop, `demo_up.sh start --fresh`, then refresh `live_kit/ABSENCE_PROOF.txt`;
   - re-run the eval if `databridge_ib` changes again.
-- **Number consistency (Fable item 2):** the canonical numbers are now 7,374 / 400 / 1,152. Replace
+- **Number consistency (Fable item 2):** the canonical numbers are now 7,374 / 400 / 1,152.
+  *(Done in `d7e461e`; only dated history keeps the old numbers.)* Replace
   every "5,958" and "976" in the handouts, slides.json, CHANGELOG and ORGANISER_UPDATE, then rebuild the
   handout PDFs.
 **Opus and Codex:** were still running at hand-off. If their files are missing, re-run Opus in the

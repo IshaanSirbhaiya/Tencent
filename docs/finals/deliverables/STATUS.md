@@ -1,7 +1,7 @@
 # Deliverables: build status (checkpoint, 30 Oct 2026)
 
 Written at the coordinator's checkpoint call (laptop going offline). Branch `final_v1.1`, nothing
-committed by this agent. Spec: `PLAN.md`; reviews applied: `review_codex.md` (highs + mediums),
+committed by this agent *(at the time; since committed in `8312864`, `1701515` and `7a8f709`; the cloud update is §5)*. Spec: `PLAN.md`; reviews applied: `review_codex.md` (highs + mediums),
 `review_fable.md` (top 5 + §6), `review_opus.md` (findings 1-5 mandatory + mediums, T14-T16).
 
 ## 1. Done (P0)

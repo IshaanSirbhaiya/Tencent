@@ -7,7 +7,7 @@ Jira, Slack and Google Drive. **Internal Brain**, the ask product inside it, ans
 asker may open, checks each source live, and writes every step to a tamper-evident audit log.
 
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech track (Aspire) · Team Walnut, finalist.
-This is the **finals build** (branch `final_v1.0`) for Demo Day, 3 Nov 2026. The judge's guide is
+This is the **finals build** (branch `final_v1.3`) for Demo Day, 3 Nov 2026. The judge's guide is
 [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). Every feature, who can use it, and the test behind it:
 [docs/finals/FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). What changed since the 16 Oct
 submission, commit by commit: [docs/finals/CHANGELOG.md](docs/finals/CHANGELOG.md).
@@ -191,9 +191,9 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 
 | Tencent tool | How we used it | Evidence |
 |---|---|---|
-| **CodeBuddy** | Six build sessions: drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests, ran a security review, then fixed its own code after a Codex review | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md), transcripts in `docs/tencent/evidence/`, screenshots in `submission/01_codebuddy/` |
-| **WorkBuddy** | The Brain's second front door: three connectors (ask as Jordan, ask as Ken, compliance audit), each carrying its own signed token | [WorkBuddy guide](docs/tencent/workbuddy/README.md), screenshots in `submission/02_workbuddy/` |
-| **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1 and CB5; configured as the first model in the Brain's answer chain and as the audit search's fallback parser (rules run first, the model only when they recognise nothing); wired, not yet run live | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py`, `audit/nl_llm.py` |
+| **CodeBuddy** | Nine build sessions (CB1–CB9). CB1–CB6 (14–15 Oct) drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests, ran a security review, then fixed its own code after a Codex review. CB7–CB9 (30 Oct) worked on the finals code: a security review of the finals backend, the WorkBuddy connector upgrade, the Walnut WorkBuddy skill | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md), transcripts in `docs/tencent/evidence/`, screenshots in `submission/01_codebuddy/` |
+| **WorkBuddy** | The Brain's second front door: three connectors (ask as Jordan, ask as Ken, compliance audit), each carrying its own signed token. The compliance connector is never in the same WorkBuddy connector list as the employee ones (its own workspace, or `--compliance-user-config` on a separate seat; D-30) | [WorkBuddy guide](docs/tencent/workbuddy/README.md), screenshots in `submission/02_workbuddy/` |
+| **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1, CB5, CB7 and CB9; configured as the first model in the Brain's answer chain and as the audit search's fallback parser (rules run first, the model only when they recognise nothing); wired, not yet run live | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py`, `audit/nl_llm.py` |
 | **TokenHub** | The Brain's model gateway (Hy3, then DeepSeek as backup). Wired in and tested; live run pending activation | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
 | **Lighthouse** | A hardened one-command deploy kit (HTTPS, passcode-gated demo, only ports 80/443 open); no live instance because Lighthouse was unavailable during the event | [deploy/lighthouse/](deploy/lighthouse/README.md) |
 | **Miora** | Tencent's AI design agent made the cover art from our written brief; we added the title | `submission/06_cover/` |

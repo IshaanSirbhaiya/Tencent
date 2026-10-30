@@ -15,7 +15,7 @@ Every feature, who can use it, where it is and the test that proves it:
 
 ## Finals build
 
-This is the build for Demo Day (3 Nov 2026), on branch `final_v1.0`. Since the 16 Oct submission, one
+This is the build for Demo Day (3 Nov 2026), on branch `final_v1.3`. Since the 16 Oct submission, one
 web app now has two modes, switched at the top left:
 
 - **User mode** for staff: Ask (with optional voice dictation), Compare, History, Settings and the

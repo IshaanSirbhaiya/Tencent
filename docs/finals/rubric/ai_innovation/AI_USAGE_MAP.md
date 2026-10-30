@@ -36,7 +36,7 @@ the real service has not answered yet · **Planned** = not built ([AGENTIC_ROADM
 - **Several distinct AI jobs, each fenced.** The answering model has no tools and sees only released
   passages. The audit parser runs its rules first and uses the model only when they recognise nothing, behind a closed schema. Every fallback is labelled.
 - **Honest gaps.** Hy3 live is pending. The audit parser's model fallback is wired but has not run live. Act is built, tested and
-  committed (`8312864`); its model-written draft is wired but has not run live, and Act is not yet exposed over MCP (`ib_propose_action`). Voice is planned.
+  committed (`8312864`); its model-written draft is wired but has not run live, and Act is not yet exposed over MCP (`ib_propose_action`). Tencent voice (row 12, ASR/RTC) is planned; the browser's own dictation in the Ask composer is built (`1bc6b4c`) and uses no Tencent service.
   Deliverables: Table and Chart run with no model; Analysis says "Needs the model" until Hy3 is live, and the model path is tested with a fake chain only.
   Say these before a judge asks.
 
