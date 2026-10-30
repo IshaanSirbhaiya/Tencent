@@ -228,14 +228,21 @@ def main() -> int:
         code, st, _ = maya.call("GET", "ib/status", timeout=15)
         if code == 200 and isinstance(st, dict):
             m = st.get("models") or {}
-            live = bool(m.get("active"))
+            active = bool(m.get("active"))
+            # Hy3 is named only when the active chain IS TokenHub; any other model is neutral
+            hy3 = active and m.get("active_provider", "tencent-tokenhub") == "tencent-tokenhub"
+            live = hy3
             chain = ", ".join(m.get("active_chain") or m.get("chain") or []) or "none"
-            model_info = {"live": live, "chain": chain, "force_offline": st.get("force_offline"),
+            model_info = {"live": live, "ai": active and not hy3, "chain": chain,
+                          "force_offline": st.get("force_offline"),
                           "key_configured": st.get("key_configured")}
             if a.offline:
                 rep.add("model", "model", "Model", "info", "mock fixtures (offline build)")
-            elif live:
+            elif hy3:
                 rep.add("model", "model", "Model: Tencent Hunyuan LIVE via TokenHub", "pass", chain)
+            elif active:
+                rep.add("model", "model", "Model: AI model active", "pass",
+                        "an AI model answers from the cited sources; never claim Hy3")
             else:
                 why = "IB_FORCE_OFFLINE=1" if st.get("force_offline") else "no live model"
                 rep.add("model", "model", "Model: extractive fallback (quoted from the sources)", "warn",

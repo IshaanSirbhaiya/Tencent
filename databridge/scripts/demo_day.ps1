@@ -468,6 +468,7 @@ function Show-Verdict([int]$Code, [string]$Base) {
     $r = Get-Content $Report -Raw | ConvertFrom-Json
     if ($r.mode -eq 'offline') { $model = 'Model: OFFLINE MOCK (recorded fixtures). Say so on stage.' }
     elseif ($r.model.live) { $model = "Model: Tencent Hunyuan LIVE ($($r.model.chain)). Hy3 lines are allowed." }
+    elseif ($r.model.ai) { $model = 'Model: AI model active (not Hy3). Say "an AI model, from the cited sources"; never claim Hy3.' }
     else { $model = 'Model: extractive fallback. Use the default lines: "quoted from the sources, with the same checks".' }
   } catch { }
   if ($DryRun) { Say ''; Say 'DRY RUN finished: nothing was changed.' 'Magenta'; return }
