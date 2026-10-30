@@ -27,12 +27,28 @@ def _office_bytes() -> bytes:
     return buf.getvalue()
 
 
+WRITE = {"writer", "fileOrganizer", "organizer", "owner"}
+
+
+def _writer(mini) -> tuple[dict, str]:
+    """A folder and a person granted WRITE on it directly (derived from the mini world)."""
+    for f in mini["drive"]["folders"]:
+        for p in f.get("permissions", []):
+            if p["type"] == "user" and p["role"] in WRITE:
+                return f, p["principal"]
+    pytest.skip("no direct writer in the mini world")
+
+
 def _body(mini, **over) -> dict:
-    folder = mini["drive"]["folders"][0]
+    folder, owner = _writer(mini)
     body = {"folder": folder["id"], "name": "Quarterly plan.docx", "mime": DOCX,
-            "content_b64": base64.b64encode(_office_bytes()).decode(), "owner": "jdoe"}
+            "content_b64": base64.b64encode(_office_bytes()).decode(), "owner": owner}
     body.update(over)
     return body
+
+
+def _email(mini, uid: str) -> str:
+    return next(u["email"] for u in mini["directory"]["users"] if u["id"] == uid)
 
 
 def _perm_view(perms):
@@ -40,7 +56,7 @@ def _perm_view(perms):
 
 
 def test_upload_is_served_byte_exact_with_the_folders_permissions(client, svc, admin, mini, sink):
-    folder = mini["drive"]["folders"][0]
+    folder, owner = _writer(mini)
     r = client.post(UP, headers=admin, json=_body(mini))
     assert r.status_code == 200, r.text
     out = r.json()
@@ -52,7 +68,7 @@ def test_upload_is_served_byte_exact_with_the_folders_permissions(client, svc, a
     assert meta["mimeType"] == DOCX and meta["parents"] == [folder["id"]]
     assert meta["driveId"] == folder["drive"] and meta["name"] == "Quarterly plan.docx"
     assert meta["size"] == str(len(_office_bytes()))
-    assert meta["lastModifyingUser"]["emailAddress"] == "jdoe@companya.example"
+    assert meta["lastModifyingUser"]["emailAddress"] == _email(mini, owner)
 
     media = client.get(f"/drive/v3/files/{fid}", params={"alt": "media"}, headers=svc)
     assert media.status_code == 200 and media.content == _office_bytes()
@@ -78,7 +94,8 @@ def test_upload_fires_one_signed_content_changed_and_enters_the_changes_feed(cli
     platform, headers, body = sink.calls[0]
     assert platform == "drive" and verify_signature(headers, body)
     p = json.loads(body)
-    assert p["type"] == "content.changed" and p["object_ids"] == [fid] and p["user"] == "jdoe"
+    assert p["type"] == "content.changed" and p["object_ids"] == [fid]
+    assert p["user"] == _writer(mini)[1]
     ch = client.get("/drive/v3/changes", headers=svc, params={"pageToken": tok}).json()
     assert [c["fileId"] for c in ch["changes"]] == [fid]
     assert ch["changes"][0]["removed"] is False
@@ -132,3 +149,51 @@ def test_bad_uploads_are_refused_and_change_nothing(client, svc, admin, mini, si
     assert client.post(UP, headers=admin, json=_body(mini, **over)).status_code == status
     assert client.get("/drive/v3/files", headers=svc).json()["files"] == before
     assert sink.calls == []
+
+
+def _holders(mini, fid: str) -> dict[str, str]:
+    """user -> role granted directly or inherited down the folder chain (users only; the mini
+    world's group and drive grants are readers)."""
+    folders = {f["id"]: f for f in mini["drive"]["folders"]}
+    out: dict[str, str] = {}
+    cur = fid
+    while cur:
+        f = folders[cur]
+        for p in f.get("permissions", []):
+            if p["type"] == "user":
+                out.setdefault(p["principal"], p["role"])
+        if f.get("inherited_permissions_disabled"):
+            break
+        cur = f.get("parent")
+    return out
+
+
+def test_an_uploader_without_write_on_the_folder_is_refused_and_nothing_changes(client, svc, admin,
+                                                                             mini, sink):
+    """Round 4 Codex B9: Drive itself checks the acting user's WRITE at insert (reader,
+    commenter, outsider: refused), so a revocation after the IB's check still stops the write."""
+    before = client.get("/drive/v3/files", headers=svc).json()["files"]
+    tried = 0
+    for f in mini["drive"]["folders"]:
+        holders = _holders(mini, f["id"])
+        for u in mini["directory"]["users"]:
+            if holders.get(u["id"]) in WRITE:
+                continue
+            sink.clear()
+            r = client.post(UP, headers=admin, json=_body(mini, folder=f["id"], owner=u["id"]))
+            assert r.status_code == 403, (f["id"], u["id"], r.text)
+            assert sink.calls == []
+            tried += 1
+    assert tried
+    assert client.get("/drive/v3/files", headers=svc).json()["files"] == before
+
+
+def test_write_inherited_down_the_folder_chain_is_enough(client, admin, mini):
+    folders = {f["id"]: f for f in mini["drive"]["folders"]}
+    folder, owner = _writer(mini)
+    child = next((f for f in folders.values() if f.get("parent") == folder["id"]
+                  and not f.get("inherited_permissions_disabled")), None)
+    if child is None:
+        pytest.skip("no inheriting child folder")
+    r = client.post(UP, headers=admin, json=_body(mini, folder=child["id"], owner=owner))
+    assert r.status_code == 200, r.text

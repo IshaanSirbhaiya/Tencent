@@ -11,8 +11,10 @@
   ``Developers`` role).
 * ``POST issue`` creates an issue the way Jira Cloud's ``POST /rest/api/3/issue`` does (fields
   ``project``, ``summary``, ``issuetype``, ``description`` as ADF, optional ``reporter`` and
-  ``labels``); 201 ``{id, key, self}``. The reporter (the person the issue is created for) must hold
-  "Create issues" in the project, otherwise a 403 like Jira's. A ``content.changed`` webhook follows.
+  ``labels``); 201 ``{id, key, self}``. Like Jira Cloud, it authorises the CALLER (the service
+  account: ``World.jira_service_can_create``), not the reporter; a caller without "Create issues"
+  in the project gets a 403. The reporter's own permission is checked by the Internal Brain's live
+  ``creatable`` re-check, not here. A ``content.changed`` webhook follows.
 """
 from __future__ import annotations
 

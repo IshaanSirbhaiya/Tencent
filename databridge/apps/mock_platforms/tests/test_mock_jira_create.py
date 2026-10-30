@@ -135,3 +135,15 @@ def test_unknown_or_deactivated_reporter_is_400_and_changes_nothing(client, svc,
 
 def test_create_issue_needs_a_token(client):
     assert client.post(f"{J}/issue", json=_fields()).status_code == 401
+
+
+@pytest.mark.parametrize("acl", [{}, {"roles": []}, {"roles": [], "users": [], "groups": []}])
+def test_an_empty_create_acl_means_nobody_may_create(client, admin, acl):
+    """Round 4 Codex A3 (round 2 Codex #7): the default ``Developers`` holder applies only when the
+    project has NO ``create`` key. A ``create`` key with no holders means nobody may create."""
+    w = client.app.state.world
+    w.projects["PAY"]["create"] = acl
+    assert _create_ok(client, admin, "acc-jdoe") == []              # jdoe is a PAY Developer
+    assert w.jira_can_create("jdoe", "PAY") is False
+    del w.projects["PAY"]["create"]                                 # no key: Jira's default scheme
+    assert _create_ok(client, admin, "acc-jdoe") == [10001]

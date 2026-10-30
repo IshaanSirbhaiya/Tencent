@@ -271,13 +271,17 @@ class World:
     def jira_can_create(self, uid: Optional[str], project_key: str) -> bool:
         """"Create issues" in a project. The world may give a project a ``create`` holder set
         (``roles``/``users``/``groups``); without one, Jira's default scheme applies here: the
-        project's ``Developers`` role (Viewers can browse but not create)."""
+        project's ``Developers`` role (Viewers can browse but not create). The default applies
+        only when the project has NO ``create`` key: an empty holder set means nobody may create
+        (round 4 Codex A3)."""
         if uid is None or not self.active(uid):
             return False
         proj = self.projects.get(project_key)
         if proj is None:
             return False
-        c = proj.get("create") or {"roles": ["Developers"]}
+        c = proj["create"] if "create" in proj else {"roles": ["Developers"]}
+        if not isinstance(c, dict):
+            return False                    # a malformed holder set grants nothing (fail closed)
         if self._in_roles(uid, project_key, c.get("roles", [])):
             return True
         return self.in_principals(uid, c.get("users", []), c.get("groups", []))

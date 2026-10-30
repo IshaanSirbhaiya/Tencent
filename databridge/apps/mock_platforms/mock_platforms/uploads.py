@@ -12,7 +12,13 @@ Body ``{"folder", "name", "mime", "content_b64", "owner"}``:
 * ``content_b64``: standard base64, at most ``MAX_BYTES`` (5 MiB) decoded. Text types must be UTF-8
   and are stored as text (served by ``alt=media`` like every other text file); Office / PDF files
   are stored as bytes and ``alt=media`` serves the exact bytes back.
-* ``owner``: the uploader (an IB user id or a Drive email); shown as ``lastModifyingUser``.
+* ``owner``: the uploader (an IB user id or a Drive email); shown as ``lastModifyingUser``. Like
+  Drive, the insert checks that this ACTIVE user can write to the folder NOW (``writer``,
+  ``fileOrganizer``, ``organizer`` or ``owner``, granted to them, a group they are in or their
+  domain, directly or inherited down the folder chain and from the shared drive), else ``403
+  insufficientFilePermissions`` and nothing changes (round 4 Codex B9). A directory user with the
+  ``admin_it`` role stands in for the Workspace admin and may upload into any folder (the Internal
+  Brain's own rule).
 
 The upload is recorded in the Drive ``changes`` feed and fires the signed ``content.changed``
 webhook for the new file id, like every other admin mutation (``?webhook=0`` applies it silently).
@@ -32,6 +38,27 @@ from .admin import _emit, _err, _user
 from .common import admin_auth, world
 
 router = APIRouter(dependencies=[Depends(admin_auth)])
+WRITE_ROLES = frozenset({"writer", "fileOrganizer", "organizer", "owner"})
+
+
+def can_write(w, uid: str, folder_id: str) -> bool:
+    """``uid`` may add a file to ``folder_id`` now (call with ``w.lock`` held)."""
+    u = w.users.get(uid) or {}
+    if not w.active(uid):
+        return False
+    if "admin_it" in (u.get("roles") or []):
+        return True
+    groups = w.user_groups(uid)
+    email = str(u.get("email") or "")
+    domain = email.rsplit("@", 1)[-1].lower() if "@" in email else ""
+    for perm, _inh, _src, _kind in w.drive_permission_sources(folder_id):
+        if perm.get("role") not in WRITE_ROLES:
+            continue
+        t, who = perm.get("type"), perm.get("principal")
+        if (t == "user" and who == uid) or (t == "group" and who in groups) or \
+                (t == "domain" and isinstance(who, str) and domain and who.lower() == domain):
+            return True
+    return False
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_NAME = 200
@@ -85,6 +112,8 @@ def drive_upload(request: Request, body: dict = Body(...)):
         if folder is None or folder.get("trashed"):
             raise _err(404, f"unknown folder {folder_id!r}")
         owner = _user(w, "drive", body.get("owner"))
+        if not can_write(w, owner, folder_id):
+            raise _err(403, "insufficientFilePermissions: the uploader cannot write to this folder")
         fid = f"up-{uuid.uuid4().hex[:20]}"
         now = w.now_iso()
         w.files[fid] = {"id": fid, "name": name.strip(), "mimeType": mime, "folder": folder_id,
