@@ -383,6 +383,35 @@ def team_film(part: dict, clean: Path, out: Path, work: Path, preview: bool) -> 
     return got, note
 
 
+# The live WorkBuddy capture (main session, 30 Oct): three moments, all kept: the question sent, the cited
+# answer ("answered as jdoe"), the receipt (request id, channel workbuddy-mcp, stages, sealed records).
+WORKBUDDY_MOMENTS = [(0.0, 6.0), (6.0, 20.0), (20.0, 34.0)]
+MAX_SPEEDUP = 1.6
+
+
+def moment_plan(moments: list[tuple[float, float]], secs: float) -> list[dict]:
+    """Fit moments into `secs`: each gets time in proportion to its length, is sped up at most x1.6, and what
+    still does not fit is trimmed from the END of that moment (never a whole moment)."""
+    total = sum(b - a for a, b in moments)
+    out = []
+    for a, b in moments:
+        n = b - a
+        o = secs * n / total
+        speed = min(MAX_SPEEDUP, max(1.0, n / o))
+        raw = min(n, o * speed)
+        out.append({"a": a, "len": n, "out": round(o, 3), "speed": round(speed, 4), "raw": round(raw, 3)})
+    return out
+
+
+def clips_dir() -> Path:
+    """Where the takes are: --clips / $WALNUT_V3_CLIPS, else <v3>/clips, else this checkout's
+    submission/finals_video/v3/clips (record_v3.cjs writes beside itself), whichever has takes."""
+    for d in (os.environ.get("WALNUT_V3_CLIPS"), V3 / "clips", REPO / "submission" / "finals_video" / "v3" / "clips"):
+        if d and Path(d).is_dir() and any(Path(d).glob("*.marks.json")):
+            return Path(d)
+    return V3 / "clips"
+
+
 # ---- a narrated part -----------------------------------------------------------------------------
 def film_source(part: dict, args) -> tuple[Path | None, list[tuple[float, float]], list]:
     """(clean film, anchors in clean seconds, problems) for C4 / C5."""
@@ -425,7 +454,7 @@ def narrated(part: dict, args, work: Path, out: Path, preview: bool) -> tuple[fl
             sources.append((clean, duration(clean), anchors, []))
     for scene, optional in part.get("clips", []):
         try:
-            take = v3_take(V3 / "clips", scene)
+            take = v3_take(clips_dir(), scene)
         except TakeError as e:
             if optional:
                 notes.append(f"{scene} left out: {e}")
@@ -529,10 +558,20 @@ def stills_part(part: dict, args, work: Path, out: Path, preview: bool) -> tuple
         if kind == "film":
             film = next((V3 / f"{name}{e}" for e in FILM_EXT if (V3 / f"{name}{e}").exists()), None)
             if film:
-                run(["ffmpeg", "-y", "-i", str(film), "-filter_complex", slides_vf(False).replace("[v]", ",tpad=stop_mode=clone:stop_duration=60[v]"),
-                     "-map", "[v]", "-an", "-c:v", "libx264", "-crf", "17", "-t", f"{secs:.2f}", str(p)])
+                moments = WORKBUDDY_MOMENTS if name == "C6_workbuddy" else [(0.0, duration(film))]
+                plan = moment_plan(moments, secs)
+                chain = []
+                for k, m in enumerate(plan):
+                    chain.append(f"[0:v]trim=start={m['a']:.3f}:end={m['a'] + m['raw']:.3f},setpts=(PTS-STARTPTS)/{m['speed']:.4f},"
+                                 f"fps={FPS},tpad=stop_mode=clone:stop_duration={m['out']:.3f},trim=duration={m['out']:.3f}[m{k}]")
+                chain.append("".join(f"[m{k}]" for k in range(len(plan))) + f"concat=n={len(plan)}:v=1:a=0,"
+                             + f"scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x0a0b0d,format=yuv420p[v0]")
+                extra, pill, last, _ = _pills([{"at": 0.6, "seconds": max(1.0, secs - 1.2), "text": cap}] if cap else [],
+                                              secs, 1, work, f"{part['id']}_wb", "v0")
+                run(["ffmpeg", "-y", "-i", str(film), *extra, "-filter_complex", ";".join(chain) + pill, "-map", f"[{last}]",
+                     "-an", "-c:v", "libx264", "-crf", "17", "-r", str(FPS), "-t", f"{secs:.2f}", str(p)])
                 pieces.append(p)
-                notes.append(f"{name} (live capture)")
+                notes.append(f"{name} (live capture: " + ", ".join(f"x{m['speed']:.2f}" + (f" -{m['len'] - m['raw']:.1f}s" if m['len'] - m['raw'] > 0.05 else "") for m in plan) + ")")
                 continue
             name = "workbuddy_mcp_panel.png"                  # no live capture yet: the 15 Oct window capture
             notes.append("WorkBuddy: the 15 Oct still (no live capture yet)")
@@ -741,6 +780,11 @@ def self_test() -> int:
     tot = 10.1 + 61 + 79.8 + 3.5 + 4.0 + 89.2 + 52.3 + 31.7 + sum(v * HUMAN + LEAD + TAIL for k, v in lengths.items()
                                                          if k not in ("B_C4", "A_C5"))
     assert tot < MAX_MAIN, tot
+    # the WorkBuddy moments: all three kept, at most x1.6, the rest trimmed from each moment's end
+    mp = moment_plan(WORKBUDDY_MOMENTS, 7.0)
+    assert len(mp) == 3 and all(m["speed"] <= MAX_SPEEDUP and m["raw"] <= m["len"] for m in mp)
+    assert abs(sum(m["out"] for m in mp) - 7.0) < 0.01 and mp[1]["raw"] < mp[1]["len"]
+    assert all(m["speed"] == 1.0 and m["raw"] == m["len"] for m in moment_plan(WORKBUDDY_MOMENTS, 40.0))
     # subtitles, cue sheet, filters
     srt = srt_from([{"start": 1.0, "end": 5.0, "text": "One two. Three four five six."}])
     assert srt.startswith("1\n00:00:01,000 --> ") and "\n2\n" in srt
@@ -778,10 +822,13 @@ def main() -> int:
     ap.add_argument("--mask-topbar", action="store_true", help="C3: crop the top bar (cursor, focus ring) and re-scale")
     ap.add_argument("--intro-height", type=int, default=864, help="C1: the camera frame's height on the 1080 canvas")
     ap.add_argument("--burn-subs", action="store_true", help="burn the subtitles into the picture as well")
+    ap.add_argument("--clips", type=Path, default=None, help="the takes folder (default: see clips_dir())")
     ap.add_argument("--allow-long", action="store_true", help="do not refuse a main cut over 8:00")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.clips:
+        os.environ["WALNUT_V3_CLIPS"] = str(a.clips)
     if a.cues:
         md = cue_sheet(planned(), "planned timings")
         V3.mkdir(parents=True, exist_ok=True)

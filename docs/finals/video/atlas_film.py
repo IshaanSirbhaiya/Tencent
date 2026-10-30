@@ -57,9 +57,9 @@ ATLAS_WAITS = [(35.8, 42.1), (70.3, 76.6)]
 CUTS: list[tuple[float, float]] = []
 TARGET_LUFS = -16.0
 # Template-match scores (measured on the Atlas film, 30 Oct): the real label scores 0.85-1.0; ordinary text
-# never above 0.78 (whole words and halves alike), with nothing in between. So a hit is >= 0.85 (a half word
-# >= 0.88), and after blurring no frame may score 0.82 or more.
-DETECT_MIN, HALF_MIN = 0.85, 0.88
+# never above 0.78 (whole words and halves alike). A hit is >= 0.82 for whole and half words alike, and after
+# blurring no frame may score 0.82 or more: the detector and the check use the same line.
+DETECT_MIN, HALF_MIN = 0.82, 0.82
 VERIFY_MAX = 0.82
 PAD_PX, PAD_FRAMES = 8, 4
 
@@ -197,11 +197,13 @@ def loudness(path: Path) -> tuple[float, float]:
 
 
 def level_gain(lufs: float, peak: float) -> float:
-    """The one allowed sound change: a whole-clip gain towards -16 LUFS, only when it is more than 1 LU off,
-    never pushing the peak above -1 dBTP (no limiter, no compression, no timing change)."""
+    """The one allowed sound change: a whole-clip gain towards -16 LUFS, only when it is more than 1 LU off (no
+    limiter, no compression, no timing change). A gain UP never pushes the peak above -1 dBTP; a gain down is
+    never limited by the peak (the Atlas film decodes to +10 dBFS peaks: lowering it only reduces clipping)."""
     if lufs != lufs or abs(lufs - TARGET_LUFS) <= 1.0:
         return 0.0
-    return round(min(TARGET_LUFS - lufs, -1.0 - peak), 2)
+    g = TARGET_LUFS - lufs
+    return round(g if g < 0 else min(g, -1.0 - peak), 2)
 
 
 def stream_seconds(path: Path, kind: str) -> float | None:
@@ -239,6 +241,18 @@ def run_ff(cmd: list[str]) -> None:
         raise SystemExit(f"ffmpeg failed: {r.stderr[-800:]}")
 
 
+def lay_sound(film: Path, picture: Path, out: Path) -> dict:
+    """The source's own sound onto the clean picture, its timing untouched; at most one whole-clip gain."""
+    lufs, peak = loudness(film)
+    gain = level_gain(lufs, peak)
+    acodec = ["-c:a", "copy"] if gain == 0 else ["-af", f"volume={gain}dB", "-c:a", "aac", "-b:a", "256k"]
+    tmp = out.with_name(out.stem + ".sound.mp4")
+    run_ff(["ffmpeg", "-v", "error", "-y", "-i", str(picture), "-i", str(film), "-map", "0:v", "-map", "1:a",
+            "-c:v", "copy", *acodec, "-movflags", "+faststart", str(tmp)])
+    tmp.replace(out)
+    return {"kept": True, "source_lufs": lufs, "source_peak_dbfs": peak, "gain_db": gain}
+
+
 def render(film: Path, out: Path, report: Path, keep_audio: bool = True) -> dict:
     cv2, np = _cv()
     sw, sh, dur = probe(film)
@@ -258,7 +272,11 @@ def render(film: Path, out: Path, report: Path, keep_audio: bool = True) -> dict
     canvas[:] = (13, 11, 10)                                   # the video's dark background (0x0a0b0d)
     ox, kept = (W - cw) // 2, 0
     blurred_frames = 0
+    vdur = stream_seconds(film, "v") or dur
+    last = int(round(vdur * FPS))                             # 120 -> 30 fps, the same length as the source
     for i, (t, f) in enumerate(frames(film, cw, ch)):
+        if i >= last:
+            break
         if in_cut(t):
             continue
         f = f.copy()
@@ -279,12 +297,7 @@ def render(film: Path, out: Path, report: Path, keep_audio: bool = True) -> dict
     # the sound: the source's own track, its timing untouched; at most one whole-clip gain
     audio: dict = {"kept": False}
     if keep_audio and stream_seconds(film, "a") is not None:
-        lufs, peak = loudness(film)
-        gain = level_gain(lufs, peak)
-        acodec = ["-c:a", "copy"] if gain == 0 else ["-af", f"volume={gain}dB", "-c:a", "aac", "-b:a", "256k"]
-        run_ff(["ffmpeg", "-v", "error", "-y", "-i", str(silent), "-i", str(film), "-map", "0:v", "-map", "1:a",
-                "-c:v", "copy", *acodec, "-movflags", "+faststart", str(out)])
-        audio = {"kept": True, "source_lufs": lufs, "source_peak_dbfs": peak, "gain_db": gain}
+        audio = lay_sound(film, silent, out)
         silent.unlink()
     else:
         silent.replace(out)
@@ -347,7 +360,7 @@ def self_test() -> int:
     assert boxes_for(14, hits) and boxes_for(16, hits) and not boxes_for(17, hits)   # 12 + PAD_FRAMES
     assert not CUTS and not in_cut(36.0), "the films are not cut by default (founder's order)"
     assert in_cut(36.0, ATLAS_WAITS) and not in_cut(35.0, ATLAS_WAITS) and not in_cut(76.6, ATLAS_WAITS)
-    assert level_gain(-8.2, -0.5) == -7.8 and level_gain(-16.6, -3) == 0.0 and level_gain(float("nan"), 0) == 0.0
+    assert level_gain(-8.2, 10.1) == -7.8 and level_gain(-16.6, -3) == 0.0 and level_gain(float("nan"), 0) == 0.0
     assert level_gain(-24.0, -3.0) == 2.0, "a gain up never pushes the peak above -1 dBTP"
     assert pad_box((0, 0, 10, 10), 100, 100) == (0, 0, 18, 14)
     print("self-test ok: ranges, margins, no cuts by default, the whole-clip level gain")
@@ -364,6 +377,7 @@ def main() -> int:
     ap.add_argument("--no-audio", action="store_true", help="drop the film's sound (default: keep it exactly as recorded)")
     ap.add_argument("--ref-film", type=Path, default=None, help="where the label templates are cut from (default the Atlas film)")
     ap.add_argument("--verify-only", action="store_true")
+    ap.add_argument("--audio-only", action="store_true", help="re-lay the source's sound on the existing clean picture, then verify")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -378,6 +392,12 @@ def main() -> int:
         print(f"no Atlas film at {a.film} (copy Dev's film there as atlas_film.mp4)")
         return 2
     report = a.out.with_name(a.out.stem.replace("_clean", "") + "_film.json")
+    if a.audio_only:
+        info = json.loads(report.read_text(encoding="utf-8"))
+        info["audio"] = lay_sound(a.film, a.out, a.out)
+        report.write_text(json.dumps(info, indent=1), encoding="utf-8")
+        print(f"film: sound re-laid {info['audio']}")
+        return 0 if verify(a.film, a.out, report, info) else 1
     info = None if a.verify_only else render(a.film, a.out, report, keep_audio=not a.no_audio)
     if info:
         for r in info["blurred_ranges"]:
