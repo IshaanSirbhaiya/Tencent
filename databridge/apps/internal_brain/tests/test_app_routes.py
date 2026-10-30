@@ -82,7 +82,7 @@ def test_every_sim_and_audit_route_of_the_built_app_requires_auth(tmp_path, demo
     assert {"/sim/reset", "/sim/revoke-channel"} <= probed
     assert any(p.startswith("/audit/") for p in probed)
     demo = {"/sim/add-document", "/sim/upload-file", "/sim/check-absent", "/sim/engine-refresh",
-            "/sim/engine-status", "/ib/graph/changes"}
+            "/sim/engine-status", "/ib/graph/changes", "/sim/upload-folders"}
     assert (demo <= probed) if demo_features else probed.isdisjoint(demo)
 
 

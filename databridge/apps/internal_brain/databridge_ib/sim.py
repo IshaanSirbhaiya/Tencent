@@ -56,7 +56,8 @@ and the same 404.
 Ledger: a post is recorded write-ahead (round 3 L5) as ``ingest.sync`` with ``detail.reason =
 "sim.add-document"``, ``phase="requested"`` (the person, platform, container, kind, the text's
 byte length and SHA-256; never the text or the title) after every check and before the source
-call; a ledger failure is a ``503`` and nothing is posted. After the source call a second record
+call; a ledger failure, or no ledger configured at all (round 4 Codex B8), is a ``503`` and
+nothing is posted. After the source call a second record
 (``phase="written"``) adds the doc id (its failure is logged; the post already happened). The
 note reaches the index through
 the mock platform's signed ``content.changed`` webhook, applied by ``Ingestor.apply_event`` (which
@@ -181,14 +182,20 @@ def _manifest(world_path: Path) -> dict:
         return {}
 
 
+class LedgerUnavailable(RuntimeError):
+    """No ledger is configured, so a write-ahead record cannot be made (round 4 Codex B8)."""
+
+
 def write_ahead(led: Any, sub: str, stage: str, phase: str, detail: dict) -> None:
     """Record a write to a source made on ``sub``'s behalf (``/sim/add-document``,
     ``/sim/upload-file``; round 3 L5) as ``ingest.sync`` with ``detail.reason = stage``,
     ``detail.phase`` (``requested`` before the source call, ``written`` with the doc id after) and
-    ``detail.by = sub``. Never the text, title or file name. No ledger configured: nothing to do.
-    A ledger error propagates (the caller answers 503 before the write)."""
+    ``detail.by = sub``. Never the text, title or file name. No ledger configured is the same as a
+    ledger that is down (round 4 Codex B8): ``LedgerUnavailable`` is raised, never a quiet return,
+    so the write cannot go ahead unaudited. Any ledger error propagates (the caller answers 503
+    before the write)."""
     if led is None:
-        return
+        raise LedgerUnavailable("no ledger configured")
     from .models import SourceChangeEvent
     led.append(SourceChangeEvent(kind="ingest.sync", platform=detail.get("platform"),
                                  event_time=datetime.now(timezone.utc),

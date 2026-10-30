@@ -29,10 +29,14 @@ Rules (the graph's own, ``graph.py``):
   window: no nodes, a fresh cursor, nothing back-filled.
 * **Ledger (write-ahead, ``graph.viewed``; counts only).** Ledgering every 3-second poll would
   flood the audit log with rows that record no read, so: the FIRST poll of a window (a new cursor
-  issued) is ledgered with zero counts, and after that only a NON-EMPTY delta is ledgered, before
-  the response, with ``docs_checked`` = the live checks it ran. An empty poll inside a window is
-  not ledgered: nothing was returned to the person. (Candidates that failed their live check in
-  such a poll are not recorded either; they were never shown.) A ledger failure is a 503. The
+  issued) is ledgered with zero counts. After that, EVERY poll is ledgered BEFORE Gate 1, Gate 2
+  and the read-through (``outcome="checking"``, zero counts; round 4 Codex B2, rule 3), whether
+  or not it has candidates (round 5 Codex #8, rule 4: a ledger outage is then the same 503 for
+  every poll, so it never tells a candidate from none), and a poll whose candidates are all
+  denied is on the record too; a NON-EMPTY delta then adds its own row, before the response, with
+  ``docs_checked`` = the live checks it ran. A poll with no Gate-1 candidate (Ken's, for a note he
+  cannot read) still makes no source call (D-24). A ledger failure is a 503, before any source
+  call. The
   rows carry ``mode="changes"`` (PLAN L-4), so compliance views never count a poll as a focus.
 * **Demo-only** (D-24). ``bootstrap.build_app`` mounts this router only when
   ``IbConfig.demo_features_on`` (``IB_DEMO_FEATURES=1`` and not ``IB_DEPLOYED=1``); otherwise the
@@ -235,10 +239,16 @@ def changes(user, *, index, directory, ledger, connectors, tracker: ChangeTracke
         if tracker.window_opened(user.id):
             _ledger(ledger, user, 0, 0, 0, 0)
         return empty
+    # write-ahead (rule 3, round 4 Codex B2; round 5 Codex #8, rule 4): EVERY poll in a window is
+    # recorded BEFORE Gate 1, Gate 2 and the read-through, whether or not it has candidates, so a
+    # ledger outage is the same 503 for every poll (it never reveals that a candidate exists) and
+    # a poll whose candidates are all denied is still on the record. Counts only, all zero: the
+    # row says a check is about to run, never what it is about. A row is not a source call.
+    _ledger(ledger, user, 0, 0, 0, 0, outcome="checking")
     readable = index.readable(user, getattr(directory, "epoch", 0))         # GATE 1
     cands = [d for _s, d in tracker.window(t, t_now) if d in readable][:max_check]
     if not cands:
-        return empty                                       # no source call (R4)
+        return empty                                       # no source call (L3, D-24)
     deadline = authz.deadline_in(timeout_s)                # ONE deadline for every check (L-6)
     got, n_checked = authz.authorize(user, cands, index=index, connectors=connectors,
                                      readable=readable, deadline=deadline)
@@ -261,8 +271,9 @@ def changes(user, *, index, directory, ledger, connectors, tracker: ChangeTracke
     return {"cursor": empty["cursor"], "nodes": nodes, "edges": edges}
 
 
-def _ledger(ledger, user, nodes: int, docs: int, edges: int, checked: int) -> None:
-    ledger.append(GraphViewed(sub=user.id, mode="changes", outcome="ok", nodes_returned=nodes,
+def _ledger(ledger, user, nodes: int, docs: int, edges: int, checked: int, *,
+            outcome: str = "ok") -> None:
+    ledger.append(GraphViewed(sub=user.id, mode="changes", outcome=outcome, nodes_returned=nodes,
                               docs_returned=docs, edges_returned=edges, docs_checked=checked,
                               policy_version=POLICY_VERSION,
                               event_time=datetime.now(timezone.utc)))

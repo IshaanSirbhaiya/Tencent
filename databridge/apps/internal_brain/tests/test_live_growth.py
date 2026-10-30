@@ -133,8 +133,14 @@ def test_note_never_reaches_ken_byte_identical_and_without_a_source_call(world, 
             calls.append(a[1] if len(a) > 1 else k.get("doc_ids"))
             return real(*a, **k)
         monkeypatch.setattr(authzmod.gates, "check_all", counting)
+        n_ken = len([ev for ev in world.ledger.events if ev.kind == "graph.viewed"
+                     and ev.sub == OUTSIDER])
         r_a = _poll(ken_a, c_k)
         assert calls == []                                          # L3: no source call for Ken
+        # round 5 Codex #8: every poll writes its write-ahead row (a ledger row, not a source call)
+        ken_rows = [ev for ev in world.ledger.events if ev.kind == "graph.viewed"
+                    and ev.sub == OUTSIDER][n_ken:]
+        assert [(r.mode, r.outcome, r.docs_checked) for r in ken_rows] ==             [("changes", "checking", 0)]
         r_b = _poll(ken_b, c_kb)
         assert r_a.content == r_b.content                           # L2: byte-identical
         assert set(r_a.json()) == {"cursor", "nodes", "edges"}
@@ -360,3 +366,104 @@ def test_reset_removes_the_note_and_rebaselines_the_feed(env):
     assert _as(app, svc, POSTER).get(f"/ib/doc/{doc_id}").status_code == 404
     clock.t += 1
     assert _poll(priya, cur).json()["nodes"] == []                  # no "updated" burst
+
+
+# --- Round 4 Codex B2: write-ahead BEFORE Gate 2 and the read-through ---------------------------------
+def test_a_poll_is_ledgered_before_its_live_check_even_when_fully_denied(env, monkeypatch):
+    """A poll with Gate-1 candidates appends its ``graph.viewed`` row (``outcome="checking"``)
+    BEFORE any live source check, so a poll whose candidates are all denied is still recorded."""
+    e, app, svc, clock = env
+    jd = _as(app, svc, POSTER)
+    cur = _poll(jd).json()["cursor"]
+    clock.t += 1
+    _post(jd)
+    clock.t += 1
+    rows_at_check: list[int] = []
+
+    def deny_all(user, doc_ids, **kw):
+        rows_at_check.append(len([ev for ev in e.ledger.events if ev.kind == "graph.viewed"
+                                  and ev.sub == POSTER]))
+        return {}, 0
+    monkeypatch.setattr("databridge_ib.live.authz.authorize", deny_all)
+    n = len([ev for ev in e.ledger.events if ev.kind == "graph.viewed" and ev.sub == POSTER])
+    body = _poll(jd, cur).json()
+    assert body["nodes"] == [] and body["edges"] == []
+    assert rows_at_check and rows_at_check[0] == n + 1             # the row came first
+    pre = [ev for ev in e.ledger.events if ev.kind == "graph.viewed" and ev.sub == POSTER][-1]
+    assert (pre.mode, pre.outcome, pre.nodes_returned, pre.docs_returned) == \
+        ("changes", "checking", 0, 0)
+
+
+def test_ledger_down_before_the_live_check_is_503_with_no_source_call(env, monkeypatch):
+    e, app, svc, clock = env
+    jd = _as(app, svc, POSTER)
+    cur = _poll(jd).json()["cursor"]
+    clock.t += 1
+    _post(jd)
+    clock.t += 1
+    calls = []
+    real = authzmod.gates.check_all
+
+    def counting(*a, **k):
+        calls.append(1)
+        return real(*a, **k)
+    monkeypatch.setattr(authzmod.gates, "check_all", counting)
+
+    def boom(ev):
+        raise RuntimeError("ledger down")
+    monkeypatch.setattr(e.ledger, "append", boom)
+    r = jd.get("/ib/graph/changes", params={"since": cur})
+    assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+    assert calls == []                                              # nothing read from the source
+
+
+# --- Round 5 Codex #8 (rules 3 and 4): the ledger is hit the same way BEFORE Gate 1 on every poll --
+def test_every_poll_is_ledgered_before_gate_1_whatever_its_candidates(env, monkeypatch):
+    e, app, svc, clock = env
+    jd, ken = _as(app, svc, POSTER), _as(app, svc, OUTSIDER)
+    c_j, c_k = _poll(jd).json()["cursor"], _poll(ken).json()["cursor"]
+    clock.t += 1
+    _post(jd)
+    clock.t += 1
+    rows_at_gate1: list[tuple[str, int]] = []
+    real = e.index.readable
+
+    def readable(user, *a, **k):
+        rows_at_gate1.append((user.id, len([ev for ev in e.ledger.events
+                                            if ev.kind == "graph.viewed" and ev.sub == user.id])))
+        return real(user, *a, **k)
+    monkeypatch.setattr(e.index, "readable", readable)
+    for c, cur, sub in ((jd, c_j, POSTER), (ken, c_k, OUTSIDER)):
+        n = len([ev for ev in e.ledger.events if ev.kind == "graph.viewed" and ev.sub == sub])
+        _poll(c, cur)
+        assert (sub, n + 1) in rows_at_gate1                        # the row came before Gate 1
+
+
+def test_ledger_down_is_the_same_503_with_or_without_candidates(env, monkeypatch):
+    """A poll with a Gate-1 candidate, an equivalent poll without one (Ken, who cannot read the
+    note) and the poster's own idle poll all get the same bytes while the ledger is down."""
+    e, app, svc, clock = env
+    jd, ken = _as(app, svc, POSTER), _as(app, svc, OUTSIDER)
+    c_j, c_k = _poll(jd).json()["cursor"], _poll(ken).json()["cursor"]
+    clock.t += 1
+    _post(jd)
+    clock.t += 1
+    c_idle = _poll(jd, c_j).json()["cursor"]                        # the note delivered: now idle
+    clock.t += 1
+    calls = []
+    real = authzmod.gates.check_all
+
+    def counting(*a, **k):
+        calls.append(1)
+        return real(*a, **k)
+    monkeypatch.setattr(authzmod.gates, "check_all", counting)
+
+    def boom(ev):
+        raise RuntimeError("ledger down")
+    monkeypatch.setattr(e.ledger, "append", boom)
+    with_cands = jd.get("/ib/graph/changes", params={"since": c_j})
+    without = ken.get("/ib/graph/changes", params={"since": c_k})
+    idle = jd.get("/ib/graph/changes", params={"since": c_idle})
+    assert with_cands.status_code == without.status_code == idle.status_code == 503
+    assert with_cands.content == without.content == idle.content
+    assert calls == []                                              # nothing read from the source

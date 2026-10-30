@@ -407,6 +407,32 @@ def test_write_permission_is_read_live_from_drive(env):
         e.reset()
 
 
+def test_write_permission_is_rechecked_just_before_the_drive_write(env, monkeypatch):
+    """Round 4 Codex B9: the writer's grant is removed at the source (no webhook) WHILE the file is
+    being extracted. The live check runs again right before the Drive write: refused with the one
+    404, no write-ahead record, nothing stored in Drive."""
+    e, app, svc = env
+    holders = [p for p in FOLDERS[FOLDER].get("permissions", []) if p.get("role") in WRITE]
+    real = X.extract
+
+    def revoke_then_extract(kind, data):
+        for p in holders:
+            r = _admin_client(e).post(f"/admin/drive/files/{FOLDER}/permissions/remove?webhook=0",
+                                      json={"permission_id": p["id"]})
+            assert r.status_code == 200
+        return real(kind, data)
+    monkeypatch.setattr(X, "extract", revoke_then_extract)
+    n, stored = len(_writes(e)), set(e.mock.state.world.files)
+    try:
+        r = _up(_as(app, svc, WRITER), *CASES["txt"][:2])
+        assert r.status_code == 404 and r.json() == REFUSAL
+        assert _refusals(e)[-1].error_code == "no_write_permission"
+        assert _writes(e)[n:] == []
+        assert set(e.mock.state.world.files) == stored
+    finally:
+        e.reset()
+
+
 def test_a_source_error_on_the_live_check_is_a_refusal(env, monkeypatch):
     e, app, svc = env
     from databridge_ib.connectors._http import SourceFailure

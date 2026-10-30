@@ -32,6 +32,13 @@ Safety, all fail closed (``Refused``; the reason is for the ledger only):
 * macros: any ``vbaProject.bin`` member, or a macro-enabled content type, is refused (macro-enabled
   extensions are not on the whitelist at all); nothing is ever executed;
 * PDF: at most ``PDF_MAX_PAGES`` pages;
+* .xlsx extent (round 4 Codex B11): both readers build a DENSE grid (calamine's range and
+  ``to_python()``, openpyxl's ``iter_rows`` and its merged, hyperlink and comment cells), so a
+  small sparse file with two far-apart cells would expand to billions of cells. Before any reader
+  runs, ``xlsx_extent`` measures max_row x max_column of every sheet from the XML itself (cell and
+  row references, implicit positions, ``dimension``, ``mergeCell``, ``hyperlink`` and ``comment``
+  refs) and a workbook over ``XLSX_MAX_CELLS`` is refused (``xlsx_dimensions``). The worker's
+  time budget below stays as the backstop;
 * a time budget (``TIME_BUDGET_S``): every reader runs in a separate WORKER PROCESS (``spawn``, one
   at a time); a read that has not finished within the budget is refused and the worker process is
   KILLED, so a runaway parse cannot keep using CPU or memory in the Internal Brain. A crashed
@@ -70,6 +77,7 @@ ZIP_MAX_RATIO = 100
 ZIP_RATIO_FLOOR = 256 * 1024
 PDF_MAX_PAGES = 50
 MAX_ROWS_PER_TABLE = 5_000
+XLSX_MAX_CELLS = 1_000_000      # sum over sheets of max_row x max_column (round 4 Codex B11)
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -452,9 +460,124 @@ def _flatten(kind: str, rec: Any, r: dict[str, Any]) -> str:
     return text
 
 
+#: the elements whose position or ``ref`` makes a reader materialise cells, by LOCAL name in any
+#: namespace (a chart's ``<c:chart>`` has the local name ``chart`` and never matches ``c``)
+_XL_TAGS = frozenset({"row", "c", "dimension", "mergeCell", "hyperlink", "comment"})
+_XL_CELL = re.compile(r"^\$?([A-Za-z]{0,3})\$?([0-9]{0,7})$")
+_XL_ABSURD = 10 ** 18                               # an unparseable or out-of-range reference
+
+
+def _xl_point(ref: str) -> tuple[int, int]:
+    """``(row, col)`` of ``B12`` / ``$B$12`` / ``B`` / ``12``; absurd when it is none of those."""
+    m = _XL_CELL.match(ref.strip()) if len(ref) <= 64 else None
+    if not m or not (m.group(1) or m.group(2)):
+        return _XL_ABSURD, _XL_ABSURD
+    col = 0
+    for ch in m.group(1).upper():
+        col = col * 26 + (ord(ch) - 64)
+    return (int(m.group(2)) if m.group(2) else 0), col
+
+
+class _XlAbsurd(Exception):
+    """The extent is already absurd: stop parsing."""
+
+
+def _xl_member_extent(xml: bytes) -> int:
+    """max_row x max_column of one XML member, STREAM-PARSED with expat (round 5 Codex #6). A start
+    tag of any length, a ``>`` inside an attribute value and an ``r=`` inside another attribute's
+    value are read exactly as an XML reader reads them; only the unprefixed ``r`` and ``ref``
+    attributes count (what openpyxl reads). No tree is built. A DTD or an entity declaration, or
+    XML that does not parse, is ``ValueError`` (fail closed: the upload is refused)."""
+    from xml.parsers import expat
+    st = {"rows": 0, "cols": 0, "row": 0, "col": 0}
+
+    def start(name: str, attrs: dict) -> None:
+        tag = name.rsplit(":", 1)[-1]                # no namespace processing: the local name
+        if tag not in _XL_TAGS:
+            return
+        if tag == "row":
+            r = attrs.get("r")
+            if r is None:
+                st["row"] += 1
+            else:
+                raw = r.strip()
+                st["row"] = int(raw) if raw.isdigit() and len(raw) <= 7 else _XL_ABSURD
+            st["col"] = 0
+            st["rows"] = max(st["rows"], st["row"])
+        elif tag == "c":
+            r = attrs.get("r")
+            if r is None:
+                st["col"] += 1
+                st["rows"] = max(st["rows"], st["row"])
+            else:
+                row, st["col"] = _xl_point(r)
+                st["rows"] = max(st["rows"], row or st["row"])
+            st["cols"] = max(st["cols"], st["col"])
+        else:                                          # dimension, mergeCell, hyperlink, comment
+            ref = attrs.get("ref")
+            if ref is None:
+                return
+            for end in (ref if len(ref) <= 128 else "!").split(":")[:2]:
+                row, col = _xl_point(end)
+                st["rows"], st["cols"] = max(st["rows"], row), max(st["cols"], col)
+        if st["rows"] * st["cols"] >= _XL_ABSURD:
+            raise _XlAbsurd()
+
+    def refuse(*_a) -> None:
+        raise ValueError("xml_dtd")
+
+    p = expat.ParserCreate()      # prefixes kept as written; an unprefixed ``r`` is the key "r"
+    p.StartElementHandler = start
+    p.StartDoctypeDeclHandler = refuse
+    p.EntityDeclHandler = refuse
+    try:
+        p.Parse(xml, True)
+    except _XlAbsurd:
+        return _XL_ABSURD
+    except expat.ExpatError:
+        raise ValueError("unparseable") from None
+    return st["rows"] * st["cols"]
+
+
+def xlsx_extent(data: bytes) -> int:
+    """Sum over the workbook's XML members of max_row x max_column: the cells a dense reader
+    could build. Read from the XML only (no reader; stream-parsed, round 5 Codex #6); an
+    unparseable reference counts as absurd, and XML that does not parse is ``ValueError``.
+    The zip limits (``check_bytes``) bound what is decompressed here."""
+    total = 0
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            with z.open(info) as f:
+                head = f.read(64)
+            try:
+                xml_like = info.filename.lower().endswith(".xml") or _xml_head(head)
+            except Refused:
+                xml_like = True
+            if not xml_like:
+                continue
+            total += _xl_member_extent(z.read(info))   # expat reads UTF-8/16 itself
+            if total >= _XL_ABSURD:
+                return _XL_ABSURD
+    return total
+
+
+def check_xlsx_extent(data: bytes) -> None:
+    try:
+        n = xlsx_extent(data)
+    except (zipfile.BadZipFile, OSError, ValueError, RuntimeError):
+        raise Refused("unreadable") from None
+    if n > XLSX_MAX_CELLS:
+        raise Refused("xlsx_dimensions")
+
+
 def _read(kind: str, data: bytes) -> str:
-    """Worker side: page cap, the kind's reader, flatten, clean. Raises ``Refused``."""
+    """Worker side: page cap, the .xlsx extent, the kind's reader, flatten, clean. Raises
+    ``Refused``."""
     r = _readers_for(kind)
+    if kind == "xlsx":
+        check_xlsx_extent(data)                        # before any reader builds a grid (B11)
     if kind == "pdf":
         try:
             doc = r["_pdfium"].PdfDocument(data)
@@ -597,4 +720,4 @@ __all__ = ["Refused", "extract", "check_bytes", "clean_text", "kind_for_filename
            "is_whatsapp", "whatsapp_text", "run_in_worker", "worker_pid",
            "EXT_KIND", "KIND_MIME", "EXTRACT_MIME_KIND", "BINARY_MIME_KIND", "TEXT_KINDS",
            "MAX_FILE_BYTES", "MAX_TEXT_CHARS", "TIME_BUDGET_S", "PDF_MAX_PAGES", "ZIP_MAX_TOTAL",
-           "ZIP_MAX_ENTRIES", "ZIP_MAX_RATIO"]
+           "ZIP_MAX_ENTRIES", "ZIP_MAX_RATIO", "XLSX_MAX_CELLS", "xlsx_extent", "check_xlsx_extent"]

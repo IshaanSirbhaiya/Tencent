@@ -293,7 +293,7 @@ fix has a regression test; tests are in `databridge/apps/internal_brain/tests/`.
 | # | Finding | Disposition | Where / regression test |
 |---|---|---|---|
 | T4-1 | Token CLI prints a usable token | **Fixed (CB6).** Prints only with `--print`; `--out FILE` writes an owner-only file; setup imports `mint_for` so no token passes through stdout. | `databridge/scripts/ib_mint_token.py`; `test_mint_token_cli.py` |
-| T4-2 | Token files can land inside the repo, readable by others | **Fixed.** `workbuddy_setup.py` refuses an output folder inside the repository and restricts each `mcp.json` to the current user (icacls / chmod 600). | `databridge/scripts/workbuddy_setup.py` |
+| T4-2 | Token files can land inside the repo, readable by others | **Fixed.** `workbuddy_setup.py` refuses an output folder inside the repository and restricts each `mcp.json` to the current user (icacls / chmod 600). Round 4 Codex B7/B10: the token is written only into a new, randomly named temp file whose ACL is already restricted and verified by a second icacls listing (only this account, no inherited entry), then atomically renamed; an icacls failure or a wider ACL exits 1 and publishes nothing; a symlink, junction or non-regular target is refused. Round 5 Codex #4/#5: the file is now born private: it is created with an exclusive create inside a new folder whose ACL was already restricted to this account and verified, written through that one descriptor (never reopened by name), its ACL and file id checked, then atomically renamed; the folder is removed. | `databridge/scripts/workbuddy_setup.py`; `test_workbuddy_setup_private.py` |
 | T4-3 | Non-JSON or malformed responses crash a tool | **Fixed (CB6).** Shape-validated, fixed sanitised error; a bad `whoami` keeps the answer. | `mcp_server.py`, `audit_mcp_server.py`; `test_mcp_server.py` |
 | T4-4 | `doc_id` can redirect the audit request (`../verify#`) | **Fixed (CB6).** Percent-encoded single path segment; `.`/`..`/empty rejected. | `audit_mcp_server.py`; `test_mcp_server.py` |
 | T4-5 | Huge `since_days` crashes | **Fixed (CB6).** Accepted only in 1..3650. | `test_mcp_server.py` |
@@ -728,15 +728,54 @@ in the ledger only (`::test_write_denied_at_the_source_is_one_polite_message`). 
 unknown (timeout, lost or malformed response, 5xx) is never told "nothing was changed": it is a 409
 `outcome_unknown` ("We could not confirm whether the ticket was created. Check the project before trying
 again."), and no second create from that answer is allowed for 15 minutes; a repeat confirm of a created
-proposal replays its result (v3.1, `tests/test_act_round2.py`). Act calls are rate limited per person
-(429, `action.failed` stage `rate`).
+proposal replays its result (v3.1, `tests/test_act_round2.py`). Moving a proposal to in-flight and
+checking that no other proposal for the same answer is in flight or held is one locked step, so two
+proposals confirmed together never both create (v3.2,
+`tests/test_act_round4.py::test_two_proposals_confirmed_together_never_both_create`). Act calls are rate
+limited per person (429); only the first refusal per person per window is recorded (`action.failed`
+stage `rate`), so a loop cannot grow the ledger
+(`::test_only_the_first_over_limit_act_call_per_window_is_ledgered`). The proposal caps hold under
+concurrent requests (the store check and the insert are one locked step) and when an in-flight proposal
+is released back to pending (`::test_the_store_cap_holds_under_concurrent_proposals`,
+`::test_a_released_proposal_respects_the_per_person_cap`); expired unknown-outcome holds are swept
+(`::test_expired_unknown_holds_are_swept`).
+
+**The draft floor (v3.2).** A model-written draft sentence is kept only when at least 80% of its content
+words are in the facts its own tags cite, AND: every capitalised word (a name) is in those facts (a
+sentence opener such as "Currently" excepted); every number is in its anchor sentence (the cited fact
+sentence(s) sharing the most content words with it), so a number changed to another number, even one
+found in a different sentence, fails; and its negation equals every anchor's ("not", "no", "never",
+"won't", "can't", CJK 不/没/无/未/非/别/勿/莫), so a dropped or added negation fails. A failing sentence is
+dropped; with none left, the draft is the cited sentences
+(`test_act_round4.py::test_floor_negation_must_match_its_source`, `::test_floor_a_changed_number_fails`,
+`::test_floor_a_novel_name_fails_outright`,
+`::test_a_model_draft_that_drops_a_negation_falls_back_to_the_cited_sentences`). Limits: names are
+recognised by capitalisation only (a lower-case or CJK name swap is caught only by the 80% rule), and
+numbers written as words are ordinary words. Round 5 (Codex final #1): ONE anchor sentence must hold every name and every number together (a name or number found only in another cited sentence, or in a tied anchor, fails), and each clause's negation must equal that of the anchor clause it overlaps most, so "for Acme but not for Bayfront" cannot become "for Bayfront but not for Acme" (`test_act_round5.py`).
+
+**`/ib/open/<token>` (v3.2).** A per-person limit (30 clicks a minute; 429; first refusal per window
+recorded as `action.failed` stage `rate`, reason `open_rate_limited`; a refused click writes no
+`doc.viewed`). After the write-ahead `doc.viewed`, ANY error in the access check (Gate 1 or the live
+Gate 2 raising) is the same 404 bytes as an unknown token; only a ledger failure is a 503, and it is the
+same for every token (`tests/test_open_route.py::test_an_access_check_error_is_the_unknown_token_404`,
+`::test_open_is_rate_limited_per_person_and_ledgered_once_per_window`). The token map is built once per
+index version (`Index.acl_version`), so a click is one dictionary lookup, not an HMAC per indexed
+document (`::test_a_click_does_not_hash_every_indexed_document`).
 
 **Write-ahead ledger.** New kinds (`models.EVENT_KINDS`, `audit/ledger.py`, `audit/stats.py` totals):
-`action.proposed` (kind, action id, cited document ids and count, sentence count, target project, option
+`action.requested` (v3.2: stage `accepted` before the live source check of a draft or proposal, with no
+`req_id` because ownership is not known yet; stage `decided`, with the document ids a model may see,
+before a draft's model call; stage `replayed` before a repeat confirm of a created proposal returns its
+stored result: `test_act_round4.py::test_draft_ledger_down_is_503_before_any_source_check_or_model_call`,
+`::test_draft_records_accepted_then_decided_before_the_model_then_proposed`,
+`::test_decided_ledger_down_is_503_and_no_model_call`,
+`::test_propose_ledger_down_is_503_before_any_source_check`,
+`::test_a_replay_with_its_receipt_on_record_is_still_ledgered`), `action.proposed` (kind, action id, cited document ids and count, sentence count, target project, option
 count, the model, a SHA-256 digest of the draft or proposal; never its text) is sealed BEFORE a draft or
 proposal is returned; `action.confirmed` (with the digest of exactly what will be sent) BEFORE the create;
 then `action.executed` (the new issue key) or `action.failed` (stage and reason code). `action.rejected`
-records a cancel. Every call writes one record before it answers, including a failed lookup, which is
+records a cancel. Every call that passes the rate limit writes at least one record before it answers,
+including an invalid confirm (`::test_an_invalid_confirm_is_ledgered_before_the_422`) and a failed lookup, which is
 recorded WITHOUT the requested id, so an attempt on someone else's request does not appear in that
 person's receipt. A ledger outage is 503 and nothing happens (`::test_draft_ledger_down_is_503_and_no_draft`,
 `::test_ledger_down_at_propose_or_confirm_is_503_and_nothing_is_created`). Action records carry the
@@ -747,7 +786,9 @@ answer's `req_id`, so they appear in that request's compliance journey and in th
   503 and the issue exists; `action.confirmed` (with the payload digest) is already on record, and a
   repeat confirm of that proposal appends `action.executed` and replays the result (in memory only). This
   is the same gap as the dispatcher's (`apps/dispatcher/dispatcher.py`).
-- A replayed confirm writes no new record (the create is already on record).
+- A replayed confirm writes `action.requested` stage `replayed` (v3.2; before, it wrote nothing).
+- The one-create-at-a-time rule is per person and answer, in one process; two different people acting
+  on their own answers are independent.
 - The opaque token is per document, so two tickets citing the same document show the same token.
 - Proposals live in the IB process's memory: a restart drops them (the confirm is then a 404).
 - The draft's sentences are the answer's sentences as released: a cited document's access is re-checked,
@@ -778,11 +819,20 @@ folder (`writer`, `fileOrganizer`, `organizer`, `owner`; direct, group or compan
 Drive at upload time with one attempt; read access is not enough, and any source error or 429 is a
 refusal (`::test_write_permission_is_required_and_read_is_not_enough`,
 `::test_write_permission_is_read_live_from_drive`, `::test_a_source_error_on_the_live_check_is_a_refusal`).
-`admin_it` may upload into any existing folder. The new file gets no direct permission: it inherits the
+`admin_it` may upload into any existing folder. WRITE is checked live again right before the Drive write,
+and the mock Drive refuses an uploader without WRITE at insert (round 4 Codex B9;
+`::test_write_permission_is_rechecked_just_before_the_drive_write`,
+`test_mock_drive_upload.py::test_an_uploader_without_write_on_the_folder_is_refused_and_nothing_changes`).
+The new file gets no direct permission: it inherits the
 folder's, so who can read it is decided by Drive, and the index learns it from Drive's ACL like any file
 (`::test_restricted_upload_equals_non_existent_for_a_person_without_folder_access`; the live-kit run
 checks the vendor guest gets the file only where the folder lets him read,
 `::test_live_kit_upload_end_to_end`).
+
+**Folder picker (D-34).** `GET /sim/upload-folders` is mounted with the upload and lists ONLY the folders the
+caller may write to, each checked live with the upload's own check; anyone else gets `[]`, byte-identical,
+and an ancestor's name shows only to people who can open it (`test_upload_folders.py`).
+A zero-count `graph.viewed` row (`mode="upload_folders"`, `outcome="checking"`) is written BEFORE any Drive listing or permission read; a ledger failure, or no ledger configured, is a 503 with no Drive call (round 5 Codex #7; `::test_the_accepted_row_is_written_before_any_drive_call`, `::test_a_ledger_failure_is_503_with_no_drive_call`, `::test_no_ledger_is_503_with_no_drive_call_never_a_silent_release`).
 
 **Untrusted bytes.** In this order, all fail closed:
 1. the body is at most 7 MiB, checked on `Content-Length` and while streaming, before JSON parsing or
@@ -803,7 +853,15 @@ checks the vendor guest gets the file only where the folder lets him read,
    `resolve_entities=False` (round 3 review), which is a second, independent layer;
 5. macros: a `vbaProject.bin` member or a macro-enabled content type is refused; nothing is ever executed
    (the readers only read text);
-6. PDF: at most 50 pages; no OCR;
+6. PDF: at most 50 pages; no OCR; .xlsx: before any reader builds its dense grid, max_row × max_column
+   of every sheet is read from the XML (cell and row references, implicit positions, `dimension`,
+   `mergeCell`, `hyperlink`, `comment`) and over 1,000,000 cells in all is refused as `xlsx_dimensions`
+   (round 4 Codex B11; `test_extract_files.py::test_sparse_xlsx_is_refused_before_iterating`,
+   `::test_sparse_xlsx_extent_is_measured_from_the_xml_without_a_reader`); the sheet XML is
+   stream-parsed with expat, so a start tag of any length (a 10 KB padded tag), a `>` inside an attribute
+   value or an `r=` inside another attribute is read as a reader reads it, and XML that does not parse is
+   refused (round 5 Codex #6; `::test_an_xlsx_tag_of_any_length_is_measured_round5`); no memory ceiling
+   is set on the worker, the 15 s kill below stays the backstop;
 7. the reader runs in a separate worker process with a 15 s budget; past it the worker process is killed,
    so a runaway parse cannot keep using CPU or memory in the Brain
    (`::test_a_read_past_the_time_budget_is_killed_with_its_worker`);
@@ -814,7 +872,11 @@ checks the vendor guest gets the file only where the folder lets him read,
    IB process, outside the worker's budget.
 The readers are Walnut's own convert readers, imported, not changed (`packages/convert`). The connector runs
 the same checks again when it fetches an Office, PDF or CSV file; a Markdown or text file is stored
-already cleaned and is read as text, like every other Drive text file.
+already cleaned and is read as text, like every other Drive text file. That download holds at most 5 MiB:
+a `Content-Length` over it is refused before any body byte is read, and the stream is abandoned the moment
+it passes the cap (round 4 Codex B13; `test_connector_drive.py::test_download_is_capped_while_streaming`,
+`::test_download_over_the_cap_by_content_length_reads_no_body`). Text, Markdown and export reads are not
+capped this way.
 
 **Masking.** The extracted text goes through the ingest path, so cards, card security codes, NRIC/FIN and
 IBANs are masked before the index holds it (`::test_card_and_nric_inside_a_docx_are_masked`,
@@ -836,7 +898,9 @@ per person per window is ledgered (`::test_refusals_over_the_rate_limit_write_on
 the stored bytes; never the bytes or the file name) before the Drive call; a ledger failure is a 503 and
 nothing is uploaded. `phase="written"` adds the doc id after the call (its failure is logged only: the
 file is already stored) (`::test_a_successful_upload_is_ledgered_write_ahead`,
-`::test_upload_ledger_down_is_503_and_nothing_is_uploaded`).
+`::test_upload_ledger_down_is_503_and_nothing_is_uploaded`). No ledger configured at all is treated as a
+ledger that is down: `sim.write_ahead` raises instead of returning, so the write is a 503 (round 4 Codex B8;
+`test_sim_add_document.py::test_write_ahead_without_a_ledger_fails_closed`).
 
 **Reset.** `/sim/reset` reloads the platforms, so the files are gone; the index is reconciled, and the
 reset hook `uploads.reset_uploads` drops any uploaded row still indexed and clears the rate window
@@ -893,9 +957,13 @@ check in `create_app` never saw `/sim/*` or `/audit/*` (all of them were on allo
   the live check (`::test_cap_applies_after_the_live_check`).
 - Write-ahead ledger, counts only: `graph.viewed` with `mode="changes"` when a window opens (at most one
   such row per person per 5 s, round 3 I2: a cursor-less or garbage-cursor loop returns only a cursor and
-  adds no rows) and for every non-empty reply. An empty poll inside a window returned nothing and is not
-  ledgered. A ledger failure
+  adds no rows) and for every non-empty reply. A ledger failure
   is a 503 (`::test_polls_are_ledgered_as_changes_not_focus`, `::test_ledger_down_on_a_non_empty_poll_is_503`).
+  A poll with Gate-1 candidates appends a zero-count row (`outcome="checking"`) BEFORE Gate 2 and the
+  read-through, so a fully denied poll is recorded and a ledger outage is a 503 with no source call (round 4
+  Codex B2; `::test_a_poll_is_ledgered_before_its_live_check_even_when_fully_denied`,
+  `::test_ledger_down_before_the_live_check_is_503_with_no_source_call`).
+  Round 5 Codex #8 (rule 4): EVERY poll in a window appends that row before Gate 1, candidates or not, so a ledger outage is the same 503 bytes for a poll with a candidate and one without (Ken's poll still makes no source call; `::test_ledger_down_is_the_same_503_with_or_without_candidates`, `::test_every_poll_is_ledgered_before_gate_1_whatever_its_candidates`). `/audit/stats` `graph_views` leaves out `checking` and `upload_folders` rows (`test_dev_views_hardening.py::test_graph_views_exclude_poll_write_ahead_rows_and_the_upload_folder_picker`).
 - `/sim/reset` re-baselines the tracker after its full reconciliation, so a reset is not a burst of
   "updated" documents, and the note is gone from the source, the index and `/ib/doc`
   (`::test_reset_removes_the_note_and_rebaselines_the_feed`).
@@ -913,7 +981,9 @@ At most 5 posts per person per minute, then 429 (`::test_rate_limit_five_per_min
 write-ahead (round 3 L5) as `ingest.sync`, `detail.reason="sim.add-document"`, `phase="requested"`
 (person, container, kind, the text's length and SHA-256, never the text) before the source call, and
 `phase="written"` with the doc id after; a ledger failure is a 503 and nothing is posted
-(`::test_a_successful_post_is_ledgered_write_ahead`, `::test_add_document_ledger_down_is_503_and_nothing_is_posted`). The IB never
+(`::test_a_successful_post_is_ledgered_write_ahead`, `::test_add_document_ledger_down_is_503_and_nothing_is_posted`;
+with no ledger configured it is the same 503, round 4 Codex B8,
+`::test_add_document_without_a_ledger_is_503_and_nothing_is_posted`). The IB never
 indexes the posted text directly: the mock's signed webhook makes the ingestor re-fetch and mask it, so
 card numbers and NRIC are masked in the index, the excerpt and the answer, and never reach the ledger
 (`test_live_growth.py::test_sensitive_values_in_a_note_are_masked_everywhere`). The note is answerable at
@@ -1067,3 +1137,33 @@ to any source.
 - The label rule fails closed for a label written after its number ("0.4% for ID").
 - Every model-path claim above is tested with a fake model chain; Hy3 has not been run against this
   feature in the cloud session.
+
+**Round 4 fixes (Codex review B1-B6, B12; `docs/finals/reviews/round4_dispositions.md`).**
+- `.pptx`: `ptext` removes XML-invalid control characters BEFORE the formula guard, and the chart
+  workbook writes every string cell with `write_string`, so `{=...}`, `=`, `+`, `-`, `@` and the tab/CR
+  forms are always text, NUL-prefixed ones included (`test_deliverables.py::test_r4_b1_*`).
+- `.pptx` speaker notes are per slide type: value slides say what their values were matched to; the title
+  and Sources slides make no numeric claim (`::test_r4_b14_*`).
+- Export write-ahead: a `deliverable.requested` row with `export_format` is appended before Gate 2 and the
+  source read; a ledger failure is a 503 with nothing read (`::test_r4_b2_*`).
+- After any model call, the fallback included, the sources are authorised again; a model title is
+  re-checked against what is left, else the fixed title (`::test_r4_b3_*`, `::test_r4_b4_*`).
+- Binding: a number in an analysis sentence must sit in ONE source row or sentence clause with its own
+  entity and metric words; a chart series name, y-axis label or column label taken from the source must
+  be that value's column header, cell words or prose clause. Swaps are dropped
+  (`test_deliverables_verify.py::test_r4_b5_*`, `::test_r4_b6_*`). Not bound: identifiers and dates in a
+  sentence (presence only).
+- Round 5 (Codex final #2, #3): a sentence's number is also bound to its clause's SHORT content words ("gas", "oil", "fee", "tax", "net", "SG"; a stop-word list replaces the 4-letter cut), and a chart series name taken from the sources is decided over all its points' evidence, then EVERY point must be bound to it in its own row or sentence, so a mixed-evidence "Revenue" series cannot release cost values (`test_deliverables_round5.py`).
+- Bodies over 4 KB are a 413 (Content-Length or while streaming), and the rate limit runs before the body
+  is read (`::test_r4_b12_*`).
+
+### 15.15 Round 4: web proxy, preflight board, login chips and demo kit (Opus web/kit review)
+
+Details and tests: `docs/finals/reviews/round4_dispositions.md`, section "Opus web kit: proxy, preflight, login chips, demo kit".
+
+- `/present/preflight` is served only on a loopback Host AND to a session the IB confirms through `GET /auth/whoami`; otherwise, and always when `IB_DEPLOYED=1`, it is the one 404. The Lighthouse `web` service now sets `IB_DEPLOYED=1` (`app/present/preflight/page.tsx`; `tests/e2e/preflight.spec.ts`).
+- Rule 4 before sign-in: the login chips describe each persona by role only and name no channel, space, project, drive or folder, EN and zh (`lib/personas.ts`, `lib/i18n/user.ts`; checked against `world.json` by `tests/e2e/user.spec.ts`).
+- The open link (`/api/ib/ib/open/<token>`) is relayed only for a clicked top-level navigation (`Sec-Fetch-Dest: document`, `Sec-Fetch-Mode: navigate`, `Sec-Fetch-User: ?1`) when the browser sends Sec-Fetch headers; anything else is the one 404 (`app/api/ib/[...path]/route.ts`; `tests/e2e/act.spec.ts`).
+- `demo_up.sh` sources `.env.ib.local` only inside the Internal Brain's subshell; the other processes get only the shared values they must agree on (read once by bash in a throw-away subshell that prints only those keys, so the mocks, the seeder and the Brain hold the same strings). Next, the mock platforms, the seeder and the engine never receive the TokenHub key or the IB's signing keys from the key file, and `demo_up.sh` also removes `TOKENHUB_API_KEY` from their environment when the parent shell has it (round-5 Opus #2, #11). Other variables the parent shell holds are inherited as usual.
+- `hy3_check.py` refuses a `TOKENHUB_BASE` that is not https (plain http only to loopback) or that carries credentials, before the key is sent (exit 2; `tests/test_round2_kit.py`).
+- `fill_template.py` uses the server's CSV formula prefixes (full-width forms and Unicode spaces included) plus a leading double quote (`tests/test_round2_kit.py`).

@@ -3,16 +3,18 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 // The guided tours: a tiny module store (useSyncExternalStore) plus a page-action channel.
 //
-// Two tours, one per mode (components/tour/steps.ts holds the steps):
+// Two tours, one per mode (components/tour/steps.ts holds the steps). They are separate (DECISIONS
+// D-36): neither one starts, resumes or offers the other; each offers itself on first entry to its mode.
 //   user  "Try it", 4 steps (~45 s): sign in as Jordan, ask, open citation [1], Ken's two refusals;
-//         then a 4-item checklist card.
+//         then a 3-item checklist card.
 //   dev   5 steps: Mission control, the journey of your last answer, the knowledge graph, the Trust
-//         centre, and (compliance) analytics + audit verify.
+//         centre, and (compliance) analytics + audit verify; Finish on the last step ends it.
 //
 // Storage (every access in try/catch; blocked storage still runs the tour, it just forgets):
 //   sessionStorage ib-tour            the running tour (survives a full reload)
 //   sessionStorage ib-tour-last-req   the request the tour asked, for the dev tour's journey step
-//   localStorage   ib-tour-offer      'dismissed' once the first-visit offer is answered
+//   localStorage   ib-tour-offer      {"user":true,"dev":false}: that mode's first-visit offer was answered;
+//                                      the legacy value 'dismissed' (tests, the video recorder) means both
 //   localStorage   ib-tour-done       {"user":true,"dev":false}; the legacy value '1' means both
 //   localStorage   ib-tour-checklist  {"asked":true,...}
 
@@ -124,13 +126,14 @@ function tourForPath(path: string): TourId {
  *    From the sign-in page, step 0 signs in as Jordan straight away.
  */
 export function startTour(arg: number | TourId = 0) {
-  dismissOffer();
   if (typeof arg === 'number') {
     const path = typeof window === 'undefined' ? '/' : window.location.pathname;
     const tour = tourForPath(path);
+    dismissOffer(tour);
     const step = Math.max(0, Math.min(arg, TOUR_LENGTH[tour] - 1));
     set({ open: true, tour, step, entry: path === '/login' && tour === 'user' && step === 0 ? 'signin' : 'start', done: [] });
   } else {
+    dismissOffer(arg);
     set({ open: true, tour: arg, step: 0, entry: 'start', done: [] });
   }
 }
@@ -181,14 +184,29 @@ export function markTourDone(t: TourId) {
   emit();
 }
 
-/** One-time gentle offer, remembered per browser. No storage: do not nag on every page. */
-export function offerDismissed(): boolean {
-  if (!store('local')) return true;
-  return read('local', OFFER_KEY) === 'dismissed';
+function offerMap(): Record<TourId, boolean> {
+  const raw = read('local', OFFER_KEY);
+  if (raw === 'dismissed') return { user: true, dev: true };
+  try {
+    const v = raw ? (JSON.parse(raw) as Partial<Record<TourId, boolean>>) : {};
+    return { user: !!v.user, dev: !!v.dev };
+  } catch {
+    return { user: false, dev: false };
+  }
 }
 
-export function dismissOffer() {
-  write('local', OFFER_KEY, 'dismissed');
+/** One-time gentle offer per tour, remembered per browser. No storage: do not nag on every page. */
+export function offerDismissed(t: TourId): boolean {
+  if (!store('local')) return true;
+  return offerMap()[t];
+}
+
+/** Answer one tour's first-visit offer ("Not now", Take the tour, Skip). The other tour's offer is untouched. */
+export function dismissOffer(t: TourId) {
+  const m = offerMap();
+  if (m[t]) return;
+  m[t] = true;
+  write('local', OFFER_KEY, JSON.stringify(m));
   emit();
 }
 
@@ -199,18 +217,19 @@ export function useOfferOpen(t: TourId): boolean {
       listeners.add(l);
       return () => listeners.delete(l);
     },
-    () => !offerDismissed() && !isTourDone(t),
+    () => !offerDismissed(t) && !isTourDone(t),
     () => false,
   );
 }
 
 /* ------------------------------------------------------------ the user tour's checklist */
 
-export type ChecklistItem = 'asked' | 'source' | 'identical' | 'dev';
-export const CHECKLIST: ChecklistItem[] = ['asked', 'source', 'identical', 'dev'];
+// User mode only: switching to Developer mode is not an item (the tours are separate, D-36).
+export type ChecklistItem = 'asked' | 'source' | 'identical';
+export const CHECKLIST: ChecklistItem[] = ['asked', 'source', 'identical'];
 export type Checklist = Record<ChecklistItem, boolean>;
 
-const EMPTY_CHECKS: Checklist = { asked: false, source: false, identical: false, dev: false };
+const EMPTY_CHECKS: Checklist = { asked: false, source: false, identical: false };
 let checks: Checklist | null = null;
 
 function loadChecks(): Checklist {

@@ -130,8 +130,9 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             totals["syncs"] += 1
         elif k == "map.viewed":
             totals["map_views"] += 1
-        elif k == "graph.viewed":
-            totals["graph_views"] += 1
+        elif k == "graph.viewed":   # round 5: poll write-ahead and folder-picker rows are not views
+            if data.get("outcome") != "checking" and data.get("mode") != "upload_folders":
+                totals["graph_views"] += 1
         elif k == "doc.viewed":
             totals["doc_views"] += 1
         elif k == "trace.viewed":
@@ -140,8 +141,8 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             totals["logins"] += 1
         elif k.startswith("action."):
             totals["actions_" + k.split(".", 1)[1]] += 1
-        elif k.startswith("deliverable."):
-            totals["deliverables_" + k.split(".", 1)[1]] += 1
+        elif k.startswith("deliverable.") and not (k == "deliverable.requested" and data.get("export_format")):
+            totals["deliverables_" + k.split(".", 1)[1]] += 1   # round 4 B2: export rows are not requests
     allowed = sum(v for key, v in gate2_verdicts.items() if key in ALLOWED_VERDICTS)
     gate2_total = sum(gate2_verdicts.values())
     finished = totals["answered"] + totals["refused"]

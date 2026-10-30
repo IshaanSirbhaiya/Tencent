@@ -131,9 +131,9 @@ def _tag_of(ctx: str, title: str) -> str:
 _NOTE = re.compile(r"(Multi-currency accounts for Indonesian SME customers are priced at a 0\.4% FX margin\.)")
 
 
-def _chain(captured, deliver, models=("hy3",), fail=()):
-    """Answers with the pricing sheet's Notes sentence; deliverables with ``deliver(kind, ctx)``.
-    ``fail``: model names that raise."""
+def _chain(captured, deliver, models=("hy3",), fail=(), answer=None):
+    """Answers with the pricing sheet's Notes sentence (or ``answer(ctx)``); deliverables with
+    ``deliver(kind, ctx)``. ``fail``: model names that raise."""
     from databridge_harness import FakeBackend, Harness
 
     def respond_for(name):
@@ -148,6 +148,8 @@ def _chain(captured, deliver, models=("hy3",), fail=()):
                 kind = ("chart" if "into a chart" in system else
                         "table" if "comparison table" in system else "analysis")
                 return deliver(kind, ctx)
+            if answer is not None:
+                return answer(ctx)
             for line in ctx.splitlines():
                 m = _NOTE.search(line)
                 if m:
@@ -663,8 +665,12 @@ def test_kinds_are_registered_parsed_and_counted(tmp_path):
         assert le.event is not None and le.event.kind == le.kind
     st = compute_stats(svc.ledger.events(), now=datetime.now(timezone.utc) + timedelta(seconds=5))
     t = st["totals"]
+    # round 4 B2: the export writes its own ``deliverable.requested`` (``export_format`` set) ahead
+    # of its live re-check; the stat counts CREATE requests only (exports: deliverables_exported)
     assert (t["deliverables_requested"], t["deliverables_created"], t["deliverables_exported"],
             t["deliverables_failed"]) == (1, 1, 1, 1)
+    reqs = _events(svc, "deliverable.requested")
+    assert [r.export_format for r in reqs] == [None, "csv"]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -852,3 +858,217 @@ def test_a_build_error_writes_failed_after_requested_and_answers_503(tmp_path, m
     assert fail.deliverable_id == req.deliverable_id and fail.reason_code == "build_RuntimeError"
     assert fail.stage == "generate" and not _events(svc, "deliverable.created")
     assert "builder bug" not in r.text
+
+
+# ------------------------------------------------------------------------------------------------
+# Round 4 (docs/finals/reviews/round4_codex_cloud_work.md): B1, B2, B3, B4, B12
+# ------------------------------------------------------------------------------------------------
+_R4_EVIL = ("\x00{=SUM(1,1)}", "{=SUM(1,1)}", "\x01=1+1", "=1+1", "+1+1", "-1+1", "@SUM(A1)",
+            "\t=1+1", "\r=1+1", "\x0b{=A1}", " {=A1}")
+
+
+def _r4_workbook_cells(data: bytes) -> list:
+    openpyxl = pytest.importorskip("openpyxl")
+    cells = []
+    for blob in _chart_xlsx_blobs(data):
+        xml = _zip_xml(blob)
+        assert not re.search(r"<f[\s>/]", xml), xml[:400]          # no formula, array or not
+        wb = openpyxl.load_workbook(io.BytesIO(blob))
+        for ws in wb.worksheets:
+            cells += [c for row in ws.iter_rows() for c in row if c.value is not None]
+    return cells
+
+
+def _r4_chart(labels):
+    return {"type": "bar", "x_label": "", "y_label": "", "unit": "number", "currency": None,
+            "series": [{"name": lab, "points": [{"x": lab, "value": i + 1, "raw": str(i + 1),
+                                                 "tag": "C1"}]} for i, lab in enumerate(labels)]}
+
+
+def test_r4_b1_control_characters_are_removed_before_the_formula_guard():
+    if not X.pptx_available():
+        pytest.skip("python-pptx not installed")
+    for s in _R4_EVIL:
+        out = X.ptext(s)
+        assert not re.search(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", out)
+        assert out.startswith("'") or not (X._TRIGGER.match(out) or X._PPTX_TRIGGER.match(out)), (s, out)
+    data = X.build_pptx("chart", _r4_chart(_R4_EVIL), [], title="t", req_id="ab" * 16,
+                        as_of=datetime(2026, 10, 30, tzinfo=timezone.utc))
+    cells = _r4_workbook_cells(data)
+    assert cells and all(c.data_type != "f" for c in cells)
+    for c in cells:
+        if isinstance(c.value, str):
+            assert not c.value.startswith(("=", "{=", "+", "-", "@", "\t", "\r")), c.value
+
+
+def test_r4_b1_chart_workbook_writes_every_string_as_text_even_unguarded(monkeypatch):
+    """The workbook layer on its own: with ``ptext`` bypassed, ``{=...}``, ``=`` and the rest are
+    still written as text cells (``write_string``), never a formula or an array formula."""
+    if not X.pptx_available():
+        pytest.skip("python-pptx not installed")
+    monkeypatch.setattr(X, "ptext", lambda s: re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", str(s)))
+    data = X.build_pptx("chart", _r4_chart(_R4_EVIL), [], title="t", req_id="ab" * 16,
+                        as_of=datetime(2026, 10, 30, tzinfo=timezone.utc))
+    cells = _r4_workbook_cells(data)
+    texts = [c.value for c in cells if isinstance(c.value, str)]
+    assert "{=SUM(1,1)}" in texts and "=1+1" in texts            # kept, as plain text
+    assert all(c.data_type != "f" for c in cells)
+
+
+_R4_FEE = "The SG FX conversion fee for multi-currency accounts is 0.35% on every plan."
+_R4_Q = "SG FX conversion fee and Indonesian SME multi-currency FX margin"
+
+
+def _r4_answer(ctx):
+    """An answer that cites BOTH the pricing sheet (Notes) and the fee schedule, verbatim."""
+    out = []
+    for line in ctx.splitlines():
+        tag = line.split("]")[0][1:] if line.startswith("[C") else ""
+        m = _NOTE.search(line)
+        if tag and m:
+            out.append(f"{m.group(1)[:-1]} [{tag}].")
+        elif tag and _R4_FEE[:-1] in line:
+            out.append(f"{_R4_FEE[:-1]} [{tag}].")
+    return " ".join(dict.fromkeys(out))
+
+
+def _r4_world(tmp_path, deliver):
+    holder: dict = {}
+
+    def d(kind, ctx):
+        return deliver(kind, ctx, holder["svc"])
+    app, svc = _world(tmp_path, chain=_chain([], d, answer=_r4_answer))
+    holder["svc"] = svc
+    jd = _c(app, svc, "jdoe")
+    ans = _ask(jd, _R4_Q)
+    assert {c["doc_id"] for c in ans["citations"]} >= {"slack:p1", "jira:FX-1"}, ans
+    return app, svc, jd, ans["request_id"]
+
+
+def test_r4_b3_a_title_drawn_from_a_source_revoked_mid_generation_is_not_released(tmp_path):
+    def deliver(kind, ctx, svc):
+        fee, sheet = _tag_of(ctx, "FX fee schedule"), _tag_of(ctx, "SME pricing by market")
+        svc.connectors["jira"].readers["jira:FX-1"].discard("jdoe")       # revoked mid-call
+        return json.dumps({"title": "SG FX conversion fee", "sections": [
+            {"heading": "Key facts", "sentences": [
+                {"text": _R4_FEE, "tags": [fee]},
+                {"text": "Indonesian SME customers are priced at a 0.4% FX margin.",
+                 "tags": [sheet]}]}]})
+
+    app, svc, jd, rid = _r4_world(tmp_path, deliver)
+    d = _deliver(jd, rid, "analysis").json()
+    assert d["status"] == "ready" and d["generated"] == "model", d
+    assert all(c["doc_id"] != "jira:FX-1" for c in d["citations"])
+    assert d["title"] == "Analysis from your sources"                 # not the revoked source's
+    assert "conversion" not in json.dumps(d).lower()
+
+
+def test_r4_b4_the_deterministic_fallback_is_reauthorised_after_a_model_call(tmp_path):
+    def deliver(kind, ctx, svc):
+        svc.connectors["slack"].readers["slack:p1"].discard("jdoe")       # revoked mid-call
+        return "this is not JSON"                                         # invalid output
+
+    app, svc, jd, rid = _r4_world(tmp_path, deliver)
+    for kind in ("table", "chart"):
+        d = _deliver(jd, rid, kind).json()
+        assert d["generated"] != "model", d
+        assert all(c["doc_id"] != "slack:p1" for c in d["citations"]), (kind, d)
+        blob = json.dumps(d)
+        assert "0.4% FX margin" not in blob and "SME pricing" not in blob, (kind, d)
+        assert "slack:p1" not in _events(svc, "deliverable.created")[-1].doc_ids
+
+
+def test_r4_b2_export_writes_ahead_before_gate2_and_the_source_read(tmp_path, monkeypatch):
+    from databridge_ib import authz
+    app, svc = _world(tmp_path)
+    jd = _c(app, svc, "jdoe")
+    did = _deliver(jd, _ask(jd)["request_id"], "table").json()["deliverable_id"]
+    order: list = []
+    real_auth = authz.authorize
+
+    def spy(*a, **k):
+        order.append("authorize")
+        return real_auth(*a, **k)
+    monkeypatch.setattr(authz, "authorize", spy)
+    real = _fail(svc, {"deliverable.requested"})
+    r = _export(jd, did)
+    assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+    assert order == []                                   # no Gate 2, no source read, no bytes
+    assert "content-disposition" not in r.headers
+
+    def append(ev):
+        order.append(ev.kind)
+        return real(ev)
+    svc.ledger.append = append
+    r = _export(jd, did)
+    assert r.status_code == 200
+    assert [o for o in order if o == "authorize" or o.startswith("deliverable.")] == [
+        "deliverable.requested", "authorize", "deliverable.exported"]
+    req = _events(svc, "deliverable.requested")[-1]
+    assert req.deliverable_id == did and req.export_format == "csv" and not req.model_planned
+
+
+def test_r4_b12_oversized_bodies_and_the_rate_limit_come_before_the_body_is_read(tmp_path,
+                                                                                monkeypatch):
+    from databridge_ib.deliverables import routes as R
+    from databridge_ib.deliverables import service as S
+    app, svc = _world(tmp_path)
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    cap = getattr(R, "MAX_BODY_BYTES", 4096)
+    big = json.dumps({"req_id": rid, "kind": "table", "pad": "x" * (cap + 10)})
+    for path in ("/ib/deliverables", "/ib/deliverables/export"):
+        r = jd.post(path, content=big, headers={"Content-Type": "application/json"})
+        assert r.status_code == 413, (path, r.status_code)
+        assert "x" * 50 not in r.text
+
+    def gen():                                  # no Content-Length: capped while it is read
+        yield b'{"req_id": "' + rid.encode() + b'", "kind": "table", "pad": "'
+        for _ in range(64):
+            yield b"x" * 1024
+        yield b'"}'
+    r = jd.post("/ib/deliverables", content=gen(), headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+    # the rate limit is checked before the body is read: over the limit is 429 for a body that
+    # is never read or parsed
+    monkeypatch.setattr(S, "RATE_N", 1)
+    app2, svc2 = _world(tmp_path / "b")
+    jd2 = _c(app2, svc2, "jdoe")
+    rid2 = _ask(jd2)["request_id"]
+    assert _deliver(jd2, rid2, "table").status_code == 200
+    read: list = []
+    real_body = getattr(R, "_read_capped", None)
+
+    async def spy(request):
+        read.append(1)
+        return await real_body(request)
+    monkeypatch.setattr(R, "_read_capped", spy, raising=False)
+    r = jd2.post("/ib/deliverables", content=b"{not json",
+                 headers={"Content-Type": "application/json"})
+    assert r.status_code == 429 and read == []
+
+
+def test_r4_b14_speaker_notes_claim_only_what_each_slide_type_checked(tmp_path):
+    """Round 4 B14: value slides say each value was matched to its source cell or line; the title
+    and Sources slides make no numeric-verification claim."""
+    if not X.pptx_available():
+        pytest.skip("python-pptx not installed")
+    import pptx
+    app, svc = _world(tmp_path)
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    for kind, value_note in (("chart", X.NOTES_CHECKED), ("table", X.NOTES_TABLE)):
+        d = _deliver(jd, rid, kind).json()
+        r = _export(jd, d["deliverable_id"], "pptx")
+        assert r.status_code == 200, (kind, r.text)
+        slides = list(pptx.Presentation(io.BytesIO(r.content)).slides)
+        notes = [s.notes_slide.notes_text_frame.text for s in slides]
+        title_n, value_ns, sources_n = notes[0], notes[1:-1], notes[-1]
+        assert slides[-1].shapes.title.text == "Sources"
+        for plain in (title_n, sources_n):
+            assert X.NOTES_PLAIN in plain, (kind, plain)
+            assert "matched" not in plain and "number" not in plain.lower(), (kind, plain)
+        assert value_ns
+        for n in value_ns:
+            assert value_note in n and X.NOTES_PLAIN not in n, (kind, n)
+            assert "cell or line" in n

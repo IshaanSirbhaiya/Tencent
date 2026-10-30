@@ -261,7 +261,7 @@ Unchanged shape. A projection failure is now a ledgered 500 (it used to be an un
 
 | Kind | Fields (besides `kind`, `event_time`, `synthetic_replay`) |
 |---|---|
-| `graph.viewed` | `sub`, `mode` (`overview`/`focus`/`search`/`openable`), `outcome` (`ok`/`not_found`), `nodes_returned`, `docs_returned`, `edges_returned`, `docs_checked`, `policy_version` |
+| `graph.viewed` | `sub`, `mode` (`overview`/`focus`/`search`/`openable`/`changes`/`upload_folders`), `outcome` (`ok`/`not_found`/`checking`), `nodes_returned`, `docs_returned`, `edges_returned`, `docs_checked`, `policy_version`. `checking` (zero counts) is a write-ahead row: one for every live poll in a window before Gate 1, and one for every folder-picker call before any Drive call (round 5). `/audit/stats` `totals.graph_views` leaves out `checking` rows and `upload_folders` rows. |
 | `doc.viewed` | `sub`, `doc_id` (as requested, max 300 chars), `with_query`, `policy_version` (written before the access decision) |
 | `trace.viewed` | `sub`, `outcome`, `citations_returned` |
 
@@ -693,6 +693,68 @@ Code: `actions.py`, `app.py`, `models.py` (`action.failed` stage `rate`), web pr
   changed" text and every 503 to "Nothing was sent or created"; it must show `message` for
   `error: "outcome_unknown"` and must not claim nothing was created on a 503 after Confirm.
 
+## Act v3.2 (30 Oct, round-4 Codex review fixes)
+
+Code: `actions.py`, `app.py` (`/ib/act/*`, `/ib/open` only), `models.py` + `audit/ledger.py` (one new
+kind), mock `state.py`/`jira.py`, web `components/user/ActSheet.tsx`, `lib/i18n/act.ts`. Tests:
+`tests/test_act_round4.py`, `tests/test_open_route.py`,
+`apps/mock_platforms/tests/test_mock_jira_create.py::test_an_empty_create_acl_means_nobody_may_create`,
+`tests/e2e/act.spec.ts`. Findings: `docs/finals/reviews/round4_codex_cloud_work.md` A1-A9, R1;
+dispositions in `round4_dispositions.md`.
+
+- **New ledger kind `action.requested`** (write-ahead, A1). Fields: `sub`, `action_id`, `action`,
+  `stage`, `doc_ids`, `model_planned`, `policy_version`.
+
+  | `stage` | Written | `req_id` |
+  |---|---|---|
+  | `accepted` | after the rate limit, BEFORE the live source check of a draft or a proposal | `null` (ownership not yet known) |
+  | `decided` | BEFORE a draft's model call; `doc_ids` = the documents the model may see | the answer's |
+  | `replayed` | BEFORE a repeat confirm of a created proposal (receipt on record) returns its stored result | the answer's |
+
+  The `action_id` is the same as the later `action.proposed` (the proposal id for a ticket). A ledger
+  failure at any stage is the 503 and nothing after it runs (no Gate 2, no model, no stored result).
+  `/audit/stats` `kinds` counts `action.requested`.
+- **Invalid confirm** (unknown project, empty or over-long summary): `action.failed` stage `confirm`,
+  reason `invalid`, then the 422 as before. The proposal stays usable.
+- **Rate limit records.** Over the limit is still `429 {"detail": "too many requests"}`, but only the
+  FIRST refusal per person per window writes `action.failed` stage `rate`; later refusals write nothing
+  (and no `action.requested`).
+- **One create at a time per answer.** A confirm while ANOTHER proposal of the same person for the same
+  answer is in flight (or held unknown) is `409 outcome_unknown` (ledger reason `outcome_unknown_hold`);
+  that proposal stays pending and can be confirmed once the other finishes.
+- **Caps.** The store check and the insert are one locked step; a proposal released back to pending
+  trims that person's other pending proposals to 5 (oldest first). Expired 15-minute unknown-outcome
+  holds are swept.
+- **Draft floor.** A model draft sentence also fails on a name not in its cited facts, a number not in
+  its anchor fact sentence, or a negation that differs from its anchor (SECURITY §15.11). The response
+  shape is unchanged (a fallback draft has `model.fallback_used: true`).
+- **`GET /ib/open/{token}`.** Per person 30 a minute: `429 {"detail": "too many requests"}` (first
+  refusal per window: `action.failed` stage `rate`, reason `open_rate_limited`, `action: null`; no
+  `doc.viewed`). After `doc.viewed`, any error in the access check is the one
+  `404 {"detail": "not found"}`; 503 only when the ledger is down. A click no longer hashes every indexed
+  id (the token map is rebuilt when `Index.acl_version` moves).
+- **Ticket description.** The link rule is stated once and the request id moves to a closing line:
+
+  ```
+  Follow-up created from an Internal Brain answer.
+
+  Sources (each link opens only for people allowed to open that source):
+
+  Source 1: <IB_OPEN_LINK_BASE>/ib/open/<32 hex>
+
+  Reference: <req_id>
+  ```
+
+  The web mock (`lib/mock/extra/act.ts`) writes the same text, ending with `Reference: <req_id>` (fixed after
+  round 4; round-5 Opus #5c).
+- **Web.** `failOf` reads the 409 body: `error: "outcome_unknown"` shows the unknown-outcome sentence on
+  propose as on confirm (never "Nothing was changed"); a 429 shows "Too many requests in a short time. Try
+  again in a minute." (no counts). When a ticket can't be made, the sheet header drops "Create…" and
+  "Nothing is created until you confirm", and one `role="status"` sentence says "You can't create a
+  follow-up ticket from this answer. You can still draft a reply." with a Draft a reply button (no
+  reason, rule 4). The draft sheet is titled "Reply draft" (the "Draft for your review" label appears
+  once), and a quoted chat line's speaker handle is shown as the persona's name. EN and zh strings.
+
 ## Demo-proof features (v4, 30 Oct): live growth, add a document, absence check, engine refresh (D-24)
 
 Plan: `docs/finals/live_growth/PLAN.md`. Security: `docs/tencent/SECURITY.md` §15.13. Code: `live.py`,
@@ -703,7 +765,12 @@ Plan: `docs/finals/live_growth/PLAN.md`. Security: `docs/tencent/SECURITY.md` §
 `IB_DEPLOYED=1`. Off, they are not mounted: every call is the framework's unknown-route 404
 (`{"detail": "Not Found"}`), byte-identical to any other unknown path, signed in or not. Only
 `databridge/scripts/demo_up.sh` sets the flag (with `IB_ENGINE_URL`, `IB_ENGINE_TOKEN` for the engine
-refresh). `POST /sim/upload-file` (contract `uploads.md`) follows the same two switches.
+refresh). `POST /sim/upload-file` (contract `uploads.md`) follows the same two switches, and so does
+`GET /sim/upload-folders` (D-34, `uploads.md` §9): the upload sheet's folder picker, `[{id, path}]` of
+ONLY the folders the caller may upload into now (checked live like the upload), `[]` for anyone else,
+10 per minute, ledgered as `graph.viewed` `mode="upload_folders"` (an `outcome="checking"` row before any
+Drive call, then `ok` before the reply; a ledger failure or no ledger is a 503 with no Drive call, round 5
+Codex #7); proxied for the main session only.
 
 **`GET /ib/status`** gains `"demo_features": true | false` (true only when the routes are mounted). The web
 app shows the demo controls only when this is true AND the viewer turned "Demo features" on in Settings
@@ -731,8 +798,11 @@ and Compare slots (proxy: already in `ALLOWED` and `SLOT_ALLOWED`).
 - Deletions and revocations are never sent; the next full `/ib/graph` load shows them.
 - A change the caller cannot open is indistinguishable from no change (same keys, empty lists, the same
   cursor for the same clock). No counts, no sequence numbers, no reasons.
-- Ledger: `graph.viewed` with `mode: "changes"` (counts only) when a window opens and for each non-empty
-  reply, before the reply. 401 / 403 / 503 as usual; never a 404 while mounted.
+- Ledger: `graph.viewed` with `mode: "changes"` (counts only) when a window opens (at most once per
+  person per 5 s); for EVERY poll in a window, an `outcome: "checking"` row with zero counts before
+  Gate 1 (round 5 Codex #8: a ledger outage is the same 503 whether or not the poll has candidates;
+  the row is not a source call, so Ken's poll still makes none); and for each non-empty reply, a row
+  before the reply. 401 / 403 / 503 as usual; never a 404 while mounted.
 - Client: poll every 2 s (Stage theme) or 3 s; stop on 401/403/404 and while the tab is hidden or the
   viewer paused; back off on 503 (x2 up to 30 s).
 
@@ -825,7 +895,8 @@ proxy relays `content-disposition` when it matches
 | 401 / 403 | | no valid session / not an employee role |
 | 404 | `{"detail": "not found"}` | ONE answer for: flag off, someone else's request, an unknown or malformed id, a refused or failed answer, an answer none of whose cited documents the person can open now, someone else's / unknown / expired deliverable (90 min), an export where nothing passes the re-check |
 | 422 | | a body with an unknown key (any identity field), a bad `kind`/`chart`/`format`; a `format` the (owned) deliverable does not offer. The owner check runs first, so a stranger gets the 404 |
-| 429 | `{"detail": "too many requests"}` | more than 10 creates or 20 exports per person per minute (recorded as `deliverable.failed`, stage `rate`, no ids) |
+| 413 | `{"detail": "too large"}` | round 4 B12: a body over 4 KB (by `Content-Length`, or while it streams); never parsed |
+| 429 | `{"detail": "too many requests"}` | more than 10 creates or 20 exports per person per minute (recorded as `deliverable.failed`, stage `rate`, no ids). Round 4 B12: checked before the body is read |
 | 503 | `{"error": "temporarily unavailable"}` | the ledger could not record the call (nothing shown or exported), the sources could not be checked, a file over its cap, a `.pptx` build error |
 
 ## POST /ib/deliverables
@@ -896,7 +967,7 @@ Response 200: the file bytes. Headers: `content-type` `text/csv; charset=utf-8` 
 
 | Kind | Fields (besides `kind`, `req_id`, `event_time`, `synthetic_replay`) |
 |---|---|
-| `deliverable.requested` | `sub`, `deliverable_id`, `deliverable` (kind), `model_planned`, `policy_version` |
+| `deliverable.requested` | `sub`, `deliverable_id`, `deliverable` (kind), `model_planned`, `policy_version`, `export_format` (round 4 B2: `csv`/`pptx` on an EXPORT's write-ahead row, appended before its live re-check; `null` on a create). `/audit/stats` `deliverables_requested` counts create requests only (rows with no `export_format`); exports are counted by `deliverables_exported` |
 | `deliverable.created` | `sub`, `deliverable_id`, `deliverable`, `status`, `generated`, `model`, `prompt_version`, `cited_docs`, `doc_ids`, `context_chars`, `context_digest` (SHA-256 of what the model was shown), `items_*`/`values_*`/`names_dropped` counts, `fallback`, `digest` (SHA-256 of the canonical JSON of the response's `deliverable_id, kind, status, title, generated, model, check, content, citations`), `policy_version` |
 | `deliverable.exported` | `sub`, `deliverable_id`, `deliverable`, `format` (`csv`/`pptx`), `bytes`, `digest` (SHA-256 of the file), `items_dropped_on_recheck` |
 | `deliverable.failed` | `sub`, `deliverable_id?`, `deliverable?`, `stage` (`lookup`/`rate`/`generate`/`export`), `reason_code` (ledger only). A failed lookup or a rate refusal has no `req_id` and no `deliverable_id` |

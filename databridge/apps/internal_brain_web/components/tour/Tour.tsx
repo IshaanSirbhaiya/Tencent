@@ -6,6 +6,11 @@
 //   <TourButton/>   the header button (shell): starts the tour for the CURRENT mode.
 //   <TourOffer/>    kept for the shell's import; the offer is now a toast drawn by the overlay.
 //
+// The two tours are separate (docs/finals/DECISIONS.md D-36). Each mode offers its own tour the first
+// time a signed-in person is in it (User mode: /, /compare, /history, /settings; Developer mode: any
+// /dev page), with its own "answered" flag. Neither tour hands over to the other, and a tour left
+// open is closed when the page moves to the other mode, so a mode switch never resumes it.
+//
 // Mechanics: a positioned ring whose huge box-shadow dims the page around a cut-out (no library,
 // pointer-events none, so the real page stays usable underneath); a non-modal card with the step
 // counter, Back / Do it for me / Next / Skip and ← → Esc; the card is portalled into an open side
@@ -14,6 +19,7 @@ import { ArrowLeft, ArrowRight, Check, Compass, Loader2, X } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { usePresenter } from '@/components/presenter/store';
 import { usePrefs, useSession } from '@/components/shell/Providers';
 import { Button, IconButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
@@ -48,6 +54,14 @@ const MISSING_AFTER_MS = 10_000;
 const ACT_WAIT_MS = 30_000;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const q = (sel: string) => document.querySelector<HTMLElement>(sel);
+
+/** The mode a page belongs to by its route alone: /dev/* is Developer mode; /, /compare, /history,
+ *  /settings are User mode. Others (/login, /present, the legacy /map, /audit, /sim) belong to neither. */
+function routeMode(path: string): TourId | null {
+  if (path === '/dev' || path.startsWith('/dev/')) return 'dev';
+  if (/^\/(compare|history|settings)?(\/.*)?$/.test(path)) return 'user';
+  return null;
+}
 
 function visible(el: Element | null): el is HTMLElement {
   if (!el || !(el instanceof HTMLElement)) return false;
@@ -90,11 +104,13 @@ export function TourOverlay() {
   const router = useRouter();
   const pathname = usePathname() ?? '/';
   const { me, status, switchPersona } = useSession();
-  const { mode, switchMode } = usePrefs();
+  const { mode } = usePrefs();
   const t = useMessages(tourMessages);
   const checks = useChecklist();
-  const offerOpen = useOfferOpen('user');
+  const userOfferOpen = useOfferOpen('user');
+  const devOfferOpen = useOfferOpen('dev');
   const dialogOpen = useAnyDialogOpen();
+  const presenterArmed = usePresenter().armed;
 
   const steps = STEPS[tour.tour];
   const isEnd = tour.tour === 'user' && tour.step === TOUR_LENGTH.user;
@@ -395,9 +411,11 @@ export function TourOverlay() {
       cancelAnimationFrame(frame);
     };
   }, []);
+  // The tours are separate: a page of the other mode closes a running tour (it is not resumed later).
+  const pageMode = routeMode(pathname);
   useEffect(() => {
-    if (mode === 'dev' && me) tick('dev');
-  }, [mode, me]);
+    if (tour.open && pageMode && pageMode !== tour.tour) closeTour();
+  }, [tour.open, tour.tour, pageMode]);
 
   /* ---------------------------------------------------------------- moving */
   const total = TOUR_LENGTH[tour.tour];
@@ -416,7 +434,7 @@ export function TourOverlay() {
     if (tr.step > 0) goToStep(tr.step - 1);
   }, []);
   const skip = useCallback(() => {
-    dismissOffer();
+    dismissOffer(tourRef.current.tour);
     closeTour();
   }, []);
 
@@ -460,11 +478,14 @@ export function TourOverlay() {
 
   /* ---------------------------------------------------------------- render */
   // The offer toast sits outside any dialog, so it hides while a dialog or sheet is open (it covered the Act
-  // sheet's fields at 390 px and broke the modal focus model; WCAG 2.4.11).
-  const offer = !tour.open && mounted && !!me && status === 'ready' && pathname === '/' && mode === 'user' && offerOpen && !dialogOpen;
+  // sheet's fields at 390 px and broke the modal focus model; WCAG 2.4.11). Each mode offers its own tour,
+  // on that mode's own pages only; never while the presenter is armed (stage.ts also hides it under Stage).
+  const offerFor: TourId | null =
+    pageMode === 'dev' && mode === 'dev' && devOfferOpen ? 'dev' : pageMode === 'user' && mode === 'user' && userOfferOpen ? 'user' : null;
+  const offer = !tour.open && mounted && !!me && status === 'ready' && !presenterArmed && !dialogOpen ? offerFor : null;
 
   if (!mounted) return null;
-  if (!tour.open) return offer ? <OfferToast /> : null;
+  if (!tour.open) return offer ? <OfferToast tour={offer} /> : null;
   if (!step && !isEnd) return null;
 
   const inDialog = !!host;
@@ -580,20 +601,10 @@ export function TourOverlay() {
 
       <div className="flex items-center justify-between gap-2 border-t border-line bg-surface/60 px-3 py-2.5">
         {isEnd ? (
-          <>
-            <Button variant="ghost" size="sm" onClick={closeTour} data-testid="tour-end-close">
-              {t('end.close')}
-            </Button>
-            {checks.dev || mode === 'dev' ? (
-              <Button ref={primary} variant="primary" size="sm" iconRight={ArrowRight} onClick={() => startTour('dev')} data-testid="tour-dev-start">
-                {t('end.devTour')}
-              </Button>
-            ) : (
-              <Button ref={primary} variant="primary" size="sm" iconRight={ArrowRight} onClick={() => switchMode('dev')} data-testid="tour-switch-dev">
-                {t('end.switch')}
-              </Button>
-            )}
-          </>
+          // The user tour ends here, in User mode: no hand-over to the Developer tour (D-36).
+          <Button ref={primary} variant="primary" size="sm" onClick={closeTour} className="ml-auto" data-testid="tour-end-close">
+            {t('end.close')}
+          </Button>
         ) : (
           <>
             <Button variant="ghost" size="sm" onClick={skip} className="-ml-1 px-2">
@@ -701,7 +712,7 @@ function place(rect: Rect, width: number, h: number, vw: number, vh: number, sid
 
 function EndChecklist({ checks, n }: { checks: Record<(typeof CHECKLIST)[number], boolean>; n: number }) {
   const t = useMessages(tourMessages);
-  const label: Record<(typeof CHECKLIST)[number], TourKey> = { asked: 'check.asked', source: 'check.source', identical: 'check.identical', dev: 'check.dev' };
+  const label: Record<(typeof CHECKLIST)[number], TourKey> = { asked: 'check.asked', source: 'check.source', identical: 'check.identical' };
   return (
     <div className="mt-3">
       <p className="mb-1.5 text-caption tabular-nums text-subtle" data-testid="tour-checklist-progress">
@@ -731,13 +742,15 @@ function EndChecklist({ checks, n }: { checks: Record<(typeof CHECKLIST)[number]
   );
 }
 
-/** The first-visit offer: a small toast, never a modal, never timed. */
-function OfferToast() {
+/** The first-visit offer for one mode's tour: a small toast, never a modal, never timed. */
+function OfferToast({ tour }: { tour: TourId }) {
   const t = useMessages(tourMessages);
+  const dev = tour === 'dev';
   return (
     <aside
-      aria-label={t('offer.label')}
+      aria-label={t(dev ? 'offer.devLabel' : 'offer.label')}
       data-testid="tour-offer"
+      data-tour-offer={tour}
       data-stage-hide
       className="ds-pop fixed left-4 right-4 top-16 z-[70] rounded-xl sm:bottom-4 sm:top-auto border border-line-strong bg-overlay p-4 text-fg shadow-pop sm:right-auto sm:w-[22rem]"
       data-state="open"
@@ -748,12 +761,12 @@ function OfferToast() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-heading-sm text-fg">{t('offer.title')}</p>
-          <p className="mt-0.5 text-body-sm text-muted">{t('offer.body')}</p>
+          <p className="mt-0.5 text-body-sm text-muted">{t(dev ? 'offer.devBody' : 'offer.body')}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="sm" data-tour-launch onClick={() => startTour('user')}>
+            <Button variant="primary" size="sm" data-tour-launch onClick={() => startTour(tour)}>
               {t('offer.start')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={dismissOffer}>
+            <Button variant="ghost" size="sm" onClick={() => dismissOffer(tour)}>
               {t('offer.later')}
             </Button>
           </div>

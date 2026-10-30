@@ -19,8 +19,9 @@ Rules (contract: ``docs/finals/contracts/uploads.md``; ``docs/tencent/SECURITY.m
 * **Where.** The folder must exist in Drive now. An employee must hold WRITE on it (``writer``,
   ``fileOrganizer``, ``organizer`` or ``owner``, granted to them, to a group they are in, or to the
   company domain), read LIVE from Drive at upload time (``files/{folder}`` +
-  ``files/{folder}/permissions``, one attempt each, any source error is a refusal). ``admin_it``
-  may upload into any existing folder.
+  ``files/{folder}/permissions``, one attempt each, any source error is a refusal), and checked
+  again right before the Drive write (round 4 Codex B9); Drive itself refuses an uploader without
+  WRITE. ``admin_it`` may upload into any existing folder.
 * **What.** Extension whitelist (``extract_files.EXT_KIND``); request body at most
   ``MAX_BODY_BYTES`` (7 MiB, enforced on ``Content-Length`` AND while streaming, before any JSON
   parsing or base64 decoding); file at most 5 MiB decoded; bytes must match the extension; zip-bomb,
@@ -41,6 +42,19 @@ Rules (contract: ``docs/finals/contracts/uploads.md``; ``docs/tencent/SECURITY.m
 * **Reset.** ``/sim/reset`` reloads the platforms (the uploaded files are gone) and reconciles the
   index; ``reset_uploads`` (a reset hook) then drops any uploaded document still indexed and
   clears the rate-limit window.
+
+``GET /sim/upload-folders`` (D-34) is the upload sheet's folder picker: ``[{id, path}]`` sorted by
+path, ONLY the folders the signed-in person may upload into, each checked live with the same
+``_where`` the upload runs (folder exists, WRITE for an employee, any folder for ``admin_it``). It
+is mounted under exactly the same switches as ``/sim/upload-file``. A folder that cannot be
+checked (source error, past the time budget) is left out; a person who may write nowhere, and any
+failure to list, get ``[]``: no counts, no reasons, no hidden names (an ancestor folder's name is
+part of a path only when the person can open that ancestor now). ``FOLDERS_RATE_LIMIT`` calls per
+person per minute (refusal: the one 404, first over-limit ledgered). Ledger: ``graph.viewed`` with
+``mode="upload_folders"`` (counts only): an accepted row (``outcome="checking"``, zero counts)
+BEFORE ``_folders`` lists Drive or reads a permission, then the decided row (``outcome="ok"``)
+before the response (round 5 Codex #7, rule 3). A ledger failure, or no ledger configured, is a
+503 with no Drive call.
 """
 from __future__ import annotations
 
@@ -51,6 +65,7 @@ import logging
 import os
 import re
 import threading
+import time
 import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
@@ -62,16 +77,21 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from . import extract_files as X
-from .sim import EMPLOYEE_ROLES, _RateLimiter, write_ahead
+from .sim import EMPLOYEE_ROLES, LedgerUnavailable, _RateLimiter, write_ahead
 
 log = logging.getLogger("databridge_ib.uploads")
 
 STAGE = "sim.upload-file"
+FOLDERS_STAGE = "sim.upload-folders"
 NOT_FOUND = "not found"
 MAX_BODY_BYTES = 7 * 1024 * 1024
 MAX_B64_CHARS = (X.MAX_FILE_BYTES * 4) // 3 + 8
 MAX_NAME = 120
 RATE_LIMIT, RATE_WINDOW_S = 5, 60.0
+FOLDERS_RATE_LIMIT = 10                  # folder-list calls per person per minute
+MAX_FOLDERS = 200                        # candidate folders checked live per call
+FOLDERS_BUDGET_S = 10.0                  # wall-clock budget for one call's live checks
+READ_ROLES = frozenset({"reader", "commenter", "writer", "fileOrganizer", "organizer", "owner"})
 WRITE_ROLES = frozenset({"writer", "fileOrganizer", "organizer", "owner"})
 FOLDER_MIME = "application/vnd.google-apps.folder"
 _FOLDER = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
@@ -153,13 +173,17 @@ def display_name(filename: str, title: Optional[str], kind: str) -> str:
 def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
                         client_factory: Optional[Callable[[], httpx.Client]] = None,
                         rate_limiter: Optional[_RateLimiter] = None,
-                        warm: bool = True) -> APIRouter:
+                        folders_rate_limiter: Optional[_RateLimiter] = None,
+                        warm: bool = True, clock: Callable[[], float] = time.monotonic) -> APIRouter:
     """``svc`` is the app's ``Services`` (connectors, directory, ledger, cfg); ``current`` is the
     principal dependency (``app.principal_dependency``). ``cfg`` overrides ``svc.cfg`` (tests);
     ``client_factory`` builds the admin client for the Drive platform (default: the configured
-    Drive base URL with the admin token)."""
+    Drive base URL with the admin token). ``folders_rate_limiter`` limits ``GET
+    /sim/upload-folders`` (default ``FOLDERS_RATE_LIMIT`` per minute); ``clock`` times its budget."""
     cfg = cfg if cfg is not None else svc.cfg
     state = _State(rate_limiter or _RateLimiter(RATE_LIMIT, RATE_WINDOW_S))
+    fstate = _State(folders_rate_limiter or _RateLimiter(FOLDERS_RATE_LIMIT, RATE_WINDOW_S))
+    state.folders = fstate                                          # reset_uploads clears it too
     _STATES[id(svc)] = state
     router = APIRouter(prefix="/sim")
     if warm and _enabled(cfg) is None:     # start the extraction worker now, not on the first upload
@@ -171,13 +195,13 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
         return httpx.Client(base_url=cfg.platform_base["drive"], timeout=20.0,
                             headers={"Authorization": f"Bearer {cfg.admin_token}"})
 
-    def _ledger_refusal(user, reason: str) -> None:
+    def _ledger_refusal(user, reason: str, stage: str = STAGE) -> None:
         led = getattr(svc, "ledger", None)
         if led is None:
             return
         from .models import RequestFailed
         try:
-            led.append(RequestFailed(sub=getattr(user, "id", "?"), stage=STAGE, error_code=reason,
+            led.append(RequestFailed(sub=getattr(user, "id", "?"), stage=stage, error_code=reason,
                                      event_time=datetime.now(timezone.utc)))
         except Exception as exc:                                    # noqa: BLE001
             log.warning("ledger append for an upload refusal failed: %s", type(exc).__name__)
@@ -193,14 +217,16 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
             return "role"
         return None
 
-    def _grants_write(conn, perms: list, account: str, now_user) -> bool:
-        """WRITE for this person from the folder's LIVE permission list. Any entry the check
-        cannot read with confidence fails the whole check closed."""
+    def _grants_write(conn, perms: list, account: str, now_user,
+                      roles: frozenset = WRITE_ROLES) -> bool:
+        """WRITE (or, with ``roles=READ_ROLES``, any access) for this person from the folder's
+        LIVE permission list. Any entry the check cannot read with confidence fails the whole
+        check closed."""
         allowed = False
         for p in perms:
             if not isinstance(p, dict) or not isinstance(p.get("deleted", False), bool):
                 return False
-            if p.get("deleted") or p.get("expirationTime") or p.get("role") not in WRITE_ROLES:
+            if p.get("deleted") or p.get("expirationTime") or p.get("role") not in roles:
                 continue
             t = p.get("type")
             if t == "user":
@@ -223,8 +249,9 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
             # "anyone" (link sharing) never grants an upload here
         return allowed
 
-    def _where(user, folder: str, account: str) -> None:
-        """The folder exists in Drive now and (unless admin_it) this person can write to it now."""
+    def _where(user, folder: str, account: str) -> dict:
+        """The folder exists in Drive now and (unless admin_it) this person can write to it now.
+        Returns the folder's live metadata."""
         conn = (getattr(svc, "connectors", None) or {}).get("drive")
         if conn is None:
             raise _Refused("no_drive_connector")
@@ -233,7 +260,7 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
             if meta is None or meta.get("trashed") or meta.get("mimeType") != FOLDER_MIME:
                 raise _Refused("folder_unknown")
             if "admin_it" in set(user.roles):
-                return
+                return meta
             perms = conn._permissions(folder, gate2=True)
         except _Refused:
             raise
@@ -247,6 +274,73 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
             raise _Refused("identity_changed")
         if not _grants_write(conn, perms, account, now_user):
             raise _Refused("no_write_permission")
+        return meta
+
+    def _can_open(user, conn, fid: str, account: str) -> bool:
+        """Any access (reader and up) for this person to folder ``fid``, read LIVE; any doubt is
+        False. Decides only whether an ancestor's NAME may appear in a path."""
+        if "admin_it" in set(user.roles):
+            return True
+        try:
+            perms = conn._permissions(fid, gate2=True)
+        except Exception:                                           # noqa: BLE001 — fail closed
+            return False
+        now_user = svc.directory.get(user.id)
+        if perms is None or now_user is None or not now_user.active:
+            return False
+        return _grants_write(conn, perms, account, now_user, READ_ROLES)
+
+    def _folders(user) -> tuple[list[dict], int]:
+        """The folders this person may upload into NOW, as ``[{id, path}]`` sorted by path, and
+        how many folders were checked live. Raises ``_Refused`` (a ledger-only reason) when the
+        answer is simply ``[]``."""
+        reason = _who(user)
+        if reason:
+            raise _Refused(reason)
+        account = (getattr(user, "platform_ids", None) or {}).get("drive")
+        if not account:
+            raise _Refused("no_platform_account")
+        conn = (getattr(svc, "connectors", None) or {}).get("drive")
+        if conn is None:
+            raise _Refused("no_drive_connector")
+        try:      # every folder the service account sees: candidates only, never returned as such
+            listed = conn._list(f"mimeType = '{FOLDER_MIME}' and trashed = false", attempts=1)
+        except Exception:                                           # noqa: BLE001 — fail closed
+            raise _Refused("source_error") from None
+        tree = {str(f["id"]): f for f in listed
+                if f.get("mimeType") == FOLDER_MIME and _FOLDER.match(str(f.get("id", "")))}
+        start, checked = clock(), 0
+        ok: dict[str, dict] = {}
+        for fid in sorted(tree)[:MAX_FOLDERS]:
+            if clock() - start > FOLDERS_BUDGET_S:
+                break                                   # not checked in time: not listed
+            checked += 1
+            try:
+                ok[fid] = _where(user, fid, account)    # the upload's own live check
+            except _Refused:
+                continue
+        opens: dict[str, bool] = {}
+
+        def path_of(fid: str, meta: dict) -> str:
+            names = [str(meta.get("name") or fid)]
+            seen = {fid}
+            parent = next(iter(meta.get("parents") or []), None)
+            while parent and parent in tree and parent not in seen:
+                seen.add(parent)
+                if parent not in opens:
+                    opens[parent] = parent in ok or _can_open(user, conn, parent, account)
+                if not opens[parent]:
+                    break                               # a folder they cannot open: no name
+                names.insert(0, str(tree[parent].get("name") or parent))
+                parent = next(iter(tree[parent].get("parents") or []), None)
+            drive = str(meta.get("driveId") or "")
+            dname = conn._drive_name(drive) if drive else ""
+            # the shared drive's name leads when Drive gives one (drives.get); never a bare id
+            return " / ".join([dname, *names] if dname and dname != drive else names)
+
+        out = [{"id": fid, "path": path_of(fid, meta)} for fid, meta in ok.items()]
+        out.sort(key=lambda f: (f["path"].casefold(), f["id"]))
+        return out, checked
 
     def _upload(raw: bytes, user) -> dict:
         try:
@@ -281,6 +375,9 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
         payload = {"folder": body.folder, "name": display_name(body.filename, body.title, kind),
                    "mime": X.KIND_MIME[kind], "content_b64": base64.b64encode(data).decode("ascii"),
                    "owner": account}
+        # round 4 Codex B9: extraction can take up to the time budget, so WRITE is checked LIVE
+        # again right before the write (the mock Drive also checks the uploader at insert)
+        _where(user, body.folder, account)
         # round 3 L5: write-ahead record of the write (never the bytes or the name); a ledger
         # failure is a 503 and nothing is uploaded
         wrote = {"platform": "drive", "container": body.folder, "kind": label,
@@ -355,7 +452,55 @@ def make_uploads_router(svc: Any, current: Callable, *, cfg: Any = None,
             await run_in_threadpool(_ledger_refusal, user, "internal_error")
             return _refusal()
 
+    def _ledger_folders(sub: str, n: int, checked: int, outcome: str = "ok") -> None:
+        """``outcome="checking"`` (zero counts) is the accepted row, written BEFORE any Drive
+        call; ``"ok"`` is the decided row, before the response (round 5 Codex #7, rule 3). No
+        ledger is the same as a ledger that is down: it raises, never a quiet return."""
+        led = getattr(svc, "ledger", None)
+        if led is None:
+            raise LedgerUnavailable("no ledger configured")
+        from .config import POLICY_VERSION
+        from .models import GraphViewed
+        led.append(GraphViewed(sub=sub, mode="upload_folders", outcome=outcome, nodes_returned=n,
+                               docs_checked=checked, policy_version=POLICY_VERSION,
+                               event_time=datetime.now(timezone.utc)))
+
+    @router.get("/upload-folders")
+    async def upload_folders(user=Depends(current)):
+        """The upload folder picker (D-34): only the folders this person may upload into now."""
+        sub = getattr(user, "id", "?")
+        if not fstate.limiter.allow(sub):
+            if fstate.note_over_limit(sub):
+                await run_in_threadpool(_ledger_refusal, user, "rate_limited", FOLDERS_STAGE)
+            return _refusal()
+        off = _enabled(cfg)
+        if off:                                     # a router built directly with the switches off
+            await run_in_threadpool(_ledger_refusal, user, off, FOLDERS_STAGE)
+            return _refusal()
+        try:                                        # write-ahead: BEFORE any Drive call (#7)
+            await run_in_threadpool(_ledger_folders, sub, 0, 0, "checking")
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("ledger append before the upload folder list failed: %s",
+                      type(exc).__name__)
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+        try:
+            out, checked = await run_in_threadpool(_folders, user)
+        except _Refused as exc:                     # no role, no account, cannot list: nothing
+            await run_in_threadpool(_ledger_refusal, user, exc.reason, FOLDERS_STAGE)
+            out, checked = [], 0
+        except Exception as exc:                                    # noqa: BLE001 — fail closed
+            log.warning("upload folder list failed: %s", type(exc).__name__)
+            await run_in_threadpool(_ledger_refusal, user, "internal_error", FOLDERS_STAGE)
+            out, checked = [], 0
+        try:                                        # write-ahead: before anything is returned
+            await run_in_threadpool(_ledger_folders, sub, len(out), checked)
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("ledger append for the upload folder list failed: %s", type(exc).__name__)
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+        return JSONResponse(content=out)
+
     router.upload_state = state                                     # tests / reset_uploads
+    router.folders_state = fstate
     return router
 
 
@@ -379,10 +524,13 @@ def reset_uploads(svc: Any) -> int:
         return 0
     with state.lock:
         ids, state.doc_ids = sorted(state.doc_ids), set()
-    with state.limiter._lock:
-        state.limiter._hits.clear()
-    with state.lock:
-        state.over.clear()
+    for st in (state, getattr(state, "folders", None)):
+        if st is None:
+            continue
+        with st.limiter._lock:
+            st.limiter._hits.clear()
+        with st.lock:
+            st.over.clear()
     index = getattr(svc, "index", None)
     dropped = 0
     for doc_id in ids:
@@ -393,7 +541,7 @@ def reset_uploads(svc: Any) -> int:
 
 
 def mount_uploads_router(app, svc: Any, reset_hooks: Optional[list] = None) -> None:
-    """Mount ``POST /sim/upload-file`` on a built app (``bootstrap.build_app``), with the app's
+    """Mount ``POST /sim/upload-file`` and ``GET /sim/upload-folders`` on a built app (``bootstrap.build_app``), with the app's
     own principal dependency. ``reset_hooks`` is ``build_app``'s list of ``/sim/reset`` hooks:
     ``reset_uploads`` is put FIRST, so the uploads are gone before the live tracker rebaselines."""
     if _enabled(svc.cfg) is not None:
@@ -406,4 +554,4 @@ def mount_uploads_router(app, svc: Any, reset_hooks: Optional[list] = None) -> N
 
 __all__ = ["make_uploads_router", "mount_uploads_router", "reset_uploads", "UploadBody",
            "display_name", "demo_features_on", "MAX_BODY_BYTES", "RATE_LIMIT", "WRITE_ROLES",
-           "STAGE"]
+           "STAGE", "FOLDERS_STAGE", "FOLDERS_RATE_LIMIT"]

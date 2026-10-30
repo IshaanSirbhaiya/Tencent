@@ -51,21 +51,31 @@ Outcomes (v3.1). A proposal is ``pending`` → ``inflight`` → ``created`` / ``
 "Nothing was changed" is true. A timeout, a lost or malformed response or a 5xx is ``unknown``: Jira
 may have created the issue, so the person is told exactly that (``TICKET_OUTCOME_UNKNOWN``), the same
 proposal never creates again, and a NEW proposal or confirm for the same answer is held for
-``UNKNOWN_HOLD_S``. A repeat confirm of a ``created`` proposal replays its result (and re-tries the
-``action.executed`` receipt if that append had failed: the first call was a 503). Jira POSTs are
-never retried. The state is in memory (one process; a restart forgets it, documented limit).
+``UNKNOWN_HOLD_S``. One create at a time per answer (v3.2, round 4 A5): moving a proposal to
+``inflight`` and checking that no other proposal for the same ``(person, req_id)`` is in flight or
+held is ONE locked step, so two proposals confirmed together never both create. A repeat confirm of
+a ``created`` proposal replays its result (and re-tries the ``action.executed`` receipt if that
+append had failed: the first call was a 503). Jira POSTs are never retried. The state is in memory
+(one process; a restart forgets it, documented limit).
 
-Limits: per person, ``RATE_N`` drafts/proposals and ``RATE_N`` confirms per ``RATE_WINDOW_S``
-(``action.failed`` stage ``rate``, 429), and at most ``MAX_PROPOSALS_PER_PERSON`` pending proposals
-(a new one replaces only that person's oldest pending one). An in-flight or unresolved proposal is
-never evicted.
+Limits: per person, ``RATE_N`` drafts/proposals and ``RATE_N`` confirms per ``RATE_WINDOW_S`` (429;
+only the FIRST refusal per person per window is ledgered, ``action.failed`` stage ``rate``, so a loop
+cannot grow the ledger), and at most ``MAX_PROPOSALS_PER_PERSON`` pending proposals (a new one
+replaces only that person's oldest pending one). The store check and the insert are one locked step,
+and a proposal released back to pending trims that person's other pending ones to the cap. An
+in-flight proposal is never evicted; an ``unknown`` one is kept for ``RETAIN_S + UNKNOWN_HOLD_S``,
+and expired unknown-outcome holds are swept on every eviction pass.
 
 Ledger (write-ahead; a ledger failure is 503 and nothing happens)
 -----------------------------------------------------------------
-``action.proposed`` (counts, ids, kind, a digest; never draft text) BEFORE a draft or proposal is
-returned; ``action.confirmed`` BEFORE the create; ``action.executed`` after it, or
-``action.failed`` (reason code ledger-only). ``action.rejected`` when the person cancels. Every
-call writes exactly one record before it answers, including a failed lookup.
+``action.requested`` stage ``accepted`` (no ``req_id``: ownership is not known yet) BEFORE the live
+source check of a draft or proposal; stage ``decided`` (the documents the model may see) BEFORE a
+draft's model call; ``action.proposed`` (counts, ids, kind, a digest; never draft text) BEFORE a
+draft or proposal is returned; ``action.confirmed`` BEFORE the create; ``action.executed`` after it,
+or ``action.failed`` (reason code ledger-only). ``action.rejected`` when the person cancels; a repeat
+confirm of a created proposal appends the missing ``action.executed`` or, when that is on record,
+``action.requested`` stage ``replayed``. Every call that passes the rate limit writes at least one
+record before it answers, including a failed lookup and an invalid confirm.
 
 This follows the outbox pattern of ``packages/outbox`` + ``apps/dispatcher`` (the model drafts, a
 named human approves, model-free code executes). It does not import that package: the outbox is
@@ -90,7 +100,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 from . import authz, narrate
 from .config import POLICY_VERSION
 from .models import (SCOPE_NOTE, ActionConfirmed, ActionExecuted, ActionFailed, ActionProposed,
-                     ActionRejected, DirectoryUser, ModelInfo)
+                     ActionRejected, ActionRequested, DirectoryUser, ModelInfo)
 
 DRAFT_LABEL = "Draft for your review"
 #: the ONE message for every reason a ticket cannot be proposed or created (no detail, ever)
@@ -108,6 +118,7 @@ MAX_PROPOSALS_PER_PERSON = 5
 RETAIN_S = 60 * 60                  # a finished proposal is kept this long for a replay
 UNKNOWN_HOLD_S = PROPOSAL_TTL_S     # no new create for the same answer while an outcome is unknown
 RATE_N, RATE_WINDOW_S = 10, 60.0
+OPEN_RATE_N = 30                    # /ib/open link clicks per person per RATE_WINDOW_S (round 4 R1)
 OPEN_PATH = "/ib/open/"
 OPEN_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 NEUTRAL_SUMMARY = "Follow-up on an Internal Brain answer"
@@ -122,7 +133,11 @@ _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 # A model-written draft sentence must be made of its sources' words (round-2b Opus #1): the answer
 # wall keeps a sentence that shares ONE word with a fact, which let a reply add promises ("we will
 # waive all charges") or reasons no source gave. Here at least DRAFT_SUPPORT of a sentence's content
-# words must appear in the facts its own tags point at; otherwise the sentence is dropped.
+# words must appear in the facts its own tags point at; otherwise the sentence is dropped. Word
+# overlap is not support (round 4 Codex A2; round 5 #1), so these fail a sentence outright: a name
+# (a capitalised word) or a number that is not in its ANCHOR sentence (the fact sentence it
+# overlaps most; one anchor must hold them all), and a negation that differs from its anchor's,
+# for the whole sentence or for any clause against the anchor clause it overlaps most.
 DRAFT_SUPPORT = 0.8
 _WORD = re.compile(r"[^\W_]+")
 _CJK = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
@@ -132,9 +147,54 @@ their them then there these they this those to too us was we were what when wher
 would you your yours hello hi dear thanks thank please""".split())
 
 
+_NEG_WORDS = frozenset("not no never none nobody nothing neither nor without".split())
+_CJK_NEG = re.compile(r"[不没沒无無未非别別勿莫]")
+_CONTRACTIONS = ((re.compile(r"\bwon['’]t\b", re.I), "will not"),
+                 (re.compile(r"\bshan['’]t\b", re.I), "shall not"),
+                 (re.compile(r"\bcan['’]t\b|\bcannot\b", re.I), "can not"),
+                 (re.compile(r"\b(\w+)n['’]t\b", re.I), r"\1 not"))
+_NUMBER = re.compile(r"\d+(?:[.,:/]\d+)*")
+_SOURCE_SPLIT = re.compile(r"(?<=[.!?])\s+|(?<=[。！？])")
+#: a capitalised first word that only opens a sentence ("Currently, ..."): not a name
+_OPENERS = frozenset("""currently unfortunately however also additionally importantly generally
+typically overall yes sure certainly note per according based just here now today still again
+otherwise meanwhile instead therefore""".split())
+
+
+def _expand(text: str) -> str:
+    """Tags removed and negative contractions spelled out ("won't" -> "will not")."""
+    out = _TAG.sub(" ", text or "")
+    for pat, rep in _CONTRACTIONS:
+        out = pat.sub(rep, out)
+    return out
+
+
+def _negated(text: str) -> bool:
+    norm = _expand(text).lower()
+    return bool(_CJK_NEG.search(norm)) or any(w in _NEG_WORDS for w in _WORD.findall(norm))
+
+
+def _names(text: str) -> list[str]:
+    """Capitalised words (lower-cased), other than stopwords and a sentence opener."""
+    out = []
+    for i, w in enumerate(_WORD.findall(_expand(text))):
+        if _CJK.search(w) or not w[0].isupper():
+            continue
+        low = w.lower()
+        if low in _STOP or (i == 0 and low in _OPENERS):
+            continue
+        out.append(low)
+    return out
+
+
+def _source_sentences(source: "str | Sequence[str]") -> list[str]:
+    parts = [source] if isinstance(source, str) else list(source)
+    return [x.strip() for p in parts for x in _SOURCE_SPLIT.split(p or "") if x.strip()]
+
+
 def _content_words(text: str) -> list[str]:
     out: list[str] = []
-    for w in _WORD.findall(_TAG.sub(" ", text).lower()):
+    for w in _WORD.findall(_expand(text).lower()):
         if _CJK.search(w):
             out.extend(ch for ch in w if _CJK.match(ch))       # CJK: one character, one word
         elif w not in _STOP and (len(w) > 1 or w.isdigit()):
@@ -142,13 +202,61 @@ def _content_words(text: str) -> list[str]:
     return out
 
 
-def supported(sentence: str, source: str, floor: float = DRAFT_SUPPORT) -> bool:
-    """True when at least ``floor`` of the sentence's content words occur in ``source``."""
+def supported(sentence: str, source: "str | Sequence[str]", floor: float = DRAFT_SUPPORT) -> bool:
+    """True when the draft sentence is backed by ``source`` (its own cited facts):
+
+    * at least ``floor`` of its content words occur in the facts (the round-2b 80% rule);
+    * its ANCHOR is the fact sentence(s) sharing the most content words with it; its negation must
+      equal every anchor's (a dropped or added "not" fails);
+    * (round 5 #1) ONE anchor must hold every name (capitalised word) and every number in it, and
+      each of its clauses must have the negation of the anchor clause it overlaps most. A name or
+      number found only in another cited sentence fails, and so does a "not" moved between clauses."""
     words = _content_words(sentence)
-    if not words:
+    sents = _source_sentences(source)
+    if not words or not sents:
         return False
-    have = set(_content_words(source))
-    return sum(w in have for w in words) / len(words) >= floor
+    have = set(_content_words(" ".join(sents)))
+    if sum(w in have for w in words) / len(words) < floor:
+        return False
+    mine = set(words)
+    scored = [(len(mine & set(_content_words(s))), s) for s in sents]
+    best = max(n for n, _ in scored)
+    anchors = [s for n, s in scored if n == best]
+    neg = _negated(sentence)
+    if any(_negated(a) != neg for a in anchors):
+        return False
+    # round 5 #1: ONE anchor must hold every name and every number, with the same negation clause
+    # by clause. A name or number from another cited sentence (or from a tied anchor) fails.
+    names = _names(sentence)
+    nums = _NUMBER.findall(_TAG.sub(" ", sentence))
+    return any(all(n in set(_WORD.findall(_expand(a).lower())) for n in names)
+               and all(n in _NUMBER.findall(a) for n in nums)
+               and _clauses_agree(sentence, a) for a in anchors)
+
+
+#: where a clause ends for the negation check: ; : or a comma (not inside 1,000 or 10:30), CJK
+#: punctuation, a contrastive word, or "and"/"or" right before a negation ("... and not for X")
+_CLAUSE_SPLIT = re.compile(
+    r"[;:,](?!\d)|[，；：。]|\b(?:but|however|although|though|whereas|while|except|unless|yet)\b"
+    r"|\b(?:and|or)\b(?=\s+(?:not|no|never|none|without)\b)", re.I)
+
+
+def _clauses(text: str) -> list[str]:
+    return [c for c in _CLAUSE_SPLIT.split(_expand(text)) if _content_words(c)]
+
+
+def _clauses_agree(sentence: str, anchor: str) -> bool:
+    """Round 5 #1: each clause of the draft sentence has the negation of the anchor clause it
+    overlaps most (any one, on a tie), so "for Acme but not for Bayfront" cannot be turned into
+    "for Bayfront but not for Acme". A clause sharing no word with the anchor is not compared."""
+    theirs = [(set(_content_words(c)), _negated(c)) for c in _clauses(anchor)]
+    for c in _clauses(sentence):
+        mine = set(_content_words(c))
+        scored = [(len(mine & w), n) for w, n in theirs]
+        best = max((k for k, _ in scored), default=0)
+        if best and not any(n == _negated(c) for k, n in scored if k == best):
+            return False
+    return True
 
 KINDS = ("reply", "message")
 GREETING = {"reply": "Hello,", "message": "Hi,"}
@@ -203,7 +311,19 @@ class _Limiter:
     def __init__(self, n: int, window: float):
         self.n, self.window = n, window
         self._hits: dict[str, deque] = {}
+        self._over: dict[str, float] = {}       # person -> when their last refusal was ledgered
         self._lock = threading.Lock()
+
+    def note_over(self, key: str) -> bool:
+        """True for the first refusal of ``key`` in a window (ledger it), False for the rest
+        (round 4 R1, the same rule as the upload routes' round 3 L3)."""
+        now = time.monotonic()
+        with self._lock:
+            last = self._over.get(key)
+            if last is not None and now - last < self.window:
+                return False
+            self._over[key] = now
+            return True
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()
@@ -323,11 +443,12 @@ def open_token(key: bytes, doc_id: str) -> str:
 
 def ticket_description(req_id: str, links: Sequence[str]) -> str:
     """The fixed description: the request id and one neutral label per source with an opaque
-    Internal Brain link, nothing else (no titles, ids, spaces or channels in clear)."""
+    Internal Brain link, nothing else (no titles, ids, spaces or channels in clear). The link rule
+    is stated once; the request id is a closing "Reference" line (round 4 Sonnet UX)."""
     lines = "\n".join(f"Source {n}: {u}" for n, u in enumerate(links, 1))
-    return ("Follow-up created from an Internal Brain answer (request " + req_id + ").\n\n"
-            "Sources (each link opens only for people allowed to open that source; for anyone "
-            "else it is not found):\n\n" + lines)
+    return ("Follow-up created from an Internal Brain answer.\n\n"
+            "Sources (each link opens only for people allowed to open that source):\n\n" + lines
+            + "\n\nReference: " + req_id)
 
 
 class ActionService:
@@ -350,34 +471,64 @@ class ActionService:
         self._lock = threading.Lock()
         self._rate = _Limiter(RATE_N, RATE_WINDOW_S)
         self._confirm_rate = _Limiter(RATE_N, RATE_WINDOW_S)
+        self._open_rate = _Limiter(OPEN_RATE_N, RATE_WINDOW_S)
+        # opaque token -> doc id, rebuilt only when the index changes (round 4 R1)
+        self._open_lock = threading.Lock()
+        self._open_map: Optional[dict[str, str]] = None
+        self._open_ver: Any = None
 
     # -- limits and opaque links --------------------------------------------------------------
-    def _limit(self, limiter: _Limiter, user: DirectoryUser, action: str) -> None:
+    def _limit(self, limiter: _Limiter, user: DirectoryUser, action: Optional[str],
+               reason: str = "rate_limited") -> None:
+        """429 over the limit. Only the first refusal per person per window is ledgered (R1), so
+        a loop cannot grow the ledger; a refused call records no attempt row."""
         if not limiter.allow(user.id):
-            self._fail(user, "rate", "rate_limited", action=action)    # no ids
+            if limiter.note_over(user.id):
+                self._fail(user, "rate", reason, action=action)        # no ids
             raise RateLimited()
+
+    def limit_open(self, user: DirectoryUser) -> None:
+        """The per-person limit of ``/ib/open`` (checked before the token is even looked at)."""
+        self._limit(self._open_rate, user, None, "open_rate_limited")
 
     def open_link(self, doc_id: str) -> str:
         return f"{self.open_base}{OPEN_PATH}{open_token(self.open_key, doc_id)}"
 
+    def _open_tokens(self) -> Mapping[str, str]:
+        """token -> doc id for every indexed document. Built once per index version
+        (``Index.acl_version`` moves on every upsert, ACL change and delete), so a click costs
+        one dict lookup, not an HMAC per indexed document. An index without that counter is
+        rebuilt on every call (correct, just slower)."""
+        ver = getattr(self.index, "acl_version", None)
+        with self._open_lock:
+            if ver is not None and self._open_map is not None and ver == self._open_ver:
+                return self._open_map
+            built = {open_token(self.open_key, d): d for d in self.index.doc_ids()}
+            if ver is not None:
+                self._open_map, self._open_ver = built, ver
+            return built
+
     def resolve_open(self, token: str) -> Optional[str]:
-        """The indexed document whose opaque token this is, else None. Every indexed id is
-        compared (no early exit); access is decided by the caller (Gate 1 + Gate 2)."""
+        """The indexed document whose opaque token this is, else None. The token is a 128-bit
+        HMAC, so a map lookup reveals nothing a guess could use; access is decided by the caller
+        (Gate 1 + Gate 2)."""
         if not isinstance(token, str) or not OPEN_TOKEN_RE.match(token):
             return None
-        found = None
-        for d in self.index.doc_ids():
-            if hmac.compare_digest(open_token(self.open_key, d), token):
-                found = d
-        return found
+        return self._open_tokens().get(token)
+
+    def _sweep_unknown_locked(self) -> None:
+        """Drop expired unknown-outcome holds (round 4 A8: the map never grows without bound)."""
+        now = time.monotonic()
+        for k in [k for k, at in self._unknown.items() if now - at > UNKNOWN_HOLD_S]:
+            del self._unknown[k]
+
+    def _held_locked(self, sub: str, req_id: str) -> bool:
+        self._sweep_unknown_locked()
+        return (sub, req_id) in self._unknown
 
     def _held(self, user: DirectoryUser, req_id: str) -> bool:
         with self._lock:
-            at = self._unknown.get((user.id, req_id))
-            if at is not None and time.monotonic() - at > UNKNOWN_HOLD_S:
-                del self._unknown[(user.id, req_id)]
-                at = None
-            return at is not None
+            return self._held_locked(user.id, req_id)
 
     # -- ledger -------------------------------------------------------------------------------
     def _append(self, event) -> None:
@@ -390,6 +541,16 @@ class ActionService:
               action_id: Optional[str] = None, action: Optional[str] = None) -> None:
         self._append(ActionFailed(sub=user.id, stage=stage, reason_code=reason[:80], req_id=req_id,
                                   action_id=action_id, action=action, event_time=self.clock()))
+
+    def _requested(self, user: DirectoryUser, stage: str, action: str, action_id: str, *,
+                   req_id: Optional[str] = None, doc_ids: Sequence[str] = (),
+                   model_planned: bool = False) -> None:
+        """The write-ahead attempt row (round 4 A1): before the live source check (``accepted``),
+        before a model call (``decided``) and before a replayed result (``replayed``)."""
+        self._append(ActionRequested(sub=user.id, req_id=req_id, action_id=action_id,
+                                     action=action, stage=stage, doc_ids=tuple(doc_ids),
+                                     model_planned=model_planned, policy_version=POLICY_VERSION,
+                                     event_time=self.clock()))
 
     def _not_found(self, user: DirectoryUser, action: str) -> NotFound:
         # recorded WITHOUT the requested id: an attempt on someone else's request must not show
@@ -466,10 +627,9 @@ class ActionService:
             return None
         text = narrate.drop_addressed_to_ai(text)
         valid = set(ctx.cites)
-        said = {tag: " ".join(f.text for f in ctx.facts if tag in f.tags) for tag in valid}
         body = [f for f in split_facts(text)
                 if f.tags and set(f.tags) <= valid
-                and supported(f.text, " ".join(said[t] for t in f.tags))]
+                and supported(f.text, [x.text for x in ctx.facts if set(x.tags) & set(f.tags)])]
         return (body[:MAX_FACTS], info) if body else None
 
     def draft(self, user: DirectoryUser, req_id: str, kind: str = "reply") -> dict[str, Any]:
@@ -477,11 +637,20 @@ class ActionService:
             raise ValueError("kind")
         action = f"draft.{kind}"
         self._limit(self._rate, user, action)
+        action_id = uuid.uuid4().hex
+        # write-ahead (A1): on record before the live source check and any model call
+        self._requested(user, "accepted", action, action_id, model_planned=self.chain is not None)
         ctx = self.context(user, req_id)
         if ctx is None:
             raise self._not_found(user, action)
         script = script_lines(ctx.facts) if kind == "reply" else []
-        got = None if script else self._model_body(ctx, kind)
+        got = None
+        if not script and self.chain is not None:
+            # what the model may see, on record BEFORE it is asked (rule 3: decided before a model)
+            self._requested(user, "decided", action, action_id, req_id=req_id,
+                            doc_ids=list(dict.fromkeys(s.doc_id for s in ctx.cites.values())),
+                            model_planned=True)
+            got = self._model_body(ctx, kind)
         if script:
             body, model = script, SCRIPT
         elif got is not None:
@@ -496,7 +665,6 @@ class ActionService:
                             closing])
         tags = [t for f in body for t in f.tags]
         citations = self._citations(ctx, tags)
-        action_id = uuid.uuid4().hex
         # write-ahead: the draft is on record (as a digest) before it leaves the service
         self._append(ActionProposed(
             sub=user.id, req_id=req_id, action_id=action_id, action=action,
@@ -521,6 +689,8 @@ class ActionService:
     def propose_ticket(self, user: DirectoryUser, req_id: str) -> dict[str, Any]:
         action = "ticket.create"
         self._limit(self._rate, user, action)
+        pid = uuid.uuid4().hex
+        self._requested(user, "accepted", action, pid)        # write-ahead (A1)
         ctx = self.context(user, req_id)
         if ctx is None:
             raise self._not_found(user, action)
@@ -552,22 +722,25 @@ class ActionService:
         links = [self.open_link(d) for d in dict.fromkeys(c["doc_id"] for c in citations)]
         summary = default_summary(ctx.question)
         description = ticket_description(req_id, links)
-        if not self._has_room(user):
-            self._fail(user, "propose", "capacity", req_id=req_id, action=action)
-            raise Unavailable()
-        pid = uuid.uuid4().hex
         prop = Proposal(proposal_id=pid, sub=user.id, req_id=req_id, project=project,
                         options=options, summary=summary, description=description,
                         doc_ids=tuple(dict.fromkeys(c["doc_id"] for c in citations)),
                         citations=citations)
-        self._append(ActionProposed(
-            sub=user.id, req_id=req_id, action_id=pid, action=action,
-            cited_docs=len(prop.doc_ids), doc_ids=prop.doc_ids, target=project,
-            options=len(options), digest=_sha(self._payload(project, summary, description)),
-            policy_version=POLICY_VERSION, event_time=self.clock()))
-        with self._lock:
-            self._evict_locked(user.id)
-            self._proposals[pid] = prop
+        # the capacity check and the insert are ONE locked step (A7); the id is not yet known to
+        # anyone, so the slot cannot be confirmed before action.proposed is on record
+        if not self._reserve(prop):
+            self._fail(user, "propose", "capacity", req_id=req_id, action=action)
+            raise Unavailable()
+        try:
+            self._append(ActionProposed(
+                sub=user.id, req_id=req_id, action_id=pid, action=action,
+                cited_docs=len(prop.doc_ids), doc_ids=prop.doc_ids, target=project,
+                options=len(options), digest=_sha(self._payload(project, summary, description)),
+                policy_version=POLICY_VERSION, event_time=self.clock()))
+        except ActionError:
+            with self._lock:
+                self._proposals.pop(pid, None)
+            raise
         expires = self.clock() + timedelta(seconds=PROPOSAL_TTL_S)
         return {"proposal_id": pid, "action_id": pid, "kind": "ticket", "status": "proposed",
                 "req_id": req_id, "project": {"key": project, "name": options[project]},
@@ -592,28 +765,50 @@ class ActionService:
                       and now - p.finished > RETAIN_S)
                   or (p.state == "unknown" and now - p.finished > RETAIN_S + UNKNOWN_HOLD_S)]:
             del self._proposals[k]
+        self._sweep_unknown_locked()
         if sub is not None:             # one person's pending proposals evict only their own
-            mine = [k for k, p in self._proposals.items() if p.sub == sub and p.state == "pending"]
-            for k in mine[:max(0, len(mine) - MAX_PROPOSALS_PER_PERSON + 1)]:
-                del self._proposals[k]
+            self._trim_locked(sub, MAX_PROPOSALS_PER_PERSON - 1)
         if len(self._proposals) >= MAX_PROPOSALS:   # then finished, replay-only entries, oldest first
             done = [k for k, p in self._proposals.items()
                     if p.state in ("failed", "cancelled") or (p.state == "created" and p.receipt)]
             for k in done[:len(self._proposals) - MAX_PROPOSALS + 1]:
                 del self._proposals[k]
 
-    def _has_room(self, user: DirectoryUser) -> bool:
-        """Room for one more proposal without evicting anyone else's pending or unresolved one."""
-        with self._lock:
-            self._evict_locked()
-            mine = sum(1 for p in self._proposals.values()
-                       if p.sub == user.id and p.state == "pending")
-            # full of other people's live proposals: refuse rather than evict theirs
-            return len(self._proposals) < MAX_PROPOSALS or mine >= MAX_PROPOSALS_PER_PERSON
+    def _trim_locked(self, sub: str, limit: int, keep: Optional[str] = None) -> None:
+        """At most ``limit`` pending proposals of ``sub`` stay (oldest go first; never ``keep``)."""
+        mine = [k for k, p in self._proposals.items() if p.sub == sub and p.state == "pending"]
+        extra = len(mine) - limit
+        for k in [k for k in mine if k != keep][:max(0, extra)]:
+            del self._proposals[k]
 
-    def _claim(self, user: DirectoryUser, proposal_id: str) -> tuple[Optional[Proposal], str]:
+    def _has_room_locked(self, sub: str) -> bool:
+        """Room for one more proposal without evicting anyone else's pending or unresolved one."""
+        self._evict_locked()
+        mine = sum(1 for p in self._proposals.values() if p.sub == sub and p.state == "pending")
+        # full of other people's live proposals: refuse rather than evict theirs
+        return len(self._proposals) < MAX_PROPOSALS or mine >= MAX_PROPOSALS_PER_PERSON
+
+    def _has_room(self, user: DirectoryUser) -> bool:
+        with self._lock:
+            return self._has_room_locked(user.id)
+
+    def _reserve(self, prop: Proposal) -> bool:
+        """Check room and insert in ONE locked step (round 4 A7), so concurrent proposers cannot
+        all pass the check and then exceed ``MAX_PROPOSALS`` or the per-person cap."""
+        with self._lock:
+            if not self._has_room_locked(prop.sub):
+                return False
+            self._evict_locked(prop.sub)
+            self._proposals[prop.proposal_id] = prop
+            return True
+
+    def _claim(self, user: DirectoryUser, proposal_id: str, *, reserve: bool = False
+               ) -> tuple[Optional[Proposal], str]:
         """The caller's own proposal and the state it was in. A ``pending`` one is moved to
-        ``inflight`` under the lock (a double click cannot create twice)."""
+        ``inflight`` under the lock (a double click cannot create twice). With ``reserve`` (a
+        confirm), the same locked step also refuses while ANOTHER proposal for the same answer is
+        in flight or its outcome is held unknown (round 4 A5): the state stays ``pending`` and
+        ``"held"`` is returned, so two proposals confirmed together never both create."""
         if not isinstance(proposal_id, str) or not ID_RE.match(proposal_id):
             return None, ""
         with self._lock:
@@ -624,6 +819,10 @@ class ActionService:
             if prev == "pending":
                 if time.monotonic() - p.created > PROPOSAL_TTL_S:
                     return None, ""
+                if reserve and (self._held_locked(p.sub, p.req_id) or any(
+                        q is not p and q.sub == p.sub and q.req_id == p.req_id
+                        and q.state == "inflight" for q in self._proposals.values())):
+                    return p, "held"
                 p.state = "inflight"
             return p, prev
 
@@ -637,9 +836,12 @@ class ActionService:
 
     def _release(self, p: Proposal) -> None:
         """Back to pending: nothing happened at the source (a validation or pre-effect failure).
-        The entry is never evicted while in flight, so it is still in the store."""
+        The entry is never evicted while in flight, so it is still in the store. The person's
+        OTHER pending proposals are trimmed to the cap (round 4 A7: proposals made while this one
+        was in flight must not leave them over it)."""
         with self._lock:
             p.state = "pending"
+            self._trim_locked(p.sub, MAX_PROPOSALS_PER_PERSON, keep=p.proposal_id)
 
     def _finish(self, p: Proposal, state: str) -> None:
         with self._lock:
@@ -649,13 +851,17 @@ class ActionService:
 
     def _replay(self, user: DirectoryUser, p: Proposal, action: str) -> dict[str, Any]:
         """A repeat confirm of a created proposal: the known result. If its ``action.executed``
-        receipt did not reach the ledger, it is appended now (a failure is the 503 again)."""
+        receipt did not reach the ledger, it is appended now; otherwise ``action.requested`` stage
+        ``replayed`` is (round 4 A1). Either way a record precedes the response, and a ledger
+        failure is the 503 again."""
         if not p.receipt:
             self._append(ActionExecuted(sub=user.id, req_id=p.req_id, action_id=p.proposal_id,
                                         action=action, target=p.result["project"]["key"],
                                         result_ref=p.result["issue"]["key"],
                                         event_time=self.clock()))
             p.receipt = True
+        else:
+            self._requested(user, "replayed", action, p.proposal_id, req_id=p.req_id)
         return dict(p.result)
 
     @staticmethod
@@ -673,13 +879,17 @@ class ActionService:
                        ) -> dict[str, Any]:
         action = "ticket.create"
         self._limit(self._confirm_rate, user, action)
-        p, prev = self._claim(user, proposal_id)
+        p, prev = self._claim(user, proposal_id, reserve=True)
         if p is None or prev == "cancelled":
             raise self._not_found(user, action)
         if prev == "created":
             return self._replay(user, p, action)
         if prev in ("inflight", "unknown"):
             self._fail(user, "confirm", "outcome_unknown_repeat", req_id=p.req_id,
+                       action_id=p.proposal_id, action=action)
+            raise OutcomeUnknown()
+        if prev == "held":          # another proposal for this answer is in flight or unresolved
+            self._fail(user, "confirm", "outcome_unknown_hold", req_id=p.req_id,
                        action_id=p.proposal_id, action=action)
             raise OutcomeUnknown()
         if prev == "failed":
@@ -690,12 +900,9 @@ class ActionService:
         target = project if project is not None else p.project
         if not final or len(final) > SUMMARY_MAX or target not in p.options:
             self._release(p)
+            self._fail(user, "confirm", "invalid", req_id=p.req_id, action_id=p.proposal_id,
+                       action=action)                       # a record before the 422 (rule 3)
             raise ValueError("invalid")
-        if self._held(user, p.req_id):          # another proposal for this answer is unresolved
-            self._release(p)
-            self._fail(user, "confirm", "outcome_unknown_hold", req_id=p.req_id,
-                       action_id=p.proposal_id, action=action)
-            raise OutcomeUnknown()
         payload = self._payload(target, final, p.description)
         try:                    # write-ahead: confirmed BEFORE anything changes in the source
             self._append(ActionConfirmed(sub=user.id, req_id=p.req_id, action_id=p.proposal_id,

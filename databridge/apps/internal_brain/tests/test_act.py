@@ -34,7 +34,7 @@ from test_graph_doc import ALL, PUBLIC_ONLY, READERS, SECRETS
 from test_pipeline_core import FakeConnector, _users
 
 ACTION_KINDS = ("action.proposed", "action.confirmed", "action.executed", "action.failed",
-                "action.rejected")
+                "action.rejected", "action.requested")
 Q = "database migration cutover"
 
 
@@ -129,7 +129,7 @@ def _norm(body):
     for k in ("as_of", "action_id", "proposal_id", "req_id", "expires_at"):
         d.pop(k, None)
     if isinstance(d.get("description"), str):
-        d["description"] = d["description"].split("(request ")[0]
+        d["description"] = d["description"].split("\n\nSources")[0]
     return json.dumps(d, sort_keys=True)
 
 
@@ -173,7 +173,9 @@ def test_action_kinds_are_registered_parsed_and_counted(tmp_path):
     assert jd.post("/ib/act/ticket/cancel", json={"proposal_id": pid}).status_code == 200
     assert jd.post("/ib/act/draft", json={"req_id": "nope"}).status_code == 404
     kinds = [e.kind for e in svc.ledger.events() if e.kind.startswith("action.")]
-    assert kinds == ["action.proposed", "action.proposed", "action.rejected", "action.failed"]
+    # round 4 A1: every draft and proposal is on record (``action.requested``) before its source check
+    assert kinds == ["action.requested", "action.proposed", "action.requested", "action.proposed",
+                     "action.rejected", "action.requested", "action.failed"]
     for le in svc.ledger.events():                 # every record parses to its typed model
         assert le.event is not None and le.event.kind == le.kind
     from datetime import datetime, timedelta, timezone
@@ -181,6 +183,7 @@ def test_action_kinds_are_registered_parsed_and_counted(tmp_path):
     t = st["totals"]
     assert (t["actions_proposed"], t["actions_rejected"], t["actions_failed"],
             t["actions_confirmed"], t["actions_executed"]) == (2, 1, 1, 0, 0)
+    assert st["kinds"]["action.requested"] == 3
     assert st["kinds"]["action.proposed"] == 2
 
 

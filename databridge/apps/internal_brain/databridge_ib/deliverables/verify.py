@@ -19,16 +19,29 @@ What a kept NUMBER (a chart point, a numeric table cell) has to satisfy (review_
    number in between. A label needs at least one real word token;
 6. the UNIT is worked out by our code from ``raw`` (else the CSV column header): percent, a
    currency (one ISO code or symbol), days, hours, or a plain number. One unit and one currency
-   per series, and per chart. The model's own ``unit`` field is not trusted.
+   per series, and per chart. The model's own ``unit`` field is not trusted;
+7. (round 4 B6) the METRIC is bound to that number too: a series name, y-axis label or table column
+   label taken from the source must be that column's header or words of the number's own cell (CSV),
+   or words of the number's own clause (prose). A value moved to another column or metric is
+   dropped; a label the source does not hold is replaced by neutral text ("Values", "Column n").
+   (round 5 #3) A chart series name is decided first, over all its points' evidence; when it is
+   from the sources, EVERY point must be bound to it in its own row or sentence, or it is dropped.
+   A chart title may only use words of the chart's own checked labels.
 
 A SENTENCE (analysis) is checked against the units of its OWN tags only (never the answer):
 every number by key AND unit marker, every identifier as a whole token, every capitalised term
 (sentence-initial included, unless a common word) as a whole word, no identity assertion, no text
 addressed to an AI, no URL, e-mail address or phone number, a shared content word, no filler
-opener, at most 30 words.
+opener, at most 30 words. Round 4 B5: each NUMBER must be found in ONE source unit together with
+the names and content words of its own clause in the sentence (round 5 #2: every alphabetic word
+of 2+ letters except a small stop-word list, so "gas", "fee", "net" bind too): in a CSV row, within
+that row plus the header of the number's column; in prose, within the number's own clause of that
+sentence ("Singapore revenue is 20" fails when 20 is Hong Kong's, or Singapore's cost).
 
 What this does NOT prove (rule 8): that a comparison is meaningful (two figures from different
-dates), or the relation a sentence draws between two evidenced terms. Lowercase or non-Latin
+dates), or the relation a sentence draws between two evidenced terms. Identifiers and dates in a
+sentence are checked for presence in the sentence's sources, not bound to a clause; a clause with
+no name or content word (e.g. "and 20") binds to any unit holding that number. Lowercase or non-Latin
 invented names are not caught by the capitalised-term rule (non-Latin runs must appear verbatim).
 """
 from __future__ import annotations
@@ -189,11 +202,71 @@ def unit_of(raw: str, header: str = "") -> tuple[str, Optional[str]]:
 # ------------------------------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Found:
-    """Where a checked number was found: the unit, the source span, our unit and currency."""
+    """Where a checked number was found: the unit, the source span, our unit and currency, and
+    (round 4 B6) the words its metric may be named by."""
     unit: Unit
     span: ValueSpan
     unit_class: str
     currency: Optional[str]
+    metric_words: frozenset = frozenset()
+
+
+# -- round 4 B5/B6: binding a value to ITS entity and metric ------------------------------------
+#: where the words a value "sits with" end after it: the next value, punctuation, a conjunction
+_CLAUSE_END = re.compile(r"[;,:!?]|\.(?!\d)|\s(?:and|but|while|whereas|whilst)\s", re.I)
+
+
+def _stem(w: str) -> str:
+    return w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
+
+
+def wordset(text: str) -> set[str]:
+    """Lower-case words, a plural ``s`` folded (``fees`` = ``fee``)."""
+    return {_stem(w) for w in words(text)}
+
+
+def clause(text: str, nums: Sequence[ValueSpan], span: ValueSpan) -> str:
+    """The words the number at ``span`` sits with in ``text``: from the previous number to it,
+    then what follows it up to the clause's end. In "Singapore revenue is 10, cost is 20" the
+    clause of 20 is ", cost is " and never holds "Singapore" or "revenue"."""
+    start = max((o.end for o in nums if o.end <= span.start), default=0)
+    nxt = min((o.start for o in nums if o.start >= span.end), default=len(text))
+    after = text[span.end:nxt]
+    m = _CLAUSE_END.search(after)
+    return text[start:span.start] + " " + (after[:m.start()] if m else after)
+
+
+def metric_tokens(label: str) -> set[str]:
+    """The words a metric label (a series name, an axis or column label) must be bound by."""
+    return {_stem(w) for w in label_tokens(label) if any(c.isalpha() for c in w)}
+
+
+#: round 5 #2: the words a clause may hold without claiming anything about its number. A short
+#: content word ("gas", "oil", "fee", "tax", "net", "sg") is NOT here: it is bound like any other.
+_CLAIM_STOP = STOP | _FUNCTION | frozenset(
+    "am be is are was were been has had have do did does done get got its it our we us you he she "
+    "they his her my me him an the of off on in at to by up out so if or nor no not too also all "
+    "any can may now new one two per vs via say says said set hit put let saw see "
+    # short relation verbs: they link a name to its number, they are not the entity or metric
+    "pay add use run own led won ran".split())
+
+
+def claim_tokens(text: str) -> set[str]:
+    """What a sentence's clause claims about its number: every name or acronym (capitalised, not
+    a common word) and every alphabetic content word of 2+ letters that is not a stop-word."""
+    out: set[str] = set()
+    for m in re.finditer(r"\b[A-Z][A-Za-z0-9'&-]*[A-Za-z0-9]\b", text):
+        low = m.group(0).lower()
+        if low not in COMMON and low not in _FUNCTION:
+            out |= {w for w in words(m.group(0)) if any(c.isalpha() for c in w)}
+    out |= {w for w in words(text) if len(w) >= 2 and w.isalpha() and w not in _CLAIM_STOP}
+    return {_stem(w) for w in out}
+
+
+def _header(ev: Optional[Evidence], col: Optional[int]) -> str:
+    if ev is None or ev.csv is None or col is None or col >= len(ev.csv.header):
+        return ""
+    return ev.csv.header[col]
 
 
 def _boundary_ok(line: str, p: int, needle: str) -> bool:
@@ -234,10 +307,17 @@ def _bound_in_sentence(line: str, span: ValueSpan, toks: Sequence[str]) -> bool:
     return True
 
 
-def find_number(x: str, value: Any, raw: str, ev: Optional[Evidence]) -> tuple[Optional[Found], str]:
+def find_number(x: str, value: Any, raw: str, ev: Optional[Evidence], *,
+                metric: str = "") -> tuple[Optional[Found], str]:
     """``(Found, "ok")`` when the point ``{x, value, raw}`` passes rules 2-6 in ``ev``; else
     ``(None, reason)`` with one of: tag, value, raw, scale, ambiguous_grouping, accounting, label,
-    unsafe, not_found."""
+    unsafe, not_found.
+
+    Round 4 B6: with a ``metric`` (the series name, or the table column label), the number must
+    ALSO be bound to it: in a CSV row, every metric word is in that column's header or in the
+    number's own cell; in prose, in the number's own clause. A value moved to another column or
+    metric is not found."""
+    need = metric_tokens(metric) if metric else set()
     if ev is None:
         return None, "tag"
     vkey = value_key(value)
@@ -279,10 +359,13 @@ def find_number(x: str, value: Any, raw: str, ev: Optional[Evidence]) -> tuple[O
                         continue
                 elif not _bound_in_sentence(line, src, toks):
                     continue
-                header = (ev.csv.header[col] if ev.csv is not None and col is not None
-                          and col < len(ev.csv.header) else "")
+                header = _header(ev, col)
+                mw = (wordset(header) | wordset(line) if unit.row is not None
+                      else wordset(clause(line, _nums(line), src)))
+                if not need <= mw:                              # B6: another column / metric
+                    continue
                 uc, cur = unit_of(r, header)
-                return Found(unit, src, uc, cur), "ok"
+                return Found(unit, src, uc, cur, frozenset(mw)), "ok"
     return None, "not_found"
 
 
@@ -365,12 +448,21 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
     series_out = []
     for s in spec.get("series") or []:
         pts, seen = [], set()
+        sname = nfkc(str(s.get("name", "")))
+        # B6 (round 5 #3): the series name is decided FIRST, over the evidence of all its points.
+        # A name taken from the sources names a source metric, so EVERY point must be bound to it
+        # in its own row or sentence (a point whose evidence lacks the metric is dropped); a name
+        # the sources do not hold binds nothing and is replaced by "Values" below.
+        s_tags = dict.fromkeys(str(p.get("tag", "")) for p in s.get("points") or [])
+        s_hay = [u for t in s_tags if t in evidence for u in evidence[t].units]
+        metric = sname if sname and check_short_text(sname, s_hay) else ""
         for p in s.get("points") or []:
             check.items_proposed += 1
             check.values_proposed += 1
             x = nfkc(str(p.get("x", "")))
-            found, why = find_number(x, p.get("value"), str(p.get("raw", "")),
-                                     evidence.get(str(p.get("tag", ""))))
+            pev = evidence.get(str(p.get("tag", "")))
+            found, why = find_number(x, p.get("value"), str(p.get("raw", "")), pev,
+                                     metric=metric)
             if found is None:
                 check.drop(why, value=why in _VALUE_REASONS or why == "tag",
                            name=why in ("label", "unsafe"))
@@ -380,7 +472,8 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
                 continue
             seen.add(x.lower())
             pts.append({"x": x, "value": p.get("value"), "raw": nfkc(str(p.get("raw"))),
-                        "tag": str(p.get("tag")), "_unit": (found.unit_class, found.currency)})
+                        "tag": str(p.get("tag")), "_unit": (found.unit_class, found.currency),
+                        "_mw": found.metric_words})
         if not pts:
             continue
         units = {p["_unit"] for p in pts}
@@ -409,6 +502,9 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
         return None
     tags = {p["tag"] for s in kept for p in s["points"]}
     hay = [u for t in sorted(tags) for u in evidence[t].units]
+    y_label = nfkc(str(spec.get("y_label") or ""))
+    yneed = metric_tokens(y_label) if check_short_text(y_label, hay) else set()
+    y_bound = all(yneed <= p["_mw"] for s in kept for p in s["points"])     # B6: the y metric
     for i, s in enumerate(kept, 1):
         if not check_short_text(s["name"], hay):
             if s["name"]:
@@ -416,6 +512,7 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
             s["name"] = "Values" if len(kept) == 1 else f"Series {i}"
         for p in s["points"]:
             p.pop("_unit", None)
+            p.pop("_mw", None)
         s.pop("_unit", None)
     n_kept = sum(len(s["points"]) for s in kept)
     check.values_kept += n_kept
@@ -429,10 +526,10 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
         else:
             kind, as_bar = "bar", True
     x_label = nfkc(str(spec.get("x_label") or ""))
-    y_label = nfkc(str(spec.get("y_label") or ""))
     return {"type": kind, "drawn_as_bar": as_bar,
             "x_label": x_label if x_label and check_short_text(x_label, hay) else "",
-            "y_label": y_label if y_label and check_short_text(y_label, hay) else "",
+            "y_label": (y_label if y_label and y_bound and check_short_text(y_label, hay)
+                        else ""),
             "unit": main[0], "currency": main[1], "series": kept}
 
 
@@ -463,6 +560,36 @@ def _value_supported(text: str, span: ValueSpan, hay: str) -> bool:
                    for s in _nums(hay))
     needle = re.compile(r"(?<![a-z0-9])" + re.escape(span.key) + r"(?![a-z0-9])")
     return bool(needle.search(fold_dashes(hay).lower()))
+
+
+def _num_bound(t: str, nums: Sequence[ValueSpan], s: ValueSpan,
+               sources: Sequence[tuple[Unit, Evidence]], *, bind: bool = True) -> bool:
+    """Round 4 B5: a number in a sentence must be found (key AND unit marker, read safely) in ONE
+    source unit together with what its clause claims about it (``claim_tokens``: the entity and
+    metric words): in a CSV row, within that row's cells plus the header of the number's own
+    column; in prose, within the number's own clause of that sentence. A value that only appears
+    somewhere else in the evidence ("Singapore revenue is 20" when 20 is Hong Kong's) fails."""
+    if ambiguous_at(t, s):
+        return False
+    want, need = _marker(t, s), (claim_tokens(clause(t, nums, s)) if bind else set())
+    for unit, ev in sources:
+        if unit.row is not None:
+            if unit.row < 0:
+                continue
+            row_words = wordset(" ".join(unit.cells))
+            for col, cell in enumerate(unit.cells):
+                line = norm(cell)
+                if any(o.key == s.key and _marker(line, o) == want and not ambiguous_at(line, o)
+                       for o in _nums(line)) and need <= row_words | wordset(_header(ev, col)):
+                    return True
+            continue
+        line = norm(unit.text)
+        lnums = _nums(line)
+        for o in lnums:
+            if (o.key == s.key and _marker(line, o) == want and not ambiguous_at(line, o)
+                    and need <= wordset(clause(line, lnums, o))):
+                return True
+    return False
 
 
 def _names_ok(text: str, hay: str) -> bool:
@@ -501,12 +628,18 @@ def check_sentence(text: str, tags: Sequence[str], evidence: Mapping[str, Eviden
     spans = [s for s in value_spans(t)]
     nums = [s for s in spans if s.kind == "num"]
     check.values_proposed += len(nums)
-    if any(not _value_supported(t, s, hay) for s in spans):
-        check.drop("value", value=True)
+    sources = [(u, evidence[x]) for x in tags for u in evidence[x].units]
+    if any(not _value_supported(t, s, hay) for s in spans if s.kind != "num") or any(
+            not _num_bound(t, nums, s, sources, bind=False) for s in nums):
+        check.drop("value", value=True)                 # a value no cited source holds
         check.values_dropped += max(0, len(nums) - 1)
         return None
     if not _names_ok(t, hay):
         check.drop("name", name=True)
+        return None
+    if any(not _num_bound(t, nums, s, sources) for s in nums):
+        check.drop("value", value=True)                 # B5: held, but not with ITS entity/metric
+        check.values_dropped += max(0, len(nums) - 1)
         return None
     hw = set(_CONTENT.findall(hay.lower())) - _FUNCTION
     if not (set(_CONTENT.findall(t.lower())) - _FUNCTION) & hw:
@@ -522,10 +655,15 @@ def cell_numeric(text: str) -> bool:
 
 
 def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping[str, Evidence],
-               check: Check, *, is_label: bool) -> Optional[dict[str, Any]]:
+               check: Check, *, is_label: bool, column: str = "") -> Optional[dict[str, Any]]:
     """A table cell, bound to its ROW: the row label's tokens and the cell are in ONE unit (the
     same CSV row or sentence) of the cell's own tag. A numeric cell is checked like a chart point
-    with the row label as its label. Empty cells pass as empty."""
+    with the row label as its label. Empty cells pass as empty.
+
+    Round 4 B6: bound to its COLUMN too (``column``, the checked column label; "" for none): a
+    numeric cell as a chart point with the column label as its metric; a text cell in a CSV row
+    must sit in a cell whose header (or own text) holds the column label's words; in prose the
+    sentence must hold them."""
     t = norm(text).strip()
     tags = [str(x) for x in dict.fromkeys(tags)]
     if not t:
@@ -541,7 +679,7 @@ def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping
     nums = _nums(t)
     if len(nums) == 1 and not is_label:
         check.values_proposed += 1
-        found, why = _find_cell_number(row_label, t, ev)
+        found, why = _find_cell_number(row_label, t, ev, column)
         if found is None:
             check.drop(why, value=True)
             return None
@@ -550,6 +688,7 @@ def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping
         return {"text": t, "tags": tags, "numeric": True}
     toks = label_tokens(t)
     rtoks = label_tokens(row_label) if not is_label else []
+    cneed = metric_tokens(column) if column and not is_label else set()
     for unit in ev.units:
         if unit.row is not None and unit.row < 0 and not is_label:
             continue
@@ -559,6 +698,13 @@ def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping
             ok = set(toks) <= lw
         else:
             ok = t in line
+        if ok and cneed:
+            if unit.row is not None and unit.row >= 0:      # the cell sits under that column
+                ok = any((set(toks) <= set(words(c)) if toks else t in norm(c))
+                         and cneed <= wordset(_header(ev, i)) | wordset(c)
+                         for i, c in enumerate(unit.cells))
+            else:
+                ok = cneed <= wordset(line)
         if ok and set(rtoks) <= lw and all(_value_supported(t, s, line) for s in value_spans(t)):
             check.items_kept += 1
             return {"text": t, "tags": tags, "numeric": False}
@@ -566,8 +712,10 @@ def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping
     return None
 
 
-def _find_cell_number(row_label: str, cell: str, ev: Evidence) -> tuple[Optional[Found], str]:
-    """A numeric cell: its own number is the value, the row label is the label."""
+def _find_cell_number(row_label: str, cell: str, ev: Evidence, column: str = ""
+                      ) -> tuple[Optional[Found], str]:
+    """A numeric cell: its own number is the value, the row label is the label, the column label
+    is the metric (round 4 B6)."""
     n = _nums(cell)[0]
     try:
         value: Any = float(Decimal(n.key)) if "." in n.key else int(n.key)
@@ -575,9 +723,10 @@ def _find_cell_number(row_label: str, cell: str, ev: Evidence) -> tuple[Optional
         return None, "value"
     if value_key(value) != n.key:
         return None, "value"
-    return find_number(row_label, value, cell, ev)
+    return find_number(row_label, value, cell, ev, metric=column)
 
 
 __all__ = ["Check", "Found", "find_number", "check_chart", "check_sentence", "check_cell",
            "check_short_text", "unit_of", "value_key", "ambiguous_at", "period_key", "norm",
+           "clause", "claim_tokens", "metric_tokens", "wordset",
            "label_tokens", "unsafe_text", "cell_numeric", "words"]

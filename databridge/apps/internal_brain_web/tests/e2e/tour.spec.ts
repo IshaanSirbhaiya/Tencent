@@ -4,6 +4,7 @@ import { expectAccessible, login } from './helpers';
 // The guided tours (components/tour/*), in mock mode.
 //   User "Try it": sign in as Jordan → ask → citation [1] → Ken's two refusals → checklist.
 //   Developer: Mission control → journey → graph → Trust centre → analytics + audit verify.
+// The two are separate (D-36): each mode offers its own tour on first entry, with its own flag.
 // Every step is driven with "Do it for me", so the real pages do the work.
 
 const card = (page: Page) => page.getByTestId('tour');
@@ -64,17 +65,109 @@ test('user tour runs end to end with "Do it for me", from the sign-in link', asy
   const list = page.getByTestId('tour-checklist');
   await expect(list).toBeVisible();
   for (const k of ['asked', 'source', 'identical']) await expect(list.locator(`[data-check="${k}"]`)).toHaveAttribute('data-checked', 'true');
-  await expect(list.locator('[data-check="dev"]')).toHaveAttribute('data-checked', 'false');
-  await expect(page.getByTestId('tour-checklist-progress')).toHaveText('3 of 4 done');
+  await expect(list.locator('[data-check="dev"]')).toHaveCount(0);
+  await expect(page.getByTestId('tour-checklist-progress')).toHaveText('3 of 3 done');
+  // The user tour ends in User mode: no hand-over to the Developer tour (D-36).
+  await expect(page.getByTestId('tour-switch-dev')).toHaveCount(0);
+  await expect(page.getByTestId('tour-dev-start')).toHaveCount(0);
   await expectAccessible(page, 'tour/user-checklist');
-  await page.getByTestId('tour-switch-dev').click();
-  await page.waitForURL((u) => u.pathname === '/dev');
-  await expect(list.locator('[data-check="dev"]')).toHaveAttribute('data-checked', 'true');
-  await expect(page.getByTestId('tour-dev-start')).toBeVisible();
   const done = await page.evaluate(() => JSON.parse(localStorage.getItem('ib-tour-done') ?? '{}'));
   expect(done.user).toBe(true);
+  expect(done.dev).toBeFalsy();
   await page.getByTestId('tour-end-close').click();
   await expect(card(page)).toHaveCount(0);
+  expect(new URL(page.url()).pathname).toBe('/compare');
+  await expect(page.getByTestId('mode-switch').getByRole('radio', { name: 'User' })).toHaveAttribute('aria-checked', 'true');
+});
+
+const offer = (page: Page) => page.getByTestId('tour-offer');
+const offerFlags = (page: Page) => page.evaluate(() => localStorage.getItem('ib-tour-offer'));
+
+test('each mode offers its own tour on first entry; "Not now" on the user offer leaves the developer offer', async ({ page }) => {
+  await login(page, 'jdoe');
+  // First entry to User mode: the user tour's offer.
+  await expect(offer(page)).toBeVisible();
+  await expect(offer(page)).toHaveAttribute('data-tour-offer', 'user');
+  await expect(offer(page)).toHaveAccessibleName('Guided tour');
+  await offer(page).getByRole('button', { name: 'Not now' }).click();
+  await expect(offer(page)).toHaveCount(0);
+  expect(JSON.parse((await offerFlags(page)) ?? '{}')).toEqual({ user: true, dev: false });
+
+  // First entry to Developer mode (the header's mode switch): its own offer, still unseen.
+  await page.getByTestId('mode-switch').getByRole('radio', { name: 'Developer' }).click();
+  await page.waitForURL((u) => u.pathname === '/dev');
+  await expect(offer(page)).toBeVisible();
+  await expect(offer(page)).toHaveAttribute('data-tour-offer', 'dev');
+  await expect(offer(page)).toHaveAccessibleName('Developer tour');
+  await expect(card(page)).toHaveCount(0);
+  await expectAccessible(page, 'tour/offer-dev');
+
+  // Its "Take the tour" starts the DEVELOPER tour and answers only the developer offer.
+  await offer(page).getByRole('button', { name: 'Take the tour' }).click();
+  await expect(counter(page)).toContainText('Developer tour');
+  await expect(counter(page)).toContainText('Step 1 of 5');
+  expect(JSON.parse((await offerFlags(page)) ?? '{}')).toEqual({ user: true, dev: true });
+  await card(page).getByRole('button', { name: 'Skip tour' }).click();
+  await expect(card(page)).toHaveCount(0);
+  await page.goto('/dev/trust');
+  await expect(page.getByTestId('whoami')).toContainText('jdoe');
+  await expect(offer(page)).toHaveCount(0);
+});
+
+test('"Not now" on the developer offer leaves the user offer; neither offer shows on /present or while presenting', async ({ page }) => {
+  await login(page, 'jdoe');
+  await expect(offer(page)).toHaveAttribute('data-tour-offer', 'user');
+  // Any /dev page is a first entry to Developer mode.
+  await page.goto('/dev/graph');
+  await expect(offer(page)).toHaveAttribute('data-tour-offer', 'dev');
+  await offer(page).getByRole('button', { name: 'Not now' }).click();
+  await expect(offer(page)).toHaveCount(0);
+  expect(JSON.parse((await offerFlags(page)) ?? '{}')).toEqual({ user: false, dev: true });
+  await page.goto('/compare');
+  await expect(page.getByTestId('whoami')).toContainText('jdoe');
+  await expect(offer(page)).toHaveAttribute('data-tour-offer', 'user');
+
+  // The presenter's slides belong to neither mode; an armed presenter hides the offer everywhere.
+  await page.goto('/present');
+  await expect(page.getByTestId('whoami').or(page.locator('main'))).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(offer(page)).toHaveCount(0);
+  await page.evaluate(() => sessionStorage.setItem('ib.presenter', JSON.stringify({ armed: true, started: false, step: 0, stage: false, reqs: {} })));
+  await page.goto('/');
+  await expect(page.getByTestId('whoami')).toContainText('jdoe');
+  await page.waitForTimeout(800);
+  await expect(offer(page)).toHaveCount(0);
+});
+
+test('switching mode never carries a tour across; the header button starts the current mode\'s tour', async ({ page }) => {
+  await login(page, 'jdoe');
+  await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
+  await expect(counter(page)).toContainText('Try it');
+  await expect(counter(page)).toContainText('Step 2 of 4');
+
+  // Into Developer mode: the user tour closes, nothing starts by itself, only the dev offer shows.
+  await page.getByTestId('mode-switch').getByRole('radio', { name: 'Developer' }).click();
+  await page.waitForURL((u) => u.pathname === '/dev');
+  await expect(card(page)).toHaveCount(0);
+  await expect(offer(page)).toHaveAttribute('data-tour-offer', 'dev');
+  await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
+  await expect(counter(page)).toContainText('Developer tour');
+  await expect(counter(page)).toContainText('Step 1 of 5');
+  await next(page);
+  await expect(counter(page)).toContainText('Step 2 of 5');
+
+  // Back to User mode: the dev tour closes and is not resumed; no user offer (it was answered).
+  await page.getByTestId('mode-switch').getByRole('radio', { name: 'User' }).click();
+  await page.waitForURL((u) => u.pathname === '/');
+  await expect(card(page)).toHaveCount(0);
+  await expect(offer(page)).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('whoami')).toContainText('jdoe');
+  await page.waitForTimeout(800);
+  await expect(card(page)).toHaveCount(0);
+  await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
+  await expect(counter(page)).toContainText('Try it');
+  await expect(counter(page)).toContainText('Step 2 of 4');
 });
 
 test('Skip closes the tour and retires the first-visit offer (light theme, axe)', async ({ page }) => {

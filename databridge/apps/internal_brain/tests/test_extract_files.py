@@ -329,3 +329,85 @@ def test_a_missing_library_switches_off_only_its_formats(monkeypatch):
         X._readers_for("pdf")
     assert ei.value.reason == "unavailable"
     assert set(X._readers_for("csv")) == {"csv"}
+
+
+# ---------------------------------------------------------------------------------------------
+# round 4 Codex B11: a sparse .xlsx is bounded BEFORE any reader builds its dense grid
+# ---------------------------------------------------------------------------------------------
+def _xlsx_cells(cells: dict[str, str]) -> bytes:
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    for ref, v in cells.items():
+        ws[ref] = v
+    b = io.BytesIO()
+    wb.save(b)
+    return b.getvalue()
+
+
+def _sheet_member(data: bytes) -> str:
+    return next(n for n in zipfile.ZipFile(io.BytesIO(data)).namelist()
+                if n.startswith("xl/worksheets/") and n.endswith(".xml"))
+
+
+def _patch_sheet(data: bytes, fn) -> bytes:
+    name = _sheet_member(data)
+    xml = zipfile.ZipFile(io.BytesIO(data)).read(name).decode("utf-8")
+    return _replace_member(data, name, fn(xml).encode("utf-8"))
+
+
+def test_sparse_xlsx_extent_is_measured_from_the_xml_without_a_reader():
+    """The extent is max_row x max_column per sheet, from cell and row references, the declared
+    dimension, merged ranges, hyperlinks and comments (openpyxl materialises every one of those),
+    and from implicit positions when a cell or row carries no reference."""
+    small = _xlsx_cells({"A1": "Plan", "B1": "Fee", "A2": "Growth", "B2": "0.30%"})
+    assert X.xlsx_extent(small) == 4
+    far = _xlsx_cells({"A1": "a", "XFD1048576": "far"})
+    assert X.xlsx_extent(far) == 16384 * 1048576
+    merged = _patch_sheet(small, lambda x: x.replace(
+        "</sheetData>", '</sheetData><mergeCells count="1"><mergeCell ref="C3:ZZ90000"/></mergeCells>'))
+    assert X.xlsx_extent(merged) == 702 * 90000
+    linked = _patch_sheet(small, lambda x: x.replace(
+        "</sheetData>", '</sheetData><hyperlinks><hyperlink ref="A1:AB60000" r:id="rId9"/>'
+                        '</hyperlinks>'))
+    assert X.xlsx_extent(linked) == 28 * 60000
+    implicit = _patch_sheet(small, lambda x: re.sub(r'<sheetData>.*</sheetData>',
+                                                    "<sheetData><row>" + "<c/>" * 700
+                                                    + "</row><row/><row/></sheetData>", x,
+                                                    flags=re.S))
+    assert X.xlsx_extent(implicit) == 700 * 3
+    assert X.xlsx_extent(_patch_sheet(small, lambda x: x.replace(
+        'r="B2"', 'r="B99999999999999999999"'))) > X.XLSX_MAX_CELLS
+
+
+def test_sparse_xlsx_is_refused_before_iterating():
+    over = _xlsx_cells({"A1": "Plan", "B1": "Fee", "A2": "Growth", "B2": "1",
+                        "CV12000": "far"})                  # 100 x 12,000 = 1.2M cells
+    assert _reason("xlsx", over) == "xlsx_dimensions"
+    t0 = time.monotonic()
+    assert _reason("xlsx", _xlsx_cells({"A1": "a", "B1": "b", "XFD1048576": "far"})) == \
+        "xlsx_dimensions"
+    assert time.monotonic() - t0 < 10                    # refused up front, not by the kill
+    assert "Row 1: Plan=Growth, Fee=1" in X.extract(
+        "xlsx", _xlsx_cells({"A1": "Plan", "B1": "Fee", "A2": "Growth", "B2": "1"}))
+
+
+def test_an_xlsx_tag_of_any_length_is_measured_round5():
+    """Round 5 Codex #6 (B11 partial): a start tag padded past the old 4,096-byte window, a ``>``
+    inside an attribute value, or an ``r=`` hidden inside another attribute's value cannot hide a
+    far cell from the extent scan (the sheet is stream-parsed, attributes exactly as a reader
+    sees them)."""
+    small = _xlsx_cells({"A1": "Plan", "B1": "Fee", "A2": "Growth", "B2": "1"})
+    far = 16384 * 1048576
+    pad = " " * 10240                                      # a 10 KB start tag
+    padded = _patch_sheet(small, lambda x: x.replace('<c r="B2"', f'<c{pad}r="XFD1048576"'))
+    assert len(padded) < 64 * 1024                         # still a small file
+    assert X.xlsx_extent(padded) >= far
+    assert _reason("xlsx", padded) == "xlsx_dimensions"
+    row_padded = _patch_sheet(small, lambda x: x.replace('<row r="2"', f'<row{pad}r="1048576"'))
+    assert X.xlsx_extent(row_padded) >= 1048576 * 2
+    gt = _patch_sheet(small, lambda x: x.replace('<c r="B2"', '<c foo=">" r="XFD1048576"'))
+    assert X.xlsx_extent(gt) >= far
+    hidden = _patch_sheet(small, lambda x: x.replace('<c r="B2"',
+                                                     '<c foo=" r=\'A1\'" r="XFD1048576"'))
+    assert X.xlsx_extent(hidden) >= far
+    assert X.xlsx_extent(small) == 4                       # the ordinary sheet is unchanged

@@ -278,7 +278,9 @@ def test_changes_deliver_the_new_note_only_to_people_who_can_open_it(env):
 
     idle = jd.get("/ib/graph/changes", params={"since": first_j["cursor"]}).json()
     assert idle["nodes"] == [] and set(idle) == {"cursor", "nodes", "edges"}
-    assert len(_graph_views(e)) == n0 + 2            # an empty poll inside a window is not
+    # round 5 Codex #8: every poll in a window writes its zero-count write-ahead row before Gate 1
+    assert len(_graph_views(e)) == n0 + 3
+    assert (_graph_views(e)[-1].outcome, _graph_views(e)[-1].docs_returned) == ("checking", 0)
 
     doc_id = _note(jd).json()["doc_id"]
     d = jd.get("/ib/graph/changes", params={"since": idle["cursor"]}).json()
@@ -418,3 +420,32 @@ def test_add_document_ledger_down_is_503_and_nothing_is_posted(env, monkeypatch)
     r = _note(_as(app, svc, AUTHOR), text="this must not be posted")
     assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
     assert len(e.hooks) == hooks
+
+
+def test_write_ahead_without_a_ledger_fails_closed():
+    """Round 4 Codex B8: no ledger configured is the same as a ledger that is down. The source write
+    must not go ahead unaudited, so ``write_ahead`` raises instead of returning quietly."""
+    from databridge_ib.sim import LedgerUnavailable, write_ahead
+    with pytest.raises(LedgerUnavailable):
+        write_ahead(None, AUTHOR, "sim.add-document", "requested", {"platform": "slack"})
+
+
+def test_add_document_without_a_ledger_is_503_and_nothing_is_posted(world, tmp_path, monkeypatch):
+    """Round 4 Codex B8, end to end: a sim router built with no ledger (and an ingestor without
+    one) answers 503 for a post that would otherwise succeed, and nothing reaches the source."""
+    e = world
+    monkeypatch.setattr(e.ingestor, "ledger", None)
+    cfg = IbConfig(var_root=tmp_path / "var", world_path=WORLD, admin_token=ADMIN,
+                   demo_login=True, demo_features=True)
+    svc = Services(cfg=cfg, directory=e.directory, index=e.index, connectors=e.connectors,
+                   ledger=e.ledger, answers=MemAnswers(), pipeline=e.pipeline, ingestor=e.ingestor)
+    app = create_app(svc, sim_router_factory=lambda cur, rr: make_sim_router(
+        cfg, rr, client_factory=lambda: _admin_client(e), ingestor=e.ingestor, current=cur,
+        ledger=None))
+    hooks = len(e.hooks)
+    try:
+        r = _note(_as(app, svc, AUTHOR), text="this must not be posted without an audit row")
+        assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+        assert len(e.hooks) == hooks
+    finally:
+        world.reset()

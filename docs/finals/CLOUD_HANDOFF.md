@@ -1,3 +1,123 @@
+# >>> CLOUD SESSION 2 START HERE (laptop battery dying, Fri 30 Oct ~18:30 SGT) <<<
+
+**State at hand-off:** branch `final_v1.2`. This commit is everything on the laptop, including WORK IN
+PROGRESS from two agents that were still running (see "Unverified at hand-off" below). `final_v1.3` on
+origin is still the old cloud commit `1076517`. Do NOT move it until the checks below pass.
+
+## Task 0 (FOUNDER, URGENT): watch for the teammate's push EVERY 10 MINUTES
+
+The teammate will push his branch (or branches) later. Set up a recurring check NOW:
+- use `/loop 10m` or ScheduleWakeup (600 s);
+- each check runs `git fetch --all --prune` and looks for any new branch, on origin or on a fork URL the
+  founder gives, that is not final_v1.x or Tencent;
+- as soon as one appears, start Task 1 immediately and tell the founder;
+- keep doing Task 2 between checks.
+
+## Task 1 (the founder's ask): merge the teammate's work
+
+1. **Find the branch.** The founder says the teammate has pushed. At hand-off, NO teammate branch was on
+   `origin` (IshaanSirbhaiya/Tencent); only final_v1.0..v1.3 and Tencent. Run `git fetch --all` and list the
+   branches. If it still isn't there, ask the founder for the exact repo URL and branch name. Never push to
+   walnut-upstream (Dev-Sirbhaiya/Walnut); reading from it is fine.
+2. **Analyse before merging** with `docs/finals/MERGE_PLAN.md` and `databridge/scripts/merge_precheck.py <branch>`:
+   - secrets;
+   - real company names;
+   - `packages/**` untouched (the engine is never modified);
+   - the per-feature hard-rule checklists (voice / just-in-time UI / dots);
+   - the conflict hot spots.
+   Write `docs/finals/MERGE_ANALYSIS_<branch>.md` (the plan, conflicts, risks) BEFORE merging. Run a 5-seat
+   review on the plan (Sonnet, Haiku, Opus, Fable) in parallel.
+3. **If it is clean, or the conflicts are resolvable:**
+   - `git switch -c final_v1.4 final_v1.2`, then `git merge --no-ff <branch>`, and resolve per MERGE_PLAN;
+   - test the IB suite, mock_platforms, fixtures, tsc, the Playwright mock e2e, and the leak eval if the
+     backend or world changed;
+   - fix anything red, then push `final_v1.4`;
+   - if a conflict is a product decision, stop and ask the founder.
+4. **After the JIT UI merge:** extend the **User-mode tour** with JIT steps (founder reminder; see the
+   MERGE_PLAN tail). The User and Developer tours stay separate.
+5. **Fill the video slots S1–S3** (docs/finals/video/VIDEO_SCRIPT_FINALS.md) from the teammate's features,
+   and add QA_BANK answers for them.
+
+## Task 2: finish tonight's lock (it was in progress on the laptop)
+
+### Unverified at hand-off (in this commit; finish and test them)
+
+a. **DONE (verified on laptop: test_act* 61, test_deliverables* 145 pass; tests test_act_round5.py, test_deliverables_round5.py).** Grounding fixes, round-5 Codex items 3–5:**
+   - `databridge_ib/actions.py` `supported`: the name must be in the anchor, and negation is checked per
+     clause;
+   - `deliverables/verify.py` `claim_tokens`: keep short content words;
+   - `deliverables/verify.py` `check_chart`: a series is bound to its metric.
+
+   That agent had not reported. Run test_act*.py and test_deliverables*.py, and fix anything red.
+
+b. **Separate User / Developer tours** (components/tour/*, tests/e2e/tour.spec.ts):
+   - each tour offers itself on first entry to its own mode;
+   - no "switch to Developer" chaining;
+   - the header button starts the current mode's tour.
+
+   This may be half-done. Finish it, and add decision D-36 plus a FEATURE_CATALOGUE line.
+
+c. **Presenter test** `presenter.spec.ts:485` ("D then Esc puts the session back") failed once in the full
+   run (expected "busy", got "ready"). It is likely a timing race, since it passed 25/25 for its author.
+   Confirm, and make the test robust if it is flaky.
+
+### Done and verified on the laptop
+
+- All round-4 fixes.
+- Round-5 fixes:
+  - #7, upload-folders write-ahead;
+  - #8, a uniform live-poll 503;
+  - the B11 xlsx scan;
+  - stats;
+  - the WorkBuddy token;
+  - D sign-in;
+  - kit and video scene 19 as Leo;
+  - presenter popstate;
+  - Next over the sheet;
+  - reveal at 05/06;
+  - Exit on a slide.
+- Test results:
+  - full IB suite: 1,274 passed (2 known flakes);
+  - e2e: 181 passed, 1 failed (item c), 42 skipped;
+  - mock platforms 159; fixtures 47;
+  - **leak eval: 0 leaks / 7,374, 0/400, 0 injection, recall 100%**.
+- Stage QA re-run: PASS (docs/finals/demo_day/STAGE_QA_30OCT.md).
+
+### Then
+
+- From a CLEAN checkout, run the full IB suite, e2e, mock, fixtures and the eval.
+- Put the measured counts into README, STATUS, FEATURE_CATALOGUE, TEST_REPORT, ORGANISER_UPDATE, QA_BANK and
+  video_constants, then run `scripts/eval_summary.py --e2e <n>`.
+- Commit, push `final_v1.2`, then `git push origin final_v1.2:final_v1.3`. This moves the pointer that the
+  organiser email links to.
+- Tell the founder the email is ready. They send it before 23:59 SGT.
+- Codex: Run 2 is done (round5_codex_final.md) and Run 3 is reserved. There is no Codex in the cloud.
+
+## Also on the laptop (not pushed unless noted)
+
+- **`feat/graph-galaxy`**: the graph speed fix (one Gate-2 pass for graph and map), being built in a
+  separate worktree. If it was pushed, review it and merge it AFTER the lock (Saturday). Diagnosis:
+  docs/finals/live_growth/GRAPH_PERF_DIAGNOSIS.md.
+- **Step 01 slowdown**: caused by the whole-ledger verify on every write, which is engine code, so it was
+  not changed.
+  - Mitigation: a fresh reset on the morning of Demo Day, and close graph tabs (FOUNDER_TODO,
+    STEP01_PERF_DIAGNOSIS.md).
+  - Live-poll rows now add one ledger row per poll while a graph tab is open.
+- **App-mode "Demo story"**: PLAN_v2 is approved for a Saturday build (docs/finals/app_mode/PLAN_v2.md).
+- **Hy3**: the founder is activating it on a NEW Tencent Cloud account (card added, 10 USD alert). A
+  voucher redeem is pending. The key goes ONLY into the laptop's .env.ib.local, entered by the founder; the
+  cloud has no key.
+
+## Rules
+
+- Never `git stash`, `git checkout --` or `git reset --hard`.
+- Never push to walnut-upstream, and never commit to `Tencent`.
+- Synthetic data only.
+- Restricted ≡ non-existent.
+- Never claim Hy3 answered, and never claim more than the tests prove.
+- Update the docs with every change.
+- Maximum parallelism; 5-seat reviews (Sonnet/Haiku/Opus/Fable, plus Codex when available).
+
 # Cloud handoff: Walnut DataBridge finals build (written Fri 30 Oct 2026, ~11:45 SGT)
 
 ## Laptop session, 30 Oct evening (status; read this first)

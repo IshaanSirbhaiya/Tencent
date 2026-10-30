@@ -28,7 +28,8 @@ from databridge_ib.sim import make_sim_router
 
 DEMO_ROUTES = [("GET", "/ib/graph/changes"), ("POST", "/sim/add-document"),
                ("POST", "/sim/check-absent"), ("POST", "/sim/engine-refresh"),
-               ("POST", "/sim/engine-status"), ("POST", "/sim/upload-file")]
+               ("POST", "/sim/engine-status"), ("POST", "/sim/upload-file"),
+               ("GET", "/sim/upload-folders")]
 UNKNOWN = {"GET": "/ib/graph/no-such-route", "POST": "/sim/no-such-route"}
 PUBLIC_ROUTES = {"/health", "/auth/demo-login", "/webhooks/{platform}"}
 
@@ -306,17 +307,20 @@ def test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login(tmp_pa
     from databridge_ib.uploads import mount_uploads_router
     on = build_app(_cfg(tmp_path / "on", demo_features=True), sync=False)
     assert "/sim/upload-file" in mounted_paths(on)
+    assert "/sim/upload-folders" in mounted_paths(on)                  # D-34: the same switches
     # a deployment (build_app refuses dev keys there, so the mount step is called directly)
     dep = FastAPI()
     deployed = SimpleNamespace(cfg=SimpleNamespace(deployed=True, demo_login=True,
                                                    demo_features=True))
     mount_uploads_router(dep, deployed, [])
-    assert dep.routes == [] or "/sim/upload-file" not in mounted_paths(dep)
+    assert dep.routes == [] or {"/sim/upload-file", "/sim/upload-folders"}.isdisjoint(
+        mounted_paths(dep))
     for i, kw in enumerate(({"demo_features": True, "demo_login": False},
                             {"demo_features": False})):
         app = build_app(_cfg(tmp_path / str(i), **kw), sync=False)
         svc = app.state.svc
         assert "/sim/upload-file" not in mounted_paths(app)
+        assert "/sim/upload-folders" not in mounted_paths(app)
         n = len(list(svc.ledger.events()))
         clients = [TestClient(app)]
         if kw.get("demo_login", True):
@@ -327,4 +331,8 @@ def test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login(tmp_pa
                                                      "content_b64": "eA=="})
                 u = c.post(UNKNOWN["POST"], json={})
                 assert r.status_code == u.status_code == 404 and r.content == u.content, kw
+                r = c.get("/sim/upload-folders")                           # D-34
+                u = c.get(UNKNOWN["GET"])
+                assert r.status_code == u.status_code == 404 and r.content == u.content, kw
+                assert r.headers.get("content-type") == u.headers.get("content-type")
         assert len(list(svc.ledger.events())) == n

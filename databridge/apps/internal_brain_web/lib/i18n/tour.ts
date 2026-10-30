@@ -12,6 +12,8 @@ const en = {
   'offer.body': 'Try it in 45 seconds: ask once, open a source, then watch two refusals match.',
   'offer.start': 'Take the tour',
   'offer.later': 'Not now',
+  'offer.devLabel': 'Developer tour',
+  'offer.devBody': 'Five steps under the hood: the pipeline, one answer end to end, the knowledge graph and the Trust centre.',
 
   // the step card
   'card.label': 'Guided tour',
@@ -71,14 +73,11 @@ const en = {
   'end.title': "You've seen the core idea",
   'end.body': 'Answers come only from what each person can open, and a refusal never hints at what is hidden.',
   'end.progress': '{n} of {total} done',
-  'end.switch': 'Switch to Developer mode',
-  'end.devTour': 'Take the developer tour',
   'end.close': 'Done',
   'check.label': 'Tour checklist',
   'check.asked': 'Asked a question',
   'check.source': 'Opened a source',
   'check.identical': 'Saw identical refusals',
-  'check.dev': 'Switched to Developer mode',
   'check.isDone': 'done',
   'check.isTodo': 'not yet',
 
@@ -129,6 +128,8 @@ const zh: Record<TourKey, string> = {
   'offer.body': '45 秒上手：提一个问题，打开一个来源，再看两个完全相同的拒答。',
   'offer.start': '开始导览',
   'offer.later': '以后再说',
+  'offer.devLabel': '开发者导览',
+  'offer.devBody': '五步看懂内部：处理流程、一个回答的完整旅程、知识图谱和信任中心。',
 
   'card.label': '导览',
   'card.eyebrow.user': '试一试',
@@ -185,14 +186,11 @@ const zh: Record<TourKey, string> = {
   'end.title': '你已经看到了核心理念',
   'end.body': '回答只来自每个人能打开的内容，拒答也绝不暗示有内容被隐藏。',
   'end.progress': '已完成 {n} / {total}',
-  'end.switch': '切换到开发者模式',
-  'end.devTour': '开始开发者导览',
   'end.close': '完成',
   'check.label': '导览清单',
   'check.asked': '提出了一个问题',
   'check.source': '打开了一个来源',
   'check.identical': '看到了完全相同的拒答',
-  'check.dev': '切换到了开发者模式',
   'check.isDone': '已完成',
   'check.isTodo': '未完成',
 

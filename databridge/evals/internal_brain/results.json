@@ -1,9 +1,9 @@
 {
- "generated_at": "2026-10-30T05:30:46+00:00",
+ "generated_at": "2026-10-30T09:50:55+00:00",
  "config": {
-  "world": "/home/user/tencent/databridge/fixtures/enterprise/world.json",
+  "world": "E:\\Tenecent Hack_Walnut\\Tencent\\databridge\\fixtures\\enterprise\\world.json",
   "world_sha256": "e3381d7122570db7744f63094b7fbcdf05617aedb1c5de0a22f4f3d5b48861b7",
-  "ib_code_sha256": "3a0b1a9a5ec7af3882d1838418310b1737464147c7cc8c8550d098f226de2c5f",
+  "ib_code_sha256": "e8a1d35c97a6f8e79d5967648cfa4243e3b7cb25a4a9eb268cc02346b1f07992",
   "manifest_sha256": null,
   "meta": {
    "domain": "companya.example",
@@ -36,18 +36,18 @@
   "probes_run": 3687,
   "args": {
    "worker_spec": null,
-   "workers": 4,
+   "workers": 3,
    "limit": 0,
    "p2_n": 100,
    "no_p2": false,
-   "out": "/home/user/logs/eval",
-   "work": "<temp>/evalwork"
+   "out": "E:\\Tenecent Hack_Walnut\\Tencent\\databridge\\evals\\internal_brain",
+   "work": "<temp>/ibeval-zgt3xz1t"
   },
   "shards": {
    "A0": {
-    "build_s": 15.2,
-    "run_s": 35.0,
-    "n_records": 1844,
+    "build_s": 34.3,
+    "run_s": 145.4,
+    "n_records": 2458,
     "indexed_docs": 1204,
     "indexed_by_platform": {
      "confluence": 228,
@@ -63,9 +63,9 @@
     ]
    },
    "A1": {
-    "build_s": 15.4,
-    "run_s": 38.1,
-    "n_records": 1844,
+    "build_s": 35.2,
+    "run_s": 154.2,
+    "n_records": 2458,
     "indexed_docs": 1204,
     "indexed_by_platform": {
      "confluence": 228,
@@ -81,27 +81,9 @@
     ]
    },
    "A2": {
-    "build_s": 15.5,
-    "run_s": 37.3,
-    "n_records": 1844,
-    "indexed_docs": 1204,
-    "indexed_by_platform": {
-     "confluence": 228,
-     "jira": 261,
-     "slack": 628,
-     "drive": 87
-    },
-    "connectors": [
-     "confluence",
-     "drive",
-     "jira",
-     "slack"
-    ]
-   },
-   "A3": {
-    "build_s": 14.1,
-    "run_s": 39.3,
-    "n_records": 1842,
+    "build_s": 34.7,
+    "run_s": 157.0,
+    "n_records": 2458,
     "indexed_docs": 1204,
     "indexed_by_platform": {
      "confluence": 228,
@@ -117,8 +99,8 @@
     ]
    },
    "A_control": {
-    "build_s": 15.2,
-    "run_s": 6.5,
+    "build_s": 35.1,
+    "run_s": 21.8,
     "n_records": 400,
     "indexed_docs": 1204,
     "indexed_by_platform": {
@@ -135,8 +117,8 @@
     ]
    },
    "B_jdoe": {
-    "build_s": 12.5,
-    "run_s": 5.6,
+    "build_s": 27.2,
+    "run_s": 18.8,
     "n_records": 200,
     "indexed_docs": 930,
     "indexed_by_platform": {
@@ -153,8 +135,8 @@
     ]
    },
    "B_ken.ext": {
-    "build_s": 1.8,
-    "run_s": 0.7,
+    "build_s": 7.6,
+    "run_s": 1.5,
     "n_records": 200,
     "indexed_docs": 24,
     "indexed_by_platform": {
@@ -193,7 +175,7 @@
    "extractive": 1.0
   },
   "canaries_valid": true,
-  "runtime_s": 54.2,
+  "runtime_s": 194.3,
   "shards_failed": 0
  },
  "per_mode": {
@@ -208,7 +190,7 @@
    "served_by_model": 1045,
    "model_called_but_grounding_fell_back": 2,
    "errors": 0,
-   "latency_ms_mean": 19.2
+   "latency_ms_mean": 57.2
   },
   "extractive": {
    "requests": 3687,
@@ -221,7 +203,7 @@
    "served_by_model": 0,
    "model_called_but_grounding_fell_back": 0,
    "errors": 0,
-   "latency_ms_mean": 18.4
+   "latency_ms_mean": 53.4
   }
  },
  "taxonomy": {
@@ -400,7 +382,127 @@
  "errors": [],
  "expected_refusal_failures": [
   {
-   "req_id": "dad028092be84c9daee5a8550e6c992c",
+   "req_id": "8088dc273e21470e87848fa32f7673c7",
+   "persona": "maya.compliance",
+   "probe": "W-P-maya.compliance-34",
+   "type": "world:direct",
+   "mode": "fake-capture",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "6af724b534454ee992e985c48fbf84c5",
+   "persona": "maya.compliance",
+   "probe": "W-P-maya.compliance-34",
+   "type": "world:direct",
+   "mode": "extractive",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "7b0c6499792b4e71898b9d2a2942693b",
+   "persona": "admin.it",
+   "probe": "W-P-admin.it-34",
+   "type": "world:direct",
+   "mode": "fake-capture",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "f570b9249e624c70a1c1ff2993b1d168",
+   "persona": "amy.am",
+   "probe": "W-P-amy.am-13",
+   "type": "world:direct",
+   "mode": "fake-capture",
+   "question": "What is PAY-233 about?",
+   "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "e1873706a07b41c784df8b5666204543",
+   "persona": "amy.am",
+   "probe": "W-P-amy.am-34",
+   "type": "world:direct",
+   "mode": "fake-capture",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "d9218a3157204d2ea15beb0c2182fdce",
+   "persona": "mlro.tan",
+   "probe": "W-P-mlro.tan-13",
+   "type": "world:direct",
+   "mode": "fake-capture",
+   "question": "What is PAY-233 about?",
+   "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "eccf5db0119f4c8eb856eecfce055e76",
+   "persona": "mlro.tan",
+   "probe": "W-P-mlro.tan-34",
+   "type": "world:direct",
+   "mode": "fake-capture",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "e17d7477a8774aaa9b971ebd36d8eadb",
+   "persona": "admin.it",
+   "probe": "W-P-admin.it-34",
+   "type": "world:direct",
+   "mode": "extractive",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "48c03695e370479e8726194bd3a56144",
+   "persona": "amy.am",
+   "probe": "W-P-amy.am-13",
+   "type": "world:direct",
+   "mode": "extractive",
+   "question": "What is PAY-233 about?",
+   "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "8d69fc86a9ec40419edf98c32e510136",
+   "persona": "amy.am",
+   "probe": "W-P-amy.am-34",
+   "type": "world:direct",
+   "mode": "extractive",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "fab9e65637ff4170af9402457c7923eb",
+   "persona": "mlro.tan",
+   "probe": "W-P-mlro.tan-13",
+   "type": "world:direct",
+   "mode": "extractive",
+   "question": "What is PAY-233 about?",
+   "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "64b3707c306b4dbea8ecb3bc57f8bcb6",
+   "persona": "mlro.tan",
+   "probe": "W-P-mlro.tan-34",
+   "type": "world:direct",
+   "mode": "extractive",
+   "question": "When is the next settlement key rotation?",
+   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+   "what": "expected_refusal_not_served"
+  },
+  {
+   "req_id": "f2be094d53bd4229bb055ee182f1120c",
    "persona": "leo.ops",
    "probe": "W-P-leo.ops-34",
    "type": "world:direct",
@@ -410,133 +512,13 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "9beee4da417845998ddf0ab2df49e491",
-   "persona": "amy.am",
-   "probe": "W-P-amy.am-13",
-   "type": "world:direct",
-   "mode": "fake-capture",
-   "question": "What is PAY-233 about?",
-   "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "692f028e2c624a4687757b6c7e584520",
-   "persona": "mlro.tan",
-   "probe": "W-P-mlro.tan-34",
-   "type": "world:direct",
-   "mode": "fake-capture",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "f1173c3c049e45fb971d3d286d657c85",
+   "req_id": "d4ead6c41cfa4c10b996436ca4c75192",
    "persona": "leo.ops",
    "probe": "W-P-leo.ops-34",
    "type": "world:direct",
    "mode": "extractive",
    "question": "When is the next settlement key rotation?",
    "answer": "Speed up idempotency key handling in the settlement batch job [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint is cached and key rotation is automated. [C2] We agreed to keep SAML metadata rotation out of scope for th",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "dd6efff922ce4711be32fd75b52b7da5",
-   "persona": "amy.am",
-   "probe": "W-P-amy.am-13",
-   "type": "world:direct",
-   "mode": "extractive",
-   "question": "What is PAY-233 about?",
-   "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "bea2efefd9254be59c0f00f975a08e8b",
-   "persona": "mlro.tan",
-   "probe": "W-P-mlro.tan-34",
-   "type": "world:direct",
-   "mode": "extractive",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "fcd2b57b7ab24af8a07c7262865e1285",
-   "persona": "amy.am",
-   "probe": "W-P-amy.am-34",
-   "type": "world:direct",
-   "mode": "fake-capture",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "630e6de744a54c25a0a4ccc08be0be64",
-   "persona": "amy.am",
-   "probe": "W-P-amy.am-34",
-   "type": "world:direct",
-   "mode": "extractive",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "985f614046b34ec0b5ddbcb24761c556",
-   "persona": "maya.compliance",
-   "probe": "W-P-maya.compliance-34",
-   "type": "world:direct",
-   "mode": "fake-capture",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "b6e6b302282241ad9dedb16c10fc36ee",
-   "persona": "admin.it",
-   "probe": "W-P-admin.it-34",
-   "type": "world:direct",
-   "mode": "fake-capture",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "f9a88226c84b43f488d13a81e72d3515",
-   "persona": "maya.compliance",
-   "probe": "W-P-maya.compliance-34",
-   "type": "world:direct",
-   "mode": "extractive",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "a22af05ede034962bfe61a3d5150af77",
-   "persona": "admin.it",
-   "probe": "W-P-admin.it-34",
-   "type": "world:direct",
-   "mode": "extractive",
-   "question": "When is the next settlement key rotation?",
-   "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "6f5eab314e1441be8dc66a4710e69b37",
-   "persona": "mlro.tan",
-   "probe": "W-P-mlro.tan-13",
-   "type": "world:direct",
-   "mode": "fake-capture",
-   "question": "What is PAY-233 about?",
-   "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
-   "what": "expected_refusal_not_served"
-  },
-  {
-   "req_id": "d64a3fa6bf994b5b9d339c4b5fce464e",
-   "persona": "mlro.tan",
-   "probe": "W-P-mlro.tan-13",
-   "type": "world:direct",
-   "mode": "extractive",
-   "question": "What is PAY-233 about?",
-   "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
    "what": "expected_refusal_not_served"
   }
  ],
@@ -553,7 +535,127 @@
   },
   "examples": [
    {
-    "req_id": "dad028092be84c9daee5a8550e6c992c",
+    "req_id": "8088dc273e21470e87848fa32f7673c7",
+    "persona": "maya.compliance",
+    "probe": "W-P-maya.compliance-34",
+    "type": "world:direct",
+    "mode": "fake-capture",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "6af724b534454ee992e985c48fbf84c5",
+    "persona": "maya.compliance",
+    "probe": "W-P-maya.compliance-34",
+    "type": "world:direct",
+    "mode": "extractive",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "7b0c6499792b4e71898b9d2a2942693b",
+    "persona": "admin.it",
+    "probe": "W-P-admin.it-34",
+    "type": "world:direct",
+    "mode": "fake-capture",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "f570b9249e624c70a1c1ff2993b1d168",
+    "persona": "amy.am",
+    "probe": "W-P-amy.am-13",
+    "type": "world:direct",
+    "mode": "fake-capture",
+    "question": "What is PAY-233 about?",
+    "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "e1873706a07b41c784df8b5666204543",
+    "persona": "amy.am",
+    "probe": "W-P-amy.am-34",
+    "type": "world:direct",
+    "mode": "fake-capture",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "d9218a3157204d2ea15beb0c2182fdce",
+    "persona": "mlro.tan",
+    "probe": "W-P-mlro.tan-13",
+    "type": "world:direct",
+    "mode": "fake-capture",
+    "question": "What is PAY-233 about?",
+    "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "eccf5db0119f4c8eb856eecfce055e76",
+    "persona": "mlro.tan",
+    "probe": "W-P-mlro.tan-34",
+    "type": "world:direct",
+    "mode": "fake-capture",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "e17d7477a8774aaa9b971ebd36d8eadb",
+    "persona": "admin.it",
+    "probe": "W-P-admin.it-34",
+    "type": "world:direct",
+    "mode": "extractive",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "48c03695e370479e8726194bd3a56144",
+    "persona": "amy.am",
+    "probe": "W-P-amy.am-13",
+    "type": "world:direct",
+    "mode": "extractive",
+    "question": "What is PAY-233 about?",
+    "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "8d69fc86a9ec40419edf98c32e510136",
+    "persona": "amy.am",
+    "probe": "W-P-amy.am-34",
+    "type": "world:direct",
+    "mode": "extractive",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "fab9e65637ff4170af9402457c7923eb",
+    "persona": "mlro.tan",
+    "probe": "W-P-mlro.tan-13",
+    "type": "world:direct",
+    "mode": "extractive",
+    "question": "What is PAY-233 about?",
+    "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "64b3707c306b4dbea8ecb3bc57f8bcb6",
+    "persona": "mlro.tan",
+    "probe": "W-P-mlro.tan-34",
+    "type": "world:direct",
+    "mode": "extractive",
+    "question": "When is the next settlement key rotation?",
+    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
+    "what": "expected_refusal_not_served"
+   },
+   {
+    "req_id": "f2be094d53bd4229bb055ee182f1120c",
     "persona": "leo.ops",
     "probe": "W-P-leo.ops-34",
     "type": "world:direct",
@@ -563,133 +665,13 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "9beee4da417845998ddf0ab2df49e491",
-    "persona": "amy.am",
-    "probe": "W-P-amy.am-13",
-    "type": "world:direct",
-    "mode": "fake-capture",
-    "question": "What is PAY-233 about?",
-    "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "692f028e2c624a4687757b6c7e584520",
-    "persona": "mlro.tan",
-    "probe": "W-P-mlro.tan-34",
-    "type": "world:direct",
-    "mode": "fake-capture",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "f1173c3c049e45fb971d3d286d657c85",
+    "req_id": "d4ead6c41cfa4c10b996436ca4c75192",
     "persona": "leo.ops",
     "probe": "W-P-leo.ops-34",
     "type": "world:direct",
     "mode": "extractive",
     "question": "When is the next settlement key rotation?",
     "answer": "Speed up idempotency key handling in the settlement batch job [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint is cached and key rotation is automated. [C2] We agreed to keep SAML metadata rotation out of scope for th",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "dd6efff922ce4711be32fd75b52b7da5",
-    "persona": "amy.am",
-    "probe": "W-P-amy.am-13",
-    "type": "world:direct",
-    "mode": "extractive",
-    "question": "What is PAY-233 about?",
-    "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "bea2efefd9254be59c0f00f975a08e8b",
-    "persona": "mlro.tan",
-    "probe": "W-P-mlro.tan-34",
-    "type": "world:direct",
-    "mode": "extractive",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "fcd2b57b7ab24af8a07c7262865e1285",
-    "persona": "amy.am",
-    "probe": "W-P-amy.am-34",
-    "type": "world:direct",
-    "mode": "fake-capture",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "630e6de744a54c25a0a4ccc08be0be64",
-    "persona": "amy.am",
-    "probe": "W-P-amy.am-34",
-    "type": "world:direct",
-    "mode": "extractive",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "985f614046b34ec0b5ddbcb24761c556",
-    "persona": "maya.compliance",
-    "probe": "W-P-maya.compliance-34",
-    "type": "world:direct",
-    "mode": "fake-capture",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "b6e6b302282241ad9dedb16c10fc36ee",
-    "persona": "admin.it",
-    "probe": "W-P-admin.it-34",
-    "type": "world:direct",
-    "mode": "fake-capture",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: Wrapping up the token service design discussion from this sprint [C1].",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "f9a88226c84b43f488d13a81e72d3515",
-    "persona": "maya.compliance",
-    "probe": "W-P-maya.compliance-34",
-    "type": "world:direct",
-    "mode": "extractive",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "a22af05ede034962bfe61a3d5150af77",
-    "persona": "admin.it",
-    "probe": "W-P-admin.it-34",
-    "type": "world:direct",
-    "mode": "extractive",
-    "question": "When is the next settlement key rotation?",
-    "answer": "omar.f: We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. [C1] sara.sec: Security is fine with ES256 as long as the JWKS endpoint",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "6f5eab314e1441be8dc66a4710e69b37",
-    "persona": "mlro.tan",
-    "probe": "W-P-mlro.tan-13",
-    "type": "world:direct",
-    "mode": "fake-capture",
-    "question": "What is PAY-233 about?",
-    "answer": "jdoe: I opened PAY-233 [C1][C2][C3] to track backup restore drills omar.f: can we pair on this tomorrow [C1]? omar.f: I opened PAY-233 [C1][C2][C3] to track settlement cut-off times sophie.t: done, see the thread in the team channel raj.m: ",
-    "what": "expected_refusal_not_served"
-   },
-   {
-    "req_id": "d64a3fa6bf994b5b9d339c4b5fce464e",
-    "persona": "mlro.tan",
-    "probe": "W-P-mlro.tan-13",
-    "type": "world:direct",
-    "mode": "extractive",
-    "question": "What is PAY-233 about?",
-    "answer": "jdoe: I opened PAY-233 to track backup restore drills [C1] omar.f: I opened PAY-233 to track settlement cut-off times [C2] priya.sre: added a note to PAY-233 [C3]",
     "what": "expected_refusal_not_served"
    }
   ]
@@ -755,12 +737,12 @@
     }
    },
    "world_must_cite": {
-    "priya.sre": {
-     "n": 12,
-     "released": 12,
-     "cited": 12,
+    "jdoe": {
+     "n": 15,
+     "released": 15,
+     "cited": 13,
      "released_recall": 1.0,
-     "cited_recall": 1.0
+     "cited_recall": 0.8666666666666667
     },
     "ALL": {
      "n": 78,
@@ -769,10 +751,10 @@
      "released_recall": 1.0,
      "cited_recall": 0.9358974358974359
     },
-    "sara.sec": {
-     "n": 10,
-     "released": 10,
-     "cited": 10,
+    "priya.sre": {
+     "n": 12,
+     "released": 12,
+     "cited": 12,
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
@@ -804,17 +786,17 @@
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
-    "jdoe": {
-     "n": 15,
-     "released": 15,
-     "cited": 13,
-     "released_recall": 1.0,
-     "cited_recall": 0.8666666666666667
-    },
     "admin.it": {
      "n": 3,
      "released": 3,
      "cited": 3,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
+    },
+    "sara.sec": {
+     "n": 10,
+     "released": 10,
+     "cited": 10,
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
@@ -887,10 +869,10 @@
     }
    },
    "world_must_cite": {
-    "priya.sre": {
-     "n": 12,
-     "released": 12,
-     "cited": 12,
+    "jdoe": {
+     "n": 15,
+     "released": 15,
+     "cited": 15,
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
@@ -901,12 +883,12 @@
      "released_recall": 1.0,
      "cited_recall": 0.9871794871794872
     },
-    "sara.sec": {
-     "n": 10,
-     "released": 10,
-     "cited": 9,
+    "priya.sre": {
+     "n": 12,
+     "released": 12,
+     "cited": 12,
      "released_recall": 1.0,
-     "cited_recall": 0.9
+     "cited_recall": 1.0
     },
     "maya.compliance": {
      "n": 4,
@@ -936,19 +918,19 @@
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
-    "jdoe": {
-     "n": 15,
-     "released": 15,
-     "cited": 15,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
     "admin.it": {
      "n": 3,
      "released": 3,
      "cited": 3,
      "released_recall": 1.0,
      "cited_recall": 1.0
+    },
+    "sara.sec": {
+     "n": 10,
+     "released": 10,
+     "cited": 9,
+     "released_recall": 1.0,
+     "cited_recall": 0.9
     },
     "ken.ext": {
      "n": 1,

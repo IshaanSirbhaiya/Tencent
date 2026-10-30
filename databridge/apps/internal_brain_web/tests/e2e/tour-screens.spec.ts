@@ -67,9 +67,7 @@ for (const th of ['dark', 'light'] as const) {
     await card(page).getByTestId('tour-next').click();
     await expect(page.getByTestId('tour-checklist')).toBeVisible();
     await shot(page, '08-user-checklist', th);
-    await page.getByTestId('tour-switch-dev').click();
-    await expect(page.getByTestId('tour-dev-start')).toBeVisible();
-    await shot(page, '09-user-checklist-done', th);
+    // The user tour ends here, in User mode (no hand-over to the Developer tour, D-36).
   });
 
   test(`developer tour screens (${th})`, async ({ page }) => {
@@ -77,6 +75,9 @@ for (const th of ['dark', 'light'] as const) {
     await theme(page, th);
     await login(page, 'maya.compliance');
     await page.goto('/dev');
+    // Developer mode's own first-visit toast
+    await expect(page.locator('[data-testid="tour-offer"][data-tour-offer="dev"]')).toBeVisible();
+    await shot(page, '10-dev-offer-toast', th);
     await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
     await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', 'Highlighted: The pipeline');
     await card(page).getByTestId('tour-do-it').click();

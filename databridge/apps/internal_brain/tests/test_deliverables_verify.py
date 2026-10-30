@@ -392,3 +392,96 @@ def test_safe_chart_workbook_writes_formula_and_link_strings_as_text_even_unguar
     data.add_series("=SUM(A1)", [1, 2, 3, 4])
     xml = _xlsx_xml(data.xlsx_blob)
     assert not re.search(r"<f[\s>/]", xml) and "<hyperlink" not in xml and "relationships/hyperlink" not in xml
+
+
+# -- round 4 B5/B6: a value is bound to ITS entity and metric, not just present somewhere ---------
+R4_PROSE = "Singapore revenue is 10. Hong Kong revenue is 20."
+R4_CSV = "Market,Revenue,Cost\nSingapore,100,20\nHong Kong,200,30\n"
+R4_ONE_LINE = "Singapore revenue is 10, cost is 20."
+
+
+@pytest.mark.parametrize("text,sentence,ok", [
+    (R4_PROSE, "Singapore revenue is 10.", True),
+    (R4_PROSE, "Hong Kong revenue is 20.", True),
+    (R4_PROSE, "Singapore revenue is 20.", False),              # Hong Kong's value, swapped
+    (R4_PROSE, "Hong Kong revenue is 10.", False),
+    (R4_CSV, "Singapore revenue is 100.", True),
+    (R4_CSV, "Singapore cost is 20.", True),
+    (R4_CSV, "Singapore revenue is 20.", False),                # the Cost column's value
+    (R4_CSV, "Hong Kong cost is 20.", False),                   # Singapore's row
+    (R4_CSV, "Singapore revenue is 200.", False),               # Hong Kong's row
+    (R4_ONE_LINE, "Singapore revenue is 10.", True),
+    (R4_ONE_LINE, "Singapore revenue is 20.", False),           # the cost figure
+    (R4_ONE_LINE, "Singapore cost is 10.", False),
+    (R4_PROSE, "Singapore revenue is 10 and Hong Kong revenue is 20.", True),
+    (R4_PROSE, "Singapore revenue is 20 and Hong Kong revenue is 10.", False),
+])
+def test_r4_b5_analysis_values_are_bound_to_their_entity_and_metric(text, sentence, ok):
+    e = ev(text)
+    got = V.check_sentence(sentence, ["C1"], e, V.Check())
+    assert (got is not None) is ok, (sentence, got)
+
+
+def test_r4_b5_existing_pricing_sentence_still_passes():
+    e = ev(PRICING)
+    assert V.check_sentence("Indonesian SME customers pay a 0.4% FX margin.", ["C1"], e,
+                            V.Check()) is not None
+    assert V.check_sentence("Indonesian SME customers pay a 0.35% FX margin.", ["C1"], e,
+                            V.Check()) is None               # SG/HK's figure
+
+
+def _r4_chart(name, pts, y_label=""):
+    return {"title": "t", "type": "bar", "x_label": "", "y_label": y_label, "series": [
+        {"name": name, "points": [{"x": x, "value": v, "raw": r, "tag": "C1"} for x, v, r in pts]}]}
+
+
+def test_r4_b6_chart_values_are_bound_to_their_column():
+    e = ev(R4_CSV)
+    swapped = _r4_chart("Revenue", [("Singapore", 20, "20"), ("Hong Kong", 30, "30")])
+    assert V.check_chart(swapped, e, V.Check()) is None             # the Cost column, named Revenue
+    right = V.check_chart(_r4_chart("Cost", [("Singapore", 20, "20"), ("Hong Kong", 30, "30")]),
+                          e, V.Check())
+    assert right is not None and right["series"][0]["name"] == "Cost"
+    rev = V.check_chart(_r4_chart("Revenue", [("Singapore", 100, "100"), ("Hong Kong", 200, "200")]),
+                        e, V.Check())
+    assert rev is not None
+    c = V.Check()
+    mixed = V.check_chart(_r4_chart("Revenue", [("Singapore", 100, "100"), ("Hong Kong", 30, "30"),
+                                                ("Hong Kong", 200, "200")]), e, c)
+    assert [p["value"] for p in mixed["series"][0]["points"]] == [100, 200]
+    assert c.values_dropped == 1
+    # a y-axis label that names another metric is not kept
+    y = V.check_chart(_r4_chart("Cost", [("Singapore", 20, "20"), ("Hong Kong", 30, "30")],
+                                y_label="Revenue"), e, V.Check())
+    assert y is not None and y["y_label"] == ""
+
+
+def test_r4_b6_prose_chart_metric_is_the_label_next_to_the_value():
+    e = ev("SG revenue is 10, cost is 20.\nHK revenue is 30, cost is 40.")
+    assert V.check_chart(_r4_chart("Revenue", [("SG", 20, "20"), ("HK", 40, "40")]), e,
+                         V.Check()) is None
+    assert V.check_chart(_r4_chart("Revenue", [("SG", 10, "10"), ("HK", 30, "30")]), e,
+                         V.Check()) is not None
+
+
+def test_r4_b6_table_cells_are_bound_to_their_column():
+    e = ev(R4_CSV)
+    c = V.Check()
+    t = B.check_table({"columns": ["Market", "Revenue", "Cost"], "rows": [
+        [{"text": "Singapore", "tags": ["C1"]}, {"text": "20", "tags": ["C1"]},       # swapped
+         {"text": "100", "tags": ["C1"]}],                                             # swapped
+        [{"text": "Hong Kong", "tags": ["C1"]}, {"text": "200", "tags": ["C1"]},
+         {"text": "30", "tags": ["C1"]}],
+    ]}, e, c, source="model")
+    # Singapore's two swapped cells are dropped, so its row (no kept cell) goes
+    assert [[x["text"] for x in r] for r in t["rows"]] == [["Hong Kong", "200", "30"]]
+    assert c.values_dropped == 2 and c.values_kept == 2
+    # a model chart title that names a metric the points are not bound to: the fixed title
+    chart = V.check_chart(_r4_chart("Cost", [("Singapore", 20, "20"), ("Hong Kong", 30, "30")]),
+                          e, V.Check())
+    assert B.checked_title("Revenue by market", "chart", e, ["C1"], V.Check(),
+                           labels=B.title_labels("chart", chart)) == "Chart from your sources"
+    assert B.checked_title("Cost by market", "chart", e, ["C1"], V.Check(),
+                           labels=B.title_labels("chart", chart)) == "Chart from your sources"
+    assert B.checked_title("Cost", "chart", e, ["C1"], V.Check(),
+                           labels=B.title_labels("chart", chart)) == "Cost"
