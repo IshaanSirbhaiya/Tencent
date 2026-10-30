@@ -176,6 +176,23 @@ ArrowLeft after a stuck step dropped to /present with no HUD.
   fix them.
 - Docs not written: SECURITY §15, backend_v1 v4, FEATURE_CATALOGUE, AI_USAGE_MAP, D-25, QA_BANK Q10.
 - P1 (Summary, Slides/.pptx with the T15 formula guard) untouched.
+
+**Live growth agent checkpoint** (full detail in `live_growth/STATUS.md`):
+- Done: live_growth 11/11, sim_add_document 29/29, demo_features 11/11, tsc clean, grow e2e 6/6.
+  Live check passed: the note shows in 3.6 s; Ken sees nothing; engine refresh 34 s; 429 on a repeat;
+  reset clean.
+- **Full IB suite: 1036 passed, 2 failed.** Both are in `test_connector_drive.py`
+  (`test_markdown_and_csv`, `test_crawl_full_then_quiet`): `connectors/drive.py` (the uploads change)
+  returns nothing for the CSV/Markdown fixture. **These are the "2 unidentified failures" the
+  Deliverables note mentions. Fix first.**
+- Left:
+  - decide whether `/sim/upload-file` is unmounted when the flag is off (today it answers 401, not the
+    unknown-route 404);
+  - make `tests/test_app_routes.py` loop over `app.iter_routes()` (it skips included routers today);
+  - Fable item 1 (keep the grow steps off the Space path);
+  - a reset step in the rehearsal checklist; a PROPOSED line in PRESENTER_KEYS.
+- Laptop-only: `demo_up.sh stop/status` can't see the ports on this laptop (netstat is empty); use a
+  health-probe-based stop.
 **Opus and Codex:** were still running at hand-off. If their files are missing, re-run Opus in the
 cloud on `git diff 7bf3246..final_v1.2 -- databridge/`; Codex waits for the laptop.
 
