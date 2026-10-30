@@ -22,7 +22,7 @@ Folder: `Tencent/submission/finals/clips/`. Record on 2 Nov **after the freeze**
 |---|---|---|---|---|
 | A | `clipA_compare_amy_rachel_ken.mp4` | Amy and Rachel on Velquarry, then Ken's identical refusals, then the sources sheet [2] | 0:00 to 1:40 | steps 0 to 3b |
 | B | `clipB_journey_audit_tamper.mp4` | Maya's journey for Rachel's request, Verify green, sandbox tamper, Verify red at the entry | 1:40 to 2:35 | steps 4 to 6b |
-| C | `clipC_workbuddy_jordan.mp4` | Jordan asks in WorkBuddy, the cited answer, then the new row in `/dev/audit` with channel `workbuddy-mcp` | 2:35 to 3:20 | steps 7 to 8 |
+| C | `clipC_workbuddy_jordan.mp4` | **Today an in-app stand-in:** Jordan asks the headline question in User mode, with the cited answer and source [1] open (row 63). Say "this is the same question; in WorkBuddy it arrives through our MCP connector". The real WorkBuddy clip replaces it once captured on the stage laptop | 2:35 to 3:20 | steps 7 to 8 |
 
 Also record (not one of the three clips):
 
@@ -39,7 +39,7 @@ The clips must be a real recording of the real system on the real seed. Do not e
 |---|---|
 | Venue Wi-Fi fails | We do not rely on it. Everything runs locally except the model and WorkBuddy calls, via a phone hotspot |
 | TokenHub slow or rate-limited | 4 second timeout, then the extractive answer; pre-warm |
-| WorkBuddy fails | Clip C; cut order in `RUN_SHEET.md` §4 puts the audit-row cut first among the WorkBuddy items |
+| WorkBuddy fails | Clip C (in-app stand-in until the real WorkBuddy clip exists; say so); cut order in `RUN_SHEET.md` §4 puts the audit-row cut first among the WorkBuddy items |
 | Browser or app error | `B`; a second browser window is pre-opened at each step |
 | Laptop or display failure | Laptop B, identical build, adapters |
 | Projector aspect problem | Design is 1280 x 720 safe; tested at rehearsal |
