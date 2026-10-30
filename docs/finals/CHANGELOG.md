@@ -31,6 +31,18 @@ everyday-company world. Their rows are in the areas below.
 | **Stand-in model guardrails** (D-42) | One spend ledger and one set of caps for every stand-in call, kept outside the demo state | On `final_v1.4` only: `databridge_ib/model_guard.py`, `scripts/wipe_guard.sh`, `tests/test_model_guard.py`; total, daily, service-wide and per-person limits, fail closed, untouched by every reset; "Model budget" numbers on the preflight board and in `/ib/status` (admin and compliance) |
 | **Hallway test** | 5 people × 20 min; results into the fix log and the proof slide | Protocol ready ([HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)); Sat 31 Oct |
 
+## 30 Oct 2026, late night (Atlas onboarding scenario, branch `feat/atlas-workflow`)
+
+Teammate Dev's Workflow 1 ("Your first day leading Project Atlas"), integrated. Branch `feat/atlas-workflow`, from `final_v1.4-wip` (`1b6500c`), with `origin/feat/story1-fixes` (and through it `final_v1.4`, `e72b18b`) merged in.
+
+| Area | Change |
+|---|---|
+| Scenario | `fixtures/scenarios/atlas_onboarding/`: the additive world (Company A plus Atlas), sources, personas, `build.py`, `run_demo.py`, `verify.py`, the teammate's offline proof. Windows fixes: UTF-8 reads and writes, a locked SQLite file no longer fails the clean-up, re-runs write their proof to `var/` (D-45) |
+| Brain | `databridge_ib/subject.py`: a briefing on a named project is scoped to it (search by section, the project's own documents only, the rules page reads more of them through both gates). `pipeline.py` and `views/service.py` call it; every other question is unchanged (D-45) |
+| Demo | `IB_WORLD=atlas bash scripts/demo_up.sh start` runs the main stack on the Atlas world with its own state (`var/ib-atlas`); it refuses to reuse a stack already running. Default unchanged |
+| Eval | `IB_EVAL_WORLD=<path>` runs the leak eval on another world. Atlas world: 0 leaks in 7,374 requests, 0 differential mismatches |
+| Tests | `tests/test_subject_scope.py` (15). Full IB suite: the affected files (test_subject_scope, test_quoted_script_skip, test_story1_fixes) 79 passed after the merge; the full-suite result is in the branch hand-over. Default-world leak eval: 0 leaks in 7,374 requests, 0 differential mismatches (unchanged) |
+
 ## 30 Oct 2026, night (cloud session 2)
 
 Branch `final_v1.2-cloud` (now locked as `final_v1.3`). The round-4 fixes from the laptop section below were finished

@@ -71,6 +71,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 12. [Deliverables from an answer](#12-deliverables-from-an-answer-kill-switch-d-25): V1 Table, chart, analysis (P0) · V2 Slides export (P1)
 13. [Act, and what is planned](#13-act-and-what-is-planned): K1 Act v3.2 · K2 Proxy open-link check · Planned: the "Demo story" app mode (not built)
 14. [Pages beside the chat (just-in-time views)](#14-pages-beside-the-chat-just-in-time-views-d-37-d-38-d-39): J1 Page or chat · J2 The page, composed by the AI page composer · J3 The canvas and the Xcode-like Ask
+16. [Scenario: your first day leading Project Atlas](#16-scenario-your-first-day-leading-project-atlas-d-45): W1 The Atlas onboarding brief
 
 ---
 
@@ -740,3 +741,19 @@ An intelligence layer on top of the Brain, in the Ask view only. Same kill switc
 | Compare and slides | "Different answers" line in Compare; business headline "Projected"; the proof slide says the eval ran with a test model and the quoting path | `tests/e2e/compare.spec.ts`, `tests/e2e/presenter.spec.ts` |
 | Presenter warm-up | Starts at the proof step; a step waits at most 8 s for it | `tests/e2e/presenter.spec.ts` |
 | Journey model card | A model that is not named shows "AI model" and "—" (reuses `lib/format.ts` `modelLabel`) | No automated test of the stand-in case yet (the mock journeys are quoted or named models) |
+
+## 16. Scenario: your first day leading Project Atlas (D-45)
+
+Teammate Dev's Workflow 1, added as an additive scenario world. README: [`fixtures/scenarios/atlas_onboarding/README.md`](../../databridge/fixtures/scenarios/atlas_onboarding/README.md).
+
+### W1. The Atlas onboarding brief
+
+| | |
+|---|---|
+| What | Alex Morgan (`alex.product`), the incoming product lead, asks one question ("Bring me up to speed with an onboarding brief: purpose, status, team table and contributions, decisions, blockers, timeline and first-week checklist..."). The answer cites Slack, Confluence, Jira and Drive; the page opens beside the chat with key facts, the 12-member team table, the timeline and the first-week checklist. **Change this page** with the scenario's layout sentence adds the conversations and the by-document sections |
+| Data | `fixtures/scenarios/atlas_onboarding/world.json` = Company A plus 7 Confluence pages (one restricted note, one unrelated project), 12 Jira issues, 10 Slack threads, 7 Drive files (roster, research, QA, SOP, two imported emails, one imported WhatsApp export) and 8 new people. Email and WhatsApp are imported archives in Drive, not native connectors. All fictional |
+| How | `databridge_ib/subject.py`: a briefing on a named project is searched section by section about that project, and only documents whose title or place names it are kept; the rules page reads more of the asker's own documents about it (recorded first, both gates) |
+| Run | Separate: `run_demo.py` (Brain 8115, mocks 8215, web 3115, state `var/atlas-onboarding/`; no model by default). Main stack: `IB_WORLD=atlas bash scripts/demo_up.sh start --fresh` (state `var/ib-atlas`) |
+| Guarantees | Identity from the session only; a non-member (Ken) gets no citations and the same response as for an invented project; the restricted note and Project Boreal never appear; another employee cannot reuse Alex's answer (404). Every other question keeps its exact retrieval query |
+| Tests | `tests/test_subject_scope.py` (15: the rule, default-world questions unchanged, the brief end to end, restricted is the same as non-existent, answer reuse, and the D-43 approved-script skip together with the scoping); `verify.py` (11 checks, offline). Leak eval on the Atlas world (`IB_EVAL_WORLD`): 0 leaks in 7,374 requests, 0 contract violations, 0 differential mismatches. Full IB suite: the affected files (test_subject_scope, test_quoted_script_skip, test_story1_fixes) 79 passed after the merge; the full-suite result is in the branch hand-over. Default-world leak eval: 0 leaks in 7,374 requests, 0 differential mismatches (unchanged) |
+| Not done | The model-composed page for this scenario (wired through `--with-configured-model`, not run); the video |
