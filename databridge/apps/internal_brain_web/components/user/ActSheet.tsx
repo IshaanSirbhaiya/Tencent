@@ -10,6 +10,7 @@ import { Badge, Button, Sheet, SheetContent, SkeletonText, inputClass } from '@/
 import { ApiError, actApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { placeLabel } from '@/lib/format';
+import { personaById } from '@/lib/personas';
 import { useLang, useMessages } from '@/lib/i18n';
 import { actMessages, type ActKey } from '@/lib/i18n/act';
 import type { ActCitation, ActDraft, AskResponse, TicketCreated, TicketProposal } from '@/lib/types';
@@ -18,9 +19,33 @@ import { toast } from './Toast';
 
 export type ActMode = 'draft' | 'ticket';
 
-type Fail = 'nothing' | 'unavailable' | 'error';
-const failOf = (e: unknown): Fail =>
-  e instanceof ApiError && e.status === 404 ? 'nothing' : e instanceof ApiError && e.status === 409 ? 'unavailable' : 'error';
+// 'unknown' = a 409 outcome_unknown: an earlier create from this answer may have happened (never
+// "nothing was changed", on propose as on confirm; round 4 Codex A6). 'rate' = a 429.
+type Fail = 'nothing' | 'unavailable' | 'unknown' | 'rate' | 'error';
+const failOf = (e: unknown): Fail => {
+  if (!(e instanceof ApiError)) return 'error';
+  if (e.status === 404) return 'nothing';
+  if (e.status === 409) return e.message === 'outcome_unknown' ? 'unknown' : 'unavailable';
+  if (e.status === 429) return 'rate';
+  return 'error';
+};
+
+/** "priya.sre: Blocker ..." (a chat line quoted in an answer): the speaker, shown as a name. */
+const SPEAKER = /^([a-z][a-z0-9._-]{1,40}):\s+(\S[\s\S]*)$/;
+function Spoken({ text }: { text: string }) {
+  const m = SPEAKER.exec(text);
+  if (!m) return <>{text}</>;
+  const who = personaById(m[1]);
+  return (
+    <>
+      <span className="font-medium" data-testid="act-draft-speaker">
+        {who?.fullName ?? m[1]}
+      </span>
+      {': '}
+      {m[2]}
+    </>
+  );
+}
 
 /** The draft label the server returns for every draft (translated in the UI; anything else is shown as is). */
 const SERVER_DRAFT_LABEL = 'Draft for your review';
@@ -75,7 +100,7 @@ export function ActRow({ response }: { response: AskResponse }) {
         {t('act.ticket')}
       </button>
       <span className="basis-full text-caption text-subtle sm:basis-auto">{t('act.hint')}</span>
-      <ActSheet response={response} mode={mode} onClose={() => setMode(null)} returnFocusTo={opener.current} />
+      <ActSheet response={response} mode={mode} onClose={() => setMode(null)} onMode={setMode} returnFocusTo={opener.current} />
     </section>
   );
 }
@@ -123,25 +148,49 @@ function SourceList({ response, citations, title }: { response: AskResponse; cit
   );
 }
 
-function Failure({ kind, onRetry, t }: { kind: Fail; onRetry: () => void; t: (key: ActKey) => string }) {
-  if (kind === 'error') {
+function Failure({ kind, onRetry, onDraft, t }: { kind: Fail; onRetry: () => void; onDraft?: () => void; t: (key: ActKey) => string }) {
+  if (kind === 'error' || kind === 'rate') {
     return (
-      <div role="alert" className="flex flex-col items-center px-4 py-12 text-center" data-testid="act-error">
+      <div role="alert" className="flex flex-col items-center px-4 py-12 text-center" data-testid={kind === 'rate' ? 'act-rate' : 'act-error'}>
         <TriangleAlert aria-hidden className="mb-3 h-6 w-6 text-warn" />
-        <p className="text-body-sm text-fg">{t('act.error')}</p>
+        <p className="text-body-sm text-fg">{kind === 'rate' ? t('act.rateLimited') : t('act.error')}</p>
         <Button className="mt-4" size="sm" icon={RefreshCw} onClick={onRetry}>
           {t('act.retry')}
         </Button>
       </div>
     );
   }
+  if (kind === 'unknown') {
+    // An earlier create from this answer may have happened: never "nothing was changed".
+    return (
+      <div role="alert" className="flex flex-col items-center px-4 py-12 text-center" data-testid="act-outcome-unknown">
+        <TriangleAlert aria-hidden className="mb-3 h-6 w-6 text-warn" />
+        <p className="max-w-sm text-body-sm text-fg">{t('act.ticket.outcomeUnknown')}</p>
+      </div>
+    );
+  }
+  if (kind === 'unavailable') {
+    // One sentence, no reason (rule 4), and the way on: the reply draft is still there.
+    return (
+      <div className="flex flex-col items-center px-4 py-10 text-center" data-testid="act-unavailable">
+        <p role="status" className="max-w-sm text-heading-sm text-fg" data-testid="act-unavailable-text">
+          {t('act.ticket.blocked')}
+        </p>
+        {onDraft ? (
+          <Button className="mt-4" size="sm" icon={MessageSquareReply} onClick={onDraft} data-testid="act-unavailable-draft">
+            {t('act.draft')}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-col items-center px-4 py-12 text-center" data-testid={kind === 'unavailable' ? 'act-unavailable' : 'act-nothing'}>
+    <div className="flex flex-col items-center px-4 py-12 text-center" data-testid="act-nothing">
       <span aria-hidden className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-raised text-muted">
         <Info className="h-5 w-5" />
       </span>
-      <p className="max-w-sm text-heading-sm text-fg">{kind === 'unavailable' ? t('act.ticket.unavailable') : t('act.nothing')}</p>
-      {kind === 'nothing' ? <p className="mt-1 max-w-sm text-body-sm text-muted">{t('act.nothingHint')}</p> : null}
+      <p className="max-w-sm text-heading-sm text-fg">{t('act.nothing')}</p>
+      <p className="mt-1 max-w-sm text-body-sm text-muted">{t('act.nothingHint')}</p>
     </div>
   );
 }
@@ -150,12 +199,18 @@ export interface ActSheetProps {
   response: AskResponse;
   mode: ActMode | null;
   onClose: () => void;
+  /** Switch the open sheet to the other action (the "Draft a reply" way on from a blocked ticket). */
+  onMode?: (mode: ActMode) => void;
   returnFocusTo?: HTMLElement | null;
 }
 
-export function ActSheet({ response, mode, onClose, returnFocusTo }: ActSheetProps) {
+export function ActSheet({ response, mode, onClose, onMode, returnFocusTo }: ActSheetProps) {
   const t = useMessages(actMessages);
   const returnRef = useRef<HTMLElement | null>(null);
+  // The ticket can't be made: the header drops "Create…" and "Nothing is created until you confirm"
+  // so the one status sentence in the body is not contradicted (round 4 Sonnet UX).
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => setBlocked(false), [mode]);
   if (returnFocusTo) returnRef.current = returnFocusTo;
   const open = mode !== null;
   return (
@@ -163,8 +218,8 @@ export function ActSheet({ response, mode, onClose, returnFocusTo }: ActSheetPro
       {open ? (
         <SheetContent
           width="lg"
-          title={mode === 'draft' ? t('act.draft.title') : t('act.ticket.title')}
-          description={mode === 'draft' ? t('act.draft.desc') : t('act.ticket.desc')}
+          title={mode === 'draft' ? t('act.draft.sheetTitle') : blocked ? t('act.ticket.titleBlocked') : t('act.ticket.title')}
+          description={mode === 'draft' ? t('act.draft.desc') : blocked ? undefined : t('act.ticket.desc')}
           closeLabel={t('act.close')}
           data-testid={mode === 'draft' ? 'act-draft-sheet' : 'act-ticket-sheet'}
           onCloseAutoFocus={(e) => {
@@ -175,7 +230,11 @@ export function ActSheet({ response, mode, onClose, returnFocusTo }: ActSheetPro
             }
           }}
         >
-          {mode === 'draft' ? <DraftView response={response} /> : <TicketView response={response} onDone={onClose} />}
+          {mode === 'draft' ? (
+            <DraftView response={response} />
+          ) : (
+            <TicketView response={response} onDone={onClose} onBlocked={setBlocked} onDraft={onMode ? () => onMode('draft') : undefined} />
+          )}
         </SheetContent>
       ) : null}
     </Sheet>
@@ -294,7 +353,7 @@ function DraftView({ response }: { response: AskResponse }) {
             {d.opener}{' '}
             {d.body.map((b, i) => (
               <span key={i} data-testid="act-draft-sentence">
-                {b.text}
+                <Spoken text={b.text} />
                 {b.tags.map((tag) => (
                   <SourceBadge key={tag} n={numberOf(response, tag, d.citations)} c={byCite.get(tag)} />
                 ))}{' '}
@@ -338,7 +397,17 @@ type TicketLoad =
   | { state: 'expired' }
   | { state: 'fail'; kind: Fail };
 
-function TicketView({ response, onDone }: { response: AskResponse; onDone: () => void }) {
+function TicketView({
+  response,
+  onDone,
+  onBlocked,
+  onDraft,
+}: {
+  response: AskResponse;
+  onDone: () => void;
+  onBlocked?: (blocked: boolean) => void;
+  onDraft?: () => void;
+}) {
   const t = useMessages(actMessages);
   const [load, setLoad] = useState<TicketLoad>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -347,7 +416,9 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
   const [busy, setBusy] = useState<'confirm' | 'cancel' | null>(null);
   // After Confirm: 'unknown' = Jira's outcome is unknown (409 outcome_unknown; never "nothing was changed"),
   // 'pending' = the service failed after Confirm (503 or no answer): the outcome is not confirmed yet.
-  const [confirmErr, setConfirmErr] = useState<Fail | 'unknown' | 'pending' | null>(null);
+  const [confirmErr, setConfirmErr] = useState<Fail | 'pending' | null>(null);
+  const blocked = load.state === 'fail' && load.kind === 'unavailable';
+  useEffect(() => onBlocked?.(blocked), [blocked]);
   const ids = { project: useId(), summary: useId(), desc: useId() };
   const doneRef = useRef<HTMLHeadingElement | null>(null);
   const once = useOnce<TicketProposal>();
@@ -374,7 +445,7 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
   }, [load.state]);
 
   if (load.state === 'loading') return <SkeletonText lines={6} label={t('act.ticket.loading')} />;
-  if (load.state === 'fail') return <Failure kind={load.kind} onRetry={() => setAttempt((a) => a + 1)} t={t} />;
+  if (load.state === 'fail') return <Failure kind={load.kind} onRetry={() => setAttempt((a) => a + 1)} onDraft={onDraft} t={t} />;
   if (load.state === 'expired') {
     return (
       <div className="px-4 py-12 text-center" data-testid="act-expired">
@@ -429,7 +500,6 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
     } catch (e) {
       const k = failOf(e);
       if (k === 'nothing') setLoad({ state: 'expired' });
-      else if (k === 'unavailable' && e instanceof ApiError && e.message === 'outcome_unknown') setConfirmErr('unknown');
       else if (k === 'error') setConfirmErr('pending');
       else setConfirmErr(k);
     } finally {
@@ -528,7 +598,7 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
           >
             {p.description}
           </pre>
-          <p className="text-2xs text-muted">{t('act.ticket.descriptionHint')}</p>
+          {/* The link rule is stated once, in the description itself (round 4 Sonnet UX). */}
           <ServerLangNote />
         </div>
       </div>
@@ -543,7 +613,9 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
               ? t('act.ticket.outcomeUnknown')
               : confirmErr === 'pending'
                 ? t('act.ticket.notConfirmed')
-                : t('act.error')}
+                : confirmErr === 'rate'
+                  ? t('act.rateLimited')
+                  : t('act.error')}
         </p>
       ) : null}
 

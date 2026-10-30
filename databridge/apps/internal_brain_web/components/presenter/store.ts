@@ -23,6 +23,8 @@ export interface PresenterState {
   /** Stage: the key legend row is showing (3 s after P, or toggled with ?). Not persisted. */
   legend: boolean;
   clipOpen: boolean;
+  /** B on a step with no recording: the short "No recording for this step" note (not persisted). */
+  clipNote: boolean;
   resetOpen: boolean;
   /** persona id → the latest request id that persona's column produced (for the journey step). */
   reqs: Record<string, string>;
@@ -49,6 +51,7 @@ const INITIAL: PresenterState = {
   resetting: false,
   legend: false,
   clipOpen: false,
+  clipNote: false,
   resetOpen: false,
   reqs: {},
   health: null,

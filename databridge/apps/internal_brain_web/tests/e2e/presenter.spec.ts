@@ -170,10 +170,13 @@ test('P then Space walks the whole script from the keyboard', async ({ page }) =
   await expect(page.getByTestId('whoami')).toBeVisible();
 
   // 5, 6: audit Verify, then the sandbox tamper. The keys keep working on pages without the bar.
-  await next(page);
+  // Each is ready only once its result is on screen (stage QA 30 Oct #3).
+  expect(await press(page)).toBe('ready');
   await expect(page).toHaveURL(/\/dev\/audit\?verify=1$/);
-  await next(page);
+  await expect(page.getByTestId('verify-status')).toBeVisible();
+  expect(await press(page)).toBe('ready');
   await expect(page).toHaveURL(/\/dev\/audit\?tamper=1$/);
+  await expect(page.getByTestId('tamper-panel')).toHaveAttribute('data-state', 'done');
 
   // 7: WorkBuddy is off-app: the app goes back to the real ledger view.
   await next(page);
@@ -469,9 +472,12 @@ test('signing out from the shell drops the cached deliverables answer (round-2 O
 });
 
 test('/present/preflight is served on the loopback stage laptop (the presenter flow keeps working)', async ({ page }) => {
+  // Loopback AND a session the IB confirms (round-4 Opus #2): signed out it is the one 404.
+  expect((await page.request.get('/present/preflight')).status()).toBe(404);
+  await login(page, 'jdoe');
   const r = await page.goto('/present/preflight');
   expect(r?.status()).toBe(200);
-  // From any other host name and signed out: one 404 (health, ledger and per-persona counts stay local).
+  // From any other host name, even signed in: one 404 (health, ledger and per-persona counts stay local).
   const away = await page.request.get('/present/preflight', { headers: { host: 'demo.example' } });
   expect(away.status()).toBe(404);
 });
@@ -482,9 +488,20 @@ test('D then Esc puts the session back: ← to the journey shows the waterfall, 
   expect(await press(page)).toBe('ready'); // 01
   expect(await press(page)).toBe('ready'); // 02
   expect(await press(page)).toBe('ready'); // 03: the sources sheet
-  await page.keyboard.press('Escape');
+  // B over the sheet: the sheet closes and the recording plays; B again returns (stage QA 30 Oct #2).
+  await expect(page.getByTestId('sources-sheet')).toBeVisible();
+  await page.keyboard.press('b');
+  await expect(page.getByTestId('clip-overlay')).toBeVisible();
   await expect(page.getByTestId('sources-sheet')).toHaveCount(0);
+  await page.keyboard.press('b');
+  await expect(page.getByTestId('clip-overlay')).toHaveCount(0);
+  // Space over step 03's sources sheet closes it and goes on (stage QA re-run): open it again with 2.
+  await page.waitForTimeout(450);
+  await page.keyboard.press('2');
+  await expect(page.getByTestId('sources-sheet')).toBeVisible();
   expect(await press(page)).toBe('ready'); // 04: the journey, as Maya
+  await expect(page.getByTestId('sources-sheet')).toHaveCount(0);
+  await expect(stepNo(page)).toHaveText('04');
   await expect(page.getByTestId('journey-waterfall')).toBeVisible();
   expect(await press(page)).toBe('ready'); // 05: Verify
   await expect(stepNo(page)).toHaveText('05');
@@ -565,4 +582,308 @@ test('a ?grow=1 tab opened signed out picks up the grow steps once P signs someo
   await expect(stepNo(page)).toHaveText('00');
   await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
   await expect(bar(page)).toContainText('/ 13');
+});
+
+test('a shell sign-out during the P warm-up stays signed out: the warm-up never signs anyone back in (round-4 Opus #1)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await login(page, 'jdoe');
+  await page.goto('/compare');
+  await expect(page.getByLabel('Question for both')).toBeVisible();
+  // Hold the warm-up's ask (it runs as Leo), so the sign-out lands in the middle of it.
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  let asked = false;
+  await page.route('**/api/ib/ib/ask', async (route) => {
+    // only the warm-up's question (Q_DELIVER); Compare's asks go straight through
+    if ((route.request().postData() ?? '').includes('Indonesian SME')) {
+      asked = true;
+      await held;
+    }
+    await route.continue();
+  });
+  await page.locator('body').click({ position: { x: 5, y: 300 } });
+  await page.keyboard.press('Control+Shift+P');
+  await expect(bar(page)).toBeVisible();
+  await page.keyboard.press('p');
+  // The title card comes first (stage QA 30 Oct #6); the warm-up waits until step 01's Compare has
+  // settled, so it never competes with the two live Compare asks (round-5 Opus cross-check #3).
+  await expect(stepNo(page)).toHaveText('00');
+  await expect.poll(() => barState(page)).toBe('ready');
+  await page.waitForTimeout(1_000);
+  expect(asked).toBe(false);
+  await next(page);
+  await expect(page).toHaveURL(/a=amy\.am&b=mlro\.tan/);
+  await expect.poll(() => barState(page), { timeout: 30_000 }).not.toBe('busy');
+  await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
+  await expect.poll(() => asked, { timeout: 30_000 }).toBe(true);
+  await page.keyboard.press('s'); // Stage off: the shell's account menu shows again
+  await page.locator('button:has([data-testid="whoami"])').first().click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+  await page.waitForTimeout(300);
+  release();
+  await expect(page).toHaveURL(/\/login/, { timeout: 30_000 });
+  // Give the warm-up, its deliverables and step 0 every chance to finish, then check nobody is signed in.
+  await page.waitForTimeout(4_000);
+  expect((await page.request.get('/api/ib/auth/whoami')).status()).toBe(401);
+  await expect(page).toHaveURL(/\/login/);
+  expect(await page.evaluate(() => sessionStorage.getItem('ib.presenter.deliver'))).toBeNull();
+});
+
+test('D, then a shell Sign out while D is still building: nobody is signed back in (round-5 Codex #9)', async ({ page }) => {
+  test.setTimeout(120_000);
+  await login(page, 'jdoe');
+  await page.goto('/compare');
+  await expect(page.getByLabel('Question for both')).toBeVisible();
+  await page.evaluate(() => sessionStorage.removeItem('ib.presenter.deliver')); // D must build now
+  // Hold D's warm-up at its last step, putting jdoe back after building Leo's deliverables, so the
+  // Sign out lands while D is still running (and before D's own switch to Leo).
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  let asked = false;
+  let holding = false;
+  await page.route('**/api/ib/ib/ask', async (route) => {
+    if ((route.request().postData() ?? '').includes('Indonesian SME')) asked = true;
+    await route.continue();
+  });
+  await page.route('**/api/ib/auth/demo-login', async (route) => {
+    if (asked && (route.request().postData() ?? '').includes('"jdoe"')) {
+      holding = true;
+      await held;
+    }
+    await route.continue();
+  });
+  await page.locator('body').click({ position: { x: 5, y: 300 } });
+  await page.keyboard.press('Control+Shift+P');
+  await expect(bar(page)).toBeVisible();
+  await page.keyboard.press('d');
+  await expect.poll(() => holding, { timeout: 60_000 }).toBe(true);
+  await page.locator('button:has([data-testid="whoami"])').first().click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+  await page.waitForTimeout(300);
+  release();
+  await expect(page).toHaveURL(/\/login/, { timeout: 30_000 });
+  // Give D every chance to finish, then check: still signed out, still on /login, no panel.
+  await page.waitForTimeout(4_000);
+  expect((await page.request.get('/api/ib/auth/whoami')).status()).toBe(401);
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByTestId('presenter-deliver-answer')).toHaveCount(0);
+});
+
+test('browser Back at step 07 stays on step 07: it never re-runs step 06\'s tamper demo (round-5 Opus cross-check #1)', async ({ page }) => {
+  await login(page, 'maya.compliance');
+  await page.goto('/dev/audit');
+  // Step 07 (WorkBuddy), as if the script had walked there.
+  await page.evaluate(() => sessionStorage.setItem('ib.presenter', JSON.stringify({ armed: true, started: true, step: 7, stage: true, reqs: {} })));
+  await page.reload();
+  await expect(stepNo(page)).toHaveText('07');
+  await expect.poll(() => barState(page)).toBe('ready');
+  // Coming back from WorkBuddy: the focus handler opens /dev/audit?latest=1 (a new history entry).
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(page).toHaveURL(/\/dev\/audit\?latest=1$/);
+  // Back: /dev/audit again. Same path as step 06, but not step 06's page (?tamper=1).
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/\/dev\/audit$/);
+  await page.waitForTimeout(1_500);
+  await expect(stepNo(page)).toHaveText('07');
+  expect(page.url()).not.toContain('tamper');
+});
+
+/* ---------------------------------------------------------------- mouse (PRESENTER_KEYS.md, "Mouse") */
+
+const ctl = (page: Page, name: string) => page.getByTestId(`presenter-ctl-${name}`);
+
+/** Dispatch a mouse side button (3 = back, 4 = forward); returns true when the page prevented the default. */
+const sideButton = (page: Page, button: 3 | 4) =>
+  page.evaluate((b) => {
+    const target = document.querySelector('main') ?? document.body;
+    target.dispatchEvent(new MouseEvent('mousedown', { button: b, bubbles: true, cancelable: true }));
+    const ev = new MouseEvent('mouseup', { button: b, bubbles: true, cancelable: true });
+    target.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }, button);
+
+/** Click a bar control that moves the script, wait until the new step has finished; returns the bar state. */
+async function click(page: Page, name: string) {
+  await page.waitForTimeout(450); // the same 400 ms debounce as the keys
+  const before = await stepNo(page).innerText();
+  await ctl(page, name).click();
+  // A Back to a slide is over in a few milliseconds: wait for the step number, then for the step.
+  await expect(stepNo(page)).not.toHaveText(before);
+  await expect.poll(() => barState(page), { timeout: 30_000 }).not.toBe('busy');
+  return barState(page);
+}
+
+test('the mouse drives the script: Start, Next, Back, side buttons, browser Back, Hide and Show, Exit', async ({ page }) => {
+  test.setTimeout(180_000);
+  await login(page, 'jdoe');
+  await page.goto('/compare?present=1');
+  await expect(page).toHaveURL(/\/present$/);
+  await expect(bar(page)).toBeVisible();
+
+  // Before P: Start, Reset, Hide, Exit; each named, with its key in the tooltip and at least 32 px.
+  for (const n of ['start', 'reset', 'hide', 'exit']) await expect(ctl(page, n)).toBeVisible();
+  await expect(ctl(page, 'back')).toHaveCount(0);
+  await expect(ctl(page, 'start')).toHaveAttribute('aria-label', 'Start');
+  await expect(ctl(page, 'start')).toHaveAttribute('title', 'Start (P)');
+  await expect(ctl(page, 'exit')).toHaveAttribute('title', 'Exit presenter (Ctrl+Shift+P)');
+  for (const n of ['start', 'reset', 'hide', 'exit']) {
+    const box = (await ctl(page, n).boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(32);
+    expect(box.height).toBeGreaterThanOrEqual(32);
+  }
+
+  // Start = P.
+  await ctl(page, 'start').click();
+  await expect(stepNo(page)).toHaveText('00');
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  // Stage keeps one row: once the 3 s legend after P is gone, only More is on it; More opens the
+  // controls row, which then stays open.
+  await expect(page.getByTestId('presenter-keys')).toHaveCount(0, { timeout: 6_000 });
+  await expect(ctl(page, 'next')).toHaveCount(0);
+  await ctl(page, 'more').click();
+  await expect(ctl(page, 'more')).toHaveAttribute('aria-expanded', 'true');
+  await expect(ctl(page, 'back')).toHaveAttribute('aria-disabled', 'true'); // nothing before 00
+  await expect(ctl(page, 'next')).toHaveAttribute('title', 'Next (Space)');
+  await expect(ctl(page, 'clip')).toBeVisible(); // step 00 has a recording
+  await expectAccessible(page, 'presenter/stage-mouse-controls');
+
+  // Next, clicked twice quickly: one step (the busy and debounce rules of Space).
+  await page.waitForTimeout(450);
+  await ctl(page, 'next').click();
+  await ctl(page, 'next').click({ force: true });
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  await expect(stepNo(page)).toHaveText('01');
+  await expect(page).toHaveURL(/a=amy\.am&b=mlro\.tan/);
+  await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
+
+  // Space with the Next button focused advances once: its keyup is swallowed, the button never fires too.
+  await expect(ctl(page, 'next')).toBeFocused();
+  expect(await press(page)).toBe('ready');
+  await page.waitForTimeout(600);
+  await expect(stepNo(page)).toHaveText('02');
+
+  // Back = the left arrow.
+  expect(await click(page, 'back')).toBe('ready');
+  await expect(stepNo(page)).toHaveText('01');
+
+  // Mouse side buttons: forward = Next, back = Back; the browser's own navigation is prevented.
+  await page.waitForTimeout(450);
+  expect(await sideButton(page, 4)).toBe(true);
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  await expect(stepNo(page)).toHaveText('02');
+  expect(await sideButton(page, 3)).toBe(true);
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  await expect(stepNo(page)).toHaveText('01');
+
+  // Browser Back to the previous step's page is Back: the bar and the page agree afterwards.
+  await page.waitForTimeout(1_100); // outside the side-button window
+  expect(await press(page)).toBe('ready');
+  await expect(stepNo(page)).toHaveText('02');
+  await page.evaluate(() => history.back());
+  await expect(stepNo(page)).toHaveText('01');
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  await expect(page).toHaveURL(/a=amy\.am&b=mlro\.tan/);
+  await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
+
+  // The More row stayed open through every step.
+  await expect(ctl(page, 'more')).toHaveAttribute('aria-expanded', 'true');
+  // Hide: the bar goes, a small handle stays (focused); the handle brings it back.
+  await ctl(page, 'hide').click();
+  await expect(bar(page)).toHaveCount(0);
+  await expect(page.getByTestId('presenter-show')).toBeFocused();
+  await expectAccessible(page, 'presenter/stage-hidden-handle');
+  await page.getByTestId('presenter-show').click();
+  await expect(bar(page)).toBeVisible();
+  await expect(ctl(page, 'hide')).toBeFocused();
+
+  // Reset opens the same confirm as R.
+  await ctl(page, 'reset').click();
+  const dialog = page.getByRole('dialog', { name: 'Reset the demo?' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cancel' }).first().click();
+  await expect(stepNo(page)).toHaveText('01');
+
+  // Exit = Ctrl+Shift+P: bar and Stage gone, keys and side buttons off, ordinary clicks navigate.
+  await ctl(page, 'exit').click();
+  await expect(bar(page)).toHaveCount(0);
+  await expect(page.getByTestId('presenter-show')).toHaveCount(0);
+  await expect(page.locator('html')).not.toHaveAttribute('data-stage', /.*/);
+  const url = page.url();
+  await page.keyboard.press('Space');
+  expect(await sideButton(page, 3)).toBe(false);
+  await page.waitForTimeout(500);
+  expect(page.url()).toBe(url);
+  await page.getByTestId('side-nav').locator('[data-nav="history"]').first().click();
+  await expect(page).toHaveURL(/\/history$/);
+});
+
+test('armed: ordinary clicks stay ordinary, and only the side buttons are taken over', async ({ page }) => {
+  await login(page, 'jdoe');
+  await page.goto('/compare');
+  await expect(page.getByLabel('Question for both')).toBeVisible();
+  await page.locator('body').click({ position: { x: 5, y: 300 } });
+  await page.keyboard.press('Control+Shift+P');
+  await expect(bar(page)).toBeVisible();
+  await expectAccessible(page, 'presenter/rehearsal-light-controls');
+  // A left click on an ordinary element is never prevented while armed.
+  const prevented = await page.evaluate(() => {
+    const ev = new MouseEvent('mouseup', { button: 0, bubbles: true, cancelable: true });
+    document.body.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  });
+  expect(prevented).toBe(false);
+  // Side buttons before P: the browser does not navigate, and nothing starts.
+  expect(await sideButton(page, 4)).toBe(true);
+  await expect(page.getByTestId('presenter-step-title')).toHaveText('Press P to start');
+  // The app's own navigation works with the mouse while armed.
+  await page.getByTestId('side-nav').locator('[data-nav="history"]').first().click();
+  await expect(page).toHaveURL(/\/history$/);
+  await expect(bar(page)).toBeVisible();
+});
+
+test('the mouse controls pass axe in the dark theme and read in Chinese', async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('ib-tour-offer', 'dismissed');
+      localStorage.setItem('ib-theme', 'dark');
+    } catch {
+      /* storage blocked */
+    }
+  });
+  await login(page, 'jdoe');
+  await page.goto('/compare');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.locator('body').click({ position: { x: 5, y: 300 } });
+  await page.keyboard.press('Control+Shift+P');
+  await expect(bar(page)).toBeVisible();
+  await expectAccessible(page, 'presenter/rehearsal-dark-controls');
+  await page.keyboard.press('l');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans');
+  await expect(ctl(page, 'start')).toHaveAttribute('title', '开始（P）');
+  await expect(ctl(page, 'exit')).toHaveAttribute('aria-label', '退出演示模式');
+  await page.keyboard.press('l');
+});
+
+test('B on a slide keeps the slide and says there is no recording (stage QA 30 Oct #4)', async ({ page }) => {
+  await login(page, 'jdoe');
+  await page.goto('/present/proof');
+  // Step 08 (proof), as if the script had walked there.
+  await page.evaluate(() => sessionStorage.setItem('ib.presenter', JSON.stringify({ armed: true, started: true, step: 8, stage: true, reqs: {} })));
+  await page.reload();
+  await expect(stepNo(page)).toHaveText('08');
+  await expect(ctl(page, 'clip')).toHaveCount(0); // no recording button on a slide
+  // The note is announced: it appears inside an always-mounted polite live region (round-5 Opus cross-check #2).
+  const region = page.getByTestId('clip-note-region');
+  await expect(region).toHaveAttribute('role', 'status');
+  await expect(region).toHaveAttribute('aria-live', 'polite');
+  await page.keyboard.press('b');
+  await expect(region.getByTestId('clip-none-note')).toHaveText('No recording for this step');
+  await expect(page.getByTestId('clip-overlay')).toHaveCount(0);
+  await expect(page.getByTestId('proof-leaks')).toBeVisible();
+  await expect(page.getByTestId('clip-none-note')).toHaveCount(0, { timeout: 5_000 });
+  // Exit on a slide goes to the app, never a page with no links (stage QA re-run).
+  await page.keyboard.press('Control+Shift+P');
+  await expect(bar(page)).toHaveCount(0);
+  await expect(page).not.toHaveURL(/\/present/);
+  await expect(page.getByTestId('side-nav')).toBeVisible();
 });

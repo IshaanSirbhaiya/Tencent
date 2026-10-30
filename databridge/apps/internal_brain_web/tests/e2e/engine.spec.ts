@@ -42,6 +42,18 @@ test.describe('engine view', () => {
     await shot(page, '01-graph-dark-1280');
   });
 
+  test('every graph node is at least a 24 px target (WCAG 2.5.8; round-4 Sonnet F11)', async ({ page }) => {
+    await openEngine(page);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible();
+    // On screen, at the fitted zoom (and again after zooming out): never under 24 CSS px.
+    const smallest = () =>
+      page.locator('.react-flow__node').evaluateAll((els) => Math.min(...els.map((e) => Math.min(e.getBoundingClientRect().width, e.getBoundingClientRect().height))));
+    await expect.poll(smallest).toBeGreaterThanOrEqual(23.5);
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await expect.poll(smallest).toBeGreaterThanOrEqual(23.5);
+  });
+
   test('the table alternative lists the same nodes and opens a link panel', async ({ page }) => {
     await openEngine(page);
     await page.getByTestId('engine-graph-view').getByRole('radio', { name: 'Table' }).click();

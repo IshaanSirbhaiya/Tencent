@@ -39,12 +39,12 @@ const ICON: Record<Status, typeof CheckCircle2> = { pass: CheckCircle2, fail: XC
 function Row({ c }: { c: ServerCheck }) {
   const Icon = ICON[c.status];
   return (
-    <li className="flex items-start gap-4 border-t border-line py-3 first:border-t-0" data-testid={`pf-${c.key}`} data-status={c.status}>
-      <Icon aria-hidden className={cn('mt-1 h-8 w-8 shrink-0', TONE[c.status])} />
-      <span className={cn('w-[5.5rem] shrink-0 pt-0.5 text-[1.5rem] font-bold tracking-wide', TONE[c.status])}>{WORD[c.status]}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[1.5rem] font-semibold leading-snug text-fg">{c.label}</span>
-        {c.detail ? <span className="block text-[1.125rem] leading-snug text-muted">{c.detail}</span> : null}
+    <li className="flex items-start gap-3 border-t border-line py-3 first:border-t-0 sm:gap-4" data-testid={`pf-${c.key}`} data-status={c.status}>
+      <Icon aria-hidden className={cn('mt-1 h-6 w-6 shrink-0 sm:h-8 sm:w-8', TONE[c.status])} />
+      <span className={cn('w-[4.25rem] shrink-0 pt-0.5 text-[1.125rem] font-bold tracking-wide sm:w-[5.5rem] sm:text-[1.5rem]', TONE[c.status])}>{WORD[c.status]}</span>
+      <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+        <span className="block text-[1.125rem] font-semibold leading-snug text-fg sm:text-[1.5rem]">{c.label}</span>
+        {c.detail ? <span className="block text-[1rem] leading-snug text-muted sm:text-[1.125rem]">{c.detail}</span> : null}
       </span>
     </li>
   );
@@ -52,9 +52,9 @@ function Row({ c }: { c: ServerCheck }) {
 
 function Section({ title, note, checks }: { title: string; note?: string; checks: ServerCheck[] }) {
   return (
-    <section className="rounded-lg border border-line bg-surface px-6 py-4">
-      <h2 className="text-[1.75rem] font-semibold tracking-[-0.01em] text-fg">{title}</h2>
-      {note ? <p className="text-[1.0625rem] text-muted">{note}</p> : null}
+    <section className="min-w-0 rounded-lg border border-line bg-surface px-4 py-4 sm:px-6">
+      <h2 className="text-[1.375rem] font-semibold tracking-[-0.01em] text-fg sm:text-[1.75rem]">{title}</h2>
+      {note ? <p className="text-[1rem] text-muted [overflow-wrap:anywhere] sm:text-[1.0625rem]">{note}</p> : null}
       <ul className="mt-2">{checks.map((c) => <Row key={c.key} c={c} />)}</ul>
     </section>
   );
@@ -173,7 +173,7 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
   if (report && ageMin !== null && ageMin > STALE_MIN)
     scriptChecks.unshift({ key: 'stale', label: `Start report is ${Math.round(ageMin)} minutes old`, status: 'warn', detail: 'run Start again (or Reset) so the first ask on stage is warm' });
   if (report && report.mode !== (mock ? 'offline' : 'live'))
-    scriptChecks.unshift({ key: 'mode', label: `Start report is for the ${report.mode} build`, status: 'warn', detail: 'it does not describe this server; run the matching Start' });
+    scriptChecks.unshift({ key: 'report-mode', label: `Start report is for the ${report.mode} build`, status: 'warn', detail: 'it does not describe this server; run the matching Start' });
 
   const all = [...serviceChecks, ...scriptChecks, ...warmChecks, ...local];
   const fails = all.filter((c) => c.status === 'fail').length;
@@ -181,10 +181,11 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
   const ready = fails === 0 && local.length > 0;
 
   return (
-    <div className="min-h-dvh bg-bg px-[4vw] pb-40 pt-[3vh] text-fg">
+    // lang="en": the board is English-only (a backstage tool), so a zh-Hans page still reads it as English.
+    <div lang="en" className="min-h-dvh bg-bg px-4 pb-40 pt-[3vh] text-fg sm:px-[4vw]">
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[1.125rem] font-semibold uppercase tracking-[0.14em] text-subtle">Walnut DataBridge · Demo Day preflight</p>
+        <div className="min-w-0">
+          <p className="text-[1rem] font-semibold uppercase tracking-[0.14em] text-subtle sm:text-[1.125rem]">Walnut DataBridge · Demo Day preflight</p>
           <h1
             className={cn('mt-1 text-[clamp(3rem,6vw,5.5rem)] font-bold leading-none tracking-[-0.03em]', local.length === 0 ? 'text-muted' : ready ? 'text-ok' : 'text-bad')}
             data-testid="pf-verdict"
@@ -215,7 +216,7 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
         </div>
       </header>
 
-      <div className="mt-6 grid gap-5 xl:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Section title="Services" note="Checked now by this server." checks={serviceChecks} />
         <Section
           title="Model and audit chain"
@@ -230,7 +231,7 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
         <Section title="This screen and laptop" note="Checked now by this browser." checks={local.length ? local : [{ key: 'pending', label: 'Checking…', status: 'info', detail: '' }]} />
       </div>
 
-      <p className="mt-6 text-[1.125rem] text-muted">
+      <p className="mt-6 text-[1.125rem] text-muted [overflow-wrap:anywhere]">
         Next: open <span className="font-mono text-fg">/present?present=1</span>, press <b>P</b>, then <b>Space</b> for each step. <b>B</b> plays the backup clip, <b>R</b> resets. Runbook:{' '}
         <span className="font-mono">docs/finals/demo_day/DEMO_DAY_RUNBOOK.md</span>
       </p>

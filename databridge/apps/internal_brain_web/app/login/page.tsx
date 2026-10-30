@@ -158,7 +158,7 @@ export default function LoginPage() {
                     </span>
                     <span className="mt-0.5 block text-body-sm text-muted">{role(p)}</span>
                     <span className="mt-2 block text-caption text-muted">
-                      <span className="font-medium text-fg">{t('login.canOpen')}:</span> <span className="line-clamp-2 inline">{note(p)}</span>
+                      <span className="font-medium text-fg">{t('login.roleLabel')}</span> <span className="line-clamp-2 inline">{note(p)}</span>
                     </span>
                   </span>
                   <span aria-hidden className="absolute right-3 top-3">

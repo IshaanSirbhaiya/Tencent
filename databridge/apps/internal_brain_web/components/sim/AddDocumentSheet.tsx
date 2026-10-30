@@ -6,6 +6,9 @@
 // - Slack only (the stage UI never offers Confluence; PLAN §4.4 item 3).
 // - The channel list comes ONLY from the person's own /ib/map, so it lists channels they can
 //   already read and leaks nothing. The server re-checks live membership at post time.
+// - The upload folder list comes ONLY from GET /sim/upload-folders (D-34): the folders the person
+//   may upload into now, by name, checked live by the server. No copy here names a folder. A typed
+//   folder ID stays as a collapsed "Advanced" fallback, shown only when that list is empty or fails.
 // - On a refusal the sheet shows one neutral sentence; it never says why (404 is one answer).
 // - Round-3 review H3: after a successful post or upload the form is cleared, so one more Enter on
 //   stage cannot post the same note twice; focus goes back to the empty field. L4: success is a
@@ -16,6 +19,7 @@ import { Badge, Button, Field, Input, SheetContent, Tabs, TabsContent, TabsList,
 import { rememberPost } from '@/components/graph/useLiveChanges';
 import { ApiError, liveApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import type { UploadFolder } from '@/lib/types';
 import { useMessages } from '@/lib/i18n';
 import { graphMessages } from '@/lib/i18n/graph';
 
@@ -93,20 +97,25 @@ function fmtSize(n: number): string {
 
 const FOLDER_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
+type Folders = { state: 'loading' } | { state: 'ok'; list: UploadFolder[] } | { state: 'failed' };
+
 /**
  * `presenterOwned`: the presenter's grow step opened the sheet (round-3 Fable #1). Focus then goes
  * to the sheet itself, not its Close button or the text field, so Space keeps driving the script
  * (controller.ts lets `data-presenter-owned` dialogs through) and never closes the sheet or types.
  *
- * Upload folder: there is no per-person list of Drive folders in the API (/ib/map lists shared
- * drives, not folders), so the field stays a typed folder id with a plain label and an example; a
- * name list would need a server route that lists only the folders the person can open.
+ * Upload folder (D-34): a list of folder NAMES from GET /sim/upload-folders, which returns only the
+ * folders this person may upload into now (the server re-checks at upload time anyway). The typed
+ * folder ID is a collapsed "Advanced" fallback, offered only when that list is empty or fails.
  */
 export function AddDocumentSheet({ note, channels, testId = 'add-doc', presenterOwned = false }: { note: AddNote; channels: Channel[]; testId?: string; presenterOwned?: boolean }) {
   const t = useMessages(graphMessages);
   const [tab, setTab] = useState<'note' | 'file'>('note');
   const [file, setFile] = useState<File | null>(null);
-  const [folder, setFolder] = useState('');
+  const [folder, setFolder] = useState(''); // the Advanced fallback: a typed folder ID
+  const [picked, setPicked] = useState(''); // the folder chosen from the list (its id)
+  const [folders, setFolders] = useState<Folders>({ state: 'loading' });
+  const asked = useRef(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const owned = useRef(presenterOwned);
   owned.current = presenterOwned;
@@ -134,6 +143,18 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc', presenter
     prevUp.current = up.kind;
   }, [up.kind]);
 
+  // The folder list is fetched once, the first time the file tab is shown.
+  useEffect(() => {
+    if (tab !== 'file' || asked.current) return;
+    asked.current = true;
+    liveApi
+      .uploadFolders()
+      .then((list) => setFolders({ state: 'ok', list: Array.isArray(list) ? list.filter((f) => f && typeof f.id === 'string' && typeof f.path === 'string' && FOLDER_ID.test(f.id)) : [] }))
+      .catch(() => setFolders({ state: 'failed' }));
+  }, [tab]);
+  const listed = folders.state === 'ok' && folders.list.length > 0;
+  const target = listed ? (folders.list.some((f) => f.id === picked) ? picked : '') : folders.state === 'loading' ? '' : folder.trim();
+
   const pick = (f: File | null) => {
     setFile(f);
     if (f && f.size > MAX_FILE) setUp({ kind: 'error', text: t('add.tooBig') });
@@ -141,7 +162,7 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc', presenter
   };
 
   const upload = async () => {
-    if (!file || up.kind === 'busy' || !FOLDER_ID.test(folder.trim())) return;
+    if (!file || up.kind === 'busy' || !FOLDER_ID.test(target)) return;
     if (file.size > MAX_FILE) {
       setUp({ kind: 'error', text: t('add.tooBig') });
       return;
@@ -149,7 +170,7 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc', presenter
     setUp({ kind: 'busy' });
     try {
       const content_b64 = toB64(await file.arrayBuffer());
-      const r = await liveApi.uploadFile({ filename: file.name, content_b64, folder: folder.trim(), ...(title.trim() ? { title: title.trim() } : {}) });
+      const r = await liveApi.uploadFile({ filename: file.name, content_b64, folder: target, ...(title.trim() ? { title: title.trim() } : {}) });
       rememberPost(r.doc_id);
       // uploaded: clear the file and title so the same file is not uploaded twice by accident
       setFile(null);
@@ -281,14 +302,50 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc', presenter
                 {file ? t('add.picked', { name: file.name, size: fmtSize(file.size) }) : ''}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field id={`${testId}-folder`} label={t('add.folder')} hint={t('add.folderHint')}>
-                  <Input id={`${testId}-folder`} aria-describedby={`${testId}-folder-hint`} value={folder} onChange={(e) => setFolder(e.target.value)} pattern="[A-Za-z0-9_-]{1,128}" placeholder="fd-7" autoComplete="off" spellCheck={false} data-testid={`${testId}-folder`} />
-                </Field>
+                {listed ? (
+                  <Field id={`${testId}-folders`} label={t('add.folder')} hint={t('add.folderHint')}>
+                    <select
+                      id={`${testId}-folders`}
+                      aria-describedby={`${testId}-folders-hint`}
+                      className={inputClass}
+                      value={target}
+                      onChange={(e) => setPicked(e.target.value)}
+                      required
+                      data-testid={`${testId}-folders`}
+                    >
+                      <option value="" disabled>
+                        {t('add.folderChoose')}
+                      </option>
+                      {folders.list.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.path}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-fg">{t('add.folder')}</p>
+                    <p className="text-caption text-muted" role="status" aria-live="polite" data-testid={`${testId}-folders-state`}>
+                      {folders.state === 'loading' ? t('add.foldersLoading') : folders.state === 'failed' ? t('add.foldersFailed') : t('add.foldersNone')}
+                    </p>
+                  </div>
+                )}
                 <Field id={`${testId}-ftitle`} label={t('add.fileTitle')}>
                   <Input id={`${testId}-ftitle`} value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
                 </Field>
               </div>
-              <Button ref={uploadRef} type="submit" variant="primary" busy={up.kind === 'busy'} disabled={!file || up.kind === 'busy' || file.size > MAX_FILE || !FOLDER_ID.test(folder.trim())} data-testid={`${testId}-upload`}>
+              {folders.state !== 'loading' && !listed ? (
+                <details className="rounded-md border border-line px-3 py-2" data-testid={`${testId}-advanced`}>
+                  <summary className="cursor-pointer text-xs font-medium text-fg">{t('add.folderAdvanced')}</summary>
+                  <div className="mt-3">
+                    <Field id={`${testId}-folder`} label={t('add.folderId')} hint={t('add.folderIdHint')}>
+                      <Input id={`${testId}-folder`} aria-describedby={`${testId}-folder-hint`} value={folder} onChange={(e) => setFolder(e.target.value)} pattern="[A-Za-z0-9_-]{1,128}" autoComplete="off" spellCheck={false} data-testid={`${testId}-folder`} />
+                    </Field>
+                  </div>
+                </details>
+              ) : null}
+              <Button ref={uploadRef} type="submit" variant="primary" busy={up.kind === 'busy'} disabled={!file || up.kind === 'busy' || file.size > MAX_FILE || !FOLDER_ID.test(target)} data-testid={`${testId}-upload`}>
                 {up.kind === 'busy' ? t('add.uploading') : t('add.upload')}
               </Button>
               {msg(up, `${testId}-upload-status`)}

@@ -18,6 +18,7 @@ import ReactFlow, {
   Position,
   ReactFlowProvider,
   useReactFlow,
+  useStore,
   type Edge,
   type EdgeChange,
   type EdgeProps,
@@ -55,6 +56,8 @@ interface NodeData {
   kindLabel: string;
   color: string;
   size: number;
+  /** The node's hit box in flow units: at least MIN_TARGET screen px at the current zoom. */
+  box: number;
   dim: boolean;
   showLabel: boolean;
 }
@@ -78,15 +81,23 @@ const HANDLE_STYLE: React.CSSProperties = {
   pointerEvents: 'none',
 };
 
+/**
+ * WCAG 2.5.8 target size (round-4 Sonnet F11): every node is a focusable button, so its box is at
+ * least 24 CSS px square on screen, at any zoom, even when the dot is smaller. The dot sits centred
+ * in that box and the handles are centred too, so links and the layout's centre points do not move.
+ */
+const MIN_TARGET = 24;
+
 const EntityNode = memo(function EntityNode({ data, selected }: NodeProps<NodeData>) {
   const short = data.label.length > 30 ? `${data.label.slice(0, 29)}…` : data.label;
+  const box = data.box;
   return (
-    <div className="group relative" style={{ width: data.size, height: data.size }}>
+    <div className="group relative flex items-center justify-center" style={{ width: box, height: box }}>
       <Handle type="target" position={Position.Top} style={HANDLE_STYLE} isConnectable={false} />
       <span
         aria-hidden
         className={cn(
-          'block rounded-full border transition-opacity duration-base',
+          'block shrink-0 rounded-full border transition-opacity duration-base',
           selected ? 'border-fg ring-2 ring-accent ring-offset-2 ring-offset-bg' : 'border-fg/25',
         )}
         style={{ width: data.size, height: data.size, background: data.color, opacity: data.dim ? 0.16 : 1 }}
@@ -165,6 +176,8 @@ export interface EngineCanvasProps {
 
 function CanvasInner({ nodes, edges, palette, selection, onSelect, onExpand, keepPositions, allLabels, layout, label, className, testId }: EngineCanvasProps) {
   const rf = useReactFlow();
+  // Flow units that make MIN_TARGET screen px now (whole units, so zooming re-renders in steps).
+  const minBox = useStore((st) => Math.ceil(MIN_TARGET / Math.max(st.transform[2] || 1, 0.05)));
   const reduce = useReducedMotion();
   const duration = reduce ? 0 : 200;
   const prior = useRef<Map<string, Pos>>(new Map());
@@ -198,12 +211,13 @@ function CanvasInner({ nodes, edges, palette, selection, onSelect, onExpand, kee
         return {
           id: n.id,
           type: 'entity',
-          position: { x: p.x - size / 2, y: p.y - size / 2 },
+          position: { x: p.x - Math.max(size, minBox) / 2, y: p.y - Math.max(size, minBox) / 2 },
           data: {
             label: n.label,
             kindLabel: style.label,
             color: style.color,
             size,
+            box: Math.max(size, minBox),
             dim: !!n.dim,
             showLabel: allLabels || nodes.length <= 12 || size >= (nodes.length > 60 ? 28 : 22),
           },
@@ -214,7 +228,7 @@ function CanvasInner({ nodes, edges, palette, selection, onSelect, onExpand, kee
           zIndex: selection?.id === n.id ? 10 : 1,
         };
       }),
-    [nodes, positions, degree, palette, selection, allLabels],
+    [nodes, positions, degree, palette, selection, allLabels, minBox],
   );
 
   const rfEdges: Edge<EdgeData>[] = useMemo(

@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { LiveAnnouncer } from '@/components/ui/announce';
 import { TooltipProvider } from '@/components/ui/overlays';
 import { ApiError, api } from '@/lib/api';
+import { claimSession } from '@/components/presenter/session';
 import { LangContext } from '@/lib/i18n';
 import { DEFAULT_PREFS, MODE_HOME, applyPrefs, loadPrefs, modeForPath, savePref, type Lang, type Mode, type Prefs } from '@/lib/prefs';
 import type { WhoAmI } from '@/lib/types';
@@ -228,7 +229,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     try {
-      await api.logout();
+      // Queued with the presenter's session changes, last (round-4 Opus #1): a P warm-up running
+      // now stops and never signs anyone back in after this.
+      await claimSession(() => api.logout());
     } catch {
       /* the session may already be gone */
     }
@@ -241,7 +244,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   const switchPersona = useCallback(
     async (id: string) => {
-      await api.switchTo(id);
+      await claimSession(() => api.switchTo(id)); // same queue as Sign out (round-4 Opus #1)
       forgetIdentityCaches();
       announceSignedOut();
       // force: a whoami that started before the switch must not win with the OLD identity.

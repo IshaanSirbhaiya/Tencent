@@ -47,6 +47,8 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: new RegExp(`^audit\\/doc\\/${DOC_ID}\\/accessors$`) },
   { method: 'POST', re: /^audit\/(ask|reveal|tamper-demo)$/ },
   { method: 'POST', re: /^sim\/[a-z][a-z-]*$/ },
+  // The upload sheet's folder picker (D-34): main session only, like sim/upload-file
+  { method: 'GET', re: /^sim\/upload-folders$/ },
 ];
 
 const COOKIE = 'ib_session';
@@ -210,10 +212,18 @@ function getFromThisSite(req: NextRequest): boolean {
 // allowed from elsewhere: a top-level navigation only. Its only effects are a doc.viewed record and a
 // 303 to a source the signed-in person can open now (Gate 1 + Gate 2 in the IB); anything else is
 // the IB's one 404.
+// Round-4 Opus #5: when the browser sends Sec-Fetch headers, the request must be a top-level document
+// navigation the person clicked (Dest document, Mode navigate, User ?1). A script's `location = …`,
+// window.open without a click, an iframe, an <img> or a fetch gets the open route's one 404 instead.
+// No Sec-Fetch headers at all (curl, tests, an old browser): left to the IB, as before.
 const OPEN_LINK = /^ib\/open\/[0-9a-f]{32}$/;
-function openNavigation(req: NextRequest, path: string): boolean {
+function openNavigation(req: NextRequest): boolean {
+  const dest = req.headers.get('sec-fetch-dest');
   const mode = req.headers.get('sec-fetch-mode');
-  return OPEN_LINK.test(path) && (mode === null || mode === 'navigate');
+  const site = req.headers.get('sec-fetch-site');
+  const user = req.headers.get('sec-fetch-user');
+  if (dest === null && mode === null && site === null && user === null) return true;
+  return dest === 'document' && mode === 'navigate' && user === '?1';
 }
 
 /** The IB's 303 for an open link: relayed only on that route, only to an http(s) URL. */
@@ -236,7 +246,9 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   const method = req.method.toUpperCase();
   if (!cleanSegments(segments)) return fail(400, 'bad request');
   if (!allowedHost(req)) return fail(403, 'forbidden');
-  if (method === 'GET' && !getFromThisSite(req) && !openNavigation(req, path)) return fail(403, 'forbidden');
+  if (method === 'GET' && OPEN_LINK.test(path)) {
+    if (!openNavigation(req)) return fail(404, 'not found');
+  } else if (method === 'GET' && !getFromThisSite(req)) return fail(403, 'forbidden');
   if (!allowed(ALLOWED, method, path)) return fail(404, 'not found');
   const slot = slotOf(req);
   if (slot === null) return fail(400, 'bad request');

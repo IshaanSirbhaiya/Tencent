@@ -422,6 +422,7 @@ type Numbering = ReturnType<typeof useNumbering>;
 
 function Chips({ tags, num, onJump }: { tags: string[]; num: Numbering; onJump?: Jump }) {
   const { lang } = useLang();
+  const t = useMessages(deliverMessages);
   // the chip's own label is UI text, inside content marked lang="en"
   return (
     <span lang={lang}>
@@ -434,15 +435,30 @@ function Chips({ tags, num, onJump }: { tags: string[]; num: Numbering; onJump?:
             key={tag}
             data-testid="deliver-cite"
             className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded border border-line-strong bg-raised px-1 align-middle text-caption font-semibold tabular-nums text-muted"
-            aria-label={`[${e.n}] ${e.dc?.title ?? ''}`}
           >
-            {e.n}
+            {/* round 4 UX F12: the visible number is hidden from AT; the name is "Source n: title" */}
+            <span aria-hidden="true">{e.n}</span>
+            {/* round-5 Opus #14: the title is English source text, so only it carries lang="en" (the
+                "Source n:" prefix stays in the UI language; {title} ends the string in EN and zh) */}
+            <span className="sr-only">
+              {t('deliver.chipLabel', { n: e.n, title: '' })}
+              <span lang="en">{e.dc?.title ?? ''}</span>
+            </span>
           </span>
         );
       })}
     </span>
   );
 }
+
+/** The server's FIXED titles are UI text and are translated; any other title is source-worded
+ * and shown exactly as returned, marked lang="en" (round 4 UX F5). */
+const FIXED_TITLES: Record<string, DeliverKey> = {
+  'Table from your sources': 'deliver.fixedTitle.table',
+  'Chart from your sources': 'deliver.fixedTitle.chart',
+  'Analysis from your sources': 'deliver.fixedTitle.analysis',
+  'Quoted from your sources': 'deliver.fixedTitle.quoted',
+};
 
 function builtBy(d: Deliverable, num: Numbering, t: T): string {
   const m = d.model;
@@ -500,6 +516,10 @@ function MetaLine({ d, num, t }: { d: Deliverable; num: Numbering; t: T }) {
         <span className="basis-full text-subtle" data-testid="deliver-fallback">
           {t('deliver.by.modelFailed')}
         </span>
+      ) : d.generated === 'deterministic' ? (
+        <span className="basis-full text-subtle" data-testid="deliver-nomodel">
+          {t('deliver.by.noModel')}
+        </span>
       ) : null}
     </div>
   );
@@ -513,6 +533,10 @@ function Ready({ response, d, onRetry, focus, onFocused }: { response: AskRespon
   const titleId = useId();
   const listId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const copyRef = useRef<HTMLButtonElement>(null);
+  const { lang } = useLang();
+  const fixedKey = FIXED_TITLES[d.title];
+  const shownTitle = fixedKey ? t(fixedKey) : d.title;
   useFocusOnMount(titleRef, focus, onFocused);
   const jump: Jump = (n) => {
     const el = document.getElementById(listId)?.querySelector<HTMLElement>(`[data-ns~="${n}"]`);
@@ -555,16 +579,25 @@ function Ready({ response, d, onRetry, focus, onFocused }: { response: AskRespon
   const changed = d.citations.filter((c) => c.changed_since_answer);
   return (
     <div data-testid="deliver-view" data-kind={d.kind} data-generated={d.generated} data-model={d.model?.model ?? ''}>
-      <h3 ref={titleRef} id={titleId} tabIndex={-1} lang="en" className="text-heading-sm font-semibold text-fg outline-none" data-testid="deliver-title">
-        {d.title}
+      <h3 ref={titleRef} id={titleId} tabIndex={-1} lang={fixedKey ? lang : 'en'} className="text-heading-sm font-semibold text-fg outline-none" data-testid="deliver-title">
+        {shownTitle}
       </h3>
+      {/* round 4 UX F12: one Tab from the title reaches the actions instead of every source chip */}
+      <button
+        type="button"
+        onClick={() => copyRef.current?.focus()}
+        className="sr-only focus:not-sr-only focus:mt-1 focus:inline-block focus:rounded focus:px-2 focus:py-1 focus:text-caption focus:text-fg"
+        data-testid="deliver-skip"
+      >
+        {t('deliver.skipActions')}
+      </button>
       <div className="mt-1">
         <MetaLine d={d} num={num} t={t} />
       </div>
 
       <div className="mt-4">
-        {d.kind === 'table' ? <TableView table={d.content as DeliverTable} title={d.title} num={num} onJump={jump} t={t} /> : null}
-        {d.kind === 'chart' ? <ChartView chart={d.content as DeliverChart} title={d.title} titleId={titleId} num={num} onJump={jump} t={t} /> : null}
+        {d.kind === 'table' ? <TableView table={d.content as DeliverTable} title={shownTitle} num={num} onJump={jump} t={t} /> : null}
+        {d.kind === 'chart' ? <ChartView chart={d.content as DeliverChart} title={shownTitle} titleId={titleId} num={num} onJump={jump} t={t} /> : null}
         {d.kind === 'analysis' ? <AnalysisView a={d.content as DeliverAnalysis} num={num} onJump={jump} /> : null}
       </div>
 
@@ -577,7 +610,7 @@ function Ready({ response, d, onRetry, focus, onFocused }: { response: AskRespon
       ))}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="primary" icon={copied ? Check : Copy} onClick={() => void copy()} data-testid="deliver-copy">
+        <Button ref={copyRef} size="sm" variant="primary" icon={copied ? Check : Copy} onClick={() => void copy()} data-testid="deliver-copy">
           {t('deliver.copy')}
         </Button>
         {d.exports.includes('csv') ? (

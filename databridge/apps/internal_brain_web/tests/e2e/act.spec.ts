@@ -36,8 +36,10 @@ test('account manager: the reply draft is the approved wording, for review, neve
   await row.getByTestId('act-draft').click();
   const sheet = page.getByTestId('act-draft-sheet');
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole('heading', { name: 'Draft for your review' })).toBeVisible();
+  // Round 4 Sonnet UX: the sheet is titled "Reply draft", so "Draft for your review" appears once (the label).
+  await expect(sheet.getByRole('heading', { name: 'Reply draft' })).toBeVisible();
   await expect(sheet.getByTestId('act-draft-label')).toHaveText('Draft for your review');
+  await expect(sheet.getByText('Draft for your review', { exact: true })).toHaveCount(1);
   await expect(sheet.getByTestId('act-draft-how')).toHaveText('Uses the approved wording, word for word');
   const text = sheet.getByTestId('act-draft-text');
   await expect(text).toContainText('Your account is undergoing a routine review in line with our regulatory obligations.');
@@ -61,11 +63,17 @@ test('account manager: the reply draft is the approved wording, for review, neve
   await expect(sheet).toBeHidden();
   await expect(row.getByTestId('act-draft')).toBeFocused();
 
-  // Amy holds no Jira create role: one polite sentence, no reason
+  // Amy holds no Jira create role: one status sentence at the top, no reason (rule 4), no
+  // contradicting "Create…" title or "Nothing is created until you confirm", and the way on.
   await row.getByTestId('act-ticket').click();
   const tsheet = page.getByTestId('act-ticket-sheet');
-  await expect(tsheet.getByTestId('act-unavailable')).toHaveText("A follow-up ticket can’t be created from this answer. Nothing was changed.");
+  await expect(tsheet.getByRole('status')).toHaveText('You can’t create a follow-up ticket from this answer. You can still draft a reply.');
+  await expect(tsheet.getByRole('heading', { name: 'Follow-up ticket' })).toBeVisible();
+  await expect(tsheet).not.toContainText('Nothing is created until you confirm');
+  await expect(tsheet).not.toContainText('Create a follow-up ticket');
   await expectAccessible(page, 'act ticket unavailable');
+  await tsheet.getByTestId('act-unavailable-draft').click();
+  await expect(page.getByTestId('act-draft-sheet').getByTestId('act-draft-text')).toBeVisible();
 });
 
 test('engineer: a follow-up ticket is proposed, confirmed and created', async ({ page }) => {
@@ -81,9 +89,25 @@ test('engineer: a follow-up ticket is proposed, confirmed and created', async ({
   const summary = sheet.getByTestId('act-ticket-summary');
   await expect(summary).toHaveValue('Follow-up on an Internal Brain answer');
   const desc = sheet.getByTestId('act-ticket-description');
-  await expect(desc).toContainText(`(request ${reqId})`);
+  await expect(desc).toContainText(`Reference: ${reqId}`);
+  await expect(desc).not.toContainText('(request ');
   await expect(desc).toContainText('Source 1: ');
   await expect(desc).toContainText('/api/ib/ib/open/');
+  // Round-4 Opus #6: the links are on this app's own origin (not a fixed :3100), and the mock has an
+  // ib/open route that answers like the real one: a view for someone who may open it, else the one 404.
+  const origin = new URL(page.url()).origin;
+  const link = ((await desc.textContent()) ?? '').match(/Source 1: (\S+)/)![1];
+  expect(link.startsWith(`${origin}/api/ib/ib/open/`), link).toBe(true);
+  const opened = await page.request.get(link, { headers: { 'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'cross-site', 'sec-fetch-user': '?1' } });
+  expect(opened.status()).toBe(200);
+  expect(typeof (await opened.json()).doc_id).toBe('string');
+  // Round-4 Opus #5: a scripted navigation (no user activation), an iframe or a fetch: the one 404.
+  for (const h of [
+    { 'sec-fetch-dest': 'document', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'cross-site' },
+    { 'sec-fetch-dest': 'iframe', 'sec-fetch-mode': 'navigate', 'sec-fetch-site': 'cross-site', 'sec-fetch-user': '?1' },
+    { 'sec-fetch-dest': 'empty', 'sec-fetch-mode': 'cors', 'sec-fetch-site': 'same-origin' },
+  ]) expect((await page.request.get(link, { headers: h })).status(), JSON.stringify(h)).toBe(404);
+  expect((await page.request.get(`${origin}/api/ib/ib/open/${'0'.repeat(32)}`)).status()).toBe(404);
   // The scrollable description is a focusable, named region (axe scrollable-region-focusable), in English.
   await expect(desc).toHaveAttribute('tabindex', '0');
   await expect(desc).toHaveAttribute('role', 'region');
@@ -165,7 +189,7 @@ test('Chinese: the act row and sheet are translated', async ({ page }) => {
   await expect(row.getByTestId('act-ticket')).toHaveText('创建跟进工单');
   await row.getByTestId('act-draft').click();
   const sheet = page.getByTestId('act-draft-sheet');
-  await expect(sheet.getByRole('heading', { name: '草稿，请你审阅' })).toBeVisible();
+  await expect(sheet.getByRole('heading', { name: '回复草稿' })).toBeVisible();
   // The server's English text is marked as English (WCAG 3.1.2) and one zh line says so; the fixed
   // server label is translated, the chrome around it is Chinese.
   await expect(sheet.getByTestId('act-draft-text')).toHaveAttribute('lang', 'en');
@@ -251,4 +275,37 @@ test('after Confirm: an unknown Jira outcome and a 503 never say "nothing was ch
   await sheet.getByTestId('act-ticket-cancel').click();
   await expect(sheet).toBeHidden();
   await expect(page.getByText('Cancelled. Nothing was created.')).toHaveCount(0);
+});
+
+test('re-opening the ticket sheet after an unknown outcome says so, never "nothing was changed"', async ({ page }) => {
+  // Round 4 Codex A6: propose answers 409 outcome_unknown while an earlier create is unresolved.
+  await quiet(page, 'light');
+  await login(page, 'jdoe');
+  await ask(page, S1);
+  await page.route('**/api/ib/ib/act/ticket/propose', (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'outcome_unknown', message: 'We could not confirm whether the ticket was created. Check the project before trying again.' }),
+    }),
+  );
+  await page.getByTestId('answer').getByTestId('act-ticket').click();
+  const sheet = page.getByTestId('act-ticket-sheet');
+  const unknown = sheet.getByTestId('act-outcome-unknown');
+  await expect(unknown).toHaveText('We could not confirm whether the ticket was created. Check the project before trying again.');
+  await expect(sheet).not.toContainText(/Nothing was (changed|created)/);
+  await expectAccessible(page, 'act ticket propose outcome unknown');
+});
+
+test('a rate-limited action says to try again in a minute, with no counts', async ({ page }) => {
+  await quiet(page);
+  await login(page, 'jdoe');
+  await ask(page, S1);
+  await page.route('**/api/ib/ib/act/draft', (route) =>
+    route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ detail: 'too many requests' }) }),
+  );
+  await page.getByTestId('answer').getByTestId('act-draft').click();
+  const rate = page.getByTestId('act-draft-sheet').getByTestId('act-rate');
+  await expect(rate).toContainText('Too many requests in a short time. Try again in a minute.');
+  await expect(rate).not.toContainText(/\d/);
 });

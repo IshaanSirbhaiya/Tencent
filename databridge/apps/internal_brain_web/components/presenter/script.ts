@@ -42,6 +42,8 @@ export interface StepCtx {
    * Resolves false when it never appeared (the page itself shows why).
    */
   reveal: (selector: string, timeoutMs?: number) => Promise<boolean>;
+  /** Wait (up to `timeoutMs`, default 15 s) for `selector` without scrolling; false when it never appeared. */
+  waitFor: (selector: string, timeoutMs?: number) => Promise<boolean>;
 }
 
 export type StepId =
@@ -161,7 +163,12 @@ export const STEPS: PresenterStep[] = [
     say: 'Mehul: "I am the compliance officer. Verify: intact."',
     url: '/dev/audit?verify=1',
     clip: CLIPS.B,
-    action: async (ctx) => ctx.go('/dev/audit?verify=1'),
+    // Ready only once the Verify result is on screen (stage QA 30 Oct #3: the HUD said ready ~0.9 s early),
+    // scrolled into view first (stage QA re-run: it could still be below the fold when ready showed).
+    action: async (ctx) => {
+      await ctx.go('/dev/audit?verify=1');
+      if (!(await ctx.reveal('[data-testid="verify-status"],[data-testid="verify-panel"] [role="alert"]', 15_000))) fail('verify result');
+    },
   },
   {
     id: 'tamper',
@@ -169,7 +176,12 @@ export const STEPS: PresenterStep[] = [
     say: 'Mehul: "Now I change one word in a copy of the log, denied to allowed. Verify." Read the entry number off the screen.',
     url: '/dev/audit?tamper=1',
     clip: CLIPS.B,
-    action: async (ctx) => ctx.go('/dev/audit?tamper=1'),
+    // Ready only once "Chain broken at entry N" (or the error) is on screen (stage QA 30 Oct #3: ~3 s early),
+    // scrolled into view first (stage QA re-run).
+    action: async (ctx) => {
+      await ctx.go('/dev/audit?tamper=1');
+      if (!(await ctx.reveal('[data-testid="tamper-panel"][data-state="done"],[data-testid="tamper-panel"][data-state="error"]', 20_000))) fail('tamper result');
+    },
   },
   {
     id: 'workbuddy',
@@ -227,7 +239,8 @@ export const GROW_STEPS: PresenterStep[] = [
     action: async (ctx) => {
       await ctx.signInMain('jdoe');
       await ctx.go(GROW_URL);
-      if ((await ctx.call('graph.addNote', { channel: GROW_CHANNEL, text: NOTE_GROW, post: false }, 20_000)) !== 'ok') fail('graph not ready');
+      // 60 s: Jordan's graph takes about 25 s after a fresh sign-in (stage QA 30 Oct #1: 20 s failed 2 of 2).
+      if ((await ctx.call('graph.addNote', { channel: GROW_CHANNEL, text: NOTE_GROW, post: false }, 60_000)) !== 'ok') fail('graph not ready');
     },
   },
   {

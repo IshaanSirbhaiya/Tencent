@@ -548,7 +548,8 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
               {/* a real trigger, so closing the sheet returns focus here (round-3 H1); below `sm` the
                   label is visually hidden (still the accessible name) so the button is not clipped */}
               <SheetTrigger asChild>
-                <Button size="sm" variant="secondary" icon={FilePlus2} className="px-2 sm:px-2.5" data-testid={`${testId}-add`}>
+                <Button size="sm" variant="secondary" icon={FilePlus2} className="px-2 sm:px-2.5" title={t('add.open')} data-testid={`${testId}-add`}>
+                  <span aria-hidden className="sm:hidden">{t('add.short')}</span>
                   <span className="sr-only sm:not-sr-only">{t('add.open')}</span>
                   <Badge tone="warn" className="sm:ml-1.5">
                     {t('demo.badge')}

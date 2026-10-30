@@ -1,5 +1,8 @@
 import { type Page, expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { PERSONAS } from '../../lib/personas';
+import { PERSONA_ZH } from '../../lib/i18n/user';
 import { displayAnswer, plainAnswer, speakerParts } from '../../components/user/answerText';
 import { REFUSAL_TEXT, S1, SCOPE_NOTE, ask, expectAccessible, login, resetDemo } from './helpers';
 
@@ -253,4 +256,61 @@ test('rule 4: sign-in notes and starters never hint at what a person cannot open
   const starters = (id: string) => PERSONAS.find((p) => p.id === id)!.suggestions;
   for (const id of ['jdoe', 'ken.ext', 'maya.compliance', 'mlro.tan']) expect(starters(id).join(' '), id).not.toMatch(/Q3 breach/);
   expect(starters('amy.am').join(' ')).not.toMatch(/suspicious transaction report/);
+});
+
+test('round-4 starter swaps: each is a world question the persona gets a cited answer to', () => {
+  // The starters that replaced questions about places these people cannot open. The answerability is
+  // read from the synthetic world (its questions and fact permissions), never written down here.
+  type Q = { persona?: string; question: string; expect_refusal: boolean; applies_after: string | null; must_cite_facts: string[] };
+  type F = { id: string; permitted: string[] };
+  const world = JSON.parse(readFileSync(path.resolve(__dirname, '../../../../fixtures/enterprise/world.json'), 'utf8')) as { questions: Q[]; facts: F[] };
+  const facts = new Map(world.facts.map((f) => [f.id, f]));
+  const swapped: [string, string][] = [
+    ['admin.it', 'Who approves spend above SGD 500?'],
+    ['maya.compliance', 'Do I need to declare a gift from a supplier?'],
+    ['leo.ops', 'Can we offer yield on idle balances to a Hong Kong SME?'],
+    ['mlro.tan', 'What does a new joiner do in week 1?'],
+  ];
+  for (const [id, q] of swapped) {
+    // In the first four: the home page shows only four starters (Composer.tsx).
+    expect(PERSONAS.find((p) => p.id === id)!.suggestions.slice(0, 4), id).toContain(q);
+    const entry = world.questions.find((x) => x.persona === id && x.question === q && x.applies_after === null);
+    expect(entry, `${id}: ${q} is in the world`).toBeTruthy();
+    expect(entry!.expect_refusal, `${id}: ${q}`).toBe(false);
+    expect(entry!.must_cite_facts.length, `${id}: ${q} cites a fact`).toBeGreaterThan(0);
+    for (const f of entry!.must_cite_facts) expect(facts.get(f)?.permitted ?? [], `${id} may open ${f}`).toContain(id);
+  }
+  // The starters they replaced are gone from those people.
+  for (const id of ['maya.compliance', 'mlro.tan']) expect(PERSONAS.find((p) => p.id === id)!.suggestions.join(' '), id).not.toMatch(/database migration/);
+  expect(PERSONAS.find((p) => p.id === 'admin.it')!.suggestions.join(' ')).not.toMatch(/runbook/);
+  expect(PERSONAS.find((p) => p.id === 'leo.ops')!.suggestions.join(' ')).not.toMatch(/payment outage/);
+});
+
+test('rule 4: sign-in notes are role-only and name no place from the world (round-4 Opus #3)', () => {
+  // The login chips are shown to everyone before sign-in. Read the synthetic world itself, never a
+  // hand-written list: every channel, space, Jira project, drive and folder, by name, key and id.
+  type Named = { id?: string; key?: string; name?: string };
+  const world = JSON.parse(readFileSync(path.resolve(__dirname, '../../../../fixtures/enterprise/world.json'), 'utf8')) as {
+    slack: { channels: Named[] };
+    confluence: { spaces: Named[] };
+    jira: { projects: Named[] };
+    drive: { drives: Named[]; folders: Named[] };
+  };
+  const places = [...world.slack.channels, ...world.confluence.spaces, ...world.jira.projects, ...world.drive.drives, ...world.drive.folders];
+  // One plain dictionary word ("Security", "Product") is also a job description, so it is left to the
+  // structural check below; every multi-word, hyphenated or id-like name must never appear.
+  const names = new Set<string>();
+  for (const c of places) {
+    for (const v of [c.name, c.key, c.id]) if (v && /[\s\-&_.]|\d/.test(v)) names.add(v.toLowerCase());
+  }
+  expect(names.size).toBeGreaterThan(10);
+  const structural = /#|\bspaces?\b|\bchannels?\b|\bfolders?\b|\bdrives?\b|\bprojects?\b|\bshares?\b|need-to-know|\bonly\b/i;
+  for (const p of PERSONAS) {
+    const note = p.note.toLowerCase();
+    for (const n of names) expect(note, `${p.id} names ${n}`).not.toContain(n);
+    expect(p.note, p.id).not.toMatch(structural);
+    const zh = PERSONA_ZH[p.id]?.note ?? '';
+    for (const n of names) expect(zh.toLowerCase(), `${p.id} (zh) names ${n}`).not.toContain(n);
+    expect(zh, `${p.id} (zh)`).not.toMatch(/#|空间|频道|文件夹|共享盘|云端硬盘|Drive|项目|仅限|需知/);
+  }
 });

@@ -12,7 +12,7 @@ import { useLang } from '@/lib/i18n';
 import { ClipOverlay } from './ClipOverlay';
 import { DeliverOverlay } from './DeliverOverlay';
 import { installPresenterKeys, setArmed, setHost, setStage } from './controller';
-import { PresenterBar } from './PresenterBar';
+import { PresenterBar, PresenterShowHandle } from './PresenterBar';
 import { ResetConfirm } from './ResetConfirm';
 import { applyStage } from './stage';
 import { getPresenter, setPresenter, usePresenter } from './store';
@@ -100,13 +100,24 @@ export function PresenterRoot() {
     if (s.stage) applyStage(true);
   }, [s.stage]);
 
+  // After the script, off its pages, the bar is out of the way; the handle brings it back on this
+  // page (so the mouse can still reach Back, Reset or Exit), until the next page change.
+  const [peek, setPeek] = useState(false);
+  useEffect(() => setPeek(false), [pathname]);
+
   if (!owner || !s.armed) return null;
   const step = s.started ? STEPS[s.step] : null;
   // The script is over: off the presenter's own pages (login, graph, Q&A) the bar gets out of the way.
   const finished = s.started && s.step === STEPS.length - 1 && !s.busy;
-  if (finished && !PRESENTER_PAGE.test(pathname ?? ''))
+  if (finished && !PRESENTER_PAGE.test(pathname ?? '') && !peek)
     return (
       <>
+        <PresenterShowHandle
+          onShow={() => {
+            setPresenter({ hidden: false });
+            setPeek(true);
+          }}
+        />
         <ClipOverlay />
         <ResetConfirm />
         <DeliverOverlay />
@@ -115,7 +126,7 @@ export function PresenterRoot() {
   return (
     <>
       {step?.offApp && !s.hidden ? <WorkBuddyCard /> : null}
-      {!s.hidden ? <PresenterBar /> : null}
+      {!s.hidden ? <PresenterBar /> : <PresenterShowHandle />}
       <ClipOverlay />
       <ResetConfirm />
       <DeliverOverlay />

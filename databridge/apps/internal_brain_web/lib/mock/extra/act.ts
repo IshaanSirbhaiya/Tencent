@@ -5,6 +5,7 @@
 //   POST ib/act/ticket/propose   {req_id}        → a proposal in a project I may create issues in
 //   POST ib/act/ticket/confirm   {proposal_id, summary?, project?} → the created (mock) issue
 //   POST ib/act/ticket/cancel    {proposal_id}
+//   GET  ib/open/{token}         → the document view if I may open it now, else the one 404
 //
 // One 404 for someone else's, unknown and refused requests; one polite 409 when a ticket can't be
 // made. Action records join the request's sealed chain: GET audit/journey/{req} and
@@ -17,6 +18,8 @@ import { DOCS, ROLES, SCOPE_NOTE, type MockDoc } from '../fixtures';
 import { handle as analytics } from './analytics';
 import type { MockCtx, MockHandler } from './types';
 import { extraDocMeta } from './user';
+import { mockDoc } from '../finals';
+import type { MockState } from '../fixtures';
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
@@ -54,11 +57,21 @@ interface ActStore {
   recs: Map<string, Rec[]>;
   proposals: Map<string, Proposal>;
   next: Record<string, number>;
+  /** Opaque open-link token → doc id (the real IB keeps the same mapping server-side). */
+  links?: Map<string, string>;
 }
-const g = globalThis as unknown as { __ibAct?: ActStore; __ibMock?: { ledger: AuditEvent[]; answers: Map<string, string> } };
+const g = globalThis as unknown as {
+  __ibAct?: ActStore;
+  __ibMock?: { ledger: AuditEvent[]; answers: Map<string, string>; state?: MockState; syncAt?: Record<string, number> };
+};
 function act(): ActStore {
   if (!g.__ibAct) g.__ibAct = { recs: new Map(), proposals: new Map(), next: {} };
   return g.__ibAct;
+}
+function linksStore(): Map<string, string> {
+  const s = act();
+  if (!s.links) s.links = new Map();
+  return s.links;
 }
 function record(reqId: string, kind: string) {
   const s = act();
@@ -192,7 +205,7 @@ function draft(sub: string, b: Record<string, unknown>) {
   });
 }
 
-function propose(sub: string, b: Record<string, unknown>) {
+function propose(sub: string, b: Record<string, unknown>, origin: string) {
   if (!onlyKeys(b, ['req_id'])) return json({ detail: 'invalid' }, 422);
   const ctx = context(sub, b.req_id);
   if (!ctx) return notFound();
@@ -208,15 +221,21 @@ function propose(sub: string, b: Record<string, unknown>) {
   const citations = citationsOf(ctx, ctx.facts.flatMap((f) => f.tags));
   // v3.1: opaque Internal Brain links and neutral labels only (no ids, titles or channels in clear),
   // and a neutral summary (the question is not copied), as the Brain does
-  const base = `${(process.env.IB_PUBLIC_ORIGIN || 'http://127.0.0.1:3100').replace(/\/+$/, '')}/api/ib`;
-  const links = Array.from(new Set(citations.map((c) => c.doc_id))).map(
-    (d) => `${base}/ib/open/${createHash('sha256').update(`ib-open-mock\u0000${d}`).digest('hex').slice(0, 32)}`,
-  );
+  // Round-4 Opus #6: on this app's own origin (the offline build runs on :3101), not a fixed :3100.
+  const base = `${(process.env.IB_PUBLIC_ORIGIN || origin).replace(/\/+$/, '')}/api/ib`;
+  const links = Array.from(new Set(citations.map((c) => c.doc_id))).map((d) => {
+    const token = createHash('sha256').update(`ib-open-mock\u0000${d}`).digest('hex').slice(0, 32);
+    linksStore().set(token, d);
+    return `${base}/ib/open/${token}`;
+  });
   const summary = 'Follow-up on an Internal Brain answer';
   const description =
-    `Follow-up created from an Internal Brain answer (request ${ctx.req.req_id}).\n\n` +
-    'Sources (each link opens only for people allowed to open that source; for anyone else it is not found):\n\n' +
-    links.map((u, i) => `Source ${i + 1}: ${u}`).join('\n');
+    // The same shape as databridge_ib/actions.py ticket_description (round 4): the link rule once,
+    // then a closing "Reference" line with the request id.
+    'Follow-up created from an Internal Brain answer.\n\n' +
+    'Sources (each link opens only for people allowed to open that source):\n\n' +
+    links.map((u, i) => `Source ${i + 1}: ${u}`).join('\n') +
+    `\n\nReference: ${ctx.req.req_id}`;
   const id = randomUUID().replace(/-/g, '');
   act().proposals.set(id, { id, sub, req: ctx.req.req_id, project: options[0], options, summary, description, used: false });
   record(ctx.req.req_id, 'action.proposed');
@@ -309,8 +328,35 @@ async function withActions(ctx: MockCtx, reqId: string, receipt: boolean): Promi
   return json(body);
 }
 
+/**
+ * The origin the browser used. Next's nextUrl names "localhost" whatever the Host was, so the Host
+ * header is used; the proxy has already checked it (loopback, or IB_PUBLIC_ORIGIN's host).
+ */
+function originOf(ctx: MockCtx): string {
+  const host = ctx.req.headers.get('host');
+  return host ? `${ctx.req.nextUrl.protocol}//${host}` : ctx.req.nextUrl.origin;
+}
+
+/**
+ * GET ib/open/{token}: the real route records doc.viewed and answers a 303 to the source when the
+ * signed-in person may open it now; the offline mock has no source systems, so it answers the same
+ * document view GET ib/doc does. An unknown token or a document this person cannot open: the one 404.
+ */
+function openLink(sub: string, token: string) {
+  if (!/^[0-9a-f]{32}$/.test(token)) return notFound();
+  const docId = linksStore().get(token);
+  const m = g.__ibMock;
+  if (!docId || !m?.state || !m.syncAt) return notFound();
+  const view = mockDoc(sub, m.state, docId, m.syncAt);
+  return view ? json(view) : notFound();
+}
+
 export const handle: MockHandler = async (ctx) => {
   const { path, method, sub, roles } = ctx;
+  if (method === 'GET' && path.startsWith('ib/open/')) {
+    if (!ROLES[sub]) return json({ detail: 'authentication required' }, 401);
+    return openLink(sub, path.slice('ib/open/'.length));
+  }
   if (method === 'GET' && path.startsWith('audit/journey/') && roles.includes('compliance_officer')) {
     return withActions(ctx, decodeURIComponent(path.slice('audit/journey/'.length)), false);
   }
@@ -322,7 +368,7 @@ export const handle: MockHandler = async (ctx) => {
   const b = await bodyOf(ctx);
   if (!b) return json({ detail: 'invalid' }, 422);
   if (path === 'ib/act/draft') return draft(sub, b);
-  if (path === 'ib/act/ticket/propose') return propose(sub, b);
+  if (path === 'ib/act/ticket/propose') return propose(sub, b, originOf(ctx));
   if (path === 'ib/act/ticket/confirm') return confirm(sub, b);
   if (path === 'ib/act/ticket/cancel') return cancel(sub, b);
   return notFound();

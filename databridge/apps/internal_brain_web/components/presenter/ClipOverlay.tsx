@@ -2,6 +2,8 @@
 // B: the backup recording for the current step, full screen, muted, from public/clips/ (local, no
 // network). Always labelled "Recording · not live" (BACKUP_PLAN.md: a recording is never presented
 // as live). A missing file shows "Clip not recorded yet" with the expected path. B or Esc returns.
+// A step with no recording (the slides) never opens it: B shows a short note and the slide stays
+// (stage QA 30 Oct #4; controller.ts toggleClip).
 import * as D from '@radix-ui/react-dialog';
 import { Film, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -18,6 +20,23 @@ export function ClipOverlay() {
   useEffect(() => setMissing(false), [clip, s.clipOpen]);
 
   return (
+    <>
+    {/* A polite live region that is always mounted (round-5 Opus cross-check #2): a region that
+        appears together with its text is often not announced; this one only changes its text. */}
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="clip-note-region"
+      className="pointer-events-none fixed inset-x-0 top-[max(0.75rem,2.5vh)] z-[60] flex justify-center px-3 print:hidden"
+    >
+      {s.clipNote ? (
+        <p className="flex items-center gap-2 rounded-lg border border-line-strong bg-overlay px-3 py-2 text-body-sm text-fg shadow-pop" data-testid="clip-none-note">
+          <Film aria-hidden className="h-4 w-4 shrink-0 text-muted" />
+          {t('pr.clip.noneShort')}
+        </p>
+      ) : null}
+    </div>
     <D.Root open={s.clipOpen} onOpenChange={(o) => setPresenter({ clipOpen: o })}>
       <D.Portal>
         <D.Overlay className="fixed inset-0 z-[60] bg-black" />
@@ -59,5 +78,6 @@ export function ClipOverlay() {
         </D.Content>
       </D.Portal>
     </D.Root>
+    </>
   );
 }

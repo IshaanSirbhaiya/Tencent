@@ -700,6 +700,11 @@ export interface UploadFileBody {
   folder: string;
   title?: string;
 }
+/** GET /sim/upload-folders: ONLY folders the person may upload into now, sorted by path (D-34). */
+export interface UploadFolder {
+  id: string;
+  path: string;
+}
 export interface UploadFileResult {
   ok: boolean;
   doc_id: string;

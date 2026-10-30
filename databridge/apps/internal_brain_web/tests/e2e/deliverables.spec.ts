@@ -41,7 +41,15 @@ test('Leo: table copied cell by cell, chart with value labels, analysis needs th
   await expect(sheet).toBeVisible();
   const view = sheet.getByTestId('deliver-view');
   await expect(view).toHaveAttribute('data-kind', 'table');
-  await expect(view.getByTestId('deliver-by')).toHaveText('Copied cell by cell from [1], no model');
+  await expect(view.getByTestId('deliver-by')).toHaveText('Copied cell by cell from source [1]');
+  // round 4 UX F6: "no model" is a quiet info line, not the by-line
+  await expect(view.getByTestId('deliver-nomodel')).toHaveText('No AI model was used: this was built by code, straight from your sources.');
+  // round 4 UX F12: one Tab from the focused title reaches the skip link, which lands on Copy
+  await view.getByTestId('deliver-title').focus();
+  await page.keyboard.press('Tab');
+  await expect(view.getByTestId('deliver-skip')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(view.getByTestId('deliver-copy')).toBeFocused();
   await expect(view.getByTestId('deliver-pill')).toHaveCount(0);
   await expect(view.getByTestId('deliver-label')).toHaveText('Draft for your review');
   const table = view.getByTestId('deliver-table');
@@ -60,7 +68,7 @@ test('Leo: table copied cell by cell, chart with value labels, analysis needs th
   await sheet.getByTestId('deliver-tab-chart').click();
   const chart = sheet.getByTestId('deliver-panel-chart').getByTestId('deliver-view');
   await expect(chart.getByTestId('deliver-title')).toHaveText('FX margin by market');
-  await expect(chart.getByTestId('deliver-by')).toHaveText('Charted from the table in [1], no model');
+  await expect(chart.getByTestId('deliver-by')).toHaveText('Charted from the table in source [1]');
   const fig = chart.getByTestId('deliver-chart');
   await expect(fig.getByRole('img')).toHaveAttribute('aria-label', /3 bars, from 0\.35% to 0\.4%/);
   await expect(fig.locator('.recharts-label-list').first()).toContainText('0.35%');
@@ -204,7 +212,10 @@ test('zh: server text is marked lang="en", the chart name and the copy text are 
   await answer.getByTestId('deliver-table').click();
   const sheet = page.getByTestId('deliver-sheet');
   const view = sheet.getByTestId('deliver-panel-table').getByTestId('deliver-view');
-  await expect(view.getByTestId('deliver-title')).toHaveAttribute('lang', 'en');
+  // round 4 UX F5: the server's fixed title is UI text, so it is translated (lang zh); a
+  // source-worded title stays English with lang="en"
+  await expect(view.getByTestId('deliver-title')).toHaveText('根据你的来源生成的表格');
+  await expect(view.getByTestId('deliver-title')).toHaveAttribute('lang', 'zh');
   await expect(view.getByTestId('deliver-label')).toHaveText('草稿，供你审阅');
   await expect(view.getByTestId('deliver-table').locator('table')).toHaveAttribute('lang', 'en');
   await expect(view.getByTestId('deliver-scope')).toHaveAttribute('lang', 'en');

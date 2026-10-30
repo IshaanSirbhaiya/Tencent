@@ -12,6 +12,7 @@ import { announce } from '@/components/ui/announce';
 import { callPresenter } from './bus';
 import { clearDeliverCache, openDeliverables, warmDeliverables } from './deliver';
 import { STEPS, stepUrl, type StepCtx } from './script';
+import { markSessionOwned, serialSession, sessionOwner } from './session';
 import { applyStage } from './stage';
 import { clearPresenter, getPresenter, setPresenter, type Dot } from './store';
 
@@ -45,13 +46,15 @@ class Superseded extends Error {
 }
 
 /* ------------------------------------------------- session serialisation */
-// Session-changing work (the main demo sign-in, Reset's sign-outs) runs one at a time, in order,
-// so Reset can never interleave with a sign-in that is halfway through.
-let sessionChain: Promise<unknown> = Promise.resolve();
-function serialSession<T>(fn: () => Promise<T>): Promise<T> {
-  const next = sessionChain.then(fn, fn);
-  sessionChain = next.catch(() => undefined);
-  return next;
+// Session-changing work (the main demo sign-in, Reset's sign-outs, and the shell's Sign out and
+// persona switch) runs one at a time, in order, through ./session.ts (round-4 Opus #1), so Reset
+// can never interleave with a sign-in that is halfway through.
+
+/** The shell signed out or switched persona while this step was running: it stops, it does not override. */
+class SessionTaken extends Error {
+  constructor() {
+    super('session-taken');
+  }
 }
 
 function ctx(gen: number): StepCtx {
@@ -59,6 +62,8 @@ function ctx(gen: number): StepCtx {
   const live = () => {
     if (!isLive()) throw new Superseded();
   };
+  // Who owned the main session when this step began; a shell change after that wins.
+  let owned = sessionOwner();
   return {
     go: async (url) => {
       live();
@@ -75,6 +80,9 @@ function ctx(gen: number): StepCtx {
     signInMain: (persona) =>
       serialSession(async () => {
         live();
+        if (sessionOwner() !== owned) throw new SessionTaken();
+        markSessionOwned();
+        owned = sessionOwner();
         let sub: string | null = null;
         try {
           sub = (await api.whoami()).sub;
@@ -105,6 +113,15 @@ function ctx(gen: number): StepCtx {
         await sleep(100);
       }
     },
+    waitFor: async (selector, timeoutMs = 15_000) => {
+      const end = Date.now() + timeoutMs;
+      for (;;) {
+        live();
+        if (document.querySelector(selector)) return true;
+        if (Date.now() >= end) return false;
+        await sleep(100);
+      }
+    },
   };
 }
 
@@ -119,7 +136,14 @@ function flashLegend(ms = 3_000) {
     setPresenter({ legend: false });
   }, ms);
 }
-function toggleLegend() {
+/** A click inside the legend row keeps it open (the 3 s flash after P no longer closes it). */
+export function pinLegend() {
+  if (!legendTimer) return;
+  clearTimeout(legendTimer);
+  legendTimer = null;
+  setPresenter({ legend: true });
+}
+export function toggleLegend() {
   if (legendTimer) clearTimeout(legendTimer);
   legendTimer = null;
   setPresenter({ legend: !getPresenter().legend });
@@ -140,6 +164,23 @@ export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
     // A superseded action says nothing: the newer one owns the bar.
     if (gen === generation) setPresenter({ busy: false, failed: true });
   }
+  if (dir === 'forward' && gen === generation) warmAfter(i);
+}
+
+/*
+ * D's warm-up waits until the first Compare step has settled (round-5 Opus cross-check #3): it
+ * runs one more live ask and its deliverables, so it must not compete with the two live Compare
+ * asks of step 01. It starts once step 01 has finished (or failed, or was skipped past), while the
+ * presenter speaks over step 01's answers; Compare uses its own slot sessions, so borrowing the
+ * main session then is invisible. D before that still builds on demand.
+ */
+let warmPending = false;
+function warmAfter(i: number) {
+  if (!warmPending) return;
+  const compare = STEPS.findIndex((st) => st.id === 'compare-people');
+  if (compare < 0 || i < compare) return;
+  warmPending = false;
+  void warmDeliverables(serialSession).then(() => refreshHealth());
 }
 
 /**
@@ -153,12 +194,15 @@ export function start() {
   applyStage(true);
   setPresenter({ armed: true, stage: true, hidden: false });
   flashLegend();
-  // Q&A beat D: build Leo's deliverables first (serialised, so step 0's sign-in waits for it)
-  const warm = warmDeliverables(serialSession);
+  // The title card first (stage QA 30 Oct #6: building Leo's deliverables first made P take 4.7 to
+  // 6.5 s). Q&A beat D's warm-up runs once step 01's Compare has settled (warmAfter), in the
+  // background, through the same session queue, so a step's sign-in that comes later still waits
+  // for it and wins.
+  warmPending = true;
   const first = runStep(0, 'forward');
   void refreshHealth();
-  // /ib/status is 401 until someone is signed in: read the dots again once the warm-up and step 0 are done.
-  void Promise.allSettled([warm, first]).then(() => refreshHealth());
+  // /ib/status is 401 until someone is signed in: read the dots again once step 0 is done.
+  void first.then(() => refreshHealth());
 }
 
 /** Sign both compare slots out while holding their locks (never halfway through a Compare run). */
@@ -187,7 +231,10 @@ export async function resetDemo() {
   setPresenter({ resetOpen: false, clipOpen: false, busy: true, failed: false, resetting: true });
   try {
     await callPresenter('compare-cancel');
-    await serialSession(() => Promise.allSettled([api.logout(), signSlotsOut()]));
+    await serialSession(() => {
+      markSessionOwned(); // R owns the session now: nothing D borrowed is put back
+      return Promise.allSettled([api.logout(), signSlotsOut()]);
+    });
     clearCompareCache();
     clearPresenter();
     clearDeliverCache();
@@ -195,17 +242,21 @@ export async function resetDemo() {
     resetting = false;
     setPresenter({ resetting: false });
   }
-  const warm = warmDeliverables(serialSession); // R rebuilds the D cache
+  warmPending = true; // R rebuilds the D cache, once step 01's Compare has settled (warmAfter)
   await runStep(0, 'forward');
   void refreshHealth();
-  void warm.then(() => refreshHealth());
 }
+
+/** The presenter's own slides (00 and 08 to 10): no app navigation on them. */
+const SLIDE_PATH = /^\/present(\/(proof|business|close))?\/?$/;
 
 export function setArmed(on: boolean) {
   setPresenter({ armed: on, hidden: false });
   if (!on) {
     applyStage(false);
     setPresenter({ stage: false, clipOpen: false, resetOpen: false });
+    // Exit on a slide would leave a page with no links (stage QA re-run): go to the app's home.
+    if (typeof window !== 'undefined' && SLIDE_PATH.test(window.location.pathname)) host?.push('/');
   }
 }
 
@@ -252,6 +303,102 @@ const anyDialog = () => document.querySelector('[role="dialog"],[role="alertdial
 let lastAdvance = 0;
 let swallowSpaceUp = false;
 
+/* --------------------------------------------- actions shared by keys, bar buttons and mouse */
+// The bar's buttons and the mouse's side buttons call exactly these, so a click and a key press
+// can never disagree (same busy, debounce and failed-step rules).
+
+/**
+ * Space / ▶ / mouse forward: the next step. A failed step is tried again (`skip` false), or skipped
+ * (`skip` true: → and the bar's Skip). Ignored while a step runs, before P, and within 400 ms of
+ * the last advance (a double press or double click).
+ */
+export function advance(skip = false) {
+  const s = getPresenter();
+  if (!s.started || s.busy) return;
+  const now = Date.now();
+  if (now - lastAdvance < 400) return; // debounce a double press
+  lastAdvance = now;
+  closeSourcesSheet();
+  // A failed step does not advance on Space: Space tries it again, the right arrow skips it.
+  if (s.failed && !skip) void runStep(s.step, 'forward');
+  else if (s.step + 1 < STEPS.length) void runStep(s.step + 1, 'forward');
+}
+
+/**
+ * Step 03 leaves the sources sheet open. Space, → and the bar's Next close it (through its own Esc
+ * handler, which restores focus) and go on, as over the grow step's Add sheet (stage QA re-run).
+ * No other dialog is closed this way.
+ */
+const sourcesSheet = () => document.querySelector('[role="dialog"][data-testid="sources-sheet"]');
+function closeSourcesSheet() {
+  if (!sourcesSheet()) return;
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+}
+
+/** ← / ◀ / mouse back: re-open the previous step. Ignored while a step runs, before P and at step 00. */
+export function goBack() {
+  const s = getPresenter();
+  if (!s.started || s.busy || s.step === 0) return;
+  void runStep(s.step - 1, 'back');
+}
+
+/** P / Start (never a second run on top of the current one). */
+export function startOnce() {
+  const s = getPresenter();
+  if (s.busy || s.resetting) return;
+  start();
+}
+
+let clipNoteTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * B: the backup recording on or off. Stage QA 30 Oct: over a sheet (the sources sheet in step 03,
+ * D's panel) B closes that sheet first and then plays the recording (#2); the reset confirm is
+ * never closed this way. On a step with no recording (the slides) B leaves the slide on screen and
+ * shows a short "No recording for this step" note instead of a black screen (#4).
+ */
+export function toggleClip() {
+  const s = getPresenter();
+  if (s.clipOpen) {
+    setPresenter({ clipOpen: false });
+    return;
+  }
+  if (s.resetOpen || s.resetting) return;
+  if (!STEPS[s.step]?.clip) {
+    if (clipNoteTimer) clearTimeout(clipNoteTimer);
+    setPresenter({ clipNote: true });
+    clipNoteTimer = setTimeout(() => {
+      clipNoteTimer = null;
+      setPresenter({ clipNote: false });
+    }, 2_500);
+    return;
+  }
+  const sheet = openDialog();
+  if (sheet) {
+    // Close it through its own Esc handler (it restores focus and, for D, the session), then play.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+    setTimeout(() => setPresenter({ clipOpen: true }), 0);
+    return;
+  }
+  setPresenter({ clipOpen: true, clipNote: false });
+}
+
+/** R: open the reset confirm (the reset itself runs only from the confirm). */
+export function askReset() {
+  if (getPresenter().resetting) return;
+  setPresenter({ resetOpen: true });
+}
+
+/** H: hide or show the bar on purpose. */
+export function toggleHidden(hidden = !getPresenter().hidden) {
+  setPresenter({ hidden });
+}
+
+/** Ctrl+Shift+P off / Exit presenter: keys off, Stage off, the app is an ordinary website again. */
+export function exitPresenter() {
+  setArmed(false);
+}
+
 function onKeyDown(e: KeyboardEvent) {
   const s = getPresenter();
   const key = e.key;
@@ -264,11 +411,17 @@ function onKeyDown(e: KeyboardEvent) {
   if (!s.armed || e.ctrlKey || e.altKey || e.metaKey || e.defaultPrevented) return;
   if (typing(e.target)) return;
 
-  // A dialog has the keyboard (sources sheet, reset confirm, recording): only B closes the recording.
+  // A dialog has the keyboard (sources sheet, reset confirm, recording): only B works there. It
+  // closes the recording, or closes a sheet and plays the recording (toggleClip; never the reset confirm).
   if (openDialog()) {
-    if (key.toLowerCase() === 'b' && s.clipOpen && !e.repeat) {
+    if (key.toLowerCase() === 'b' && !e.repeat) {
       e.preventDefault();
-      setPresenter({ clipOpen: false });
+      toggleClip();
+    } else if ((key === ' ' || key === 'Spacebar' || key === 'ArrowRight') && sourcesSheet() && openDialog() === sourcesSheet()) {
+      // Step 03's sources sheet: Space and → close it and go on (advance closes it).
+      e.preventDefault();
+      if (key !== 'ArrowRight') swallowSpaceUp = true;
+      if (!e.repeat) advance(key === 'ArrowRight');
     }
     return;
   }
@@ -283,37 +436,30 @@ function onKeyDown(e: KeyboardEvent) {
       if (key === 'ArrowRight' && inComposite) return;
       e.preventDefault();
       if (key !== 'ArrowRight') swallowSpaceUp = true;
-      if (e.repeat || !s.started || s.busy) return;
-      const now = Date.now();
-      if (now - lastAdvance < 400) return; // debounce a double press
-      lastAdvance = now;
-      // A failed step does not advance on Space: Space tries it again, the right arrow skips it.
-      if (s.failed && key !== 'ArrowRight') void runStep(s.step, 'forward');
-      else if (s.step + 1 < STEPS.length) void runStep(s.step + 1, 'forward');
+      if (e.repeat) return;
+      advance(key === 'ArrowRight');
       return;
     }
     case 'ArrowLeft':
       if (inComposite) return;
       e.preventDefault();
-      if (e.repeat || !s.started || s.busy || s.step === 0) return;
-      void runStep(s.step - 1, 'back');
+      if (e.repeat) return;
+      goBack();
       return;
   }
   if (e.repeat) return;
   switch (key.toLowerCase()) {
     case 'p':
       e.preventDefault();
-      if (s.busy || s.resetting) return; // never a second run on top of the current one
-      start();
+      startOnce(); // never a second run on top of the current one
       return;
     case 'b':
       e.preventDefault();
-      setPresenter({ clipOpen: !s.clipOpen });
+      toggleClip();
       return;
     case 'r':
       e.preventDefault();
-      if (s.resetting) return;
-      setPresenter({ resetOpen: true });
+      askReset();
       return;
     case 'l':
       e.preventDefault();
@@ -347,7 +493,7 @@ function onKeyDown(e: KeyboardEvent) {
       return;
     case 'h':
       e.preventDefault();
-      setPresenter({ hidden: !s.hidden });
+      toggleHidden();
       return;
     case '?':
       e.preventDefault();
@@ -371,6 +517,70 @@ function onFocus() {
   if (s.armed && s.started && STEPS[s.step]?.id === 'workbuddy' && !s.busy) host?.push('/dev/audit?latest=1');
 }
 
+/* ------------------------------------------------------------------ mouse */
+// The mouse's back and forward side buttons (MouseEvent.button 3 and 4) are ◀ and ▶ while presenter
+// mode is armed, and the browser does not also go back or forward (preventDefault on mousedown,
+// mouseup and auxclick; the step moves once, on mouseup). Only these two buttons are touched: an
+// ordinary click (links, the app's own navigation, answer cards, the bar's buttons) is never
+// prevented or stopped, so the app stays an ordinary website under the mouse.
+
+let lastSideButton = 0;
+
+function onSideButton(e: MouseEvent) {
+  const dir = e.button === 3 ? 'back' : e.button === 4 ? 'forward' : null;
+  if (!dir || !getPresenter().armed) return;
+  e.preventDefault();
+  if (e.type !== 'mouseup') return;
+  lastSideButton = Date.now();
+  if (openDialog()) return; // as for the keys: an open dialog has the input
+  if (dir === 'back') goBack();
+  else advance();
+}
+
+/*
+ * Browser history (the toolbar's back button, Alt+←, a side button the browser handled anyway).
+ * Rule (PRESENTER_KEYS.md, "Mouse"): when the browser goes back to the PREVIOUS step's page, that is
+ * ◀: the script steps back with it (re-opening that page, and its session where the step needs
+ * one), so the bar and the page agree. Any other history move (forward, or back to a page the
+ * driver opened by clicking around) is left to the browser as on any website: the step number
+ * stays, and the next ▶ / Space opens its own page as usual. Ignored while a step runs (the step
+ * owns the page and re-opens it, or says "did not finish") and just after a side button already
+ * moved the script.
+ */
+/**
+ * Whether the page is at a step's URL: the same path AND every query parameter the step's URL sets
+ * (round-5 Opus cross-check #1). Steps 05 to 07 all live on /dev/audit (?verify=1, ?tamper=1, plain),
+ * so a path-only match took Back from step 07's ?latest=1 entry to step 07's own /dev/audit entry as
+ * "back to step 06" and re-ran the tamper demo. Extra parameters the page adds itself are allowed.
+ */
+export function atStepUrl(stepHref: string, here: Pick<Location, 'origin' | 'pathname' | 'search'> = window.location): boolean {
+  let want: URL;
+  try {
+    want = new URL(stepHref, here.origin);
+  } catch {
+    return false;
+  }
+  if (want.pathname !== here.pathname) return false;
+  const have = new URLSearchParams(here.search);
+  let all = true;
+  want.searchParams.forEach((v, k) => {
+    if (have.get(k) !== v) all = false;
+  });
+  return all;
+}
+
+function onPopState() {
+  const s = getPresenter();
+  if (!s.armed || !s.started || s.busy || s.step === 0) return;
+  if (Date.now() - lastSideButton < 1_000) return;
+  const prev = STEPS[s.step - 1];
+  if (!prev) return;
+  const reqOnly = { req: (persona: string) => getPresenter().reqs[persona] ?? null } as StepCtx;
+  if (!atStepUrl(stepUrl(prev, reqOnly))) return;
+  // After the router has handled its own popstate, so the step's navigation is the last word.
+  setTimeout(goBack, 0);
+}
+
 let installed = false;
 export function installPresenterKeys() {
   if (installed || typeof window === 'undefined') return;
@@ -378,4 +588,8 @@ export function installPresenterKeys() {
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('keyup', onKeyUp, true);
   window.addEventListener('focus', onFocus);
+  window.addEventListener('mousedown', onSideButton, true);
+  window.addEventListener('mouseup', onSideButton, true);
+  window.addEventListener('auxclick', onSideButton, true);
+  window.addEventListener('popstate', onPopState);
 }

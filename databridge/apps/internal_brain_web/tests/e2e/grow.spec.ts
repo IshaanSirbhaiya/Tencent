@@ -265,23 +265,25 @@ test('390 px: the Add button is not clipped and the feed is one compact line (M7
   await expectAccessible(page, 'grow/390');
 });
 
-test('upload: the chosen file is named; too big is caught on pick; success clears the form (H3, L3)', async ({ page }) => {
-  await login(page, 'jdoe');
+test('upload: pick a folder by NAME; too big is caught on pick; success clears the form (D-34, H3, L3)', async ({ page }) => {
+  // leo.ops may write to two folders in the world (the product group's); the list holds only those
+  await login(page, 'leo.ops');
   await enableDemo(page);
-  let uploads = 0;
+  const sent: { folder?: string }[] = [];
   await page.route('**/api/ib/sim/upload-file', (r) => {
-    uploads += 1;
-    return r.fulfill({ json: { ok: true, doc_id: 'drive:fd-3:r3fix', platform: 'drive', container: 'fd-3', at: new Date().toISOString() } });
+    sent.push(JSON.parse(r.request().postData() ?? '{}'));
+    return r.fulfill({ json: { ok: true, doc_id: 'drive:up-0123456789abcdef0123', platform: 'drive', container: '0ACompany', kind: 'md', at: new Date().toISOString() } });
   });
   await page.goto('/dev/graph?add=1');
   const sheet = page.getByTestId('graph-main-addsheet');
   await expect(sheet).toBeVisible({ timeout: 45_000 });
   await sheet.getByRole('tab', { name: 'Upload a file' }).click();
-  // round-3 Fable #9: no magic default id; a plain label and an example; Upload waits for a folder id
-  const folder = sheet.getByTestId('graph-main-addsheet-folder');
-  await expect(folder).toHaveValue('');
-  await expect(sheet.getByText('Drive folder id', { exact: true })).toBeVisible();
-  await folder.fill('fd-7');
+  const folder = sheet.getByLabel('Drive folder', { exact: true });
+  await expect(folder).toBeVisible();
+  const labels = (await folder.locator('option').allTextContents()).slice(1);
+  expect(labels).toEqual(['Pricing & Offers', 'Vendor share']); // sorted, writable only
+  await expect(folder).toHaveValue(''); // no default: the person chooses
+  await expect(sheet.getByTestId('graph-main-addsheet-advanced')).toHaveCount(0); // no ID field while the list works
   const input = sheet.getByTestId('graph-main-addsheet-file');
   await input.setInputFiles({ name: 'big.txt', mimeType: 'text/plain', buffer: Buffer.alloc(5 * 1024 * 1024 + 10, 97) });
   await expect(sheet.getByTestId('graph-main-addsheet-upload-status-error')).toHaveText('That file is larger than 5 MB.');
@@ -289,11 +291,86 @@ test('upload: the chosen file is named; too big is caught on pick; success clear
   await input.setInputFiles({ name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('# Shard 3\nCopy job resumes Thursday.\n') });
   await expect(sheet.getByTestId('graph-main-addsheet-picked')).toHaveText(/^Selected: notes\.md · \d+ B$/);
   await expect(sheet.getByTestId('graph-main-addsheet-upload-status-error')).toHaveText('');
+  await expect(sheet.getByTestId('graph-main-addsheet-upload')).toBeDisabled(); // no folder chosen yet
+  // keyboard: focus the list and choose by its name
+  await folder.focus();
+  await folder.selectOption({ label: 'Vendor share' });
+  await expect(folder).toHaveValue('fd-7');
   await sheet.getByTestId('graph-main-addsheet-upload').click();
   await expect(sheet.getByTestId('graph-main-addsheet-upload-status')).toHaveText('Uploaded to Drive · notes.md');
+  expect(sent.map((b) => b.folder)).toEqual(['fd-7']);
   await expect(input).toHaveValue('');
   await expect(sheet.getByTestId('graph-main-addsheet-picked')).toHaveText('');
   await expect(sheet.getByTestId('graph-main-addsheet-upload')).toBeDisabled();
   await expect(input).toBeFocused();
-  expect(uploads).toBe(1);
+  await expectAccessible(page, 'grow/upload-picker');
+});
+
+test('upload: someone who may write nowhere sees no folder name, only a collapsed ID fallback (D-34)', async ({ page }) => {
+  await login(page, 'jdoe'); // jdoe can read Engineering's folders but write to none
+  await enableDemo(page);
+  const sent: { folder?: string }[] = [];
+  await page.route('**/api/ib/sim/upload-file', (r) => {
+    sent.push(JSON.parse(r.request().postData() ?? '{}'));
+    return r.fulfill({ json: { ok: true, doc_id: 'drive:up-0123456789abcdef0124', platform: 'drive', container: '0AEng', kind: 'md', at: new Date().toISOString() } });
+  });
+  await page.goto('/dev/graph?add=1');
+  const sheet = page.getByTestId('graph-main-addsheet');
+  await expect(sheet).toBeVisible({ timeout: 45_000 });
+  await sheet.getByRole('tab', { name: 'Upload a file' }).click();
+  await expect(sheet.getByTestId('graph-main-addsheet-folders-state')).toHaveText('No folder you can add files to was found.');
+  await expect(sheet.getByTestId('graph-main-addsheet-folders')).toHaveCount(0);
+  // no copy anywhere in the upload UI names a folder (round-4 Opus #4)
+  const text = await sheet.innerText();
+  expect(text).not.toMatch(/fd-\d|Vendor share|Pricing|Finance/);
+  const id = sheet.getByTestId('graph-main-addsheet-folder');
+  await expect(id).toBeHidden(); // collapsed
+  await sheet.getByText('Advanced: folder ID').click();
+  await expect(id).toBeVisible();
+  expect(await id.getAttribute('placeholder')).toBeNull(); // no example id
+  await id.fill('fd-3');
+  await sheet.getByTestId('graph-main-addsheet-file').setInputFiles({ name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('# Notes\n') });
+  await sheet.getByTestId('graph-main-addsheet-upload').click();
+  await expect(sheet.getByTestId('graph-main-addsheet-upload-status')).toHaveText('Uploaded to Drive · notes.md');
+  expect(sent.map((b) => b.folder)).toEqual(['fd-3']);
+});
+
+test('upload: the folder list failing falls back to the ID field; works at 390 px (D-34)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, 'leo.ops');
+  await enableDemo(page);
+  await page.route('**/api/ib/sim/upload-folders', (r) => r.fulfill({ status: 503, json: { error: 'temporarily unavailable' } }));
+  await page.goto('/dev/graph?add=1');
+  const sheet = page.getByTestId('graph-main-addsheet');
+  await expect(sheet).toBeVisible({ timeout: 45_000 });
+  await sheet.getByRole('tab', { name: 'Upload a file' }).click();
+  await expect(sheet.getByTestId('graph-main-addsheet-folders-state')).toHaveText('Could not load your folders.');
+  await sheet.getByText('Advanced: folder ID').focus();
+  await page.keyboard.press('Enter'); // a native <details>: keyboard opens it
+  const id = sheet.getByTestId('graph-main-addsheet-folder');
+  await expect(id).toBeVisible();
+  const box = await id.boundingBox();
+  expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(wide).toBe(false);
+});
+
+test('390 px: the picker list fits and the Add button shows a short label with a tooltip', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, 'leo.ops');
+  await enableDemo(page);
+  await page.goto('/dev/graph');
+  const add = page.getByTestId('graph-main-add');
+  await expect(add).toBeVisible({ timeout: 45_000 });
+  await expect(add).toHaveAttribute('title', 'Add a document');
+  await expect(add).toContainText('Add');
+  await expect(add).toHaveAccessibleName(/^Add a document/);
+  await add.click();
+  const sheet = page.getByTestId('graph-main-addsheet');
+  await sheet.getByRole('tab', { name: 'Upload a file' }).click();
+  const folder = sheet.getByLabel('Drive folder', { exact: true });
+  await expect(folder).toBeVisible();
+  const box = await folder.boundingBox();
+  expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  await expectAccessible(page, 'grow/upload-picker-390');
 });

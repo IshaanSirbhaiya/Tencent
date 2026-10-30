@@ -11,7 +11,7 @@ const userEn = {
     'Each person at Company A can open different things in Confluence, Jira, Slack and Google Drive. Answers use only what the person you choose can open.',
   'login.people': 'People at Company A',
   'login.keys': 'Arrow keys choose a person. Enter signs in.',
-  'login.canOpen': 'Can open',
+  'login.roleLabel': 'Role:',
   'login.startHere': 'Start here',
   'login.continueAs': 'Continue as {name}',
   'login.signingIn': 'Signing in as {name}…',
@@ -202,7 +202,7 @@ const userZh: Record<UserKey, string> = {
   'login.subtitle': 'A 公司的每个人在 Confluence、Jira、Slack 和 Google Drive 中能打开的内容各不相同。回答只会使用你所选身份能打开的内容。',
   'login.people': 'A 公司的成员',
   'login.keys': '用方向键选择人员，按 Enter 登录。',
-  'login.canOpen': '可访问',
+  'login.roleLabel': '角色：',
   'login.startHere': '从这里开始',
   'login.continueAs': '以 {name} 的身份继续',
   'login.signingIn': '正在以 {name} 的身份登录…',
@@ -378,15 +378,15 @@ const userZh: Record<UserKey, string> = {
 
 export const userMessages = defineMessages<UserKey>({ en: userEn, zh: userZh });
 
-/** Persona roles and "can open" lines in 简体中文 (English comes from lib/personas.ts as written). */
+/** Persona roles and role-only notes in 简体中文 (English comes from lib/personas.ts as written). */
 export const PERSONA_ZH: Record<string, { role: string; note: string }> = {
-  jdoe: { role: '后端工程师', note: '支付工程空间和团队频道' },
-  'priya.sre': { role: '值班 SRE', note: 'Runbooks 空间、#incidents、数据库迁移负责人频道' },
-  'ken.ext': { role: '外部承包商', note: 'Slack Connect 访客：仅 #vendor-acme 和供应商共享盘' },
-  'sara.sec': { role: '安全', note: '安全团队空间和事件频道' },
+  jdoe: { role: '后端工程师', note: '支付工程团队' },
+  'priya.sre': { role: '值班 SRE', note: '平台 SRE 负责人' },
+  'ken.ext': { role: '外部承包商', note: '合作伙伴经理，外部供应商' },
+  'sara.sec': { role: '安全', note: '安全工程师，负责事件响应' },
   'maya.compliance': { role: '合规官', note: '审计控制台访问权限；查看回答须说明理由并记录' },
-  'leo.ops': { role: '产品与运营', note: 'Product 空间、Drive“Pricing & Offers”' },
-  'amy.am': { role: '客户经理', note: '客户与产品空间' },
-  'mlro.tan': { role: '反洗钱报告官（金融犯罪）', note: '金融犯罪团队空间，仅限需知' },
+  'leo.ops': { role: '产品与运营', note: '产品与运营经理' },
+  'amy.am': { role: '客户经理', note: '负责中小企业客户账户' },
+  'mlro.tan': { role: '反洗钱报告官（金融犯罪）', note: '负责金融犯罪审查' },
   'admin.it': { role: '平台模拟器', note: '操作演示平台' },
 };

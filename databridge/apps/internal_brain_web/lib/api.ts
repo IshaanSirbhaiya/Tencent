@@ -493,6 +493,8 @@ export const liveApi = {
     call<import('./types').AddDocumentResult>('/sim/add-document', { method: 'POST', body }),
   uploadFile: (body: import('./types').UploadFileBody) =>
     call<import('./types').UploadFileResult>('/sim/upload-file', { method: 'POST', body }),
+  /** The folders the signed-in person may upload into now, by name (D-34; main session only). */
+  uploadFolders: () => call<import('./types').UploadFolder[]>('/sim/upload-folders'),
   engineRefresh: () => call<import('./types').EngineRefreshStatus>('/sim/engine-refresh', { method: 'POST', body: {} }),
   engineStatus: () => call<import('./types').EngineRefreshStatus>('/sim/engine-status', { method: 'POST', body: {} }),
 };

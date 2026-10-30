@@ -10,6 +10,7 @@ const actEn = {
   'act.hint': 'Uses only the sources cited above. Nothing is sent or created without you.',
 
   /* draft sheet */
+  'act.draft.sheetTitle': 'Reply draft',
   'act.draft.title': 'Draft for your review',
   'act.draft.desc': 'Built only from the sources this answer cited. It is not sent.',
   'act.draft.loading': 'Drafting from the cited sources…',
@@ -30,7 +31,9 @@ const actEn = {
 
   /* ticket sheet */
   'act.ticket.title': 'Create a follow-up ticket',
+  'act.ticket.titleBlocked': 'Follow-up ticket',
   'act.ticket.desc': 'Nothing is created until you confirm.',
+  'act.ticket.blocked': 'You can’t create a follow-up ticket from this answer. You can still draft a reply.',
   'act.ticket.loading': 'Checking where you can create tickets…',
   'act.ticket.project': 'Project',
   'act.ticket.projectHint': 'Only projects where Jira lets you create issues.',
@@ -38,7 +41,6 @@ const actEn = {
   'act.ticket.summaryHint': '{n} of {max} characters',
   'act.ticket.type': 'Type',
   'act.ticket.description': 'Description',
-  'act.ticket.descriptionHint': 'Links only: each opens only for people the source allows.',
   'act.ticket.sources': 'Linked in this ticket',
   'act.ticket.confirm': 'Create ticket',
   'act.ticket.confirmIn': 'Create ticket in {key}',
@@ -59,6 +61,7 @@ const actEn = {
   'act.nothing': 'There is nothing in this answer to act on.',
   'act.nothingHint': 'Only sources you can still open are used.',
   'act.error': 'This is temporarily unavailable. Nothing was sent or created.',
+  'act.rateLimited': 'Too many requests in a short time. Try again in a minute.',
   'act.retry': 'Try again',
   'act.close': 'Close',
   'act.serverLang': 'The draft and the ticket text are shown in English, exactly as the server returned them.',
@@ -70,6 +73,7 @@ const actZh: Record<keyof typeof actEn, string> = {
   'act.ticket': '创建跟进工单',
   'act.hint': '仅使用上方引用的来源。未经你确认，不会发送或创建任何内容。',
 
+  'act.draft.sheetTitle': '回复草稿',
   'act.draft.title': '草稿，请你审阅',
   'act.draft.desc': '仅根据此回答引用的来源生成，不会发送。',
   'act.draft.loading': '正在根据引用来源起草…',
@@ -89,7 +93,9 @@ const actZh: Record<keyof typeof actEn, string> = {
   'act.draft.recorded': '展示前已记录到审计日志。',
 
   'act.ticket.title': '创建跟进工单',
+  'act.ticket.titleBlocked': '跟进工单',
   'act.ticket.desc': '在你确认之前不会创建任何内容。',
+  'act.ticket.blocked': '你无法根据此回答创建跟进工单。你仍然可以起草回复。',
   'act.ticket.loading': '正在检查你可以在哪里创建工单…',
   'act.ticket.project': '项目',
   'act.ticket.projectHint': '只列出 Jira 允许你创建事项的项目。',
@@ -97,7 +103,6 @@ const actZh: Record<keyof typeof actEn, string> = {
   'act.ticket.summaryHint': '{n} / {max} 个字符',
   'act.ticket.type': '类型',
   'act.ticket.description': '描述',
-  'act.ticket.descriptionHint': '仅包含链接：每个链接只对来源系统允许的人开放。',
   'act.ticket.sources': '此工单链接的来源',
   'act.ticket.confirm': '创建工单',
   'act.ticket.confirmIn': '在 {key} 中创建工单',
@@ -117,6 +122,7 @@ const actZh: Record<keyof typeof actEn, string> = {
   'act.nothing': '此回答中没有可以采取行动的内容。',
   'act.nothingHint': '只会使用你目前仍可打开的来源。',
   'act.error': '暂时无法使用。未发送或创建任何内容。',
+  'act.rateLimited': '短时间内请求过多，请一分钟后再试。',
   'act.retry': '重试',
   'act.close': '关闭',
   'act.serverLang': '草稿和工单内容按服务器返回的英文原文显示，未翻译。',

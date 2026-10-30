@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Metadata } from 'next';
 import { cookies, headers } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { NextRequest } from 'next/server';
 import { PreflightBoard, type ServerCheck, type ScriptReport } from '@/components/preflight/PreflightBoard';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +12,8 @@ export const metadata: Metadata = { title: 'Walnut DataBridge · Preflight' };
 // Demo Day preflight (docs/finals/demo_day/DEMO_DAY_RUNBOOK.md). Read-only: the server side probes
 // the local services' /health and reads the last report of scripts/demo_preflight.py (which the
 // one-click Start runs, with the pre-warm asks); the board adds the browser-side checks (screen,
-// zoom, clock, clips, live model status). Nothing here writes anywhere. Not served when deployed.
+// zoom, clock, clips, live model status). Nothing here writes anywhere. Not served when deployed;
+// locally only on the loopback address to a signed-in person (see allowed() below).
 
 const MOCK = process.env.NEXT_PUBLIC_IB_MOCK === '1' || process.env.IB_MOCK === '1';
 
@@ -49,17 +51,52 @@ function loopbackHost(): boolean {
 }
 
 /**
- * Who may see the board (it shows service health, ledger counts and per-persona citation counts):
- * never on a deployment (IB_DEPLOYED=1, the same switch as /api/walnut: one 404); otherwise the stage
- * laptop on its own loopback address, or anyone else only with a signed session cookie.
+ * A valid Internal Brain session, per the IB itself (GET /auth/whoami with the ib_session cookie, as
+ * /api/walnut does). A cookie that is merely present is not enough. Any error or timeout means no.
  */
-function allowed(): boolean {
+async function validSession(): Promise<boolean> {
+  const session = cookies().get('ib_session')?.value;
+  if (!session) return false;
+  try {
+    let status: number;
+    let body: unknown;
+    if (MOCK) {
+      const { handleMock } = await import('@/lib/mock/server');
+      const r = await handleMock(new NextRequest('http://127.0.0.1/api/ib/auth/whoami', { method: 'GET' }), 'auth/whoami', session);
+      status = r.status;
+      body = await r.json().catch(() => null);
+    } else {
+      const base = (process.env.IB_API_URL || 'http://127.0.0.1:8100').replace(/\/+$/, '');
+      const r = await fetch(`${base}/auth/whoami`, {
+        method: 'GET',
+        headers: { accept: 'application/json', cookie: `ib_session=${session}` },
+        cache: 'no-store',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(5000),
+      });
+      status = r.status;
+      body = await r.json().catch(() => null);
+    }
+    return status === 200 && !!body && typeof body === 'object' && typeof (body as { sub?: unknown }).sub === 'string';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Who may see the board (it shows service health, ledger counts and per-persona citation counts):
+ * never on a deployment (IB_DEPLOYED=1, the same switch as /api/walnut; deploy/lighthouse sets it on
+ * the web service). Otherwise only the stage laptop on its own loopback address (DNS rebinding) AND
+ * with a session the IB confirms. Everything else gets the one 404.
+ */
+async function allowed(): Promise<boolean> {
   if (process.env.IB_DEPLOYED === '1') return false;
-  return loopbackHost() || !!cookies().get('ib_session')?.value;
+  if (!loopbackHost()) return false;
+  return validSession();
 }
 
 export default async function PreflightPage() {
-  if (!allowed()) notFound();
+  if (!(await allowed())) notFound();
   const services: ServerCheck[] = MOCK
     ? [{ key: 'mode', label: 'Offline mock build: no services needed', status: 'info', detail: 'answers are recorded fixtures (say so on stage)' }]
     : await Promise.all([

@@ -3,6 +3,7 @@ import { Link2 } from 'lucide-react';
 import { CodeHash } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { fmtDate, fmtTime } from '@/lib/format';
+import { useLang } from '@/lib/i18n';
 
 export interface ChainItem {
   /** Global ledger seq (compliance) or the per-request ordinal (receipt). */
@@ -18,6 +19,7 @@ const KIND_NOTE: Record<string, string> = {
   'answer.released': 'before the response left',
   'request.failed': 'failed closed',
   // Act on an answer (POST /ib/act/*): the same request id, sealed in the same chain
+  'action.requested': 'before the source check, the model or a stored result',
   'action.proposed': 'before the draft or proposal was shown',
   'action.confirmed': 'confirmed by the person, before anything changed',
   'action.executed': 'created in the source by our code',
@@ -29,12 +31,31 @@ const KIND_NOTE: Record<string, string> = {
   'deliverable.exported': 'before the file left',
   'deliverable.failed': 'nothing was shown',
 };
+// The same notes in Chinese (round-5 Opus #12 added action.requested to both).
+const KIND_NOTE_ZH: Record<string, string> = {
+  'request.accepted': '在任何检索之前',
+  'retrieval.decided': '在任何模型调用之前',
+  'answer.released': '在回复发出之前',
+  'request.failed': '已安全拒绝',
+  'action.requested': '在核对来源、调用模型或使用已存结果之前',
+  'action.proposed': '在显示草稿或提议之前',
+  'action.confirmed': '由本人确认，在任何更改之前',
+  'action.executed': '由我们的代码在来源中创建',
+  'action.failed': '没有任何更改',
+  'action.rejected': '已取消；没有任何更改',
+  'deliverable.requested': '在重新核对来源或调用任何模型之前',
+  'deliverable.created': '在显示表格、图表或分析之前',
+  'deliverable.exported': '在文件发出之前',
+  'deliverable.failed': '没有显示任何内容',
+};
 
 /**
  * The request's sealed records drawn as a vertical hash chain. Each record's hash covers the one
  * before it in the ledger, so the links are drawn between consecutive records.
  */
 export function LedgerChain({ items, testId = 'ledger-chain' }: { items: ChainItem[]; testId?: string }) {
+  const { lang } = useLang();
+  const notes = lang === 'zh' ? KIND_NOTE_ZH : KIND_NOTE;
   if (!items.length) return <p className="text-body-sm text-muted">No sealed records.</p>;
   return (
     <ol className="relative" data-testid={testId}>
@@ -54,7 +75,7 @@ export function LedgerChain({ items, testId = 'ledger-chain' }: { items: ChainIt
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-mono text-caption tabular-nums text-subtle">{it.label}</span>
               <span className="font-mono text-caption text-fg">{it.kind}</span>
-              {KIND_NOTE[it.kind] ? <span className="text-caption text-subtle">· {KIND_NOTE[it.kind]}</span> : null}
+              {notes[it.kind] ? <span className="text-caption text-subtle">· {notes[it.kind]}</span> : null}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
               <CodeHash value={it.hash} head={10} tail={6} label={`${it.kind} hash`} />

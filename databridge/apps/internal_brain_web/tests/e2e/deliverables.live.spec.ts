@@ -36,7 +36,7 @@ test('live: Leo turns the FX answer into a table and a chart; the proxy relays o
   const sheet = page.getByTestId('deliver-sheet');
   const table = sheet.getByTestId('deliver-panel-table').getByTestId('deliver-view');
   await expect(table.getByTestId('deliver-table')).toContainText('0.4% FX margin');
-  await expect(table.getByTestId('deliver-by')).toHaveText(/Copied cell by cell from \[\d\], no model/);
+  await expect(table.getByTestId('deliver-by')).toHaveText(/Copied cell by cell from source \[\d\]/);
   await expectAccessible(page, 'live table');
   await page.screenshot({ path: `${SHOTS}/live-1-table.png` });
 
