@@ -7,8 +7,11 @@
 // - The channel list comes ONLY from the person's own /ib/map, so it lists channels they can
 //   already read and leaks nothing. The server re-checks live membership at post time.
 // - On a refusal the sheet shows one neutral sentence; it never says why (404 is one answer).
+// - Round-3 review H3: after a successful post or upload the form is cleared, so one more Enter on
+//   stage cannot post the same note twice; focus goes back to the empty field. L4: success is a
+//   polite status region that stays mounted; an error is an alert.
 import { FileUp, MessageSquarePlus } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, Field, Input, SheetContent, Tabs, TabsContent, TabsList, TabsTrigger, inputClass } from '@/components/ui';
 import { rememberPost } from '@/components/graph/useLiveChanges';
 import { ApiError, liveApi } from '@/lib/api';
@@ -56,6 +59,7 @@ export function useAddNote(channels: Channel[]) {
         const r = await liveApi.addDocument({ platform: 'slack', target, text: body });
         rememberPost(r.doc_id);
         const name = channels.find((c) => c.id === target)?.name ?? target;
+        setText(''); // posted: an extra Enter must not post the same note again
         setStatus({ kind: 'ok', text: t('add.posted', { channel: name }) });
         return true;
       } catch (e) {
@@ -81,6 +85,12 @@ function toB64(buf: ArrayBuffer): string {
   return btoa(s);
 }
 
+function fmtSize(n: number): string {
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+  return `${n} B`;
+}
+
 export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note: AddNote; channels: Channel[]; testId?: string }) {
   const t = useMessages(graphMessages);
   const [tab, setTab] = useState<'note' | 'file'>('note');
@@ -89,9 +99,33 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
   const [title, setTitle] = useState('');
   const [up, setUp] = useState<Status>({ kind: 'idle' });
   const [soon, setSoon] = useState(false);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const postRef = useRef<HTMLButtonElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLButtonElement>(null);
+
+  // The submit button is disabled while busy, so focus would fall to <body>: put it back once the
+  // request settles (success: the now-empty field; error: the button, to try again).
+  const noteKind = note.status.kind;
+  const prevNote = useRef(noteKind);
+  useEffect(() => {
+    if (prevNote.current === 'busy' && (noteKind === 'ok' || noteKind === 'error')) (noteKind === 'ok' ? textRef.current : postRef.current)?.focus();
+    prevNote.current = noteKind;
+  }, [noteKind]);
+  const prevUp = useRef(up.kind);
+  useEffect(() => {
+    if (prevUp.current === 'busy' && (up.kind === 'ok' || up.kind === 'error')) (up.kind === 'ok' ? fileRef.current : uploadRef.current)?.focus();
+    prevUp.current = up.kind;
+  }, [up.kind]);
+
+  const pick = (f: File | null) => {
+    setFile(f);
+    if (f && f.size > MAX_FILE) setUp({ kind: 'error', text: t('add.tooBig') });
+    else setUp({ kind: 'idle' });
+  };
 
   const upload = async () => {
-    if (!file) return;
+    if (!file || up.kind === 'busy') return;
     if (file.size > MAX_FILE) {
       setUp({ kind: 'error', text: t('add.tooBig') });
       return;
@@ -101,6 +135,10 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
       const content_b64 = toB64(await file.arrayBuffer());
       const r = await liveApi.uploadFile({ filename: file.name, content_b64, folder: folder.trim(), ...(title.trim() ? { title: title.trim() } : {}) });
       rememberPost(r.doc_id);
+      // uploaded: clear the file and title so the same file is not uploaded twice by accident
+      setFile(null);
+      setTitle('');
+      if (fileRef.current) fileRef.current.value = '';
       setUp({ kind: 'ok', text: t('add.uploaded', { name: title.trim() || file.name }) });
     } catch (e) {
       const st = e instanceof ApiError ? e.status : 0;
@@ -110,12 +148,18 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
     }
   };
 
-  const msg = (s: Status, id: string) =>
-    s.kind === 'ok' || s.kind === 'error' ? (
-      <p role="status" className={cn('text-caption', s.kind === 'ok' ? 'text-ok' : 'text-bad')} data-testid={id}>
-        {s.text}
+  // A polite status region that stays mounted (its text changes), and an alert for errors.
+  // Both stay rendered (never display:none), so assistive tech hears the text when it arrives.
+  const msg = (s: Status, id: string) => (
+    <div className="text-caption">
+      <p role="status" aria-live="polite" className="text-ok" data-testid={id}>
+        {s.kind === 'ok' ? s.text : ''}
       </p>
-    ) : null;
+      <p role="alert" className="text-bad" data-testid={`${id}-error`}>
+        {s.kind === 'error' ? s.text : ''}
+      </p>
+    </div>
+  );
 
   return (
     <SheetContent
@@ -152,7 +196,7 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
               }}
             >
               <Field id={`${testId}-channel`} label={t('add.channel')} hint={t('add.channelHint')}>
-                <select id={`${testId}-channel`} className={inputClass} value={note.channel} onChange={(e) => note.setChannel(e.target.value)} data-testid={`${testId}-channel`}>
+                <select id={`${testId}-channel`} aria-describedby={`${testId}-channel-hint`} className={inputClass} value={note.channel} onChange={(e) => note.setChannel(e.target.value)} data-testid={`${testId}-channel`}>
                   {channels.map((c) => (
                     <option key={c.id} value={c.id}>
                       #{c.name}
@@ -162,6 +206,7 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
               </Field>
               <Field id={`${testId}-text`} label={t('add.text')}>
                 <textarea
+                  ref={textRef}
                   id={`${testId}-text`}
                   className={cn(inputClass, 'min-h-[8rem] resize-y py-2')}
                   maxLength={MAX_NOTE}
@@ -172,7 +217,7 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
                 />
               </Field>
               <div className="flex items-center gap-3">
-                <Button type="submit" variant="primary" busy={note.status.kind === 'busy'} disabled={!note.text.trim() || note.status.kind === 'busy'} data-testid={`${testId}-post`}>
+                <Button ref={postRef} type="submit" variant="primary" busy={note.status.kind === 'busy'} disabled={!note.text.trim() || note.status.kind === 'busy'} data-testid={`${testId}-post`}>
                   {note.status.kind === 'busy' ? t('add.posting') : t('add.post')}
                 </Button>
                 <span id={`${testId}-count`} className="text-caption tabular-nums text-subtle">
@@ -199,23 +244,28 @@ export function AddDocumentSheet({ note, channels, testId = 'add-doc' }: { note:
             >
               <Field id={`${testId}-file`} label={t('add.file')} hint={t('add.fileHint')}>
                 <input
+                  ref={fileRef}
                   id={`${testId}-file`}
                   type="file"
                   accept=".docx,.xlsx,.pptx,.pdf,.csv,.md,.txt"
                   className={cn(inputClass, 'py-1.5')}
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => pick(e.target.files?.[0] ?? null)}
+                  aria-describedby={`${testId}-file-hint ${testId}-picked`}
                   data-testid={`${testId}-file`}
                 />
               </Field>
+              <p id={`${testId}-picked`} className="-mt-2 text-caption text-muted empty:hidden" data-testid={`${testId}-picked`}>
+                {file ? t('add.picked', { name: file.name, size: fmtSize(file.size) }) : ''}
+              </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field id={`${testId}-folder`} label={t('add.folder')}>
-                  <Input id={`${testId}-folder`} value={folder} onChange={(e) => setFolder(e.target.value)} pattern="[A-Za-z0-9_-]{1,128}" data-testid={`${testId}-folder`} />
+                <Field id={`${testId}-folder`} label={t('add.folder')} hint={t('add.folderHint')}>
+                  <Input id={`${testId}-folder`} aria-describedby={`${testId}-folder-hint`} value={folder} onChange={(e) => setFolder(e.target.value)} pattern="[A-Za-z0-9_-]{1,128}" data-testid={`${testId}-folder`} />
                 </Field>
                 <Field id={`${testId}-ftitle`} label={t('add.fileTitle')}>
                   <Input id={`${testId}-ftitle`} value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
                 </Field>
               </div>
-              <Button type="submit" variant="primary" busy={up.kind === 'busy'} disabled={!file || up.kind === 'busy'} data-testid={`${testId}-upload`}>
+              <Button ref={uploadRef} type="submit" variant="primary" busy={up.kind === 'busy'} disabled={!file || up.kind === 'busy' || file.size > MAX_FILE} data-testid={`${testId}-upload`}>
                 {up.kind === 'busy' ? t('add.uploading') : t('add.upload')}
               </Button>
               {msg(up, `${testId}-upload-status`)}

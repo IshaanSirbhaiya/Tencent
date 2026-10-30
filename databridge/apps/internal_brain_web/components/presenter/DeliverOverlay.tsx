@@ -11,7 +11,7 @@ export function DeliverOverlay() {
   const { response, deliverables, kinds } = s.cache;
   return (
     <>
-      <div className="fixed inset-0 z-40 overflow-y-auto bg-bg px-6 py-8" data-testid="presenter-deliver-answer">
+      <div role="region" aria-label="Answer" className="fixed inset-0 z-40 overflow-y-auto bg-bg px-6 py-8" data-testid="presenter-deliver-answer">
         <div className="mx-auto max-w-3xl">
           <AnswerCard response={response} onCite={() => undefined} latest={false} idPrefix="pd-" showJourney={false} compact />
         </div>

@@ -6,7 +6,7 @@
 import { Check, Circle, FilePlus2, Loader2, Network, RefreshCw, Table2, Undo2, Workflow } from 'lucide-react';
 import Link from 'next/link';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Badge, Button, EmptyState, SegmentedControl, Sheet } from '@/components/ui';
+import { Badge, Button, EmptyState, SegmentedControl, Sheet, SheetTrigger } from '@/components/ui';
 import { usePresenterHandler } from '@/components/presenter/bus';
 import { usePresenter } from '@/components/presenter/store';
 import { AddDocumentSheet, type Channel, useAddNote } from '@/components/sim/AddDocumentSheet';
@@ -518,12 +518,16 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
         <div className="ml-auto flex items-center gap-2">
           {slot === 'a' && demo.on ? (
             <Sheet open={addOpen} onOpenChange={setAddOpen}>
-              <Button size="sm" variant="secondary" icon={FilePlus2} onClick={() => setAddOpen(true)} data-testid={`${testId}-add`}>
-                {t('add.open')}
-                <Badge tone="warn" className="ml-1.5">
-                  {t('demo.badge')}
-                </Badge>
-              </Button>
+              {/* a real trigger, so closing the sheet returns focus here (round-3 H1); below `sm` the
+                  label is visually hidden (still the accessible name) so the button is not clipped */}
+              <SheetTrigger asChild>
+                <Button size="sm" variant="secondary" icon={FilePlus2} className="px-2 sm:px-2.5" data-testid={`${testId}-add`}>
+                  <span className="sr-only sm:not-sr-only">{t('add.open')}</span>
+                  <Badge tone="warn" className="sm:ml-1.5">
+                    {t('demo.badge')}
+                  </Badge>
+                </Button>
+              </SheetTrigger>
               <AddDocumentSheet note={note} channels={channels} testId={`${testId}-addsheet`} />
             </Sheet>
           ) : null}
@@ -590,7 +594,8 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
             </div>
           ) : (
             <>
-              <div className="pointer-events-none absolute right-3 top-3 z-10 flex flex-col items-end gap-2">
+              {/* feed and legend stop above the map controls; the legend scrolls if it is taller */}
+              <div className="pointer-events-none absolute right-3 top-3 z-10 flex max-h-[calc(100%-14rem)] flex-col items-end gap-2">
                 {demo.on ? (
                   <LiveFeed
                     items={feed}

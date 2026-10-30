@@ -186,3 +186,80 @@ test.describe('engine view (proxy off)', () => {
     await shot(page, '07-proxy-off-dark-1280');
   });
 });
+
+// ---- demo engine refresh (round-3 UX review H2, M9): mock server, proxy on, status routes stubbed --
+test.describe('engine refresh (demo)', () => {
+  test.skip(!ON, 'needs a server with WALNUT_PROXY=1 (ENGINE_PROXY=on)');
+
+  async function enableDemo(page: Page) {
+    await page.goto('/settings');
+    const card = page.getByTestId('settings-demo');
+    await card.getByRole('switch').click();
+    await expect(card.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+  }
+  /** Stub /sim/engine-refresh and /sim/engine-status: `script` decides each status answer. */
+  async function stub(page: Page, script: (n: number) => 'fail' | Record<string, unknown>) {
+    const started = new Date(Date.now() - 5_000).toISOString();
+    const running = { state: 'running', step: 'building', started_at: started, finished_at: null, snapshot_at: null, reloaded: null };
+    let n = 0;
+    await page.route('**/api/ib/sim/engine-refresh', (r) => r.fulfill({ json: running }));
+    await page.route('**/api/ib/sim/engine-status', (r) => {
+      n += 1;
+      if (n === 1) return r.fulfill({ json: { state: 'idle', step: null, started_at: null, finished_at: null, snapshot_at: null, reloaded: null } });
+      const a = script(n - 1);
+      return a === 'fail' ? r.fulfill({ status: 503, json: { error: 'temporarily unavailable' } }) : r.fulfill({ json: { ...running, ...a } });
+    });
+    return { running };
+  }
+
+  test('the live region changes only with the step; the timer ticks outside it; focus stays on the button', async ({ page }) => {
+    await login(page, 'jdoe');
+    await enableDemo(page);
+    await stub(page, () => ({}));
+    await page.goto('/dev/brain');
+    const refresh = page.getByTestId('engine-refresh');
+    await expect(refresh).toBeVisible({ timeout: 45_000 });
+    const btn = refresh.getByTestId('engine-refresh-button');
+    await btn.focus();
+    await page.keyboard.press('Enter');
+    const status = refresh.getByTestId('engine-refresh-status');
+    await expect(status).toHaveText('Rebuilding the snapshot · Building from the source estate');
+    await expect(btn).toBeFocused(); // aria-disabled, not disabled: focus does not fall to <body>
+    await expect(btn).toHaveAttribute('aria-disabled', 'true');
+    const timer = refresh.getByTestId('engine-refresh-timer');
+    await expect(timer).toHaveAttribute('aria-hidden', 'true');
+    const t0 = await timer.textContent();
+    const seen = new Set<string>();
+    for (let i = 0; i < 6; i++) {
+      seen.add((await status.textContent()) ?? '');
+      await page.waitForTimeout(500);
+    }
+    expect([...seen]).toEqual(['Rebuilding the snapshot · Building from the source estate']);
+    expect(await timer.textContent()).not.toBe(t0); // the visible counter still ticks
+    // pressing it again while running starts nothing
+    await page.keyboard.press('Enter');
+    await expect(btn).toBeFocused();
+  });
+
+  test('a failed status poll keeps the running rebuild on screen; three in a row say so (M9)', async ({ page }) => {
+    await login(page, 'jdoe');
+    await enableDemo(page);
+    let failing = true;
+    await stub(page, () => (failing ? 'fail' : { state: 'done', step: null, finished_at: new Date().toISOString(), reloaded: true }));
+    await page.goto('/dev/brain');
+    const refresh = page.getByTestId('engine-refresh');
+    await expect(refresh).toBeVisible({ timeout: 45_000 });
+    await refresh.getByTestId('engine-refresh-button').click();
+    await expect(refresh).toHaveAttribute('data-misses', '1', { timeout: 10_000 });
+    await expect(refresh).toHaveAttribute('data-state', 'running');
+    await expect(refresh.getByTestId('engine-refresh-status')).toContainText('Rebuilding the snapshot');
+    await expect(refresh.getByTestId('engine-refresh-button')).toHaveAttribute('aria-disabled', 'true');
+    await expect(refresh.getByTestId('engine-refresh-lost')).toHaveCount(0);
+    await expect(refresh.getByTestId('engine-refresh-lost')).toHaveText('Cannot read the rebuild status right now; still trying.', { timeout: 30_000 });
+    await expect(refresh).toHaveAttribute('data-state', 'running');
+    failing = false;
+    await expect(refresh.getByTestId('engine-refresh-status')).toContainText('Snapshot rebuilt', { timeout: 20_000 });
+    await expect(refresh.getByTestId('engine-refresh-lost')).toHaveCount(0);
+    await expect(refresh.getByRole('button', { name: 'Reload the engine view' })).toBeVisible(); // L5
+  });
+});

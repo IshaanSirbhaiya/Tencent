@@ -5,6 +5,12 @@
 // Rule 4: a 404 is one sentence ("nothing to build") whatever the reason. Fable review §6: one
 // metadata line, a neutral pill (amber only when something was removed, never green), the source
 // chip beside every x label and the value written on every bar, Recharts defaults stripped.
+//
+// Round-3 review: M1 the server's text (title, label, cells, sentences, scope note, source titles)
+// is English, so it carries lang="en" (the fixed draft label is translated); M2 a table row whose
+// cells all cite the same sources shows its chips once, at the end of the row; M3 a chip here does
+// not open a second modal: it moves focus to that source in this panel's "Cited in" list; M6 after
+// Regenerate / Try again focus goes to the loading line, then to the new title.
 import { ChartColumn, Check, Copy, Download, FileText, Info, RefreshCw, Table2, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Bar, BarChart, LabelList, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
@@ -13,7 +19,7 @@ import { Button, Sheet, SheetContent, Skeleton, Tabs, TabsContent, TabsList, Tab
 import { ApiError, analyticsApi, deliverApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { placeLabel } from '@/lib/format';
-import { useMessages } from '@/lib/i18n';
+import { useLang, useMessages } from '@/lib/i18n';
 import { deliverMessages, type DeliverKey } from '@/lib/i18n/deliver';
 import type {
   AskResponse,
@@ -31,6 +37,11 @@ import { toast } from './Toast';
 
 type T = (key: DeliverKey, vars?: Record<string, string | number>) => string;
 export type OnCite = (index: number, opener?: HTMLElement) => void;
+/** Moves focus to a source's entry in this panel's "Cited in" list (by its answer number). */
+type Jump = (n: number) => void;
+
+/** The server's fixed draft label; any other label is shown as returned (English). */
+const SERVER_DRAFT_LABEL = 'Draft for your review';
 
 const KIND_ICON: Record<DeliverableKind, LucideIcon> = { table: Table2, chart: ChartColumn, analysis: FileText };
 const KIND_ORDER: DeliverableKind[] = ['table', 'chart', 'analysis'];
@@ -67,7 +78,9 @@ function useDeliverables(): DeliverablesStatus | null {
 /* ---------------------------------------------------------------------------------- row */
 
 /** The chips under a released answer: only the kinds this server offers (no model: no Analysis). */
-export function DeliverRow({ response, onCite }: { response: AskResponse; onCite?: OnCite }) {
+// `onCite` is accepted for the AnswerCard's API, but chips inside the panel never open a second
+// modal over it (review M3); they point at the panel's own source list instead.
+export function DeliverRow({ response }: { response: AskResponse; onCite?: OnCite }) {
   const t = useMessages(deliverMessages);
   const st = useDeliverables();
   const [kind, setKind] = useState<DeliverableKind | null>(null);
@@ -108,7 +121,6 @@ export function DeliverRow({ response, onCite }: { response: AskResponse; onCite
         onKind={setKind}
         onClose={() => setKind(null)}
         returnFocusTo={opener.current}
-        onCite={onCite}
       />
     </section>
   );
@@ -133,7 +145,7 @@ export interface DeliverSheetProps {
   preloaded?: Partial<Record<DeliverableKind, Deliverable>>;
 }
 
-export function DeliverSheet({ response, kinds, kind, onKind, onClose, returnFocusTo, onCite, preloaded }: DeliverSheetProps) {
+export function DeliverSheet({ response, kinds, kind, onKind, onClose, returnFocusTo, preloaded }: DeliverSheetProps) {
   const t = useMessages(deliverMessages);
   const returnRef = useRef<HTMLElement | null>(null);
   if (returnFocusTo) returnRef.current = returnFocusTo;
@@ -155,7 +167,7 @@ export function DeliverSheet({ response, kinds, kind, onKind, onClose, returnFoc
             }
           }}
         >
-          <Panel response={response} kinds={kinds} kind={kind} onKind={onKind} onCite={onCite} preloaded={preloaded} />
+          <Panel response={response} kinds={kinds} kind={kind} onKind={onKind} preloaded={preloaded} />
         </SheetContent>
       ) : null}
     </Sheet>
@@ -167,14 +179,12 @@ function Panel({
   kinds,
   kind,
   onKind,
-  onCite,
   preloaded,
 }: {
   response: AskResponse;
   kinds: DeliverableKind[];
   kind: DeliverableKind;
   onKind: (k: DeliverableKind) => void;
-  onCite?: OnCite;
   preloaded?: Partial<Record<DeliverableKind, Deliverable>>;
 }) {
   const t = useMessages(deliverMessages);
@@ -211,7 +221,10 @@ function Panel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, response.request_id, attempt]);
 
+  // the kind whose Regenerate / Try again was pressed: its views take focus as they mount (M6)
+  const [focusKind, setFocusKind] = useState<DeliverableKind | null>(null);
   const retry = (k: DeliverableKind) => {
+    setFocusKind(k);
     setLoads((s) => ({ ...s, [k]: { state: 'loading', since: Date.now() } }));
     setAttempt((a) => ({ ...a, [k]: (a[k] ?? 0) + 1 }));
   };
@@ -237,7 +250,8 @@ function Panel({
             load={loads[k] ?? { state: 'loading', since: Date.now() }}
             onRetry={() => retry(k)}
             onShowTable={kinds.includes('table') && k !== 'table' ? () => onKind('table') : undefined}
-            onCite={onCite}
+            focus={focusKind === k}
+            onFocused={() => setFocusKind(null)}
           />
         </TabsContent>
       ))}
@@ -257,10 +271,22 @@ function useElapsed(since: number | null): number {
   return since === null ? 0 : now - since;
 }
 
-function Loading({ kind, since, t }: { kind: DeliverableKind; since: number; t: T }) {
+/** Focuses `ref` once when it mounts with `on` set (after a retry), then calls `done` if given. */
+function useFocusOnMount(ref: React.RefObject<HTMLElement | null>, on: boolean | undefined, done?: () => void) {
+  useEffect(() => {
+    if (!on) return;
+    ref.current?.focus();
+    done?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
+function Loading({ kind, since, t, focus }: { kind: DeliverableKind; since: number; t: T; focus?: boolean }) {
   const elapsed = useElapsed(since);
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusOnMount(ref, focus);
   return (
-    <div role="status" data-testid="deliver-loading" className="flex flex-col gap-4">
+    <div ref={ref} tabIndex={-1} role="status" data-testid="deliver-loading" className="flex flex-col gap-4 outline-none">
       <p className="text-body-sm text-muted">
         {elapsed > 8000 ? t('deliver.slow') : t('deliver.loading', { kind: t(`deliver.kind.${kind}` as DeliverKey) })}
       </p>
@@ -302,17 +328,51 @@ function View({
   load,
   onRetry,
   onShowTable,
-  onCite,
+  focus,
+  onFocused,
 }: {
   response: AskResponse;
   kind: DeliverableKind;
   load: Load;
   onRetry: () => void;
   onShowTable?: () => void;
-  onCite?: OnCite;
+  focus?: boolean;
+  onFocused?: () => void;
 }) {
   const t = useMessages(deliverMessages);
-  if (load.state === 'loading') return <Loading kind={kind} since={load.since} t={t} />;
+  if (load.state === 'loading') return <Loading kind={kind} since={load.since} t={t} focus={focus} />;
+  if (load.state !== 'ok' || load.d.status === 'needs_model' || load.d.status === 'insufficient' || !load.d.content)
+    return <Settled key={load.state} kind={kind} load={load} onRetry={onRetry} onShowTable={onShowTable} focus={focus} onFocused={onFocused} />;
+  return <Ready response={response} d={load.d} onRetry={onRetry} focus={focus} onFocused={onFocused} />;
+}
+
+/** The states without a deliverable (nothing, error, needs the model, insufficient). */
+function Settled({
+  load,
+  onRetry,
+  onShowTable,
+  focus,
+  onFocused,
+}: {
+  kind: DeliverableKind;
+  load: Load;
+  onRetry: () => void;
+  onShowTable?: () => void;
+  focus?: boolean;
+  onFocused?: () => void;
+}) {
+  const t = useMessages(deliverMessages);
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusOnMount(ref, focus, onFocused);
+  return (
+    <div ref={ref} tabIndex={-1} className="outline-none">
+      <SettledBody load={load} onRetry={onRetry} onShowTable={onShowTable} t={t} />
+    </div>
+  );
+}
+
+function SettledBody({ load, onRetry, onShowTable, t }: { load: Load; onRetry: () => void; onShowTable?: () => void; t: T }) {
+  if (load.state === 'loading') return null;
   if (load.state === 'fail') {
     if (load.kind === 'nothing') return <Notice testId="deliver-nothing" text={t('deliver.nothing')} hint={t('deliver.nothingHint')} />;
     return (
@@ -337,9 +397,7 @@ function View({
     </Button>
   ) : null;
   if (d.status === 'needs_model') return <Notice testId="deliver-needs-model" text={t('deliver.needsModel')} action={tableBtn} />;
-  if (d.status === 'insufficient' || !d.content)
-    return <Notice testId="deliver-insufficient" text={t('deliver.insufficient')} action={tableBtn} />;
-  return <Ready response={response} d={d} onRetry={onRetry} onCite={onCite} />;
+  return <Notice testId="deliver-insufficient" text={t('deliver.insufficient')} action={tableBtn} />;
 }
 
 /* -------------------------------------------------------------------------------- ready */
@@ -359,14 +417,15 @@ function useNumbering(response: AskResponse, d: Deliverable) {
 
 type Numbering = ReturnType<typeof useNumbering>;
 
-function Chips({ tags, num, onCite }: { tags: string[]; num: Numbering; onCite?: OnCite }) {
+function Chips({ tags, num, onJump }: { tags: string[]; num: Numbering; onJump?: Jump }) {
+  const { lang } = useLang();
+  // the chip's own label is UI text, inside content marked lang="en"
   return (
-    <>
+    <span lang={lang}>
       {tags.map((tag) => {
         const e = num.get(tag);
         if (!e) return null;
-        if (e.c && onCite && e.i >= 0)
-          return <CitationChip key={tag} citation={e.c} n={e.n} onOpen={(el) => onCite(e.i, el)} className="ml-1" />;
+        if (e.c && onJump) return <CitationChip key={tag} citation={e.c} n={e.n} onOpen={() => onJump(e.n)} className="ml-1" />;
         return (
           <span
             key={tag}
@@ -378,7 +437,7 @@ function Chips({ tags, num, onCite }: { tags: string[]; num: Numbering; onCite?:
           </span>
         );
       })}
-    </>
+    </span>
   );
 }
 
@@ -404,7 +463,13 @@ function MetaLine({ d, num, t }: { d: Deliverable; num: Numbering; t: T }) {
   const pillText = sentences ? t('deliver.pillSentences', { kept, total }) : t('deliver.pill', { kept, total });
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line pb-3 text-caption text-muted" data-testid="deliver-meta">
-      <span data-testid="deliver-label">{d.label}</span>
+      {d.label === SERVER_DRAFT_LABEL ? (
+        <span data-testid="deliver-label">{t('deliver.draftLabel')}</span>
+      ) : (
+        <span data-testid="deliver-label" lang="en">
+          {d.label}
+        </span>
+      )}
       <span aria-hidden className="text-subtle">
         ·
       </span>
@@ -437,16 +502,25 @@ function MetaLine({ d, num, t }: { d: Deliverable; num: Numbering; t: T }) {
   );
 }
 
-function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Deliverable; onRetry: () => void; onCite?: OnCite }) {
+function Ready({ response, d, onRetry, focus, onFocused }: { response: AskResponse; d: Deliverable; onRetry: () => void; focus?: boolean; onFocused?: () => void }) {
   const t = useMessages(deliverMessages);
   const num = useNumbering(response, d);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const titleId = useId();
+  const listId = useId();
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useFocusOnMount(titleRef, focus, onFocused);
+  const jump: Jump = (n) => {
+    const el = document.getElementById(listId)?.querySelector<HTMLElement>(`[data-ns~="${n}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'nearest' });
+    el.focus();
+  };
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(plainText(d, num));
+      await navigator.clipboard.writeText(plainText(d, num, t));
       setCopied(true);
       toast(t('deliver.copied'));
       setTimeout(() => setCopied(false), 1600);
@@ -478,7 +552,7 @@ function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Del
   const changed = d.citations.filter((c) => c.changed_since_answer);
   return (
     <div data-testid="deliver-view" data-kind={d.kind} data-generated={d.generated} data-model={d.model?.model ?? ''}>
-      <h3 id={titleId} className="text-heading-sm font-semibold text-fg" data-testid="deliver-title">
+      <h3 ref={titleRef} id={titleId} tabIndex={-1} lang="en" className="text-heading-sm font-semibold text-fg outline-none" data-testid="deliver-title">
         {d.title}
       </h3>
       <div className="mt-1">
@@ -486,9 +560,9 @@ function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Del
       </div>
 
       <div className="mt-4">
-        {d.kind === 'table' ? <TableView table={d.content as DeliverTable} title={d.title} num={num} onCite={onCite} t={t} /> : null}
-        {d.kind === 'chart' ? <ChartView chart={d.content as DeliverChart} title={d.title} titleId={titleId} num={num} onCite={onCite} t={t} /> : null}
-        {d.kind === 'analysis' ? <AnalysisView a={d.content as DeliverAnalysis} num={num} onCite={onCite} /> : null}
+        {d.kind === 'table' ? <TableView table={d.content as DeliverTable} title={d.title} num={num} onJump={jump} t={t} /> : null}
+        {d.kind === 'chart' ? <ChartView chart={d.content as DeliverChart} title={d.title} titleId={titleId} num={num} onJump={jump} t={t} /> : null}
+        {d.kind === 'analysis' ? <AnalysisView a={d.content as DeliverAnalysis} num={num} onJump={jump} /> : null}
       </div>
 
       {(d.content as DeliverChart).drawn_as_bar ? <p className="mt-2 text-caption text-muted">{t('deliver.drawnAsBar')}</p> : null}
@@ -518,8 +592,10 @@ function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Del
         </Button>
       </div>
 
-      <SourceList d={d} num={num} title={t(`deliver.sources.${d.kind}` as DeliverKey)} />
-      <p className="mt-4 text-caption text-subtle">{d.scope_note}</p>
+      <SourceList d={d} num={num} title={t(`deliver.sources.${d.kind}` as DeliverKey)} listId={listId} />
+      <p className="mt-4 text-caption text-subtle" lang="en" data-testid="deliver-scope">
+        {d.scope_note}
+      </p>
       <p className="mt-1 text-caption text-subtle" data-testid="deliver-recorded">
         {t('deliver.recorded')} <span className="font-mono">{d.deliverable_id.slice(0, 12)}</span>
       </p>
@@ -527,24 +603,36 @@ function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Del
   );
 }
 
-function SourceList({ d, num, title }: { d: Deliverable; num: Numbering; title: string }) {
+function SourceList({ d, num, title, listId }: { d: Deliverable; num: Numbering; title: string; listId: string }) {
   const seen = new Set<string>();
   const rows = d.citations.filter((c) => (seen.has(c.doc_id) ? false : (seen.add(c.doc_id), true)));
   if (!rows.length) return null;
   return (
     <section className="mt-5">
       <h3 className="mb-2 text-micro font-semibold uppercase tracking-wider text-subtle">{title}</h3>
-      <ol className="flex flex-col gap-1.5" data-testid="deliver-sources">
-        {rows.map((c) => (
-          <li key={c.doc_id} className="flex min-w-0 items-center gap-2 rounded-md border border-line bg-surface px-2.5 py-2 text-body-sm">
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-line-strong px-1 text-caption font-semibold tabular-nums">
-              {num.get(c.tag)?.n ?? c.n}
-            </span>
-            <PlatformIcon platform={c.platform} tone="platform" size="sm" showLabel={false} />
-            <span className="min-w-0 flex-1 truncate text-fg">{c.title}</span>
-            <span className="hidden shrink-0 truncate text-caption text-muted sm:inline">{placeLabel(c.platform, c.container_name)}</span>
-          </li>
-        ))}
+      <ol id={listId} className="flex flex-col gap-1.5" data-testid="deliver-sources">
+        {rows.map((c) => {
+          const n = num.get(c.tag)?.n ?? c.n;
+          // every number that points at this document (a chip may cite any of them)
+          const ns = [...new Set(d.citations.filter((x) => x.doc_id === c.doc_id).map((x) => num.get(x.tag)?.n ?? x.n))];
+          return (
+            <li
+              key={c.doc_id}
+              tabIndex={-1}
+              data-ns={ns.join(' ')}
+              className="flex min-w-0 items-center gap-2 rounded-md border border-line bg-surface px-2.5 py-2 text-body-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+            >
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-line-strong px-1 text-caption font-semibold tabular-nums">{n}</span>
+              <PlatformIcon platform={c.platform} tone="platform" size="sm" showLabel={false} />
+              <span className="min-w-0 flex-1 truncate text-fg" lang="en">
+                {c.title}
+              </span>
+              <span className="hidden shrink-0 truncate text-caption text-muted sm:inline" lang="en">
+                {placeLabel(c.platform, c.container_name)}
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
@@ -552,10 +640,18 @@ function SourceList({ d, num, title }: { d: Deliverable; num: Numbering; title: 
 
 /* --------------------------------------------------------------------------- the kinds */
 
-function TableView({ table, title, num, onCite, t }: { table: DeliverTable; title: string; num: Numbering; onCite?: OnCite; t: T }) {
+/** True when every non-empty cell of the row cites exactly the same sources. */
+function sameTags(cells: DeliverTable['rows'][number]): boolean {
+  const key = (tags: string[]) => [...new Set(tags)].sort().join('|');
+  const keys = new Set(cells.filter((c) => c.text).map((c) => key(c.tags)));
+  return keys.size <= 1;
+}
+
+function TableView({ table, title, num, onJump, t }: { table: DeliverTable; title: string; num: Numbering; onJump?: Jump; t: T }) {
+  const { lang } = useLang();
   return (
     <div className="max-w-full overflow-x-auto rounded-lg border border-line" data-testid="deliver-table">
-      <table className="w-full border-collapse text-body-sm">
+      <table className="w-full border-collapse text-body-sm" lang="en">
         <caption className="sr-only">{title}</caption>
         <thead className="bg-raised">
           <tr>
@@ -567,39 +663,51 @@ function TableView({ table, title, num, onCite, t }: { table: DeliverTable; titl
           </tr>
         </thead>
         <tbody>
-          {table.rows.map((r, ri) => (
-            <tr key={ri} className="border-b border-line last:border-b-0">
-              {r.map((cell, ci) => {
-                const Tag = ci === 0 ? 'th' : 'td';
-                return (
-                  <Tag
-                    key={ci}
-                    {...(ci === 0 ? { scope: 'row' } : {})}
-                    className={cn('px-3 py-2 align-top', ci === 0 ? 'text-left font-medium text-fg' : 'text-fg', cell.numeric && 'text-right tabular-nums')}
-                    data-testid="deliver-cell"
-                  >
-                    {cell.text ? (
-                      <>
-                        {cell.text}
-                        <Chips tags={cell.tags} num={num} onCite={onCite} />
-                      </>
-                    ) : (
-                      <span className="text-subtle">{t('deliver.empty')}</span>
-                    )}
-                  </Tag>
-                );
-              })}
-            </tr>
-          ))}
+          {table.rows.map((r, ri) => {
+            // one set of chips per row when the whole row cites the same sources (review M2);
+            // per cell only when a row mixes sources
+            const perRow = sameTags(r);
+            let lastFilled = -1;
+            r.forEach((c, i) => {
+              if (c.text) lastFilled = i;
+            });
+            return (
+              <tr key={ri} className="border-b border-line last:border-b-0" data-chips={perRow ? 'row' : 'cell'}>
+                {r.map((cell, ci) => {
+                  const Tag = ci === 0 ? 'th' : 'td';
+                  const chips = !perRow || ci === lastFilled;
+                  return (
+                    <Tag
+                      key={ci}
+                      {...(ci === 0 ? { scope: 'row' } : {})}
+                      className={cn('px-3 py-2 align-top', ci === 0 ? 'text-left font-medium text-fg' : 'text-fg', cell.numeric && 'text-right tabular-nums')}
+                      data-testid="deliver-cell"
+                    >
+                      {cell.text ? (
+                        <>
+                          {cell.text}
+                          {chips ? <Chips tags={cell.tags} num={num} onJump={onJump} /> : null}
+                        </>
+                      ) : (
+                        <span className="text-subtle" lang={lang}>
+                          {t('deliver.empty')}
+                        </span>
+                      )}
+                    </Tag>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
 }
 
-function AnalysisView({ a, num, onCite }: { a: DeliverAnalysis; num: Numbering; onCite?: OnCite }) {
+function AnalysisView({ a, num, onJump }: { a: DeliverAnalysis; num: Numbering; onJump?: Jump }) {
   return (
-    <div className="flex flex-col gap-4" data-testid="deliver-analysis">
+    <div className="flex flex-col gap-4" data-testid="deliver-analysis" lang="en">
       {a.sections.map((s, i) => (
         <section key={i}>
           <h4 className="mb-1 text-micro font-semibold uppercase tracking-wider text-subtle">{s.heading}</h4>
@@ -607,7 +715,7 @@ function AnalysisView({ a, num, onCite }: { a: DeliverAnalysis; num: Numbering; 
             {s.sentences.map((x, j) => (
               <span key={j} data-testid="deliver-sentence">
                 {x.text}
-                <Chips tags={x.tags} num={num} onCite={onCite} />{' '}
+                <Chips tags={x.tags} num={num} onJump={onJump} />{' '}
               </span>
             ))}
           </p>
@@ -624,7 +732,7 @@ function unitTick(chart: DeliverChart, v: number): string {
   return s;
 }
 
-function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverChart; title: string; titleId: string; num: Numbering; onCite?: OnCite; t: T }) {
+function ChartView({ chart, title, titleId, num, onJump, t }: { chart: DeliverChart; title: string; titleId: string; num: Numbering; onJump?: Jump; t: T }) {
   const series = chart.series;
   const xs: string[] = [];
   for (const s of series) for (const p of s.points) if (!xs.includes(p.x)) xs.push(p.x);
@@ -645,8 +753,11 @@ function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverCh
   const label =
     chart.type === 'line'
       ? t('deliver.chartLabelLine', { title, n: values.length, min: unitTick(chart, min), max: unitTick(chart, max) })
-      : t('deliver.chartLabel', { type: 'Bar', title, n: values.length, min: unitTick(chart, min), max: unitTick(chart, max) });
-  const colors = ['rgb(var(--accent-solid))', 'rgb(var(--muted))', 'rgb(var(--line-strong))'];
+      : t('deliver.chartLabelBar', { title, n: values.length, min: unitTick(chart, min), max: unitTick(chart, max) });
+  // up to three series are told apart by colour AND (for lines) dash; a 4th cycles, never undefined
+  const palette = ['rgb(var(--accent-solid))', 'rgb(var(--fg))', 'rgb(var(--muted))'];
+  const dashes = [undefined, '6 3', '2 3'];
+  const colors = series.map((_, i) => palette[i % palette.length]);
   const tagOf = (x: string) => {
     for (const s of series) {
       const p = s.points.find((q) => q.x === x);
@@ -717,7 +828,7 @@ function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverCh
               {yAxis}
               <Tooltip content={<TipBox />} cursor={{ stroke: 'rgb(var(--line-strong))' }} isAnimationActive={false} />
               {series.map((s, i) => (
-                <Line key={i} dataKey={`v${i}`} name={s.name} stroke={colors[i]} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} connectNulls={false}>
+                <Line key={i} dataKey={`v${i}`} name={s.name} stroke={colors[i]} strokeDasharray={dashes[i % dashes.length]} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} connectNulls={false}>
                   <LabelList dataKey={`r${i}`} position="top" fill="rgb(var(--fg))" fontSize={13} />
                 </Line>
               ))}
@@ -739,7 +850,7 @@ function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverCh
       {series.length > 1 ? (
         <ul className="mt-1 flex flex-wrap gap-3 text-caption text-muted">
           {series.map((s, i) => (
-            <li key={i} className="inline-flex items-center gap-1.5">
+            <li key={i} className="inline-flex items-center gap-1.5" lang="en">
               <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: colors[i] }} />
               {s.name}
             </li>
@@ -751,10 +862,20 @@ function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverCh
         <table className="w-full border-collapse text-body-sm" data-testid="deliver-chart-table">
           <thead>
             <tr className="border-b border-line">
-              {series.length > 1 ? <th scope="col" className="px-2 py-1.5 text-left text-caption font-semibold text-muted" /> : null}
-              <th scope="col" className="px-2 py-1.5 text-left text-caption font-semibold text-muted">
-                {chart.x_label || t('deliver.col.label')}
-              </th>
+              {series.length > 1 ? (
+                <th scope="col" className="px-2 py-1.5 text-left text-caption font-semibold text-muted">
+                  {t('deliver.col.series')}
+                </th>
+              ) : null}
+              {chart.x_label ? (
+                <th scope="col" lang="en" className="px-2 py-1.5 text-left text-caption font-semibold text-muted">
+                  {chart.x_label}
+                </th>
+              ) : (
+                <th scope="col" className="px-2 py-1.5 text-left text-caption font-semibold text-muted">
+                  {t('deliver.col.label')}
+                </th>
+              )}
               <th scope="col" className="px-2 py-1.5 text-right text-caption font-semibold text-muted">
                 {t('deliver.col.value')}
               </th>
@@ -767,13 +888,19 @@ function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverCh
             {series.flatMap((s, i) =>
               s.points.map((p) => (
                 <tr key={`${i}-${p.x}`} className="border-b border-line last:border-b-0">
-                  {series.length > 1 ? <td className="px-2 py-1.5 text-muted">{s.name}</td> : null}
-                  <th scope="row" className="px-2 py-1.5 text-left font-medium text-fg">
+                  {series.length > 1 ? (
+                    <td className="px-2 py-1.5 text-muted" lang="en">
+                      {s.name}
+                    </td>
+                  ) : null}
+                  <th scope="row" lang="en" className="px-2 py-1.5 text-left font-medium text-fg">
                     {p.x}
                   </th>
-                  <td className="px-2 py-1.5 text-right tabular-nums text-fg">{p.raw}</td>
+                  <td lang="en" className="px-2 py-1.5 text-right tabular-nums text-fg">
+                    {p.raw}
+                  </td>
                   <td className="px-2 py-1.5">
-                    <Chips tags={[p.tag]} num={num} onCite={onCite} />
+                    <Chips tags={[p.tag]} num={num} onJump={onJump} />
                   </td>
                 </tr>
               )),
@@ -787,16 +914,18 @@ function ChartView({ chart, title, titleId, num, onCite, t }: { chart: DeliverCh
 
 /* ------------------------------------------------------------------------------- copy */
 
-function plainText(d: Deliverable, num: Numbering): string {
+/** The Copy text. Headings come from the UI language (review M5); the deliverable's own text is as
+ *  returned. The server's CSV keeps its fixed English headers (it is one file for every reader). */
+function plainText(d: Deliverable, num: Numbering, t: T): string {
   const mark = (tags: string[]) => tags.map((tag) => `[${num.get(tag)?.n ?? '?'}]`).join('');
   const lines: string[] = [d.title, ''];
   if (d.kind === 'table') {
     const tb = d.content as DeliverTable;
-    lines.push([...tb.columns, 'Sources'].join('\t'));
+    lines.push([...tb.columns, t('deliver.copySources')].join('\t'));
     for (const r of tb.rows) lines.push([...r.map((c) => c.text), mark([...new Set(r.flatMap((c) => c.tags))])].join('\t'));
   } else if (d.kind === 'chart') {
     const ch = d.content as DeliverChart;
-    lines.push(['Series', ch.x_label || 'Label', 'Value as written', 'Source'].join('\t'));
+    lines.push([t('deliver.col.series'), ch.x_label || t('deliver.col.label'), t('deliver.col.value'), t('deliver.col.source')].join('\t'));
     for (const s of ch.series) for (const p of s.points) lines.push([s.name, p.x, p.raw, mark([p.tag])].join('\t'));
   } else {
     const a = d.content as DeliverAnalysis;
@@ -806,7 +935,7 @@ function plainText(d: Deliverable, num: Numbering): string {
       lines.push('');
     }
   }
-  lines.push('', 'Sources');
+  lines.push('', t('deliver.copySources'));
   for (const c of d.citations) lines.push(`[${num.get(c.tag)?.n ?? c.n}] ${c.title} · ${placeLabel(c.platform, c.container_name)}`);
   return lines.join('\n');
 }

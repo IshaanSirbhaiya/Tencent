@@ -116,6 +116,7 @@ test('states: needs the model, nothing to build, error with retry', async ({ pag
   mode = 'nothing';
   await answer.getByTestId('deliver-chart').click();
   await expect(sheet.getByTestId('deliver-nothing')).toHaveText(/There’s nothing to build from this answer\./);
+  await expect(sheet.getByTestId('deliver-nothing')).not.toContainText(/can (still )?open/);
   await page.keyboard.press('Escape');
 
   mode = 'error';
@@ -125,6 +126,7 @@ test('states: needs the model, nothing to build, error with retry', async ({ pag
   mode = 'pass';
   await sheet.getByRole('button', { name: 'Try again' }).click();
   await expect(sheet.getByTestId('deliver-chart')).toBeVisible();
+  await expect(sheet.getByTestId('deliver-panel-chart').getByTestId('deliver-title')).toBeFocused(); // M6
 });
 
 test('the row is not shown on a refusal or in Compare', async ({ page }) => {
@@ -135,4 +137,80 @@ test('the row is not shown on a refusal or in Compare', async ({ page }) => {
   await page.goto(`/compare?mode=person&p=leo.ops&q1=${encodeURIComponent(Q)}&q2=${encodeURIComponent(Q)}`);
   await page.waitForTimeout(1500);
   await expect(page.getByTestId('deliver-row')).toHaveCount(0);
+});
+
+// ---- round-3 UX review (M1-M6, L1) ---------------------------------------------------------------
+
+test('table chips: one per row when the row cites one source; a chip points inside the panel, no second modal', async ({ page }) => {
+  const answer = await leoAnswer(page, 'light');
+  await answer.getByTestId('deliver-table').click();
+  const sheet = page.getByTestId('deliver-sheet');
+  const table = sheet.getByTestId('deliver-panel-table').getByTestId('deliver-table');
+  await expect(table).toBeVisible();
+  // M2: every mock row cites [1] in every cell, so each row shows its chip once (4 tab stops, not 20)
+  const rows = table.locator('tbody tr');
+  const n = await rows.count();
+  expect(n).toBeGreaterThan(1);
+  await expect(table.locator('tbody tr[data-chips="row"]')).toHaveCount(n);
+  await expect(table.getByTestId('citation-chip')).toHaveCount(n);
+  // M3: the chip moves focus to "Cited in this table"; the Deliver sheet is the only dialog
+  await table.getByTestId('citation-chip').first().click();
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(sheet.getByTestId('deliver-sources').locator('li').first()).toBeFocused();
+  // L1: no "you can still open" hint in the panel description
+  await expect(sheet).not.toContainText(/still open|can open/);
+  await expectAccessible(page, 'deliverables table chips (light)');
+});
+
+test('Regenerate keeps keyboard focus: the loading line, then the new title (M6)', async ({ page }) => {
+  const answer = await leoAnswer(page);
+  await answer.getByTestId('deliver-table').click();
+  const sheet = page.getByTestId('deliver-sheet');
+  await expect(sheet.getByTestId('deliver-view')).toBeVisible();
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((r) => (release = r));
+  await page.route('**/api/ib/ib/deliverables', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await sheet.getByTestId('deliver-regenerate').focus();
+  await page.keyboard.press('Enter');
+  await expect(sheet.getByTestId('deliver-loading')).toBeFocused();
+  release();
+  await expect(sheet.getByTestId('deliver-title')).toBeFocused();
+});
+
+test('zh: server text is marked lang="en", the chart name and the copy text are Chinese (M1, M4, M5)', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('ib-lang', 'zh');
+    } catch {
+      /* storage blocked */
+    }
+  });
+  await quiet(page, 'light');
+  await login(page, 'leo.ops');
+  const box = page.locator('textarea').first();
+  await box.fill(Q);
+  await box.press('Enter');
+  const answer = page.getByTestId('answer');
+  await expect(answer.getByTestId('deliver-row')).toBeVisible();
+  await answer.getByTestId('deliver-table').click();
+  const sheet = page.getByTestId('deliver-sheet');
+  const view = sheet.getByTestId('deliver-panel-table').getByTestId('deliver-view');
+  await expect(view.getByTestId('deliver-title')).toHaveAttribute('lang', 'en');
+  await expect(view.getByTestId('deliver-label')).toHaveText('草稿，供你审阅');
+  await expect(view.getByTestId('deliver-table').locator('table')).toHaveAttribute('lang', 'en');
+  await expect(view.getByTestId('deliver-scope')).toHaveAttribute('lang', 'en');
+  await view.getByTestId('deliver-copy').click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('\t来源');
+  expect(copied).not.toMatch(/\bSources\b/);
+  await expectAccessible(page, 'deliverables table (zh)');
+
+  await sheet.getByTestId('deliver-tab-chart').click();
+  const fig = sheet.getByTestId('deliver-panel-chart').getByTestId('deliver-chart');
+  await expect(fig.getByRole('img')).toHaveAttribute('aria-label', /^柱状图，/);
+  await expect(fig.getByRole('img')).not.toHaveAttribute('aria-label', /Bar/);
 });

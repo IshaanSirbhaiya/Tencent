@@ -1,5 +1,6 @@
 // "Turn this answer into" strings (table, chart, analysis), English + 简体中文. The deliverable's
-// own text (cells, labels, sentences) is never translated: it is shown exactly as the API returns it.
+// own text (cells, labels, sentences) is never translated: it is shown exactly as the API returns it,
+// marked lang="en" (WCAG 3.1.2). Only the server's fixed draft label has a translation here.
 import { defineMessages } from '.';
 
 const deliverEn = {
@@ -7,9 +8,10 @@ const deliverEn = {
   'deliver.table': 'Table',
   'deliver.chart': 'Chart',
   'deliver.analysis': 'Analysis',
-  'deliver.hint': 'Built only from this answer and the sources you can open.',
+  'deliver.hint': 'Built from this answer and its cited sources.',
   'deliver.title': 'From this answer',
-  'deliver.desc': 'Built only from this answer and the sources you can still open.',
+  'deliver.desc': 'Built from this answer and its cited sources.',
+  'deliver.draftLabel': 'Draft for your review',
   'deliver.close': 'Close',
   'deliver.kinds': 'What to build',
 
@@ -39,7 +41,9 @@ const deliverEn = {
   'deliver.col.label': 'Label',
   'deliver.col.value': 'Value as written',
   'deliver.col.source': 'Source',
-  'deliver.chartLabel': '{type} chart, {title}, {n} bars, from {min} to {max}',
+  'deliver.chartLabelBar': 'Bar chart, {title}, {n} bars, from {min} to {max}',
+  'deliver.col.series': 'Series',
+  'deliver.copySources': 'Sources',
   'deliver.chartLabelLine': 'Line chart, {title}, {n} points, from {min} to {max}',
   'deliver.foundIn': 'found in [{n}] {title}',
 
@@ -59,7 +63,7 @@ const deliverEn = {
   'deliver.insufficient': 'Not enough numbers from your sources to draw a chart.',
   'deliver.showTable': 'Show the table instead',
   'deliver.nothing': 'There’s nothing to build from this answer.',
-  'deliver.nothingHint': 'Only sources you can still open are used.',
+  'deliver.nothingHint': 'Try asking the question again.',
   'deliver.error': 'This is temporarily unavailable. Nothing was sent or created.',
   'deliver.busy': 'Too many requests. Wait a minute and try again.',
   'deliver.retry': 'Try again',
@@ -72,9 +76,10 @@ const deliverZh: Record<DeliverKey, string> = {
   'deliver.table': '表格',
   'deliver.chart': '图表',
   'deliver.analysis': '分析',
-  'deliver.hint': '仅根据此回答和你可打开的来源生成。',
+  'deliver.hint': '根据此回答及其引用的来源生成。',
   'deliver.title': '基于此回答',
-  'deliver.desc': '仅根据此回答和你目前仍可打开的来源生成。',
+  'deliver.desc': '根据此回答及其引用的来源生成。',
+  'deliver.draftLabel': '草稿，供你审阅',
   'deliver.close': '关闭',
   'deliver.kinds': '要生成的内容',
 
@@ -104,7 +109,9 @@ const deliverZh: Record<DeliverKey, string> = {
   'deliver.col.label': '标签',
   'deliver.col.value': '原文数值',
   'deliver.col.source': '来源',
-  'deliver.chartLabel': '{type}，{title}，{n} 个柱，从 {min} 到 {max}',
+  'deliver.chartLabelBar': '柱状图，{title}，{n} 个柱，从 {min} 到 {max}',
+  'deliver.col.series': '系列',
+  'deliver.copySources': '来源',
   'deliver.chartLabelLine': '折线图，{title}，{n} 个点，从 {min} 到 {max}',
   'deliver.foundIn': '见于 [{n}] {title}',
 
@@ -124,7 +131,7 @@ const deliverZh: Record<DeliverKey, string> = {
   'deliver.insufficient': '你的来源中没有足够的数字来绘制图表。',
   'deliver.showTable': '改为显示表格',
   'deliver.nothing': '此回答中没有可用于生成的内容。',
-  'deliver.nothingHint': '仅使用你目前仍可打开的来源。',
+  'deliver.nothingHint': '请再问一次这个问题。',
   'deliver.error': '暂时无法使用。没有发送或创建任何内容。',
   'deliver.busy': '请求过多。请稍候一分钟再试。',
   'deliver.retry': '重试',

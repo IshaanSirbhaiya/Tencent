@@ -125,7 +125,7 @@ export function Legend({
   const row =
     'flex h-7 w-full items-center gap-2 rounded px-1.5 text-left text-caption transition-colors duration-fast hover:bg-raised aria-[pressed=false]:text-subtle';
   return (
-    <section aria-label={t('legend.title')} className="pointer-events-auto w-48 rounded-lg border border-line bg-surface/95 p-1.5 text-fg" data-testid="graph-legend">
+    <section aria-label={t('legend.title')} className="ds-scroll pointer-events-auto min-h-0 w-48 overflow-y-auto rounded-lg border border-line bg-surface/95 p-1.5 text-fg" data-testid="graph-legend">
       <button
         type="button"
         className="flex h-6 w-full items-center justify-between rounded px-1.5 text-micro font-semibold uppercase tracking-wide text-muted hover:text-fg"

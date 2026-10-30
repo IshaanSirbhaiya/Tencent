@@ -142,7 +142,7 @@ test('post a note as jdoe: it arrives in "Just added", Show selects it, pausing 
   await expect(page.getByTestId('graph-main-canvas')).toBeVisible({ timeout: 45_000 });
   const feed = page.getByTestId('graph-main-live');
   await expect(feed).toBeVisible();
-  await expect(feed.getByTestId('graph-main-live-empty')).toHaveText('Nothing new yet. Changes you can open appear here.');
+  await expect(feed.getByTestId('graph-main-live-empty')).toHaveText('Nothing new yet.'); // L1: no "you can open" hint
 
   const sheet = page.getByTestId('graph-main-addsheet');
   await expect(sheet).toBeVisible();
@@ -151,7 +151,15 @@ test('post a note as jdoe: it arrives in "Just added", Show selects it, pausing 
   await expectAccessible(page, 'grow/add-sheet');
   await sheet.getByTestId('graph-main-addsheet-post').click();
   await expect(sheet.getByTestId('graph-main-addsheet-status')).toHaveText('Posted to Slack · #db-migration');
+  // H3: the form is cleared, so another Enter cannot post the same note twice; focus is on the field
+  await expect(sheet.getByTestId('graph-main-addsheet-text')).toHaveValue('');
+  await expect(sheet.getByTestId('graph-main-addsheet-post')).toBeDisabled();
+  await expect(sheet.getByTestId('graph-main-addsheet-text')).toBeFocused();
+  await expect(sheet.getByTestId('graph-main-addsheet-status-error')).toHaveAttribute('role', 'alert'); // L4
+  await expect(sheet.getByTestId('graph-main-addsheet-status-error')).toHaveText('');
   await page.keyboard.press('Escape');
+  // H1: closing the sheet returns focus to the "Add a document" button
+  await expect(page.getByTestId('graph-main-add')).toBeFocused();
 
   const item = feed.getByTestId('graph-main-live-item').first();
   await expect(item).toBeVisible({ timeout: 10_000 });
@@ -160,6 +168,8 @@ test('post a note as jdoe: it arrives in "Just added", Show selects it, pausing 
   await expect(item).toHaveAttribute('data-doc', /^slack:C0DBMIG:/);
   await page.screenshot({ path: 'test-results/grow-mock-feed.png' });
 
+  // L5: the "Show" button is named after its item
+  await expect(item.getByRole('button')).toHaveAccessibleName(/^Show Update on DBMIG-12/);
   await item.getByRole('button', { name: 'Show' }).click();
   await expect(page.getByTestId('graph-main-panel')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -202,4 +212,81 @@ test('Compare: only the poster receives the note; upload tab and engine refresh 
   await refresh.getByTestId('engine-refresh-button').click();
   await expect(refresh.getByTestId('engine-refresh-status')).toContainText('Rebuilding the snapshot');
   await expect(refresh.getByTestId('engine-refresh-status')).toContainText('Snapshot rebuilt', { timeout: 20_000 });
+});
+
+// ---- round-3 UX review (H1, M7, M8) ---------------------------------------------------------------
+
+test('Add opened by keyboard: Esc returns focus to the button (H1)', async ({ page }) => {
+  await login(page, 'jdoe');
+  await enableDemo(page);
+  await page.goto('/dev/graph');
+  await expect(page.getByTestId('graph-main-canvas')).toBeVisible({ timeout: 45_000 });
+  const add = page.getByTestId('graph-main-add');
+  await add.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('graph-main-addsheet')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('graph-main-addsheet')).toBeHidden();
+  await expect(add).toBeFocused();
+});
+
+test('live updates that stop for good say so, and the switch reads off (M8)', async ({ page }) => {
+  await login(page, 'jdoe');
+  await enableDemo(page);
+  await page.route('**/api/ib/ib/graph/changes**', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"not found"}' }));
+  await page.goto('/dev/graph');
+  const feed = page.getByTestId('graph-main-live');
+  await expect(feed).toHaveAttribute('data-state', 'stopped', { timeout: 45_000 });
+  await expect(feed.getByTestId('graph-main-live-status')).toHaveText('Live updates stopped. Reload the page to restart them.');
+  const sw = feed.getByTestId('graph-main-live-switch');
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).toBeDisabled();
+});
+
+test('390 px: the Add button is not clipped and the feed is one compact line (M7)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, 'jdoe');
+  await enableDemo(page);
+  await page.goto('/dev/graph');
+  await expect(page.getByTestId('graph-main-canvas')).toBeVisible({ timeout: 45_000 });
+  const add = page.getByTestId('graph-main-add');
+  await expect(add).toHaveAccessibleName(/^Add a document/);
+  const clipped = await add.evaluate((el) => el.scrollWidth > el.clientWidth + 1);
+  expect(clipped).toBe(false);
+  const box = await add.boundingBox();
+  expect(box && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  const feed = page.getByTestId('graph-main-live');
+  await expect(feed).toBeVisible();
+  await expect(feed.getByTestId('graph-main-live-empty')).toHaveCount(0); // compact below sm
+  const fb = await feed.boundingBox();
+  expect(fb!.height).toBeLessThan(60);
+  await expectAccessible(page, 'grow/390');
+});
+
+test('upload: the chosen file is named; too big is caught on pick; success clears the form (H3, L3)', async ({ page }) => {
+  await login(page, 'jdoe');
+  await enableDemo(page);
+  let uploads = 0;
+  await page.route('**/api/ib/sim/upload-file', (r) => {
+    uploads += 1;
+    return r.fulfill({ json: { ok: true, doc_id: 'drive:fd-3:r3fix', platform: 'drive', container: 'fd-3', at: new Date().toISOString() } });
+  });
+  await page.goto('/dev/graph?add=1');
+  const sheet = page.getByTestId('graph-main-addsheet');
+  await expect(sheet).toBeVisible({ timeout: 45_000 });
+  await sheet.getByRole('tab', { name: 'Upload a file' }).click();
+  const input = sheet.getByTestId('graph-main-addsheet-file');
+  await input.setInputFiles({ name: 'big.txt', mimeType: 'text/plain', buffer: Buffer.alloc(5 * 1024 * 1024 + 10, 97) });
+  await expect(sheet.getByTestId('graph-main-addsheet-upload-status-error')).toHaveText('That file is larger than 5 MB.');
+  await expect(sheet.getByTestId('graph-main-addsheet-upload')).toBeDisabled();
+  await input.setInputFiles({ name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('# Shard 3\nCopy job resumes Thursday.\n') });
+  await expect(sheet.getByTestId('graph-main-addsheet-picked')).toHaveText(/^Selected: notes\.md · \d+ B$/);
+  await expect(sheet.getByTestId('graph-main-addsheet-upload-status-error')).toHaveText('');
+  await sheet.getByTestId('graph-main-addsheet-upload').click();
+  await expect(sheet.getByTestId('graph-main-addsheet-upload-status')).toHaveText('Uploaded to Drive · notes.md');
+  await expect(input).toHaveValue('');
+  await expect(sheet.getByTestId('graph-main-addsheet-picked')).toHaveText('');
+  await expect(sheet.getByTestId('graph-main-addsheet-upload')).toBeDisabled();
+  await expect(input).toBeFocused();
+  expect(uploads).toBe(1);
 });

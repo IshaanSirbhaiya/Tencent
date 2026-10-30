@@ -8,6 +8,7 @@
 // while typing in a field, inside composite widgets for the arrow keys, and with Ctrl/Alt/Meta held.
 import { clearCompareCache } from '@/components/compare/cache';
 import { ApiError, analyticsApi, api, ibHealth, slotLogout, withSlotLocks } from '@/lib/api';
+import { announce } from '@/components/ui/announce';
 import { callPresenter } from './bus';
 import { clearDeliverCache, openDeliverables, warmDeliverables } from './deliver';
 import { STEPS, stepUrl, type StepCtx } from './script';
@@ -322,7 +323,10 @@ function onKeyDown(e: KeyboardEvent) {
     case 'd':
       e.preventDefault();
       if (s.busy || s.resetting) return;
-      void openDeliverables(serialSession, () => host?.refreshSession());
+      // nothing cached (switch off, no citations, signed out): say so instead of a dead key press
+      void openDeliverables(serialSession, () => host?.refreshSession()).then((ok) => {
+        if (!ok) announce('Deliverables are not ready for this answer.');
+      });
       return;
     case 'escape':
       e.preventDefault();
