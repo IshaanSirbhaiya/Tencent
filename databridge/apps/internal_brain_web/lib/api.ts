@@ -11,6 +11,7 @@ import type {
   HistoryItem,
   Journey,
   KnowledgeGraph,
+  KnowledgeGalaxy,
   KnowledgeMap,
   RevealResult,
   SimResult,
@@ -145,20 +146,25 @@ function demoLogin(persona: string, passcode: string | undefined, slot?: Slot) {
 // starts a new generation, so a request still running for A is never handed to B (restricted ≡ non-existent).
 let sessionGen = 0;
 let mapInFlight: { gen: number; p: Promise<KnowledgeMap> } | null = null;
-const newSession = <T,>(p: Promise<T>): Promise<T> => {
+// The same for GET /ib/galaxy, also keyed to the limit asked for.
+let galaxyInFlight: { gen: number; limit: number; p: Promise<KnowledgeGalaxy> } | null = null;
+const dropInFlight = () => {
   sessionGen += 1;
   mapInFlight = null;
-  return p.finally(() => {
-    sessionGen += 1;
-    mapInFlight = null;
-  });
+  galaxyInFlight = null;
+};
+const newSession = <T,>(p: Promise<T>): Promise<T> => {
+  dropInFlight();
+  return p.finally(dropInFlight);
 };
 
 /** Drop the shared in-flight requests: the signed-in person changed (also outside this tab). */
 export function forgetInFlight() {
-  sessionGen += 1;
-  mapInFlight = null;
+  dropInFlight();
 }
+
+const GALAXY_LIMIT = 300;
+const galaxyPath = (limit: number) => `/ib/galaxy${qs({ limit: String(limit) })}`;
 
 export const api = {
   login: async (persona: string, passcode?: string) => {
@@ -181,6 +187,17 @@ export const api = {
       if (mapInFlight?.gen === gen) mapInFlight = null;
     });
     mapInFlight = { gen, p };
+    return p;
+  },
+  /** The graph page's overview AND map from one live pass (GET /ib/galaxy). Concurrent callers of the
+   *  SAME signed-in session and limit share one in-flight request; a new sign-in never reuses it. */
+  galaxy: ({ limit = GALAXY_LIMIT }: { limit?: number } = {}): Promise<KnowledgeGalaxy> => {
+    if (galaxyInFlight && galaxyInFlight.gen === sessionGen && galaxyInFlight.limit === limit) return galaxyInFlight.p;
+    const gen = sessionGen;
+    const p = call<KnowledgeGalaxy>(galaxyPath(limit)).finally(() => {
+      if (galaxyInFlight?.gen === gen && galaxyInFlight.limit === limit) galaxyInFlight = null;
+    });
+    galaxyInFlight = { gen, limit, p };
     return p;
   },
   sources: async (): Promise<SourceStatus[]> => {
@@ -226,6 +243,8 @@ export function slotApi(slot: Exclude<Slot, 'a'>) {
     whoami: () => call<WhoAmI>('/auth/whoami', { slot }),
     ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question }, slot }),
     map: () => call<KnowledgeMap>('/ib/map', { slot }),
+    /** GET /ib/galaxy for this compare slot: never shared, never the main session's request. */
+    galaxy: ({ limit = GALAXY_LIMIT }: { limit?: number } = {}) => call<KnowledgeGalaxy>(galaxyPath(limit), { slot }),
   };
 }
 
@@ -464,7 +483,7 @@ export interface OpenableResult {
 
 /**
  * The knowledge-graph calls bound to a session slot. Slot `a` is the main session; `b`/`c` are the
- * separately signed compare slots (the proxy allows ib/map, ib/graph and POST ib/graph/openable there,
+ * separately signed compare slots (the proxy allows ib/map, ib/graph, ib/galaxy and POST ib/graph/openable there,
  * not ib/doc). Identity always comes from the slot's own signed cookie: no call names a person.
  */
 export function graphApi(slot: Slot = 'a') {
@@ -475,6 +494,8 @@ export function graphApi(slot: Slot = 'a') {
     graph: (query: GraphQuery = {}) =>
       call<KnowledgeGraph>(`/ib/graph${qs({ focus: query.focus, q: query.q, limit: query.limit ? String(query.limit) : undefined })}`, { slot: s }),
     map: () => (slot === 'a' ? api.map() : call<KnowledgeMap>('/ib/map', { slot: s })),
+    /** Overview + map from one live pass: the main session shares api.galaxy; a compare slot never does. */
+    galaxy: (opts: { limit?: number } = {}) => (slot === 'a' ? api.galaxy(opts) : slotApi(slot).galaxy(opts)),
     openable: (docIds: string[]) => call<OpenableResult>('/ib/graph/openable', { method: 'POST', body: { doc_ids: docIds }, slot: s }),
   };
 }

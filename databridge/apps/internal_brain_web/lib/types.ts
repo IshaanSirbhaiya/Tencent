@@ -349,6 +349,14 @@ export interface KnowledgeGraph {
   freshness_note: string;
 }
 
+/** GET /ib/galaxy?limit=N: the overview (the GET /ib/graph?limit=N body) and the map (the GET /ib/map
+ *  body plus `complete`) from ONE live pass (galaxy.py). `map.complete` is false when any check of
+ *  that pass was undecided; it is a flag only: no count of undecided items exists anywhere. */
+export interface KnowledgeGalaxy {
+  overview: KnowledgeGraph;
+  map: KnowledgeMap & { complete: boolean };
+}
+
 export interface GraphQuery {
   focus?: string;
   q?: string;

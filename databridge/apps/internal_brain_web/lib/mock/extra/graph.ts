@@ -750,3 +750,14 @@ export function graphDocExtras(sub: string, docId: string): { author: { id: stri
   const d = docResponse(sub, docId, null);
   return d ? { author: d.author, links: d.links } : null;
 }
+
+/**
+ * For lib/mock/extra/galaxy.ts: the overview body GET /ib/graph?limit= gives in mock mode, and the
+ * simulator state GET /ib/map is built from, so the galaxy mock serves exactly the two single views.
+ */
+export function overviewFor(sub: string, limit: number): KnowledgeGraph | null {
+  return graphResponse(sub, { focus: null, q: null, limit });
+}
+export function currentMockState(): MockState {
+  return mockState();
+}

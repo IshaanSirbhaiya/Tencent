@@ -39,7 +39,7 @@ export function CompareView({ initialPersona }: { initialPersona?: string | null
   const [sharedState, setSharedState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const rightSub = useRef<string | null>(null);
 
-  // Sign slot b in as the chosen person and fetch THEIR graph + map, holding the slot lock so another
+  // Sign slot b in as the chosen person and fetch THEIR graph + map (one GET /ib/galaxy), holding the slot lock so another
   // tab cannot switch the slot halfway. Every response is checked against the sub just signed in.
   const preload = useCallback(async (): Promise<{ overview: KnowledgeGraph; map: KnowledgeMap }> => {
     const api = graphApi('b');
@@ -48,7 +48,7 @@ export function CompareView({ initialPersona }: { initialPersona?: string | null
       if (who.sub !== persona) throw new ApiError(0, 'identity');
       rightSub.current = who.sub;
       setRight({ sub: who.sub, name: who.name || persona });
-      const [overview, map] = await Promise.all([api.graph({ limit: 300 }), api.map()]);
+      const { overview, map } = await api.galaxy({ limit: 300 });     // one live pass for this side
       if ((await api.whoami()).sub !== who.sub) throw new ApiError(0, 'identity');
       return { overview, map };
     });

@@ -33,6 +33,7 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: /^ib\/(history|sources|map|status)$/ },
   { method: 'GET', re: /^ib\/trace\/[A-Za-z0-9_-]{1,200}$/ },
   { method: 'GET', re: /^ib\/graph$/ },
+  { method: 'GET', re: /^ib\/galaxy$/ },
   { method: 'GET', re: /^ib\/graph\/changes$/ },
   { method: 'POST', re: /^ib\/graph\/openable$/ },
   // Act on an answer: main session only (never in a compare slot)
@@ -67,6 +68,7 @@ const SLOT_ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^ib\/ask(\/stream)?$/ },
   { method: 'GET', re: /^ib\/map$/ },
   { method: 'GET', re: /^ib\/graph$/ },
+  { method: 'GET', re: /^ib\/galaxy$/ },
   { method: 'GET', re: /^ib\/graph\/changes$/ },
   { method: 'POST', re: /^ib\/graph\/openable$/ },
 ];

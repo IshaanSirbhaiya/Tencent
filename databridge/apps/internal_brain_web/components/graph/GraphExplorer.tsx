@@ -133,16 +133,9 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
           ({ overview, map: m } = await preload());
           if (live) setPhase({ kind: 'loading', places: true, docs: true });
         } else {
-          [overview, m] = await Promise.all([
-            src.graph({ limit: OVERVIEW_LIMIT }).then((r) => {
-              if (live) setPhase((p) => (p.kind === 'loading' ? { ...p, places: true } : p));
-              return r;
-            }),
-            src.map().then((r) => {
-              if (live) setPhase((p) => (p.kind === 'loading' ? { ...p, docs: true } : p));
-              return r;
-            }),
-          ]);
+          // ONE live pass for both views (GET /ib/galaxy): each document is checked with its source once
+          ({ overview, map: m } = await src.galaxy({ limit: OVERVIEW_LIMIT }));
+          if (live) setPhase({ kind: 'loading', places: true, docs: true });
         }
         if (overview.sub !== m.sub || (expectSub && overview.sub !== expectSub)) throw new Mismatch();
         const g = buildGalaxy(overview, m);

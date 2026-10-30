@@ -6,11 +6,13 @@ for (const size of ['as served', '1,300 nodes']) test(`fps during pan/zoom (${si
   await login(page, 'jdoe');
   if (size !== 'as served') {
     // Rendering stress only: pad the map response with copies of real items (ids suffixed) to ~1,300 nodes.
-    await page.route('**/api/ib/ib/map', async (route) => {
+    // The graph page reads the map from GET /ib/galaxy (one live pass for the overview and the map).
+    await page.route('**/api/ib/ib/galaxy**', async (route) => {
       const res = await route.fetch();
-      const map = await res.json();
+      const body = await res.json();
+      const map = body.map;
       for (const p of map.platforms) for (const c of p.containers) c.items = [...c.items, ...c.items.slice(0, Math.ceil(c.items.length * 0.5)).map((it: any) => ({ ...it, doc_id: `${it.doc_id}~x` }))];
-      await route.fulfill({ response: res, json: map });
+      await route.fulfill({ response: res, json: body });
     });
   }
   await page.goto('/dev/graph');

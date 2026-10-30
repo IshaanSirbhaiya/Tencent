@@ -98,7 +98,7 @@ test('a document the API will not return reads "Not available to you right now"'
 test('503: designed error state, then retry recovers', async ({ page }) => {
   await login(page, 'jdoe');
   let fail = true;
-  await page.route('**/api/ib/ib/graph?limit=300', (r) =>
+  await page.route('**/api/ib/ib/galaxy?limit=300', (r) =>
     fail ? r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"temporarily unavailable"}' }) : r.continue(),
   );
   await page.goto('/dev/graph');
