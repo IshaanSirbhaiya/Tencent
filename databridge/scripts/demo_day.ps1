@@ -512,7 +512,7 @@ function Start-Offline {
     if ($DryRun) { Dry 'npm run build:mock' }
     else {
       $blog = Join-Path $LogDir "build-mock-$Stamp.log"
-      $p = Start-Process -FilePath $env:ComSpec -ArgumentList "/c npm run build:mock > `"$blog`" 2>&1" -WorkingDirectory $Web -WindowStyle Hidden -PassThru -Wait
+      $p = Start-Process -FilePath $env:ComSpec -ArgumentList "/c set NEXT_PUBLIC_IB_MOCK_MODEL=extractive&& npm run build:mock > `"$blog`" 2>&1" -WorkingDirectory $Web -WindowStyle Hidden -PassThru -Wait
       if ($p.ExitCode -ne 0 -or (Test-BuildFresh '.next-mock') -eq 'missing') { Bad "Mock build failed; see $blog"; Show-Big $NotReadyArt 'Red'; return 1 }
       Ok 'Mock build ready'
     }

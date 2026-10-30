@@ -101,7 +101,12 @@ export const DOCS = {
 
 export type DocKey = keyof typeof DOCS;
 
-export const HY3: ModelInfo = { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false };
+// The offline stage fallback builds with NEXT_PUBLIC_IB_MOCK_MODEL=extractive, so canned answers are never
+// labelled as written by Hy3 on stage. The default (tests, dev) keeps the Hy3 label the UI is designed for.
+export const HY3: ModelInfo =
+  process.env.NEXT_PUBLIC_IB_MOCK_MODEL === 'extractive'
+    ? { provider: 'deterministic', model: 'extractive-v1', fallback_used: false }
+    : { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false };
 export const DEEPSEEK: ModelInfo = { provider: 'tencent-tokenhub', model: 'deepseek-v4.1-flash', fallback_used: true };
 export const EXTRACTIVE: ModelInfo = { provider: 'deterministic', model: 'extractive-v1', fallback_used: false };
 
