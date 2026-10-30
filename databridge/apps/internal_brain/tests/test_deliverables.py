@@ -189,7 +189,7 @@ def test_offline_table_chart_and_needs_model(tmp_path):
     assert any(c["doc_id"] == "slack:p1" for c in ans["citations"]), ans
     st = jd.get("/ib/status").json()["deliverables"]
     assert st == {"enabled": True, "model": False, "kinds": ["table", "chart"],
-                  "exports": {"csv": True, "pptx": False}}
+                  "exports": {"csv": True, "pptx": X.pptx_available()}}
     t = _deliver(jd, ans["request_id"], "table").json()
     assert t["status"] == "ready" and t["generated"] == "deterministic"
     assert t["model"] == {"provider": "deterministic", "model": "source-table-v1", "fallback_used": False}
@@ -197,7 +197,8 @@ def test_offline_table_chart_and_needs_model(tmp_path):
     assert [c["text"] for c in t["content"]["rows"][2]] == ["ID", "Growth", "0.4% FX margin"]
     tag = t["content"]["from_tag"]
     assert all(c["tags"] == [tag] for r in t["content"]["rows"] for c in r)
-    assert t["check"]["values_proposed"] == 0 and t["exports"] == ["csv"]
+    assert t["check"]["values_proposed"] == 0
+    assert t["exports"] == (["csv", "pptx"] if X.pptx_available() else ["csv"])
     assert [c["doc_id"] for c in t["citations"]] == ["slack:p1"]
     n = next(i for i, c in enumerate(ans["citations"], 1) if c["tag"] == tag)
     assert t["citations"][0]["n"] == n                       # the answer's own numbering
@@ -254,7 +255,8 @@ def test_rule4_prompt_holds_only_openable_cited_passages(tmp_path):
 # ------------------------------------------------------------------------------------------------
 # T2: one 404 for someone else's, unknown and refused; failed lookups are not in their receipt
 # ------------------------------------------------------------------------------------------------
-def test_someone_elses_unknown_and_refused_are_one_404(tmp_path):
+def test_someone_elses_unknown_and_refused_are_one_404(tmp_path, monkeypatch):
+    monkeypatch.setattr(X, "pptx_available", lambda: False)     # no python-pptx: CSV only
     app, svc = _world(tmp_path)
     jd, pr = _c(app, svc, "jdoe"), _c(app, svc, "priya")
     theirs = _ask(pr)["request_id"]
@@ -655,3 +657,124 @@ def test_kinds_are_registered_parsed_and_counted(tmp_path):
     t = st["totals"]
     assert (t["deliverables_requested"], t["deliverables_created"], t["deliverables_exported"],
             t["deliverables_failed"]) == (1, 1, 1, 1)
+
+
+# ------------------------------------------------------------------------------------------------
+# P1 Slides (.pptx) and T15: every string in the deck and its chart's embedded workbook is guarded
+# ------------------------------------------------------------------------------------------------
+def _pptx_strings(data: bytes) -> tuple[list[str], list[str]]:
+    """``(every string in the deck, every FORMULA cell of an embedded chart workbook)``: slide text,
+    table cells, notes, chart titles and the embedded XLSX (opened with openpyxl)."""
+    pptx = pytest.importorskip("pptx")
+    openpyxl = pytest.importorskip("openpyxl")
+    prs = pptx.Presentation(io.BytesIO(data))
+    out, formulas = [], []
+    for slide in prs.slides:
+        if slide.has_notes_slide:
+            out.append(slide.notes_slide.notes_text_frame.text)
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                out.append(sh.text_frame.text)
+            if getattr(sh, "has_table", False) and sh.has_table:
+                out += [c.text for r in sh.table.rows for c in r.cells]
+            if getattr(sh, "has_chart", False) and sh.has_chart:
+                ch = sh.chart
+                out += [str(c) for c in ch.plots[0].categories] + [s.name for s in ch.series]
+                for ax in (ch.value_axis, ch.category_axis):
+                    if ax.has_title:
+                        out.append(ax.axis_title.text_frame.text)
+                wb = openpyxl.load_workbook(io.BytesIO(ch.part.chart_workbook.xlsx_part.blob))
+                for ws in wb.worksheets:
+                    for row in ws.iter_rows():
+                        for cell in row:
+                            if cell.data_type == "f" or (isinstance(cell.value, str)
+                                                          and cell.value.startswith("=")):
+                                formulas.append(str(cell.value))
+                            if cell.value is not None:
+                                out.append(str(cell.value))
+    return out, formulas
+
+
+_EVIL_LABELS = _d("slack:p1", "SME pricing by market",
+                  "market,plan,price\n=cmd|' /C calc'!A0 SG,Growth,0.35% FX margin\n"
+                  "@SUM(A1) HK,Growth,0.35% FX margin\n+ID,Growth,0.4% FX margin\n"
+                  "Notes: Multi-currency accounts for Indonesian SME customers are priced at a 0.4% FX "
+                  "margin.", container="pricing", author="priya", kind="file")
+
+
+def test_pptx_embedded_workbook_has_no_formulas(tmp_path):
+    """T15 (Opus review #4): labels planted at the source as formulas reach the chart's categories
+    (python-pptx writes them with XlsxWriter ``write()``); every one is written as text."""
+    if not X.pptx_available():
+        pytest.skip("python-pptx not installed")
+    app, svc = _world(tmp_path, [_EVIL_LABELS, FEES])
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    for kind in ("chart", "table"):
+        d = _deliver(jd, rid, kind).json()
+        assert d["status"] == "ready" and "pptx" in d["exports"], (kind, d)
+        r = _export(jd, d["deliverable_id"], "pptx")
+        assert r.status_code == 200
+        assert re.fullmatch(rf'attachment; filename="walnut-{kind}-[0-9a-f]{{8}}-\d{{8}}\.pptx"',
+                            r.headers["content-disposition"])
+        assert r.headers["content-type"] == X.CONTENT_TYPES["pptx"]
+        assert r.headers["x-content-type-options"] == "nosniff"
+        strings, formulas = _pptx_strings(r.content)
+        assert formulas == []
+        for s in strings:
+            for line in s.splitlines():
+                assert not X._TRIGGER.match(line) or X._PLAIN_NUMBER.match(line.strip()), (kind, line)
+        assert "'=cmd|' /C calc'!A0 SG" in strings and "'@SUM(A1) HK" in strings
+        ex = _events(svc, "deliverable.exported")[-1]
+        assert ex.format == "pptx" and ex.bytes == len(r.content)
+        assert ex.digest == hashlib.sha256(r.content).hexdigest()
+
+
+def test_pptx_deck_is_built_from_the_checked_content_without_a_model(tmp_path):
+    """The offline deck (no model): title, the native chart with exactly the checked points, the
+    Sources slide; notes say what was checked (Opus #8), core properties are ours."""
+    if not X.pptx_available():
+        pytest.skip("python-pptx not installed")
+    import pptx
+    app, svc = _world(tmp_path)
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    d = _deliver(jd, rid, "chart").json()
+    r = _export(jd, d["deliverable_id"], "pptx")
+    assert r.status_code == 200 and len(r.content) < X.PPTX_CAP
+    prs = pptx.Presentation(io.BytesIO(r.content))
+    slides = list(prs.slides)
+    assert len(slides) == 3
+    assert slides[0].shapes.title.text == "FX margin by market"
+    chart = next(sh.chart for sh in slides[1].shapes if getattr(sh, "has_chart", False) and sh.has_chart)
+    assert list(chart.plots[0].categories) == ["SG", "HK", "ID"]
+    assert [list(s.values) for s in chart.series] == [[0.35, 0.35, 0.4]]
+    notes = slides[1].notes_slide.notes_text_frame.text
+    assert X.NOTES_CHECKED in notes and "Every number" not in notes
+    assert "SME pricing by market" in " ".join(sh.text_frame.text for sh in slides[2].shapes
+                                                  if sh.has_text_frame)
+    assert prs.core_properties.author == "Walnut DataBridge" and prs.core_properties.last_modified_by == ""
+    assert d["model"]["provider"] == "deterministic"
+    for s in SECRETS:                                      # restricted content never reaches a deck
+        assert all(s not in x for x in _pptx_strings(r.content)[0])
+
+
+def test_pptx_export_rechecks_a_revoked_source_and_records_failures(tmp_path, monkeypatch):
+    """The deck is built only after the same live re-check as the CSV; a revoked source is the one
+    404; a build failure is a 503 with ``deliverable.failed`` (stage export) and no bytes."""
+    if not X.pptx_available():
+        pytest.skip("python-pptx not installed")
+    app, svc = _world(tmp_path)
+    jd = _c(app, svc, "jdoe")
+    rid = _ask(jd)["request_id"]
+    d = _deliver(jd, rid, "table").json()
+    monkeypatch.setattr(X, "build_pptx", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("x")))
+    r = _export(jd, d["deliverable_id"], "pptx")
+    assert r.status_code == 503 and r.json() == {"error": "temporarily unavailable"}
+    f = _events(svc, "deliverable.failed")[-1]
+    assert f.stage == "export" and f.reason_code == "pptx_RuntimeError"
+    assert not [e for e in _events(svc, "deliverable.exported")]
+    monkeypatch.undo()
+    monkeypatch.setenv("IB_DELIVERABLES", "1")
+    svc.connectors["slack"].readers["slack:p1"].discard("jdoe")           # revoked at the source
+    assert _export(jd, d["deliverable_id"], "pptx").status_code == 404

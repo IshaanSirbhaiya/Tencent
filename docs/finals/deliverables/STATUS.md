@@ -93,3 +93,55 @@ The running stack IB on :8100 has this code but `IB_DELIVERABLES` unset (status 
 - The P warm-up switches the MAIN session to Leo and back (serialised with the presenter's own
   sign-ins). If nobody was signed in it signs out again at the end.
 - Store is in memory: after an IB restart, exports of old deliverables are the one 404; Regenerate.
+
+## 5. Cloud session update (30 Oct 2026, branch `final_v1.2`, Linux, offline: `IB_FORCE_OFFLINE=1`)
+
+### 5.1 P0 confirmed green
+
+`IB_FORCE_OFFLINE=1 PYTHONPATH="apps/internal_brain:packages/core:packages/harness:packages/adapter:packages/retrieval" python -m pytest apps/internal_brain/tests/test_deliverables*.py -q -p no:cacheprovider`
+→ **91 passed** before this session's changes, **95 passed** after (70 in `test_deliverables_verify.py`,
+24 in `test_deliverables.py`, 1 in `test_deliverables_eval.py`). `tests/test_act.py`: 19 passed.
+`npx tsc --noEmit`: clean (a first run hit errors in `components/user/ActSheet.tsx` while another agent
+was editing it; the final run, after that edit landed, is clean). Hy3/TokenHub is not live here: every result above is the offline path or a fake model chain.
+
+### 5.2 Opus review, mandatory items 1-5
+
+| Opus item | Code | Test(s) | Status |
+|---|---|---|---|
+| 1. Number check by span, not substring (`35%`⊂`0.35%`, sign, `20,000`⊂`120,000`, `1,812`⊂`21,812`) | `verify.py` `find_number` (raw must hold one number span whose key equals `value`; the source span must sit exactly on it, `_boundary_ok`) | `test_deliverables_verify.py::test_adversarial_points_are_dropped` (cases 1-4), `::test_number_forms_that_pass`; `test_deliverables.py::test_label_binding_and_unit_tricks_from_the_model` | Done, tested |
+| 2. Check against source lines only, never the answer's model-written sentences | `evidence.py` `build_evidence` (units from the snapshot excerpt only; answer sentences go to `context_text` as an untagged orientation block) | `test_deliverables_verify.py::test_evidence_keeps_rows_filters_metadata_and_never_uses_the_answer` (the Opus case "Indonesian SMEs pay 0.35% [C2]" must not support `ID → 0.35%`), `::test_sentence_checked_only_against_its_own_tags` | Done, tested |
+| 3. Scale, locale and unit tricks rejected; unit and currency worked out by our code, one per series and chart; strict finite numbers | `verify.py` `ambiguous_at`, `_SCALE_AFTER`, `_AMBIGUOUS`, `unit_of`, `check_chart`; `spec.py` `Number` (strict, `allow_inf_nan=False`) | `test_deliverables_verify.py::test_adversarial_points_are_dropped` (`20k`, `1.8 million`, `IDR 20.000`, `0,35%`, `20 000`, `35 bps`, `2万`, `(500)`, `0.0035`), `::test_chart_mixed_units_and_currencies_are_dropped`, `::test_value_key_rejects_non_numbers`, `::test_model_schemas_are_closed_strict_and_rectangular` | Done, tested |
+| 4. PPTX formula guard (T15; applies to P1) | `export.py` `ptext` (the CSV `guard` + XML-invalid characters removed) applied to every string `build_pptx` writes: slide text, table cells, notes, chart categories, series names, axis titles, core properties | `test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas` (formula labels planted at the source; the chart's embedded XLSX opened with openpyxl: no formula cell), `test_deliverables_verify.py::test_pptx_writer_guards_planted_hyperlink_in_categories_series_and_text` (`=HYPERLINK(...)` as category and series name), T16 eval now also exports .pptx | **Built this session**, tested. Checked that T15 fails when the guard is removed |
+| 5. Label binding (same CSV row; in prose, label before the number with no other number between; at least one real word; tokens split on non-alphanumerics) | `verify.py` `label_tokens`, `has_real_word`, `_bound_in_sentence`, CSV branch of `find_number`; `check_cell` binds a cell to its row label | `test_deliverables_verify.py::test_label_binding_csv_row_and_prose_nearest`, `::test_adversarial_points_are_dropped` (`the`, `A`, `HK` on a shared line, `Zorblax`), `::test_model_table_cells_are_bound_to_their_row` | Done, tested. 5(c) timeline dates: no timeline kind exists, so not applicable |
+
+### 5.3 P1
+
+- **Slides (.pptx): built.** `POST /ib/deliverables/export` with `format: "pptx"` for a ready table or
+  chart: a title slide, the table (native, 10 rows per slide) or a native, editable column/line chart
+  of exactly the checked points, a Sources slide (`http(s)` links only), a footer, speaker notes that
+  say what was checked (not "every number was found", Opus #8), our core properties. Built from the
+  stored copy after the same live re-check as the CSV; the title is re-checked against the remaining
+  sources (Opus #12). No model. Cap 2 MB. A build error is `deliverable.failed` (stage `export`) and
+  503. Offered only when python-pptx and XlsxWriter import (`/ib/status.deliverables.exports.pptx`);
+  `XlsxWriter==3.2.9` added to `databridge/requirements-lock.txt`. **Not** in
+  `deploy/lighthouse/requirements-ib.txt`, so the Lighthouse image offers CSV only. Web: a
+  "Download .pptx" button appears when the response lists `pptx` (the mock still lists CSV only, so the
+  mock e2e is unchanged; the live button has not been clicked in a browser in this session).
+  Tests: `test_pptx_embedded_workbook_has_no_formulas`, `test_pptx_deck_is_built_from_the_checked_content_without_a_model`,
+  `test_pptx_export_rechecks_a_revoked_source_and_records_failures`, the unit T15 test above.
+- **Summary: not built.** It would add a fourth kind to the ledger models, the web types and the
+  mock; offline it would only repeat the answer's cited sentences (Act's draft already does that), and
+  a model summary needs Hy3, which is not live here. It stays "Needs the model" in the plan.
+
+### 5.4 Docs written (targeted appends) and what is left
+
+- `docs/tencent/SECURITY.md` §15.14 (Gate 1/Gate 2, restricted ≡ non-existent, grounding wall and
+  verifier, model, exports, ledger records, kill switch, limits); `docs/finals/contracts/backend_v1.md`
+  "v4 (30 Oct): Deliverables"; `FEATURE_CATALOGUE.md` §12 (V1 P0, V2 Slides); `DECISIONS.md` D-25;
+  `rubric/ai_innovation/AI_USAGE_MAP.md` row 13 and the honest-gaps line; `rubric/demo_story/QA_BANK.md`
+  Q10 (ends "Dev, D." with the new [DELIVER] tag).
+- Web: `DeliverSheet.tsx` gains a "Download .pptx" button (shown only when `exports` lists `pptx`) and
+  `lib/i18n/deliver.ts` its EN/简体中文 label. The Playwright spec was NOT re-run: the mock never lists
+  `pptx` (unchanged), so the new button is not reachable in the mock.
+- Still open from §3: the live UI run (`deliverables.live.spec.ts`), the stage-laptop rehearsal of D then
+  R, a live Hy3 run of the model path, `PRESENTER_KEYS.md`, Q7/Q18 clauses (Fable §4).

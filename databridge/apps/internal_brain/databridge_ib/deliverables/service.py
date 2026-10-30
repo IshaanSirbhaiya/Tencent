@@ -16,8 +16,8 @@ Order of one ``create`` (PLAN §4, with review_opus.md #9-#11 and review_codex.m
    ``deliverable.created``; only then is it published to the export store and returned.
 
 ``export``: rate limit → owner + TTL lookup (one 404) → format/kind (422) → re-authorise and
-re-check against the sources as they are now → build the file from the STORED copy (never
-mutated) → LEDGER ``deliverable.exported`` → bytes.
+re-check against the sources as they are now → build the file (CSV, or .pptx when python-pptx is
+installed) from the STORED copy (never mutated) → LEDGER ``deliverable.exported`` → bytes.
 
 The store is in memory (90 min, 300 entries): it is lost on a restart, and the ledger's digest
 then proves only what was shown, not the content (rule 8; Opus review #13).
@@ -44,7 +44,7 @@ from . import build, export, prompts
 from .evidence import build_evidence, context_text
 from .model import structured
 from .spec import MODEL_FOR
-from .verify import Check
+from .verify import Check, check_short_text
 
 KINDS = ("table", "chart", "analysis")
 MODEL_KINDS = ("table", "chart", "analysis")
@@ -139,7 +139,7 @@ class DeliverableService:
         model = self.chain is not None
         return {"enabled": self.enabled, "model": model,
                 "kinds": [k for k in KINDS if model or k != "analysis"] if self.enabled else [],
-                "exports": {"csv": self.enabled, "pptx": False}}
+                "exports": {"csv": self.enabled, "pptx": self.enabled and export.pptx_available()}}
 
     # -- ledger -------------------------------------------------------------------------------
     def _append(self, event) -> None:
@@ -239,7 +239,7 @@ class DeliverableService:
                 "model": model.model_dump(mode="json") if model else None,
                 "check": check.public() if generated == "model" else Check().public(),
                 "content": content, "citations": citations,
-                "exports": ["csv"] if status == "ready" and kind in ("table", "chart") else [],
+                "exports": self._exports(status, kind),
                 "fallback": fallback, "prompt_version": prompts.PROMPT_VERSION,
                 "scope_note": SCOPE_NOTE, "as_of": now.isoformat()}
         resp = json.loads(canonical(resp))            # one private, immutable copy
@@ -264,6 +264,23 @@ class DeliverableService:
                 self._evict()
                 self._store[did] = entry
         return copy.deepcopy(resp)
+
+    @staticmethod
+    def _export_title(kind: str, title: str, evidence) -> str:
+        """The sealed title, checked again against the sources as they are now (Opus review #12):
+        fixed text stays, a source-worded title must still be in a remaining cited unit."""
+        fixed = set(build.FIXED_TITLE.values()) | {"Quoted from your sources"}
+        if title in fixed:
+            return title
+        units = [u for ev in evidence.values() for u in ev.units]
+        return title if units and check_short_text(title, units) else build.FIXED_TITLE[kind]
+
+    @staticmethod
+    def _exports(status: str, kind: str) -> list[str]:
+        """CSV for a ready table or chart; .pptx too when python-pptx is installed (P1 Slides)."""
+        if status != "ready" or kind not in ("table", "chart"):
+            return []
+        return ["csv", "pptx"] if export.pptx_available() else ["csv"]
 
     def _build(self, kind: str, chart: str, evidence, context: str, question: str):
         check = Check()
@@ -372,8 +389,19 @@ class DeliverableService:
         now = self.clock()
         tags = build.content_tags(e.kind, content)
         citations = self._citations(tags, cites, self._answer_citations(e.req_id), now.isoformat())
-        data = export.build_csv(e.kind, content, citations)
-        if len(data) > export.CSV_CAP:
+        if fmt == "pptx":
+            try:
+                title = self._export_title(e.kind, str(sealed["title"]), evidence)
+                data = export.build_pptx(e.kind, content, citations, title=title,
+                                         req_id=e.req_id, as_of=now)
+            except Exception as exc:                                # noqa: BLE001
+                self._fail(user, "export", "pptx_" + type(exc).__name__, req_id=e.req_id,
+                           deliverable_id=deliverable_id, kind=e.kind)
+                raise Unavailable("pptx") from None
+            cap = export.PPTX_CAP
+        else:
+            data, cap = export.build_csv(e.kind, content, citations), export.CSV_CAP
+        if len(data) > cap:
             self._fail(user, "export", "too_large", req_id=e.req_id,
                        deliverable_id=deliverable_id, kind=e.kind)
             raise Unavailable("too_large")

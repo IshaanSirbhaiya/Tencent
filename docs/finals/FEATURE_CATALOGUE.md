@@ -65,6 +65,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 9. [Tooling and scripts](#9-tooling-and-scripts): T1 to T10
 10. [Evidence](#10-evidence)
 11. [Demo-proof features](#11-demo-proof-features-behind-a-toggle-d-24): G1 Watch the brain grow · G2 Add a document · G3 Not in the brain yet · G4 Engine refresh · G5 The toggle
+12. [Deliverables from an answer](#12-deliverables-from-an-answer-kill-switch-d-25): V1 Table, chart, analysis (P0) · V2 Slides export (P1)
 
 ---
 
@@ -527,7 +528,7 @@ tests (Python 3.13) and the web typecheck (Node 20); and a Lighthouse deploy kit
 |---|---|---|
 | Leak evaluation | 0 leaks / 7,374; 0 / 400 differential; 0 injection hard failures / 1,152; generated 30 Oct 03:27 UTC (11:27 SGT) on the finals pipeline | [RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](../../databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Backend tests | 754 passed at `7bf3246` | `databridge/apps/internal_brain/tests/` |
-| Web e2e | 124 passed, 0 failed, 38 env-gated skips, three consecutive runs | [TEST_REPORT.md](TEST_REPORT.md) |
+| Web e2e | 124 passed, 0 failed, 38 env-gated skips, three consecutive runs; `act.spec.ts` (5), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | [TEST_REPORT.md](TEST_REPORT.md) |
 | Live QA | Every page × persona against the real backend: 32 checks, 11 bugs fixed, issues listed | [QA_LIVE.md](QA_LIVE.md) |
 | Final reviews | Five models: security, UX, claims, code | [reviews/](reviews/final_opus_security.md) ([Opus security](reviews/final_opus_security.md) · [Sonnet UX](reviews/final_sonnet_ux.md) · [Haiku claims](reviews/final_haiku_claims.md) · [Codex](reviews/final_codex.md) · [Fable](reviews/final_fable.md)) |
 | Rubric pack | Each of the 10 criteria: seen live, in the app, to read | [rubric/README.md](rubric/README.md) |
@@ -600,3 +601,32 @@ plan: [live_growth/PLAN.md](live_growth/PLAN.md).
 | Guarantees | Toggle off on the server: all five routes are the unknown-route 404, signed in or not; `/ib/status` says `demo_features`; with it on, the routes are allowlisted and need a session |
 | Tests | `test_demo_features.py` (5 toggle tests); `grow.spec.ts` "hidden by default" |
 | Screens | [grow/01-settings-demo-toggle.png](screens/grow/01-settings-demo-toggle.png) · [grow/10-after-reset.png](screens/grow/10-after-reset.png) |
+
+## 12. Deliverables from an answer (kill switch, D-25)
+
+A product feature behind a kill switch, not a demo prop: `IB_DELIVERABLES=1` (off by default in code, on
+in `scripts/demo_up.sh` and `scripts/run_local_demo.sh`; off, both routes answer the not-found 404 and
+record nothing). Security notes: `docs/tencent/SECURITY.md` §15.14; contracts:
+`docs/finals/contracts/backend_v1.md` "v4 (30 Oct): Deliverables"; plan, reviews and status:
+[deliverables/](deliverables/STATUS.md).
+
+### V1. Table, chart, analysis from an answer (P0)
+
+| | |
+|---|---|
+| What | Under a cited answer, **Turn this answer into**: Table, Chart or Analysis, in a wide sheet with `[n]` chips, one metadata line, Copy, **Download .csv**, Regenerate. A chart has value labels and a data table caption |
+| Who | The asker, for their OWN released answer, using only cited documents they can still open |
+| Where | `AnswerCard` → `DeliverSheet`; `POST /ib/deliverables`, `POST /ib/deliverables/export`; Presenter key `D` (cached warm-up on `P`) |
+| Status | **Offline (no model), tested:** Table (copied from a CSV-shaped block of a cited source, else quoted source sentences) and Chart (from a numeric source column, e.g. "FX margin by market" SG 0.35 / HK 0.35 / ID 0.4). **Analysis says "Needs the model"** without one. The model path (Hy3 or DeepSeek, task `ib_deliver`) is tested with a fake model chain only; Hy3/TokenHub was not live for this feature's cloud run |
+| Guarantees | Built on Act's context (ownership, sealed answer hash, live Gate 1 + Gate 2 on every cited document); one 404 for every not-found case; paired worlds with and without restricted content give identical outputs; every number lies exactly on a number span of its own cited source line, bound to its label, unit and currency worked out by our code (Opus review items 1-5); write-ahead `deliverable.requested/created/exported/failed` with counts and digests only; exports re-check the sources; formula guard on every CSV cell |
+| Tests | `test_deliverables_verify.py` (70, incl. T14 `::test_adversarial_points_are_dropped`, `::test_label_binding_csv_row_and_prose_nearest`, `::test_csv_formula_guard`); `test_deliverables.py` (24, incl. `::test_offline_table_chart_and_needs_model`, `::test_restricted_question_equals_a_world_without_it`, `::test_someone_elses_unknown_and_refused_are_one_404`, `::test_ledger_outage_is_503_and_nothing_happens`, `::test_bodies_carry_no_identity_and_flag_off_is_404`); `test_deliverables_eval.py::test_no_leak_or_injection_through_deliverables_and_exports` (T16); web `deliverables.spec.ts` (4, mock, axe) |
+| Screens | [deliverables/mock-1-table-dark.png](screens/deliverables/mock-1-table-dark.png) · [deliverables/mock-2-chart-dark.png](screens/deliverables/mock-2-chart-dark.png) · [deliverables/mock-3-analysis-dark.png](screens/deliverables/mock-3-analysis-dark.png) · [deliverables/mock-4-chart-light.png](screens/deliverables/mock-4-chart-light.png) (mock data; the live UI run is not done) |
+
+### V2. Slides export (.pptx, P1)
+
+| | |
+|---|---|
+| What | **Download .pptx** for a ready table or chart: title slide, the native table or an editable native chart, a Sources slide, speaker notes saying what was checked |
+| Status | Backend built and tested offline (no model needed); offered only when python-pptx and XlsxWriter are installed (not in the Lighthouse image). The web button shows when the response lists `pptx`; not yet clicked in a live browser. Summary (P1) is **not built** |
+| Guarantees | Built from the stored, re-checked content; every string in the deck and in the chart's embedded workbook passes the formula guard (Opus review #4, T15); 2 MB cap; `deliverable.exported` before the bytes |
+| Tests | `test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas`, `::test_pptx_deck_is_built_from_the_checked_content_without_a_model`, `::test_pptx_export_rechecks_a_revoked_source_and_records_failures`; `test_deliverables_verify.py::test_pptx_writer_guards_planted_hyperlink_in_categories_series_and_text`; the T16 eval exports .pptx too |

@@ -18,7 +18,7 @@ Seven guarantees, each with one test or eval that backs it. Details and limits a
 | 4 | Every answer is logged before it is returned. If the ledger is down, the answer is a 503. | `tests/test_app_routes.py::test_ledger_failure_is_503` |
 | 5 | Edits, deletions and rollbacks of the audit log are detected, and so are edited answer texts. | `tests/test_audit_tamper.py::test_edit_detected`; `tests/test_audit_verify_content.py::test_edited_answer_is_detected_without_a_reveal` |
 | 6 | A revocation in the source is honoured on the next question, even if the webhook was lost. | `tests/test_scenarios_e2e.py::test_s4_revocation_without_webhook` |
-| 7 | Text planted in a document is treated as data. The final eval run had 0 injection hard failures in 976 injection-relevant requests. | `databridge/evals/internal_brain/RESULTS.md` (section "Injection") |
+| 7 | Text planted in a document is treated as data. The final eval run (30 Oct) had 0 injection hard failures in 1,152 injection-relevant requests. | `databridge/evals/internal_brain/RESULTS.md` (section "Injection") |
 | 8 | The web proxy refuses cross-origin POSTs, non-JSON bodies and path tricks. | `databridge/apps/internal_brain_web/tests/e2e/proxy.spec.ts` |
 
 Reviewed by Codex (tracks 1-7), a CodeBuddy security review, and two Claude review rounds (Opus, Sonnet,
@@ -181,7 +181,7 @@ They are exercised by the canonical questions `INJ-q1` to `INJ-q4` (`tests/test_
 and by the leak eval's injection probes. The first eval run (RESULTS.md, before the `8b5eb57`/`d69ab97` fixes)
 recorded **0 leaks** and **6 injection hard failures**, all forged citations: a literal `[C9]` in a source bound
 to a real passage tag (an integrity failure, not a disclosure). The tag neutralisation above is the fix;
-the final run (`databridge/evals/internal_brain/RESULTS.md`, 976 injection-relevant requests) records
+the final run (`databridge/evals/internal_brain/RESULTS.md`, 1,152 injection-relevant requests) records
 **0 injection hard failures**.
 
 ## 5. Side channels
@@ -909,3 +909,104 @@ build output.
 - The engine snapshot is built from the world file, so a note added live appears in the Internal Brain's
   graph, not in the engine snapshot. The build rewrites `fixtures/enterprise/graph_rows/*.json`
   deterministically from `world.json` (byte-identical to the current rows while the world is unchanged).
+
+### 15.14 Deliverables: a table, chart or analysis from an answer's sources (`POST /ib/deliverables*`, D-25)
+
+After an answer the asker can turn it into a table, a chart or an analysis, and download a table or chart
+as `.csv` or `.pptx` (`databridge_ib/deliverables/`; contracts in `docs/finals/contracts/backend_v1.md`
+v4; plan and reviews in `docs/finals/deliverables/`). It is built on Act's action context (section
+15.11), so it reaches only documents the answer cited. Tests: `tests/test_deliverables.py`,
+`tests/test_deliverables_verify.py`, `tests/test_deliverables_eval.py`.
+
+**Gate 1 and Gate 2.** The order of one request: session (401), employee role (403), kill switch, rate
+limit (10 per person per minute; 20 exports), then ownership with no source read (`projection.owns`), then
+`deliverable.requested` is written, then `ActionService.context()` re-checks the sealed answer hash and
+runs Gate 1, a live Gate 2 and the read-through on every cited document. Only documents the person can
+open NOW become evidence; a revoked citation drops out, and when none is left the response is the same
+404 as for someone else's request, an unknown id or a refused answer
+(`test_deliverables.py::test_someone_elses_unknown_and_refused_are_one_404`,
+`::test_revoked_source_is_removed_and_export_rechecks`). After a model call the cited documents are
+authorised again; a document revoked or edited meanwhile is removed and the content re-checked. Every
+export authorises again and re-checks the stored content against the sources as they are then
+(`::test_export_after_a_source_edit_rechecks_against_the_new_version`,
+`::test_pptx_export_rechecks_a_revoked_source_and_records_failures`).
+
+**Restricted ≡ non-existent.** A restricted question, a question answered next to restricted content,
+and the same questions in a world without that content give identical deliverables and exports
+(`::test_restricted_question_equals_a_world_without_it`); the prompt holds only openable cited passages
+(`::test_rule4_prompt_holds_only_openable_cited_passages`). The "removed" counts are computed from
+permitted input only. A failed lookup and a rate-limit refusal are recorded WITHOUT a request or
+deliverable id. On export, the owner check (one 404) runs before the format check (422), so a 422 never
+tells a stranger that an id exists. Run through the leak and injection eval with real connectors, both
+export formats included: no forbidden hit, no injected statement
+(`test_deliverables_eval.py::test_no_leak_or_injection_through_deliverables_and_exports`).
+
+**The grounding wall and the verifier (`verify.py`).** Evidence is the cited documents' current text
+only: lines filtered like `extractive_answer` (metadata, URL-only and AI-addressed lines dropped), at
+most 1,200 characters per document (the `/ib/doc` excerpt size) and 12,000 in total. The answer's own
+sentences are shown to the model as an untagged orientation block and are never evidence (finals Opus
+review #2). Every value a deliverable shows has a source pointer (a `[n]` citation with document,
+version and check time) and passes the checks:
+- a number (chart point, numeric cell) must lie exactly on a number span of one source line or CSV row
+  of its own cited document, sign included, with word boundaries (`35%` in `0.35%`, `0.5%` in `-0.5%`,
+  `20,000` in `120,000` are dropped); scale words and letters (`20k`, `1.8 million`, `35 bps`, `2万`),
+  ambiguous groupings (`IDR 20.000`, `0,35`, `20 000`) and `(500)` are rejected; no unit conversion;
+- its label is bound to it: the same CSV row, or in prose every label word before the number with no
+  other number between; a label needs one real word;
+- our code works out the unit and currency (the model's is ignored); one unit and one currency per
+  series and per chart;
+- a sentence is checked against its own tags only (numbers with their unit marker, capitalised terms,
+  CJK runs, no URL, e-mail, phone, identity assertion or text addressed to an AI); titles, series names,
+  column and axis labels must consist of words in the cited lines, else fixed text is used.
+Deterministic builds (no model) pass the same checks. Tests: `test_deliverables_verify.py` (T14,
+70 tests in all, including `::test_adversarial_points_are_dropped`), `test_deliverables.py::test_model_invents_values_and_names`,
+`::test_chart_number_not_in_source_is_dropped_everywhere`. Opus items 1-5 are mapped to code and tests in
+`docs/finals/deliverables/STATUS.md` §5.2.
+
+**The model.** Offline, Table and Chart are built without a model (a table copied from a CSV-shaped block
+of a cited source, else quoted source sentences; a chart from a numeric column) and Analysis says
+"Needs the model". With a model chain configured, the model (task `ib_deliver`) returns a closed JSON
+spec (`extra="forbid"`, strict finite numbers); at most 2 model calls in flight in the process, one 30 s
+deadline per request, late results discarded (`::test_model_budget_and_global_cap`). Anything that fails
+the checks is dropped and counted; nothing passes means the deterministic build. The model never chooses
+a document, a recipient or an action. With TokenHub configured, up to 12,000 characters of the cited
+documents' current text go to it per call (more than the answer step sends).
+
+**Exports.** Built on the server from the stored, checked copy, never from anything the browser sends.
+Every CSV cell and every string written into a `.pptx` (slide text, table cells, notes, chart
+categories and series names, which python-pptx writes into the chart's embedded workbook with
+XlsxWriter `write()`) passes the formula guard: a leading `= + - @`, tab, CR, LF or full-width form,
+also after Unicode spaces, gets a `'` unless the cell is a plain number
+(`test_deliverables_verify.py::test_csv_formula_guard`, T15
+`test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas`). Links only `http(s)` from our
+citation metadata. File names from fixed parts only (`walnut-<kind>-<hex8>-<yyyymmdd>.<ext>`);
+`content-disposition`, `X-Content-Type-Options: nosniff` and `Cache-Control: no-store` are set, and the web
+proxy relays the disposition only for this route and only in that exact shape. Caps: CSV 256 KB, `.pptx`
+2 MB. `.pptx` is offered only when python-pptx and XlsxWriter are installed (not in the Lighthouse image).
+
+**Ledger records (write-ahead).** `deliverable.requested` (deliverable id, kind, whether a model is
+planned) before any live source read or model call; `deliverable.created` (status, generated by
+model/deterministic/none, model, prompt version, cited document ids and count, context length and
+SHA-256, proposed/kept/dropped counts, fallback reason, SHA-256 of the canonical response) before the
+response; `deliverable.exported` (format, bytes, SHA-256 of the file, items dropped on re-check) before
+the bytes; `deliverable.failed` (stage `lookup`, `rate`, `generate` or `export`, reason code). Never a
+title, cell, label or sentence (`::test_write_ahead_order_and_no_text_in_ledger`). A ledger failure is a
+503 and nothing is shown or exported (`::test_ledger_outage_is_503_and_nothing_happens`).
+
+**Kill switch.** `IB_DELIVERABLES=1` turns the feature on; it is off by default in code and on in
+`scripts/demo_up.sh` and `scripts/run_local_demo.sh`. The routes stay mounted; off, they answer the same
+`404 {"detail": "not found"}` as not-found and record nothing (`::test_bodies_carry_no_identity_and_flag_off_is_404`).
+The flag is global, so its state reveals nothing about any document. It is read at start-up: to turn it
+off, unset it and restart the IB. It is a kill switch, not a demo-only switch: the feature writes nothing
+to any source.
+
+**Limits.**
+- The checks prove that each value is written in a cited source line next to its label; they do not
+  prove that a comparison between two values is meaningful (two figures from different dates) or the
+  relation a sentence draws between two evidenced terms. Lowercase or non-Latin invented names are not
+  caught by the capitalised-term rule (non-Latin runs must appear verbatim).
+- The deliverable store is in memory (90 minutes, 300 entries): a restart loses it, and the ledger's
+  digest then proves what was shown, not the content.
+- The label rule fails closed for a label written after its number ("0.4% for ID").
+- Every model-path claim above is tested with a fake model chain; Hy3 has not been run against this
+  feature in the cloud session.

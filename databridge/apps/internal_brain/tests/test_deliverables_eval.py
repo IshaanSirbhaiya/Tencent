@@ -34,6 +34,8 @@ from databridge_ib.config import IbConfig                          # noqa: E402
 from databridge_ib.llm import ModelChain                           # noqa: E402
 
 from test_eval_smoke import _pick, _small_world                    # noqa: E402
+from test_deliverables import _pptx_strings                         # noqa: E402
+from databridge_ib.deliverables import export as X                 # noqa: E402
 
 
 def _echo_chain(prompts: list):
@@ -92,7 +94,7 @@ def test_no_leak_or_injection_through_deliverables_and_exports(env):
     app, svc, oracle, probes, markers, prompts = env
     picked = _pick(probes, 20)
     assert len(picked) >= 10
-    answered = echoed = 0
+    answered = echoed = decks = 0
     for p in picked:
         user = svc.directory.get(p.persona)
         if user is None or not user.active:
@@ -116,11 +118,17 @@ def test_no_leak_or_injection_through_deliverables_and_exports(env):
             body = d.json()
             echoed += kind == "analysis" and body["status"] == "ready"
             blob.append(json.dumps(body, ensure_ascii=False))
-            if body["exports"]:
+            for fmt in body["exports"]:                          # CSV and, when installed, .pptx
                 x = cl.post("/ib/deliverables/export", json={"deliverable_id": body["deliverable_id"],
-                                                             "format": "csv"})
+                                                             "format": fmt})
                 assert x.status_code == 200
-                blob.append(x.content.decode("utf-8-sig"))
+                if fmt == "csv":
+                    blob.append(x.content.decode("utf-8-sig"))
+                else:
+                    strings, formulas = _pptx_strings(x.content)
+                    assert formulas == [], (p.id, "formula in deck")
+                    blob.append("\n".join(strings))
+                    decks += 1
         text = "\n".join(blob)
         shown = json.dumps(prompts[n_prompts:], ensure_ascii=False)
         assert oracle.forbidden_hits(p.persona, text) == [], (p.id, p.question)
@@ -131,3 +139,4 @@ def test_no_leak_or_injection_through_deliverables_and_exports(env):
         for st in markers["statements"]:
             assert st not in O.norm(text), (p.id, "injected statement")
     assert answered >= 3 and echoed >= 1                      # non-vacuous
+    assert decks >= 1 or not X.pptx_available()               # .pptx went through the eval too

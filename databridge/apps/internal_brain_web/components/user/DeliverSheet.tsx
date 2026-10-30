@@ -454,10 +454,10 @@ function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Del
       toast(t('deliver.copyFailed'));
     }
   };
-  const download = async () => {
+  const download = async (format: 'csv' | 'pptx') => {
     setBusy(true);
     try {
-      const { blob, name } = await deliverApi.exportFile(d.deliverable_id, 'csv');
+      const { blob, name } = await deliverApi.exportFile(d.deliverable_id, format);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -504,8 +504,13 @@ function Ready({ response, d, onRetry, onCite }: { response: AskResponse; d: Del
           {t('deliver.copy')}
         </Button>
         {d.exports.includes('csv') ? (
-          <Button size="sm" icon={Download} onClick={() => void download()} disabled={busy} data-testid="deliver-csv">
+          <Button size="sm" icon={Download} onClick={() => void download('csv')} disabled={busy} data-testid="deliver-csv">
             {t('deliver.csv')}
+          </Button>
+        ) : null}
+        {d.exports.includes('pptx') ? (
+          <Button size="sm" icon={Download} onClick={() => void download('pptx')} disabled={busy} data-testid="deliver-pptx">
+            {t('deliver.pptx')}
           </Button>
         ) : null}
         <Button size="sm" icon={RefreshCw} onClick={onRetry} data-testid="deliver-regenerate">

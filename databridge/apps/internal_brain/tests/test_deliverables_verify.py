@@ -312,3 +312,33 @@ def test_file_names_are_fixed_parts_only():
     name = X.filename("table", 'x"\r\nSet-Cookie: a', when, "csv")
     assert X.FILENAME_RE.match(name)
     assert X.content_disposition(name) == f'attachment; filename="{name}"'
+
+
+# -- T15 at the unit level: the .pptx writer guards every string it is given ---------------------
+def test_pptx_writer_guards_planted_hyperlink_in_categories_series_and_text():
+    pytest.importorskip("pptx")
+    import io as _io
+    import openpyxl
+    from pptx import Presentation
+    planted = '=HYPERLINK("http://x.example","y")'
+    content = {"type": "bar", "x_label": "+cmd", "y_label": "@x", "unit": "percent",
+               "currency": None,
+               "series": [{"name": planted, "points": [
+                   {"x": planted, "value": 0.35, "raw": "0.35%", "tag": "C1"},
+                   {"x": " =1+1", "value": -0.5, "raw": "-0.5%", "tag": "C1"}]}]}
+    cites = [{"tag": "C1", "n": 1, "doc_id": "d", "title": "=evil title", "platform": "drive",
+              "container_name": "-x", "version": "3", "checked_at": "t",
+              "deep_link": "javascript:alert(1)"}]
+    data = X.build_pptx("chart", content, cites, title="@title", req_id="zz", as_of=datetime(2026, 10, 30))
+    prs = Presentation(_io.BytesIO(data))
+    chart = next(sh.chart for sh in prs.slides[1].shapes if sh.has_chart)
+    assert list(chart.plots[0].categories) == ["'" + planted, "' =1+1"]
+    assert chart.series[0].name == "'" + planted
+    wb = openpyxl.load_workbook(_io.BytesIO(chart.part.chart_workbook.xlsx_part.blob))
+    cells = [c for ws in wb.worksheets for r in ws.iter_rows() for c in r if c.value is not None]
+    assert not any(c.data_type == "f" or str(c.value).startswith("=") for c in cells)
+    assert prs.slides[0].shapes.title.text == "'@title"
+    texts = " ".join(sh.text_frame.text for sh in prs.slides[2].shapes if sh.has_text_frame)
+    assert "'[1] =evil title" not in texts and "javascript" not in texts      # link dropped
+    assert "request 00000000" in texts                                        # non-hex req id
+    assert X.ptext("a\x00b\x0bc") == "abc"

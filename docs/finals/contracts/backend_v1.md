@@ -727,3 +727,125 @@ so the proxy's existing `sim/<name>` rule covers them.
   a second start within 2 minutes of the last is `429 {"detail": "too many requests"}`. A start is
   ledgered write-ahead (`ingest.sync`, `detail.reason: "engine.refresh"`); a ledger failure is 503.
 - `engine-status` reads the status. The UI polls it every 2 s while `state` is `running`.
+
+# v4 (30 Oct): Deliverables from an answer (`/ib/deliverables*`, D-25)
+
+Code: `databridge_ib/deliverables/` (`routes.py`, `service.py`, `verify.py`, `evidence.py`, `build.py`,
+`export.py`, `model.py`, `spec.py`, `prompts.py`). Tests: `tests/test_deliverables.py`,
+`tests/test_deliverables_verify.py`, `tests/test_deliverables_eval.py`. Security: `docs/tencent/SECURITY.md`
+§15.14. Plan, reviews and status: `docs/finals/deliverables/`. The general rules at the top of this file
+apply (401, 403, the one 404, the one 503).
+
+**Flag.** `IB_DELIVERABLES=1` (kill switch; off by default in code, on in `scripts/demo_up.sh` and
+`scripts/run_local_demo.sh`; read at start-up, so turning it off needs an IB restart). The routes are
+always mounted. Off: both routes answer `404 {"detail": "not found"}` (the same bytes as not-found) after
+the 401/403 checks, and nothing is recorded.
+
+**`GET /ib/status`** gains:
+
+```json
+"deliverables": {"enabled": true, "model": false, "kinds": ["table", "chart"],
+                 "exports": {"csv": true, "pptx": true}}
+```
+
+`kinds` lists `analysis` only when a model chain is configured; `[]` when off. `exports.pptx` is true only
+when python-pptx and XlsxWriter are installed (not in the Lighthouse image).
+
+## Proxy allowlist (v4 deliverables)
+
+| Method | Path | Slot (compare/View-as) |
+|---|---|---|
+| POST | `/ib/deliverables` | **no** (main session only) |
+| POST | `/ib/deliverables/export` | no |
+
+One pattern: `^ib\/deliverables(\/export)?$`. For `ib/deliverables/export` with status 200 only, the
+proxy relays `content-disposition` when it matches
+`^attachment; filename="walnut-[a-z]+-[0-9a-f]{8}-\d{8}\.(pptx|csv)"$` exactly, plus `nosniff`.
+
+## Status codes (both routes)
+
+| Status | Body | When |
+|---|---|---|
+| 200 | below | |
+| 401 / 403 | | no valid session / not an employee role |
+| 404 | `{"detail": "not found"}` | ONE answer for: flag off, someone else's request, an unknown or malformed id, a refused or failed answer, an answer none of whose cited documents the person can open now, someone else's / unknown / expired deliverable (90 min), an export where nothing passes the re-check |
+| 422 | | a body with an unknown key (any identity field), a bad `kind`/`chart`/`format`; a `format` the (owned) deliverable does not offer. The owner check runs first, so a stranger gets the 404 |
+| 429 | `{"detail": "too many requests"}` | more than 10 creates or 20 exports per person per minute (recorded as `deliverable.failed`, stage `rate`, no ids) |
+| 503 | `{"error": "temporarily unavailable"}` | the ledger could not record the call (nothing shown or exported), the sources could not be checked, a file over its cap, a `.pptx` build error |
+
+## POST /ib/deliverables
+
+Request: `{"req_id": "<one of MY request ids>", "kind": "table" | "chart" | "analysis", "chart": "auto" | "bar" | "line"}`
+(`chart` optional, default `auto`, used only by the model path). Closed body (`extra="forbid"`).
+
+Response 200 (an offline chart; abridged):
+
+```json
+{
+  "deliverable_id": "9b0c…(uuid4 hex)", "req_id": "…", "kind": "chart", "status": "ready",
+  "label": "Draft for your review", "title": "FX margin by market", "generated": "deterministic",
+  "model": {"provider": "deterministic", "model": "source-chart-v1", "fallback_used": false},
+  "check": {"values_proposed": 0, "values_kept": 0, "values_dropped": 0, "items_proposed": 0,
+            "items_kept": 0, "items_dropped": 0, "names_dropped": 0},
+  "content": {"type": "bar", "drawn_as_bar": false, "x_label": "market", "y_label": "FX margin",
+              "unit": "percent", "currency": null, "from_tag": "C2",
+              "series": [{"name": "FX margin", "points": [
+                {"x": "SG", "value": 0.35, "raw": "0.35% FX margin", "tag": "C2"}, …]}]},
+  "citations": [{"tag": "C2", "n": 2, "doc_id": "drive:df-3", "platform": "drive", "kind": "file",
+                 "container": "…", "container_name": "…", "title": "…", "version": "3",
+                 "updated_at": "…", "deep_link": "…", "cited_version": "3",
+                 "changed_since_answer": false, "checked_at": "…"}],
+  "exports": ["csv", "pptx"], "fallback": "no_model", "prompt_version": "ib-deliver-2026-10-31.1",
+  "scope_note": "…", "as_of": "…"
+}
+```
+
+- `status`: `ready`; `needs_model` (Analysis with no model, or nothing the model wrote passed);
+  `insufficient` (Table or Chart: nothing in the cited sources to build one). `content` is `null` unless
+  `ready`, and `exports` is `[]`.
+- `generated`: `model`, `deterministic` or `none`. `model.model` for deterministic builds:
+  `source-table-v1` (a CSV-shaped block of a cited source, `content.source: "source_table"`),
+  `quoted-table-v1` (quoted source sentences, `content.source: "cited_facts"`), `source-chart-v1`.
+  `fallback`: `none`, `no_model`, `timeout`, `busy`, `invalid_output`, `model_error`, `nothing_passed`.
+- `content` per kind: table `{source, from_tag?, columns[], rows[][{text, tags[], numeric}], truncated}`
+  (at most 6 columns, 20 rows); chart as above (`type` `bar`/`line`; a line whose x values are not all
+  dates or periods is drawn as a bar, `drawn_as_bar: true`); analysis
+  `{sections: [{heading, sentences: [{text, tags[]}]}]}`.
+- Tags are the ANSWER's own tags; `n` is the answer's numbering. `check` counts what a MODEL proposed
+  (all zero for deterministic builds).
+- Ledger: `deliverable.requested` before the live source checks and any model call;
+  `deliverable.created` before the response.
+
+## POST /ib/deliverables/export
+
+Request: `{"deliverable_id": "<one of MY deliverables>", "format": "csv" | "pptx"}`.
+
+Response 200: the file bytes. Headers: `content-type` `text/csv; charset=utf-8` or
+`application/vnd.openxmlformats-officedocument.presentationml.presentation`;
+`content-disposition: attachment; filename="walnut-<kind>-<req_id[:8] hex, else 00000000>-<yyyymmdd>.<csv|pptx>"`;
+`x-content-type-options: nosniff`; `cache-control: no-store`.
+
+- Built on the server from the stored, checked deliverable after a live re-authorisation and re-check
+  against the sources as they are now (items whose source was revoked or changed are removed). Never
+  from anything the browser sends.
+- CSV: UTF-8 with BOM, CRLF; the table (plus a `Sources` column of `[n]` markers) or the chart's data
+  (`Series, Label, Value as written, Value, Unit, Source`), a blank line, then one row per source. Cap
+  256 KB.
+- `.pptx` (16:9): title slide, the table (10 rows per slide) or a native, editable chart, a Sources slide;
+  speaker notes list the sources and what was checked. Cap 2 MB.
+- Every cell and string passes the formula guard (leading `= + - @`, tab, CR, LF, full-width forms, also
+  after Unicode spaces, get a `'`; plain numbers such as `-0.5%` do not).
+- Ledger: `deliverable.exported` before the bytes.
+
+## Ledger event kinds (v4 deliverables)
+
+| Kind | Fields (besides `kind`, `req_id`, `event_time`, `synthetic_replay`) |
+|---|---|
+| `deliverable.requested` | `sub`, `deliverable_id`, `deliverable` (kind), `model_planned`, `policy_version` |
+| `deliverable.created` | `sub`, `deliverable_id`, `deliverable`, `status`, `generated`, `model`, `prompt_version`, `cited_docs`, `doc_ids`, `context_chars`, `context_digest` (SHA-256 of what the model was shown), `items_*`/`values_*`/`names_dropped` counts, `fallback`, `digest` (SHA-256 of the canonical JSON of the response's `deliverable_id, kind, status, title, generated, model, check, content, citations`), `policy_version` |
+| `deliverable.exported` | `sub`, `deliverable_id`, `deliverable`, `format` (`csv`/`pptx`), `bytes`, `digest` (SHA-256 of the file), `items_dropped_on_recheck` |
+| `deliverable.failed` | `sub`, `deliverable_id?`, `deliverable?`, `stage` (`lookup`/`rate`/`generate`/`export`), `reason_code` (ledger only). A failed lookup or a rate refusal has no `req_id` and no `deliverable_id` |
+
+Never a title, cell, label or sentence. They appear in `/audit/events`, the request's journey, the
+asker's receipt and `/audit/stats` (totals `deliverables_requested`, `deliverables_created`,
+`deliverables_exported`, `deliverables_failed`).
