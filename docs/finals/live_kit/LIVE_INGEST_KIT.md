@@ -12,7 +12,7 @@ Purpose: on Demo Day (Tue 3 Nov 2026) show that a new sentence or file goes into
 
 ## 0. Before you start (the morning of, and 10 minutes before going on)
 
-1. Stack up with demo features: Internal Brain (`IB_DEMO_LOGIN=1`, `IB_DEMO_FEATURES=1`, not `IB_DEPLOYED`), mock platforms, web on 3100. The `/sim/*` endpoints (add-document, upload-file, check-absent) must exist; if `/sim/add-document` answers 404 for a member, demo features are off. Do not fix this on stage.
+1. Stack up with demo features: Internal Brain (`IB_DEMO_LOGIN=1`, `IB_DEMO_FEATURES=1`, not `IB_DEPLOYED`), mock platforms, web on 3100. The `/sim/*` endpoints (add-document, upload-file, check-absent) must exist; if `/sim/add-document` or `/sim/upload-file` answers 404 for a member, one of the three switches is wrong (`IB_DEMO_FEATURES=1` and `IB_DEMO_LOGIN=1` set, `IB_DEPLOYED` unset): any one gives the same 404. Do not fix this on stage.
 2. Reset to a clean world (the Reset control, or `POST /sim/reset` as `admin.it`). Reset re-reads every source, so anything added earlier leaves the index.
 3. `python docs/finals/live_kit/check_absent.py --all` -> must end `RESULT: all checks passed`. This proves every sample is still absent and every "before" question still gets the refusal. It is read-only (it signs in with demo-login, which writes one `session.started` record per call).
 4. Rehearse the ONE sample you will use at least twice, with the reset in between.
