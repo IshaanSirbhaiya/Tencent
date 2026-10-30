@@ -42,7 +42,7 @@ for (const th of ['dark', 'light'] as const) {
     await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', "Highlighted: Jordan's card");
     await shot(page, '01-user-step1-signin', th);
     await card(page).getByTestId('tour-do-it').click();
-    await expect(page.getByTestId('tour-counter')).toContainText('Step 2 of 4');
+    await expect(page.getByTestId('tour-counter')).toContainText('Step 2 of 6');
     await expect(page.getByTestId('tour-spotlight')).toBeVisible();
     await shot(page, '02-user-step2-ask', th);
     await card(page).getByTestId('tour-do-it').click();
@@ -57,7 +57,17 @@ for (const th of ['dark', 'light'] as const) {
     await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', 'Highlighted: The cited passage');
     await shot(page, '05-user-step3-source', th);
     await card(page).getByTestId('tour-next').click();
-    await expect(page.getByTestId('tour-counter')).toContainText('Step 4 of 4');
+    // steps 4 and 5: the page beside the chat (the teammate's just-in-time view, merged on final_v1.4)
+    await expect(page.getByTestId('tour-counter')).toContainText('Step 4 of 6');
+    await card(page).getByTestId('tour-do-it').click();
+    await expect(page.locator('[data-testid="view-canvas"][data-open="true"]')).toBeVisible({ timeout: 60_000 });
+    await shot(page, '05b-user-step4-page', th);
+    await card(page).getByTestId('tour-next').click();
+    await expect(page.getByTestId('tour-counter')).toContainText('Step 5 of 6');
+    await card(page).getByTestId('tour-do-it').click();
+    await shot(page, '05c-user-step5-change', th);
+    await card(page).getByTestId('tour-next').click();
+    await expect(page.getByTestId('tour-counter')).toContainText('Step 6 of 6');
     await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', "Highlighted: Ken's two questions");
     await shot(page, '06-user-step4-ken', th);
     await card(page).getByTestId('tour-do-it').click();
