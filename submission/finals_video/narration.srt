@@ -71,8 +71,8 @@ Every sentence points at a passage she can open right now.
 Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
 
 19
-00:01:52,470 --> 00:01:55,270
-And the whole app also speaks Chinese.
+00:01:52,470 --> 00:01:56,070
+And the screens you ask from speak Chinese too.
 
 20
 00:02:04,370 --> 00:02:07,570
@@ -184,7 +184,7 @@ It built our WorkBuddy connector and the model tests, and ran a security review 
 
 47
 00:04:48,840 --> 00:04:51,240
-Every session is in the repo.
+Nine sessions, all in the repo.
 
 48
 00:04:51,890 --> 00:04:56,690
@@ -208,15 +208,15 @@ We didn't just demo it, we attacked it.
 
 53
 00:05:24,540 --> 00:05:28,540
-Five thousand nine hundred and fifty-eight adversarial requests: zero leaks.
+Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 
 54
 00:05:28,540 --> 00:05:30,940
 Four hundred paired questions: zero differences.
 
 55
-00:05:30,940 --> 00:05:37,340
-And seven hundred and fifty-four backend tests, plus a hundred and twenty-four browser tests, all passing.
+00:05:30,940 --> 00:05:38,140
+And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
 
 56
 00:05:38,990 --> 00:05:40,790

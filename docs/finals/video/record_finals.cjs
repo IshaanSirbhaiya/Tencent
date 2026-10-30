@@ -42,6 +42,12 @@ const SIZE = { width: 1536, height: 864 };
 const VIEW = SIZE;
 const QV = "Why has Velquarry Trading's account been restricted, and what should I tell the customer?";
 const QB = "Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?";
+// Facts that are not read from the live app: docs/finals/video/video_constants.json (CodeBuddy session
+// count and so on). Test counts and eval numbers are NOT kept here: they come from
+// databridge/apps/internal_brain_web/public/eval_summary.json (assemble_finals.py reads them).
+const CONST = JSON.parse(fs.readFileSync(path.join(__dirname, 'video_constants.json'), 'utf8'));
+const NUM_WORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
 const pause = (p, s) => p.waitForTimeout(s * 1000);
 
 // seeded randomness (mulberry32) so re-shoots are repeatable
@@ -331,7 +337,7 @@ const SCENES = {
     const lang = page.getByRole('button', { name: /^Language:/ });
     await click(page, lang, 0.5);
     await click(page, page.getByRole('menuitemradio', { name: '简体中文' }), 0.2);
-    mark(page, '简体中文: the whole interface, one click', 3);
+    mark(page, '简体中文: the user screens, one click', 3);
     await pause(page, 2.2);
     await click(page, page.getByRole('button', { name: /^(Language|语言):/ }), 0.5);
     await click(page, page.getByRole('menuitemradio', { name: 'English' }), 1.0);
@@ -363,7 +369,7 @@ const SCENES = {
     await slow(page, page.getByTestId('graph-legend').waitFor({ timeout: 90000 }));
     await pause(page, 1.2);
     mark(page, 'Jordan · backend engineer: everything he can open', 4);
-    await hover(page, page.getByText(/867 items|items · /).first(), 2);
+    await hover(page, page.getByText(/\d[\d,]* items|items · /).first(), 2);   // the count is whatever the world has now
     await hover(page, page.getByTestId('graph-legend'), 1.5);
     const search = page.getByTestId('graph-main-search').locator('input').or(page.getByPlaceholder(/Search titles/)).first();
     if (await search.count()) {
@@ -383,26 +389,30 @@ const SCENES = {
     await slow(page, page.waitForFunction(() => /can open\s+\d+\s+items[\s\S]*can open\s+\d+\s+items/i.test(document.body.innerText)
       && !/Checking each item/i.test(document.body.innerText), null, { timeout: 120000 }).catch(() => {}));
     await pause(page, 1.5);
-    mark(page, 'Ken, signed in separately: 24 items, no greyed-out boxes', 4.5);
+    mark(page, 'Ken, signed in separately: a small corner, no greyed-out boxes', 4.5);
     await hover(page, page.getByText(/Ken can open \d+/).first(), 2.2);
     await hover(page, page.getByText('SECOND PERSON', { exact: false }).first(), 2.5, { dx: 0.3 });
   } },
   // OPTIONAL, being built (30 Oct): Jordan posts a Slack note from /dev/graph?add=1, it appears in his
-  // graph, and he asks about it and gets it back with a citation. The selectors below are best guesses
-  // until the feature lands; if the "add" form is not there the scene fails cleanly, is saved as
+  // graph, and he asks about it and gets it back with a citation. The feature has landed (needs demo features
+  // on, D-24; it WRITES a real note into the mock Slack of the stack); if the "add" form is not there the scene fails cleanly, is saved as
   // 06b_brain_grow.FAILED.webm, and assemble_finals.py leaves the optional segment out.
   '06b_brain_grow': { who: 'jdoe', mode: 'dev', async run(page) {                       // ~28 s
     const NOTE = 'Heads-up: the ledger cutover dry run moves to Thursday 9am, owner Priya.';
     await goto(page, `${WEB}/dev/graph?add=1`, 0);
     await slow(page, page.getByTestId('graph-legend').waitFor({ timeout: 90000 }));
     await pause(page, 1.0);
-    const box = page.getByRole('dialog').getByRole('textbox').or(page.locator('[data-testid*=add] textarea, [data-testid*=add] input[type=text]')).first();
+    // the Add sheet (components/sim/AddDocumentSheet.tsx, testId graph-main-addsheet): note textarea + 'Post to Slack'
+    const box = page.getByTestId('graph-main-addsheet-text');
     if (!(await box.waitFor({ timeout: 10000 }).then(() => true, () => false))) throw new Error('the "add a Slack note" form is not in this build yet');
     mark(page, 'Jordan posts a Slack note: watch the brain grow', 4);
     await click(page, box, 0.2);
     await type(page, NOTE);
     await pause(page, 0.4);
-    await click(page, page.getByRole('button', { name: /post|add|send/i }).last(), 0);
+    await click(page, page.getByTestId('graph-main-addsheet-post'), 0);
+    await slow(page, page.getByText(/Posted to Slack/).first().waitFor({ timeout: 20000 }).catch(() => {}));
+    await pause(page, 1.2);
+    await page.keyboard.press('Escape'); await pause(page, 0.6);          // close the sheet before the mode switch
     await slow(page, page.waitForFunction(() => /cutover dry run/i.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {}));
     await pause(page, 1.2);
     mark(page, 'The new message is in his graph, checked with Slack', 4);
@@ -478,7 +488,7 @@ const SCENES = {
     await slow(page, page.getByTestId('engine-snapshot-banner').waitFor({ timeout: 60000 }));
     await pause(page, 1.2);
     mark(page, 'The Walnut engine: Company A as Jordan sees it', 4);
-    await hover(page, page.getByText(/932\s*entities/).first(), 2.2);
+    await hover(page, page.getByText(/\d[\d,]*\s*entities/).first(), 2.2);
     await click(page, page.getByTestId('engine-tab-brain'), 0);
     await slow(page, page.waitForFunction(() => /\d+ of the \d+/.test(document.querySelector('[data-testid=engine-asof-count]')?.textContent || '')
       && document.querySelector('[data-testid=engine-time-slider] input[type=range]'), null, { timeout: 60000 }).catch(() => {}));
@@ -565,7 +575,7 @@ function codebuddyHtml() {
    <li>Built the WorkBuddy connector</li>
    <li>Built the token tool and the model-chain tests</li>
    <li>Ran a security review of the gates and the audit log, and found real issues</li>
-  </ul><p class="note muted">Six CodeBuddy sessions. Every transcript is in the repo: docs/tencent/evidence/</p></div>
+  </ul><p class="note muted">${cap(NUM_WORD[CONST.codebuddy_sessions] || String(CONST.codebuddy_sessions))} CodeBuddy sessions. Every transcript is in the repo: docs/tencent/evidence/</p></div>
   <div class="shot"><img src="${img}"></div></div>
   </div></body></html>`;
 }

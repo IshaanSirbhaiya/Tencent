@@ -1,6 +1,6 @@
 # Finals demo video
 
-The new demo video for **Walnut DataBridge** (finals build, branch `final_v1.0`). It replaces the 16 Oct
+The new demo video for **Walnut DataBridge** (finals build, branch `final_v1.2`). It replaces the 16 Oct
 video (https://youtu.be/fr9wqHWsijY) and follows the same pattern: Ishaan's camera intro, then a
 narrated demo of the real app.
 
@@ -88,6 +88,8 @@ Watch `walnut_databridge_finals.mp4` once end to end. Then upload it (YouTube, u
 with the project link and description.
 
 ## Scenes (test assembly, 30 Oct)
+
+> Plan (founder, 30 Oct): the video may be longer than the first. Three cuts from the same takes: short about 6:00, main about 7:55, full about 9:15, with new scenes 17 to 20 (Act, Deliverables, Uploads, Miora) and slots for the teammates' voice, just-in-time UI and dots. See "The new timeline" in `docs/finals/video/VIDEO_PLAN.md`. The table below is what is assembled today.
 
 | Time | Scene |
 |---|---|

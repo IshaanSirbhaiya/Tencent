@@ -1,6 +1,6 @@
 # Finals demo video: script and shot list
 
-**What it is:** the new demo video for the finals build of **Walnut DataBridge** (branch `final_v1.0`). It
+**What it is:** the new demo video for the finals build of **Walnut DataBridge** (branch `final_v1.2`). It
 replaces the 16 Oct video (https://youtu.be/fr9wqHWsijY, 6:28, made from the old UI) and keeps its
 pattern: Ishaan's camera intro, then a narrated screen demo of the real app.
 
@@ -16,9 +16,10 @@ voice-over against the cue sheet, and `assemble_finals.py --voice <file>` lays i
 **How to read it:** like you're showing a friend something you built. Relaxed, not salesy. Pauses are
 fine; the picture has room for them. About 150 words a minute.
 
-**Hy3 lines.** Hy3 is wired in but not switched on yet (TokenHub activation is pending), so the app
-labels every answer "Quoted from sources (no model)". A line marked **[if Hy3 is on]** is read only after
-Hy3 has answered live in this app; otherwise read the **[otherwise]** line. Keep each marked line on one
+**Hy3 lines.** Hy3 is wired in but not live (TokenHub activation is pending; as of 30 Oct it has not
+answered live), so the app labels every answer "Quoted from sources (no model)". A line marked
+**[ONLY IF HY3 LIVE]** is read only after Hy3 has answered live in this app; otherwise read the
+**[otherwise]** line. (The assembler also still accepts the old spelling "[if Hy3 is on]".) Keep each marked line on one
 line: `assemble_finals.py` reads the script line by line. If Hy3 goes live, scenes 02, 04 and 13 must
 also be re-shot, because the answer label changes on screen.
 
@@ -80,11 +81,12 @@ the marker "Identical responses: same text, same sources".
 **On screen:** Rachel's own Ask page. She clicks her starter question about the Velquarry review. The live
 progress line, then the cited answer. She clicks a citation: the source sheet shows the platform, the
 version, "Checked live at" and the cited lines highlighted. **Esc**. Then the language menu: 简体中文, and
-back to English.
+back to English. (User screens only: Developer pages stay English, D-32, so the line must not say
+"the whole app".)
 
 > Here's Rachel's own screen. Every sentence points at a passage she can open right now. Click one,
 > and you see the exact lines, the version, and when it was checked with the source: seconds ago.
-> And the whole app also speaks Chinese.
+> And the screens you ask from speak Chinese too.
 
 ### 05 · Developer mode: one request, end to end (2:03–2:37)
 **On screen:** signed in as Maya (compliance officer). She switches to **Developer** at the top left,
@@ -157,7 +159,7 @@ file.
 CodeBuddy built.
 
 > We built this with Tencent CodeBuddy. It built our WorkBuddy connector and the model tests, and ran a
-> security review that found real issues. Every session is in the repo.
+> security review that found real issues. Nine sessions, all in the repo.
 
 ### 12 · Ask from Tencent WorkBuddy (4:51–5:08)
 **On screen:** two real WorkBuddy window captures (15 Oct): the three DataBridge connectors, then one
@@ -172,15 +174,15 @@ question through Jordan's and Ken's connectors with two different answers.
 
 > Tencent Hy3 is wired in through TokenHub, with a backup model and a safe fallback.
 > **[otherwise]** Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks.
-> **[if Hy3 is on]** The answers you saw were written by Hy3, inside exactly the same checks.
+> **[ONLY IF HY3 LIVE]** The answers you saw were written by Hy3, inside exactly the same checks.
 
 ### 14 · The proof (5:20–5:38)
 **On screen:** the app's proof slide: 0 leaks in 7,374 adversarial requests, 0 differences in 400 paired
-questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 1,131 backend + 166 browser tests.
+questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 1,131 backend + 166 browser tests (from `eval_summary.json`; 41 browser tests are skipped, so say "none failing", not "all passing").
 
-> We didn't just demo it, we attacked it. Five thousand nine hundred and fifty-eight adversarial
+> We didn't just demo it, we attacked it. Seven thousand three hundred and seventy-four adversarial
 > requests: zero leaks. Four hundred paired questions: zero differences. And one thousand one hundred and
-> thirty-one backend tests, plus a hundred and sixty-six browser tests, all passing.
+> thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
 
 ### 15 · What it's worth (5:38–5:57)
 **On screen:** the app's business slide: about US$1.3M a year (estimate), break-even about 7 minutes per

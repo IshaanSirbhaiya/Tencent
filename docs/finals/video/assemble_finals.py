@@ -56,11 +56,66 @@ CARDS, CLIPS = V / "cards", V / "clips"
 WB = REPO / "submission" / "02_workbuddy"
 INTRO = REPO / "submission" / "05_video" / "voice" / "intro_final.mp4"
 SCRIPT = REPO / "docs" / "finals" / "video" / "VIDEO_SCRIPT_FINALS.md"
+EVAL_SUMMARY = REPO / "databridge" / "apps" / "internal_brain_web" / "public" / "eval_summary.json"
+CONSTANTS = HERE / "video_constants.json"
 SILENT = V / "walnut_databridge_finals_SILENT.mp4"
 FINAL = V / "walnut_databridge_finals.mp4"
 W, H, FPS = 1920, 1080, 30
 XFADE = 0.35
 WPS = 2.5                                   # relaxed speaking pace: about 150 words a minute
+
+def facts() -> dict:
+    """The numbers the video says or shows, read from the evidence, never typed here: eval_summary.json
+    (the app's own proof slide reads the same file) and video_constants.json (CodeBuddy session count)."""
+    e = json.loads(EVAL_SUMMARY.read_text(encoding="utf-8"))
+    c = json.loads(CONSTANTS.read_text(encoding="utf-8"))
+    return {"requests": e["requests"], "leaks": e["leaks"], "pairs": e["differential"]["pairs"],
+            "mismatches": e["differential"]["mismatches"], "injection": e["injection"]["requests"],
+            "hard_failures": e["injection"]["hard_failures"], "backend": e["tests"]["backend"],
+            "e2e": e["tests"]["e2e"], "stale": bool(e.get("stale")), "codebuddy": c["codebuddy_sessions"]}
+
+
+_ONES = ("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen "
+         "sixteen seventeen eighteen nineteen").split()
+_TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+
+
+def words(n: int) -> str:
+    """British spoken form: 1131 -> 'one thousand one hundred and thirty-one'."""
+    if n < 20:
+        return _ONES[n]
+    if n < 100:
+        return _TENS[n // 10] + (f"-{_ONES[n % 10]}" if n % 10 else "")
+    if n < 1000:
+        return f"{_ONES[n // 100]} hundred" + (f" and {words(n % 100)}" if n % 100 else "")
+    return f"{words(n // 1000)} thousand" + (f" and {words(n % 1000)}" if n % 1000 and n % 1000 < 100 else
+                                              f" {words(n % 1000)}" if n % 1000 else "")
+
+
+def norm(text: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", text.lower().replace("-", " ")).split())
+
+
+def check_script_numbers() -> list[str]:
+    """Problems between what scenes 11 and 14 SAY (VIDEO_SCRIPT_FINALS.md) and the evidence. [] = fine."""
+    f, bad, text = facts(), [], norm(SCRIPT.read_text(encoding="utf-8"))
+    if f["stale"]:
+        bad.append("eval_summary.json says stale: true; re-run the evals before recording")
+    if (f["leaks"], f["mismatches"], f["hard_failures"]) != (0, 0, 0):
+        bad.append(f"the evidence is not 'zero': leaks {f['leaks']}, mismatches {f['mismatches']}, "
+                   f"hard failures {f['hard_failures']}; the script says zero")
+    for key, what in (("requests", "adversarial requests"), ("pairs", "paired questions"),
+                      ("backend", "backend tests"), ("e2e", "browser tests")):
+        w = norm(words(f[key]))
+        if w not in text and not (w.startswith("one hundred") and "a" + w[3:] in text):   # "a hundred and ..."
+            bad.append(f"the script never says '{words(f[key])}' ({f[key]:,} {what} in eval_summary.json)")
+    if not any(norm(words(f["codebuddy"])) + w in text for w in (" codebuddy", " sessions")):
+        bad.append(f"the script never says '{words(f['codebuddy'])}' CodeBuddy sessions")
+    for stale in ("5 958", "5958", "754", "one hundred and twenty four", "nine hundred and seventy six", "six codebuddy"):
+        if stale in text:
+            bad.append(f"stale number or wording in the script: '{stale}'")
+    return bad
+
 
 # (kind, file, target seconds, label, extra). The label's first word is the VIDEO_SCRIPT_FINALS.md scene
 # number. extra: {"optional": True} leaves a missing segment out; {"pills": [(at, seconds, text)]} puts
@@ -86,10 +141,15 @@ SEGMENTS = [
      {"pills": [(1.0, 5.0, "One question, Jordan's and Ken's connectors: two answers")]}),
     ("clip", "13_hy3_status.webm", 15, "13 Tencent Hy3", {}),
     ("card", "14_proof.png", 18, "14 The proof",
-     {"pills": [(9.5, 7.0, "Plus 1,131 backend tests and 166 browser tests, all passing")]}),
+     {"pills": [(9.5, 7.0, "PROOF_PILL")]}),
     ("card", "15_business.png", 19, "15 What it's worth", {}),
     ("card", "16_close.png", 11, "16 Close", {}),
 ]
+
+
+def proof_pill() -> str:
+    f = facts()
+    return f"Plus {f['backend']:,} backend and {f['e2e']:,} browser tests passing, none failing"
 
 
 def run(cmd: list[str]) -> str:
@@ -312,7 +372,11 @@ def self_test() -> int:
             assert "unreadable" in str(e), e
     finally:
         shutil.rmtree(d, ignore_errors=True)
-    print(f"self-test ok: {len(cases)} bad takes refused, the good take accepted")
+    problems = check_script_numbers()                                  # the spoken numbers vs eval_summary.json
+    assert not problems, "script vs evidence: " + "; ".join(problems)
+    assert words(1131) == "one thousand one hundred and thirty-one" and words(7374) ==         "seven thousand three hundred and seventy-four" and words(166) == "one hundred and sixty-six"
+    print(f"self-test ok: {len(cases)} bad takes refused, the good take accepted; "
+          f"the script's numbers match eval_summary.json ({proof_pill()})")
     return 0
 
 
@@ -353,7 +417,7 @@ def clip(src: Path, target: float, out: Path, work: Path, raw: list[dict]) -> tu
 # ---- narration: cue sheet and subtitles -------------------------------------------------------
 def scenes_from_script(hy3: bool) -> dict[str, list[str]]:
     """Narration per scene from VIDEO_SCRIPT_FINALS.md ('### NN · Title' then '> ' lines), one entry per
-    sentence. '[if Hy3 is on]' / '[otherwise]' lines are picked by --hy3."""
+    sentence. '[ONLY IF HY3 LIVE]' (old spelling '[if Hy3 is on]') / '[otherwise]' lines are picked by --hy3."""
     out: dict[str, list[str]] = {}
     cur = None
     for line in SCRIPT.read_text(encoding="utf-8").splitlines():
@@ -366,7 +430,7 @@ def scenes_from_script(hy3: bool) -> dict[str, list[str]]:
             cur = None
         if cur and line.startswith(">"):
             text = line[1:].strip()
-            if "[if Hy3 is on]" in text and not hy3:
+            if ("[ONLY IF HY3 LIVE]" in text or "[if Hy3 is on]" in text) and not hy3:
                 continue
             if "[otherwise]" in text and hy3:
                 continue
@@ -399,6 +463,8 @@ def stamp(sec: float, srt: bool = True) -> str:
 
 def write_cues(timeline: list[dict], hy3: bool) -> list[dict]:
     """narration_cues.md and narration.srt from the script and the real timeline; returns the cues."""
+    for problem in check_script_numbers():
+        print("TRUTH CHECK:", problem)
     lines, spans = scenes_from_script(hy3), scene_spans(timeline)
     total = timeline[-1]["end"] if timeline else 0
     srt, cues, warn, n = [], [], [], 1
@@ -549,7 +615,8 @@ def main() -> int:
             length, note = clip(src, secs, out, work, take[1])
             parts.append((out, length, label, note))
         else:
-            still(src, secs, out, work, extra.get("pills", ()))
+            still(src, secs, out, work, [(a, d, proof_pill() if t == "PROOF_PILL" else t)
+                                         for a, d, t in extra.get("pills", ())])
             parts.append((out, float(secs), label, kind))
 
     # join the segments with short cross-fades

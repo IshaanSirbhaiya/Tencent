@@ -33,7 +33,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **1:38** Here's Rachel's own screen.
 - **1:40** Every sentence points at a passage she can open right now.
 - **1:44** Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
-- **1:52** And the whole app also speaks Chinese.
+- **1:52** And the screens you ask from speak Chinese too.
 
 ## 2:03–2:37 · 05 Developer mode: the journey
 
@@ -82,7 +82,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 
 - **4:39** We built this with Tencent CodeBuddy.
 - **4:41** It built our WorkBuddy connector and the model tests, and ran a security review that found real issues.
-- **4:48** Every session is in the repo.
+- **4:48** Nine sessions, all in the repo.
 
 ## 4:51–5:08 · 12 WorkBuddy: the connectors
 
@@ -97,9 +97,9 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 ## 5:20–5:38 · 14 The proof
 
 - **5:21** We didn't just demo it, we attacked it.
-- **5:24** Five thousand nine hundred and fifty-eight adversarial requests: zero leaks.
+- **5:24** Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 - **5:28** Four hundred paired questions: zero differences.
-- **5:30** And seven hundred and fifty-four backend tests, plus a hundred and twenty-four browser tests, all passing.
+- **5:30** And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
 
 ## 5:38–5:57 · 15 What it's worth
 

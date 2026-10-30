@@ -1,0 +1,6 @@
+{
+ "_note": "Facts the video needs that are not in eval_summary.json. Test counts and eval numbers are read from databridge/apps/internal_brain_web/public/eval_summary.json, never typed here.",
+ "codebuddy_sessions": 9,
+ "old_video_seconds": 388,
+ "old_video_label": "6:28 (intro 0:32 + demo 5:56)"
+}
