@@ -1,12 +1,14 @@
 'use client';
-import { ArrowUp, Info, Lock, RefreshCw, TriangleAlert } from 'lucide-react';
+import { ArrowUp, Info, Lock, Mic, RefreshCw, Square, TriangleAlert } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { PlatformIcon } from '@/components/PlatformIcon';
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { cn } from '@/lib/cn';
-import { useMessages } from '@/lib/i18n';
+import { useLang, useMessages } from '@/lib/i18n';
 import { userMessages } from '@/lib/i18n/user';
+import { DICTATION_LANG, voiceMessages } from '@/lib/i18n/voice';
 import { inferPlatforms } from './answerText';
+import { useDictation } from './useDictation';
 
 export const MAX_QUESTION = 2000;
 const SHOW_COUNT_FROM = 1600;
@@ -24,7 +26,16 @@ export const Composer = forwardRef<
   { value: string; onChange: (v: string) => void; onSubmit: () => void; busy: boolean; placeholder: string; size?: 'lg' | 'md'; autoFocus?: boolean }
 >(function Composer({ value, onChange, onSubmit, busy, placeholder, size = 'lg', autoFocus }, ref) {
   const t = useMessages(userMessages);
+  const tv = useMessages(voiceMessages);
+  const { lang } = useLang();
   const box = useRef<HTMLTextAreaElement>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const dict = useDictation({
+    lang: DICTATION_LANG[lang] ?? DICTATION_LANG.en,
+    getValue: () => valueRef.current,
+    onText: (v) => onChange(v.slice(0, MAX_QUESTION)),
+  });
   useImperativeHandle(ref, () => ({ focus: () => box.current?.focus() }), []);
 
   // Grow with the text, up to a limit; then scroll.
@@ -60,6 +71,11 @@ export const Composer = forwardRef<
         autoFocus={autoFocus}
         onChange={(e) => onChange(e.target.value.slice(0, MAX_QUESTION))}
         onKeyDown={(e) => {
+          if (e.key === 'Escape' && dict.listening) {
+            e.preventDefault();
+            dict.stop();
+            return;
+          }
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             if (canSend) onSubmit();
@@ -93,6 +109,33 @@ export const Composer = forwardRef<
               </>
             ) : null}
           </p>
+          {dict.supported ? (
+            <button
+              type="button"
+              data-testid="dictate"
+              aria-pressed={dict.listening}
+              aria-label={dict.listening ? tv('voice.stop') : tv('voice.start')}
+              title={dict.listening ? tv('voice.stop') : tv('voice.start')}
+              aria-describedby="dictation-note"
+              onClick={dict.toggle}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && dict.listening) {
+                  e.preventDefault();
+                  dict.stop();
+                } else if (e.key === ' ') {
+                  // Space toggles here; preventDefault also stops the presenter's Space (advance) key.
+                  e.preventDefault();
+                  dict.toggle();
+                }
+              }}
+              className={cn(
+                'inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors duration-fast focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+                dict.listening ? 'border-focus bg-accent-solid/10 text-fg' : 'border-line bg-surface text-muted hover:border-line-strong hover:text-fg',
+              )}
+            >
+              {dict.listening ? <Square aria-hidden className="h-3.5 w-3.5 fill-current" /> : <Mic aria-hidden className="h-4 w-4" />}
+            </button>
+          ) : null}
           <button
             type="submit"
             aria-label={t('ask.send')}
@@ -105,6 +148,22 @@ export const Composer = forwardRef<
           </button>
         </div>
       </div>
+      {dict.supported ? (
+        <p id="dictation-note" className="mt-2 pl-1.5 text-caption text-subtle">
+          {tv('voice.note')}
+        </p>
+      ) : null}
+      <p role="status" aria-live="polite" data-testid="dictation-status" className={dict.state === 'idle' ? 'sr-only' : 'mt-1 pl-1.5 text-caption text-muted'}>
+        {dict.state === 'listening'
+          ? tv('voice.listening')
+          : dict.state === 'stopped'
+            ? tv('voice.stopped')
+            : dict.state === 'denied'
+              ? tv('voice.denied')
+              : dict.state === 'error'
+                ? tv('voice.error')
+                : ''}
+      </p>
     </form>
   );
 });
