@@ -62,7 +62,7 @@ Verdict: append-only. Kept, not restored.
 | All 6 manifest P2 pairs (incl. 3 new WP pairs) | byte-identical |
 | Live-ingestion kit (12 samples): proof phrase absent; before-question, Ken and outsider refused | 37 of 37 checks pass |
 | Full leak eval (`IB_FORCE_OFFLINE=1 python -m evals.internal_brain.run`) | 0 leaks in 7,374 requests (3,687 probes × 2); 95% UB 0.0814% per path; 0 of 400 P2 pairs differ; control 0; injection 0 hard failures in 1,152; utility 100% both paths; canaries valid; 14 quality findings (same 7 ids × 2 as before) |
-| Full IB suite | Previous run on this world (before the title change and the narrate fix): 891 passed, 3 failed, all in the untracked `test_uploads.py` (another session's uncommitted upload work; not world related). Final re-run was in progress at checkpoint (hard stop): no failures up to ~92%; summary line not reached |
+| Full IB suite | Previous run on this world (before the title change and the narrate fix): 891 passed, 3 failed, all in the untracked `test_uploads.py` (another session's uncommitted upload work; not world related). Final re-run on the final state (after the checkpoint): **1040 passed, 0 failed** (18 min 41 s) |
 
 ## 4. New counts
 
@@ -73,10 +73,9 @@ indexed; 562 readable by every member); **72 planted facts** (23 new `WP-*`); **
 
 ## 5. Left to do (exact next steps)
 
-1. Re-run the full IB suite on the final state and record the count:
-   `cd databridge; PYTHONPATH="apps/internal_brain;packages/core;packages/harness;packages/adapter;packages/retrieval" .venv/Scripts/python -m pytest apps/internal_brain/tests -q -p no:cacheprovider`.
-   If only `test_uploads.py` fails, check it against the uploads owner's work, not the world.
-2. Update "754 backend tests" in `STATUS.md` §2 and `FEATURE_CATALOGUE.md` (Numbers row) with that count.
+1. Done: the full IB suite on the final state passed (1040 passed, 0 failed).
+2. Update "754 backend tests" in `STATUS.md` §2 and `FEATURE_CATALOGUE.md` (Numbers row) to 1040, noting
+   that the count includes uncommitted test files from other workstreams.
 3. Coordinator: restart the shared stack with `--fresh` (the running stack has the old index), then rerun
    `docs/finals/live_kit/check_absent.py --all` over HTTP to refresh `ABSENCE_PROOF.txt`.
 4. Rebuild the original-Walnut graph DB if it is used: `python scripts/build_enterprise_graph.py`.
