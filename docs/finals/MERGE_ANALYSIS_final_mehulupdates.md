@@ -1,13 +1,14 @@
 # Merge analysis: `final_mehulupdates` into `final_v1.4`
 
-Written Fri 30 Oct 2026. Status: **WIP, not verified, blocked** (see §5).
+Written Fri 30 Oct 2026. Status: **WIP, not verified.** The `onboarding.py` blocker (§5) was resolved upstream
+by `e740215` (merged in `e47069a`); the suites have not been run on the merged tree.
 
 | Item | Value |
 |---|---|
 | Source branch | `origin/final_mehulupdates`, one commit `980b17b` (author: the teammate, 30 Oct 18:31 +0800) |
 | Merge base | `1076517` (docs: verified test counts everywhere ...) |
 | Target | `final_v1.4` (pushed as `final_v1.4-wip`) |
-| Merge commit | `cddd878` "merge origin/final_mehulupdates (980b17b) into final_v1.4: WIP, NOT VERIFIED" |
+| Merge commits | `cddd878` "merge origin/final_mehulupdates (980b17b) into final_v1.4: WIP, NOT VERIFIED"; `e47069a` merges the follow-up `e740215` (drops the `onboarding.py` import) |
 | Plan it deviates from | `docs/finals/MERGE_PLAN.md` put the just-in-time UI on `final_v1.5`, after voice on `final_v1.4`. Voice has not arrived, so the JIT branch went first, onto `final_v1.4`. |
 
 Line numbers below are in the merge commit `cddd878` unless marked "working tree". Paths under
@@ -27,8 +28,8 @@ Source: `git show --stat 980b17b` and its commit message.
    words), `composer.py` (model-composed page, spend cap, rate limits), `pagespec.py`, `pagecheck.py` (every
    value checked against its cited source; drops are counted), `blocks.py`, `a2ui.py` (A2UI v0.9 messages),
    `service.py`, `routes.py`, `prompts.py`, `spec.py`.
-3. **Extra documents for a page.** Up to `MAX_EXTRA = 12` more of the asker's own documents
-   (`views/service.py:61`), each through Gate 1 and the live Gate 2 with read-through (`views/service.py:242-263`).
+3. **Extra documents for a page.** Up to `MAX_EXTRA = 12` more of the asker's own documents, only when the
+   model composer is on (after `e740215`) (`views/service.py:61`), each through Gate 1 and the live Gate 2 with read-through (`views/service.py:242-263`).
 4. **Change this page** in plain words, in the canvas box or as a short chat request ("make the table black"):
    the page is rebuilt (`app/(user)/page.tsx`, `isPageEdit`; `ViewCanvas.tsx`, `data-testid="view-change"`).
 5. **Model-written chat answers** through the existing grounding wall when Hy3 is not live
@@ -83,24 +84,25 @@ Source: `databridge/scripts/merge_precheck.py` categories (`MERGE_PLAN.md` §1, 
    `DECISIONS.md`; (b) replace the SDK with plain HTTP calls in app code, as `llm.py` does; (c) remove the page
    composer and keep the rules planner only. Nothing was changed for this point in the merge.
 
-## 5. Blocker: `databridge_ib/onboarding.py` is missing
+## 5. Blocker: `databridge_ib/onboarding.py` was missing (resolved upstream)
 
-1. `views/service.py:52` imports `from ..onboarding import in_project, project_topic`; the module is not in
-   `980b17b`. Without it `databridge_ib.views` cannot import, so the IB does not start with the branch.
-2. For local work only, a stub exists in the working tree (`onboarding.py` line 1: "LOCAL STUB (never
-   committed)"), excluded through `.git/info/exclude`. It is not in any commit and must not be pushed.
-3. Needed from the teammate: the real `onboarding.py` (and its tests, if any). Until then the merge stays WIP
-   and no test count from this branch is quoted.
+1. In `980b17b`, `views/service.py:52` imported `from ..onboarding import in_project, project_topic`; the module
+   was not in the commit, so `databridge_ib.views` could not import and the IB did not start on a clean checkout.
+2. A local stub was used meanwhile (excluded through `.git/info/exclude`, never committed); it is gone now.
+3. The teammate's `e740215` ("fix(views): drop the import of onboarding.py") removes the import; it is merged into
+   `final_v1.4` as `e47069a`. Effect stated in that commit: pages widen their evidence (the up to 12 extra
+   documents) only when the model composer is on, which is off by default.
+4. Still open: the suites have not been run on the merged tree (§8).
 
 ## 6. The 4-seat review: findings and dispositions
 
-Four reviewers read the merged tree on 30 Oct. "In progress" = being fixed by the other agent in the working tree
-at the time of writing (uncommitted); it is not verified until the suites run.
+Four reviewers read the merged tree on 30 Oct. "In progress" = being fixed by the other agent at the time of
+writing (uncommitted); "Fixed" = committed. Neither is verified until the suites run.
 
 | # | Finding | Where | Disposition |
 |---|---|---|---|
-| 1 | The third-party model is on whenever a key is set (`IB_CLAUDE` defaults to "1") and is not stopped by the forced-offline switch | `claude.py:95`, `views/composer.py:206`, `scripts/demo_up.sh` | In progress: opt-in only (`IB_CLAUDE=1` plus a key) and never when the IB is forced offline (working tree `views/composer.py:50-51`, `claude.py:8`) |
-| 2 | User-facing labels can name the provider | web strings and status labels | In progress: neutral wording ("an AI model") |
+| 1 | The third-party model is on whenever a key is set (`IB_CLAUDE` defaults to "1") and is not stopped by the forced-offline switch | `claude.py:95`, `views/composer.py:206`, `scripts/demo_up.sh` | Fixed, not yet verified: opt-in only (`IB_CLAUDE=1` plus a key), never when forced offline (`8b16513`; `views/composer.py:50-51`) |
+| 2 | User-facing labels can name the provider | web strings and status labels | Fixed, not yet verified: neutral labels in English and 简体中文 (`0726bb1`) |
 | 3 | PreflightBoard says "Model now: Tencent Hunyuan live" whenever `models.active` is true, which includes the stand-in model | `components/preflight/PreflightBoard.tsx:128-132` | In progress: a label that never claims Hy3 for another model |
 | 4 | Extra documents read for a page and `/ib/rewrite` calls have no write-ahead record | `views/service.py:242-263`, `views/routes.py` | In progress: write-ahead records (no request text) |
 | 5 | Page builds are recorded as `deliverable.*` events with `deliverable="view"`, so they mix with the Deliverables rows in the stats | analytics stats | In progress: views counted in their own rows |
@@ -114,22 +116,21 @@ at the time of writing (uncommitted); it is not verified until the suites run.
 
 | # | Rule | State in this merge | Evidence |
 |---|---|---|---|
-| 1 | Two gates before any model; fail closed | Holds for pages: extra documents only from the permitted set, each through Gate 1 and live Gate 2 | `views/service.py:242-263`; `test_views_composer.py::test_restricted_documents_never_reach_claude_or_the_page` |
+| 1 | Two gates before any model; fail closed | Holds for pages: extra documents (composer on only) come from the permitted set, each through Gate 1 and live Gate 2 | `views/service.py:242-263`; `test_views_composer.py::test_restricted_documents_never_reach_claude_or_the_page` |
 | 2 | Restricted looks identical to non-existent (one 404) | Holds in the tests | `test_views.py::test_someone_elses_unknown_and_refused_are_one_404`, `::test_restricted_question_equals_a_world_without_it` |
 | 3 | Write-ahead ledger; no ledger, no answer | Holds for page builds; gaps for extra documents and `/ib/rewrite` (§6 row 4, in progress) | `test_views.py::test_write_ahead_order_and_no_text_in_ledger`, `::test_ledger_outage_is_503_and_nothing_is_shown`; `test_views_composer.py::test_ledger_down_before_claude_means_no_call` |
 | 4 | Every value grounded in a cited source | Holds for values; label hole in progress (§6 row 6) | `views/pagecheck.py` docstring; `test_views.py::test_model_invents_values_names_and_headings` |
 | 5 | `packages/**` untouched | Holds (0 files) | §2 row 3 |
 | 6 | No vendor SDK outside `packages/harness` | **Exception pending the founder** | §4 |
 | 7 | No secrets in the repo | Holds | §2 row 1 |
-| 8 | User-facing text never names the model provider; the stand-in model is off by default | In progress (§6 rows 1 to 3) | working tree `views/composer.py:50-51` |
+| 8 | User-facing text never names the model provider; the stand-in model is off by default | Rows 1 and 2 fixed (`8b16513`, `0726bb1`), row 3 in progress (§6) | `views/composer.py:50-51` |
 | 9 | Never claim Hy3 answered; never claim more than the tests prove | No test count from this branch is quoted as ours until the suites run on the merged tree | §1 item 9; §5 |
 | 10 | User and Developer tours separate (D-36) | Holds: the new steps are in the User tour only and link to nothing in Developer mode | `components/tour/steps.ts` |
 
 ## 8. Next steps
 
-1. Teammate: push `databridge_ib/onboarding.py` (§5).
-2. Founder: decide §4 (a, b or c).
-3. Land the §6 fixes, then run `pytest` for `databridge/apps/internal_brain`, the web e2e suites
+1. Founder: decide §4 (a, b or c).
+2. Land the §6 fixes, then run `pytest` for `databridge/apps/internal_brain`, the web e2e suites
    (including `tour.spec.ts`, `tour-screens.spec.ts`, `views.spec.ts`, `act.spec.ts`, `deliverables.spec.ts`,
    `a11y.spec.ts`) and the leak eval, and record the counts in `docs/finals/TEST_REPORT.md`.
-4. Only then mark `final_v1.4` verified and use QA_BANK Q49 to Q51 and video slot S2.
+3. Only then mark `final_v1.4` verified and use QA_BANK Q49 to Q51 and video slot S2.
