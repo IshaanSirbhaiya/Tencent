@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 from databridge_ib import auth as authmod
 from databridge_ib import authz as authzmod
 from databridge_ib import galaxy as galaxymod
+from databridge_ib import graph as graphmod
 from databridge_ib.app import Services, create_app
 from databridge_ib.config import IbConfig
 
@@ -73,6 +74,13 @@ def _galaxy(c, **params):
     body = r.json()
     assert set(body) == {"overview", "map"}
     return body
+
+
+def _plain_map(m: dict) -> dict:
+    """The galaxy's map body without its one extra field (``complete``): the ``GET /ib/map`` body."""
+    m = dict(m)
+    assert isinstance(m.pop("complete"), bool)
+    return m
 
 
 def _map_ids(m: dict) -> set[str]:
@@ -127,7 +135,8 @@ def test_galaxy_equals_overview_and_map_with_one_check_per_document(world, tmp_p
     mp = c.get("/ib/map")
     assert over.status_code == mp.status_code == 200
     assert _strip(gal["overview"]) == _strip(over.json())
-    assert _strip(gal["map"]) == _strip(mp.json())
+    assert _strip(_plain_map(gal["map"])) == _strip(mp.json())
+    assert gal["map"]["complete"] is True
     assert gal["overview"]["sub"] == gal["map"]["sub"] == sub
     assert gal["overview"]["mode"] == "overview" and gal["overview"]["complete"] is True
     if sub == WIDEST:
@@ -145,6 +154,11 @@ def test_galaxy_needs_an_employee_and_a_valid_limit(world, tmp_path):
     finally:
         users[GUEST] = saved
     assert TestClient(app).get("/ib/galaxy").status_code == 401
+    forged = TestClient(app, headers={"Authorization": "Bearer not-a-token"})
+    assert forged.get("/ib/galaxy").status_code == 401
+    other_key = authmod.mint("x" * 32, CONTRACTOR, ["employee"])   # signed with the wrong key
+    assert TestClient(app, headers={"Authorization": f"Bearer {other_key}"}).get(
+        "/ib/galaxy").status_code == 401
     c = _as(app, svc, GUEST)
     for bad in (0, 301, "x"):
         assert c.get("/ib/galaxy", params={"limit": bad}).status_code == 422
@@ -160,7 +174,7 @@ def test_both_view_events_are_appended_before_the_response(world, tmp_path):
     g = next(e for e in svc.ledger.events if e.kind == "graph.viewed")
     m = next(e for e in svc.ledger.events if e.kind == "map.viewed")
     assert g.sub == m.sub == CONTRACTOR and g.mode == "overview" and g.outcome == "ok"
-    assert g.docs_checked == len(_readable(world, CONTRACTOR))
+    assert g.docs_checked == min(len(_readable(world, CONTRACTOR)), graphmod.MAX_CHECKS_OVERVIEW)
     assert g.nodes_returned == len(gal["overview"]["nodes"])
     assert g.edges_returned == len(gal["overview"]["edges"])
     assert m.docs_listed == gal["map"]["totals"]["items"]
@@ -302,6 +316,11 @@ def test_galaxy_is_identical_with_and_without_restricted_docs(tmp_path, sub):
     assert _map_ids(ga["map"])                                  # the view is not trivially empty
     for part in ("overview", "map"):
         assert _strip(ga[part]) == _strip(gb[part]), part
+    restricted = {d for d in _P2_DOCS if sub not in _P2_READERS[d]}
+    assert restricted and restricted <= set(sa.index.doc_ids())
+    assert not (restricted & {n["id"] for n in ga["overview"]["nodes"]})
+    assert not (restricted & {x for e in ga["overview"]["edges"] for x in (e["source"], e["target"])})
+    assert not (restricted & _map_ids(ga["map"]))
     text = json.dumps(ga)
     for s in _P2_SECRETS:
         assert s not in text
@@ -320,15 +339,16 @@ def test_undecided_documents_make_the_overview_incomplete_and_leave_the_map(worl
         ids = list(doc_ids)
         late = set(ids[: max(1, len(ids) // 2)])
         held.update(late)
-        ok, n = real(user, [d for d in ids if d not in late], **kw)
+        ok, _ = real(user, [d for d in ids if d not in late], **kw)
         if kw.get("undecided") is not None:
             kw["undecided"].update(late)
-        return ok, n
+        return ok, len(ids)             # like authorize: every id handed in, timeouts included
     monkeypatch.setattr(authzmod, "authorize", partial)
     app, svc = _app(world, tmp_path)
     gal = _galaxy(_as(app, svc, CONTRACTOR))
     over, mp = gal["overview"], gal["map"]
-    assert held and over["complete"] is False
+    assert held and over["complete"] is False and mp["complete"] is False
+    assert "undecided" not in json.dumps(mp)                      # a flag, never a count
     ids = _map_ids(mp)
     assert ids and not (held & ids)
     assert mp["totals"]["items"] == len(ids)
@@ -340,7 +360,8 @@ def test_undecided_documents_make_the_overview_incomplete_and_leave_the_map(worl
             if nid in nodes:
                 assert nodes[nid]["count"] is None and nodes[nid]["degree_hidden_safe"] is None, nid
     g = next(e for e in svc.ledger.events if e.kind == "graph.viewed")
-    assert g.docs_checked == len(_readable(world, CONTRACTOR)) - len(held)
+    # GET /ib/graph's meaning: every id handed to authorize (the undecided ones too), up to the cap
+    assert g.docs_checked == min(len(_readable(world, CONTRACTOR)), graphmod.MAX_CHECKS_OVERVIEW)
 
 
 def test_an_expired_deadline_shows_nothing_and_no_exact_count(world, tmp_path, monkeypatch):
@@ -352,5 +373,68 @@ def test_an_expired_deadline_shows_nothing_and_no_exact_count(world, tmp_path, m
     assert count.total() == 0
     assert gal["overview"]["complete"] is False and gal["overview"]["nodes"] == []
     assert gal["map"]["totals"] == {"items": 0, "containers": 0, "platforms": 0}
+    assert gal["map"]["complete"] is False
     g = next(e for e in svc.ledger.events if e.kind == "graph.viewed")
-    assert g.docs_checked == 0                                  # nothing was decided live
+    # handed to authorize (which then decided none of them in time), as GET /ib/graph counts them
+    assert g.docs_checked == min(len(_readable(world, CONTRACTOR)), graphmod.MAX_CHECKS_OVERVIEW)
+
+
+def test_the_galaxy_uses_its_own_pool_and_at_least_the_maps_budget():
+    from databridge_ib import knowledge_map
+    assert galaxymod.GALAXY_CHECK_TIMEOUT_S >= knowledge_map.MAP_CHECK_TIMEOUT_S
+    assert galaxymod.GALAXY_POOL is not knowledge_map._MAP_POOL
+    assert galaxymod.GALAXY_POOL is not authzmod.VIEW_POOL
+    assert galaxymod.GALAXY_POOL._max_workers == 14
+
+
+# ---- isolation and parameters ----------------------------------------------------------------------
+def test_two_people_one_after_the_other_on_the_same_app_carry_nothing_over(world, tmp_path):
+    """The widest persona, then the guest, then the widest again, on ONE app: each galaxy equals
+    that person's galaxy on a fresh app, and the guest sees nothing only the widest can open."""
+    app, svc = _app(world, tmp_path / "shared")
+    first = _galaxy(_as(app, svc, WIDEST))
+    second = _galaxy(_as(app, svc, GUEST))
+    again = _galaxy(_as(app, svc, WIDEST))
+    fresh_app, fresh_svc = _app(world, tmp_path / "fresh")
+    alone = _galaxy(_as(fresh_app, fresh_svc, GUEST))
+    for part in ("overview", "map"):
+        assert _strip(second[part]) == _strip(alone[part]), part
+        assert _strip(first[part]) == _strip(again[part]), part
+    assert second["overview"]["sub"] == second["map"]["sub"] == GUEST
+    only_widest = _readable(world, WIDEST) - _readable(world, GUEST)
+    assert only_widest
+    assert not (only_widest & _map_ids(second["map"]))
+    assert not (only_widest & {n["id"] for n in second["overview"]["nodes"]})
+
+
+def test_a_readable_id_without_an_index_row_changes_nothing(world, tmp_path, monkeypatch):
+    """Gate 1 admits an id the index has no row for (a stale ACL entry): the galaxy equals the
+    galaxy without it, and still equals the two single views."""
+    app, svc = _app(world, tmp_path)
+    c = _as(app, svc, CONTRACTOR)
+    before = _galaxy(c)
+    ghost = "slack:C0GHOST:1700000000.000100"
+    assert world.index.doc(ghost) is None
+    real = type(world.index).readable
+    monkeypatch.setattr(type(world.index), "readable",
+                        lambda self, user, epoch=0: real(self, user, epoch) | {ghost})
+    assert ghost in world.index.readable(world.user(CONTRACTOR), world.directory.epoch)
+    with _Counting(world) as count:
+        after = _galaxy(c)
+    assert (CONTRACTOR, ghost) not in count.calls
+    for part in ("overview", "map"):
+        assert _strip(after[part]) == _strip(before[part]), part
+    assert ghost not in json.dumps(after)
+    assert _strip(after["overview"]) == _strip(c.get("/ib/graph", params={"limit": LIMIT}).json())
+    assert _strip(_plain_map(after["map"])) == _strip(c.get("/ib/map").json())
+
+
+@pytest.mark.parametrize("limit", [1, 7, graphmod.DEFAULT_LIMIT])
+def test_a_smaller_limit_equals_the_overview_at_that_limit(world, tmp_path, limit):
+    app, svc = _app(world, tmp_path)
+    c = _as(app, svc, WIDEST)
+    gal = _galaxy(c, limit=limit)
+    assert _strip(gal["overview"]) == _strip(c.get("/ib/graph", params={"limit": limit}).json())
+    assert _strip(_plain_map(gal["map"])) == _strip(c.get("/ib/map").json())   # the map has no limit
+    docs = [n for n in gal["overview"]["nodes"] if n["kind"] == "doc"]
+    assert len(docs) <= limit

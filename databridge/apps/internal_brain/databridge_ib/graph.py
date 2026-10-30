@@ -141,12 +141,15 @@ def overview_work(g1: _Gate1View) -> list[str]:
 class OverviewChecks:
     """One live pass over :func:`overview_work` of ``g1``, decided by the caller in THIS request
     (``GET /ib/galaxy``). ``ok`` holds the authorised snapshots, ``undecided`` the ids whose check or
-    read-through did not finish by the deadline, and ``attempted`` the ids handed to
-    ``authz.authorize`` (an id never attempted is not decided either)."""
+    read-through did not finish by the deadline, ``attempted`` the ids handed to
+    ``authz.authorize`` (an id never attempted is not decided either) and ``n_handed`` the ``n``
+    that ``authorize`` returned (ids handed to it, timeouts included: what ``docs_checked`` counts
+    on ``GET /ib/graph``)."""
     g1: _Gate1View
     ok: Mapping[str, authz.AuthorizedDoc]
     undecided: frozenset
     attempted: frozenset
+    n_handed: int
 
 
 def build_graph(user: DirectoryUser, *, index: Index, directory: Directory, ledger: Any,
@@ -251,7 +254,8 @@ def build_graph(user: DirectoryUser, *, index: Index, directory: Directory, ledg
         ok = {d: pre.ok[d] for d in covered if d in pre.ok}
         undecided = {d for d in covered if d in pre.undecided or d not in pre.attempted}
         checked = {d for d in covered if d not in undecided}
-        n_checked = len(checked)        # decided live; equals the loop's count when all were
+        # handed to authorize, timeouts included: the meaning docs_checked has on GET /ib/graph
+        n_checked = min(pre.n_handed, sum(1 for d in covered if d in pre.attempted))
         i = len(covered)
     while pre is None and i < len(queue) and n_checked < cap and authz.remaining(deadline) > 0:
         size = 1 if (i == 0 and doc_focus) else CHECK_BATCH
