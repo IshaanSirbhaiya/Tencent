@@ -1,5 +1,9 @@
 # Submission form answers (copy-paste ready)
 
+> **As submitted 16 Oct 2026.** The figures below are kept as submitted. Current figures (30 Oct run):
+> 0 leaks in 7,374 adversarial requests, 0 injection hard failures in 1,152, 0 of 400 differential pairs;
+> see `databridge/evals/internal_brain/RESULTS.md` and [docs/finals/CHANGELOG.md](../finals/CHANGELOG.md).
+
 > Tencent Cloud AI CAN DO IT Hackathon Singapore 2026, FinTech Track (Aspire). Form:
 > https://tinyurl.com/TCHackathonSGProjectSubmission. Deadline **Fri 16 Oct 2026, 23:59 SGT**. All
 > three team members must confirm.

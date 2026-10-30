@@ -1,5 +1,7 @@
 # Watch the brain grow: build plan
 
+> **Status:** pre-build plan. Test names in this plan are planned; the shipped names are in the STATUS file.
+
 Written 30 Oct 2026 for Demo Day (Tue 3 Nov). Sources: `RESEARCH.md` in this folder, plus the code as it
 was at 10:10 on 30 Oct. Budget: about 2 to 3 hours, built and tested. Paths are relative to
 `databridge/apps/` unless they start with `docs/`.

@@ -87,8 +87,10 @@ header is ordinary text. Not accepted: `.doc`, `.xls`, `.ppt`, macro-enabled fil
 - `doc_id`: the indexed document id; use it with `GET /ib/doc/{doc_id}` and the graph focus.
 - `container`: the shared drive the folder belongs to.
 - `kind`: `docx`, `xlsx`, `pptx`, `pdf`, `csv`, `md`, `txt` or `whatsapp`.
-- By the time the 200 arrives, the webhook has been delivered; indexing takes as long as one ingest
-  (in-process tests: immediately).
+- The 200 means Drive has stored the file. The mock posts Drive's signed webhook from a background thread
+  (`mock_platforms/webhooks.py`), so the index picks the file up when the webhook is delivered and ingested.
+  The poller (`IB_POLL_S`, 120 s on the demo stack) is the fallback. In-process tests use a synchronous
+  sink and see it at once.
 
 **404 `{"detail": "not found"}`** is the ONE refusal, byte-identical for every reason: switched off,
 deployed, no employee role, unknown folder, no write permission, live check failed, wrong or unsafe file,
@@ -140,7 +142,7 @@ first in the `/sim/reset` hooks (no `sim.py` change needed). SECURITY.md §15.12
   end with before/after and Ken, masking, write permission live, switches, byte-identical refusal, body
   limit before decoding, rate limit, reset).
 - `tests/test_extract_files.py`: 21 passed.
-- `apps/mock_platforms/tests`: 151 passed.
+- `apps/mock_platforms/tests`: 154 tests collected (30 Oct); last recorded pass 151. Re-run before 3 Nov.
 - Full IB suite, run 1: 944 passed, 2 failed (`test_connector_drive.py::test_markdown_and_csv`,
   `::test_crawl_full_then_quiet`: the fake Drive's `df-7` is a header-only CSV, `a,b`, which extraction
   turned into "no text", so the file was skipped). FIXED: a header-only CSV is indexed as its cleaned text
@@ -148,10 +150,9 @@ first in the `/sim/reset` hooks (no `sim.py` change needed). SECURITY.md §15.12
   1040 passed, 0 failed.
 
 **Left / gotchas.**
-- `python-pptx` and `pypdfium2` are installed in `.venv` but NOT in `requirements-lock.txt`. A fresh install
-  from the lock loses pptx and pdf, and (because `databridge_convert/adapters/source/__init__.py` imports
-  every document reader) docx, md and txt too; csv and xlsx keep working. Add `python-pptx==1.0.2` and
-  `pypdfium2==5.14.0` to the lock (not done: no unvetted install or lock change by this agent).
+- `python-pptx==1.0.2`, `XlsxWriter==3.2.9` and `pypdfium2==5.14.0` are pinned in
+  `databridge/requirements-lock.txt`. `deploy/lighthouse/requirements-ib.txt` does not pin them, so the
+  Lighthouse image offers CSV only (no .pptx) and has no PDF reader.
 - `IB_DEMO_FEATURES` is read from `cfg.demo_features` if `IbConfig` gets that field, else from the
   environment (`uploads.demo_features_on`). Restart the IB with both switches for the stage.
 - The extraction worker starts with the route (about 5 to 10 s); `test_uploads.py` takes about 80 s

@@ -15,7 +15,7 @@ Branch `final_v1.0`, as of commit `f0f84bd` (30 Oct 2026). What changed and when
 |---|---|
 | Data | Synthetic only: "Company A", a made-up fintech (34 people; 231 Confluence pages, 261 Jira issues, 628 Slack threads, 87 Drive files) |
 | Platforms | Mock Slack, Confluence, Jira and Drive with the real APIs' shapes, permission models and webhooks. Not run against a live tenant |
-| Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Not live yet** (TokenHub activation pending; every call returns 401006). Until then answers say "Quoted from sources (no model)" |
+| Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Not live yet** (TokenHub activation pending; every model call returns HTTP 402 with code 401006). Until then answers say "Quoted from sources (no model)" |
 | Sign-in | A demo login standing in for single sign-on. No password; optional passcode (`IB_DEMO_PASSCODE`) |
 | Numbers | 754 backend tests pass (commit `7bf3246`). 124 web e2e tests pass, 0 fail, 38 environment-gated skips ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 7,374 requests, 0 of 400 pairs differ, 0 injection hard failures in 1,152 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
 
@@ -528,7 +528,7 @@ tests (Python 3.13) and the web typecheck (Node 20); and a Lighthouse deploy kit
 |---|---|---|
 | Leak evaluation | 0 leaks / 7,374; 0 / 400 differential; 0 injection hard failures / 1,152; generated 30 Oct 03:27 UTC (11:27 SGT) on the finals pipeline | [RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](../../databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Backend tests | 754 passed at `7bf3246` | `databridge/apps/internal_brain/tests/` |
-| Web e2e | 124 passed, 0 failed, 38 env-gated skips, three consecutive runs; `act.spec.ts` (5), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | [TEST_REPORT.md](TEST_REPORT.md) |
+| Web e2e | 124 passed, 0 failed, 38 env-gated skips, three consecutive runs; `act.spec.ts` (8), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | [TEST_REPORT.md](TEST_REPORT.md) |
 | Live QA | Every page × persona against the real backend: 32 checks, 11 bugs fixed, issues listed | [QA_LIVE.md](QA_LIVE.md) |
 | Final reviews | Five models: security, UX, claims, code | [reviews/](reviews/final_opus_security.md) ([Opus security](reviews/final_opus_security.md) · [Sonnet UX](reviews/final_sonnet_ux.md) · [Haiku claims](reviews/final_haiku_claims.md) · [Codex](reviews/final_codex.md) · [Fable](reviews/final_fable.md)) |
 | Rubric pack | Each of the 10 criteria: seen live, in the app, to read | [rubric/README.md](rubric/README.md) |

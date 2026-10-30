@@ -122,6 +122,10 @@ other people see a lock card that explains why.
 | Presenter | **Presenter mode** | `/compare?present=1` | the script signs in for you | The 11-step Demo Day script (HUD 00 to 10) on the keyboard (`Space` next, `B` recording, `R` reset, `L` 中文, `S` Stage theme), plus `/present` slides. `B` plays a recorded clip of the step from `public/clips/`, labelled "Recording · not live" |
 | Both | **Tours** | "Take the tour" in the header | anyone | User tour: 4 steps and a checklist (sign in, ask, open a source, Ken's identical refusals). Developer tour: 5 steps (pipeline, journey, graph, trust, analytics or the lock card) |
 
+**Turn an answer into a table, chart or analysis** (CSV and .pptx download; every number checked against its
+source line; analysis needs the model). Live graph growth and file upload for the demo (demo-only switches).
+See [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md) §11-§12.
+
 The pre-finals Map (`/map`) is still in the User menu. The old `/audit` and `/sim` addresses redirect to
 the Developer pages.
 
@@ -161,7 +165,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 93.2% (quoted) to 97.1% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
 | Backend tests (Internal Brain) | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
-| Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added after that run and is not in the count; `act.spec.ts` (5), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending |
+| Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added after that run and is not in the count; `act.spec.ts` (8), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits

@@ -1,5 +1,9 @@
 # 04. Current state of the product (inventory for the UI rebuild)
 
+> **Dated note (30 Oct):** eval figures in this file (5,958 requests, 976 injection-relevant requests) are from the
+> 14 Oct run. The current run is 0 leaks in 7,374 requests and 0 injection hard failures in 1,152
+> (`databridge/evals/internal_brain/RESULTS.md`).
+
 Snapshot taken 2026-10-30 (read-only; no file was changed except this one). Paths are relative to the repo root `E:\Tenecent Hack_Walnut\Tencent\` unless shown absolute. Line numbers are as read on that date.
 
 **Concurrent edits:** `databridge/apps/internal_brain/databridge_ib/pipeline.py` and `models.py` were modified at 2026-10-30 02:22-02:23, while this inventory was being written. The pipeline now records per-stage timings (`stage_ms`, pipeline.py:150-197). The line numbers below for pipeline.py match the 02:23 version.

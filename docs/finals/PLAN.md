@@ -1,5 +1,9 @@
 # Finals build plan: Walnut DataBridge for Demo Day (v1)
 
+> **Dated note (30 Oct):** eval figures in this file (5,958 requests, 976 injection-relevant requests) are from the
+> 14 Oct run. The current run is 0 leaks in 7,374 requests and 0 injection hard failures in 1,152
+> (`databridge/evals/internal_brain/RESULTS.md`).
+
 Branch `final_v1.0`. Written 30 Oct 2026, 03:40 SGT. Reviewed by Sonnet, Haiku, Opus, Fable and Codex
 before the build starts. Decisions are in [DECISIONS.md](DECISIONS.md). Research is in
 [research/](research/), and the per-criterion rubric research and deliverables are in [rubric/](rubric/).

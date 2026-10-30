@@ -1,6 +1,6 @@
 # Watch the brain grow: status (30 Oct 2026, checkpoint before the move to the cloud session)
 
-Branch `final_v1.1`, uncommitted (the coordinator commits). Plan: `PLAN.md` in this folder. Decision: D-24.
+Branch `final_v1.2`. Committed in 8312864 (backend, web) and 1079bd2 (proxy route). Plan: `PLAN.md` in this folder. Decision: D-24.
 Security: `docs/tencent/SECURITY.md` §15.13. Contracts: `docs/finals/contracts/backend_v1.md`
 "Demo-proof features (v4)". Catalogue: `docs/finals/FEATURE_CATALOGUE.md` §11.
 

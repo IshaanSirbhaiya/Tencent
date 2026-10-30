@@ -1,5 +1,10 @@
 # Deliverables from an answer: build plan
 
+> **Status, 30 Oct:** this is the pre-build plan. Built kinds are table, chart and analysis
+> (`deliverables/service.py` KINDS). Summary and Email are not built. Slides exists as a .pptx export of a
+> ready table or chart. The built scope is in STATUS.md §1-§5; the sections below are the original plan.
+> Test names in this plan are planned; the shipped names are in the STATUS file.
+
 Written 30 Oct 2026 for Demo Day (Tue 3 Nov). Sources: `RESEARCH.md` in this folder and the code as it
 stood on 30 Oct (read, not changed). Budget: about 3 hours, built and tested (§9 has the cut line).
 Paths are relative to `databridge/apps/` unless they start with `docs/`.

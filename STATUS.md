@@ -23,7 +23,7 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | Hy3 readiness check; the launcher turns live Hy3 on by itself when TokenHub answers | Built (`8b69cbd`) | [`databridge/scripts/hy3_check.py`](databridge/scripts/hy3_check.py) |
 | Rubric evidence pack, one deliverable set per criterion | Written | [docs/finals/rubric/README.md](docs/finals/rubric/README.md) |
 | WorkBuddy connectors (ask as a person; compliance audit) | Built; new MCP tools added 30 Oct (answer receipt, what I can open, org summary, tamper demo; `9afd1bd`); live WorkBuddy test 33/33 | `docs/tencent/workbuddy/` |
-| Act: draft a reply or a follow-up ticket, created only after the person confirms | Built and tested (`test_act.py` 19, `test_act_e2e.py` 4 test functions, e2e `act.spec.ts` 5); committed in `8312864` | `databridge_ib/actions.py`, `components/user/ActSheet.tsx`; [backend_v1.md](docs/finals/contracts/backend_v1.md) |
+| Act: draft a reply or a follow-up ticket, created only after the person confirms | Built and tested (`test_act.py` 21, `test_act_e2e.py` 6 passed; e2e `act.spec.ts` 8 tests); committed in `8312864` | `databridge_ib/actions.py`, `components/user/ActSheet.tsx`; [backend_v1.md](docs/finals/contracts/backend_v1.md) |
 | Live graph growth and add-document (demo-only: `IB_DEMO_FEATURES=1` and the Settings switch) | Built and tested; committed in `8312864` (proxy route `1079bd2`) | [live_growth/STATUS.md](docs/finals/live_growth/STATUS.md) |
 | One-click demo kit (`Start/Stop/Reset Walnut Demo.cmd`, `demo_day.ps1`, `demo_preflight.py`) | Built (`a1ccc6c`) | repo root, `databridge/scripts/` |
 | CodeBuddy sessions CB7 to CB9 on the finals code | Done (`9afd1bd`) | [TENCENT_TOOLS_REPORT.md](docs/finals/rubric/ai_innovation/TENCENT_TOOLS_REPORT.md) |
@@ -39,13 +39,13 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | Backend tests (Internal Brain) | **754 passed**, commit 7bf3246, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
 | Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
-| Web end-to-end tests (Playwright, axe) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added afterwards and is not in the count; `act.spec.ts` (5), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Web end-to-end tests (Playwright, axe) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added afterwards and is not in the count; `act.spec.ts` (8), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | `databridge/apps/internal_brain_web/tests/e2e/` |
 
 ## 3. Pending
 
 | Item | Who | Note |
 |---|---|---|
-| **Hy3 live through TokenHub** | Ishaan (activation in the TokenHub console) | Wired and tested with a capturing test model; **live run pending**. Every model call currently returns 402 (code 401006). Until it runs, answers are quoted from the sources, with the same checks. Steps: [MORNING_BRIEF.md](docs/finals/MORNING_BRIEF.md) |
+| **Hy3 live through TokenHub** | Ishaan (activation in the TokenHub console) | Wired and tested with a capturing test model; **live run pending**. Every model call returns HTTP 402 with code 401006. Until it runs, answers are quoted from the sources, with the same checks. Steps: [MORNING_BRIEF.md](docs/finals/MORNING_BRIEF.md) |
 | **Hallway test** (5 people × 20 min) | Team, Sat 31 Oct | The only human-centered-design evidence we cannot produce ourselves. Protocol: [HALLWAY_TEST_PROTOCOL.md](docs/finals/rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md). The fix log is empty until then: [FIX_LOG.md](docs/finals/rubric/hcd_ux/FIX_LOG.md) |
 | **Venue rehearsal** | Team, Mon 2 Nov 16:00–17:00 (mandatory) | Run sheet: [RUN_SHEET.md](docs/finals/rubric/demo_story/RUN_SHEET.md); checklist: [VENUE_TECH_CHECKLIST.md](docs/finals/rubric/demo_story/VENUE_TECH_CHECKLIST.md) |
 | In progress, not committed: the new demo video (on hold) | Build team | Listed in [CHANGELOG.md → In progress](docs/finals/CHANGELOG.md#in-progress) |

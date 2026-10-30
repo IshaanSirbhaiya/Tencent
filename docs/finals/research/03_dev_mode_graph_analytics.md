@@ -1,5 +1,9 @@
 # 03 · Developer mode: graph, trace and analytics research
 
+> **Dated note (30 Oct):** eval figures in this file (5,958 requests, 976 injection-relevant requests) are from the
+> 14 Oct run. The current run is 0 leaks in 7,374 requests and 0 injection hard failures in 1,152
+> (`databridge/evals/internal_brain/RESULTS.md`).
+
 | | |
 |---|---|
 | For | Walnut DataBridge finals build (Demo Day 3 Nov 2026) |

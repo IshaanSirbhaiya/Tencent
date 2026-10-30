@@ -1,5 +1,9 @@
 # 05 - Competition research and 5-minute pitch plan (Demo Day, 3 Nov 2026)
 
+> **Dated note (30 Oct):** eval figures in this file (5,958 requests, 976 injection-relevant requests) are from the
+> 14 Oct run. The current run is 0 leaks in 7,374 requests and 0 injection hard failures in 1,152
+> (`databridge/evals/internal_brain/RESULTS.md`).
+
 Research date: 30 Oct 2026. Items marked **[verify]** came from one source or from search summaries and should be checked before you rely on them. The contest page is mostly an empty shell, so most of what follows is inference from press coverage.
 
 ## 1. What the public pages actually say

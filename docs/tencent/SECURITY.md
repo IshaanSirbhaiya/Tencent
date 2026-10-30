@@ -987,7 +987,7 @@ spec (`extra="forbid"`, strict finite numbers); at most 2 model calls in flight 
 deadline per request, late results discarded (`::test_model_budget_and_global_cap`). Anything that fails
 the checks is dropped and counted; nothing passes means the deterministic build. The model never chooses
 a document, a recipient or an action. With TokenHub configured, up to 12,000 characters of the cited
-documents' current text go to it per call (more than the answer step sends).
+documents' current text (`evidence.py` `MAX_CONTEXT_CHARS`) go to it per call.
 
 **Exports.** Built on the server from the stored, checked copy, never from anything the browser sends.
 Every CSV cell and every string written into a `.pptx` (slide text, table cells, notes, chart
