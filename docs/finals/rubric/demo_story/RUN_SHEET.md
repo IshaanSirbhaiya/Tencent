@@ -9,7 +9,7 @@ Source: `docs/finals/reviews/plan_fable.md` §3.2 (decision D-14). Tagline, said
 | Person | Role | Hands |
 |---|---|---|
 | **Ishaan** | Speaker: hook, tagline, business, close, Q&A lead | Clicker for slides only. Never touches the demo laptop |
-| **Dev** | Driver: the only person on the laptop; says what he presses ("Space") | Keyboard only |
+| **Dev** | Driver: the only person on the laptop; says what he presses ("Space") | Keyboard by default; the bar's clickable controls and the mouse side buttons are the fallback (PRESENTER_KEYS.md section 2a) |
 | **Mehul** | Compliance voice: the journey and the chain | None |
 | **Aaruni** | Tencent voice: WorkBuddy beat, proof numbers; watches the timekeeper | Starts the WorkBuddy action |
 
@@ -18,6 +18,7 @@ Rules: one speaker at a time; hand-offs by name ("Mehul, over to the compliance 
 ## 0b. Stage setup notes
 
 - **One browser window only** on stage. No second pre-opened window; WorkBuddy is the only other window.
+- **Mouse works too** (`PRESENTER_KEYS.md` §2a): the bar's ◀ ▶ buttons (in Stage behind "More"), the mouse's back/forward side buttons, "Exit presenter" and a "Show the presenter bar" handle when hidden; Dev still drives from the keyboard.
 - **`R` is the recovery key**: after a confirm it signs every demo session in the browser out, clears the presenter state and returns to step 0. It restores nothing and never edits the real ledger (the tamper step only ever changes a copy).
 - **WorkBuddy question, one exact string everywhere:** `What's the status of the database migration project and were there any blockers raised in Slack last week?`
 - Every line that names Hy3 as the author of an answer is tagged [ONLY IF HY3 LIVE] and has a default alternative ("quoted from the sources, with the same checks").
@@ -60,7 +61,7 @@ The 5:00 path is the 11 steps in `script.ts` (HUD 00 to 10). The live-growth bea
 | 2:35–2:40 | Tencent, off-app | Mehul → Aaruni | Mehul: "Aaruni, Tencent." Aaruni: "Tencent is inside the product." | Dev presses `Space`: HUD says "WorkBuddy"; Dev switches window to WorkBuddy (off-app) |
 | 2:40–2:55 | | Aaruni | "Jordan is on call at 3 a.m. and asks from WorkBuddy." (beat while the agent runs) | WorkBuddy window: Aaruni starts the action: "What's the status of the database migration project and were there any blockers raised in Slack last week?" |
 | 2:55–3:12 | | Aaruni | "WorkBuddy's agent calls our tool with Jordan's signed token, not a name it chose. Same gates, same ledger, channel 'WorkBuddy'. Both answers are quoted from the sources, with the same checks. [ONLY IF HY3 LIVE: say "Hy3 wrote both answers" instead.] [CB] CodeBuddy built the connector and ran our security review." | Cited answer stitched from Jira, Slack and Confluence appears |
-| 3:12–3:20 | | Aaruni | "Dev has not touched the mouse all demo." | Dev switches back to the app (Alt-Tab): `/dev/audit`. The newest row, channel `workbuddy-mcp`, appears when the window regains focus (`?latest=1`), not on a key. Delete the line if Dev used the mouse. No language flip here: it was cut (round-3 Fable #8; on `/dev/audit` Developer mode stays English and says so, so "the UI speaks the room's languages" would be contradicted on screen) |
+| 3:12–3:20 | | Aaruni | "Dev drives the whole demo from the keyboard." (say it only if that is true on the day; the bar's buttons are the fallback, so do not promise "no mouse") | Dev switches back to the app (Alt-Tab): `/dev/audit`. The newest row, channel `workbuddy-mcp`, appears when the window regains focus (`?latest=1`), not on a key. Delete the line if Dev used the mouse or the bar's buttons. No language flip here: it was cut (round-3 Fable #8; on `/dev/audit` Developer mode stays English and says so, so "the UI speaks the room's languages" would be contradicted on screen) |
 | 3:20–3:30 | Proof | Aaruni | "We did not just demo it. We attacked it: 7,374 adversarial requests, zero leaks. Four hundred paired questions, zero differences." [NUM] | Proof slide [S] |
 | 3:30–3:50 | | Aaruni | "[TESTER] Five people tested it on Saturday; one broke the source sheet, we fixed it. Numbers re-run this morning; every one maps to a test in the repo." | Same slide: three large numbers, one tester line, one CodeBuddy line |
 | 3:50–4:30 | Business, in Aspire's words | Ishaan | "Aspire's team told us 'what can we offer this customer' takes time today, and the brief says about 30 % of the week goes to searching. Break-even is about seven minutes saved per person per week. Base case for a 600-person fintech: about 1.3 million US dollars a year; an estimate, inputs on the one-pager. The design targets Tencent Cloud (a one-command Lighthouse deploy kit is included; we have no live instance), and Hy3 is open-weight, so a bank could host it inside its own walls." [BIZ] | Business slide [S]: one number, four inputs, Tencent stack line |

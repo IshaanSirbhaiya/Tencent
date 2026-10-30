@@ -4,7 +4,7 @@
 
 Everything written for the finals of the Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 (FinTech
 track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product inside it. Demo Day is
-3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
+3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are in the working tree, not committed; test re-run pending, final integration). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
 
 | Start here | What it is |
 |---|---|
@@ -16,18 +16,20 @@ track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product insi
 | File | What it is |
 |---|---|
 | [PLAN.md](PLAN.md) | The finals build plan: the two modes and every page (§3), backend items, design system, demo story, risks; §9 holds the v2 changes after five plan reviews |
-| [DECISIONS.md](DECISIONS.md) | Decisions D-01 to D-33, each with its reason (D-26 to D-33 were taken in the 30 Oct cloud session and wait for Ishaan's confirmation) |
+| [DECISIONS.md](DECISIONS.md) | Decisions D-01 to D-34, each with its reason (D-26 to D-33 were taken in the 30 Oct cloud session, D-34 (the upload folder picker) on the laptop that evening and wait for Ishaan's confirmation) |
+| [MERGE_PLAN.md](MERGE_PLAN.md) | The teammate's three feature branches (voice, just-in-time UI, dots) merged one at a time into new branches, with hard-rule checklists. Written 30 Oct evening; nothing merged |
+| [app_mode/PLAN_v2.md](app_mode/PLAN_v2.md) | The "Demo story" app mode (a separate, mouse-driven way through the 11 steps for the booth and hands-on time; the 5:00 stays on the keyboard presenter). **Plan only, not built.** v1 ([PLAN.md](app_mode/PLAN.md)) and four reviews ([Opus](app_mode/review_opus.md), [Sonnet](app_mode/review_sonnet.md), [Haiku](app_mode/review_haiku.md), [Fable](app_mode/review_fable.md)) sit beside it |
 | [CLOUD_HANDOFF.md](CLOUD_HANDOFF.md) | The 30 Oct cloud session: questions for Ishaan, verified test results, the hand-off state of every track |
 | [WORLD_EXPANSION_STATUS.md](WORLD_EXPANSION_STATUS.md) | The everyday-company world (append-only): how it was verified and the new counts |
 | [MORNING_BRIEF.md](MORNING_BRIEF.md) | 30 Oct brief for the team: what only a person can do (Hy3 activation, hallway test), what was built overnight |
 | [ORGANISER_UPDATE.md](ORGANISER_UPDATE.md) | The update email to the organisers: project link, description, what shipped since submission |
 | [../../submission/finals/](../../submission/README.md) | Printable handouts: A4 leave-behind with QR, judge cards per criterion, presenter cheat-sheet (PDF, with their generator) |
 | [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md) | The prompt for the new finals cover in Miora (Tencent's AI design agent) |
-| [demo_day/](demo_day/LIVE_DEMO_RESEARCH.md) | Live-demo research, the Demo Day runbook and the founder checklist for the one-click demo kit |
+| [demo_day/](demo_day/LIVE_DEMO_RESEARCH.md) | Live-demo research, the Demo Day runbook and the founder checklist for the one-click demo kit, and [STAGE_QA_30OCT.md](demo_day/STAGE_QA_30OCT.md) (the presenter path timed in headless Chrome, `B` at every step, the grow walk-up, preflight and the absence proof; 11 risks) |
 | [live_growth/](live_growth/RESEARCH.md) | "Watch the brain grow" (live graph growth, add a document; demo-only): research, plan and status |
 | [deliverables/](deliverables/STATUS.md) | Deliverables from an answer (Table, Chart, Analysis, Slides .pptx; Summary not built, D-29): plan, reviews, status |
 | [live_kit/](live_kit/LIVE_INGEST_KIT.md) | The live-ingestion kit: samples, absence proof, templates |
-| [video/](video/VIDEO_SCRIPT_FINALS.md) | *On hold.* The finals video script, recorder and assembler (committed); raw clips in `submission/finals_video/` (not committed) |
+| [video/](video/VIDEO_SCRIPT_FINALS.md) | *On hold.* The finals video script (the 16 Oct spine beat by beat, new features attached; cuts short, main and full: [VIDEO_PLAN.md](video/VIDEO_PLAN.md)), recorder and assembler (committed); [READINESS_30OCT.md](video/READINESS_30OCT.md) (scene-by-scene readiness) and [review_fable_script.md](video/review_fable_script.md) (storytelling review); raw clips in `submission/finals_video/` (not committed) |
 
 ## 2. Research
 
@@ -48,7 +50,11 @@ DECISIONS.md and a change in PLAN.md §9. Fable's run sheet (§3.2) became the d
 
 Later review rounds of the build are in [reviews/](reviews/): the final reviews (`final_*.md`), round 2 and 2b
 (Act, tools, kit; [dispositions](reviews/round2_dispositions.md)) and round 3 (Deliverables, live growth,
-uploads; [dispositions](reviews/round3_dispositions.md)).
+uploads; [dispositions](reviews/round3_dispositions.md)) and round 4 (30 Oct evening; the cloud work, the web proxy
+and demo kit, and a live UX re-check: [Codex](reviews/round4_codex_cloud_work.md),
+[Opus](reviews/round4_opus_web_kit.md), [Sonnet](reviews/round4_sonnet_ux_live.md),
+[dispositions](reviews/round4_dispositions.md); this pass's change list:
+[docs_pass_30oct_evening.md](reviews/docs_pass_30oct_evening.md)).
 
 ## 4. Rubric evidence
 
@@ -79,7 +85,7 @@ and the live Hy3 run.
 
 | File | What it holds |
 |---|---|
-| [TEST_REPORT.md](TEST_REPORT.md) | The Playwright e2e suite on the finals UI: 166 passed, 0 failed, 41 skipped (need the live stack, the engine proxy or Hy3) in the 30 Oct cloud run at `831297e`; the earlier 124-passed run kept as history |
+| [TEST_REPORT.md](TEST_REPORT.md) | **Re-run pending (final integration)** after the evening fixes. The Playwright e2e suite on the finals UI: 166 passed, 0 failed, 41 skipped (need the live stack, the engine proxy or Hy3) in the 30 Oct cloud run at `831297e`; the earlier 124-passed run kept as history |
 | [QA_LIVE.md](QA_LIVE.md) | Every page × persona run against the live backend: 32 checks, 11 bugs fixed, 4 open issues (§4; two more fixed in 8582f4b) |
 | [../../databridge/evals/internal_brain/RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md) | The leak and injection evaluation, re-run 30 Oct on the finals pipeline |
 

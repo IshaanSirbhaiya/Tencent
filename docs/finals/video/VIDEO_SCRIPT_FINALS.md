@@ -257,8 +257,9 @@ take if Ken's feed gets any item. Needs demo features on (D-24). It writes a rea
 ### 19 · Add a file
 **Cuts:** not in the short cut · main 10 s · full 15 s.
 **Original beat:** enhancement to 8 (new content goes through the same checks and into the same log).
-**On screen:** `/dev/graph?add=1`, Jordan. In the Add sheet, the file tab: a sample file is chosen, a folder is
-picked from the list, **Upload**; the status line confirms.
+**On screen:** `/dev/graph?add=1`, Leo (product and operations, who may add files to "Pricing & Offers"; Jordan may add to no
+folder). In the Add sheet, the file tab: a sample file is chosen, the folder **Pricing & Offers** is picked from the
+list by name (never Vendor share, which Ken can read), **Upload**; the status line confirms.
 **Caption:** "Add a file: it goes into a folder, through the same checks", "Uploaded and written to the audit log
 like everything else".
 **Proof:** `test_uploads.py`, `test_upload_folders.py`, `test_extract_files.py`; Opus L5 (successful source writes

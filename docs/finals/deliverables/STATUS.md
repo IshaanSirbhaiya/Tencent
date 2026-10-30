@@ -155,3 +155,13 @@ was editing it; the final run, after that edit landed, is clean). Hy3/TokenHub i
 | L1 deterministic headers skipped the check | `build.py` `source_table`: each column label passes `check_short_text` against the cited units (as `check_table` does on export), else `Column n` | `test_deliverables.py::test_source_table_headers_are_checked_so_create_equals_export` |
 | I1 switch off + invalid body gave 422 | `routes.py`: the body is read and validated after the kill switch (async handler, service call in the threadpool; the same 422 shape when on; OpenAPI body schema kept via `openapi_extra`) | `::test_bodies_carry_no_identity_and_flag_off_is_404` (invalid, extra-field, empty and malformed bodies give the 404 when off) |
 | I3 build exception left `requested` open | `service.py` `create`: the build/verify/seal block is in a try; an unexpected exception writes `deliverable.failed` (stage `generate`, reason `build_<Type>`) and raises the generic 503 | `::test_a_build_error_writes_failed_after_requested_and_answers_503` |
+
+### 5.6 Round 4 Codex review fixes (`docs/finals/reviews/round4_codex_cloud_work.md`, B1-B6, B12)
+
+Each fix has a failing-first test. Rows are in `docs/finals/reviews/round4_dispositions.md`.
+- B1: `export.py` `ptext` removes control characters before the guard; the chart workbook writes every string with `write_string` (`test_deliverables.py::test_r4_b1_*`, which open the embedded XLSX).
+- B2: the export appends `deliverable.requested` (new optional `export_format`, `models.py`) before Gate 2 and the read; ledger down is a 503 with no source read (`::test_r4_b2_*`). `audit/stats.py` leaves export rows out of `deliverables_requested` (creates only; exports stay in `deliverables_exported`) (`::test_kinds_are_registered_parsed_and_counted`).
+- B14: the speaker notes are per slide type (`export.py` `NOTES_CHECKED` chart, `NOTES_TABLE` table, `NOTES_PLAIN` title and Sources, which make no numeric claim) (`::test_r4_b14_*`).
+- B3/B4: re-authorisation runs after any model call, the fallback included. A model title is re-checked against the remaining sources, and a deterministic build is rebuilt from them (`::test_r4_b3_*`, `::test_r4_b4_*`).
+- B5/B6: `verify.py` binds each analysis number to its own clause's entity and metric words in one row or sentence. Chart series names, y labels and table column labels taken from the source are bound to the value's column header, cell or clause. A chart title may only use its checked labels (`test_deliverables_verify.py::test_r4_b5_*`, `::test_r4_b6_*`).
+- B12: `routes.py` rate-limits before reading the body and caps the body at 4 KB (Content-Length and while streaming; 413) (`::test_r4_b12_*`).

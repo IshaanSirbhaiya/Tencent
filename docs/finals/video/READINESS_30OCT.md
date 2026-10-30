@@ -98,7 +98,9 @@ Risks for the first take of the new scenes (nothing could be checked without a b
   is allowed for him; it writes a mock Jira ticket. Any other state (`act-unavailable`, `act-error`, ...) fails the take.
 - 18 Deliverables: assumes the table kind is offered (`deliver-table` row button) for that answer; `deliver-table` and
   `deliver-chart` are both a row button and a view element, so the recorder scopes them to `deliver-sheet`.
-- 19 Upload: sets the file on the hidden input and picks the first listed folder; writes a file into the mock Drive.
+- 19 Upload: recorded as Leo (`leo.ops`), not Jordan, who may write to no folder (round-5 Opus #1). Sets the file on
+  the hidden input and picks **Pricing & Offers** by its label (Leo writes there, Ken cannot read it; checked in
+  `world.json`), never by position; the take fails if that folder is not listed. Writes a file into the mock Drive.
 - 06b: needs demo features on; `graph-left-add`, `graph-left-addsheet-*`, `graph-left-live-item`, `graph-right-live`.
 - 21: the tour offer only shows if the stack has not been marked dismissed in this browser profile; the scene removes
   `ib-tour-offer` and reloads; the mic button needs the browser's speech API (Chromium headless may not have it, then

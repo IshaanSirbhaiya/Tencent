@@ -25,7 +25,72 @@ everyday-company world. Their rows are in the areas below.
 | **WorkBuddy GUI retest** | The finals MCP tools shown in the real WorkBuddy app | CB7 to CB9 and the new MCP tools are committed ([9afd1bd](https://github.com/IshaanSirbhaiya/Tencent/commit/9afd1bd)). The GUI retest is open (needs the stage laptop): [WORKBUDDY_GUI_TEST.md](rubric/ai_innovation/WORKBUDDY_GUI_TEST.md). The compliance connector is set up apart from the employee connectors (D-30) |
 | **New demo video** | The finals walk-through, narrated by the team | **On hold** until the founder says so. Script, recorder and assembler are committed in [video/](video/VIDEO_SCRIPT_FINALS.md); raw clips and the test cut in `submission/finals_video/` are not committed (74 MB) |
 | **Live Hy3** | Hy3 answers through TokenHub | Wired, **not live**: TokenHub answers 402 until activation (a person). `demo_up.sh` will switch it on by itself once [`hy3_check.py`](../../databridge/scripts/hy3_check.py) gets an answer |
+| **Demo story (app mode)** | A separate, mouse-driven way through the 11 steps for the booth and judges' hands-on time; the 5:00 stays on the keyboard presenter | **Plan only, nothing built.** [app_mode/PLAN_v2.md](app_mode/PLAN_v2.md); build window Sat 31 Oct or Sun 1 Nov |
+| **Teammate merge** (voice, just-in-time UI, dots) | Three feature branches merged one at a time into new branches | **Plan only, nothing merged.** [MERGE_PLAN.md](MERGE_PLAN.md) |
+| **Round-4 fixes, final integration** | The fixes in the "30 Oct 2026, evening (laptop)" section below | In the working tree, not committed; **full test re-run pending** (the 1,131 and 166 below are from the cloud run) |
 | **Hallway test** | 5 people × 20 min; results into the fix log and the proof slide | Protocol ready ([HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)); Sat 31 Oct |
+
+## 30 Oct 2026, evening (laptop)
+
+Written on the laptop after the cloud session. Branch `final_v1.2` (the cloud's `final_v1.3` pointer stays at
+`1076517`). Two kinds of rows: **committed** (a link) and **in the working tree, not committed yet** (no link; not in
+any commit until the coordinator commits them). **Test counts elsewhere in the docs (1,131 backend, 166 web) are from
+the cloud run at `831297e` and are unchanged here: re-run pending (final integration).** The new tests below are named
+so they can be found; they are not counted.
+
+### Round 4 reviews and their fixes
+
+Three reviews of the cloud session's work (`8fff33c..1076517`), then the fixes. Every finding and its test:
+[reviews/round4_dispositions.md](reviews/round4_dispositions.md).
+
+| Status | Change |
+|---|---|
+| Committed ([c37b141](https://github.com/IshaanSirbhaiya/Tencent/commit/c37b141)) | Codex (partial, 2 runs by budget): 0 critical, 15 high, 9 medium, 2 low. [round4_codex_cloud_work.md](reviews/round4_codex_cloud_work.md) |
+| Committed ([df9365d](https://github.com/IshaanSirbhaiya/Tencent/commit/df9365d)) | Opus on the web proxy, presenter, demo kit and secrets: 0 critical, 0 high, 4 medium, 9 low. [round4_opus_web_kit.md](reviews/round4_opus_web_kit.md) |
+| Committed ([de94005](https://github.com/IshaanSirbhaiya/Tencent/commit/de94005)) | Sonnet live UX and accessibility re-check on the live stack: 12 open, 11 verified fixed. [round4_sonnet_ux_live.md](reviews/round4_sonnet_ux_live.md) |
+| Working tree | **Act v3.2** (Codex run A). New ledger kind `action.requested` is written before the live source check, before the model call and before a replayed result (stages `accepted`, `decided`, `replayed`); a ledger failure is the 503 before Gate 2. The 80 % draft floor now also fails a negation that differs from its source, a number not in its anchor sentence and a capitalised word not in its cited facts. Two proposals confirmed together can never both create (one locked step; the second is `409 outcome_unknown`). The store cap holds under concurrent proposals; unknown-outcome holds are swept. An empty Jira `create` list grants nobody. A re-propose after an unknown outcome says so. Only the first over-limit call per person per window is ledgered. Tests: `test_act_round4.py`, `test_mock_jira_create.py`, `act.spec.ts` |
+| Working tree | **`/ib/open/<token>`**: an access-check error is the same 404 as an unknown token (no existence oracle); 30 a minute per person, one ledger row per window, no `doc.viewed` when refused; the token map is built once per index version. Tests: `test_open_route.py` |
+| Working tree | **Deliverables B1 to B6, B12, B14.** The `.pptx` writer strips control characters before the formula guard and writes every chart-workbook cell as a string (no `{=...}` array formula); the export writes `deliverable.requested` (new `export_format`) before Gate 2 and the source read; a model title is re-checked after a revoked source and after any model fallback; each analysis number must sit in one row or clause with its names; a table or chart label must be its column header or clause; the rate limit and a capped 4 KB read come before the body is parsed; speaker notes claim only what each slide type checked. `/audit/stats` counts exports apart from requests. Tests: `test_deliverables.py::test_r4_*`, `test_deliverables_verify.py::test_r4_*` |
+| Working tree | **Sim, live poll, extraction, Drive, WorkBuddy token.** `write_ahead(None, ...)` fails closed (B8). A live poll is ledgered (`graph.viewed`, `outcome="checking"`) before its live check; Ken's poll still makes no source call (B2 live half). A sparse `.xlsx` is measured from its XML and refused over 1,000,000 cells before any reader runs (B11). A Drive download is capped while streaming (B13). The WorkBuddy setup writes the token only to a new private file whose ACL was restricted and verified, refuses a junction or symlink target and renames atomically (B7, B10). Tests: `test_sim_add_document.py`, `test_live_growth.py`, `test_extract_files.py`, `test_connector_drive.py`, `test_workbuddy_setup_private.py` |
+| Working tree | **Opus web and kit fixes.** `/present/preflight` is served only on a loopback Host **and** a session the Brain confirms (the one 404 otherwise, and always when `IB_DEPLOYED=1`, which the Lighthouse compose file now sets); it fits 390 px. Login chips are **role-only** in English and 简体中文 (no channel, space, project or folder name), with a test that reads the world file. The key file's secrets go only to the Brain's own subshell; the mock platforms, engine and web never get the TokenHub key or the ledger key. The proxy lets `ib/open/<32 hex>` through only for a real click (Sec-Fetch navigate, document, user). `hy3_check.py` refuses a non-HTTPS base before sending the key. `fill_template.py` has the server's CSV guard. `demo_day.ps1` builds its JSON properly, and `--fresh` refuses to wipe while a port is still held. `check_absent.py --sim` waits and retries once on a 429. Engine nodes are 24 px targets. Tests: `preflight.spec.ts`, `user.spec.ts`, `act.spec.ts`, `engine.spec.ts`, `test_round2_kit.py` |
+| Working tree | **Session queue** (`components/presenter/session.ts`): every change of who is signed in (a step, the `P` warm-up, `D`, `R`, and the shell's Sign out and persona switch) runs one at a time, and a shell Sign out wins over queued work. `D`'s cached panel lives 12 minutes. Test: `presenter.spec.ts` "a shell sign-out during the P warm-up stays signed out" |
+| Working tree | **Act and Deliverables wording** (Sonnet): the ticket sheet says "You can't create a follow-up ticket from this answer. You can still draft a reply." and offers the draft; the draft sheet is "Reply draft" and shows persona names for chat handles; a 429 reads "Too many requests in a short time. Try again in a minute."; the Deliverables by-line is "Copied cell by cell from source [2]" or "Charted from the table in source [2]" with an info line "No AI model was used: this was built by code, straight from your sources."; the button is "Download slides (.pptx)"; the four fixed titles are translated; source chips have a screen-reader name and a skip link to Copy |
+| Working tree | The Add button at 390 px shows a short label ("Add" / "添加") instead of an icon and "Demo" |
+
+### Upload folder picker (D-34)
+
+| Status | Change |
+|---|---|
+| Working tree | The upload tab lists Drive folders by name from `GET /sim/upload-folders`: only folders the person may upload into now, each checked live with the upload's own write check, as `[{id, path}]` sorted by path (anyone else gets `[]`); mounted under the same switches as `/sim/upload-file`; 10 a minute; ledgered as `graph.viewed` `mode="upload_folders"` with counts only. The typed folder ID stays as a collapsed "Advanced" fallback, only when the list is empty or fails. The old `fd-7` hint, which told everyone a vendor folder exists, is gone. The upload re-checks WRITE right before the write-ahead record and the Drive POST, and the mock Drive refuses an uploader without WRITE (Codex B9). Tests: `test_upload_folders.py`, `test_uploads.py`, `test_mock_drive_upload.py`, `grow.spec.ts`. Decision [D-34](DECISIONS.md) |
+
+### Presenter mouse controls and the stage QA
+
+| Status | Change |
+|---|---|
+| Working tree | **Presenter mouse controls.** The bar has clickable Next, Skip this step, Back, Start, Recording, Reset, Hide the bar and Exit presenter (each calls the same action as its key, so the busy, debounce and failed-step rules are shared); on Stage the one-row bar shows "More" for the rest. The mouse's side buttons are Back and Next while armed (the browser does not also move). Browser Back to the previous step's page steps the script back with it; any other history move is left to the browser. Ordinary clicks are never taken over. `presenter.spec.ts` 23/23. Keys: [PRESENTER_KEYS.md section 2a](rubric/demo_story/PRESENTER_KEYS.md). The keyboard is still how the 5:00 is driven |
+| Committed ([1141cfb](https://github.com/IshaanSirbhaiya/Tencent/commit/1141cfb)) | **Stage QA 30 Oct** (headless Chrome, 4 default walks, `B` at every step, grow walk-up, preflight, absence proof 12 of 12): no failed step; the slowest step (tamper) settles in 2.5 to 3.7 s. [STAGE_QA_30OCT.md](demo_day/STAGE_QA_30OCT.md) lists 11 risks |
+| Working tree | Stage QA fixes: the grow step waits up to 60 s for Jordan's graph (it timed out at 20 s, 2 of 2); `P` shows step 00 at once and Leo's warm-up runs after it; steps 05 and 06 stay "Working" until the Verify result or "Chain broken at entry N" is on screen; `B` on a slide shows "No recording for this step" instead of blacking the slide; the HUD model line reads "quoting (no model)"; `check_absent.py --all --sim` waits out the rate limit. Clip C is described as the in-app stand-in it is ([6ade8cf](https://github.com/IshaanSirbhaiya/Tencent/commit/6ade8cf)). Still open: record the real WorkBuddy clip C; re-record A and B on the final build (clip B shows "Model unknown · Ledger unknown") |
+| Committed ([8ae0f1f](https://github.com/IshaanSirbhaiya/Tencent/commit/8ae0f1f)) | Demo kit: `demo_up.sh` ignores Windows' PID 0 placeholder when it checks whether a port is held (it had read as "something is listening") |
+
+### Video tooling
+
+| Commit | Change |
+|---|---|
+| [6e58274](https://github.com/IshaanSirbhaiya/Tencent/commit/6e58274) | A failed re-record never overwrites the last good take (Codex 2b #3) |
+| [d89f55a](https://github.com/IshaanSirbhaiya/Tencent/commit/d89f55a) | Readiness pass: current numbers, nine CodeBuddy sessions, every number read from the evidence; longer-cut timeline plan. [READINESS_30OCT.md](video/READINESS_30OCT.md) |
+| [2669d40](https://github.com/IshaanSirbhaiya/Tencent/commit/2669d40) | Full script, scenes 17 to 21 (Act, Deliverables, upload, Miora, extras); `--cut short\|main\|full`; slots for teammate-recorded scenes |
+| [360d72b](https://github.com/IshaanSirbhaiya/Tencent/commit/360d72b) | Fable storytelling pass: hook, tagline at the tamper, new close, truth fixes, trims. [review_fable_script.md](video/review_fable_script.md) |
+| [54c80fb](https://github.com/IshaanSirbhaiya/Tencent/commit/54c80fb) | The script follows the **16 Oct video's spine beat by beat**, with each new feature attached to the beat it strengthens ("and now it also..."); criteria table; Tencent in the title. Main cut 7:56, short 6:18, full 9:43 ([VIDEO_PLAN.md](video/VIDEO_PLAN.md)). The video is still on hold; nothing was recorded |
+
+### Q&A banks, merge plan, app mode
+
+| Commit | Change |
+|---|---|
+| [5dba9c8](https://github.com/IshaanSirbhaiya/Tencent/commit/5dba9c8) | Q&A bank Q26 to Q48 (the new features and hard judge questions); judge click paths N1 to N7 ([QA_BANK.md](rubric/demo_story/QA_BANK.md), [JUDGE_QUESTION_BANK.md](rubric/demo_story/JUDGE_QUESTION_BANK.md)) |
+| [ab01042](https://github.com/IshaanSirbhaiya/Tencent/commit/ab01042) | **Merge plan** for the teammate's three branches (voice, just-in-time UI, dots) in that order, each into its own new branch, with hard-rule checklists, and a read-only `databridge/scripts/merge_precheck.py`. Nothing is merged. [MERGE_PLAN.md](MERGE_PLAN.md) |
+| [adfc568](https://github.com/IshaanSirbhaiya/Tencent/commit/adfc568) | **App mode, plan v2: "Demo story"** (a separate mouse-driven way through the same 11 steps, for the booth and judges' hands-on time; the 5:00 stays on the keyboard presenter). Plan v1 ([0c29e01](https://github.com/IshaanSirbhaiya/Tencent/commit/0c29e01)) and four reviews ([1717a4c](https://github.com/IshaanSirbhaiya/Tencent/commit/1717a4c) Opus, [ebe43dc](https://github.com/IshaanSirbhaiya/Tencent/commit/ebe43dc) Haiku and Fable, [1141cfb](https://github.com/IshaanSirbhaiya/Tencent/commit/1141cfb) Sonnet) are dispositioned in [PLAN_v2.md](app_mode/PLAN_v2.md). **Planned, not built:** build window Sat 31 Oct or Sun 1 Nov, stop rule Sun 18:00; no D-35 is written yet |
+
+Docs: the cross-cutting docs were brought up to date in this pass ([reviews/docs_pass_30oct_evening.md](reviews/docs_pass_30oct_evening.md)); the earlier evening pass is [60c0226](https://github.com/IshaanSirbhaiya/Tencent/commit/60c0226).
 
 ## 30 Oct 2026: the finals build
 

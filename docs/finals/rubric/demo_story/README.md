@@ -26,7 +26,7 @@ Tagline: **"Answers you can prove."** Product: Walnut DataBridge (Internal Brain
 1. Hy3 live status ([HY3]). The repo says it has not been run live. Lines that name Hy3 must be edited if it is not.
 2. The tester line needs a real fix-log row ([TESTER]).
 3. Presenter mode, Compare "same person, two questions", the sandbox tamper endpoint (B11), `/dev/journey/<req>` and the slide routes must exist. See `PRESENTER_KEYS.md`.
-4. Dev's "not touched the mouse" line is true only if all steps use keys (the `2` and `L` keys are proposed in the spec).
+4. Dev drives from the keyboard by default; the presenter bar also has clickable controls and the mouse side buttons work (PRESENTER_KEYS.md section 2a), as the fallback. The run sheet no longer says the mouse is never touched; if Dev uses the bar or a side button on the day, nothing in the script needs to change.
 5. Business model answer (Q23) is not decided: team to fill.
 6. Clips A, B, C are recorded after the freeze, not before.
 

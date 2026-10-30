@@ -1,5 +1,27 @@
 # Cloud handoff: Walnut DataBridge finals build (written Fri 30 Oct 2026, ~11:45 SGT)
 
+## Laptop session, 30 Oct evening (status; read this first)
+
+The laptop took over from the cloud on branch `final_v1.2` (the cloud's `final_v1.3` pointer is `1076517`).
+Full list: [CHANGELOG.md](CHANGELOG.md) "30 Oct 2026, evening (laptop)"; every fix and its test:
+[reviews/round4_dispositions.md](reviews/round4_dispositions.md).
+
+| What | State |
+|---|---|
+| Codex review of the cloud work (your item 3 below) | **Done in part**: 2 runs by budget, 0 critical, 15 high, 9 medium, 2 low; scope items 5 to 7 went to the Claude reviewers (Opus, Sonnet). Reviews committed |
+| Round-4 fixes (Act v3.2, `/ib/open`, Deliverables, sim and live poll, extraction, Drive, WorkBuddy token, preflight, role-only login chips, secrets, proxy open-link check, mouse and stage-QA presenter fixes) | **In the working tree, not committed.** **Full test re-run pending (final integration).** The counts in this file (1,131 backend, 166 web) are still the cloud's, from `831297e` |
+| Upload folder picker (D-34) | Built in the working tree; wait for your confirmation of D-34 |
+| Presenter mouse controls | Built in the working tree (`presenter.spec.ts` 23/23); keyboard stays the way the 5:00 is driven |
+| Stage QA (your item 7, headless Chrome) | Done: no failed step in 4 default walks, absence proof 12 of 12, `demo_day.ps1` ran. [STAGE_QA_30OCT.md](demo_day/STAGE_QA_30OCT.md) |
+| Real WorkBuddy clip C, re-record of A and B (item 4 and 7 below) | **Still open.** Clip C is an in-app stand-in; clip B shows "Model unknown · Ledger unknown" |
+| Video (item 5) | Still on hold; script now follows the 16 Oct spine, cuts short/main/full. Nothing recorded |
+| Q&A banks | Q26 to Q48 and judge click paths N1 to N7 written |
+| Teammate merge | Plan only ([MERGE_PLAN.md](MERGE_PLAN.md)); nothing merged |
+| "Demo story" app mode | Plan v2 only ([app_mode/PLAN_v2.md](app_mode/PLAN_v2.md)); build window Sat 31 Oct or Sun 1 Nov; nothing built |
+| Still only a person | Hy3 activation; hallway test; WorkBuddy GUI retest and the real clip C; the organiser email |
+
+The sections below are the cloud session's own hand-off, unchanged except where marked.
+
 ## Questions for Ishaan (needs you or the laptop; the cloud session keeps going on everything else)
 
 Updated by the cloud session, Fri 30 Oct 2026 (started ~11:45 SGT).

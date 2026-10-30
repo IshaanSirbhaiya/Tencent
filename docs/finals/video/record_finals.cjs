@@ -605,7 +605,11 @@ const SCENES = {
     }
     await page.keyboard.press('Escape'); await pause(page, 0.5);
   } },
-  '19_upload': { who: 'jdoe', mode: 'dev', async run(page) {                                // ~15 s
+  // Round-5 Opus #1: recorded as Leo (grp-product), who may WRITE to "Pricing & Offers" and "Vendor share"
+  // (fixtures/enterprise/world.json fd-6, fd-7). Jordan may write to no folder, so his picker would be empty.
+  // The folder is chosen by its label, never by position: "Pricing & Offers" is the one Leo can write to that
+  // Ken (ken.ext, a reader of "Vendor share") cannot open, so the sample never lands where Ken can read it.
+  '19_upload': { who: 'leo.ops', mode: 'dev', async run(page) {                             // ~15 s
     const FILE = path.join(repo, 'docs/finals/live_kit/files/Onboarding buddy guide.md');
     if (!fs.existsSync(FILE)) throw new Error(`upload sample missing: ${FILE}`);
     await goto(page, `${WEB}/dev/graph?add=1`, 0);
@@ -620,7 +624,13 @@ const SCENES = {
     await hover(page, page.getByTestId('graph-main-addsheet-picked'), 1.2);
     const folders = page.getByTestId('graph-main-addsheet-folders');
     if (!(await folders.waitFor({ timeout: 20000 }).then(() => true, () => false))) throw new Error('no upload folder list in this build');
-    await folders.selectOption({ index: 1 });
+    const UPLOAD_FOLDER = 'Pricing & Offers';
+    const folderValue = await folders.evaluate((el, want) => {
+      const o = Array.from(el.options).find((x) => x.value && x.textContent.trim() === want);
+      return o ? o.value : null;
+    }, UPLOAD_FOLDER);
+    if (!folderValue) throw new Error(`upload folder "${UPLOAD_FOLDER}" is not in this persona's list (see world.json)`);
+    await folders.selectOption({ value: folderValue });
     await pause(page, 0.6);
     await click(page, page.getByTestId('graph-main-addsheet-upload'), 0);
     await slow(page, page.getByTestId('graph-main-addsheet-upload-status').waitFor({ timeout: 60000 }));

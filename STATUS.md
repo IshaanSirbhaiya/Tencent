@@ -4,7 +4,16 @@
 Product: **Walnut DataBridge**, with **Internal Brain** as the ask product inside it.
 Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals/PLAN.md](docs/finals/PLAN.md).
 Every feature and its test: [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since
-the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md). As of branch `final_v1.3` (30 Oct).
+the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md). As of branch `final_v1.3` (30 Oct, cloud)
+plus the laptop's evening work on `final_v1.2` (below; the round-4 fixes are in the working tree, **not committed**, and
+**no full test re-run covers them yet: re-run pending (final integration)**).
+
+More 30 Oct evening documents: [MERGE_PLAN.md](docs/finals/MERGE_PLAN.md) (the teammate's three branches, nothing merged) ·
+[app_mode/PLAN_v2.md](docs/finals/app_mode/PLAN_v2.md) (the "Demo story" app mode, planned, not built) ·
+[STAGE_QA_30OCT.md](docs/finals/demo_day/STAGE_QA_30OCT.md) · video [READINESS_30OCT.md](docs/finals/video/READINESS_30OCT.md) and
+[review_fable_script.md](docs/finals/video/review_fable_script.md) · round-4 reviews
+[Codex](docs/finals/reviews/round4_codex_cloud_work.md), [Opus](docs/finals/reviews/round4_opus_web_kit.md),
+[Sonnet](docs/finals/reviews/round4_sonnet_ux_live.md), [dispositions](docs/finals/reviews/round4_dispositions.md).
 
 ## 1. Built
 
@@ -16,6 +25,7 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | Web app, User mode: sign-in, Ask with live stage events, sources sheet, History, Settings (English / 简体中文, accessibility), Compare, Value | Built | `databridge/apps/internal_brain_web/` |
 | Voice dictation in the Ask composer (browser speech, English / 简体中文, never auto-sends, hidden when unsupported) | Built (`1bc6b4c`) | `components/user/Composer.tsx`, `useDictation.ts`; `tests/e2e/voice.spec.ts` |
 | Web app, Developer mode: Mission control, Journey, Knowledge graph, Walnut engine, Analytics, Audit with sandbox tamper demo, Simulator, Trust centre | Built | same |
+| Presenter mouse controls (evening): clickable Next, Back, Skip, Start, Recording, Reset, Hide and Exit on the bar; mouse side buttons as Back and Next; browser Back steps the script back from the previous step's page. Keyboard-driven by default; the controls are the fallback | Built in the working tree, **not committed**; `presenter.spec.ts` 23/23 (re-run pending, final integration) | [PRESENTER_KEYS.md section 2a](docs/finals/rubric/demo_story/PRESENTER_KEYS.md), `components/presenter/` |
 | Presenter mode (11-step keyboard script, HUD 00 to 10; Stage theme, slides) and tours for both modes. The three live-growth steps are added only in a tab opened with `?grow=1` (14 steps), never on the 5:00 Space path | Built | `components/presenter/`, `components/tour/` |
 | Backup clips A, B, C for the presenter `B` key | Interim recordings (`baf8a07`); re-record after the Monday freeze; C is an in-app stand-in for WorkBuddy | `databridge/apps/internal_brain_web/public/clips/`, [BACKUP_PLAN.md](docs/finals/rubric/demo_story/BACKUP_PLAN.md) |
 | Security from the final reviews: Host allowlist on the Brain and the mock, proxy refuses foreign Host and cross-site GETs, SSE gate events held until sealed, engine snapshot readable only by its own persona | Built (`bc8414c`, `7bf3246`) | [SECURITY.md §15](docs/tencent/SECURITY.md#15-developer-views-and-the-finals-v2-additions-30-oct), [FEATURE_CATALOGUE §7](docs/finals/FEATURE_CATALOGUE.md#7-security-controls) |
@@ -23,27 +33,32 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | Hy3 readiness check; the launcher turns live Hy3 on by itself when TokenHub answers | Built (`8b69cbd`) | [`databridge/scripts/hy3_check.py`](databridge/scripts/hy3_check.py) |
 | Rubric evidence pack, one deliverable set per criterion | Written | [docs/finals/rubric/README.md](docs/finals/rubric/README.md) |
 | WorkBuddy connectors (ask as a person; compliance audit) | Built; new MCP tools added 30 Oct (answer receipt, what I can open, org summary, tamper demo; `9afd1bd`); live WorkBuddy test 33/33. Source text is framed as data; the compliance connector is never written into the shared WorkBuddy config (`--compliance-user-config` on its own seat, or its own workspace; D-30, `2b339c8`) | `docs/tencent/workbuddy/` |
-| Act: draft a reply or a follow-up ticket, created only after the person confirms | Built and tested (`test_act.py` 21, `test_act_e2e.py` 6 passed; e2e `act.spec.ts` 8 tests); committed in `8312864`; v3.1 after the round-2 and 2b reviews (per-person rate limit and cap, gated source links, confirm re-check, draft grounding 80 %: `ca014cd`, `7fa6319`, D-28, D-31) | `databridge_ib/actions.py`, `components/user/ActSheet.tsx`; [backend_v1.md](docs/finals/contracts/backend_v1.md) |
+| Act: draft a reply or a follow-up ticket, created only after the person confirms | Built and tested (`test_act.py` 21, `test_act_e2e.py` 6 passed; e2e `act.spec.ts` 8 tests); committed in `8312864`; v3.1 after the round-2 and 2b reviews (per-person rate limit and cap, gated source links, confirm re-check, draft grounding 80 %: `ca014cd`, `7fa6319`, D-28, D-31). **v3.2 (evening, working tree, not committed)** after the round-4 Codex review: `action.requested` written before the source check, the model call and a replay; draft floor also checks negation, numbers and names; one create per answer; `/ib/open` returns one 404 for any access-check error and is rate limited ([round4_dispositions.md](docs/finals/reviews/round4_dispositions.md), tests `test_act_round4.py`, `test_open_route.py`) | `databridge_ib/actions.py`, `components/user/ActSheet.tsx`; [backend_v1.md](docs/finals/contracts/backend_v1.md) |
 | Live graph growth and add-document (demo-only: `IB_DEMO_FEATURES=1` and the Settings switch) | Built and tested; committed in `8312864` (proxy route `1079bd2`); round-3 review fixes in `19603c8`, `7a8f709`, `d8f8de7`. Presenter grow steps only in a `?grow=1` tab (D-26) | [live_growth/STATUS.md](docs/finals/live_growth/STATUS.md) |
-| Deliverables from an answer (kill switch `IB_DELIVERABLES`, D-25): Table and Chart with no model, Analysis ("Needs the model" until Hy3 is live), Slides `.pptx` export with the formula guard. Summary not built (D-29) | Built and tested offline (`1701515`, round-3 fixes `7a8f709`); model path tested with a fake chain only | [deliverables/STATUS.md](docs/finals/deliverables/STATUS.md), FEATURE_CATALOGUE §12 |
-| File uploads into Drive (Word, Excel, PowerPoint, PDF, CSV, Markdown, WhatsApp export; demo-only, `/sim/upload-file` mounted only with demo features and demo sign-in) | Built and tested (`8312864`, round-3 fixes `7a8f709`). The folder is entered by id; there is no folder picker | [contracts/uploads.md](docs/finals/contracts/uploads.md) |
+| Deliverables from an answer (kill switch `IB_DELIVERABLES`, D-25): Table and Chart with no model, Analysis ("Needs the model" until Hy3 is live), Slides `.pptx` export with the formula guard. Summary not built (D-29) | Built and tested offline (`1701515`, round-3 fixes `7a8f709`); model path tested with a fake chain only. Evening round-4 fixes in the working tree (B1 to B6, B12, B14: export ledgered first, `.pptx` formula guard order, number and label binding, capped body read, honest speaker notes; new wording and a "Download slides (.pptx)" button), not committed | [deliverables/STATUS.md](docs/finals/deliverables/STATUS.md), FEATURE_CATALOGUE §12 |
+| File uploads into Drive (Word, Excel, PowerPoint, PDF, CSV, Markdown, WhatsApp export; demo-only, `/sim/upload-file` mounted only with demo features and demo sign-in) | Built and tested (`8312864`, round-3 fixes `7a8f709`). **Evening (D-34, working tree, not committed): a folder picker** lists, by name, only the Drive folders the person may upload into (`GET /sim/upload-folders`); the typed folder id is a collapsed fallback; the write permission is re-checked right before the write (`test_upload_folders.py`, `test_uploads.py`) | [contracts/uploads.md](docs/finals/contracts/uploads.md) |
 | Everyday-company world (append-only: 34 people, 1,207 documents, 72 facts, 546 questions) | Built and verified (`8312864`); 464 earlier questions answer byte-identically; eval 0 / 7,374 | [WORLD_EXPANSION_STATUS.md](docs/finals/WORLD_EXPANSION_STATUS.md) |
 | One-click demo kit (`Start/Stop/Reset Walnut Demo.cmd`, `demo_day.ps1`, `demo_preflight.py`) | Built (`a1ccc6c`) | repo root, `databridge/scripts/` |
 | CodeBuddy sessions CB7 to CB9 on the finals code | Done (`9afd1bd`) | [TENCENT_TOOLS_REPORT.md](docs/finals/rubric/ai_innovation/TENCENT_TOOLS_REPORT.md) |
 | Live-ingestion kit | Written (`6c868bb`) | [LIVE_INGEST_KIT.md](docs/finals/live_kit/LIVE_INGEST_KIT.md) |
 | Printable handouts | Built (`f0f84bd`) | `submission/finals/handouts_src/` |
-| Video tooling (script, recorder, assembler) | Built (`215e31c`); the video is on hold | `docs/finals/video/`, `submission/finals_video/` |
+| Round-4 reviews of the cloud work (Codex 0 critical / 15 high / 9 medium / 2 low; Opus 0 / 0 / 4 / 9; Sonnet 12 open, 11 verified fixed) and their fixes | Reviews committed (`c37b141`, `df9365d`, `de94005`); fixes in the working tree, **not committed** | [round4_dispositions.md](docs/finals/reviews/round4_dispositions.md) |
+| Stage QA 30 Oct: 4 default walks, `B` at every step, grow walk-up, preflight, absence proof 12/12 | Done (`1141cfb`); 11 risks listed, the presenter ones fixed in the working tree; real WorkBuddy clip C and re-recorded A and B still open | [STAGE_QA_30OCT.md](docs/finals/demo_day/STAGE_QA_30OCT.md) |
+| Q&A bank Q26 to Q48 and judge click paths N1 to N7 | Written (`5dba9c8`) | [QA_BANK.md](docs/finals/rubric/demo_story/QA_BANK.md) |
+| Teammate merge plan (voice, just-in-time UI, dots) and the read-only `merge_precheck.py` | Written (`ab01042`); **nothing merged** | [MERGE_PLAN.md](docs/finals/MERGE_PLAN.md) |
+| "Demo story" app mode (mouse-driven, for the booth and hands-on time; the 5:00 stays on the keyboard presenter) | **Planned, not built.** Plan v2 after four reviews (`adfc568`); build window Sat 31 Oct or Sun 1 Nov | [app_mode/PLAN_v2.md](docs/finals/app_mode/PLAN_v2.md) |
+| Video tooling (script, recorder, assembler) | Built (`215e31c`); evening: take safety (`6e58274`), script on the 16 Oct spine beat by beat with cuts short/main/full (`2669d40`, `360d72b`, `54c80fb`). The video is still on hold; nothing recorded | `docs/finals/video/`, `submission/finals_video/` |
 | Persona suggestion chips: starter questions verified against the live pipeline | Built (`ec502cd`) | `databridge/apps/internal_brain_web/lib/personas.ts` |
 
 ## 2. Tested
 
 | Check | Result | Where |
 |---|---|---|
-| Backend tests (Internal Brain) | **1,131 passed**, 0 failed, commit 831297e, 30 Oct 2026, cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1` | `databridge/apps/internal_brain/tests/` |
+| Backend tests (Internal Brain) | **Re-run pending (final integration)**; the number is from the cloud run, before the evening fixes. **1,131 passed**, 0 failed, commit 831297e, 30 Oct 2026, cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1` | `databridge/apps/internal_brain/tests/` |
 | Mock platforms, fixtures, web typecheck | Mock platforms 154 passed; fixtures (enterprise) 47 passed; web `tsc --noEmit` clean (30 Oct 2026, cloud: Linux, commit 831297e) | `databridge/apps/mock_platforms/tests/`, `databridge/fixtures/`, `databridge/apps/internal_brain_web/` |
 | Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT; re-run again on this tree in the cloud after the day's backend changes, unchanged) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
-| Web end-to-end tests (Playwright, axe) | 166 passed, 0 failed, 41 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, cloud: Linux, commit 831297e; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Web end-to-end tests (Playwright, axe) | **Re-run pending (final integration)**; before the evening fixes. 166 passed, 0 failed, 41 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, cloud: Linux, commit 831297e; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
 
 ## 3. Pending
 
@@ -54,9 +69,11 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | **Venue rehearsal** | Team, Mon 2 Nov 16:00–17:00 (mandatory) | Run sheet: [RUN_SHEET.md](docs/finals/rubric/demo_story/RUN_SHEET.md); checklist: [VENUE_TECH_CHECKLIST.md](docs/finals/rubric/demo_story/VENUE_TECH_CHECKLIST.md) |
 | The new demo video (on hold; tooling committed, raw clips not) | Build team | Listed in [CHANGELOG.md → In progress](docs/finals/CHANGELOG.md#in-progress) |
 | **WorkBuddy GUI retest** in the real app | Ishaan's laptop (needs his OK for screen control) | [WORKBUDDY_GUI_TEST.md](docs/finals/rubric/ai_innovation/WORKBUDDY_GUI_TEST.md); prompts 5–6 run from the compliance workspace or seat (D-30) |
-| **Confirm cloud decisions D-26 to D-33** | Ishaan | [DECISIONS.md](docs/finals/DECISIONS.md) |
+| **Confirm cloud decisions D-26 to D-34** (D-34 is the upload folder picker) | Ishaan | [DECISIONS.md](docs/finals/DECISIONS.md) |
 | Re-record the backup clips | Build team, after the Monday freeze | Entry numbers and timings can change |
-| **Codex review** of the cloud session's work | Ishaan's laptop | No Codex in the cloud. Scope: everything after commit 9632dd2 (see `docs/finals/CLOUD_HANDOFF.md`) |
+| **Codex review** of the cloud session's work | Done in part (round 4, 2 runs by budget) | Items 5 to 7 of the scope were left to the Claude reviewers. [round4_codex_cloud_work.md](docs/finals/reviews/round4_codex_cloud_work.md) |
+| **Commit the round-4 fixes and run everything again** | Coordinator | Backend, web e2e (`presenter.spec.ts`, `act.spec.ts`, `deliverables.spec.ts`, `grow.spec.ts`, `preflight.spec.ts`), the eval; then update every count |
+| Build the "Demo story" app mode, then the teammate merge | Build team, Sat 31 Oct to Sun 1 Nov | Stop rule Sun 1 Nov 18:00 for the app mode; merge order voice, then just-in-time UI, then dots |
 | `demo_day.ps1` run once | Ishaan's laptop | Edited in the cloud to stop only this repo's processes; PowerShell was not run there |
 | Lighthouse server | Tencent (sold out) | Optional. The local run is the documented path |
 

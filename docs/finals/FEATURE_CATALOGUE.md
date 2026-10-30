@@ -5,9 +5,13 @@
 Every user-visible feature and every backend capability of the finals build, with who can use it,
 where it is, how to try it, the rules it keeps, the tests that prove it, and its screenshots.
 
-Branch `final_v1.3`, as of commit `1076517` (30 Oct 2026). What changed and when:
-[CHANGELOG.md](CHANGELOG.md). Work that is not committed yet is listed only in
-[CHANGELOG.md → In progress](CHANGELOG.md#in-progress), not here.
+Branch `final_v1.3` was verified at commit `1076517` (30 Oct 2026). **Updated on the laptop, 30 Oct evening
+(branch `final_v1.2`):** the rows marked *evening* below (presenter mouse controls, the upload folder picker, Act
+v3.2, the Deliverables wording and `.pptx` notes) describe round-4 fixes that are **in the working tree and not
+committed yet**, and **no full test re-run covers them yet: re-run pending (final integration).** Test counts
+quoted in this file (1,131 backend, 166 web) are from the cloud run at `831297e`. What changed and when:
+[CHANGELOG.md](CHANGELOG.md) ("30 Oct 2026, evening (laptop)"). Planned and not built: the "Demo story" app mode
+([section 13](#13-act-and-what-is-planned)).
 
 ## 0. Read this first
 
@@ -17,7 +21,7 @@ Branch `final_v1.3`, as of commit `1076517` (30 Oct 2026). What changed and when
 | Platforms | Mock Slack, Confluence, Jira and Drive with the real APIs' shapes, permission models and webhooks. Not run against a live tenant |
 | Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Not live yet** (TokenHub activation pending; every model call returns HTTP 402 with code 401006). Until then answers say "Quoted from sources (no model)" |
 | Sign-in | A demo login standing in for single sign-on. No password; optional passcode (`IB_DEMO_PASSCODE`) |
-| Numbers | 1,131 backend tests pass, 0 fail (30 Oct, cloud: Linux, Python 3.13, commit `831297e`). Web e2e (Playwright, mock mode): 166 passed, 0 failed, 41 skipped; the skipped specs need the live stack, the engine proxy or Hy3 ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 7,374 requests, 0 of 400 pairs differ, 0 injection hard failures in 1,152 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
+| Numbers | **Re-run pending (final integration): the counts below predate the evening round-4 fixes.** 1,131 backend tests pass, 0 fail (30 Oct, cloud: Linux, Python 3.13, commit `831297e`). Web e2e (Playwright, mock mode): 166 passed, 0 failed, 41 skipped; the skipped specs need the live stack, the engine proxy or Hy3 ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 7,374 requests, 0 of 400 pairs differ, 0 injection hard failures in 1,152 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
 
 ### The rules every feature keeps
 
@@ -56,7 +60,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 
 1. [User mode](#1-user-mode): U1 Sign-in · U2 Ask · U3 Voice dictation · U4 Cited answer and sources sheet · U5 Refusal · U6 History · U7 Settings · U8 Value calculator · U9 Map (pre-finals)
 2. [Compare](#2-compare): C1 Two people, one question · C2 One person, two questions
-3. [Presenter](#3-presenter): P1 Presenter mode · P2 Stage theme · P3 Slides · P4 Backup clips
+3. [Presenter](#3-presenter): P1 Presenter mode · P1a Mouse controls · P2 Stage theme · P3 Slides · P4 Backup clips
 4. [Developer mode](#4-developer-mode): D1 Mission control · D2 Request journey · D3 Knowledge graph · D4 Walnut engine · D5 Analytics · D6 Audit · D7 Tamper demo · D8 Simulator · D9 Trust centre · D10 Style guide
 5. [Shell, tours and navigation](#5-shell-tours-and-navigation): S1 Mode switch · S2 Command palette · S3 Tours · S4 Deep links and session check
 6. [Backend APIs](#6-backend-apis): B1 to B12
@@ -66,6 +70,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 10. [Evidence](#10-evidence)
 11. [Demo-proof features](#11-demo-proof-features-behind-a-toggle-d-24): G1 Watch the brain grow · G2 Add a document · G3 Not in the brain yet · G4 Engine refresh · G5 The toggle
 12. [Deliverables from an answer](#12-deliverables-from-an-answer-kill-switch-d-25): V1 Table, chart, analysis (P0) · V2 Slides export (P1)
+13. [Act, and what is planned](#13-act-and-what-is-planned): K1 Act v3.2 · K2 Proxy open-link check · Planned: the "Demo story" app mode (not built)
 
 ---
 
@@ -211,7 +216,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 
 | | |
 |---|---|
-| What | The 11-screen run sheet (title, then 10 steps) driven by keys, so one person drives the demo without a mouse. Signs the right people in, runs Compare, opens citation [2], the journey as Maya, Verify, the tamper demo, the WorkBuddy card, then slides |
+| What | The 11-screen run sheet (title, then 10 steps) driven by keys by default (the same actions are also clickable buttons, [P1a](#p1a-presenter-mouse-controls-evening-30-oct)), so one person drives the demo. Signs the right people in, runs Compare, opens citation [2], the journey as Maya, Verify, the tamper demo, the WorkBuddy card, then slides |
 | Who | The demo driver. Keys work only when armed |
 | Where | http://127.0.0.1:3100/compare?present=1 (or `/present?present=1`). Script: `components/presenter/script.ts`; keys: `controller.ts` |
 | How | 1. Open the URL. 2. Press **P** (arm and start). 3. Press **Space** for each step. Other keys: **←** back, **→** skip a failed step, **B** backup clip, **R** reset (asks first), **L** 中文, **S** Stage theme, **2** open citation [2], **Esc** hide the bar, **?** key legend, **Ctrl+Shift+P** disarm |
@@ -219,6 +224,19 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 | Tests | `presenter.spec.ts` (11 tests, incl. "P then Space walks the whole script from the keyboard", "a slot sign-in failure fails the Compare step…", "no stale request id after a failed run", "reset during a pending Compare step…") |
 | Screens | [live/presenter-step-00-title.png](screens/live/presenter-step-00-title.png) to [live/presenter-step-10-close.png](screens/live/presenter-step-10-close.png) · [live/presenter-armed.png](screens/live/presenter-armed.png) · [presenter/stage-reset-confirm.png](screens/presenter/stage-reset-confirm.png) |
 | Docs | [RUN_SHEET.md](rubric/demo_story/RUN_SHEET.md) · [PRESENTER_KEYS.md](rubric/demo_story/PRESENTER_KEYS.md) |
+
+### P1a. Presenter mouse controls (evening, 30 Oct)
+
+| | |
+|---|---|
+| What | Clickable controls on the presenter bar, so the demo can be driven or rescued with the mouse. **Keyboard-driven by default; the clickable controls are the fallback.** Next (= `Space`), Skip this step (= `→`, only on a failed step), Back (= `←`), Start (= `P`, before it), Recording (= `B`, only when the step has a clip), Reset the demo (= `R`, same confirm), Hide the bar (= `H`, a "Show the presenter bar" handle stays bottom-right), Exit presenter (= `Ctrl+Shift+P`), More controls (= `?`) |
+| Who | The demo driver |
+| Where | `components/presenter/PresenterBar.tsx`; each control calls the same function as its key in `controller.ts` (`advance`, `goBack`, `startOnce`, `toggleClip`, `askReset`, `toggleHidden`, `exitPresenter`) |
+| Side buttons | The mouse's back and forward side buttons are Back and Next while armed; the browser does not also go back or forward. Ignored while a dialog has the input |
+| Browser Back | Going back to the **previous step's page** steps the script back with it. Any other history move (Forward, or Back to a page the driver opened by clicking around) is left to the browser; the next Next opens its own page. Ignored while a step runs |
+| Guarantees | Same busy, 400 ms debounce and failed-step rules as the keys. Ordinary clicks (links, navigation, answer cards) are never taken over. Every control has a tooltip with its key, an accessible name, `aria-keyshortcuts`, a focus ring and a 32 px target; English and 简体中文. On Stage the bar is one row and shows only "More" |
+| Tests | `presenter.spec.ts` 23/23 (includes "armed: ordinary clicks stay ordinary"); *re-run pending (final integration)*. Spec: [PRESENTER_KEYS.md section 2a](rubric/demo_story/PRESENTER_KEYS.md) |
+| Limits | Not committed yet at the time of writing. The side-button and browser-Back rules are tested in a headless browser, not with a physical mouse on the stage laptop |
 
 ### P2. Stage theme
 
@@ -527,8 +545,8 @@ tests (Python 3.13) and the web typecheck (Node 20); and a Lighthouse deploy kit
 | Evidence | What it holds | File |
 |---|---|---|
 | Leak evaluation | 0 leaks / 7,374; 0 / 400 differential; 0 injection hard failures / 1,152; generated 30 Oct 03:27 UTC (11:27 SGT) on the finals pipeline | [RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](../../databridge/apps/internal_brain_web/public/eval_summary.json) |
-| Backend tests | 1,131 passed, 0 failed at `831297e` (30 Oct, cloud: Linux, Python 3.13) | `databridge/apps/internal_brain/tests/` |
-| Web e2e | 166 passed, 0 failed, 41 skipped (need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow` and `deliverables` (30 Oct, cloud, `831297e`) | [TEST_REPORT.md](TEST_REPORT.md) |
+| Backend tests | **Re-run pending (final integration).** 1,131 passed, 0 failed at `831297e` (30 Oct, cloud: Linux, Python 3.13) | `databridge/apps/internal_brain/tests/` |
+| Web e2e | **Re-run pending (final integration).** 166 passed, 0 failed, 41 skipped (need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow` and `deliverables` (30 Oct, cloud, `831297e`) | [TEST_REPORT.md](TEST_REPORT.md) |
 | Live QA | Every page × persona against the real backend: 32 checks, 11 bugs fixed, issues listed | [QA_LIVE.md](QA_LIVE.md) |
 | Final reviews | Five models: security, UX, claims, code | [reviews/](reviews/final_opus_security.md) ([Opus security](reviews/final_opus_security.md) · [Sonnet UX](reviews/final_sonnet_ux.md) · [Haiku claims](reviews/final_haiku_claims.md) · [Codex](reviews/final_codex.md) · [Fable](reviews/final_fable.md)) |
 | Rubric pack | Each of the 10 criteria: seen live, in the app, to read | [rubric/README.md](rubric/README.md) |
@@ -567,6 +585,7 @@ plan: [live_growth/PLAN.md](live_growth/PLAN.md).
 | What | A sheet with two tabs: **Slack note** (channel list built only from the person's own map; 2,000-character counter) and **Upload a file** (Word, Excel, PowerPoint, PDF, CSV, Markdown, text, WhatsApp export; sample files listed) |
 | Who | The signed-in person, as themselves (no author field); demo sign-in on |
 | Where | `/dev/graph` toolbar → `POST /sim/add-document`, `POST /sim/upload-file` |
+| Folder picker (evening, D-34; re-run pending) | The upload tab lists folders by name from `GET /sim/upload-folders`: only the folders the person may upload into, checked live; a collapsed "Advanced: folder ID" field only when the list is empty or fails (D-34; `test_upload_folders.py`, `grow.spec.ts`) |
 | How | **Add a document** → pick `#db-migration` → paste the note → **Post to Slack** |
 | Guarantees | Live membership checked at the source at post time; one 404 for every refusal; 5 per minute; the IB never indexes the text directly (signed webhook, re-fetch, mask); answerable at once with a citation by channel members, the constant refusal for Ken; reset removes it |
 | Tests | `test_sim_add_document.py` (20 tests, 29 runs, incl. validation, live membership, A1 byte-identical refusals, rate limit, deployed); `test_live_growth.py::test_added_note_is_answerable_by_members_and_ken_gets_the_constant_refusal`, `::test_sensitive_values_in_a_note_are_masked_everywhere`; uploads: `test_uploads.py` |
@@ -620,13 +639,51 @@ record nothing). Security notes: `docs/tencent/SECURITY.md` §15.14; contracts:
 | Status | **Offline (no model), tested:** Table (copied from a CSV-shaped block of a cited source, else quoted source sentences) and Chart (from a numeric source column, e.g. "FX margin by market" SG 0.35 / HK 0.35 / ID 0.4). **Analysis says "Needs the model"** without one. The model path (Hy3 or DeepSeek, task `ib_deliver`) is tested with a fake model chain only; Hy3/TokenHub was not live for this feature's cloud run |
 | Guarantees | Built on Act's context (ownership, sealed answer hash, live Gate 1 + Gate 2 on every cited document); one 404 for every not-found case; paired worlds with and without restricted content give identical outputs; every number lies exactly on a number span of its own cited source line, bound to its label, unit and currency worked out by our code (Opus review items 1-5); write-ahead `deliverable.requested/created/exported/failed` with counts and digests only; exports re-check the sources; formula guard on every CSV cell |
 | Tests | `test_deliverables_verify.py` (70, incl. T14 `::test_adversarial_points_are_dropped`, `::test_label_binding_csv_row_and_prose_nearest`, `::test_csv_formula_guard`); `test_deliverables.py` (24, incl. `::test_offline_table_chart_and_needs_model`, `::test_restricted_question_equals_a_world_without_it`, `::test_someone_elses_unknown_and_refused_are_one_404`, `::test_ledger_outage_is_503_and_nothing_happens`, `::test_bodies_carry_no_identity_and_flag_off_is_404`); `test_deliverables_eval.py::test_no_leak_or_injection_through_deliverables_and_exports` (T16); web `deliverables.spec.ts` (4, mock, axe) |
+| Wording (evening, 30 Oct) | The by-line reads "Copied cell by cell from source [2]" (table) or "Charted from the table in source [2]" (chart), and a quiet info line says "No AI model was used: this was built by code, straight from your sources." (it no longer says "no model" in the by-line). The four fixed sheet titles are translated in 简体中文; a title worded from the source is shown as returned, marked English. Source chips have a screen-reader name ("Source 2: title"), and a "Skip to Copy and downloads" button follows the title. Tests: `deliverables.spec.ts` (by-line, info line, skip, zh title) |
+| Round-4 hardening (evening) | An export writes `deliverable.requested` (with `export_format`) before Gate 2 and the source read; a model title and a model-or-fallback build are re-checked after a revoked source; each analysis number must sit in ONE source row or clause with its names (identifiers and dates are checked for presence only); a table or chart label must be its column header or clause; the rate limit and a capped 4 KB body read come first. Tests: `test_deliverables.py::test_r4_b1_*` to `::test_r4_b12_*`, `test_deliverables_verify.py::test_r4_b5_*`, `::test_r4_b6_*`; *re-run pending (final integration)*. Detail: [round4_dispositions.md](reviews/round4_dispositions.md), SECURITY section 15.14 |
 | Screens | [deliverables/mock-1-table-dark.png](screens/deliverables/mock-1-table-dark.png) · [deliverables/mock-2-chart-dark.png](screens/deliverables/mock-2-chart-dark.png) · [deliverables/mock-3-analysis-dark.png](screens/deliverables/mock-3-analysis-dark.png) · [deliverables/mock-4-chart-light.png](screens/deliverables/mock-4-chart-light.png) (mock data; the live UI run is not done) |
 
 ### V2. Slides export (.pptx, P1)
 
 | | |
 |---|---|
-| What | **Download .pptx** for a ready table or chart: title slide, the native table or an editable native chart, a Sources slide, speaker notes saying what was checked |
+| What | **Download slides (.pptx)** for a ready table or chart: title slide, the native table or an editable native chart, a Sources slide, speaker notes saying what was checked (the button label changed in the evening pass; before it read "Download .pptx") |
+| Speaker notes (evening, B14) | They differ by slide type and claim only what that type checked. Chart slide: each value was matched to a number in its cited source cell or line, bound to its label. Table slide: the same for its numbers, and its other cells were found in the same source row or sentence. Title and Sources slides: they name the deck and its sources and state no values. Test: `test_deliverables.py::test_r4_b14_speaker_notes_claim_only_what_each_slide_type_checked` (opens the `.pptx`) |
+| Formula safety (evening, B1) | Control characters are stripped before the formula guard, and the chart's embedded workbook writes every string cell as a string, so a planted `{=SUM(1,1)}` cannot become an array formula. Tests open the produced `.pptx`, extract the embedded workbook and find no formula cell: `test_deliverables.py::test_r4_b1_*` |
 | Status | Backend built and tested offline (no model needed); offered only when python-pptx and XlsxWriter are installed (not in the Lighthouse image). The web button shows when the response lists `pptx`; not yet clicked in a live browser. Summary (P1) is **not built** |
 | Guarantees | Built from the stored, re-checked content; every string in the deck and in the chart's embedded workbook passes the formula guard (Opus review #4, T15); 2 MB cap; `deliverable.exported` before the bytes |
 | Tests | `test_deliverables.py::test_pptx_embedded_workbook_has_no_formulas`, `::test_pptx_deck_is_built_from_the_checked_content_without_a_model`, `::test_pptx_export_rechecks_a_revoked_source_and_records_failures`; `test_deliverables_verify.py::test_pptx_writer_guards_planted_hyperlink_in_categories_series_and_text`; the T16 eval exports .pptx too |
+
+## 13. Act, and what is planned
+
+### K1. Act: draft a reply, or a follow-up ticket (v3.2, evening 30 Oct)
+
+Built before the evening (`8312864`, v3.1 after rounds 2 and 2b); the rows below add what round 4 changed.
+Code: `databridge_ib/actions.py`, `components/user/ActSheet.tsx`. Contract: [backend_v1.md](contracts/backend_v1.md)
+"Act v3.2". Security: SECURITY section 15.11.
+
+| | |
+|---|---|
+| What | Under a cited answer: **Draft the reply** (the Brain never sends it; Copy only) and **Create a follow-up ticket** (a Jira issue, created only after the person confirms). Source links in a ticket are `/ib/open/<token>` links that open only for people allowed to open that source |
+| Who | The asker, for their OWN released answer; a ticket needs the Jira create right (by default the Developers role) |
+| Where | `POST /ib/act/draft`, `/ib/act/ticket/propose`, `/ib/act/ticket/confirm`, `/ib/act/ticket/cancel`; `GET /ib/open/{token}` |
+| Behaviour in v3.2 | **Ledger first:** `action.requested` is written (stages `accepted`, `decided`, `replayed`) before the live source check, the model call and a stored result; a ledger failure is the 503 before any of them. **Draft floor:** the 80 % rule stays, and a sentence also fails on a capitalised word not in its cited facts, a number not in its anchor sentence, or a negation that differs; a failing draft falls back to the cited sentences. **One create per answer:** two proposals confirmed together never both create; the second is `409 outcome_unknown` and stays pending. **Caps** hold under concurrent proposals; unknown-outcome holds are swept. **`/ib/open`:** an access-check error is the same 404 as an unknown token; 30 a minute per person; only the first over-limit call per window is ledgered |
+| What the person sees | Cannot create: "You can't create a follow-up ticket from this answer. You can still draft a reply." plus a Draft a reply button (no "Create..." header). The draft sheet is titled "Reply draft"; a chat handle (`priya.sre: ...`) shows as the person's name in the view (the copied text is the server's). Ticket text states the link rule once and ends with `Reference: <req_id>`. A 429 reads "Too many requests in a short time. Try again in a minute." After an unknown outcome, re-opening the sheet says so |
+| Tests | `test_act.py`, `test_act_round2.py`, `test_act_round4.py` (`::test_draft_ledger_down_is_503_before_any_source_check_or_model_call`, `::test_floor_negation_must_match_its_source`, `::test_two_proposals_confirmed_together_never_both_create`, `::test_the_store_cap_holds_under_concurrent_proposals`, `::test_only_the_first_over_limit_act_call_per_window_is_ledgered`), `test_open_route.py` (`::test_an_access_check_error_is_the_unknown_token_404`, `::test_open_is_rate_limited_per_person_and_ledgered_once_per_window`), `test_mock_jira_create.py::test_an_empty_create_acl_means_nobody_may_create`; web `act.spec.ts`. *Re-run pending (final integration).* The e2e "re-opening the ticket sheet after an unknown outcome says so" was written, not run (it needs a separate mock dev server) |
+| Limits | The web mock's ticket description still has the old text. A lower-case or CJK name in a draft is caught only by the 80 % rule. Outcome state is in memory in one process |
+
+### K2. Proxy open-link check (evening)
+
+On `ib/open/<32 hex>`, when the browser sends Sec-Fetch headers, the proxy requires `Sec-Fetch-Dest: document`,
+`Sec-Fetch-Mode: navigate` and `Sec-Fetch-User: ?1` (a real click); a scripted navigation, an iframe or a fetch is the
+one 404. Without those headers (curl, tests) the Brain's rate limit applies. Test: `act.spec.ts` "engineer: a
+follow-up ticket...". Offline mock tickets link to the page's own origin and the mock has an `ib/open` route.
+
+### Planned, not built: "Demo story" app mode
+
+A separate, mouse-driven way through the same 11 steps (chapters), for the booth and judges' hands-on time and
+for rehearsal on another laptop. In a normal browser window, so the browser's Back and Forward work. **The 5:00
+stays on the keyboard presenter**, which already has clickable controls ([P1a](#p1a-presenter-mouse-controls-evening-30-oct)).
+Plan v2 after four reviews: [app_mode/PLAN_v2.md](app_mode/PLAN_v2.md). **Nothing is built; no D-35 is written.**
+Build window Sat 31 Oct or Sun 1 Nov; if Phase 1 is not green by Sun 1 Nov 18:00 it does not ship.
+

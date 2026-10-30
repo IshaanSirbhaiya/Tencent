@@ -67,7 +67,7 @@ header is ordinary text. Not accepted: `.doc`, `.xls`, `.ppt`, macro-enabled fil
 |---|---|---|
 | Demo only | Needs `IB_DEMO_LOGIN=1` AND `IB_DEMO_FEATURES=1`, never with `IB_DEPLOYED=1`. Otherwise `build_app` does not mount the route (round 3 L3): it answers what an unknown route answers (404, also without a session) and writes nothing. A router built directly refuses every person, `admin_it` included. | `test_demo_features.py::test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login`, `test_uploads.py::test_demo_only_switches_refuse_everyone_including_admin_it`, `::test_demo_features_switch_is_read_like_the_other_switches` |
 | Identity | From the session only; an extra body field is refused; Drive records the person's own account as the uploader. | `::test_the_body_names_no_person_and_the_owner_is_the_signed_in_person` |
-| Write permission | An employee needs `writer`, `fileOrganizer`, `organizer` or `owner` on the folder (to them, a group they are in, or the company domain), read LIVE from Drive at upload time, one attempt; any source error is a refusal. Read access is not enough. `admin_it` may upload into any existing folder. | `::test_write_permission_is_required_and_read_is_not_enough`, `::test_write_permission_is_read_live_from_drive`, `::test_a_source_error_on_the_live_check_is_a_refusal`, `::test_admin_it_may_upload_into_any_folder` |
+| Write permission | An employee needs `writer`, `fileOrganizer`, `organizer` or `owner` on the folder (to them, a group they are in, or the company domain), read LIVE from Drive at upload time, one attempt; any source error is a refusal. Read access is not enough. `admin_it` may upload into any existing folder. The live check runs again right before the Drive write, after extraction (round 4 Codex B9), and the mock Drive itself refuses an uploader without WRITE at insert (`403 insufficientFilePermissions`; a directory `admin_it` stands in for the Workspace admin). | `::test_write_permission_is_required_and_read_is_not_enough`, `::test_write_permission_is_read_live_from_drive`, `::test_write_permission_is_rechecked_just_before_the_drive_write`, `::test_a_source_error_on_the_live_check_is_a_refusal`, `::test_admin_it_may_upload_into_any_folder`; `apps/mock_platforms/tests/test_mock_drive_upload.py::test_an_uploader_without_write_on_the_folder_is_refused_and_nothing_changes` |
 | Body limit | Over 7 MiB is refused from `Content-Length` or while streaming, before JSON parsing or base64 decoding. | `::test_oversized_body_is_refused_before_decoding` |
 | File checks | Extension whitelist; bytes must match (OOXML zip with its own part folder, `%PDF-`, strict UTF-8 without NUL); at most 5 MiB; zip at most 2,000 entries and 64 MiB uncompressed (declared and streamed), ratio cap; no DTD or entity in any XML-bearing member (named `.xml`/`.rels`/`.vml` OR starting like XML after a BOM, NULs and whitespace, whatever its name; scanned as bytes and with NULs removed, so UTF-16/32 is covered; any other declared encoding is refused as `xml_encoding`; binary members are not scanned, and python-docx/python-pptx parse with `resolve_entities=False` as a second layer, round 3 L2); no `vbaProject.bin` or macro-enabled content type; PDF at most 50 pages; 15 s time budget in a worker process that is killed on overrun; text capped at 200,000 characters; a file with no text is refused. | `test_extract_files.py` (all, incl. `::test_xml_dtd_bypasses_from_round3_l2_are_refused`), `test_uploads.py::test_bad_files_are_refused_with_the_one_response`, `::test_macro_and_bomb_reasons_are_ledgered` |
 | Clean and mask | NFC; control, zero-width and bidi-override characters removed; HTML tags and comments removed in linear time (round 3 L6); then masked like any ingest. | `test_extract_files.py::test_clean_text_is_linear_on_unclosed_comments`, `::test_text_is_cleaned_and_the_name_is_display_only`, `::test_card_and_nric_inside_a_docx_are_masked`, `::test_card_number_inside_an_xlsx_is_masked` |
@@ -164,3 +164,33 @@ first in the `/sim/reset` hooks (no `sim.py` change needed). SECURITY.md §15.12
   (one shared E2E world). The worker is per process; it is killed on budget overrun and restarted.
 - `docs/finals/live_kit/make_files.py` builds no PDF; PDF is covered by hand-built PDFs in the tests.
 - Phone numbers in WhatsApp exports are not masked.
+
+## 9. The folder picker: `GET /sim/upload-folders` (D-34)
+
+The upload sheet lists folders by NAME instead of asking for a Drive folder id. Code: `uploads.py`
+(`_folders`, the route); tests: `tests/test_upload_folders.py`.
+
+**Request.** `GET /sim/upload-folders`, no body, no parameters (a query string naming a person is
+ignored: identity comes only from the token). The web proxy forwards it for the main session only, like
+`sim/upload-file` (`app/api/ib/[...path]/route.ts`).
+
+**200** `[{"id": "fd-6", "path": "Pricing & Offers"}, {"id": "fd-7", "path": "Vendor share"}]` (leo.ops in
+the synthetic world), sorted by `path` (case-insensitive, then id).
+
+| Rule | How | Test |
+|---|---|---|
+| Mounted like the upload | Mounted by `mount_uploads_router` under exactly the switches of `/sim/upload-file`; off, the unknown-route 404 | `test_demo_features.py::test_off_every_demo_route_is_the_unknown_route_404`, `::test_upload_file_is_not_mounted_on_a_deployment_or_without_demo_login`; `test_upload_folders.py::test_a_router_built_with_a_switch_off_refuses_everyone` |
+| Writable folders only | Every folder the service account lists is a candidate only; each is checked LIVE with the upload's own `_where` (exists now; WRITE for an employee; any folder for `admin_it`). Read or comment access is not enough | `::test_each_person_sees_exactly_the_folders_they_can_write_to`, `::test_read_access_is_not_enough`, `::test_admin_it_sees_every_folder_with_full_paths`, `::test_write_permission_is_read_live_from_drive` |
+| Path | The folder chain, led by the shared drive's name when Drive returns one (`drives.get`; the mock has none, so no drive prefix and never a bare drive id). An ancestor folder's name appears only when the person can open that ancestor now (checked live) | `::test_a_parent_folder_name_is_shown_only_to_people_who_can_open_it` |
+| Nothing leaks | A person who may write nowhere gets `[]`, byte-identical whoever they are (Ken included); no counts, no reasons | `::test_ken_sees_nothing_and_his_reply_is_byte_identical_to_someone_with_no_folders`, `::test_identity_comes_only_from_the_token` |
+| Fail closed | A folder whose live check fails is left out; a failed listing is `[]` (reason `source_error` in the ledger only); at most 200 candidates and a 10 s budget per call (an unchecked folder is not listed) | `::test_a_source_error_on_a_folder_leaves_it_out`, `::test_a_source_error_on_the_listing_is_an_empty_list_and_ledgered` |
+| Rate | At most 10 calls per person per minute (`FOLDERS_RATE_LIMIT`), checked first; over it, the one `404 {"detail": "not found"}`, and only the first over-limit refusal per window is ledgered; `/sim/reset` clears the window | `::test_rate_limit_per_person_per_minute_with_one_ledger_row_per_window`, `::test_reset_clears_the_folder_rate_window` |
+| Ledger | `graph.viewed` with `mode="upload_folders"` (counts only: folders returned, folders checked; never an id or name): an `outcome="checking"` row (zero counts) BEFORE any Drive listing or permission read, then the `ok` row before the response (round 5 Codex #7). A ledger failure, or no ledger configured, is a 503 with no Drive call. Refusals are `request.failed` with `stage="sim.upload-folders"` | `::test_every_call_is_ledgered_before_the_response_counts_only`, `::test_ledger_down_is_503_and_no_folder_is_returned`, `::test_the_accepted_row_is_written_before_any_drive_call`, `::test_a_ledger_failure_is_503_with_no_drive_call`, `::test_no_ledger_is_503_with_no_drive_call_never_a_silent_release` |
+
+**Web.** `AddDocumentSheet.tsx`: a labelled `<select>` (path as the label, id as the value, no default).
+Only when the list is empty or fails does a collapsed "Advanced: folder ID" field appear; no copy in the
+upload UI names a folder (round 4 Opus #4). Mock: `lib/mock/extra/uploads.ts`. E2E (mock):
+`tests/e2e/grow.spec.ts` "upload: pick a folder by NAME", "someone who may write nowhere", "the folder
+list failing", "390 px: the picker list fits".
+
+**Limit.** The list is a convenience: the upload checks WRITE live again (twice) whatever the sheet sent.

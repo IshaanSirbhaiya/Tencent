@@ -18,20 +18,49 @@ Single-key shortcuts are a WCAG 2.1.4 risk. So:
 
 | Key | Action |
 |---|---|
-| `P` | Arm and start. Applies the Stage theme, goes to step 00, warms the app (see §5). Pressed again: returns to step 00 without resetting the sandbox |
+| `P` | Arm and start. Applies the Stage theme and shows step 00 (the title card) at once; Leo's deliverables warm-up for `D` runs in the background once step 01's Compare has settled, so it never competes with the two live Compare asks (stage QA 30 Oct #6: it used to run first and P took 4.7 to 6.5 s; round-5 Opus cross-check #3). Pressed again: returns to step 00 without resetting the sandbox |
 | `Space` | Run the next step. The HUD shows what the next step will do. Debounce: ignore a second press within 400 ms |
-| `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end |
+| `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end. Over an open sheet (the sources sheet in step 03, `D`'s panel) `B` closes the sheet and plays the clip; it never closes the reset confirm. On a step with no clip (the slides, 08 to 10, and the grow steps) `B` leaves the slide up and shows "No recording for this step" for 2.5 s, announced to screen readers (stage QA 30 Oct #2, #4). That includes Q&A: at step 10 with `D`'s panel open, `B` shows the note and leaves the panel open (round-5 Opus cross-check #4) |
 | `R` | Reset: restores the tamper sandbox copy, clears the ask boxes, re-warms the model, returns to step 00. Never edits the real ledger |
 | `Esc` | **The Esc rule** (round-3 Fable #1, `controller.ts`). With a sheet or dialog open, `Esc` closes it through its own handler (sources sheet, reset confirm, `D`'s panel, the grow step's Add sheet) and never touches the HUD. Once `P` has started the script, `Esc` with nothing open **never hides the HUD**; it only brings a hidden HUD back. Before `P`, `Esc` hides or shows the HUD as before. While a dialog is open the other presenter keys are ignored, except over the grow step's Add sheet, which the script opened itself (`data-presenter-owned`): `Space` keeps driving the script there |
 | `H` | Hides or shows the HUD on purpose, at any time |
 | `ArrowLeft` | Back one step. `ArrowRight` skips a failed step |
 | `L` | Toggles English and 简体中文. Not used in the 5:00 (the flip was cut, round-3 Fable #8: Developer pages stay English) |
 | `S` | Stage theme on or off |
-| `D` | Q&A: signs Leo in and opens his cached Deliverables panel (built by the `P` warm-up). `Esc` closes it and signs back in whoever was signed in before `D` (round-3 Fable #2), so `←` to the journey shows the waterfall; the journey step's `←` also signs Maya in again on its own |
+| `D` | Q&A: signs Leo in and opens his **pre-built** Deliverables panel (built by the `P` warm-up, kept 12 minutes; after that `D` builds a fresh one, round-4 Opus #7). `Esc` closes it and signs back in whoever was signed in before `D` (round-3 Fable #2), unless a step, `R` or the shell signed someone else in meanwhile (round-4 Opus #13). If the shell signs out or switches persona while `D` is still building, `D` stops: it never signs Leo in afterwards (round-5 Codex #9), so `←` to the journey shows the waterfall; the journey step's `←` also signs Maya in again on its own |
 | `2` | Opens citation [2] on the current Compare page |
 | `?` | Key legend |
 
 Everything on the run sheet must be reachable by these keys alone.
+
+The HUD's model dot reads "quoting (no model)" (引用模式（无模型）) when no model is live (stage QA 30 Oct #5).
+
+Steps 05 (Verify) and 06 (tamper) are ready only once their result is on screen: the Verify result, or "Chain broken at entry N" (stage QA 30 Oct #3).
+
+**One session queue (round-4 Opus #1).** Every change of who is signed in to the main session (a step's sign-in, `P`'s warm-up, `D` and its `Esc`, `R`, and the shell's Sign out and persona switch) runs one at a time through `components/presenter/session.ts`. A Sign out or persona switch from the shell wins: work already queued stops and never signs anyone back in over it.
+
+## 2a. Mouse
+
+Everything the run sheet needs can also be done with the mouse. Each control calls the same action as its key (`controller.ts`: `advance`, `goBack`, `startOnce`, `toggleClip`, `askReset`, `toggleHidden`, `exitPresenter`), so the busy, debounce and failed-step rules are the same.
+
+| Control | Same as | Notes |
+|---|---|---|
+| ▶ Next | `Space` | Disabled (`aria-disabled`) while a step runs and at the last step. On a failed step it tries again, like `Space`. Over step 03's sources sheet, ▶ Next, `Space` and `→` close the sheet and go on (the bar sits above that sheet; stage QA re-run) |
+| Skip this step | `→` | Shown only on a failed step |
+| ◀ Back | `←` | Disabled while a step runs and at step 00 |
+| ▷ Start | `P` | Shown before `P` |
+| Recording | `B` | Shown only when the step has a clip |
+| Reset the demo | `R` | Opens the same confirm |
+| Hide the bar | `H` | A small "Show the presenter bar" handle stays bottom-right; it brings the bar back (so does `H`). After the script, on pages the bar leaves alone, the same handle brings it back for that page |
+| Exit presenter | `Ctrl+Shift+P` | Keys, side buttons and Stage off; the app is an ordinary website again. On a slide (00, 08 to 10, which have no links) it also opens the app home (stage QA re-run) |
+| More controls | `?` | **Stage only.** The Stage bar is one row, so it shows only "More"; More opens the key-legend row with all the controls above, and it stays open until closed. Off Stage (rehearsal) the controls sit at the end of the first row |
+| Mouse back / forward side buttons (`MouseEvent.button` 3 and 4) | `←` / `Space` | While armed only. The browser does not also go back or forward (`preventDefault` on mousedown, mouseup and auxclick; the step moves on mouseup). Ignored while a dialog has the input, like the keys |
+
+Every control has a tooltip with its key (for example "Next (Space)"), an accessible name, `aria-keyshortcuts`, the global focus ring and a target of at least 32 px; strings are in English and 简体中文. Space on a focused bar button still means Next (its keyup is swallowed), so a click and a key press never both fire; Enter or a click activates the button itself.
+
+**Ordinary clicks are never taken over.** Presenter mode listens only for the two side buttons; links, the app's own navigation, answer cards and every other click work as on any website, armed or not (`presenter.spec.ts` "armed: ordinary clicks stay ordinary").
+
+**Browser Back and Forward** (toolbar, `Alt+←`, or a side button the browser handled anyway). Rule: when the browser goes back to the **previous step's page** (the same path and every query parameter that step's URL sets, so `/dev/audit` is not step 06's `/dev/audit?tamper=1`; round-5 Opus cross-check #1), that is Back: the script steps back with it (re-opening that page, and its session where the step needs one), so the bar and the page agree. Any other history move (Forward, or Back to a page the driver opened by clicking around) is left to the browser: the step number stays, and the next ▶ or `Space` opens its own page as usual. It is ignored while a step runs (the step owns the page; at worst it says "did not finish" and `Space` retries) and for one second after a side button. Why not "sync the step to the page": several steps share a page (01, 03 and the grow-ask step are all `/compare`; 05 to 07 are all `/dev/audit`), so the page alone cannot name the step, and running a step's action from a history move could ask or sign someone in by surprise.
 
 ## 3. Stage theme
 
@@ -91,7 +120,8 @@ alone"):
    session. A tab opened signed out keeps the opt-in and picks the grow steps up once `P` signs someone in
    (`components/sim/demo.ts` asks again after a sign-in), but check that the HUD reads `/ 13` before Q&A.
    Reset and `docs/finals/live_kit/check_absent.py --all` first.
-2. `P`, then `Space` x 5, no `Esc`: 01 and 02 as usual; 03 `grow` opens Jordan's Add sheet with the note
+2. `P`, then `Space` x 5, no `Esc`: 01 and 02 as usual; 03 `grow` (it waits up to 60 s for Jordan's graph,
+   which takes about 25 s after a fresh sign-in; stage QA 30 Oct #1: 20 s failed 2 of 2) opens Jordan's Add sheet with the note
    filled and the focus on the sheet itself (not its Close button), and `Space` still advances; 04
    `grow-post` posts, shows "Posted to Slack" for about 1.5 s, then closes the sheet so the room sees the
    "Just added" feed (Jordan's side; Ken's stays empty); 05 `grow-ask` asks both on Compare.

@@ -25,6 +25,8 @@ to `databridge\var\demo-day\logs\`.
   If the taskbar is visible, click the window once and press **F11**.
 - The board at **http://127.0.0.1:3100/present/preflight** is the same check in big type: Services,
   Model and audit chain, Scripted questions, This screen. OK = green, FIX = red, CHECK = amber.
+  It opens only on this laptop's own address (127.0.0.1) and only after a sign-in (any persona); otherwise
+  it is "not found" (round 4).
 - **Amber is normal for the model** when TokenHub is not live: "Model: extractive fallback". Then say the
   default line, "quoted from the sources, with the same checks", never "Hy3 wrote it". Only when the
   Model line says **Tencent Hunyuan LIVE** may you use the [ONLY IF HY3 LIVE] lines.

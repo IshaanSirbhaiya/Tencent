@@ -23,6 +23,7 @@ Tick each one as you go. The why for every demo-day item is in
 ## Sat 31 Oct
 
 - [ ] **Hallway test**: 5 people × 20 min ([rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)). Send me the notes; I'll write the report, the fix log and the tester line on the proof slide. No test, no line: the `[TESTER]` sentence is deleted from the run sheet (never invented).
+- [ ] **Hallway kit** (script, task cards, notes form, results template): [rubric/hcd_ux/hallway_kit/](rubric/hcd_ux/hallway_kit/FACILITATOR_SCRIPT.md). Print TASK_CARDS and one NOTES_FORM per tester; do the 5-minute dry run in the script's setup first.
 - [x] **Laptop checks** (done 30 Oct evening): the cloud work was pulled; the Windows suites passed (1,131 backend); `demo_day.ps1` was run for real (a port bug was found and fixed); `--fresh` reset passed; `B` works at every step; the absence proof was refreshed (12/12); the Codex review of the cloud work was run.
 - [ ] **Video: ON HOLD until teammates' updates land** (your call). When you're ready, tell me; I re-record the scenes (about 15 min), then you record the narration against `submission/finals_video/narration_cues.md` and I merge it, exactly like last time.
 - [ ] **Decide the stage roles** (default: Ishaan speaks, Dev drives, Mehul is the compliance voice, Aaruni is the Tencent voice) and rehearse twice with [rubric/demo_story/RUN_SHEET.md](rubric/demo_story/RUN_SHEET.md).
