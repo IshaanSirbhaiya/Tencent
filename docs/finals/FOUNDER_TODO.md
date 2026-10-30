@@ -8,7 +8,7 @@ Tick each one as you go. The why for every demo-day item is in
 - [ ] **Activate Hy3 in TokenHub.** Console → TokenHub → Online Inference → activate **Hy3** and **DeepSeek V4 Flash** (balance or voucher needed). Then tell me "activated": I'll switch it on, test it and re-run the eval. Steps are in [MORNING_BRIEF.md](MORNING_BRIEF.md).
 - [ ] **Ask Xin Yi** whether the extra 5,000 credits cover TokenHub (message text is in the chat).
 - [ ] **Send the organiser email to Cindy before 23:59**: [ORGANISER_UPDATE.md](ORGANISER_UPDATE.md). I'll update the Hy3 line, and the link if final_v1.1 is ready, before you send.
-- [ ] **New cover in Miora**: paste [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md) and send me the best image.
+- [x] **New cover in Miora** (done 30 Oct: option 2 chosen, every size in `submission/06_cover/finals/`): paste [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md) and send me the best image.
 
 ## Sat 31 Oct
 
