@@ -497,6 +497,19 @@ export const liveApi = {
   engineStatus: () => call<import('./types').EngineRefreshStatus>('/sim/engine-status', { method: 'POST', body: {} }),
 };
 
+// ---- just-in-time views of an answer (POST /ib/views; main session only) ----
+export const viewApi = {
+  /** A one-page view of MY answer, laid out as `instruction` asks (empty: the automatic layout). */
+  create: (reqId: string, instruction: string) =>
+    call<import('./types').JitView>('/ib/views', { method: 'POST', body: { req_id: reqId, instruction } }),
+  /** My message as a standalone search question (my previous question as context). */
+  rewrite: (question: string, previous: string) =>
+    call<{ question: string; rewritten: boolean }>('/ib/rewrite', { method: 'POST', body: { question: question.slice(0, 2000), previous: previous.slice(0, 2000) } }),
+  /** Page or chat for MY answer: Claude decides when connected, else the rules (`question` as asked). */
+  decide: (reqId: string, question: string) =>
+    call<import('./types').JitDecision>('/ib/views', { method: 'POST', body: { req_id: reqId, instruction: question.slice(0, 300), mode: 'decide' } }),
+};
+
 // ---- deliverables from an answer (POST /ib/deliverables; main session only) ----
 export const deliverApi = {
   /** A table, chart or analysis from one of MY released answers. 404 = nothing to build (one answer). */

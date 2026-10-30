@@ -35,7 +35,7 @@ import type {
 import { CitationChip } from './CitationChip';
 import { toast } from './Toast';
 
-type T = (key: DeliverKey, vars?: Record<string, string | number>) => string;
+export type T = (key: DeliverKey, vars?: Record<string, string | number>) => string;
 export type OnCite = (index: number, opener?: HTMLElement) => void;
 /** Moves focus to a source's entry in this panel's "Cited in" list (by its answer number). */
 type Jump = (n: number) => void;
@@ -92,7 +92,7 @@ export function DeliverRow({ response }: { response: AskResponse; onCite?: OnCit
     'inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 text-caption font-medium text-fg transition-colors duration-fast hover:border-line-strong hover:bg-raised';
   return (
     <section aria-labelledby={headingId} className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid="deliver-row">
-      <h3 id={headingId} className="mr-1 text-micro font-semibold uppercase tracking-wider text-subtle">
+      <h3 id={headingId} data-part="label" className="mr-1 text-micro font-semibold uppercase tracking-wider text-subtle">
         {t('deliver.heading')}
       </h3>
       {kinds.map((k) => {
@@ -113,7 +113,7 @@ export function DeliverRow({ response }: { response: AskResponse; onCite?: OnCit
           </button>
         );
       })}
-      <span className="basis-full text-caption text-subtle sm:basis-auto">{t('deliver.hint')}</span>
+      <span data-part="hint" className="basis-full text-caption text-subtle sm:basis-auto">{t('deliver.hint')}</span>
       <DeliverSheet
         response={response}
         kinds={kinds}
@@ -418,7 +418,7 @@ function useNumbering(response: AskResponse, d: Deliverable) {
   }, [response, d]);
 }
 
-type Numbering = ReturnType<typeof useNumbering>;
+export type Numbering = ReturnType<typeof useNumbering>;
 
 function Chips({ tags, num, onJump }: { tags: string[]; num: Numbering; onJump?: Jump }) {
   const { lang } = useLang();
@@ -650,7 +650,7 @@ function sameTags(cells: DeliverTable['rows'][number]): boolean {
   return keys.size <= 1;
 }
 
-function TableView({ table, title, num, onJump, t }: { table: DeliverTable; title: string; num: Numbering; onJump?: Jump; t: T }) {
+export function TableView({ table, title, num, onJump, t }: { table: DeliverTable; title: string; num: Numbering; onJump?: Jump; t: T }) {
   const { lang } = useLang();
   return (
     <div className="max-w-full overflow-x-auto rounded-lg border border-line" data-testid="deliver-table">
@@ -735,7 +735,7 @@ function unitTick(chart: DeliverChart, v: number): string {
   return s;
 }
 
-function ChartView({ chart, title, titleId, num, onJump, t }: { chart: DeliverChart; title: string; titleId: string; num: Numbering; onJump?: Jump; t: T }) {
+export function ChartView({ chart, title, titleId, num, onJump, t }: { chart: DeliverChart; title: string; titleId: string; num: Numbering; onJump?: Jump; t: T }) {
   const series = chart.series;
   const xs: string[] = [];
   for (const s of series) for (const p of s.points) if (!xs.includes(p.x)) xs.push(p.x);

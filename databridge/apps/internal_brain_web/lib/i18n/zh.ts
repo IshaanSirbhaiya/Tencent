@@ -21,6 +21,8 @@ export const zh: Record<CoreKey, string> = {
   'shell.retrySession': '重新检查',
   'shell.moreActions': '更多选项',
   'shell.sidebar': '侧边栏',
+  'shell.navCollapse': '将侧边栏收起为图标',
+  'shell.navExpand': '展开侧边栏',
   'shell.mockNotice': '模拟模式提示',
   'shell.devEnglishOnly': '开发者模式仅提供英文',
   'persona.current': '（当前）',

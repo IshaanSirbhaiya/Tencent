@@ -301,3 +301,184 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--line-strong)) transparent;
 }
+
+/* ==========================================================================================
+   Ask, light: an Xcode-like surface (the Ask view only; every other page and the dark and
+   high-contrast themes keep the tokens above). Window grey, white panels, hairlines, one
+   system blue. Contrast >= 4.5:1 on white and on the window grey (fg 16.9, muted 7.3 / 6.7, subtle 5.4 / 4.9,
+   accent 5.6 / 5.1).
+   ========================================================================================== */
+:root[data-theme='light']:not([data-contrast='more']) .ask-x {
+  --bg: 245 245 247; /* #F5F5F7 window */
+  --surface: 255 255 255; /* panels */
+  --raised: 242 242 247; /* #F2F2F7 fills: bubbles, chips */
+  --overlay: 255 255 255;
+  --line: 227 227 232; /* #E3E3E8 hairline */
+  --line-strong: 199 199 204;
+  --fg: 29 29 31; /* #1D1D1F */
+  --muted: 88 88 93; /* #58585D: secondary text, a step darker than subtle */
+  --subtle: 106 106 111; /* #6A6A6F: 4.9:1 on the window grey, 5.4:1 on white */
+  --accent: 0 102 204; /* #0066CC text/links */
+  --accent-solid: 0 106 220; /* #006ADC fills, white text 5.0:1 */
+  --focus: 0 122 255;
+  --ask-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 24px rgb(0 0 0 / 0.05);
+}
+.ask-x {
+  --ask-shadow: 0 0 0 1px rgb(var(--line));
+  --ask-ease: cubic-bezier(0.32, 0.72, 0, 1); /* the macOS sheet curve */
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Variable', Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The split: the chat column glides left and the canvas grows in on the right. */
+.ask-split {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  transition: gap 420ms var(--ask-ease);
+}
+.ask-split[data-canvas='open'] {
+  gap: 1.25rem;
+}
+.ask-chat {
+  flex: 0 0 auto;
+  width: min(48rem, 100%);
+  min-width: 0;
+  transition: width 420ms var(--ask-ease);
+}
+.ask-canvas {
+  flex: 0 1 0%;
+  min-width: 0;
+  opacity: 0;
+  transform: translateX(2rem);
+  /* clip, not hidden: hidden makes this a scroll container and the panel inside would not stick */
+  overflow: clip;
+  transition:
+    flex-grow 420ms var(--ask-ease),
+    opacity 300ms var(--ask-ease) 80ms,
+    transform 420ms var(--ask-ease);
+}
+@media (min-width: 1024px) {
+  .ask-split[data-canvas='open'] .ask-chat {
+    width: 27.5rem;
+  }
+  .ask-split[data-canvas='open'] .ask-canvas {
+    flex-grow: 1;
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 1023.98px) {
+  .ask-canvas {
+    display: none; /* below desktop width the page opens as a full-screen sheet */
+  }
+}
+:root[data-motion='reduce'] .ask-split,
+:root[data-motion='reduce'] .ask-chat,
+:root[data-motion='reduce'] .ask-canvas {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ask-split,
+  .ask-chat,
+  .ask-canvas {
+    transition: none;
+  }
+}
+
+/* Section labels under an answer read as sentence case here (no tracked-out capitals). */
+.ask-x [data-part='section'] {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: rgb(var(--muted));
+}
+
+/* Under an answer, ChatGPT-like: icon-only copy and feedback (their names stay for screen readers
+   and tooltips), then one row of quiet pills for what you can do with it. */
+.ask-x .ask-lbl {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ask-x .ask-actions > section {
+  display: contents;
+}
+.ask-x .ask-actions [data-part='label'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ask-x .ask-actions [data-part='hint'] {
+  display: none;
+}
+.ask-x .ask-actions button[data-testid^='act-'],
+.ask-x .ask-actions button[data-testid^='deliver-'] {
+  border-radius: 9999px;
+  height: 2rem;
+  padding-inline: 0.75rem;
+  background: rgb(var(--surface));
+}
+
+/* "Next steps" under an answer: one calm panel instead of three loud rows. */
+.ask-x .ask-next [data-part='label'] {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgb(var(--muted));
+  min-width: 7.5rem;
+}
+.ask-x .ask-next [data-part='hint'] {
+  display: none;
+}
+.ask-x .ask-next button[data-testid^='act-'],
+.ask-x .ask-next button[data-testid^='deliver-'] {
+  border-radius: 9999px;
+  height: 2rem;
+  padding-inline: 0.875rem;
+  background: rgb(var(--surface));
+}
+/* With the canvas open the chat column is narrow: one source card per row, and each
+   "Next steps" label sits above its buttons. */
+@media (min-width: 1024px) {
+  .ask-split[data-canvas='open'] .ask-chat [data-testid='citations'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ask-x .ask-split[data-canvas='open'] .ask-next [data-part='label'] {
+    flex-basis: 100%;
+  }
+}
+
+/* The sidebar as an icon rail (lib/navRail.ts): desktop only; names stay readable to screen readers
+   and appear as tooltips. */
+@media (min-width: 1024px) {
+  :root[data-nav='rail'] aside[data-sidebar] {
+    width: 3.75rem;
+  }
+  :root[data-nav='rail'] aside[data-sidebar] .nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  :root[data-nav='rail'] aside[data-sidebar] [data-testid='side-nav'] > div:first-child {
+    padding-inline: 0.5rem;
+  }
+  :root[data-nav='rail'] aside[data-sidebar] a[data-nav] {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  :root[data-nav='rail'] aside[data-sidebar] [data-testid='side-nav'] > div:last-child {
+    justify-content: center;
+  }
+}

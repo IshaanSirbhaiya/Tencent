@@ -1,7 +1,9 @@
 'use client';
-import { Database, Lock } from 'lucide-react';
+import { Database, Lock, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { restoreNavRail, setNavRail, useNavRail } from '@/lib/navRail';
 import { Tooltip } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import { useI18n } from '@/lib/i18n';
@@ -20,13 +22,14 @@ function NavLink({ item, locked, onNavigate }: { item: NavItem; locked: boolean;
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       data-nav={item.id}
+      title={t(item.label)}
       className={cn(
         'group flex min-h-[2rem] items-center gap-2.5 rounded-md px-2.5 text-body-sm transition-colors duration-fast',
         active ? 'bg-raised font-medium text-fg shadow-[inset_2px_0_0_rgb(var(--accent))]' : 'text-muted hover:bg-raised/70 hover:text-fg',
       )}
     >
       <Icon aria-hidden className={cn('h-4 w-4 shrink-0', active ? 'text-accent' : 'text-subtle group-hover:text-muted')} />
-      <span className="min-w-0 flex-1 truncate">{t(item.label)}</span>
+      <span className="nav-label min-w-0 flex-1 truncate">{t(item.label)}</span>
       {locked ? (
         <>
           <Lock aria-hidden className="h-3 w-3 shrink-0 text-subtle" />
@@ -55,7 +58,7 @@ export function SideNav({ onNavigate, className }: { onNavigate?: () => void; cl
       <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {groups.map((g) => (
           <div key={g.label}>
-            <p className="mb-1.5 px-2.5 text-micro font-semibold uppercase tracking-wider text-subtle">{t(g.label)}</p>
+            <p className="nav-label mb-1.5 px-2.5 text-micro font-semibold uppercase tracking-wider text-subtle">{t(g.label)}</p>
             <ul className="space-y-0.5">
               {g.items.map((i) => (
                 <li key={i.href}>
@@ -75,10 +78,34 @@ export function SideNav({ onNavigate, className }: { onNavigate?: () => void; cl
           </ul>
         ) : null}
       </div>
-      <p className="flex items-center gap-1.5 border-t border-line px-5 py-3 text-micro text-subtle">
-        <Database aria-hidden className="h-3 w-3" />
-        {t('app.syntheticData')}
-      </p>
+      <div className="flex items-center gap-1.5 border-t border-line px-3 py-2">
+        <p className="nav-label flex min-w-0 flex-1 items-center gap-1.5 px-2 text-micro text-subtle">
+          <Database aria-hidden className="h-3 w-3 shrink-0" />
+          <span className="min-w-0">{t('app.syntheticData')}</span>
+        </p>
+        {onNavigate ? null : <RailToggle />}
+      </div>
     </nav>
+  );
+}
+
+/** Desktop only: shrink the sidebar to its icons, or open it again (remembered). */
+function RailToggle() {
+  const rail = useNavRail();
+  const { t } = useI18n();
+  useEffect(() => restoreNavRail(), []);
+  const label = rail ? t('shell.navExpand') : t('shell.navCollapse');
+  return (
+    <button
+      type="button"
+      onClick={() => setNavRail(!rail)}
+      aria-label={label}
+      title={label}
+      aria-pressed={rail}
+      data-testid="nav-rail-toggle"
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-subtle transition-colors duration-fast hover:bg-raised hover:text-fg"
+    >
+      {rail ? <PanelLeftOpen aria-hidden className="h-4 w-4" /> : <PanelLeftClose aria-hidden className="h-4 w-4" />}
+    </button>
   );
 }

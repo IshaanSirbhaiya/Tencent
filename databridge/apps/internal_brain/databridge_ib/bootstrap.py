@@ -64,7 +64,10 @@ def build_services(cfg: Optional[IbConfig] = None, *, chain: Optional[ModelChain
     sink = build_anchor_sink(cfg)
     ledger = AccessLedger(cfg, external=sink)
     answers = AnswerStore(cfg)
-    chain = chain if chain is not None else ModelChain.tokenhub()
+    if chain is None:
+        # Hy3 via TokenHub when it is live; else Claude when a key is set (claude.py); else none
+        from .claude import claude_chain
+        chain = ModelChain.tokenhub() or claude_chain(cfg.var_root / "views")
     pipeline = Pipeline(index=index, directory=directory, connectors=connectors, ledger=ledger,
                         answers=answers, chain=chain)
     ingestor = Ingestor(index, connectors, cfg.var_root / "cursors.json", directory=directory,

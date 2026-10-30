@@ -168,10 +168,11 @@ def excerpt(units: Sequence[Unit], terms: set[str], budget: int = EXCERPT_CHARS)
 
 
 def build_evidence(cites: Mapping[str, object], *, question: str = "",
-                   facts: Iterable[object] = ()) -> dict[str, Evidence]:
+                   facts: Iterable[object] = (), max_chars: int = MAX_CONTEXT_CHARS
+                   ) -> dict[str, Evidence]:
     """``{tag: Evidence}`` for every openable cited document (``ActionService.context().cites``),
     in tag order. Each document's units are cut to ``EXCERPT_CHARS``; documents after the global
-    ``MAX_CONTEXT_CHARS`` are left out (whole documents, never half a unit)."""
+    ``MAX_CONTEXT_CHARS`` (or ``max_chars``) are left out (whole documents, never half a unit)."""
     facts = list(facts)
     out: dict[str, Evidence] = {}
     total = 0
@@ -184,7 +185,7 @@ def build_evidence(cites: Mapping[str, object], *, question: str = "",
         if not cut:
             continue
         size = sum(len(u.text) + 1 for u in cut)
-        if total + size > MAX_CONTEXT_CHARS:
+        if total + size > max_chars:
             break
         total += size
         rows_kept = {u.row for u in cut if u.row is not None}

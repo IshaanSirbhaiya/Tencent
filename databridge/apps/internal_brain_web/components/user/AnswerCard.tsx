@@ -1,5 +1,5 @@
 'use client';
-import { ArrowUpRight, Check, Copy, CornerDownRight, Cpu, RefreshCw, ShieldCheck, ThumbsUp, TriangleAlert, Unlink2, History, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, CornerDownRight, Cpu, LayoutTemplate, PanelRight, RefreshCw, ShieldCheck, ThumbsUp, TriangleAlert, Unlink2, History, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { forwardRef, useEffect, useState } from 'react';
 import { BrandMark } from '@/components/Brand';
@@ -10,9 +10,10 @@ import { placeLabel } from '@/lib/format';
 import { useLang, useMessages } from '@/lib/i18n';
 import { userMessages } from '@/lib/i18n/user';
 import type { AskResponse, Citation } from '@/lib/types';
-import { MODEL_KEY, TAG_RE, checkedAgoKey, displayAnswer, followUpQuestion, followUps, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
+import { MODEL_KEY, TAG_RE, checkedAgoKey, displayAnswer, followUpQuestion, followUps, gatherTags, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
 import { ActRow } from './ActSheet';
 import { DeliverRow } from './DeliverSheet';
+import { viewMessages } from '@/lib/i18n/view';
 import { CitationChip } from './CitationChip';
 import { getFeedback, setFeedback, type FeedbackKind } from './local';
 import { RefusalCard } from './RefusalCard';
@@ -35,6 +36,12 @@ export interface AnswerCardProps {
   idPrefix?: string;
   /** Show the "How this was answered" link (default true). */
   showJourney?: boolean;
+  /** Ask page: "Open as page" builds this answer's page in the canvas */
+  onBuildView?: () => void;
+  /** Ask page: this answer's page is the one open in the canvas */
+  viewShown?: boolean;
+  /** Ask page: bring this answer's last page back into the canvas */
+  onShowView?: () => void;
 }
 
 /** Plain text with inline [n] chips. Never HTML: every part is a React text node or a chip. */
@@ -42,7 +49,7 @@ export function AnswerText({ response, onCite, className }: { response: AskRespo
   const t = useMessages(userMessages);
   const { citations } = response;
   // Display chrome only (see displayAnswer): the cited passages and the copied text are unchanged.
-  const answer = displayAnswer(response.answer);
+  const answer = gatherTags(displayAnswer(response.answer));
   const byTag = new Map(citations.map((c, i) => [c.tag, { c, i }]));
   const parts: React.ReactNode[] = [];
   let last = 0;
@@ -195,9 +202,9 @@ function ActionsRow({ response, compact, showJourney }: { response: AskResponse;
   return (
     <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
       {!refused ? (
-        <button type="button" onClick={copy} className={btn} data-testid="copy-answer">
+        <button type="button" onClick={copy} className={btn} data-testid="copy-answer" title={t('answer.copy')}>
           {copied ? <Check aria-hidden className="h-3.5 w-3.5 text-ok" /> : <Copy aria-hidden className="h-3.5 w-3.5" />}
-          {t('answer.copy')}
+          <span className="ask-lbl">{t('answer.copy')}</span>
         </button>
       ) : null}
       {!compact && !refused ? (
@@ -209,6 +216,7 @@ function ActionsRow({ response, compact, showJourney }: { response: AskResponse;
               type="button"
               aria-pressed={fb === kind}
               data-feedback={kind}
+              title={t(key)}
               className={btn}
               onClick={() => {
                 const next = fb === kind ? null : kind;
@@ -218,7 +226,7 @@ function ActionsRow({ response, compact, showJourney }: { response: AskResponse;
               }}
             >
               <Icon aria-hidden className={cn('h-3.5 w-3.5', fb === kind && 'text-accent')} />
-              {t(key)}
+              <span className="ask-lbl">{t(key)}</span>
             </button>
           ))}
         </div>
@@ -244,7 +252,7 @@ function ActionsRow({ response, compact, showJourney }: { response: AskResponse;
  * follow-ups and the constant scope note. A response with no citations renders the RefusalCard.
  */
 export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(function AnswerCard(
-  { response, onCite, compact = false, question, onFollowUp, latest = true, idPrefix = '', showJourney = true },
+  { response, onCite, compact = false, question, onFollowUp, latest = true, idPrefix = '', showJourney = true, onBuildView, viewShown, onShowView },
   ref,
 ) {
   const t = useMessages(userMessages);
@@ -276,10 +284,10 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
           <AnswerText
             response={response}
             onCite={onCite}
-            className={cn('mt-3', compact ? 'text-body-sm leading-6' : 'text-body leading-[1.75] sm:text-[1.0625rem]')}
+            className={cn('mt-3', compact ? 'text-body-sm leading-6' : 'text-body leading-7')}
           />
           <section aria-labelledby={sourcesId} className={compact ? 'mt-4' : 'mt-5'} data-tour={latest && !compact ? 'citations' : undefined}>
-            <h3 id={sourcesId} className="mb-2 text-micro font-semibold uppercase tracking-wider text-subtle">
+            <h3 id={sourcesId} data-part="section" className="mb-2 text-micro font-semibold uppercase tracking-wider text-subtle">
               {t('answer.sources')}
             </h3>
             <ol data-testid="citations" className={cn('grid gap-2', compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')}>
@@ -295,8 +303,13 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
 
       <div className={cn('flex flex-col gap-3', compact ? 'mt-3' : 'mt-4')}>
         <ActionsRow response={response} compact={compact} showJourney={showJourney} />
-        {!compact && !refused ? <ActRow response={response} /> : null}
-        {!compact && !refused ? <DeliverRow response={response} onCite={onCite} /> : null}
+        {!compact && !refused ? (
+          <div className="ask-actions flex flex-wrap items-center gap-1.5" data-testid="next-steps">
+            <ActRow response={response} />
+            <DeliverRow response={response} onCite={onCite} />
+            {onBuildView ? <PageButton shown={!!viewShown} onBuild={onBuildView} onShow={onShowView} /> : null}
+          </div>
+        ) : null}
         {fus.length ? (
           <div>
             <h3 className="sr-only">{t('answer.followups')}</h3>
@@ -330,3 +343,25 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
   );
 });
 
+/** "Open as page": build this answer's page in the canvas, or show the one already built. */
+function PageButton({ shown, onBuild, onShow }: { shown: boolean; onBuild: () => void; onShow?: () => void }) {
+  const t = useMessages(viewMessages);
+  if (shown)
+    return (
+      <span className="inline-flex h-8 items-center gap-1.5 px-2 text-caption font-medium text-accent" data-testid="view-in-canvas">
+        <PanelRight aria-hidden className="h-3.5 w-3.5" />
+        {t('view.inCanvas')}
+      </span>
+    );
+  return (
+    <button
+      type="button"
+      onClick={onShow ?? onBuild}
+      data-testid={onShow ? 'view-show' : 'view-open-page'}
+      className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-caption font-medium text-fg transition-colors duration-fast hover:border-line-strong hover:bg-raised"
+    >
+      {onShow ? <PanelRight aria-hidden className="h-3.5 w-3.5 text-muted" /> : <LayoutTemplate aria-hidden className="h-3.5 w-3.5 text-muted" />}
+      {onShow ? t('view.show') : t('view.openAsPage')}
+    </button>
+  );
+}
