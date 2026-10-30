@@ -201,3 +201,29 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
 
 def cited_tags(answer: str) -> list[str]:
     return list(dict.fromkeys(t[1:-1] for t in _TAG.findall(answer or "")))
+
+
+# -- D-43: approved wording is quoted, never re-written ------------------------------------------
+#: how the world marks customer-facing wording that must be used verbatim: the document's title
+#: says it is an APPROVED script or template ("Customer account review: approved customer
+#: script"). The generated world has no label or doc-type field for this, so the rule is the
+#: title marker alone, and deliberately narrow: both words, in that order.
+APPROVED_SCRIPT_TITLE = re.compile(r"\bapproved\b.*\b(script|template)s?\b", re.I)
+#: the reason code an answer carries when the model was skipped for this rule
+QUOTED_APPROVED_SCRIPT = "quoted_approved_script"
+
+
+def is_approved_script(p: Passage) -> bool:
+    return bool(APPROVED_SCRIPT_TITLE.search(" ".join(str(p.title or "").split())))
+
+
+def quote_only(passages: Sequence[Passage], quoted: str) -> bool:
+    """True when the deterministic quoted answer over the RELEASED passages cites approved
+    scripts/templates and nothing else (D-43): the model would only re-word text that must be used
+    word for word, so it is not called. A function of the released passages and the question only
+    (both gates already applied), so a document the asker cannot read can never change it (P2)."""
+    if not passages or not quoted or quoted.strip() == REFUSAL_TEXT:
+        return False
+    by_tag = {p.tag: p for p in passages}
+    tags = cited_tags(quoted)
+    return bool(tags) and all(t in by_tag and is_approved_script(by_tag[t]) for t in tags)
