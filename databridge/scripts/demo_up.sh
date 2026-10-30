@@ -7,6 +7,7 @@
 #   bash scripts/demo_up.sh stop
 #
 # --fresh   wipe the demo state (var/ib-final) and seed ~300 labelled replay questions again.
+#           The model spend ledger (var/model_guard) is outside it and is never wiped (D-42).
 #
 # Live Tencent Hunyuan: set IB_FORCE_OFFLINE=0 (the key comes from databridge/.env.ib.local, which is
 # git-ignored). Without it the Brain answers with the honest extractive fallback.
@@ -15,6 +16,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 STATE="${IB_VAR:-var/ib-final}"
+# the stand-in model's spend ledger (var/model_guard) is never the state and never inside it (D-42)
+. scripts/wipe_guard.sh
 LOGS="$STATE/logs"
 WEB="apps/internal_brain_web"
 # Absolute interpreter path: the command line of every Python service we start then names this
@@ -100,7 +103,8 @@ envfile_read() {
 # reach the Brain from the parent shell or from .env.ib.local (sourced only in the Brain's subshell),
 # and are unset in every other child (mock platforms, seeder, engine, Next), as TOKENHUB_API_KEY is.
 IB_ONLY_KEYS="TOKENHUB_API_KEY ANTHROPIC_API_KEY IB_CLAUDE IB_CLAUDE_BUDGET_USD IB_CLAUDE_FAST \
-IB_CLAUDE_EFFORT IB_CLAUDE_ANSWER_EFFORT IB_CLAUDE_USER_LIMIT"
+IB_CLAUDE_EFFORT IB_CLAUDE_ANSWER_EFFORT IB_CLAUDE_USER_LIMIT IB_MODEL_CAP_USD IB_MODEL_DAILY_CAP_USD \
+IB_MODEL_RPM IB_MODEL_USER_RPM IB_MODEL_GUARD_DIR"
 # For the banner only: is the opt-in stand-in model on for the Brain? Decided in a throw-away subshell
 # that sources the file the way the Brain does; it prints "on" or "off", never a key or a value.
 standin_state() {
@@ -189,6 +193,8 @@ export IB_DELIVERABLES="${IB_DELIVERABLES:-1}"
 export IB_REPLAY_KEY="${IB_REPLAY_KEY:-$("$PY" -c 'import secrets; print(secrets.token_hex(16))')}"
 save_settled   # from here on, _S_<KEY> holds what every child must see
 
+# never run on (or wipe) a state that is, holds or sits in the model spend ledger dir (D-42)
+refuse_guard_overlap "$STATE" || exit 2
 if [ "$FRESH" = "1" ]; then
   for p in 8100 8200; do stop_port "$p"; done
   # Round-4 Opus #11: stop_port leaves alone anything it cannot prove is ours. If a listener is still

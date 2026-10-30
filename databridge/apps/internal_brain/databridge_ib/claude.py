@@ -9,8 +9,10 @@ offline), and only when opted in: ``IB_CLAUDE=1`` and ``ANTHROPIC_API_KEY`` set,
 ``IB_FORCE_OFFLINE=1`` (``composer.claude_enabled``). Off by default. Outside this module the model
 is the neutral ``standin/standin-1`` (answers, /ib/status, the ledger): never the provider name.
 
-It shares the page composer's spend cap (the same file, ``views/composer.Budget``) and has its own
-service-wide and per-person (``llm.for_person``) rate limits. The key is read from the environment and never logged.
+It shares the page composer's guard (``model_guard.ModelGuard.shared``): one persistent spend ledger
+outside the demo state, a total and a daily cap, a service-wide and a per-person
+(``llm.for_person``) rate. Any limit hit is no call, so the quoted answer is served. The key is
+read from the environment and never logged.
 """
 from __future__ import annotations
 
@@ -24,8 +26,9 @@ from typing import Any, Optional
 from databridge_harness.backends import RawCompletion
 
 from .llm import MODEL_SUB, ModelChain
-from .views.composer import (GLOBAL_RATE, MODEL, PRICE_IN, PRICE_OUT, PUBLIC_MODEL, PUBLIC_PROVIDER,
-                             USER_RATE, WINDOW_S, Budget, _Window, claude_enabled, cost_usd)
+from .model_guard import REFUSED, ModelGuard
+from .views.composer import (MODEL, PRICE_IN, PRICE_OUT, PUBLIC_MODEL, PUBLIC_PROVIDER, claude_enabled,
+                             cost_usd)
 
 log = logging.getLogger("databridge_ib.claude")
 
@@ -38,13 +41,11 @@ class ClaudeBackend:
 
     name = "anthropic"
 
-    def __init__(self, budget: Budget, *, client: Any = None, effort: str = "low"):
-        self.budget, self.effort = budget, effort
+    def __init__(self, guard: ModelGuard, *, client: Any = None, effort: str = "low"):
+        #: the shared guard: per person (``llm.for_person``; a call made for nobody in particular
+        #: counts under one shared key), service-wide, and the spend caps
+        self.guard, self.effort = guard, effort
         self._client = client
-        self._rate = _Window(GLOBAL_RATE, WINDOW_S)
-        #: per person (``llm.for_person``), like the page composer; a call made for nobody in
-        #: particular counts under one shared key
-        self._user = _Window(int(os.environ.get("IB_CLAUDE_USER_LIMIT", USER_RATE)), WINDOW_S)
         self._lock = threading.Lock()
 
     def _api(self):
@@ -63,14 +64,12 @@ class ClaudeBackend:
                  if m.get("role") in ("user", "assistant")]
         if json_mode:
             system += "\n\nReturn ONLY one JSON object, no prose and no markdown fence."
-        if not self._user.allow(MODEL_SUB.get() or "-"):
-            raise RuntimeError("per-person rate limit")
-        if not self._rate.allow("*"):
-            raise RuntimeError("claude rate limit")
         chars = len(system) + sum(len(m["content"]) for m in convo)
         worst = (chars + 8_000) * PRICE_IN / 1_000_000 + ANSWER_MAX_TOKENS * PRICE_OUT / 1_000_000
-        if not self.budget.reserve(worst):
-            raise RuntimeError("claude spend cap reached")
+        ticket, why = self.guard.admit(MODEL_SUB.get() or "-", "answer", worst)
+        if ticket is None:
+            log.info("model call refused by the guard: %s", why)
+            raise RuntimeError(REFUSED)
         actual = 0.0
         try:
             resp = self._api().with_options(timeout=ANSWER_TIMEOUT_S).beta.messages.create(
@@ -89,7 +88,7 @@ class ClaudeBackend:
                                  cost_usd=actual, model_used=PUBLIC_MODEL)
         finally:
             try:
-                self.budget.settle(worst, actual)
+                self.guard.settle(ticket, actual)
             except Exception as exc:                                # noqa: BLE001
                 log.error("spend not recorded: %s", type(exc).__name__)
 
@@ -100,14 +99,15 @@ def _config_for(model: str) -> dict:
             "profiles": {"cloud": {}, "airgapped": {}}}
 
 
-def claude_chain(state_dir: Path, *, client: Any = None) -> Optional[ModelChain]:
+def claude_chain(state_dir: Optional[Path] = None, *, client: Any = None,
+                 guard: Optional[ModelGuard] = None) -> Optional[ModelChain]:
     """Claude as the answer chain, or None unless opted in (``claude_enabled``). ``client`` (a
-    test double) skips the switch."""
+    test double) skips the switch. ``state_dir`` is kept for the call sites; the spend lives in
+    the shared guard (``guard`` overrides it), outside the state."""
     if client is None and not claude_enabled():
         return None
     from databridge_harness import Harness
-    cap = float(os.environ.get("IB_CLAUDE_BUDGET_USD", "10"))
-    backend = ClaudeBackend(Budget.for_path(Path(state_dir) / "claude_spend.json", cap),
+    backend = ClaudeBackend(guard or ModelGuard.shared(),
                             client=client, effort=os.environ.get("IB_CLAUDE_ANSWER_EFFORT", "low"))
 
     def factory(_public: str):

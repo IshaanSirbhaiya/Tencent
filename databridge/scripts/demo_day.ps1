@@ -47,6 +47,14 @@ $Py = Join-Path $Db '.venv\Scripts\python.exe'
 $DayDir = Join-Path $Db 'var\demo-day'
 $LogDir = Join-Path $DayDir 'logs'
 $BrowserProfile = Join-Path $Db 'var\demo-browser'
+# The stand-in model's spend ledger (D-42): no reset or wipe here may touch it (demo_up.sh --fresh
+# wipes var\ib-final only, and refuses a state that is, holds or sits in this dir).
+$ModelGuardDir = if ($env:IB_MODEL_GUARD_DIR) { $env:IB_MODEL_GUARD_DIR } else { Join-Path $Db 'var\model_guard' }
+function Test-TouchesModelGuard([string]$Path) {
+  $p = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/') + '\'
+  $g = [IO.Path]::GetFullPath($ModelGuardDir).TrimEnd('\', '/') + '\'
+  return ($g.StartsWith($p, [StringComparison]::OrdinalIgnoreCase) -or $p.StartsWith($g, [StringComparison]::OrdinalIgnoreCase))
+}
 $Report = Join-Path $DayDir 'preflight.json'
 $LiveUrl = 'http://127.0.0.1:3100'
 $MockUrl = 'http://127.0.0.1:3101'
@@ -352,6 +360,7 @@ function Open-DemoBrowser([string]$Url) {
   Close-DemoBrowser
   # A clean profile every time: no extensions, no saved sessions (so every demo slot is signed out),
   # no zoom left over from rehearsal, no "restore pages" bubble.
+  if (Test-TouchesModelGuard $BrowserProfile) { Bad "refusing to wipe ${BrowserProfile}: it holds the model spend ledger"; return }
   for ($i = 0; $i -lt 5 -and (Test-Path $BrowserProfile); $i++) {
     Remove-Item -Recurse -Force $BrowserProfile -ErrorAction SilentlyContinue
     if (Test-Path $BrowserProfile) { Start-Sleep -Milliseconds 600 }
@@ -591,6 +600,8 @@ function Reset-Demo {
     Close-DemoBrowser
     if ((Test-Prereqs $true) -gt 0) { return 1 }
     Head 'Fresh: stop the Brain and the platforms, wipe var\ib-final, reseed (the web app keeps running)'
+    # the wipe itself is demo_up.sh's (var\ib-final only); the model spend ledger is never touched
+    if (Test-TouchesModelGuard (Join-Path $Db 'var\ib-final')) { Bad 'refusing: var\ib-final holds the model spend ledger'; return 1 }
     foreach ($port in @(8100, 8200)) { if (Test-Port $port) { Stop-DemoPort $port | Out-Null } }
     $code = Invoke-DemoUp 'start --fresh' 1200
     if ($code -ne 0) { Bad "demo_up.sh start --fresh failed (exit $code)"; Show-Big $NotReadyArt 'Red'; return 1 }

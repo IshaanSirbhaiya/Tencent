@@ -108,6 +108,10 @@ class ViewService:
             input_chars=int(input_chars), model_planned=True, policy_version=POLICY_VERSION,
             event_time=self.clock()))
 
+    def guard_refused(self, user: DirectoryUser, kind: str, code: str) -> None:
+        """A model call the guard refused (a spend cap or a rate): a counts-only row."""
+        self._fail(user, "generate", f"model_{code}_{kind}")
+
     def _fail(self, user: DirectoryUser, stage: str, reason: str, *, req_id: Optional[str] = None,
               view_id: Optional[str] = None) -> None:
         self._append(DeliverableFailed(sub=user.id, stage=stage, reason_code=reason[:80],

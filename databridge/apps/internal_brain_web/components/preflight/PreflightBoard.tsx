@@ -6,7 +6,11 @@
 import { AlertTriangle, CheckCircle2, Info, RefreshCw, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { budgetLine } from '@/lib/budget';
 import { cn } from '@/lib/cn';
+import { translate } from '@/lib/i18n';
+import { budgetMessages } from '@/lib/i18n/budget';
+import type { ModelBudget } from '@/lib/types';
 
 export type Status = 'pass' | 'fail' | 'warn' | 'info';
 export interface ServerCheck {
@@ -69,6 +73,7 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
   const [skewMs] = useState(() => (typeof window === 'undefined' ? 0 : Date.now() - serverNow));
   const [local, setLocal] = useState<ServerCheck[]>([]);
   const [modelLive, setModelLive] = useState<ServerCheck | null>(null);
+  const [budgetLive, setBudgetLive] = useState<ServerCheck | null>(null);
   const [checkedAt, setCheckedAt] = useState<Date | null>(null);
 
   const runClientChecks = useCallback(async () => {
@@ -125,7 +130,7 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
     try {
       const r = await fetch('/api/ib/ib/status', { cache: 'no-store', headers: { accept: 'application/json' } });
       if (r.ok) {
-        const s = (await r.json()) as { models?: { active?: boolean; active_provider?: string | null; active_chain?: string[] }; ledger?: { ok?: boolean | null } };
+        const s = (await r.json()) as { models?: { active?: boolean; active_provider?: string | null; active_chain?: string[] }; ledger?: { ok?: boolean | null }; model_budget?: ModelBudget };
         const live = !!s.models?.active;
         // Hy3 is named only when the active chain IS TokenHub/Hy3; any other model is neutral
         const hy3 = live && s.models?.active_provider === 'tencent-tokenhub';
@@ -141,7 +146,11 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
                 ? 'an AI model answers from the cited sources; never claim Hy3'
                 : 'answers are quoted from the sources; say so, never claim Hy3',
         });
+        // the stand-in model's budget (numbers only; /ib/status sends it to admin and compliance)
+        const b = s.model_budget;
+        setBudgetLive(!mock && b ? { key: 'model-budget-now', ...budgetLine(b, (k, v) => translate(budgetMessages, 'en', k, v)) } : null);
       } else {
+        setBudgetLive(null);
         setModelLive({ key: 'model-now', label: 'Model now: sign in to see', status: 'info', detail: 'this browser is not signed in; the Start script result is above' });
       }
     } catch {
@@ -175,6 +184,12 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
     ? report.items.filter((i) => i.group === 'model' || i.group === 'ledger')
     : [{ key: 'no-report', label: 'No Start report yet', status: 'warn', detail: 'double-click "Start Walnut Demo" (it writes the model, ledger and pre-warm results here)' }];
   if (modelLive) scriptChecks.push(modelLive);
+  if (budgetLive) {
+    // the live numbers replace the Start script's (older) model budget line
+    const i = scriptChecks.findIndex((c) => c.key === 'model_budget');
+    if (i >= 0) scriptChecks.splice(i, 1);
+    scriptChecks.push(budgetLive);
+  }
   const warmChecks: ServerCheck[] = report?.warmed
     ? report.items.filter((i) => i.group === 'warm')
     : [{ key: 'no-warm', label: 'Scripted questions not pre-warmed yet', status: 'warn', detail: 'the one-click Start asks each one once; run it before going on stage' }];

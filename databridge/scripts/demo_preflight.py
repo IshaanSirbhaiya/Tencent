@@ -179,6 +179,26 @@ def model_line(st: dict, offline: bool) -> tuple[dict, tuple[str, str, str]]:
                   f"{why}; say 'quoted from the sources, with the same checks'. Expected when TokenHub is not live")
 
 
+def budget_line(st: dict) -> Optional[tuple[str, str, str]]:
+    """``(label, status, detail)`` for the stand-in model's guard ("Model budget": numbers only),
+    or None when /ib/status does not show it (it does only to admin and compliance)."""
+    b = st.get("model_budget")
+    if not isinstance(b, dict):
+        return None
+    if not b.get("ok"):
+        return ("Model budget", "warn",
+                "the spend ledger cannot be read: no model calls, answers are quoted (see the checklist)")
+
+    def usd(k: str) -> str:
+        v = b.get(k)
+        return f"US${float(v):.2f}" if isinstance(v, (int, float)) else "?"
+    detail = (f"{usd('spent_usd')} of {usd('total_cap_usd')} spent; today {usd('today_usd')} of "
+              f"{usd('daily_cap_usd')}; {b.get('calls', '?')} calls")
+    if b.get("available"):
+        return ("Model budget", "pass", detail)
+    return ("Model budget", "warn", detail + "; a cap is reached: answers are quoted, pages use the rules")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--offline", action="store_true", help="check the mock build on :3101 (no services)")
@@ -251,6 +271,9 @@ def main() -> int:
         if code == 200 and isinstance(st, dict):
             model_info, line = model_line(st, a.offline)
             rep.add("model", "model", *line)
+            bline = None if a.offline else budget_line(st)
+            if bline:
+                rep.add("model", "model_budget", *bline)
         else:
             rep.add("model", "model", "Model status /ib/status", "fail", f"HTTP {code}")
         code, v, secs = maya.call("GET", "audit/verify", timeout=120)

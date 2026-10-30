@@ -241,13 +241,15 @@ def test_the_spend_cap_stops_calls_and_survives_a_restart(tmp_path):
 
 
 def test_rate_limits_are_per_person_and_global(tmp_path, monkeypatch):
-    monkeypatch.setattr(cmod, "USER_RATE", 2)
+    from databridge_ib.model_guard import Caps, ModelGuard
     fake = FakeClaude(lambda kind, text: json.dumps({"render": "chat", "title": "x", "reason": "y"}),
                       usage=(10, 10))
-    c = cmod.ClaudeComposer(state_dir=tmp_path, cap_usd=10, client=fake)
+    c = cmod.ClaudeComposer(client=fake, guard=ModelGuard(tmp_path / "g", Caps(user_rpm=2, rpm=4)))
     codes = [c.decide("jdoe", "q", "a", "ctx")[2] for _ in range(3)]
     assert codes == ["none", "none", "rate"]
     assert c.decide("priya", "q", "a", "ctx")[2] == "none"
+    assert c.decide("lee", "q", "a", "ctx")[2] == "none"
+    assert c.decide("sam", "q", "a", "ctx")[2] == "rate"         # the service-wide 4 a minute
 
 
 @pytest.mark.parametrize("reply,stop,code", [
@@ -347,17 +349,18 @@ def test_claude_answers_go_through_the_grounding_wall(tmp_path):
             # the wall tags each value where it stands ("0.4 [C1]% FX margin"); the web gathers them
             assert re.sub(r"\s*\[C\d+\]", "", ans["answer"]) == \
                 "Indonesian SME customers are priced at a 0.4% FX margin."
-        spent = json.loads((tmp_path / f"views{invent}" / "claude_spend.json").read_text())
+        from databridge_ib.model_guard import guard_dir
+        spent = json.loads((guard_dir() / "spend.json").read_text())
         assert spent["calls"] >= 1 and spent["usd"] > 0
+        assert {e["kind"] for e in spent["entries"]} == {"answer"}
 
 
 def test_claude_answer_over_the_cap_falls_back_to_quoting(tmp_path):
     from databridge_ib.claude import claude_chain
-    from databridge_ib.views.composer import Budget
+    from databridge_ib.model_guard import Caps, ModelGuard
 
     fake = FakeClaude(lambda kind, text: "anything")
-    chain = claude_chain(tmp_path / "views", client=fake)
-    Budget.for_path(tmp_path / "views" / "claude_spend.json", 10).cap = 0.0  # the cap is used up
+    chain = claude_chain(client=fake, guard=ModelGuard(tmp_path / "g", Caps(total_usd=0.0)))
     app, svc = _world(tmp_path / "w", chain=chain)
     ans = _ask(_c(app, svc, "jdoe"))
     assert fake.calls == [] and ans["model"]["model"] == "extractive-v1"

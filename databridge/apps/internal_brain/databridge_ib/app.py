@@ -42,6 +42,8 @@ log = logging.getLogger("databridge_ib.app")
 ALLOWED_PREFIXES = ("/health", "/auth/", "/ib/", "/webhooks/", "/audit/", "/sim/")
 COOKIE = "ib_session"
 EMPLOYEE_ROLES = {"employee", "compliance_officer", "admin_it"}
+#: who sees the stand-in model's spend numbers in /ib/status
+BUDGET_ROLES = {"compliance_officer", "admin_it"}
 MAX_WEBHOOK_BYTES = 256 * 1024
 LOOPBACK = {"127.0.0.1", "::1"}
 MAX_REPLAY_AGE = timedelta(days=400)
@@ -215,9 +217,14 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         from . import llm as llmmod
         chain = getattr(svc.pipeline, "chain", None)
         configured = llmmod.model_configured()
-        return {"models": {"provider": llmmod.provider_label() if configured else None,
-                           "chain": llmmod.configured_models(),
-                           "active": chain is not None,
+        active = chain is not None
+        out = {"models": {# the ACTIVE chain's provider and models when one is active (so a
+                           # configured-but-unused TokenHub is never shown next to active: true);
+                           # else the configured ones, shown as not in use
+                           "provider": (getattr(chain, "provider", None) if active
+                                        else llmmod.provider_label() if configured else None),
+                           "chain": (list(chain.models) if active else llmmod.configured_models()),
+                           "active": active,
                            # "tencent-tokenhub" | "openai-compatible" | "standin" (a neutral id:
                            # never the stand-in's provider name) | None
                            "active_provider": getattr(chain, "provider", None) if chain is not None else None,
@@ -232,6 +239,16 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                 "deliverables": app.state.deliverables.status(),
                 # just-in-time views of an answer (views/; same switch as deliverables)
                 "views": app.state.views.status()}
+        if set(user.roles) & BUDGET_ROLES:
+            # the stand-in model's guard: numbers only, admin and compliance only (never the
+            # provider; model_guard.py). A guard that cannot be read is reported as unavailable.
+            try:
+                from .model_guard import budget_status
+                out["model_budget"] = budget_status()
+            except Exception as exc:                                # noqa: BLE001
+                log.error("model budget status failed: %s", type(exc).__name__)
+                out["model_budget"] = {"label": "Model budget", "ok": False, "available": False}
+        return out
 
     # -- auth --------------------------------------------------------------------------------
     @app.post("/auth/demo-login")

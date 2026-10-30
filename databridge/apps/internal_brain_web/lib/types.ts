@@ -497,6 +497,22 @@ export interface IbStatus {
   key_configured: boolean;
   force_offline: boolean;
   ledger: { ok: boolean | null };
+  /** The stand-in model's guard (D-42): numbers only, sent to admin and compliance only. */
+  model_budget?: ModelBudget;
+}
+
+/** /ib/status model_budget: spend against the caps, from the persistent spend ledger. */
+export interface ModelBudget {
+  label: string;
+  ok: boolean;
+  available: boolean;
+  spent_usd: number | null;
+  total_cap_usd: number;
+  today_usd: number | null;
+  daily_cap_usd: number;
+  calls: number | null;
+  rpm: number;
+  user_rpm: number;
 }
 
 /** GET /ib/history (v1 adds channel + synthetic_replay). */
