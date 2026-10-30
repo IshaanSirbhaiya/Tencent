@@ -119,6 +119,37 @@ _TAG = re.compile(r"\[C\d+\]")
 _SPACE_BEFORE_PUNCT = re.compile(r"\s+([.,;:!?])")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 
+# A model-written draft sentence must be made of its sources' words (round-2b Opus #1): the answer
+# wall keeps a sentence that shares ONE word with a fact, which let a reply add promises ("we will
+# waive all charges") or reasons no source gave. Here at least DRAFT_SUPPORT of a sentence's content
+# words must appear in the facts its own tags point at; otherwise the sentence is dropped.
+DRAFT_SUPPORT = 0.8
+_WORD = re.compile(r"[^\W_]+")
+_CJK = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
+_STOP = frozenset("""a an and are as at be been but by can could did do does for from had has have he her
+his i if in into is it its may me might must my no not of on or our shall she should so than that the
+their them then there these they this those to too us was we were what when where which who will with
+would you your yours hello hi dear thanks thank please""".split())
+
+
+def _content_words(text: str) -> list[str]:
+    out: list[str] = []
+    for w in _WORD.findall(_TAG.sub(" ", text).lower()):
+        if _CJK.search(w):
+            out.extend(ch for ch in w if _CJK.match(ch))       # CJK: one character, one word
+        elif w not in _STOP and (len(w) > 1 or w.isdigit()):
+            out.append(w)
+    return out
+
+
+def supported(sentence: str, source: str, floor: float = DRAFT_SUPPORT) -> bool:
+    """True when at least ``floor`` of the sentence's content words occur in ``source``."""
+    words = _content_words(sentence)
+    if not words:
+        return False
+    have = set(_content_words(source))
+    return sum(w in have for w in words) / len(words) >= floor
+
 KINDS = ("reply", "message")
 GREETING = {"reply": "Hello,", "message": "Hi,"}
 OPENER = {"reply": "Thank you for getting in touch.", "message": "Here is what our sources say."}
@@ -435,7 +466,10 @@ class ActionService:
             return None
         text = narrate.drop_addressed_to_ai(text)
         valid = set(ctx.cites)
-        body = [f for f in split_facts(text) if f.tags and set(f.tags) <= valid]
+        said = {tag: " ".join(f.text for f in ctx.facts if tag in f.tags) for tag in valid}
+        body = [f for f in split_facts(text)
+                if f.tags and set(f.tags) <= valid
+                and supported(f.text, " ".join(said[t] for t in f.tags))]
         return (body[:MAX_FACTS], info) if body else None
 
     def draft(self, user: DirectoryUser, req_id: str, kind: str = "reply") -> dict[str, Any]:

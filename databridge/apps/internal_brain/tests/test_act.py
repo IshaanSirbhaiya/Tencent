@@ -383,6 +383,39 @@ def test_ungrounded_model_draft_falls_back_to_the_template(tmp_path):
     assert {b["text"] for b in d["body"]} <= {f.text for f in split_facts(ans["answer"])}
 
 
+def test_model_draft_sentences_must_be_made_of_their_sources_words(tmp_path):
+    """Round-2b Opus #1: sharing one word with a fact is not enough for a customer-facing draft.
+    Promises and reasons no source gave are dropped; a faithful rewrite is kept."""
+    captured: list = []
+
+    def reply(ctx):
+        sent = ctx.splitlines()[0].split(") ", 1)[1].rstrip(".")
+        return (f"{sent} [C1]. "
+                f"{sent}, and we will waive all charges for you [C1]. "
+                "The review is routine and your account will be fully restored very soon with compensation [C1]. "
+                "The account is restricted because of a suspicious transaction report [C1].")
+
+    app, svc = _world(tmp_path, chain=_draft_chain(captured, reply))
+    jd = _c(app, svc, "jdoe")
+    ans = _ask(jd)
+    d = jd.post("/ib/act/draft", json={"req_id": ans["request_id"]}).json()
+    assert d["model"]["model"] == "hy3"
+    assert len(d["body"]) == 1
+    for bad in ("waive", "compensation", "suspicious transaction"):
+        assert bad not in d["text"]
+
+
+def test_supported_needs_most_content_words_in_the_source():
+    from databridge_ib.actions import supported
+    src = "The account is restricted pending a routine review."
+    assert supported("Your account is restricted pending a routine review [C1].", src)
+    assert not supported("Your account is restricted pending a routine review, and we will waive all charges [C1].", src)
+    assert not supported("The account is restricted because of a suspicious transaction report [C1].", src)
+    assert not supported("[C1].", src)                                  # no content words: dropped
+    assert supported("账户正在审核", "该账户正在例行审核中")                 # CJK: per character
+    assert not supported("账户已被冻结并将退款", "该账户正在例行审核中")
+
+
 # ------------------------------------------------------------------------------------------------
 # the follow-up ticket
 # ------------------------------------------------------------------------------------------------
