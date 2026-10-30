@@ -23,9 +23,10 @@ PY="$ROOT/.venv/Scripts/python.exe"; [ -x "$PY" ] || PY="$ROOT/.venv/bin/python"
 SEP="$("$PY" -c 'import os; print(os.pathsep)')"
 IB_PATH="apps/internal_brain${SEP}packages/core${SEP}packages/harness${SEP}packages/adapter${SEP}packages/retrieval"
 
+# PID 0 is Windows' placeholder for a socket whose owner just exited; it is never a live listener.
 port_pids() {
   if command -v netstat >/dev/null 2>&1 && [ "${OS:-}" = "Windows_NT" ]; then
-    netstat -ano -p tcp 2>/dev/null | awk -v p=":$1" '$2 ~ p"$" && $4 == "LISTENING" {print $5}' | sort -u
+    netstat -ano -p tcp 2>/dev/null | awk -v p=":$1" '$2 ~ p"$" && $4 == "LISTENING" && $5 != "0" {print $5}' | sort -u
   elif command -v lsof >/dev/null 2>&1; then
     lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | sort -u
   fi
