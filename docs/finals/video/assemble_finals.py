@@ -155,7 +155,7 @@ SEGMENTS = [
     ("camera", "intro_final.mp4", 0, "00 Camera intro", {}),
     ("card", "01_title.png", 9, "01 Title", {}),                   # [1] 9 s: Tencent is named in the first line
     # [3] one question, every sentence sourced, checked live (+ 简体中文)
-    ("clip", "04_source_live.webm", (30, 34, 38), "04 One question, checked live", {}),
+    ("clip", "04_source_live.webm", (36, 36, 40), "04 One question, checked live", {}),
     # [4] the map: Jordan's everything, Ken's corner
     ("clip", "06_graph.webm", (20, 20, 26), "06 The map of what you can see", {}),
     # [5] + [7] same question, two people; the fintech part
@@ -164,26 +164,29 @@ SEGMENTS = [
     ("clip", "03_ken_identical.webm", (23, 25, 28), "03 Restricted looks like nothing", {}),
     # enhancements to [7] and [3]: the answer becomes a reply, a ticket, a file
     ("clip", "17_act.webm", (18, 22, 26), "17 Act: a draft and a ticket", {"optional": True}),
-    ("clip", "18_deliverables.webm", (10, 15, 20), "18 Deliverables: a table, a chart, a file", {"optional": True}),
+    ("clip", "18_deliverables.webm", (10, 13, 18), "18 Deliverables: a table, a chart, a file", {"optional": True}),
     # [5b] the guided tour (+ dictation, the accessibility caption, the value calculator)
-    ("clip", "21_extras.webm", (0, 12, 16), "21 New here: tour, dictation, value calculator", {"optional": True}),
+    ("clip", "21_extras.webm", (0, 10, 15), "21 New here: tour, dictation, value calculator", {"optional": True}),
     # [8] nothing stale: live growth and uploads
     ("clip", "06b_brain_grow.webm", (0, 22, 28), "06b Watch the brain grow", {"optional": True}),
-    ("clip", "19_upload.webm", (0, 10, 15), "19 Add a file", {"optional": True}),
+    ("clip", "19_upload.webm", (0, 8, 13), "19 Add a file", {"optional": True}),
     # [9] the compliance side: the journey, the audit log and the tamper demo (+ analytics, Trust centre)
     ("clip", "05_journey.webm", (30, 35, 40), "05 Developer mode: the journey", {}),
-    ("clip", "08_audit.webm", (40, 43, 50), "08 Audit, Verify and the tamper demo", {}),
+    ("clip", "08_audit.webm", (40, 41, 50), "08 Audit, Verify and the tamper demo", {}),
     ("clip", "07_analytics.webm", (12, 12, 15), "07 Analytics", {}),
-    ("clip", "09_trust.webm", 14, "09 The Trust centre", {}),
+    ("clip", "09_trust.webm", (13, 13, 14), "09 The Trust centre", {}),
     # [10] WorkBuddy
-    ("still", "workbuddy_mcp_panel.png", (5, 6, 6), "12 WorkBuddy: the connectors",
+    ("still", "workbuddy_mcp_panel.png", (6, 6, 6), "12 WorkBuddy: the connectors",
      {"pills": [(0.6, 4.0, "Tencent WorkBuddy · real window capture (15 Oct)")]}),
-    ("still", "workbuddy_compare.png", (8, 9, 12), "12 WorkBuddy: two people",
+    ("still", "workbuddy_compare.png", (9, 9, 12), "12 WorkBuddy: two people",
      {"pills": [(1.0, 4.0, "One question, Jordan's and Ken's connectors: two answers")]}),
-    # [11] what's underneath
-    ("clip", "10_engine.webm", (20, 18, 25), "10 The Walnut engine", {}),
-    # [12] how it fits together, and Hy3
-    ("clip", "13_hy3_status.webm", (14, 14, 17), "13 Tencent Hy3", {}),
+    # [11] what's underneath: shown as on 16 Oct (a recording of the ORIGINAL Walnut screens, :3300 and the
+    # gateway :8300, captioned "the platform"), then the same engine's graph inside DataBridge (shown, not used)
+    ("clip", "10a_platform.webm", (16, 16, 18), "10 The platform", {}),
+    ("clip", "10_engine.webm", (8, 10, 18), "10 The Walnut engine", {}),
+    # [12] how it fits together, and Hy3 (+ the Tencent Cloud deploy kit, a still card as on 16 Oct)
+    ("clip", "13_hy3_status.webm", (11, 11, 14), "13 Tencent Hy3", {}),
+    ("card", "13b_deploy.png", (4, 4, 5), "13 Deploy kit: Tencent Cloud", {}),
     # the teammates' slots: names, routes and lines come after the merge (TODO in the script)
     ("clip", "S1_voice.webm", (0, 8, 20), "S1 Voice", {"optional": True, "slot": True}),
     ("clip", "S2_jit_ui.webm", (0, 8, 20), "S2 Just-in-time UI", {"optional": True, "slot": True}),
@@ -193,8 +196,8 @@ SEGMENTS = [
      {"pills": [(10.5, 7.5, "PROOF_PILL")]}),
     ("card", "15_business.png", 21, "15 What it's worth",
      {"pills": [(12.0, 7.0, "Target host: Tencent Cloud. One-command deploy kit in the repo; no live instance yet")]}),
-    ("card", "11_codebuddy.png", (10, 12, 14), "11 Built with CodeBuddy", {}),
-    ("card", "20_miora.png", (0, 8, 10), "20 Miora: the cover art", {"optional": True}),
+    ("card", "11_codebuddy.png", (10, 11, 14), "11 Built with CodeBuddy", {}),
+    ("card", "20_miora.png", (0, 5, 7), "20 Miora: the cover", {"optional": True}),
     ("card", "16_close.png", 13, "16 Close", {}),
 ]
 
@@ -451,7 +454,7 @@ def self_test() -> int:
     order = [Path(n).stem for _, n, _, _, _ in SEGMENTS]
     # the 16 Oct spine, in its order: [3] 04, [4] 06, [5]+[7] 02, [6] 03, [9] 05 08, [10] 12, [11] 10, [12] 13, [13] 14, [14] 11 16
     spine = ["04_source_live", "06_graph", "02_compare_amy_rachel", "03_ken_identical", "05_journey", "08_audit",
-             "workbuddy_mcp_panel", "10_engine", "13_hy3_status", "14_proof", "11_codebuddy", "16_close"]
+             "workbuddy_mcp_panel", "10a_platform", "10_engine", "13_hy3_status", "14_proof", "11_codebuddy", "16_close"]
     assert [order.index(s) for s in spine] == sorted(order.index(s) for s in spine), "the 16 Oct spine is out of order"
     # the script: every scene of the plan has a section; cuts add lines, never remove; TODO placeholders are never read
     TODO_SCENES.clear()
@@ -461,9 +464,19 @@ def self_test() -> int:
         assert sc in lines["main"], f"no '### {sc} ·' section in VIDEO_SCRIPT_FINALS.md"
         assert len(lines["short"][sc]) <= len(lines["main"][sc]) <= len(lines["full"][sc]), sc
         assert not any(x.startswith("TODO") for c in CUTS for x in lines[c][sc]), sc
-    assert {"S1", "S2", "S3"} <= TODO_SCENES and not any(lines["full"][x] for x in ("S1", "S2", "S3"))
+    # S1 and S3 are still TODO placeholders; S2 (pages beside the chat) has its lines
+    assert {"S1", "S3"} <= TODO_SCENES and not any(lines["full"][x] for x in ("S1", "S3")) and lines["main"]["S2"]
     assert lines["short"]["02"] != lines["full"]["02"]
     assert not any(secs_for(sec, "short") for _, _, sec, _, e in SEGMENTS if e.get("slot"))
+    # accuracy (founder, 31 Oct): no spoken line names another model, says Hy3 wrote the answers, says the
+    # product "runs on" a Tencent tool, or calls a view (the graphs) how an answer is found
+    banned = ("deepseek", "written by hy3", "hy3 answered", "runs on codebuddy", "runs on workbuddy",
+              "runs on tencent cloud", "how the answer is found", "how answers are found")
+    for c in CUTS:
+        for h in (False, True):
+            spoken = " ".join(x for v in scenes_from_script(h, c).values() for x in v).lower()
+            hit = [b for b in banned if b in spoken]
+            assert not hit, f"spoken lines ({c}, hy3={h}) say {hit}"
     problems = check_script_numbers()                                  # the spoken numbers vs eval_summary.json
     assert not problems, "script vs evidence: " + "; ".join(problems)
     assert words(1131) == "one thousand one hundred and thirty-one" and words(7374) ==         "seven thousand three hundred and seventy-four" and words(166) == "one hundred and sixty-six"

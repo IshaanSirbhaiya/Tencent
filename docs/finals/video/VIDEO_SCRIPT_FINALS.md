@@ -38,7 +38,18 @@ live), so the app labels every answer "Quoted from sources (no model)". A line m
 read only after Hy3 has answered live in this app; otherwise read the **[otherwise]** line. (The assembler also
 still accepts the old spelling "[if Hy3 is on]".) Keep each marked line on one line: `assemble_finals.py` reads
 the script line by line. If Hy3 goes live, scenes 02, 04, 05 and 13 must also be re-shot, because the answer label
-changes on screen.
+changes on screen. No line ever says Hy3 answered, and no line or caption names any other model: a stand-in
+model exists in the code but is off by default, so the video never mentions it.
+
+## What each piece does (every line must agree with this)
+
+| Role | Pieces | How the video may describe it |
+|---|---|---|
+| **Used to make every answer** | the signed token (who you are); the search index; Gate 1, the index permission filter; the connectors for Slack, Confluence, Jira and Drive (Gate 2: each source is read through its own connector, with permissions checked live); the model step (today: quoted from the sources); the Walnut engine's grounding wall and source pointers; the write-ahead sealed ledger | "each source is read through its own connector, with permissions checked live"; "two permission checks first"; "the record is sealed before you see a word" |
+| **Another way to ask, through the same pipeline** | WorkBuddy (an MCP agent: same gates, written to the same sealed log); Compare | "the same gates, the same sealed log" |
+| **Views that do not answer** | the knowledge graph (a map of what each person can open, built from the same permission checks); the Walnut engine graph (Dev → Brain); the journey; audit; analytics; the Trust centre | "a map of what each person can open"; the engine graph is "shown, not used to answer". Never "how the answer is found" |
+| **On top of an answer** | Act; Deliverables; the page beside the chat (slot S2) | "the answer can become a reply / a file / a page" |
+| **The wider platform, not used to answer** | the original POC's adapter agents and adapter builder, the federated engine, the original Walnut screens, the engine gateway | scene 10 only, captioned "the platform", never "answering this question" |
 
 ## Pacing: why it should feel like a person, not a robot
 
@@ -86,10 +97,12 @@ and "Wired for Tencent Hunyuan (Hy3)" (made by `record_finals.cjs cards`).
 > Aspire's own question.
 
 ### 04 · One question, every sentence sourced and checked live
-**Cuts:** short 30 s · main 34 s · full 38 s.
+**Cuts:** short 36 s · main 36 s · full 40 s.
 **Original beat:** 3 "One question, three platforms" (one plain question, one answer, every sentence linked to its
 source, only sources the asker can open, each re-checked with the source system). Upgraded: the asker is Rachel
 with Aspire's question, the source sheet shows "Checked live at", and (new) the user screens work in 简体中文.
+The source sheet carries the pipeline line: each source is read through its own connector (Slack, Confluence,
+Jira, Drive), with permissions checked live (Gate 2).
 **On screen:** Rachel's own Ask page (`/`, User mode). She clicks her starter question about the Velquarry review.
 The live progress line, then the cited answer. She clicks a citation: the source sheet shows the platform, the
 version, "Checked live at" and the cited lines highlighted. **Esc**. Then the language menu: 简体中文, and back to
@@ -103,7 +116,8 @@ English and say so (D-32), which is why the line says "the screens you ask from"
 > Rachel is the money-laundering reporting officer at a fintech. She asks Aspire's question: why has Velquarry
 > Trading's account been restricted?
 > One answer, and every sentence points at a passage she can open right now.
-> Click one, and you see the exact lines, the version, and when it was checked with the source: seconds ago.
+> Click one, and you see the exact lines, the version, and when it was checked: seconds ago.
+> Each source is read through its own connector, with her permissions checked live.
 > **[MAIN]** Anything she cannot open at that moment is left out of the answer.
 > And now the screens you ask from work in Chinese too.
 > **[FULL]** Developer pages stay in English, and say so.
@@ -116,14 +130,17 @@ English and say so (D-32), which is why the line says "the screens you ask from"
 **Cuts:** short 20 s · main 20 s · full 26 s.
 **Original beat:** 4 "The map of what you can see" (Jordan's map, everything he can open; Ken's is far smaller, and
 there is no "plus 843 hidden": for Ken the rest simply doesn't exist). Upgraded: the knowledge graph with Compare
-two people. The counts are on screen, not spoken: the world is growing.
+two people. The counts are on screen, not spoken: the world is growing. The graph is a **view**: a map of what
+each person can open, built from the same permission checks as the answers. It is never described as how an
+answer is found.
 **On screen:** Jordan, Developer → **Knowledge graph** (`/dev/graph`): every item he can open. A search for
 "migration" opens one item's panel. Then **Compare two people**: Ken's graph beside Jordan's.
-**Caption:** "Jordan · backend engineer: everything he can open", "Ken, signed in separately: a small corner, no
-greyed-out boxes".
+**Caption:** "Jordan · backend engineer: a map of what he can open", "Ken, signed in separately: a small corner,
+no greyed-out boxes".
 **Proof:** `tests/e2e/graph.spec.ts`, `graph-screens.spec.ts`; the map totals are permission-correct (rule 1).
 
-> Here is everything Jordan, a backend engineer, can open, as one graph, each item checked with its source.
+> This is a map of what each person can open, built from the same permission checks. Here is Jordan's, a
+> backend engineer.
 > **[FULL]** Company A is a synthetic company; every name here is made up.
 > Compare two people, and Ken, an outside contractor, has a small corner of the company, with no greyed-out
 > boxes.
@@ -196,7 +213,7 @@ is Jordan's. It writes a ticket into the mock Jira, so it is recorded late.
 > **[FULL]** If a draft strays from the facts, the cited sentences are used instead.
 
 ### 18 · And now a file: Deliverables
-**Cuts:** short 10 s · main 15 s · full 20 s.
+**Cuts:** short 10 s · main 13 s · full 18 s.
 **Original beat:** enhancement to 3 (the cited answer can also become a table, a chart or a .pptx, every figure
 still pointing at its source).
 **On screen:** Jordan, the same kind of answer. Under it, the **Deliverables** row: **Table** opens a table, each
@@ -211,7 +228,7 @@ figure pointing at its sources; the pointer rests on **.pptx** (hovered, not dow
 > **[FULL]** The table is built straight from the cited facts, with no model.
 
 ### 21 · New here: a tour, dictation, the value calculator
-**Cuts:** not in the short cut · main 12 s · full 16 s.
+**Cuts:** not in the short cut · main 10 s · full 15 s.
 **Original beat:** 5b "A guided tour for anyone new". Upgraded: dictation in the composer and the accessibility
 settings as a caption; a short look at the value calculator.
 **On screen:** Jordan, as someone new. One beat on the Ask page: the first-visit tour offer, then the microphone
@@ -255,7 +272,7 @@ take if Ken's feed gets any item. Needs demo features on (D-24). It writes a rea
 > **[FULL]** The post is checked with Slack and written to the audit log, like everything else.
 
 ### 19 · Add a file
-**Cuts:** not in the short cut · main 10 s · full 15 s.
+**Cuts:** not in the short cut · main 8 s · full 13 s.
 **Original beat:** enhancement to 8 (new content goes through the same checks and into the same log).
 **On screen:** `/dev/graph?add=1`, Leo (product and operations, who may add files to "Pricing & Offers"; Jordan may add to no
 folder). In the Add sheet, the file tab: a sample file is chosen, the folder **Pricing & Offers** is picked from the
@@ -289,14 +306,14 @@ write-ahead ledger rule 3 (`test_audit_ledger.py`). Maya sees verdicts and reaso
 > Now the compliance side, as Maya.
 > **[MAIN]** The app has two modes: User, for asking, and Developer, for seeing how an answer was made.
 > This is Rachel's request, end to end.
-> Each bar is a real timing: two permission checks first, then the answer is put together.
+> Each bar is a real timing: the index filter and the live source checks first, then the answer.
 > **[FULL]** Those timings are measured, not drawn.
 > These three records were sealed and chained before Rachel saw a word.
 > And below, every document that was considered, with its verdict and the reason.
 > Maya sees every decision. She never sees the answer itself.
 
 ### 08 · The sealed audit log, and the tamper demo
-**Cuts:** short 40 s · main 43 s · full 50 s.
+**Cuts:** short 40 s · main 41 s · full 50 s.
 **Original beat:** 9 "The audit trail", second half (plain-English search, the chained and sealed log, Verify, and
 "if someone edits a single line on disk, verification catches it"). Upgraded: the tamper demo now runs live on a
 copy, and Verify points at the exact entry.
@@ -333,7 +350,7 @@ real log is never written by the demo (D-19).
 > **[FULL]** And how often the live check said no.
 
 ### 09 · The Trust centre
-**Cuts:** 14 s in every cut.
+**Cuts:** short 13 s · main 13 s · full 14 s.
 **Original beat:** enhancement to 9 and to 12 "How it fits together" (the controls behind the demo, each proved by
 a test).
 **On screen:** Maya, **Trust centre** (`/dev/trust`): seven controls, each with the frameworks it maps to and the
@@ -349,54 +366,80 @@ tests that prove it.
 # Part 5 · WorkBuddy, what's underneath, how it fits together (16 Oct beats 10 to 12)
 
 ### 12 · Ask from Tencent WorkBuddy
-**Cuts:** short 13 s · main 15 s · full 18 s.
+**Cuts:** short 15 s · main 15 s · full 18 s.
 **Original beat:** 10 "Ask from WorkBuddy" (people don't want another app; each connector carries its own signed
-token, so the AI in the middle can't decide who you are). Same captures as the first video.
+token, so the AI in the middle can't decide who you are). Shown as in the first video: real WorkBuddy window
+stills, the connector list first, then one question through two people's connectors, with small captions.
 **On screen:** two real WorkBuddy window captures (15 Oct): the three DataBridge connectors, then one question
-through Jordan's and Ken's connectors with two different answers.
-**Caption:** "Tencent WorkBuddy · real window capture (15 Oct)", "One question, Jordan's and Ken's connectors: two
-answers".
-**Proof:** `submission/02_workbuddy/`, `test_mcp_untrusted_frame.py` (identity comes only from the signed
-token, never from the agent's arguments). D-30 changed the compliance connector after these captures, so nothing
-is said about it over these stills (READINESS_30OCT.md, scene 12).
+through Jordan's and Ken's connectors with two different answers. **TODO(laptop): re-capture both stills (or a
+short clip) in WorkBuddy on the laptop, same two shots, and save them over `submission/02_workbuddy/workbuddy_mcp_panel.png`
+and `workbuddy_compare.png`; until then the 15 Oct stills are used.** WorkBuddy is another way to ask through the
+same pipeline: an MCP agent, the same two gates, every question written to the same sealed log.
+**Caption:** "Tencent WorkBuddy · real window capture (15 Oct)" (change the date when re-captured), "One question,
+Jordan's and Ken's connectors: two answers".
+**Proof:** `submission/02_workbuddy/`, `databridge/apps/mcp_server/`, `test_mcp_untrusted_frame.py` (identity comes
+only from the signed token, never from the agent's arguments). D-30 changed the compliance connector after these
+captures, so nothing is said about it over these stills (READINESS_30OCT.md, scene 12).
 
-> Nobody wants another app, so it also lives inside Tencent WorkBuddy. Each connector carries its own signed
-> token, so Jordan's connector gets Jordan's answer, and Ken's gets Ken's.
-> **[MAIN]** Same gates, same audit log.
+> It plugs into Tencent WorkBuddy, so people can ask from where they already work.
+> It's an MCP agent: each connector carries one person's signed token, so Jordan's gets Jordan's answer.
+> **[MAIN]** Same gates, same sealed log.
 > **[FULL]** The agent never decides who you are.
 
-### 10 · The Walnut engine underneath
-**Cuts:** short 20 s · main 18 s · full 25 s.
-**Original beat:** 11 "What's underneath" (the Walnut evidence engine; every fact has a source; the time slider;
-follow a value to the exact row). Same lines, re-shot inside DataBridge.
-**On screen:** Jordan, **Walnut engine** (`/dev/brain`): "932 entities · 2,246 links · 4,710 pointers" (30 Oct
-counts, on screen only). **Company brain**: the time slider dragged back, then forward. **Provenance**: the DB
-Migration Plan, one value traced to its row and file.
-**Caption:** "The Walnut engine: Company A as Jordan sees it", "Rewind the company knowledge in time", "One value
-traced to the exact row in the exact file".
-**Proof:** `tests/e2e/engine.spec.ts`, `engine-proxy.spec.ts`; the engine is reused unchanged (`databridge/packages/**`).
+### 10 · What's underneath: the platform, and the Walnut engine
+**Cuts:** short 24 s · main 26 s · full 36 s (two clips: the platform, then the engine).
+**Original beat:** 11 "What's underneath". Shown as in the first video: a screen recording of the ORIGINAL Walnut
+screens (`databridge/apps/frontend` on :3300, the engine gateway on :8300) running on Company A, one quick shot per
+screen, small captions, the pointer resting on each; then (new) the same engine inside DataBridge.
+**On screen, clip 1 (`10a_platform`, the platform):** the original screens, started with
+`bash databridge/scripts/run_walnut_original.sh`: the **Builder**, "Adapter agents" tab (an example request fills
+the box; nothing is submitted), then its "Agents" tab; **Connectors** (the source list); **Data** (the data tools,
+convert); the **engine gateway** on :8300 (its API page, the federated engine's `/federated/ask` route); the
+**knowledge graph** of Company A (`/graph`). Every caption starts "The platform:" and none says these answer a
+question: the Internal Brain's answers never go through the adapter agents, the builder or the federated engine.
+**On screen, clip 2 (`10_engine`, the engine graph inside DataBridge):** Jordan, **Walnut engine** (`/dev/brain`):
+the snapshot counts (on screen only), **Company brain** with the time slider dragged back, then forward;
+**Provenance**: the DB Migration Plan, one value traced to its row and file. This graph is shown, not used to answer.
+**Caption:** clip 1: "The platform: agents that build new adapters", "The platform: agents, built from a plain
+request", "The platform: a connector for each source", "The platform: data tools", "The platform: the engine
+gateway, with its federated engine across systems", "The platform: the evidence graph of Company A". Clip 2: "The
+Walnut engine's graph, inside DataBridge: shown here, not used to answer", "Rewind the company knowledge in time",
+"One value traced to the exact row in the exact file".
+**Proof:** `databridge/apps/frontend/README.md` (the original screens on Company A; `tests/showcase/capture_company_a.cjs`),
+`databridge/apps/frontend/e2e/builder.spec.ts`, `data.spec.ts`, `sources.spec.ts`; the gateway's routes
+(`apps/gateway/databridge_gateway/federated_routes.py`); `tests/e2e/engine.spec.ts`, `engine-proxy.spec.ts`. What the
+Internal Brain uses from the engine: the grounding wall, the source pointers and the sealed audit ledger, imported
+unchanged (`docs/tencent/DEV_PROCESS.md`, "Foundation"). **Unrecorded:** clip 1 needs the original screens running;
+record it with `node docs/finals/video/record_finals.cjs 10a_platform`.
 
-> Underneath it all is Walnut, the evidence engine.
-> **[FULL]** Here is Company A as Jordan sees it: every entity, every link, every value with a pointer.
-> Drag the time slider, and the company's knowledge rewinds to any past date.
-> And any value can be traced to the exact row in the exact file.
+> We built the whole platform: connectors to every source, AI agents that build new adapters, a federated engine
+> across systems, and an evidence graph.
+> The Internal Brain runs on its core: the grounding wall and the sealed audit trail.
+> Inside DataBridge, Jordan can look at the engine's own graph. It's shown here; it isn't used to answer.
+> **[FULL]** Drag the time slider, and the company's knowledge rewinds to any past date.
+> **[FULL]** And any value can be traced to the exact row in the exact file.
 
 ### 13 · How it fits together, and Tencent Hy3
-**Cuts:** short 14 s · main 14 s · full 17 s.
+**Cuts:** short 15 s · main 15 s · full 19 s (the model chain, then the deploy kit card).
 **Original beat:** 12 "How it fits together" (two checks before the model, a grounding check after, an audit record
 written before anything is shown; Hy3 through TokenHub, or quoted answers until then). Upgraded: the live model
-chain on Mission control instead of a card.
-**On screen:** Maya, **Mission control** (`/dev`) → the model chain: Hy3, then DeepSeek, then the quoted
-fallback. **[otherwise]** The badge reads "Extractive only".
-**Caption:** "Tencent Hy3 via TokenHub → DeepSeek → quoted fallback", then a line that follows the live status
-("Hy3 not switched on yet: answers are quoted from the sources").
+chain on Mission control instead of a card, then a still card of the Tencent Cloud deploy kit in the same card
+style as the first video's.
+**On screen:** Maya, **Mission control** (`/dev`) → the model chain: Hy3 through TokenHub, then the quoted
+fallback. **[otherwise]** The badge reads "Extractive only". Record with `IB_MODELS=hy3` so the chain on screen
+names no other model; the recorder refuses a take whose chain does. Then the card `13b_deploy.png`
+(`record_finals.cjs cards`): the Lighthouse deploy kit in `deploy/lighthouse/` (its files and the one-VM diagram),
+"written; no live instance yet".
+**Caption:** "Tencent Hy3 via TokenHub, then a quoted fallback", then a line that follows the live status ("Hy3 not
+switched on yet: answers are quoted from the sources"). The card says "Packaged for Tencent Cloud Lighthouse".
 **Proof:** the model-chain tests (`test_model_config.py`); the recorder reads `/ib/status`, and `FINALS_HY3=0|1`
-makes it refuse a take that disagrees. The frame line is rules 1, 3 and 5 of `CLAUDE.md`.
+makes it refuse a take that disagrees. The frame line is rules 1, 3 and 5 of `CLAUDE.md`. The deploy kit:
+`deploy/lighthouse/README.md` (status: written, no live instance).
 
 > **[FULL]** Two checks before any model, a grounding check after, the record written first.
-> Tencent Hy3 is wired in through TokenHub, with a safe fallback.
-> **[otherwise]** Until it is switched on, answers are quoted from the sources, through the same checks.
-> **[ONLY IF HY3 LIVE]** The answers you saw were written by Hy3, inside exactly the same checks.
+> **[otherwise]** And it's wired for Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
+> **[ONLY IF HY3 LIVE]** And it runs on Tencent Hunyuan through TokenHub, packaged to deploy on Tencent Cloud.
+> **[otherwise]** Until Hy3 is switched on, answers are quoted from the sources, through the same checks.
 
 ---
 
@@ -473,29 +516,36 @@ the assembler, late in the slide; rubric criterion 5).
 > seven minutes a week.
 
 ### 11 · Built with Tencent CodeBuddy
-**Cuts:** short 10 s · main 12 s · full 14 s.
+**Cuts:** short 10 s · main 11 s · full 14 s.
 **Original beat:** 14 "How we built it, and thanks" (CodeBuddy mapped the trust boundaries, built the WorkBuddy
-connector, wrote tests, reviewed security and found real bugs; every transcript in the repo). Upgraded: nine
-sessions, not six.
-**On screen:** card: one of the nine CodeBuddy session transcripts (the security review), and what CodeBuddy
-built.
+connector, wrote tests, reviewed security and found real bugs; every transcript in the repo). Shown as in the first
+video: one still card, no screen recording. Upgraded: nine sessions, not six, and the session evidence on the card.
+**On screen:** card: a CodeBuddy session screenshot from `submission/01_codebuddy/` (CB7, the finals security
+review, beside CB5, the first one), and what CodeBuddy built. The full transcripts are also in
+`submission/01_codebuddy/conversation_history_codebuddy_workbuddy_miora.pdf`.
 **Caption:** none (the card says "Nine CodeBuddy sessions. Every transcript is in the repo").
-**Proof:** `docs/tencent/evidence/` (CB1 to CB9), `docs/tencent/DEV_PROCESS.md`; the count is in
-`video_constants.json`.
+**Proof:** `README.md` ("CodeBuddy | Nine build sessions (CB1–CB9)"), `docs/tencent/DEV_PROCESS.md` (two security
+reviews by CodeBuddy: CB5, 7 findings, fixed in CB6 and by Claude, `SECURITY.md` §10; CB7 on the finals backend,
+F7 "Real, small", fixed with tests, `docs/tencent/reviews/codebuddy_finals_review.md`), the transcripts in
+`docs/tencent/evidence/` (`codebuddy_cb1.jsonl` to `codebuddy_cb9.jsonl`), screenshots in `submission/01_codebuddy/`;
+the count is in `video_constants.json`.
 
-> We built this with Tencent CodeBuddy, nine sessions in all.
-> **[MAIN]** It built the WorkBuddy connectors, wrote tests, and its security review found real bugs.
-> **[FULL]** All in the repo.
+> We built it with Tencent CodeBuddy: nine recorded sessions, including security reviews that found real bugs.
+> **[MAIN]** It also built the WorkBuddy connectors and wrote tests.
+> **[FULL]** Every transcript is in the repo.
 
-### 20 · Made with Miora
-**Cuts:** not in the short cut · main 8 s · full 10 s.
-**Original beat:** enhancement to 14 (how we built it).
-**On screen:** card: the cover art and the Miora session from `submission/06_cover/`.
-**Caption:** none (the card says "Made in Miora from our written brief").
-**Proof:** `submission/06_cover/miora_session1.png`, `miora_session2.png`, `docs/finals/COVER_MIORA_PROMPT.md`.
+### 20 · Made with Tencent Miora
+**Cuts:** not in the short cut · main 5 s · full 7 s.
+**Original beat:** enhancement to 14 (how we built it). One still card, as in the first video.
+**On screen:** card: the finals cover (`submission/06_cover/finals/cover_finals_1920x1080.png`, Miora output 2,
+the chosen one) beside the Miora session screenshot (`miora_session_finals.png`) as the evidence.
+**Caption:** none (the card says "Designed in Tencent Miora from our written brief").
+**Proof:** `submission/06_cover/finals/README.md` ("Finals cover (made in Miora, 30 Oct 2026)"; the session
+screenshot with the prompt; both outputs; Miora's "Generated by Miora" mark kept on the image),
+`docs/finals/COVER_MIORA_PROMPT.md` (Miora is a Tencent tool).
 
-> The cover art was made in Miora, from a written brief.
-> **[FULL]** The prompts are in the repo.
+> The cover was designed in Tencent Miora.
+> **[FULL]** The prompt and both results are in the repo.
 
 ### 16 · Close
 **Cuts:** 13 s in every cut.
