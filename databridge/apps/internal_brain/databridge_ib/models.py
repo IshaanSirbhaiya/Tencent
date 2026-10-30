@@ -413,6 +413,12 @@ class DeliverableRequested(EventBase):
     policy_version: str
     #: round 4 B2: set on an EXPORT's write-ahead row (before its live re-check); None on create
     export_format: Optional[Literal["csv", "pptx"]] = None
+    #: a view's FURTHER write-ahead rows (None on the opening row; stats count only that one):
+    #: ``sources`` before the extra documents are read (``doc_ids``: the candidates, ids only);
+    #: ``rewrite`` before ``/ib/rewrite`` calls a model (``input_chars``: a count, never the text)
+    stage: Optional[Literal["sources", "rewrite"]] = None
+    doc_ids: tuple[str, ...] = ()
+    input_chars: Optional[int] = None
 
 
 class DeliverableCreated(EventBase):

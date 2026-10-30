@@ -99,11 +99,20 @@ class ViewService:
         except Exception as exc:                                    # noqa: BLE001
             raise Unavailable(type(exc).__name__) from None
 
+    def rewrite_requested(self, user: DirectoryUser, input_chars: int) -> None:
+        """The write-ahead row before ``/ib/rewrite`` calls a model: who, when and how many
+        characters; never the words. Raises ``Unavailable`` when the ledger is down (no call)."""
+        self._append(DeliverableRequested(
+            sub=user.id, deliverable_id=uuid.uuid4().hex, deliverable="view", stage="rewrite",
+            input_chars=int(input_chars), model_planned=True, policy_version=POLICY_VERSION,
+            event_time=self.clock()))
+
     def _fail(self, user: DirectoryUser, stage: str, reason: str, *, req_id: Optional[str] = None,
               view_id: Optional[str] = None) -> None:
         self._append(DeliverableFailed(sub=user.id, stage=stage, reason_code=reason[:80],
                                        req_id=req_id, deliverable_id=view_id,
-                                       deliverable="view" if view_id else None,
+                                       deliverable="view",     # a kind, not an id: stats
+
                                        event_time=self.clock()))
 
     def _answer_citations(self, req_id: str) -> list[dict[str, Any]]:
@@ -208,7 +217,7 @@ class ViewService:
             layout = plan.clean_instruction(instruction)
             cites = dict(ctx.cites)
             if self.composer is not None:
-                cites = self._expand(user, cites, ctx.question)
+                cites = self._expand(user, cites, ctx.question, req_id=req_id, vid=vid)
             evidence = build_evidence(cites, question=ctx.question, facts=ctx.facts,
                                       max_chars=PAGE_CONTEXT_CHARS if self.composer else 12_000)
             if not evidence:
@@ -236,12 +245,17 @@ class ViewService:
                       fallback=built["fallback"], digest=digest)
         return copy.deepcopy(resp)
 
-    def _expand(self, user: DirectoryUser, cites: dict, question: str) -> dict:
+    def _expand(self, user: DirectoryUser, cites: dict, question: str, *, req_id: str, vid: str
+                ) -> dict:
         """The answer's cited documents, then up to ``MAX_EXTRA`` more of the asker's documents on
         the same subject: first the most recent ones in the same places as the cited ones (the Jira
         project, the Slack channel, the Confluence space, the Drive folder), then a search on the
         cited titles and the question. Only over their permitted set (Gate 1), each checked live
-        (Gate 2 + read-through): restricted documents are never looked at, so they cannot count."""
+        (Gate 2 + read-through): restricted documents are never looked at, so they cannot count.
+
+        Write-ahead: the candidate ids (ids only) are ledgered as ``deliverable.requested`` stage
+        ``sources`` BEFORE any of them is read, so a read that fails or a page that is never shown
+        is still on the record. Ledger down: ``Unavailable`` and nothing is read."""
         try:
             epoch = getattr(self.directory, "epoch", 0)
             readable = self.index.readable(user, epoch)
@@ -256,8 +270,15 @@ class ViewService:
             ids = list(dict.fromkeys(near[:MAX_EXTRA * 2 // 3]
                                      + [h.doc_id for h in hits if h.doc_id not in have]))
             ids = ids[:MAX_EXTRA]
-            if not ids:
-                return cites
+        except Exception:                                           # noqa: BLE001
+            return cites                                            # the answer's own sources
+        if not ids:
+            return cites
+        self._append(DeliverableRequested(
+            sub=user.id, req_id=req_id, deliverable_id=vid, deliverable="view", stage="sources",
+            doc_ids=tuple(ids), model_planned=self.composer is not None,
+            policy_version=POLICY_VERSION, event_time=self.clock()))
+        try:
             ok, _ = authz.authorize(user, ids, index=self.index, connectors=self.connectors,
                                     readable=readable, directory_epoch=epoch)
         except Exception:                                           # noqa: BLE001

@@ -417,4 +417,7 @@ def test_view_events_are_registered_and_counted(tmp_path):
     for le in svc.ledger.events():
         assert le.event is not None and le.event.kind == le.kind
     kinds = [e.deliverable for e in _events(svc) if e.kind.startswith("deliverable.")]
-    assert kinds == ["view", "view", None]
+    # the failed lookup carries the kind "view" (counted apart in the stats), never an id
+    assert kinds == ["view", "view", "view"]
+    failed = _events(svc, "deliverable.failed")[-1]
+    assert failed.req_id is None and failed.deliverable_id is None

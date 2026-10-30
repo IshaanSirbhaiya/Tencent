@@ -58,8 +58,9 @@ def mount(app: FastAPI, service: ViewService, current: Callable,
         "application/json": {"schema": RewriteBody.model_json_schema()}}}})
     async def rewrite(request: Request, user: DirectoryUser = Depends(current)):
         """A standalone search question from MY message and MY previous question (both my own
-        words; no source is read, nothing is recorded: the question then asked is ledgered by
-        ``/ib/ask`` as usual). The model when connected; otherwise the message unchanged."""
+        words; no source is read). Before the model call, a counts-only write-ahead row
+        (``deliverable.requested`` stage ``rewrite``); the question then asked is ledgered by
+        ``/ib/ask`` as usual. The model when connected; otherwise the message unchanged."""
         employee(user)
         if not service.enabled:
             raise HTTPException(404, NOT_FOUND)
@@ -70,6 +71,12 @@ def mount(app: FastAPI, service: ViewService, current: Callable,
         comp = service.composer
         if comp is None:
             return {"question": body.question, "rewritten": False}
+        try:            # write-ahead, before the model call: counts only, never the words
+            await run_in_threadpool(service.rewrite_requested, user,
+                                    len(body.question) + len(body.previous))
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("rewrite write-ahead failed: %s", type(exc).__name__)
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         got, _info, _code = await run_in_threadpool(comp.rewrite, user.id, body.question,
                                                     body.previous)
         if not got or got.strip().lower() == body.question.strip().lower():

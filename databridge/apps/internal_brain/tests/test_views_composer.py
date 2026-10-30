@@ -309,7 +309,12 @@ def test_rewrite_turns_a_follow_up_into_a_standalone_question(tmp_path):
     assert r == {"question": "What was said in Slack about the database migration blockers?",
                  "rewritten": True}
     assert "Status of the database migration project?" in seen[0]
-    assert len(_events(svc)) == n                         # nothing read, nothing recorded
+    # nothing read; one counts-only write-ahead row before the model call, never the words
+    new = _events(svc)[n:]
+    assert [(e.kind, e.stage, e.deliverable, e.req_id, e.doc_ids) for e in new] == [
+        ("deliverable.requested", "rewrite", "view", None, ())]
+    assert new[0].input_chars == len("what was said in slack?") + len(
+        "Status of the database migration project?")
     for body in ({"question": "x", "user": "priya"}, {"question": ""}):
         assert jd.post("/ib/rewrite", json=body).status_code == 422
 
