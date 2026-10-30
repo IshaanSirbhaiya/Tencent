@@ -3,7 +3,10 @@
 Branch `final_v1.0`, everything committed and pushed. **The finals build is complete**: every page is
 built, tested live against the real backend, reviewed by five models and fixed.
 
-## Things only you can do (in this order)
+## Things only you can do
+
+Demo-day laptop steps, with the reason for each: [demo_day/FOUNDER_CHECKLIST.md](demo_day/FOUNDER_CHECKLIST.md).
+ (in this order)
 
 | # | What | Why | Time |
 |---|---|---|---|
