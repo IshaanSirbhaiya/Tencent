@@ -247,6 +247,24 @@ export const GROW_STEPS: PresenterStep[] = [
 ];
 
 /**
+ * The grow beat is opt-in per tab: `?grow=1` turns it on, `?grow=0` off (sessionStorage, this tab
+ * only). Demo features alone never put it on the Space path (round-2 Fable #1: the 5:00 script is
+ * always the run sheet's steps). Returns whether this tab opted in.
+ */
+const GROW_KEY = 'ib.presenter.grow';
+export function growOptIn(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const q = new URLSearchParams(window.location.search).get('grow');
+    if (q === '1') window.sessionStorage.setItem(GROW_KEY, '1');
+    else if (q === '0') window.sessionStorage.removeItem(GROW_KEY);
+    return window.sessionStorage.getItem(GROW_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Put the grow steps into STEPS (right after the Ken beat) or take them out. STEPS keeps its
  * identity, so every reader sees the change on its next render. Returns true when it changed.
  */

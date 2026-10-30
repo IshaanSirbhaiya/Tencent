@@ -17,7 +17,7 @@ import { ResetConfirm } from './ResetConfirm';
 import { applyStage } from './stage';
 import { getPresenter, setPresenter, usePresenter } from './store';
 import { WorkBuddyCard } from './WorkBuddyCard';
-import { setGrowSteps, STEPS } from './script';
+import { growOptIn, setGrowSteps, STEPS } from './script';
 import { useDemoFeatures } from '@/components/sim/demo';
 
 /** Pages the script itself drives; the bar stays there after the last step. */
@@ -57,11 +57,12 @@ export function PresenterRoot() {
   const { lang, setLang } = useLang();
   const s = usePresenter();
   const owner = useIsOwner();
-  // the live-growth steps exist only while demo features are on (D-24)
+  // The live-growth steps exist only while demo features are on (D-24) AND this tab opted in with
+  // ?grow=1 (round-2 Fable #1): never on the default Space path.
   const demo = useDemoFeatures();
   useEffect(() => {
-    if (setGrowSteps(demo.on)) setPresenter((p) => ({ step: Math.min(p.step, STEPS.length - 1) }));
-  }, [demo.on]);
+    if (setGrowSteps(demo.on && growOptIn())) setPresenter((p) => ({ step: Math.min(p.step, STEPS.length - 1) }));
+  }, [demo.on, pathname]);
   const langRef = useRef(lang);
   langRef.current = lang;
 

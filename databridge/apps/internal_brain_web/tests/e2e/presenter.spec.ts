@@ -429,3 +429,15 @@ test('reset during a pending Compare step: the step is cancelled and everything 
   await expect.poll(() => barState(page)).toBe('ready');
   await expect(stepNo(page)).toHaveText('01');
 });
+
+test('the grow beat stays off the Space path unless the tab opts in with ?grow=1 (round-2 Fable #1)', async ({ page }) => {
+  // The mock always reports demo_features: true, and an armed presenter counts as the viewer's
+  // opt-in; even so the default script is the run sheet's 11 steps (00 to 10).
+  await startPresenting(page);
+  await expect(bar(page)).toContainText('/ 10');
+  // ?grow=1 puts the three grow steps after the Ken beat for this tab only.
+  await page.goto('/present?grow=1');
+  await expect(bar(page)).toContainText('/ 13');
+  await page.goto('/present?grow=0');
+  await expect(bar(page)).toContainText('/ 10');
+});

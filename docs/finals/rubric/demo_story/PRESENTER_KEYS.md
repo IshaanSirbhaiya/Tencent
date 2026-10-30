@@ -76,6 +76,11 @@ Questions (exact strings, from `lib/personas.ts`):
 | 11 | `Space` | 4:30 | `/present/close` (PROPOSED) | **Close slide** |
 | Q&A | none | 5:00 | `/dev/journey/<req>` | Driver goes back to the journey page and leaves it up |
 
+**Live growth is never on the Space path.** The three grow steps (`grow`, `grow-post`, `grow-ask`,
+after the Ken beat) are added only when demo features are on (D-24) **and** the tab was opened with
+`?grow=1` (stored for this tab; `?grow=0` turns it off). Without `?grow=1` the HUD counts `/ 10`;
+with it, `/ 13`. Use it for a Q&A walk-up only (round-2 Fable #1; test in `presenter.spec.ts`).
+
 Note: the run sheet's Ken step happens before the passage step. The tamper in step 6 writes only to the sandbox copy, so the WorkBuddy beat in step 7 writes a real record to the real chain afterwards (D-19), which step 8 shows.
 
 ## 7. The WorkBuddy beat (off-app)

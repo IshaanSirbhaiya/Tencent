@@ -55,6 +55,7 @@ multidict==7.1.0
 networkx==3.7
 numpy==2.5.4
 openai==2.54.0
+opencv-python-headless==5.0.0.93  # the convert package imports cv2 at load (image_ocr); without it PDF/PPTX uploads refuse as "unavailable"
 openpyxl==3.1.5
 opentelemetry-api==1.45.1
 orjson==3.13.0
