@@ -211,8 +211,9 @@ test('P then Space walks the whole script from the keyboard', async ({ page }) =
   await expect(page.getByTestId('business-value-exact')).toContainText('US$1.28M');
   await expect(page.getByTestId('business-break-even-rounded')).toHaveText(/about\s*7$/);
   await expect(page.getByTestId('business-break-even-exact')).toContainText('7.0');
-  // Hy3 and TokenHub are named only while /ib/status says the model is live (read at view time).
-  const live = (await (await page.request.get('/api/ib/ib/status')).json())?.models?.active === true;
+  // Hy3 and TokenHub are named only while /ib/status says the TokenHub chain is live (read at view time).
+  const st = (await (await page.request.get('/api/ib/ib/status')).json())?.models;
+  const live = st?.active === true && st?.active_provider === 'tencent-tokenhub';
   await expect(page.getByTestId('business-stack')).toHaveText(
     live ? 'Tencent stack: Hunyuan Hy3 through TokenHub · WorkBuddy · CodeBuddy' : 'Tencent stack: WorkBuddy · CodeBuddy',
   );
@@ -305,20 +306,28 @@ test('slides read their numbers from data files; a missing eval summary says "re
   await expect(page.getByTestId('proof-diffs')).toContainText(ev.differential.pairs.toLocaleString('en-SG'));
 });
 
-test('slides name Hy3 and TokenHub only while the model is live', async ({ page }) => {
+test('slides name Hy3 and TokenHub only while the TokenHub chain is live', async ({ page }) => {
   await login(page, 'jdoe');
   let active = false;
+  let provider: string | null = null;
   await page.route('**/api/ib/ib/status', async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    await route.fulfill({ response: res, json: { ...body, models: { ...body.models, active } } });
+    await route.fulfill({ response: res, json: { ...body, models: { ...body.models, active, active_provider: provider } } });
   });
   await page.goto('/present/proof');
   await expect(page.getByTestId('proof-codebuddy')).toContainText('Nine CodeBuddy sessions, transcripts in the repo.');
   await expect(page.getByTestId('proof-codebuddy')).not.toContainText(/hy3|TokenHub|Every session transcript/i);
   await page.goto('/present/business');
   await expect(page.getByTestId('business-stack')).toHaveText('Tencent stack: WorkBuddy · CodeBuddy');
+  // the stand-in model is active: still no Hy3 or TokenHub line
   active = true;
+  provider = 'standin';
+  await page.goto('/present/business');
+  await expect(page.getByTestId('business-stack')).toHaveText('Tencent stack: WorkBuddy · CodeBuddy');
+  await page.goto('/present/proof');
+  await expect(page.getByTestId('proof-codebuddy')).not.toContainText(/hy3|TokenHub/i);
+  provider = 'tencent-tokenhub';
   await page.goto('/present/business');
   await expect(page.getByTestId('business-stack')).toHaveText('Tencent stack: Hunyuan Hy3 through TokenHub · WorkBuddy · CodeBuddy');
   await page.goto('/present/proof');

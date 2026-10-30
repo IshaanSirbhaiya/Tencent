@@ -104,7 +104,7 @@ export function ModelStatus({ status, unavailable }: { status: IbStatus | null; 
             <span className={cn('inline-flex flex-col rounded-md border px-2.5 py-1.5', status.models?.active ? 'border-line-strong bg-surface' : 'border-dashed border-line bg-bg/40 text-subtle')}>
               <span className="text-body-sm font-medium text-fg">{MODEL_LABEL[m] ?? m}</span>
               <span className="font-mono text-micro text-subtle">
-                {status.models?.provider ?? '—'} · {m}
+                {(status.models?.active ? status.models.active_provider : null) ?? status.models?.provider ?? '—'} · {m}
               </span>
             </span>
             <ArrowRight aria-hidden className="h-3.5 w-3.5 text-subtle" />

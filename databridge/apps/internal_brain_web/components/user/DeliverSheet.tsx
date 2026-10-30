@@ -32,6 +32,7 @@ import type {
   DeliverableKind,
   DeliverablesStatus,
 } from '@/lib/types';
+import { modelKind } from './answerText';
 import { CitationChip } from './CitationChip';
 import { toast } from './Toast';
 
@@ -462,7 +463,11 @@ const FIXED_TITLES: Record<string, DeliverKey> = {
 
 function builtBy(d: Deliverable, num: Numbering, t: T): string {
   const m = d.model;
-  if (d.generated === 'model' && m) return m.fallback_used ? t('deliver.by.fallbackModel', { model: m.model }) : t('deliver.by.model', { model: m.model });
+  if (d.generated === 'model' && m) {
+    // only Hy3 (and its DeepSeek fallback) is named; any other model (the stand-in) is neutral
+    if (!['hy3', 'deepseek'].includes(modelKind(m))) return t(m.fallback_used ? 'deliver.by.fallbackAi' : 'deliver.by.ai');
+    return m.fallback_used ? t('deliver.by.fallbackModel', { model: m.model }) : t('deliver.by.model', { model: m.model });
+  }
   const from = (d.content as { from_tag?: string } | null)?.from_tag;
   const n = from ? num.get(from)?.n ?? 0 : 0;
   if (m?.model === 'source-table-v1' && n) return t('deliver.by.copied', { n });

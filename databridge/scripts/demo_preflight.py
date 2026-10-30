@@ -157,6 +157,28 @@ def origin_error(url: str, allow_remote: bool) -> str | None:
     return None
 
 
+def model_line(st: dict, offline: bool) -> tuple[dict, tuple[str, str, str]]:
+    """``(model_info, (label, status, detail))`` from a /ib/status body. Hy3 is named only when the
+    active chain IS TokenHub; any other active model (the stand-in) is "AI model active", and the
+    "quoted (no model)" line only when no model is active."""
+    m = st.get("models") or {}
+    active = bool(m.get("active"))
+    hy3 = active and m.get("active_provider", "tencent-tokenhub") == "tencent-tokenhub"
+    chain = ", ".join(m.get("active_chain") or m.get("chain") or []) or "none"
+    info = {"live": hy3, "ai": active and not hy3, "chain": chain,
+            "force_offline": st.get("force_offline"), "key_configured": st.get("key_configured")}
+    if offline:
+        return info, ("Model", "info", "mock fixtures (offline build)")
+    if hy3:
+        return info, ("Model: Tencent Hunyuan LIVE via TokenHub", "pass", chain)
+    if active:
+        return info, ("Model: AI model active", "pass",
+                      "an AI model answers from the cited sources; never claim Hy3")
+    why = "IB_FORCE_OFFLINE=1" if st.get("force_offline") else "no live model"
+    return info, ("Model: extractive fallback (quoted from the sources)", "warn",
+                  f"{why}; say 'quoted from the sources, with the same checks'. Expected when TokenHub is not live")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--offline", action="store_true", help="check the mock build on :3101 (no services)")
@@ -227,26 +249,8 @@ def main() -> int:
                 rep.add("ledger", "sim_reset", "Simulator reset (admin.it)", "fail", "demo sign-in refused")
         code, st, _ = maya.call("GET", "ib/status", timeout=15)
         if code == 200 and isinstance(st, dict):
-            m = st.get("models") or {}
-            active = bool(m.get("active"))
-            # Hy3 is named only when the active chain IS TokenHub; any other model is neutral
-            hy3 = active and m.get("active_provider", "tencent-tokenhub") == "tencent-tokenhub"
-            live = hy3
-            chain = ", ".join(m.get("active_chain") or m.get("chain") or []) or "none"
-            model_info = {"live": live, "ai": active and not hy3, "chain": chain,
-                          "force_offline": st.get("force_offline"),
-                          "key_configured": st.get("key_configured")}
-            if a.offline:
-                rep.add("model", "model", "Model", "info", "mock fixtures (offline build)")
-            elif hy3:
-                rep.add("model", "model", "Model: Tencent Hunyuan LIVE via TokenHub", "pass", chain)
-            elif active:
-                rep.add("model", "model", "Model: AI model active", "pass",
-                        "an AI model answers from the cited sources; never claim Hy3")
-            else:
-                why = "IB_FORCE_OFFLINE=1" if st.get("force_offline") else "no live model"
-                rep.add("model", "model", "Model: extractive fallback (quoted from the sources)", "warn",
-                        f"{why}; say 'quoted from the sources, with the same checks'. Expected when TokenHub is not live")
+            model_info, line = model_line(st, a.offline)
+            rep.add("model", "model", *line)
         else:
             rep.add("model", "model", "Model status /ib/status", "fail", f"HTTP {code}")
         code, v, secs = maya.call("GET", "audit/verify", timeout=120)

@@ -23,6 +23,8 @@ const deliverEn = {
 
   'deliver.by.model': 'Written by {model}',
   'deliver.by.fallbackModel': 'Written by {model} (fallback)',
+  'deliver.by.ai': 'AI-generated from your cited sources',
+  'deliver.by.fallbackAi': 'AI-generated from your cited sources (fallback)',
   'deliver.by.copied': 'Copied cell by cell from source [{n}]',
   'deliver.by.charted': 'Charted from the table in source [{n}]',
   'deliver.by.quoted': 'Quoted from your sources',
@@ -66,8 +68,8 @@ const deliverEn = {
   'deliver.sources.analysis': 'Cited in this analysis',
   'deliver.recorded': 'Recorded in the audit trail before it was shown.',
 
-  'deliver.needsModel': 'This needs the model (Hy3). It didn’t produce anything that passed the source check, so nothing was written.',
-  'deliver.noModel': 'Needs the model (Hy3). It is not connected on this build; the table and chart are built from the sources.',
+  'deliver.needsModel': 'This needs an AI model. Its draft didn’t pass the source check, so nothing was written.',
+  'deliver.noModel': 'Needs an AI model. No model is connected on this build; the table and chart are built from the sources.',
   'deliver.insufficient': 'Not enough numbers from your sources to draw a chart.',
   'deliver.showTable': 'Show the table instead',
   'deliver.nothing': 'There’s nothing to build from this answer.',
@@ -99,6 +101,8 @@ const deliverZh: Record<DeliverKey, string> = {
 
   'deliver.by.model': '由 {model} 撰写',
   'deliver.by.fallbackModel': '由 {model} 撰写（备用模型）',
+  'deliver.by.ai': '由 AI 根据您引用的来源生成',
+  'deliver.by.fallbackAi': '由 AI 根据您引用的来源生成（备用模型）',
   'deliver.by.copied': '逐格复制自来源 [{n}]',
   'deliver.by.charted': '根据来源 [{n}] 中的表格绘制',
   'deliver.by.quoted': '引用自你的来源',
@@ -142,8 +146,8 @@ const deliverZh: Record<DeliverKey, string> = {
   'deliver.sources.analysis': '此分析引用的来源',
   'deliver.recorded': '在显示之前已记录到审计轨迹。',
 
-  'deliver.needsModel': '此功能需要模型（Hy3）。模型的输出未通过来源核对，因此没有生成任何内容。',
-  'deliver.noModel': '此功能需要模型（Hy3）。此版本未连接模型；表格和图表直接根据来源生成。',
+  'deliver.needsModel': '此功能需要 AI 模型。模型的输出未通过来源核对，因此没有生成任何内容。',
+  'deliver.noModel': '此功能需要 AI 模型。此版本未连接模型；表格和图表直接根据来源生成。',
   'deliver.insufficient': '你的来源中没有足够的数字来绘制图表。',
   'deliver.showTable': '改为显示表格',
   'deliver.nothing': '此回答中没有可用于生成的内容。',

@@ -90,10 +90,10 @@ export const PIPELINE: PipelineStep[] = [
     id: 'model',
     title: 'Model chain',
     kind: 'model',
-    short: 'Hy3 → DeepSeek → extractive',
+    short: 'Configured model → extractive',
     stage: 'compose',
     explain:
-      'Only Gate-2-allowed passages are sent. Hy3 (Tencent Hunyuan, through TokenHub) answers first; DeepSeek takes over if Hy3 fails; if both fail, a deterministic extractive answer quotes the permitted passages with no model at all.',
+      'Only Gate-2-allowed passages are sent. The configured model answers: Hy3 (Tencent Hunyuan, through TokenHub) with DeepSeek as its fallback when the TokenHub key is set, otherwise an optional stand-in AI model when one is switched on. If no model is configured or none answers, a deterministic extractive answer quotes the permitted passages with no model at all. Every answer is labelled with what wrote it.',
     guarantee: 'The system still answers safely without a model.',
   },
   {

@@ -84,7 +84,7 @@ test('Leo: table copied cell by cell, chart with value labels, analysis needs th
   const an = sheet.getByTestId('deliver-panel-analysis');
   await expect(an.getByTestId('deliver-needs-model')).toBeVisible();
   // fallback 'no_model' (no model connected): never reads as "a model ran and failed" (round-3 Fable #5)
-  await expect(an.getByTestId('deliver-needs-model')).toContainText('Needs the model (Hy3). It is not connected on this build; the table and chart are built from the sources.');
+  await expect(an.getByTestId('deliver-needs-model')).toContainText('Needs an AI model. No model is connected on this build; the table and chart are built from the sources.');
   await expect(an.getByTestId('deliver-needs-model')).not.toContainText('passed the source check');
   await expect(an.getByTestId('deliver-by')).toHaveCount(0); // nothing claims to be written by a model
   await expectAccessible(page, 'deliverables analysis (dark)');

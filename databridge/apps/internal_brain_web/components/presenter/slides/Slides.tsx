@@ -21,8 +21,9 @@ const n = (v: number) => v.toLocaleString('en-SG');
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
- * Is the model chain live right now (GET /ib/status, read at view time)? null while unknown or
- * unreachable: lines that name the model or TokenHub are shown only on a definite yes.
+ * Is Hy3 through TokenHub live right now (GET /ib/status, read at view time)? null while unknown or
+ * unreachable: lines that name Hy3 or TokenHub are shown only on a definite yes. Any other active
+ * model (the stand-in, a bring-your-own endpoint) is a no: those lines would then be untrue.
  */
 function useModelLive(): boolean | null {
   const [live, setLive] = useState<boolean | null>(null);
@@ -30,7 +31,7 @@ function useModelLive(): boolean | null {
     let on = true;
     analyticsApi
       .status()
-      .then((s) => on && setLive(s?.models?.active === true))
+      .then((s) => on && setLive(s?.models?.active === true && s.models.active_provider === 'tencent-tokenhub'))
       .catch(() => on && setLive(null));
     return () => {
       on = false;

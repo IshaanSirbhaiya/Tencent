@@ -13,6 +13,7 @@ import { placeLabel } from '@/lib/format';
 import { personaById } from '@/lib/personas';
 import { useLang, useMessages } from '@/lib/i18n';
 import { actMessages, type ActKey } from '@/lib/i18n/act';
+import { modelKind } from './answerText';
 import type { ActCitation, ActDraft, AskResponse, TicketCreated, TicketProposal } from '@/lib/types';
 import { safeHref } from '@/lib/url';
 import { toast } from './Toast';
@@ -294,7 +295,9 @@ function DraftView({ response }: { response: AskResponse }) {
         ? d.model.fallback_used
           ? t('act.draft.by.fallback')
           : t('act.draft.by.template')
-        : t('act.draft.by.model', { model: d.model.model });
+        : ['hy3', 'deepseek'].includes(modelKind(d.model))
+          ? t('act.draft.by.model', { model: d.model.model })
+          : t('act.draft.by.ai'); // any other model (the stand-in): neutral, never its id
 
   const copy = async () => {
     try {

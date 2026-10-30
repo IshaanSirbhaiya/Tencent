@@ -109,6 +109,17 @@ standin_state() {
     if [ "${IB_CLAUDE:-}" = "1" ] && [ -n "${ANTHROPIC_API_KEY:-}" ] && [ "${_S_IB_FORCE_OFFLINE:-}" != "1" ]
     then echo on; else echo off; fi )
 }
+# Should the stand-in answer when TokenHub does not? Only when it is switched on (IB_CLAUDE=1 and its
+# key) AND no TokenHub / OpenAI-compatible key is set: a configured TokenHub key takes precedence in
+# the Brain (bootstrap.py), so forcing online with a dead TokenHub key would label quotes as Hy3's.
+# Same throw-away subshell as above; prints "on" or "off", never a key or a value.
+standin_wanted() {
+  ( set +eu
+    if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local </dev/null >/dev/null 2>&1; set +a; fi
+    if [ "${IB_CLAUDE:-}" = "1" ] && [ -n "${ANTHROPIC_API_KEY:-}" ] && [ -z "${TOKENHUB_API_KEY:-}" ] \
+       && [ -z "${OPENAI_API_KEY:-}" ]
+    then echo on; else echo off; fi )
+}
 # The values this script settles on (forced switches, then the file, then defaults), copied into
 # private, unexported names _S_<KEY>, so the Brain's subshell can put them back after it sources the
 # file. A key that is unset stays unset (a child's own default then applies), never "".
@@ -160,8 +171,11 @@ elif [ "${ALLOW_DEV_KEYS:-0}" != "1" ]; then
   exit 3
 fi
 if [ -z "${IB_FORCE_OFFLINE:-}" ]; then
-  # Live Tencent Hunyuan when TokenHub answers for this account; otherwise the honest fallback.
-  if "$PY" scripts/hy3_check.py --quiet; then IB_FORCE_OFFLINE=0; else IB_FORCE_OFFLINE=1; fi
+  # Live Tencent Hunyuan when TokenHub answers for this account; else the opt-in stand-in model when
+  # it is switched on and no TokenHub key is set; otherwise the honest fallback (quoted answers).
+  if "$PY" scripts/hy3_check.py --quiet; then IB_FORCE_OFFLINE=0
+  elif [ "$(standin_wanted)" = on ]; then IB_FORCE_OFFLINE=0
+  else IB_FORCE_OFFLINE=1; fi
 fi
 export IB_FORCE_OFFLINE IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
 # Demo-proof features (D-24): live growth, "Add a document", the absence check and the engine
@@ -257,8 +271,8 @@ Walnut DataBridge is up.
   App               http://127.0.0.1:3100            (User mode; switch to Developer top-left)
   Presenter         http://127.0.0.1:3100/compare?present=1
   Developer         http://127.0.0.1:3100/dev
-  Live AI           IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE (0 = Tencent Hunyuan Hy3 via TokenHub)
-  AI stand-in       $( [ "$(standin_state)" = on ] && echo "on (opt-in; spend-capped)" || echo "off (opt-in only; pages are laid out by rules)")
+  Live AI           IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE (0 = a model may answer: Hy3 via TokenHub if its key is set, else the stand-in below; 1 = quoted)
+  AI stand-in       $( [ "$(standin_state)" = on ] && echo "on (opt-in; spend-capped; check /ib/status)" || echo "off (opt-in only; pages are laid out by rules)")
   Logs              $LOGS/
 Stop with: bash scripts/demo_up.sh stop
 EOF

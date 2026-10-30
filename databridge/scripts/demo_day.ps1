@@ -392,9 +392,9 @@ function Test-Prereqs([bool]$NeedServices) {
       Bad 'No Python venv at databridge\.venv. Fix: cd databridge; py -3.13 -m venv .venv; .venv\Scripts\python -m pip install -r requirements-lock.txt'
       $fatal++
     }
-    if (Test-Path (Join-Path $Db '.env.ib.local')) { Ok 'TokenHub settings file present (.env.ib.local): Hy3 is tried at start' }
+    if (Test-Path (Join-Path $Db '.env.ib.local')) { Ok 'Settings file present (.env.ib.local): a model is tried at start (Hy3 if a TokenHub key is set; else the stand-in model if IB_CLAUDE=1)' }
     elseif ($env:TOKENHUB_API_KEY) { Ok 'TokenHub key in the environment: Hy3 is tried at start' }
-    else { Warn 'No TokenHub key (databridge\.env.ib.local or TOKENHUB_API_KEY): answers will use the extractive fallback (no Hy3)' }
+    else { Warn 'No settings file and no TokenHub key (databridge\.env.ib.local or TOKENHUB_API_KEY): answers will use the extractive fallback (no model)' }
     # Where the sign-in passcode comes from (never its value).
     $pc = Get-DemoPasscode
     switch ($pc.Source) {
