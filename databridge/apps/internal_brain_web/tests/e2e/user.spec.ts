@@ -65,7 +65,7 @@ test('ask → staged progress → cited answer → source sheet → Esc returns 
   await expect(answer).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#answer-heading')).toBeFocused();
   // Rule 8: offline answers are labelled as quoted, never as written by Hy3.
-  await expect(answer.getByTestId('model-badge')).toHaveText('Quoted from sources (no model)');
+  await expect(answer.getByTestId('model-badge')).toHaveText('Quoted from sources (no AI model on)');
   await expect(answer.getByTestId('ai-note')).toHaveCount(0);
   await expect(answer.getByTestId('scope-note')).toHaveText(SCOPE_NOTE);
   const chips = answer.getByTestId('citation-chip');
@@ -175,7 +175,7 @@ test('language switch to 简体中文 and back', async ({ page }) => {
   await page.getByLabel('你的问题').fill(S1);
   await page.getByRole('button', { name: '提问', exact: true }).click();
   await expect(page.getByTestId('answer')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('model-badge')).toHaveText('直接引自来源（未使用模型）');
+  await expect(page.getByTestId('model-badge')).toHaveText('直接引自来源（未启用 AI 模型）');
   await expect(page.getByTestId('answer-text')).toContainText('The ledger database migration'); // the answer stays as returned
 
   await page.goto('/settings');

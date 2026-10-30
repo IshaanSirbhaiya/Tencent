@@ -29,6 +29,8 @@ export interface ScriptReport {
   web: string;
   ok: boolean;
   max_s: number;
+  /** The limit for a scripted question a model answered (longer than `max_s`); older reports lack it. */
+  model_max_s?: number;
   warmed: boolean;
   model?: { live?: boolean; chain?: string };
   items: ScriptItem[];
@@ -249,7 +251,13 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
         />
         <Section
           title="Scripted questions (pre-warm)"
-          note={report?.warmed ? `Each asked once by Start, as the persona on stage; OK means the expected result in under ${report.max_s} s.` : undefined}
+          note={
+            report?.warmed
+              ? `Each asked once by Start, as the persona on stage; OK means the expected result in under ${report.max_s} s${
+                  typeof report.model_max_s === 'number' ? `, or ${report.model_max_s} s when a model wrote the answer` : ''
+                }.`
+              : undefined
+          }
           checks={warmChecks}
         />
         <Section title="This screen and laptop" note="Checked now by this browser." checks={local.length ? local : [{ key: 'pending', label: 'Checking…', status: 'info', detail: '' }]} />

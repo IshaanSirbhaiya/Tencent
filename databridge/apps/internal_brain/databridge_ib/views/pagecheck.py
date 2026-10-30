@@ -32,7 +32,7 @@ from typing import Any, Mapping, Optional, Sequence
 from databridge_core.value_forms import value_spans
 
 from ..deliverables.evidence import Evidence, nfkc
-from ..deliverables.verify import (Check, _value_supported, check_chart, check_sentence,
+from ..deliverables.verify import (Check, _nums, _value_supported, check_chart, check_sentence,
                                    check_short_text, label_tokens, norm, unsafe_text, words)
 from ..deliverables import build as dbuild
 from . import blocks as vblocks
@@ -138,15 +138,15 @@ def _cell(cell: Mapping[str, Any], evidence, rule: LabelRule, check: Check) -> d
         if toks and rule.ok(text):
             check.items_kept += 1
             return {"text": text, "tags": [], "numeric": False}
-        check.drop("untagged", name=True)
+        check.drop("untagged", name=True, values=len(nums))
         return empty
     if any(t not in evidence for t in tags):
-        check.drop("tag")
+        check.drop("tag", values=len(nums))
         return empty
     hay, _units = _hay(tags, evidence)
     hay_words = set(words(hay))
     if not set(toks) <= hay_words or any(not _value_supported(text, s, hay) for s in spans):
-        check.drop("value" if nums else "name", value=bool(nums), name=not nums)
+        check.drop("value" if nums else "name", values=len(nums), name=not nums)
         return empty
     check.items_kept += 1
     check.values_kept += len(nums)
@@ -194,8 +194,8 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
                 # a stat label may repeat the names of its own value's source line, nothing else
                 label = grounded_label(str(st.get("label", "")), rule,
                                        bound=frozenset(words(hay)) if ok else frozenset())
-                if not ok or not label:
-                    check.drop("value" if not ok else "label", value=not ok, name=bool(ok))
+                if not ok or not label:             # the stat's value goes with it either way
+                    check.drop("value" if not ok else "label", value=True, name=bool(ok))
                     continue
                 check.items_kept += 1
                 check.values_kept += 1
@@ -253,8 +253,7 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
                 when = nfkc(str(it.get("when", ""))).strip()
                 _h, units = _hay(tags, evidence)
                 if not when or not check_short_text(when, units):
-                    check.items_kept = max(0, check.items_kept - 1)
-                    check.drop("label")
+                    check.retract("label", len(_nums(got_s["text"])))
                     continue
                 items.append({"when": when, "dated_by": "source", **got_s})
             if items:

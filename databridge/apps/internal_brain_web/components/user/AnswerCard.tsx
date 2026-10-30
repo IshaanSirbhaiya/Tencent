@@ -10,7 +10,7 @@ import { placeLabel } from '@/lib/format';
 import { useLang, useMessages } from '@/lib/i18n';
 import { userMessages } from '@/lib/i18n/user';
 import type { AskResponse, Citation } from '@/lib/types';
-import { MODEL_KEY, TAG_RE, checkedAgoKey, displayAnswer, followUpQuestion, followUps, gatherTags, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
+import { TAG_RE, checkedAgoKey, displayAnswer, followUpQuestion, followUps, gatherTags, isRefusal, modelKind, modelLabelKey, modelTipKey, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
 import { ActRow } from './ActSheet';
 import { DeliverRow } from './DeliverSheet';
 import { viewMessages } from '@/lib/i18n/view';
@@ -92,15 +92,18 @@ export function AnswerText({ response, onCite, className }: { response: AskRespo
   );
 }
 
-/** Model label from response.model; the AI note is added for model-written answers. */
+/**
+ * Model label from response.model; the AI note is added for model-written answers. A quoted answer
+ * says why it was quoted (model.reason_code); the badge says "AI-generated" only once, in the note.
+ */
 export function ModelLabel({ model, className }: { model: AskResponse['model']; className?: string }) {
   const t = useMessages(userMessages);
-  const kind = modelKind(model);
-  const label = t(MODEL_KEY[kind]);
-  const isModel = kind !== 'extractive';
+  const label = t(modelLabelKey(model));
+  const tip = modelTipKey(model);
+  const isModel = modelKind(model) !== 'extractive';
   return (
     <span className={cn('inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-muted', className)}>
-      <span className="inline-flex items-center gap-1" title={model.fallback_used ? t('answer.model.fallbackTip') : kind === 'ai' ? label : `${model.provider} / ${model.model}`}>
+      <span className="inline-flex items-center gap-1" title={tip ? t(tip) : `${model.provider} / ${model.model}`}>
         <Cpu aria-hidden className="h-3.5 w-3.5 text-subtle" />
         <span data-testid="model-badge">{label}</span>
       </span>

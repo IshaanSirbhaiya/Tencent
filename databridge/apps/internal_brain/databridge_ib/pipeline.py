@@ -2,7 +2,8 @@
 
     1 authn (app)  2 LEDGER request.accepted  3 parse window  4 GATE 1 + rank (permitted corpus)
     5 relevance gate  6 GATE 2 per candidate (+read-through on drift)  7 linked objects (1+2 again)
-    8 LEDGER retrieval.decided  9 generate (hy3 → deepseek → extractive)  10 grounding wall
+    8 LEDGER retrieval.decided  9 generate (hy3 → deepseek → extractive; D-43: no model call when
+    the quoted answer is approved script/template wording only)  10 grounding wall
     11 LEDGER answer.released (before the response)  12 respond — one shape for every outcome.
 
 Any ledger failure aborts the request (fail closed): no retrieval without ``request.accepted``, no
@@ -43,6 +44,9 @@ from .subject import scope as scope_subject
 from .subject import within as within_subject
 
 EXTRACTIVE = ModelInfo(provider="deterministic", model="extractive-v1")
+#: D-43: served without a model call because the quoted answer is approved wording only
+QUOTED_SCRIPT = ModelInfo(provider="deterministic", model="extractive-v1",
+                          reason_code=narrate.QUOTED_APPROVED_SCRIPT)
 #: progress stage names, in order (``on_stage``)
 STAGES = ("accepted", "gate1", "gate2", "sealed", "composing", "grounded", "released")
 MAX_PASSAGES = 14
@@ -194,11 +198,19 @@ class Pipeline:
         t_comp = time.perf_counter()
         passages = self._passages(released_hits)
         answer, model, dropped = REFUSAL_TEXT, EXTRACTIVE, 0
-        if passages:
+        # D-43: decided BEFORE any model call, from the released passages alone (after both gates):
+        # when the quoted answer is approved customer-facing wording only, it is served as is.
+        # (a briefing on a named project quotes by its sections: ``subject.scope``)
+        quoted = (narrate.extractive_answer(passages, scope_subject(question)) if passages
+                  else REFUSAL_TEXT)
+        if passages and self.chain is not None and narrate.quote_only(passages, quoted):
+            answer, model = quoted, QUOTED_SCRIPT
+        elif passages:
             context = narrate.build_context(passages)
             with for_person(user.id):
-                text, info, _notes = (self.chain.answer(context, question) if self.chain
-                                      else (None, None, []))
+                text, info, notes = (self.chain.answer(context, question) if self.chain
+                                     else (None, None, []))
+            answered = bool(text and info)      # a model returned text past the wall
             valid = {p.tag for p in passages}
             removed = 0
             if text and text.strip() != REFUSAL_TEXT:
@@ -208,10 +220,13 @@ class Pipeline:
                 answer, model = text, info
                 dropped = removed
             else:                           # no model, or an answer citing no permitted passage
-                answer = narrate.extractive_answer(passages, scope_subject(question))
+                answer = quoted
                 if self.chain is not None:      # the model was tried and did not produce a usable answer
+                    # why, so the answer's label tells the truth (Story 1 fix #2): the wall refused
+                    # the model's text, or no model replied in time
                     model = ModelInfo(provider="deterministic", model="extractive-v1",
-                                      fallback_used=True)
+                                      fallback_used=True,
+                                      reason_code=narrate.fallback_reason(notes, answered))
         _emit(on_stage, "composing")            # an answer text exists (model or extractive)
         refused = answer.strip() == REFUSAL_TEXT
         by_tag = {p.tag: p for p in passages}

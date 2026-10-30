@@ -724,3 +724,19 @@ An intelligence layer on top of the Brain, in the Ask view only. Same kill switc
 | Where | `app/(user)/page.tsx`, `components/user/ViewCanvas.tsx`, `components/views/catalog.tsx` (the A2UI catalog), `components/shell/SideNav.tsx` + `lib/navRail.ts`, `app/globals.css` (`.ask-x`, `.ask-split`, the rail) |
 | Guarantees | Pages render through A2UI v0.9 (`@a2ui/react` 0.13.0) with the Walnut catalog only; the tree binds paths, the data model holds checked values; every string is a React text node. Scoped: other pages, dark mode and high contrast keep their tokens; light text is at least 4.5:1 |
 | Tests | `views.spec.ts` (7, mock, axe): page or chat; open as page; Change this page; a chat edit does not call `/ib/ask`; the rail; light; 390 px sheet; zh and no HTML |
+
+## 15. Story 1 workflow-test fixes (D-43, D-44)
+
+| Feature | What it does | Tests |
+|---|---|---|
+| Approved wording quoted (D-43) | When the quote cites approved scripts or templates only, no model is called; label "Approved wording, quoted exactly" | `tests/test_quoted_script_skip.py`, `tests/test_story1_fixes.py` (paired world with a hidden non-script page) |
+| Status facts in answers | The answer prompt asks for every filing, decision and count the passages give; the grounding wall is unchanged | `test_story1_fixes.py::test_the_answer_prompt_carries_the_status_facts_rule`, `::test_the_grounding_wall_still_refuses_an_invented_status_fact` |
+| True quoted-answer labels | `model.reason_code`: rejected for evidence, model did not reply, approved wording, no model on; EN and 简体中文, no provider name | `test_story1_fixes.py` (reasons, P2); `tests/e2e/model-label.spec.ts` |
+| Case page beside the chat | The page-or-chat prompt asks for a page for case and status overviews from two or more documents. It is a model decision: the test proves the prompt carries the rule, not that a live model follows it, so "Open as page" stays the stage step | `test_story1_fixes.py::test_the_decide_prompt_carries_the_case_overview_rule` |
+| Log hygiene | HTTP client loggers at WARNING: no endpoint host or URL in `ib.log` | `test_story1_fixes.py::test_http_client_request_lines_never_reach_the_log` |
+| Bounded model wait | `IB_MODEL_ANSWER_TIMEOUT_S` (default 12 s, no SDK retry), then the quote | `test_story1_fixes.py::test_answer_timeout_from_the_environment`, `::test_the_answer_call_uses_the_timeout_without_a_retry` |
+| Page-check counters | values proposed = kept + dropped | `test_story1_fixes.py::test_sentence_checks_balance` |
+| Preflight | 8 s for a quoted ask, 15 s when a model was called; rows say "AI model", never a raw id; a WARN when Rachel's answer leaves out the STR filing, the trigger count or the device link | `test_story1_fixes.py` (preflight) |
+| Compare and slides | "Different answers" line in Compare; business headline "Projected"; the proof slide says the eval ran with a test model and the quoting path | `tests/e2e/compare.spec.ts`, `tests/e2e/presenter.spec.ts` |
+| Presenter warm-up | Starts at the proof step; a step waits at most 8 s for it | `tests/e2e/presenter.spec.ts` |
+| Journey model card | A model that is not named shows "AI model" and "—" (reuses `lib/format.ts` `modelLabel`) | No automated test of the stand-in case yet (the mock journeys are quoted or named models) |

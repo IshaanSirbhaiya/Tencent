@@ -12,7 +12,7 @@ import { announce } from '@/components/ui/announce';
 import { callPresenter } from './bus';
 import { clearDeliverCache, openDeliverables, warmDeliverables } from './deliver';
 import { STEPS, stepUrl, type StepCtx } from './script';
-import { markSessionOwned, serialSession, sessionOwner } from './session';
+import { markSessionOwned, serialSession, serialSessionWithin, sessionOwner } from './session';
 import { applyStage } from './stage';
 import { clearPresenter, getPresenter, setPresenter, type Dot } from './store';
 
@@ -78,7 +78,7 @@ function ctx(gen: number): StepCtx {
       return r;
     },
     signInMain: (persona) =>
-      serialSession(async () => {
+      serialSessionWithin(async () => {
         live();
         if (sessionOwner() !== owned) throw new SessionTaken();
         markSessionOwned();
@@ -97,7 +97,7 @@ function ctx(gen: number): StepCtx {
         // /ib/status needs a session: re-read the dots now that someone is signed in, so the HUD never
         // keeps the "unknown" it got from a fetch made before the sign-in (401).
         void refreshHealth();
-      }),
+      }, SIGN_IN_WAIT_MS),
     req: (persona) => getPresenter().reqs[persona] ?? null,
     reveal: async (selector, timeoutMs = 8_000) => {
       const end = Date.now() + timeoutMs;
@@ -168,17 +168,20 @@ export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
 }
 
 /*
- * D's warm-up waits until the first Compare step has settled (round-5 review cross-check #3): it
- * runs one more live ask and its deliverables, so it must not compete with the two live Compare
- * asks of step 01. It starts once step 01 has finished (or failed, or was skipped past), while the
- * presenter speaks over step 01's answers; Compare uses its own slot sessions, so borrowing the
- * main session then is invisible. D before that still builds on demand.
+ * D's warm-up starts at the Proof slide: it runs one more live ask and its deliverables and holds
+ * the main session for about 20 s, so it must not compete with the live Compare asks (round-5
+ * review cross-check #3), nor hold up the sign-ins of steps 03 to 05 (Story 1 fix: started after
+ * step 01 it held step 03 for 17 to 23 s when the presenter moved fast). From the Proof slide on,
+ * no step of the 5:00 script signs anyone in, so the slides cover it before Q&A. D before that
+ * still builds on demand. A step that does sign in waits for it at most SIGN_IN_WAIT_MS.
  */
 let warmPending = false;
+/** The longest a step's sign-in waits for session work queued before it (then it runs anyway). */
+const SIGN_IN_WAIT_MS = 8_000;
 function warmAfter(i: number) {
   if (!warmPending) return;
-  const compare = STEPS.findIndex((st) => st.id === 'compare-people');
-  if (compare < 0 || i < compare) return;
+  const proof = STEPS.findIndex((st) => st.id === 'proof');
+  if (proof < 0 || i < proof) return;
   warmPending = false;
   void warmDeliverables(serialSession).then(() => refreshHealth());
 }
@@ -195,9 +198,9 @@ export function start() {
   setPresenter({ armed: true, stage: true, hidden: false });
   flashLegend();
   // The title card first (stage QA 30 Oct #6: building Leo's deliverables first made P take 4.7 to
-  // 6.5 s). Q&A beat D's warm-up runs once step 01's Compare has settled (warmAfter), in the
-  // background, through the same session queue, so a step's sign-in that comes later still waits
-  // for it and wins.
+  // 6.5 s). Q&A beat D's warm-up runs once the Proof slide is reached (warmAfter), in the
+  // background, through the same session queue, so a step's sign-in that comes later waits for it
+  // (at most SIGN_IN_WAIT_MS) and wins.
   warmPending = true;
   const first = runStep(0, 'forward');
   void refreshHealth();

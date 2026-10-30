@@ -84,6 +84,66 @@ export const MODEL_KEY: Record<ModelKind, UserKey> = {
   extractive: 'answer.model.extractive',
 };
 
+/**
+ * Who wrote the answer, as the footer says it. A quoted (deterministic) answer says WHY it was
+ * quoted, from `model.reason_code`: approved wording quoted without a model call ('script'), a model
+ * draft that failed the evidence check ('rejected'), no usable model reply ('unavailable'), no model
+ * switched on ('offline'), or a quoted fallback with no known reason ('quoted').
+ */
+export type AnswerSource = Exclude<ModelKind, 'extractive'> | 'script' | 'rejected' | 'unavailable' | 'offline' | 'quoted';
+
+export function answerSource(m: ModelInfo | null | undefined): AnswerSource {
+  const kind = modelKind(m);
+  if (kind !== 'extractive') return kind;
+  switch (m?.reason_code) {
+    case 'quoted_approved_script':
+      return 'script';
+    case 'model_rejected_evidence':
+      return 'rejected';
+    case 'model_unavailable':
+      return 'unavailable';
+  }
+  return m?.reason_code || m?.fallback_used ? 'quoted' : 'offline';
+}
+
+const LABEL_KEY: Record<AnswerSource, UserKey> = {
+  ai: 'answer.model.ai',
+  hy3: 'answer.model.hy3',
+  deepseek: 'answer.model.deepseek',
+  script: 'answer.model.quotedScript',
+  rejected: 'answer.model.quotedRejected',
+  unavailable: 'answer.model.quotedUnavailable',
+  offline: 'answer.model.extractive',
+  quoted: 'answer.model.quoted',
+};
+
+const TIP_KEY: Record<AnswerSource, UserKey | null> = {
+  ai: 'answer.model.tip.ai',
+  hy3: null, // a named model: the tooltip shows its provider and model id
+  deepseek: null,
+  script: 'answer.model.tip.script',
+  rejected: 'answer.model.tip.rejected',
+  unavailable: 'answer.model.tip.unavailable',
+  offline: 'answer.model.tip.offline',
+  quoted: 'answer.model.tip.quoted',
+};
+
+/** The i18n key of the answer footer's model badge. */
+export function modelLabelKey(m: ModelInfo | null | undefined): UserKey {
+  return LABEL_KEY[answerSource(m)];
+}
+
+/**
+ * The i18n key of the badge's tooltip. A model answer with `fallback_used` was written by a second
+ * model after the first failed: only then is it 'answer.model.fallbackTip'. null: a named model,
+ * whose tooltip is its provider and model id.
+ */
+export function modelTipKey(m: ModelInfo | null | undefined): UserKey | null {
+  const src = answerSource(m);
+  if ((src === 'ai' || src === 'hy3' || src === 'deepseek') && m?.fallback_used) return 'answer.model.fallbackTip';
+  return TIP_KEY[src];
+}
+
 /** 1-based position of a citation tag ("C2" → 2), as shown on the chip. */
 export function citeNumber(citations: Citation[], tag: string): number {
   return citations.findIndex((c) => c.tag === tag) + 1;

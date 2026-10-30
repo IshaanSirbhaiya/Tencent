@@ -17,7 +17,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 from ..deliverables import build as dbuild
 from ..deliverables.evidence import Evidence, Unit, nfkc
-from ..deliverables.verify import (Check, check_sentence, check_short_text, label_tokens,
+from ..deliverables.verify import (Check, _nums, check_sentence, check_short_text, label_tokens,
                                    unsafe_text, words)
 from ..index import STOPWORDS, tokens
 
@@ -297,8 +297,8 @@ def check_model_block(block: Mapping[str, Any], evidence: Mapping[str, Evidence]
             if got is None:
                 continue
             if not when or len(when) > 40 or not check_short_text(when, hay):
-                check.items_kept = max(0, check.items_kept - 1)     # kept by the sentence check
-                check.drop("label")
+                # kept by the sentence check: it and its values move to dropped (fix #7)
+                check.retract("label", len(_nums(got["text"])))
                 continue
             items.append({"when": when, "dated_by": "source", **got})
         out = {"type": "timeline", "items": items} if len(items) >= 2 else None

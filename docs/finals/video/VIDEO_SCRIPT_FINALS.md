@@ -111,6 +111,8 @@ Jira, Drive), with permissions checked live (Gate 2).
 The live progress line, then the cited answer. She clicks a citation: the source sheet shows the platform, the
 version, "Checked live at" and the cited lines highlighted. **Esc**. Then the language menu: 简体中文, and back to
 English.
+If a case page is wanted in the shot and it does not open beside the chat by itself (a model decision, D-44),
+click "Open as page" under the answer; record that click as part of the scene.
 **Caption:** "Rachel · MLRO: her own screen", then "The exact passage, its version, checked live seconds ago", then
 "简体中文: the user screens, one click".
 **Proof:** `tests/e2e/user.spec.ts` ("ask, staged progress, cited answer, source sheet, Esc returns focus");

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { ChartCard } from '@/components/analytics/ChartCard';
 import { channelLabel, int, modelInfoName, ms, reasonLabel, VERDICT_ALLOW } from '@/components/analytics/format';
 import { Badge, Card, CodeHash, DataTable, Pill, Stat, StatGrid, type ColumnDef } from '@/components/ui';
-import { fmtDate, fmtTime } from '@/lib/format';
+import { fmtDate, fmtTime, modelLabel } from '@/lib/format';
 import type { ConsideredDoc, JourneyV1 } from '@/lib/types';
 import { DocLine, ReplayBadge, RequestStatusBadge, Section } from './bits';
 import { LedgerChain } from './LedgerChain';
@@ -72,6 +72,7 @@ export function ComplianceJourney({ j }: { j: JourneyV1 }) {
   const hasStages = Object.values(stageMs).some((v) => typeof v === 'number');
   const considered = j.considered ?? [];
   const citedIds = new Set((j.citations ?? []).map((c) => c.doc_id));
+  const unnamed = !!j.model && modelLabel(j.model) === 'AI model';
   return (
     <div className="space-y-4" data-testid="journey-compliance">
       <Card className="px-4 py-4">
@@ -139,8 +140,9 @@ export function ComplianceJourney({ j }: { j: JourneyV1 }) {
           <dl className="mt-2 space-y-1.5 text-body-sm">
             {(
               [
-                ['Provider', j.model?.provider],
-                ['Model id', j.model?.model],
+                // Any model that is not a named one: never its provider key or raw id (lib/format modelLabel).
+                ['Provider', unnamed ? 'AI model' : j.model?.provider],
+                ['Model id', unnamed ? null : j.model?.model],
                 ['Fallback used', j.model ? (j.model.fallback_used ? 'Yes' : 'No') : null],
               ] as const
             ).map(([k, v]) => (

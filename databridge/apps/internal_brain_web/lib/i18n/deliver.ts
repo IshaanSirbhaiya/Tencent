@@ -68,7 +68,7 @@ const deliverEn = {
   'deliver.sources.analysis': 'Cited in this analysis',
   'deliver.recorded': 'Recorded in the audit trail before it was shown.',
 
-  'deliver.needsModel': 'The AI model ran, but it didn’t produce anything that passed the source check, so nothing was written.',
+  'deliver.needsModel': 'The AI model ran. It didn’t produce anything that passed the source check, so nothing was written.',
   'deliver.noModel': 'Needs an AI model. No model is connected on this build; the table and chart are built from the sources.',
   'deliver.insufficient': 'Not enough numbers from your sources to draw a chart.',
   'deliver.showTable': 'Show the table instead',

@@ -385,13 +385,26 @@ class Check:
     names_dropped: int = 0
     reasons: dict[str, int] = field(default_factory=dict)
 
-    def drop(self, reason: str, *, value: bool = False, name: bool = False) -> None:
+    def drop(self, reason: str, *, value: bool = False, name: bool = False,
+             values: Optional[int] = None) -> None:
+        """One item dropped. ``values``: how many proposed values went with it (counted in
+        ``values_proposed`` already); else ``value`` counts one. Story 1 fix #7: every proposed
+        value ends up kept or dropped, so values_proposed == values_kept + values_dropped."""
         self.items_dropped += 1
-        if value:
+        if values is not None:
+            self.values_dropped += max(0, values)
+        elif value:
             self.values_dropped += 1
         if name:
             self.names_dropped += 1
         self.reasons[reason] = self.reasons.get(reason, 0) + 1
+
+    def retract(self, reason: str, values: int = 0) -> None:
+        """An item counted as kept is dropped by a later check (a timeline entry whose date fails):
+        it and its values move from kept to dropped."""
+        self.items_kept = max(0, self.items_kept - 1)
+        self.values_kept = max(0, self.values_kept - values)
+        self.drop(reason, values=values)
 
     def public(self) -> dict[str, int]:
         return {k: getattr(self, k) for k in ("values_proposed", "values_kept", "values_dropped",
@@ -463,9 +476,8 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
             pev = evidence.get(str(p.get("tag", "")))
             found, why = find_number(x, p.get("value"), str(p.get("raw", "")), pev,
                                      metric=metric)
-            if found is None:
-                check.drop(why, value=why in _VALUE_REASONS or why == "tag",
-                           name=why in ("label", "unsafe"))
+            if found is None:                       # the point's value goes with it
+                check.drop(why, value=True, name=why in ("label", "unsafe"))
                 continue
             if x.lower() in seen:
                 check.drop("duplicate", value=True)
@@ -495,7 +507,7 @@ def check_chart(spec: Mapping[str, Any], evidence: Mapping[str, Evidence], check
             continue
         if len(s["points"]) < 2:
             for _ in s["points"]:
-                check.drop("too_few")
+                check.drop("too_few", value=True)
             continue
         kept.append(s)
     if not kept:
@@ -631,19 +643,19 @@ def check_sentence(text: str, tags: Sequence[str], evidence: Mapping[str, Eviden
     sources = [(u, evidence[x]) for x in tags for u in evidence[x].units]
     if any(not _value_supported(t, s, hay) for s in spans if s.kind != "num") or any(
             not _num_bound(t, nums, s, sources, bind=False) for s in nums):
-        check.drop("value", value=True)                 # a value no cited source holds
-        check.values_dropped += max(0, len(nums) - 1)
+        if not nums:                                    # the unsupported value is not a number:
+            check.values_proposed += 1                  # it is still one proposed value
+        check.drop("value", values=max(1, len(nums)))   # a value no cited source holds
         return None
     if not _names_ok(t, hay):
-        check.drop("name", name=True)
+        check.drop("name", name=True, values=len(nums))
         return None
     if any(not _num_bound(t, nums, s, sources) for s in nums):
-        check.drop("value", value=True)                 # B5: held, but not with ITS entity/metric
-        check.values_dropped += max(0, len(nums) - 1)
+        check.drop("value", values=len(nums))           # B5: held, but not with ITS entity/metric
         return None
     hw = set(_CONTENT.findall(hay.lower())) - _FUNCTION
     if not (set(_CONTENT.findall(t.lower())) - _FUNCTION) & hw:
-        check.drop("unbound")
+        check.drop("unbound", values=len(nums))
         return None
     check.items_kept += 1
     check.values_kept += len(nums)
@@ -670,6 +682,8 @@ def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping
         return {"text": "", "tags": [], "numeric": False}
     check.items_proposed += 1
     if len(tags) != 1 or tags[0] not in evidence:
+        if cell_numeric(t):                 # a dropped value is a proposed one too (fix #7)
+            check.values_proposed += 1
         check.drop("tag", value=cell_numeric(t))
         return None
     ev = evidence[tags[0]]
@@ -708,6 +722,8 @@ def check_cell(text: str, tags: Sequence[str], row_label: str, evidence: Mapping
         if ok and set(rtoks) <= lw and all(_value_supported(t, s, line) for s in value_spans(t)):
             check.items_kept += 1
             return {"text": t, "tags": tags, "numeric": False}
+    if nums:                                # a dropped value is a proposed one too (fix #7)
+        check.values_proposed += 1
     check.drop("not_found", value=bool(nums))
     return None
 

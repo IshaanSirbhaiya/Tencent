@@ -170,3 +170,48 @@ def test_another_employee_cannot_reuse_the_leads_answer(atlas):
     other = atlas["client"]("jdoe")
     r = other.post("/ib/views", json={"req_id": ans["request_id"], "instruction": "report"})
     assert r.status_code == 404
+
+
+# -- with the approved-script skip (D-43) and a model on --------------------------------------------
+@pytest.fixture(scope="module")
+def atlas_env(tmp_path_factory):
+    from e2e_world import E2E
+
+    world = _SCENARIO / "world.json"
+    if not world.exists():
+        pytest.skip("Atlas scenario world not present")
+    return E2E(tmp_path_factory.mktemp("atlas_d43"), world_path=world)
+
+
+def _with_model(env, persona, question):
+    from test_quoted_script_skip import Counting
+
+    fake = Counting()
+    env.pipeline.chain = fake.chain()
+    try:
+        return env.ask(persona, question), fake
+    finally:
+        env.pipeline.chain = None
+
+
+def test_approved_script_still_skips_the_model_and_a_briefing_still_scopes(atlas_env):
+    """Both behaviours in one pipeline over the Atlas world (Company A + Atlas): the approved-script
+    question is quoted with 0 model calls, and the onboarding brief reaches the model with the named
+    project's own documents only."""
+    from databridge_ib.narrate import QUOTED_APPROVED_SCRIPT
+    from test_quoted_script_skip import QUESTIONS
+
+    q = QUESTIONS["FC-q1"]
+    assert scope(q["question"]) == q["question"]                 # not a briefing: unchanged
+    resp, fake = _with_model(atlas_env, q["persona"], q["question"])
+    assert fake.calls == []
+    assert resp.model.reason_code == QUOTED_APPROVED_SCRIPT
+
+    m = json.loads((_SCENARIO / "manifest.json").read_text(encoding="utf-8"))
+    project = {r["doc_id"] for r in m["records"]} - set(m["excluded_for_alex"])
+    resp, fake = _with_model(atlas_env, m["signed_in_persona"], m["question"])
+    assert len(fake.calls) == 1                                  # a briefing is not a script
+    released = set(atlas_env.last("retrieval.decided").released)
+    assert released and released <= project, released - project
+    assert resp.citations and {c.doc_id for c in resp.citations} <= project
+    assert m["never_reveal"] not in json.dumps(fake.calls)
