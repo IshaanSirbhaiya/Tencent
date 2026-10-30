@@ -433,6 +433,7 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md) | The leak and injection evaluation |
 | [SUBMISSION.md](docs/tencent/SUBMISSION.md) | The submission form answers |
 | [Original Walnut screens](databridge/apps/frontend/README.md) | How to start them and what each screen shows on Company A |
+| [PLATFORM.md](docs/PLATFORM.md) | The Walnut platform underneath: every package (adapters, adapter agents, federated engine, graph, convert, materialise, agents), its tests, its screens, and which parts the Internal Brain uses |
 | [WorkBuddy guide](docs/tencent/workbuddy/README.md) | Connecting the three Internal Brain workspaces |
 | [Lighthouse deploy kit](deploy/lighthouse/README.md) | Deploying the demo on Tencent Cloud Lighthouse |
 | [README.md](README.md) | Walnut, the engine underneath |
