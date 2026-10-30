@@ -19,7 +19,7 @@ Written 30 Oct 2026. Every row points to a file, a test or a transcript.
 | **CodeBuddy** | Proof of building on CodeBuddy | **Met.** Nine sessions with full transcripts; three (CB7–CB9) on the finals code | CB7 and CB8 ended on CodeBuddy rate limits (429): recorded, work completed |
 | **WorkBuddy** | Proof of use; a live Tencent moment on stage | **Met in code and live-tested programmatically**; the GUI retest with the finals tools is still to do | The real WorkBuddy app run (checklist ready) |
 | **Hunyuan Hy3 / TokenHub** | "Tencent AI inside the product" | **Partly met.** Hy3 ran inside CodeBuddy (CB1, CB5, CB7, CB9); WorkBuddy's own agent model calls our tools; the Brain is wired for Hy3 on TokenHub but every call returns 402 (code 401006) until the account is activated | TokenHub activation (founder) |
-| **Miora** | Tencent tool use (bonus) | **Met.** Cover art from Miora (two sessions); a finals cover prompt is ready | The finals cover has not been generated yet |
+| **Miora** | Tencent tool use (bonus) | **Met.** Cover art from Miora: two sessions for the submission plus a finals session on 30 Oct (the chosen cover is in `submission/06_cover/finals/`) | None |
 | **Tencent RTC** | RTC experts on the panel | **Not used.** Our voice dictation is the browser's own speech recognition, not Tencent | See §6 for a one-day add |
 | **Lighthouse** | Tencent Cloud hosting (optional) | **Not used live.** A hardened deploy kit exists; the demo runs on the laptop (decision D-03) | None for Demo Day |
 
@@ -93,7 +93,7 @@ Action: the founder activates Hy3 in the TokenHub console (MORNING_BRIEF.md step
 | Expectation | Evidence | Verdict |
 |---|---|---|
 | Tencent design tool used | `submission/06_cover/miora_session1.png`, `miora_session2.png`, `cover_master_miora.png`; pages in the conversation-history PDF | Met |
-| A finals cover | Prompt ready in `docs/finals/COVER_MIORA_PROMPT.md` | Not generated yet (founder, about 15 minutes) |
+| A finals cover | Prompt in `docs/finals/COVER_MIORA_PROMPT.md`; session `submission/06_cover/finals/miora_session_finals.png`; outputs and sizes in `submission/06_cover/finals/` | Met (30 Oct) |
 
 ## 6. Tencent RTC (not used)
 

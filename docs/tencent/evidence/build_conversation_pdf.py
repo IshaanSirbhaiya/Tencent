@@ -50,6 +50,8 @@ FINALS_LIVE = (SUB / "02_workbuddy" / "finals" / "workbuddy_live_test.png",
 MIORA = [
     (SUB / "06_cover" / "miora_session1.png", "Miora · cover image session 1"),
     (SUB / "06_cover" / "miora_session2.png", "Miora · cover image session 2"),
+    (SUB / "06_cover" / "finals" / "miora_session_finals.png", "Miora · finals cover session (30 Oct)"),
+    (SUB / "06_cover" / "finals" / "cover_finals_option2_raw.png", "Miora · finals cover, chosen output"),
 ]
 
 
