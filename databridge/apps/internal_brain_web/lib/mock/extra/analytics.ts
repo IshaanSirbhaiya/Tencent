@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import type { AuditEvent, ModelInfo } from '../../types';
-import { DEEPSEEK, DOCS, EXTRACTIVE, HY3, SCOPE_NOTE, type DocKey, type MockState } from '../fixtures';
+import { DEEPSEEK, DOCS, EXTRACTIVE, HY3, MOCK_MODEL_LABELS, SCOPE_NOTE, type DocKey, type MockState } from '../fixtures';
 import { buildMap } from '../map';
 import type { MockHandler } from './types';
 
@@ -666,14 +666,15 @@ export const handle: MockHandler = async ({ req, path, method, sub, roles }) => 
 
   if (path === 'ib/status') {
     return json({
+      // Not live unless the build explicitly asks for model labels (MOCK_MODEL_LABELS; rule 8).
       models: {
-        provider: 'tencent-tokenhub',
-        chain: ['hy3', 'deepseek-v4.1-flash'],
-        active: true,
-        active_chain: ['hy3', 'deepseek-v4.1-flash'],
+        provider: MOCK_MODEL_LABELS ? 'tencent-tokenhub' : null,
+        chain: MOCK_MODEL_LABELS ? ['hy3', 'deepseek-v4.1-flash'] : [],
+        active: MOCK_MODEL_LABELS,
+        active_chain: MOCK_MODEL_LABELS ? ['hy3', 'deepseek-v4.1-flash'] : [],
         fallback: { provider: 'deterministic', model: 'extractive-v1' },
       },
-      key_configured: true,
+      key_configured: MOCK_MODEL_LABELS,
       force_offline: false,
       ledger: { ok: true },
     });

@@ -1,4 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
+import { PERSONAS } from '../../lib/personas';
+import { displayAnswer, plainAnswer, speakerParts } from '../../components/user/answerText';
 import { REFUSAL_TEXT, S1, SCOPE_NOTE, ask, expectAccessible, login, resetDemo } from './helpers';
 
 // User mode (mock mode): sign-in, Ask, the answer thread, the Sources sheet, refusals, history,
@@ -59,8 +61,9 @@ test('ask → staged progress → cited answer → source sheet → Esc returns 
   const answer = page.getByTestId('answer');
   await expect(answer).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#answer-heading')).toBeFocused();
-  await expect(answer.getByTestId('model-badge')).toHaveText('Tencent Hunyuan Hy3');
-  await expect(answer.getByTestId('ai-note')).toHaveText('AI-generated · check the sources');
+  // Rule 8: offline answers are labelled as quoted, never as written by Hy3.
+  await expect(answer.getByTestId('model-badge')).toHaveText('Quoted from sources (no model)');
+  await expect(answer.getByTestId('ai-note')).toHaveCount(0);
   await expect(answer.getByTestId('scope-note')).toHaveText(SCOPE_NOTE);
   const chips = answer.getByTestId('citation-chip');
   await expect(chips).toHaveCount(2);
@@ -169,7 +172,7 @@ test('language switch to 简体中文 and back', async ({ page }) => {
   await page.getByLabel('你的问题').fill(S1);
   await page.getByRole('button', { name: '提问', exact: true }).click();
   await expect(page.getByTestId('answer')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('model-badge')).toHaveText('腾讯混元 Hy3');
+  await expect(page.getByTestId('model-badge')).toHaveText('直接引自来源（未使用模型）');
   await expect(page.getByTestId('answer-text')).toContainText('The ledger database migration'); // the answer stays as returned
 
   await page.goto('/settings');
@@ -219,3 +222,35 @@ for (const theme of ['dark', 'light'] as const) {
     });
   }
 }
+
+test('answer chrome: a Slack handle shows as the person\'s name; "(synthetic case …)" leaves the first sentence only (round-2 Fable #5)', () => {
+  const hero =
+    'mlro.tan: Velquarry Trading Pte Ltd review update (synthetic case FC-2026-0147): the restriction stays in place [C1]. Later (synthetic case FC-2026-0147) stays.';
+  const shown = displayAnswer(hero);
+  expect(shown).toBe('mlro.tan: Velquarry Trading Pte Ltd review update: the restriction stays in place [C1]. Later (synthetic case FC-2026-0147) stays.');
+  const parts = speakerParts(shown);
+  expect(parts[0]).toEqual({ speaker: 'mlro.tan', name: 'Rachel Tan' });
+  // "jdoe:" (no dot) is a known username, rendered like the others, never as a raw prefix.
+  expect(speakerParts('jdoe: Wave 4 is blocked. priya.sre: Replica lag is fixed.')).toEqual([
+    { speaker: 'jdoe', name: 'Jordan Doe' },
+    'Wave 4 is blocked. ',
+    { speaker: 'priya.sre', name: 'Priya Raman' },
+    'Replica lag is fixed.',
+  ]);
+  // Ordinary words never match; unknown handles keep the handle.
+  expect(speakerParts('Note: nothing here.')).toEqual(['Note: nothing here.']);
+  expect(speakerParts('raj.m: Follow-ups.')[0]).toEqual({ speaker: 'raj.m', name: 'raj.m' });
+  // Display only: what is copied is the answer as returned.
+  const r = { answer: hero, citations: [], scope_note: '' } as unknown as Parameters<typeof plainAnswer>[0];
+  expect(plainAnswer(r)).toContain('(synthetic case FC-2026-0147): the restriction');
+  expect(PERSONAS.find((p) => p.id === 'mlro.tan')!.fullName).toBe('Rachel Tan');
+});
+
+test('rule 4: sign-in notes and starters never hint at what a person cannot open (round-2 Sonnet #5)', () => {
+  for (const p of PERSONAS) {
+    expect(p.note, p.id).not.toMatch(/\bno\b|cannot|can't|without|private|#sec-incident|#fincrime|breach/i);
+  }
+  const starters = (id: string) => PERSONAS.find((p) => p.id === id)!.suggestions;
+  for (const id of ['jdoe', 'ken.ext', 'maya.compliance', 'mlro.tan']) expect(starters(id).join(' '), id).not.toMatch(/Q3 breach/);
+  expect(starters('amy.am').join(' ')).not.toMatch(/suspicious transaction report/);
+});

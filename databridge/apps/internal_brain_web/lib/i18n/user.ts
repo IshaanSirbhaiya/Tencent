@@ -380,13 +380,13 @@ export const userMessages = defineMessages<UserKey>({ en: userEn, zh: userZh });
 
 /** Persona roles and "can open" lines in 简体中文 (English comes from lib/personas.ts as written). */
 export const PERSONA_ZH: Record<string, { role: string; note: string }> = {
-  jdoe: { role: '后端工程师', note: '支付工程，私有频道 #db-migration 成员' },
+  jdoe: { role: '后端工程师', note: '支付工程空间和团队频道' },
   'priya.sre': { role: '值班 SRE', note: 'Runbooks 空间、#incidents、数据库迁移负责人频道' },
   'ken.ext': { role: '外部承包商', note: 'Slack Connect 访客：仅 #vendor-acme 和供应商共享盘' },
-  'sara.sec': { role: '安全', note: 'SEC 空间、Jira 安全级别、#sec-incident-q3' },
+  'sara.sec': { role: '安全', note: '安全团队空间和事件频道' },
   'maya.compliance': { role: '合规官', note: '审计控制台访问权限；查看回答须说明理由并记录' },
   'leo.ops': { role: '产品与运营', note: 'Product 空间、Drive“Pricing & Offers”' },
-  'amy.am': { role: '客户经理', note: '客户与产品空间；无金融犯罪案件访问权限' },
-  'mlro.tan': { role: '反洗钱报告官（金融犯罪）', note: '金融犯罪空间、#fincrime-cases、案件文件——仅限需知' },
-  'admin.it': { role: '平台模拟器', note: '操作演示平台；无审计访问权限' },
+  'amy.am': { role: '客户经理', note: '客户与产品空间' },
+  'mlro.tan': { role: '反洗钱报告官（金融犯罪）', note: '金融犯罪团队空间，仅限需知' },
+  'admin.it': { role: '平台模拟器', note: '操作演示平台' },
 };

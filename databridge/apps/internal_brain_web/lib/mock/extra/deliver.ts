@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import type { AuditEvent } from '../../types';
-import { DOCS, SCOPE_NOTE, type MockDoc } from '../fixtures';
+import { DOCS, MOCK_MODEL_LABELS, SCOPE_NOTE, type MockDoc } from '../fixtures';
 import { handle as graph } from './graph';
 import type { MockCtx, MockHandler } from './types';
 import { extraDocMeta } from './user';
@@ -127,7 +127,9 @@ function build(sub: string, b: Record<string, unknown>) {
       series: [{ name: 'FX margin', points: [['SG', 0.35], ['HK', 0.35], ['ID', 0.4]].map(([x, v]) => ({ x, value: v, raw: `${v}% FX margin`, tag: pricing })) }],
     };
     used = [pricing];
-  } else if (kind === 'analysis' && ctx.facts.length) {
+  } else if (kind === 'analysis' && ctx.facts.length && MOCK_MODEL_LABELS) {
+    // Only when the build explicitly asks for model labels (NEXT_PUBLIC_IB_MOCK_MODEL=hy3): TokenHub is not
+    // live, so by default the mock analysis is 'needs_model', exactly like the real server without a model.
     generated = 'model';
     title = 'What this answer means';
     model = { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false };
@@ -196,7 +198,7 @@ export const handle: MockHandler = async (ctx) => {
     const r = await graph(ctx);
     if (!r || r.status !== 200) return r;
     const body = (await r.json()) as Record<string, unknown>;
-    return json({ ...body, deliverables: { enabled: true, model: true, kinds: [...KINDS], exports: { csv: true, pptx: false } } });
+    return json({ ...body, deliverables: { enabled: true, model: MOCK_MODEL_LABELS, kinds: [...KINDS], exports: { csv: true, pptx: false } } });
   }
   if (method !== 'POST' || (path !== 'ib/deliverables' && path !== 'ib/deliverables/export')) return null;
   if (!ctx.roles.some((r) => ['employee', 'compliance_officer', 'admin_it'].includes(r))) return json({ detail: 'forbidden' }, 403);

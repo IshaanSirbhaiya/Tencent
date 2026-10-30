@@ -101,13 +101,16 @@ export const DOCS = {
 
 export type DocKey = keyof typeof DOCS;
 
-// The offline stage fallback builds with NEXT_PUBLIC_IB_MOCK_MODEL=extractive, so canned answers are never
-// labelled as written by Hy3 on stage. The default (tests, dev) keeps the Hy3 label the UI is designed for.
-export const HY3: ModelInfo =
-  process.env.NEXT_PUBLIC_IB_MOCK_MODEL === 'extractive'
-    ? { provider: 'deterministic', model: 'extractive-v1', fallback_used: false }
-    : { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false };
-export const DEEPSEEK: ModelInfo = { provider: 'tencent-tokenhub', model: 'deepseek-v4.1-flash', fallback_used: true };
+// Honesty (rule 8): TokenHub is not activated, so the mock never labels a canned answer as written by a
+// model unless the build explicitly asks for it with NEXT_PUBLIC_IB_MOCK_MODEL=hy3 (UI work on the model
+// footer). The default everywhere (tests, dev, the offline stage fallback) is "Quoted from sources (no model)".
+export const MOCK_MODEL_LABELS = process.env.NEXT_PUBLIC_IB_MOCK_MODEL === 'hy3';
+export const HY3: ModelInfo = MOCK_MODEL_LABELS
+  ? { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false }
+  : { provider: 'deterministic', model: 'extractive-v1', fallback_used: false };
+export const DEEPSEEK: ModelInfo = MOCK_MODEL_LABELS
+  ? { provider: 'tencent-tokenhub', model: 'deepseek-v4.1-flash', fallback_used: true }
+  : { provider: 'deterministic', model: 'extractive-v1', fallback_used: false };
 export const EXTRACTIVE: ModelInfo = { provider: 'deterministic', model: 'extractive-v1', fallback_used: false };
 
 export interface MockState {

@@ -37,6 +37,16 @@ export const Composer = forwardRef<
     onText: (v) => onChange(v.slice(0, MAX_QUESTION)),
   });
   useImperativeHandle(ref, () => ({ focus: () => box.current?.focus() }), []);
+  // Sending ends dictation (round 2b finding 4): the microphone goes off and a late recognition result
+  // cannot rewrite the box after it is cleared. Busy covers a send that did not come from this form.
+  const send = () => {
+    dict.stop();
+    onSubmit();
+  };
+  const stopDictation = dict.stop;
+  useEffect(() => {
+    if (busy) stopDictation();
+  }, [busy, stopDictation]);
 
   // Grow with the text, up to a limit; then scroll.
   useEffect(() => {
@@ -52,7 +62,7 @@ export const Composer = forwardRef<
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSend) onSubmit();
+        if (canSend) send();
       }}
       aria-label={t('ask.formLabel')}
       data-tour="ask-form"
@@ -69,7 +79,11 @@ export const Composer = forwardRef<
         ref={box}
         value={value}
         autoFocus={autoFocus}
-        onChange={(e) => onChange(e.target.value.slice(0, MAX_QUESTION))}
+        onChange={(e) => {
+          // Typing while listening ends dictation, so the next result cannot overwrite the typed edit.
+          if (dict.listening) dict.stop();
+          onChange(e.target.value.slice(0, MAX_QUESTION));
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Escape' && dict.listening) {
             e.preventDefault();
@@ -78,7 +92,7 @@ export const Composer = forwardRef<
           }
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
-            if (canSend) onSubmit();
+            if (canSend) send();
           }
         }}
         rows={size === 'lg' ? 2 : 1}
@@ -113,8 +127,10 @@ export const Composer = forwardRef<
             <button
               type="button"
               data-testid="dictate"
+              // One fixed name plus aria-pressed (a toggle button): a changing name as well would read as a
+              // double state ("Stop dictating, pressed"). The tooltip still says what a click does.
               aria-pressed={dict.listening}
-              aria-label={dict.listening ? tv('voice.stop') : tv('voice.start')}
+              aria-label={tv('voice.button')}
               title={dict.listening ? tv('voice.stop') : tv('voice.start')}
               aria-describedby="dictation-note"
               onClick={dict.toggle}
@@ -123,7 +139,14 @@ export const Composer = forwardRef<
                   e.preventDefault();
                   dict.stop();
                 } else if (e.key === ' ') {
-                  // Space toggles here; preventDefault also stops the presenter's Space (advance) key.
+                  // preventDefault stops the presenter's Space (advance) key and page scroll. The toggle runs
+                  // on keyup only (below), where preventDefault also cancels the browser's own click, so a
+                  // Space press toggles exactly once in every browser (Firefox clicks on keyup).
+                  e.preventDefault();
+                }
+              }}
+              onKeyUp={(e) => {
+                if (e.key === ' ') {
                   e.preventDefault();
                   dict.toggle();
                 }

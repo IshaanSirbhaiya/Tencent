@@ -41,6 +41,8 @@ const actEn = {
   'act.ticket.descriptionHint': 'Links only: each opens only for people the source allows.',
   'act.ticket.sources': 'Linked in this ticket',
   'act.ticket.confirm': 'Create ticket',
+  'act.ticket.confirmIn': 'Create ticket in {key}',
+  'act.ticket.descriptionRegion': 'Ticket description (scrollable)',
   'act.ticket.cancel': 'Cancel',
   'act.ticket.creating': 'Creating…',
   'act.ticket.confirmNote': 'Created in your name. Recorded in the audit trail first.',
@@ -50,6 +52,8 @@ const actEn = {
   'act.ticket.cancelled': 'Cancelled. Nothing was created.',
   'act.ticket.expired': 'This proposal is no longer available. Start again from the answer.',
   'act.ticket.unavailable': 'A follow-up ticket can’t be created from this answer. Nothing was changed.',
+  'act.ticket.outcomeUnknown': 'We could not confirm whether the ticket was created. Check the project before trying again.',
+  'act.ticket.notConfirmed': 'We could not confirm the result yet. Try again: if the ticket was created, you get that ticket, not a second one.',
 
   /* shared */
   'act.nothing': 'There is nothing in this answer to act on.',
@@ -57,6 +61,7 @@ const actEn = {
   'act.error': 'This is temporarily unavailable. Nothing was sent or created.',
   'act.retry': 'Try again',
   'act.close': 'Close',
+  'act.serverLang': 'The draft and the ticket text are shown in English, exactly as the server returned them.',
 } as const;
 
 const actZh: Record<keyof typeof actEn, string> = {
@@ -95,6 +100,8 @@ const actZh: Record<keyof typeof actEn, string> = {
   'act.ticket.descriptionHint': '仅包含链接：每个链接只对来源系统允许的人开放。',
   'act.ticket.sources': '此工单链接的来源',
   'act.ticket.confirm': '创建工单',
+  'act.ticket.confirmIn': '在 {key} 中创建工单',
+  'act.ticket.descriptionRegion': '工单描述（可滚动）',
   'act.ticket.cancel': '取消',
   'act.ticket.creating': '正在创建…',
   'act.ticket.confirmNote': '以你的名义创建。会先记录到审计日志。',
@@ -104,12 +111,15 @@ const actZh: Record<keyof typeof actEn, string> = {
   'act.ticket.cancelled': '已取消，未创建任何内容。',
   'act.ticket.expired': '此提议已失效，请从回答重新开始。',
   'act.ticket.unavailable': '无法根据此回答创建跟进工单。未做任何更改。',
+  'act.ticket.outcomeUnknown': '我们无法确认工单是否已创建。请先检查该项目，再重试。',
+  'act.ticket.notConfirmed': '暂时无法确认结果。请重试：如果工单已创建，将返回该工单，而不会再创建一个。',
 
   'act.nothing': '此回答中没有可以采取行动的内容。',
   'act.nothingHint': '只会使用你目前仍可打开的来源。',
   'act.error': '暂时无法使用。未发送或创建任何内容。',
   'act.retry': '重试',
   'act.close': '关闭',
+  'act.serverLang': '草稿和工单内容按服务器返回的英文原文显示，未翻译。',
 };
 
 export const actMessages = defineMessages({ en: actEn, zh: actZh });

@@ -122,6 +122,22 @@ test('compare: two separately signed-in sessions, counts per side, main session 
   await expect(page.getByTestId('whoami')).toContainText('jdoe');
 });
 
+test('compare in the Stage theme: no count comparisons on the projector (round-2 Fable §6)', async ({ page }) => {
+  await login(page, 'jdoe');
+  await page.goto('/dev/graph?compare=ken.ext');
+  await expect(page.getByTestId('compare-summary')).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByTestId('compare-side-count').first()).toBeVisible();
+  await page.keyboard.press('Control+Shift+P'); // arm the presenter keys
+  await page.keyboard.press('s'); // Stage theme on
+  await expect(page.locator('html')).toHaveAttribute('data-stage', /.*/);
+  await expect(page.getByTestId('compare-summary')).toBeHidden();
+  await expect(page.getByTestId('compare-shared-group')).toBeHidden();
+  await expect(page.getByTestId('compare-side-count')).toHaveCount(2);
+  for (const el of await page.getByTestId('compare-side-count').all()) await expect(el).toBeHidden();
+  // innerText: what is rendered (textContent would include the display:none chrome)
+  expect(await page.locator('main').innerText()).not.toMatch(/can open none|can also open \d|can open \d/);
+});
+
 test('390 px light theme: accessible, no horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => localStorage.setItem('ib-theme', 'light'));

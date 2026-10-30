@@ -114,11 +114,12 @@ export function CompareView({ initialPersona }: { initialPersona?: string | null
           {t('compare.note')}
         </p>
         {summary ? (
-          <p className="text-body-sm font-medium tabular-nums text-fg" data-testid="compare-summary">
+          // Count comparisons are for Developer mode: the Stage theme (projector) hides them (round-2 Fable §6).
+          <p className="text-body-sm font-medium tabular-nums text-fg" data-testid="compare-summary" data-stage-hide>
             {summary}
           </p>
         ) : null}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2" data-stage-hide data-testid="compare-shared-group">
           <Switch
             id="graph-mark-shared"
             checked={markShared}
@@ -201,7 +202,7 @@ function SideHeader({ title, name, sub, count, control, accent }: { title: strin
         </p>
       </div>
       {count !== null ? (
-        <p className="text-caption text-muted">
+        <p className="text-caption text-muted" data-stage-hide data-testid="compare-side-count">
           can open <span className="font-medium tabular-nums text-fg">{fmtCount(count)}</span> items
         </p>
       ) : null}

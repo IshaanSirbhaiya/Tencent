@@ -10,7 +10,7 @@ import { placeLabel } from '@/lib/format';
 import { useLang, useMessages } from '@/lib/i18n';
 import { userMessages } from '@/lib/i18n/user';
 import type { AskResponse, Citation } from '@/lib/types';
-import { MODEL_KEY, TAG_RE, checkedAgoKey, followUpQuestion, followUps, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
+import { MODEL_KEY, TAG_RE, checkedAgoKey, displayAnswer, followUpQuestion, followUps, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
 import { ActRow } from './ActSheet';
 import { DeliverRow } from './DeliverSheet';
 import { CitationChip } from './CitationChip';
@@ -40,19 +40,21 @@ export interface AnswerCardProps {
 /** Plain text with inline [n] chips. Never HTML: every part is a React text node or a chip. */
 export function AnswerText({ response, onCite, className }: { response: AskResponse; onCite: AnswerCardProps['onCite']; className?: string }) {
   const t = useMessages(userMessages);
-  const { citations, answer } = response;
+  const { citations } = response;
+  // Display chrome only (see displayAnswer): the cited passages and the copied text are unchanged.
+  const answer = displayAnswer(response.answer);
   const byTag = new Map(citations.map((c, i) => [c.tag, { c, i }]));
   const parts: React.ReactNode[] = [];
   let last = 0;
   let key = 0;
-  // Plain text, with a Slack "handle: " prefix shown as a subtle "handle said" label.
+  // Plain text, with a Slack "handle: " prefix shown as a subtle "<person's name> said" label.
   const pushText = (s: string) => {
     for (const p of speakerParts(s)) {
       if (typeof p === 'string') parts.push(p);
       else
         parts.push(
-          <span key={`s${key++}`} className="mr-1 rounded bg-raised px-1 py-px text-caption font-medium text-muted" data-testid="answer-speaker">
-            {t('answer.speaker', { handle: p.speaker })}
+          <span key={`s${key++}`} className="mr-1 rounded bg-raised px-1 py-px text-caption font-medium text-muted" data-testid="answer-speaker" data-handle={p.speaker}>
+            {t('answer.speaker', { handle: p.name })}
           </span>,
         );
     }

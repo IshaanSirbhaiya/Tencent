@@ -292,7 +292,7 @@ test('slides name Hy3 and TokenHub only while the model is live', async ({ page 
     await route.fulfill({ response: res, json: { ...body, models: { ...body.models, active } } });
   });
   await page.goto('/present/proof');
-  await expect(page.getByTestId('proof-codebuddy')).toContainText('Six CodeBuddy sessions, transcripts in the repo.');
+  await expect(page.getByTestId('proof-codebuddy')).toContainText('Nine CodeBuddy sessions, transcripts in the repo.');
   await expect(page.getByTestId('proof-codebuddy')).not.toContainText(/hy3|TokenHub|Every session transcript/i);
   await page.goto('/present/business');
   await expect(page.getByTestId('business-stack')).toHaveText('Tencent stack: WorkBuddy · CodeBuddy');
@@ -440,4 +440,34 @@ test('the grow beat stays off the Space path unless the tab opts in with ?grow=1
   await expect(bar(page)).toContainText('/ 13');
   await page.goto('/present?grow=0');
   await expect(bar(page)).toContainText('/ 10');
+});
+
+test('P from signed out: the HUD dots read the status after the sign-in, never "unknown" (round-2 Fable #4)', async ({ page }) => {
+  // /ib/status needs a session: a fetch made before step 0 signs someone in is a 401.
+  await page.goto('/present?present=1');
+  await expect(bar(page)).toBeVisible();
+  await page.keyboard.press('p');
+  await expect(stepNo(page)).toHaveText('00');
+  await expect.poll(() => barState(page), { timeout: 30_000 }).toBe('ready');
+  const dots = page.getByTestId('presenter-status');
+  await expect(dots).toContainText(/Model\s+(quoting|live)/);
+  await expect(dots).toContainText(/Ledger\s+ok/);
+  await expect(dots).not.toContainText('unknown');
+});
+
+test('signing out from the shell drops the cached deliverables answer (round-2 Opus #9)', async ({ page }) => {
+  await login(page, 'jdoe');
+  await page.evaluate(() => sessionStorage.setItem('ib.presenter.deliver', JSON.stringify({ at: Date.now(), response: {}, deliverables: {}, kinds: [] })));
+  await page.locator('button:has([data-testid="whoami"])').first().click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
+  await page.waitForURL((u) => u.pathname.startsWith('/login'));
+  expect(await page.evaluate(() => sessionStorage.getItem('ib.presenter.deliver'))).toBeNull();
+});
+
+test('/present/preflight is served on the loopback stage laptop (the presenter flow keeps working)', async ({ page }) => {
+  const r = await page.goto('/present/preflight');
+  expect(r?.status()).toBe(200);
+  // From any other host name and signed out: one 404 (health, ledger and per-persona counts stay local).
+  const away = await page.request.get('/present/preflight', { headers: { host: 'demo.example' } });
+  expect(away.status()).toBe(404);
 });

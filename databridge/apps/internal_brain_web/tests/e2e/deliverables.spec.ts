@@ -29,7 +29,7 @@ async function leoAnswer(page: Page, theme: 'dark' | 'light' = 'dark') {
   return answer;
 }
 
-test('Leo: table copied cell by cell, chart with value labels, analysis with the pill', async ({ page }) => {
+test('Leo: table copied cell by cell, chart with value labels, analysis needs the model', async ({ page }) => {
   const answer = await leoAnswer(page);
   const row = answer.getByTestId('deliver-row');
   await expect(row.getByRole('heading', { name: 'Turn this answer into' })).toBeVisible();
@@ -70,13 +70,12 @@ test('Leo: table copied cell by cell, chart with value labels, analysis with the
   await expectAccessible(page, 'deliverables chart (dark)');
   await page.screenshot({ path: `${SHOTS}/mock-2-chart-dark.png` });
 
-  // Analysis: written by the model, the pill counts what was kept and what was removed
+  // Analysis needs the model. TokenHub is not live, so the mock (like the real server without a model)
+  // returns 'needs_model' unless built with NEXT_PUBLIC_IB_MOCK_MODEL=hy3 (rule 8: no "Written by hy3").
   await sheet.getByTestId('deliver-tab-analysis').click();
-  const an = sheet.getByTestId('deliver-panel-analysis').getByTestId('deliver-view');
-  await expect(an.getByTestId('deliver-by')).toHaveText('Written by hy3');
-  await expect(an.getByTestId('deliver-pill')).toContainText(/of \d+ sentences found in your sources · 1 removed/);
-  await expect(an.getByTestId('deliver-pill')).toHaveAttribute('aria-label', /1 item the model wrote was not in your sources/);
-  await expect(an.getByTestId('deliver-sentence').first()).toBeVisible();
+  const an = sheet.getByTestId('deliver-panel-analysis');
+  await expect(an.getByTestId('deliver-needs-model')).toBeVisible();
+  await expect(an.getByTestId('deliver-by')).toHaveCount(0); // nothing claims to be written by a model
   await expectAccessible(page, 'deliverables analysis (dark)');
   await page.screenshot({ path: `${SHOTS}/mock-3-analysis-dark.png` });
 

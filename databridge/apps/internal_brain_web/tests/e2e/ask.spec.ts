@@ -22,7 +22,10 @@ test('login → ask → citations visible → scope note visible', async ({ page
   await expect(cards).toHaveCount(await chips.count());
   await expect(cards.first().getByTestId('source-card')).toContainText('Checked live');
   await expect(answer.getByTestId('scope-note')).toHaveText(SCOPE_NOTE);
-  await expect(answer.getByTestId('model-badge')).toHaveText('Tencent Hunyuan Hy3');
+  // Rule 8: the mock never claims a model wrote a canned answer (TokenHub is not live) unless built with
+  // NEXT_PUBLIC_IB_MOCK_MODEL=hy3.
+  await expect(answer.getByTestId('model-badge')).toHaveText('Quoted from sources (no model)');
+  await expect(answer.getByTestId('model-badge')).not.toHaveText(/Hy3|Hunyuan|TokenHub|DeepSeek/);
   await expect(answer.getByTestId('request-id')).toHaveText(/^req_/);
 
   // A chip opens the Sources sheet; the external link opens in a new tab; Esc returns focus to the chip.
@@ -76,8 +79,8 @@ test('model badges: fallback, extractive, live re-read and stale cues are text, 
   await expect(page.getByTestId('answer')).toContainText('May be out of date');
   await ask(page, 'What was the root cause of the payment outage last quarter, and what follow-up tickets were created?');
   // Earlier answers stay on the page as answer-previous; only the newest carries the stable test ids.
-  await expect(page.getByTestId('answer').getByTestId('model-badge')).toHaveText('DeepSeek');
-  await expect(page.getByTestId('answer').getByTestId('model-badge').locator('..')).toHaveAttribute('title', /^Used because the first model did not answer in time/);
+  // The mock's fallback fixture is extractive by default too: no model name on an offline answer.
+  await expect(page.getByTestId('answer').getByTestId('model-badge')).toHaveText('Quoted from sources (no model)');
   await login(page, 'sara.sec');
   await ask(page, 'Show me the security incident report from the Q3 breach.');
   await expect(page.getByTestId('answer').getByTestId('model-badge')).toHaveText('Quoted from sources (no model)');

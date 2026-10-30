@@ -10,7 +10,7 @@ import { Badge, Button, Sheet, SheetContent, SkeletonText, inputClass } from '@/
 import { ApiError, actApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { placeLabel } from '@/lib/format';
-import { useMessages } from '@/lib/i18n';
+import { useLang, useMessages } from '@/lib/i18n';
 import { actMessages, type ActKey } from '@/lib/i18n/act';
 import type { ActCitation, ActDraft, AskResponse, TicketCreated, TicketProposal } from '@/lib/types';
 import { safeHref } from '@/lib/url';
@@ -21,6 +21,21 @@ export type ActMode = 'draft' | 'ticket';
 type Fail = 'nothing' | 'unavailable' | 'error';
 const failOf = (e: unknown): Fail =>
   e instanceof ApiError && e.status === 404 ? 'nothing' : e instanceof ApiError && e.status === 409 ? 'unavailable' : 'error';
+
+/** The draft label the server returns for every draft (translated in the UI; anything else is shown as is). */
+const SERVER_DRAFT_LABEL = 'Draft for your review';
+
+/** In 简体中文 only: one line saying the draft and the ticket text are the server's English, as returned. */
+function ServerLangNote() {
+  const t = useMessages(actMessages);
+  const { lang } = useLang();
+  if (lang !== 'zh') return null;
+  return (
+    <p className="mt-2 text-2xs text-muted" data-testid="act-lang-note">
+      {t('act.serverLang')}
+    </p>
+  );
+}
 
 /** The two buttons under a released answer. */
 export function ActRow({ response }: { response: AskResponse }) {
@@ -236,14 +251,22 @@ function DraftView({ response }: { response: AskResponse }) {
   return (
     <div data-testid="act-draft-view" data-model={d.model.model}>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="accent" data-testid="act-draft-label">
-          {d.label}
-        </Badge>
+        {/* The server's fixed label is translated; any other label is shown as returned (English). */}
+        {d.label === SERVER_DRAFT_LABEL ? (
+          <Badge tone="accent" data-testid="act-draft-label">
+            {t('act.draft.title')}
+          </Badge>
+        ) : (
+          <Badge tone="accent" data-testid="act-draft-label" lang="en">
+            {d.label}
+          </Badge>
+        )}
         <span className="inline-flex items-center gap-1 text-caption text-muted" data-testid="act-draft-how">
           <ShieldCheck aria-hidden className="h-3.5 w-3.5 text-ok" />
           {how}
         </span>
       </div>
+      <ServerLangNote />
 
       {editing ? (
         <div className="mt-4 flex flex-col gap-1">
@@ -256,6 +279,7 @@ function DraftView({ response }: { response: AskResponse }) {
             onChange={(e) => setText(e.target.value)}
             rows={12}
             className={cn(inputClass, 'h-auto min-h-[14rem] resize-y py-2 leading-6')}
+            lang="en"
             data-testid="act-draft-editor"
             aria-describedby={`${editId}-hint`}
           />
@@ -264,7 +288,7 @@ function DraftView({ response }: { response: AskResponse }) {
           </p>
         </div>
       ) : (
-        <div className="mt-4 rounded-lg border border-line bg-surface px-4 py-3.5 text-body leading-7 text-fg" data-testid="act-draft-text">
+        <div lang="en" className="mt-4 rounded-lg border border-line bg-surface px-4 py-3.5 text-body leading-7 text-fg" data-testid="act-draft-text">
           <p>{d.greeting}</p>
           <p className="mt-3">
             {d.opener}{' '}
@@ -321,7 +345,9 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
   const [summary, setSummary] = useState('');
   const [project, setProject] = useState('');
   const [busy, setBusy] = useState<'confirm' | 'cancel' | null>(null);
-  const [confirmErr, setConfirmErr] = useState<Fail | null>(null);
+  // After Confirm: 'unknown' = Jira's outcome is unknown (409 outcome_unknown; never "nothing was changed"),
+  // 'pending' = the service failed after Confirm (503 or no answer): the outcome is not confirmed yet.
+  const [confirmErr, setConfirmErr] = useState<Fail | 'unknown' | 'pending' | null>(null);
   const ids = { project: useId(), summary: useId(), desc: useId() };
   const doneRef = useRef<HTMLHeadingElement | null>(null);
   const once = useOnce<TicketProposal>();
@@ -403,12 +429,19 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
     } catch (e) {
       const k = failOf(e);
       if (k === 'nothing') setLoad({ state: 'expired' });
+      else if (k === 'unavailable' && e instanceof ApiError && e.message === 'outcome_unknown') setConfirmErr('unknown');
+      else if (k === 'error') setConfirmErr('pending');
       else setConfirmErr(k);
     } finally {
       setBusy(null);
     }
   };
   const cancel = async () => {
+    // After a Confirm whose outcome is not known, closing must not claim "nothing was created".
+    if (confirmErr === 'unknown' || confirmErr === 'pending') {
+      onDone();
+      return;
+    }
     setBusy('cancel');
     try {
       await actApi.cancelTicket(p.proposal_id);
@@ -474,21 +507,29 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
 
         <div className="flex flex-wrap items-center gap-2 text-body-sm">
           <span className="text-xs font-medium text-fg">{t('act.ticket.type')}</span>
-          <Badge tone="neutral">{p.issue_type}</Badge>
+          <Badge tone="neutral" lang="en" data-testid="act-ticket-type">
+            {p.issue_type}
+          </Badge>
         </div>
 
         <div className="flex min-w-0 flex-col gap-1">
           <span id={ids.desc} className="text-xs font-medium text-fg">
             {t('act.ticket.description')}
           </span>
+          {/* Focusable so keyboard users can scroll it (axe scrollable-region-focusable); the text is
+              the server's, in English, so it is marked lang="en" (WCAG 3.1.2). */}
           <pre
-            aria-labelledby={ids.desc}
+            tabIndex={0}
+            role="region"
+            aria-label={t('act.ticket.descriptionRegion')}
+            lang="en"
             className="max-h-56 overflow-auto whitespace-pre-wrap break-all rounded-md border border-line bg-bg/60 px-3 py-2 font-mono text-caption leading-5 text-muted"
             data-testid="act-ticket-description"
           >
             {p.description}
           </pre>
           <p className="text-2xs text-muted">{t('act.ticket.descriptionHint')}</p>
+          <ServerLangNote />
         </div>
       </div>
 
@@ -496,20 +537,27 @@ function TicketView({ response, onDone }: { response: AskResponse; onDone: () =>
 
       {confirmErr ? (
         <p role="alert" className="mt-4 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-body-sm text-fg" data-testid="act-confirm-error">
-          {confirmErr === 'unavailable' ? t('act.ticket.unavailable') : t('act.error')}
+          {confirmErr === 'unavailable'
+            ? t('act.ticket.unavailable')
+            : confirmErr === 'unknown'
+              ? t('act.ticket.outcomeUnknown')
+              : confirmErr === 'pending'
+                ? t('act.ticket.notConfirmed')
+                : t('act.error')}
         </p>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      {/* At phone width the confirm row stays in view at the bottom of the sheet (sticky). */}
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line bg-overlay pt-4 max-sm:sticky max-sm:bottom-0 max-sm:-mb-4 max-sm:pb-4" data-testid="act-ticket-actions">
         <Button
           variant="primary"
           icon={Ticket}
           busy={busy === 'confirm'}
-          disabled={!trimmed || busy !== null || confirmErr === 'unavailable'}
+          disabled={!trimmed || busy !== null || confirmErr === 'unavailable' || confirmErr === 'unknown'}
           onClick={() => void confirm()}
           data-testid="act-ticket-confirm"
         >
-          {busy === 'confirm' ? t('act.ticket.creating') : t('act.ticket.confirm')}
+          {busy === 'confirm' ? t('act.ticket.creating') : t('act.ticket.confirmIn', { key: project || p.project.key })}
         </Button>
         <Button busy={busy === 'cancel'} disabled={busy !== null} onClick={() => void cancel()} data-testid="act-ticket-cancel">
           {t('act.ticket.cancel')}

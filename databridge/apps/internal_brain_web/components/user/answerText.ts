@@ -2,33 +2,61 @@
 // API returned (the answer text, its citations) or the visitor's own question.
 import type { AskResponse, Citation, ModelInfo, Platform } from '@/lib/types';
 import type { UserKey } from '@/lib/i18n/user';
+import { PERSONAS } from '../../lib/personas';
 
 /** "[C1]" or "[C1, C2]" in the answer text. */
 export const TAG_RE = /\[(C\d+(?:\s*,\s*C\d+)*)\]/g;
 
 /**
  * A quoted Slack passage starts with its author's handle ("mlro.tan: Velquarry Trading …"). On
- * screen that raw prefix reads like a bug, so the answer renders it as a speaker label instead.
- * Only a handle-shaped word (lower case, with a dot, underscore or hyphen, as Slack handles are) at
- * the start of the text, of a line or of a sentence counts; ordinary words ("Note:") never match.
- * The answer text itself is not changed: copy, highlight and sentence matching use it as returned.
+ * screen that raw prefix reads like a bug, so the answer renders it as a speaker label instead,
+ * with the person's display name when the handle is a known person ("Rachel Tan said").
+ * Only a handle-shaped word (lower case, with a dot, underscore or hyphen, as Slack handles are) or
+ * a known person's username (e.g. "jdoe") at the start of the text, of a line or of a sentence
+ * counts; ordinary words ("Note:") never match. The answer text itself is not changed: copy,
+ * highlight and sentence matching use it as returned, and source passages are never touched.
  */
-const SPEAKER_RE = /(^|\n|[.!?。！？]\s+|^\s+)([a-z][a-z0-9]*(?:[._-][a-z0-9]+)+):[ \t]+/g;
+const KNOWN_HANDLES = PERSONAS.map((p) => p.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+const SPEAKER_RE = new RegExp(
+  `(^|\\n|[.!?。！？]\\s+|^\\s+)((?:${KNOWN_HANDLES.join('|')})(?![a-z0-9._-])|[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+):[ \\t]+`,
+  'g',
+);
 
-export type SpeakerPart = string | { speaker: string };
+export type SpeakerPart = string | { speaker: string; name: string };
 
-/** `text` split into plain strings and `{ speaker }` markers (the "handle: " prefix removed). */
+/** The display name for a speaker handle: the person's full name when known, else the handle. */
+export function speakerName(handle: string): string {
+  return PERSONAS.find((p) => p.id === handle)?.fullName ?? handle;
+}
+
+/** `text` split into plain strings and `{ speaker, name }` markers (the "handle: " prefix removed). */
 export function speakerParts(text: string): SpeakerPart[] {
   const out: SpeakerPart[] = [];
   let last = 0;
   for (const m of text.matchAll(SPEAKER_RE)) {
     const at = (m.index ?? 0) + m[1].length;
     if (at > last) out.push(text.slice(last, at));
-    out.push({ speaker: m[2] });
+    out.push({ speaker: m[2], name: speakerName(m[2]) });
     last = (m.index ?? 0) + m[0].length;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
+}
+
+/** "(synthetic case FC-2026-0147)": a data label the answer footer already carries. */
+const SYNTHETIC_CASE_RE = /\s*\(synthetic case [A-Z]{2,}-[0-9A-Z-]+\)/;
+
+/**
+ * The answer as displayed: the "(synthetic case …)" parenthesis is dropped from the FIRST sentence
+ * only (the footer says the data is synthetic). Display chrome only: copy, sentence matching and
+ * the cited passages use the text as returned.
+ */
+export function displayAnswer(answer: string): string {
+  const m = SYNTHETIC_CASE_RE.exec(answer);
+  if (!m) return answer;
+  const end = answer.search(/[.!?。！？](?=\s|\[|$)/);
+  if (end >= 0 && m.index > end) return answer;
+  return answer.slice(0, m.index) + answer.slice(m.index + m[0].length);
 }
 
 /** A refusal is the one response shape with no citations (the text is the API's constant). */

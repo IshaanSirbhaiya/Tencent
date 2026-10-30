@@ -218,7 +218,7 @@ export default function StyleGuidePage() {
               <p className="text-body-sm text-muted">Body-sm · Secondary copy and table cells.</p>
               <p className="text-caption text-muted">Caption 12 · Updated 2 hours ago</p>
               <p className="text-micro uppercase tracking-wider text-subtle">Micro 11 · Section eyebrow</p>
-              <p className="text-kpi tabular-nums">Kpi 28 · 5,958</p>
+              <p className="text-kpi tabular-nums">Kpi 28 · 7,374</p>
               <p className="font-mono text-xs">Mono · 9f2c1a7e…be41d0</p>
             </CardBody>
           </Card>
@@ -301,7 +301,7 @@ export default function StyleGuidePage() {
         <Section id="sg-kpi" title="KPI tiles and stats" description="Exact backend figures with tabular numerals; a footnote names the source.">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <KpiTile label="Requests (sample)" value="1,284" delta={{ text: '+12%', direction: 'up', sentiment: 'neutral', context: 'vs prev. 7 days' }} sparkline={<Sparkline values={SPARK} />} footnote="Source: /audit/stats · ledger seq 1–3,852" />
-            <KpiTile label="Leaks in evaluation (sample)" value="0" unit="/ 5,958" footnote="Source: eval_summary.json" />
+            <KpiTile label="Leaks in evaluation (sample)" value="0" unit="/ 7,374" footnote="Source: eval_summary.json" />
             <KpiTile label="p50 latency (sample)" value="1,180" unit="ms" delta={{ text: '−84 ms', direction: 'down', sentiment: 'good' }} />
             <KpiTile label="Loading" value="—" loading />
           </div>

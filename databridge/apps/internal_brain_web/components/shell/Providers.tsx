@@ -77,6 +77,22 @@ export function useMe(): WhoAmI | null {
  * (`ib-graph-layout:*` in sessionStorage name the nodes that person could see). Listeners such as
  * components/graph/layout.ts clear their in-memory copies on the `ib:identity-changed` event.
  */
+/** An explicit sign-out or persona switch by the person: drops the presenter's cached Leo answer and
+ *  deliverables (components/presenter/deliver.ts listens), so nothing is shown again unchecked. */
+function announceSignedOut() {
+  try {
+    // the same key as components/presenter/deliver.ts (that module may not be loaded in this tab)
+    window.sessionStorage.removeItem('ib.presenter.deliver');
+  } catch {
+    /* storage unavailable: nothing was cached there */
+  }
+  try {
+    window.dispatchEvent(new Event('ib:signed-out'));
+  } catch {
+    /* no window (SSR) */
+  }
+}
+
 function forgetIdentityCaches() {
   try {
     const s = window.sessionStorage;
@@ -217,6 +233,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       /* the session may already be gone */
     }
     forgetIdentityCaches();
+    announceSignedOut();
     setMe(null);
     setStatus('signed-out');
     router.replace('/login');
@@ -226,6 +243,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     async (id: string) => {
       await api.switchTo(id);
       forgetIdentityCaches();
+      announceSignedOut();
       // force: a whoami that started before the switch must not win with the OLD identity.
       await refresh({ force: true });
       router.refresh();

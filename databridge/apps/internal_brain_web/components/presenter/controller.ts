@@ -85,6 +85,9 @@ function ctx(gen: number): StepCtx {
         live();
         await host?.refreshSession();
         live();
+        // /ib/status needs a session: re-read the dots now that someone is signed in, so the HUD never
+        // keeps the "unknown" it got from a fetch made before the sign-in (401).
+        void refreshHealth();
       }),
     req: (persona) => getPresenter().reqs[persona] ?? null,
     reveal: async (selector, timeoutMs = 8_000) => {
@@ -138,7 +141,10 @@ export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
   }
 }
 
-/** P: Stage on, back to step 0, check the status dots. Does not touch any ledger or sandbox. */
+/**
+ * P: Stage on, back to step 0, check the status dots. It touches no sandbox, but the deliverables
+ * warm-up signs Leo in and runs one real, ledgered ask and its deliverables (deliver.ts).
+ */
 export function start() {
   // P while a step (or Reset) is running must not start a second run.
   const s = getPresenter();
@@ -147,9 +153,11 @@ export function start() {
   setPresenter({ armed: true, stage: true, hidden: false });
   flashLegend();
   // Q&A beat D: build Leo's deliverables first (serialised, so step 0's sign-in waits for it)
-  void warmDeliverables(serialSession);
-  void runStep(0, 'forward');
+  const warm = warmDeliverables(serialSession);
+  const first = runStep(0, 'forward');
   void refreshHealth();
+  // /ib/status is 401 until someone is signed in: read the dots again once the warm-up and step 0 are done.
+  void Promise.allSettled([warm, first]).then(() => refreshHealth());
 }
 
 /** Sign both compare slots out while holding their locks (never halfway through a Compare run). */
@@ -186,9 +194,10 @@ export async function resetDemo() {
     resetting = false;
     setPresenter({ resetting: false });
   }
-  void warmDeliverables(serialSession); // R rebuilds the D cache
+  const warm = warmDeliverables(serialSession); // R rebuilds the D cache
   await runStep(0, 'forward');
   void refreshHealth();
+  void warm.then(() => refreshHealth());
 }
 
 export function setArmed(on: boolean) {
@@ -208,8 +217,11 @@ export function setStage(on: boolean) {
 export async function refreshHealth() {
   const [h, s] = await Promise.allSettled([ibHealth(), analyticsApi.status()]);
   const apiDot: Dot = h.status === 'fulfilled' && h.value?.ok ? 'ok' : 'down';
-  let model: Dot = 'unknown';
-  let ledger: Dot = 'unknown';
+  // A status read that fails while the API is up (e.g. a 401 between sign-ins) keeps the last known
+  // dots rather than dropping back to "unknown" on stage.
+  const prev = getPresenter().health;
+  let model: Dot = apiDot === 'ok' && prev?.model ? prev.model : 'unknown';
+  let ledger: Dot = apiDot === 'ok' && prev?.ledger ? prev.ledger : 'unknown';
   if (s.status === 'fulfilled' && s.value) {
     model = s.value.models?.active ? 'live' : 'quoting';
     ledger = s.value.ledger?.ok === true ? 'ok' : s.value.ledger?.ok === false ? 'down' : 'unknown';

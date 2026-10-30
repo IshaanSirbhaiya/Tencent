@@ -94,6 +94,7 @@ export function TourOverlay() {
   const t = useMessages(tourMessages);
   const checks = useChecklist();
   const offerOpen = useOfferOpen('user');
+  const dialogOpen = useAnyDialogOpen();
 
   const steps = STEPS[tour.tour];
   const isEnd = tour.tour === 'user' && tour.step === TOUR_LENGTH.user;
@@ -458,7 +459,9 @@ export function TourOverlay() {
   });
 
   /* ---------------------------------------------------------------- render */
-  const offer = !tour.open && mounted && !!me && status === 'ready' && pathname === '/' && mode === 'user' && offerOpen;
+  // The offer toast sits outside any dialog, so it hides while a dialog or sheet is open (it covered the Act
+  // sheet's fields at 390 px and broke the modal focus model; WCAG 2.4.11).
+  const offer = !tour.open && mounted && !!me && status === 'ready' && pathname === '/' && mode === 'user' && offerOpen && !dialogOpen;
 
   if (!mounted) return null;
   if (!tour.open) return offer ? <OfferToast /> : null;
@@ -640,6 +643,19 @@ function openDialogAny(): boolean {
   return Array.from(document.querySelectorAll('[role="dialog"][data-state="open"]')).some(
     (d) => !d.hasAttribute('data-tour-card') && !d.closest('[data-radix-popper-content-wrapper]'),
   );
+}
+
+/** True while any modal dialog or sheet (not the tour card, not a popover) is open; follows the DOM. */
+function useAnyDialogOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(openDialogAny());
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-state'] });
+    return () => mo.disconnect();
+  }, []);
+  return open;
 }
 
 /** Scroll the highlight into view: centred if it fits, else its top just under the header. */

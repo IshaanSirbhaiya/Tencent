@@ -22,6 +22,8 @@ const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 const notFound = () => json({ detail: 'not found' }, 404);
 const UNAVAILABLE = "A follow-up ticket can't be created from this answer. Nothing was changed.";
+// databridge_ib/actions.py TICKET_OUTCOME_UNKNOWN: Jira's outcome is unknown (timeout, 5xx, malformed).
+const OUTCOME_UNKNOWN = 'We could not confirm whether the ticket was created. Check the project before trying again.';
 const ID_RE = /^[A-Za-z0-9_-]{1,200}$/;
 const SUMMARY_MAX = 200;
 
@@ -255,7 +257,14 @@ function confirm(sub: string, b: Record<string, unknown>) {
     p.used = false;
     return json({ detail: 'invalid' }, 422);
   }
+  // Test hooks (mock only): a summary carrying one of these markers stands for Jira's outcome being
+  // unknown after the confirm (409 outcome_unknown), or the service failing (503, proposal kept).
+  if (summary.includes('[mock:confirm-503]')) {
+    p.used = false;
+    return json({ error: 'temporarily unavailable' }, 503);
+  }
   record(p.req, 'action.confirmed');
+  if (summary.includes('[mock:outcome-unknown]')) return json({ error: 'outcome_unknown', message: OUTCOME_UNKNOWN }, 409);
   const s = act();
   s.next[project] = (s.next[project] ?? 900) + 1;
   const key = `${project}-${s.next[project]}`;

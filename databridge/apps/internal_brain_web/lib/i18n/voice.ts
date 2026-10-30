@@ -3,6 +3,7 @@ import { defineMessages } from '.';
 
 export const voiceMessages = defineMessages({
   en: {
+    'voice.button': 'Dictate',
     'voice.start': 'Start dictation',
     'voice.stop': 'Stop dictating',
     'voice.listening': 'Listening…',
@@ -12,6 +13,7 @@ export const voiceMessages = defineMessages({
     'voice.note': 'Dictation uses your browser’s speech service. Review the text before asking.',
   },
   zh: {
+    'voice.button': '语音输入',
     'voice.start': '开始语音输入',
     'voice.stop': '停止语音输入',
     'voice.listening': '正在聆听…',

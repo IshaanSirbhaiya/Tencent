@@ -225,3 +225,30 @@ test('phone width: the tour offer hides while a sheet is open, and the confirm r
   await expect(sheet).toBeHidden();
   await expect(offer).toBeVisible();
 });
+
+test('after Confirm: an unknown Jira outcome and a 503 never say "nothing was changed/created"', async ({ page }) => {
+  await quiet(page, 'light');
+  await login(page, 'jdoe');
+  await ask(page, S1);
+  const answer = page.getByTestId('answer');
+
+  // 503 after Confirm: the outcome is not confirmed yet; Confirm stays available (a retry returns the ticket).
+  await answer.getByTestId('act-ticket').click();
+  const sheet = page.getByTestId('act-ticket-sheet');
+  await sheet.getByTestId('act-ticket-summary').fill('Replica lag follow-up [mock:confirm-503]');
+  await sheet.getByTestId('act-ticket-confirm').click();
+  const err = sheet.getByTestId('act-confirm-error');
+  await expect(err).toHaveText('We could not confirm the result yet. Try again: if the ticket was created, you get that ticket, not a second one.');
+  await expect(err).not.toContainText(/Nothing was/);
+  await expect(sheet.getByTestId('act-ticket-confirm')).toBeEnabled();
+
+  // 409 outcome_unknown: the server's wording, Confirm disabled, and closing does not claim nothing was created.
+  await sheet.getByTestId('act-ticket-summary').fill('Replica lag follow-up [mock:outcome-unknown]');
+  await sheet.getByTestId('act-ticket-confirm').click();
+  await expect(err).toHaveText('We could not confirm whether the ticket was created. Check the project before trying again.');
+  await expect(sheet.getByTestId('act-ticket-confirm')).toBeDisabled();
+  await expectAccessible(page, 'act ticket outcome unknown');
+  await sheet.getByTestId('act-ticket-cancel').click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText('Cancelled. Nothing was created.')).toHaveCount(0);
+});

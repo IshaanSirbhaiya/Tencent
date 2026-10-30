@@ -13,19 +13,23 @@ export interface Persona {
 
 // Six demo personas plus the platform simulator operator (plan §5.1). There is no persona-list
 // endpoint, so these are fixed. Suggested questions come from the fact manifest's canonical
-// questions (fixtures/enterprise/generate.py) so they exercise both answers and refusals.
+// questions (fixtures/enterprise/generate.py). Rule 4 (restricted = non-existent): the login page shows
+// every note to everyone before sign-in, and starters are offered to the signed-in person, so a note says
+// only what that person CAN open (no private channel names, never "no access to X"), and no starter asks
+// for something the person cannot open. Refusal questions live in the presenter script and the e2e only.
+// The presenter's questions (Amy's two, presenter.spec.ts) are unchanged.
 export const PERSONAS: Persona[] = [
   {
     id: 'jdoe',
     name: 'Jordan Doe',
     fullName: 'Jordan Doe',
     role: 'Backend engineer',
-    note: 'Payments engineering, member of private #db-migration',
+    note: 'Payments engineering spaces and team channels',
     suggestions: [
       "What's the status of the database migration project and were there any blockers raised in Slack last week?",
       'What was the root cause of the payment outage last quarter, and what follow-up tickets were created?',
       'When is the next settlement key rotation window?',
-      'Show me the security incident report from the Q3 breach.',
+      'What backfill throttle are we using for the ledger copy job?',
     ],
   },
   {
@@ -49,7 +53,6 @@ export const PERSONAS: Persona[] = [
     suggestions: [
       'When will the OCR model update reach production?',
       'What is the support SLA for the KYC OCR service?',
-      'Show me the security incident report from the Q3 breach.',
     ],
   },
   {
@@ -57,7 +60,7 @@ export const PERSONAS: Persona[] = [
     name: 'Sara',
     fullName: 'Sara Lindqvist',
     role: 'Security',
-    note: 'SEC space, Jira security level, #sec-incident-q3',
+    note: 'Security team spaces and incident channels',
     suggestions: [
       'How many merchant accounts were affected in the Q3 breach?',
       'What is the status of the Q3 incident containment?',
@@ -73,7 +76,6 @@ export const PERSONAS: Persona[] = [
     note: 'Audit console access; reveals are reasoned and logged',
     suggestions: [
       'When is the technology risk audit evidence pack due?',
-      'Show me the security incident report from the Q3 breach.',
       "What's the status of the database migration project?",
     ],
   },
@@ -96,11 +98,10 @@ export const PERSONAS: Persona[] = [
     name: 'Amy',
     fullName: 'Amy Lim',
     role: 'Account manager',
-    note: 'Customer & product spaces; no FinCrime case access',
+    note: 'Customer and product spaces',
     suggestions: [
       "Why has Velquarry Trading's account been restricted, and what should I tell the customer?",
       "Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?",
-      'Has a suspicious transaction report been filed on Velquarry Trading?',
     ],
   },
   {
@@ -108,11 +109,10 @@ export const PERSONAS: Persona[] = [
     name: 'Rachel',
     fullName: 'Rachel Tan',
     role: 'MLRO (FinCrime)',
-    note: 'FinCrime space, #fincrime-cases, case files — need-to-know only',
+    note: 'FinCrime team spaces, need-to-know',
     suggestions: [
       'What did the review of Velquarry Trading Pte Ltd find, and has a suspicious transaction report been filed?',
       'What does the tipping-off handling guidance say?',
-      'Show me the security incident report from the Q3 breach.',
       "What's the status of the database migration project?",
     ],
   },
@@ -121,7 +121,7 @@ export const PERSONAS: Persona[] = [
     name: 'IT admin',
     fullName: 'Alex Mercer',
     role: 'Platform simulator',
-    note: 'Operates the demo platforms; no audit access',
+    note: 'Operates the demo platforms',
     suggestions: [
       "What's the latest runbook for the payment-service incident?",
     ],

@@ -45,14 +45,25 @@ function writeCache(c: DeliverCache | null) {
 }
 
 export function clearDeliverCache() {
+  epoch++;
   writeCache(null);
+  set({ open: false, cache: null });
 }
+
+// A warm-up that started before a sign-out must not write its result afterwards.
+let epoch = 0;
+
+// The person signing out (or switching persona from the shell) drops Leo's cached answer and
+// deliverables: nothing is shown later without a fresh, server-checked build. The shell dispatches
+// this event (components/shell/Providers.tsx); listening here avoids an import cycle.
+if (typeof window !== 'undefined') window.addEventListener('ib:signed-out', () => clearDeliverCache());
 
 let warming: Promise<DeliverCache | null> | null = null;
 
 /** Build Leo's deliverables in the main session, then put the previous session back. */
 export function warmDeliverables(serial: Serial): Promise<DeliverCache | null> {
   if (warming) return warming;
+  const started = epoch;
   warming = serial(async () => {
     let prev: string | null = null;
     try {
@@ -75,6 +86,7 @@ export function warmDeliverables(serial: Serial): Promise<DeliverCache | null> {
         }
       }
       const c: DeliverCache = { at: Date.now(), response, deliverables, kinds: st.kinds };
+      if (started !== epoch) return null; // signed out meanwhile
       writeCache(c);
       return c;
     } catch {
