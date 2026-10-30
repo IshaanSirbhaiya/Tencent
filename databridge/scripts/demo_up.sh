@@ -3,6 +3,10 @@
 #
 #   bash scripts/demo_up.sh start [--fresh]   # mock platforms :8200, Internal Brain :8100, seed,
 #                                             # Walnut engine gateway :8300, web app :3100
+#   IB_WORLD=atlas bash scripts/demo_up.sh start [--fresh]
+#                                             # the same stack on Company A + the Atlas onboarding
+#                                             # scenario (fixtures/scenarios/atlas_onboarding), with
+#                                             # its own state dir (var/ib-atlas). Default: Company A.
 #   bash scripts/demo_up.sh status
 #   bash scripts/demo_up.sh stop
 #
@@ -16,7 +20,18 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-STATE="${IB_VAR:-var/ib-final}"
+# IB_WORLD=atlas picks the additive scenario world (Company A + Atlas) for the mocks AND the Brain,
+# with its own state, so var/ib-final is never indexed from a different world. Unset: the default
+# Company A world, exactly as before. Any other IB_WORLD value is a path and passes through as before.
+WORLD_PIN=""
+if [ "${IB_WORLD:-}" = "atlas" ]; then
+  WORLD_PIN="$ROOT/fixtures/scenarios/atlas_onboarding/world.json"
+  [ -f "$WORLD_PIN" ] || { echo "missing $WORLD_PIN" >&2; exit 2; }
+  export IB_WORLD="$WORLD_PIN" MOCK_WORLD_PATH="$WORLD_PIN"
+  STATE="${IB_VAR:-var/ib-atlas}"
+else
+  STATE="${IB_VAR:-var/ib-final}"
+fi
 # the stand-in model's spend ledger (var/model_guard) is never the state and never inside it (D-42)
 . scripts/wipe_guard.sh
 LOGS="$STATE/logs"
@@ -159,6 +174,15 @@ case "${1:-start}" in
 esac
 
 FRESH=0; [ "${2:-}" = "--fresh" ] && FRESH=1
+if [ -n "$WORLD_PIN" ]; then
+  # a running stack keeps the world it started with: never reuse it under a different world
+  for p in 8100 8200; do
+    if [ -n "$(port_pids "$p")" ] || curl -fsS -m 3 "http://127.0.0.1:$p/health" >/dev/null 2>&1; then
+      echo "refusing to start IB_WORLD=atlas: :$p is already up (another world). Run '$0 stop' first." >&2
+      exit 5
+    fi
+  done
+fi
 if [ -f .env.ib.local ]; then
   # Only the values the other processes must agree on with the Brain (as before, a non-empty value in
   # the file wins). The IB_* ones are exported below and reach every child; the MOCK_* tokens and the
@@ -250,6 +274,7 @@ if need_start 8100 http://127.0.0.1:8100/health; then
     # not reach the Brain as ""), so the mocks, the seeder and the Brain hold the same strings.
     if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local; set +a; fi
     export_settled $SETTLED_KEYS
+    if [ -n "$WORLD_PIN" ]; then export IB_WORLD="$WORLD_PIN"; fi   # the chosen world wins
     PYTHONPATH="$IB_PATH" nohup "$PY" -m databridge_ib & )
 fi
 wait_http http://127.0.0.1:8100/health 180 || { echo "Internal Brain did not start; see $LOGS/ib.log" >&2; exit 1; }

@@ -6,12 +6,16 @@ app, the mock platforms, the Walnut libraries it imports and the IB e2e harness 
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]            # databridge/
 HERE = Path(__file__).resolve().parent
-WORLD = ROOT / "fixtures" / "enterprise" / "world.json"
+#: the world under test. Default: Company A. ``IB_EVAL_WORLD=<path>`` runs the same eval on another
+#: world in the same schema, e.g. the additive Atlas scenario world
+#: (``fixtures/scenarios/atlas_onboarding/world.json``); the oracle reads its ACLs the same way.
+WORLD = Path(os.environ.get("IB_EVAL_WORLD") or ROOT / "fixtures" / "enterprise" / "world.json")
 GENERATOR = ROOT / "fixtures" / "enterprise" / "generate.py"
 IB_TESTS = ROOT / "apps" / "internal_brain" / "tests"
 

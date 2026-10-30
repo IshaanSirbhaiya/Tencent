@@ -104,6 +104,9 @@ def main():
         ("web", [node, str(WEB / "node_modules/next/dist/bin/next"), "dev", "-H", "127.0.0.1", "-p", "3115"], WEB),
     ]
     children, handles = [], []
+    # `next dev` with a separate distDir adds that dir to tsconfig.json; put the file back on exit
+    tsconfig = WEB / "tsconfig.json"
+    saved_tsconfig = tsconfig.read_bytes()
     signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     try:
         for name, command, cwd in commands:
@@ -139,6 +142,8 @@ def main():
                 child.kill()
         for handle in handles:
             handle.close()
+        if tsconfig.read_bytes() != saved_tsconfig:
+            tsconfig.write_bytes(saved_tsconfig)
 
 
 if __name__ == "__main__":
