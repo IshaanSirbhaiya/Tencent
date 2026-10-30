@@ -20,6 +20,10 @@ Tick each one as you go. The why for every demo-day item is in
 - [x] **Upload folder picker**: built and tested on 30 Oct (D-34): the sheet lists, by name, only the folders the person can write to.
 - [x] **New cover in Miora** (done 30 Oct: option 2 chosen, every size in `submission/06_cover/finals/`): paste [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md) and send me the best image.
 
+## After the teammate merge
+
+- [ ] **Remind Claude:** after the just-in-time UI merge, extend the **User-mode tour** with its steps (noted in [MERGE_PLAN.md](MERGE_PLAN.md)).
+
 ## Sat 31 Oct
 
 - [ ] **Hallway test**: 5 people × 20 min ([rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)). Send me the notes; I'll write the report, the fix log and the tester line on the proof slide. No test, no line: the `[TESTER]` sentence is deleted from the run sheet (never invented).

@@ -492,3 +492,14 @@ The docs are always kept live. Update them in the merge branch before pushing:
 | `final_v1.4` | Voice | | | | | | | |
 | `final_v1.5` | JIT UI | | | | | | | |
 | `final_v1.6` | Dots | | | | | | | |
+
+
+## Reminder from the founder (30 Oct): extend the User-mode tour after the JIT UI merge
+
+When the teammate's **just-in-time UI** branch is merged, extend the **User-mode interactive tour**
+(`components/tour/steps.ts`, User section) with steps that show it:
+- ask for a custom view, see the generated table or UI, and open a cell's source.
+
+Keep the User and Developer tours separate (each starts on first entry to its own mode). Add the steps in
+EN and 简体中文, extend `tests/e2e/tour.spec.ts`, keep axe clean, and add a matching beat in the video script's
+S2 slot.
