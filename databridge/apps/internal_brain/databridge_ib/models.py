@@ -194,7 +194,7 @@ EVENT_KINDS = ("request.accepted", "retrieval.decided", "answer.released", "requ
                "directory.changed", "ingest.sync", "anchor.published", "map.viewed", "auth.login",
                "graph.viewed", "doc.viewed", "trace.viewed",
                "action.proposed", "action.confirmed", "action.executed", "action.failed",
-               "action.rejected",
+               "action.rejected", "action.requested",
                "deliverable.requested", "deliverable.created", "deliverable.exported",
                "deliverable.failed")
 
@@ -285,13 +285,14 @@ class MapViewed(EventBase):
 
 class GraphViewed(EventBase):
     """A person opened (part of) their knowledge graph, or asked which ids they can open
-    (``mode="openable"``). Counts only: no titles, no ids, no query text (write-ahead, before the
+    (``mode="openable"``), or listed the Drive folders they may upload into
+    (``mode="upload_folders"``, D-34; ``nodes_returned`` = folders returned). Counts only: no titles, no ids, no query text (write-ahead, before the
     response). ``docs_checked`` counts the live Gate-2 checks this call ran (compliance-only
     record); everything returned was confirmed in the same call."""
     kind: Literal["graph.viewed"] = "graph.viewed"
     sub: str
-    mode: Literal["overview", "focus", "search", "openable", "changes"]
-    outcome: Literal["ok", "not_found"] = "ok"
+    mode: Literal["overview", "focus", "search", "openable", "changes", "upload_folders"]
+    outcome: Literal["ok", "not_found", "checking"] = "ok"   # "checking": live-poll write-ahead (round 4 B2)
     nodes_returned: int = 0
     docs_returned: int = 0
     edges_returned: int = 0
@@ -382,6 +383,21 @@ class ActionRejected(EventBase):
     action: ActionKind
 
 
+class ActionRequested(EventBase):
+    """An Act call's write-ahead row (round 4 Codex A1). ``accepted``: written before the live
+    source check (no ``req_id``: ownership is not known yet). ``decided``: the documents a model
+    may see, written before the model call. ``replayed``: a repeat confirm of a created proposal,
+    written before the stored result is returned. Ids and counts only."""
+    kind: Literal["action.requested"] = "action.requested"
+    sub: str
+    action_id: str
+    action: Optional[ActionKind] = None
+    stage: Literal["accepted", "decided", "replayed"]
+    doc_ids: tuple[str, ...] = ()
+    model_planned: bool = False
+    policy_version: str
+
+
 #: what a deliverable is built as (deliverables/; docs/finals/deliverables/PLAN.md)
 DeliverableKind = Literal["table", "chart", "analysis", "summary", "slides"]
 
@@ -395,6 +411,8 @@ class DeliverableRequested(EventBase):
     deliverable: DeliverableKind
     model_planned: bool = False
     policy_version: str
+    #: round 4 B2: set on an EXPORT's write-ahead row (before its live re-check); None on create
+    export_format: Optional[Literal["csv", "pptx"]] = None
 
 
 class DeliverableCreated(EventBase):
