@@ -33,7 +33,22 @@ from .views.composer import (MODEL, PRICE_IN, PRICE_OUT, PUBLIC_MODEL, PUBLIC_PR
 log = logging.getLogger("databridge_ib.claude")
 
 ANSWER_MAX_TOKENS = 4_000
-ANSWER_TIMEOUT_S = 45.0
+#: the slowest a stand-in model call may take before the quoted answer is served instead
+#: (``IB_MODEL_ANSWER_TIMEOUT_S``; it was a fixed 45 s). Demo Day QA: a stage answer that has not
+#: arrived in about 12 s is better served quoted, with the label saying the model did not reply in
+#: time, than waited for. Bounded to 1 to 120 s; an unreadable value means the default.
+ANSWER_TIMEOUT_DEFAULT_S = 12.0
+
+
+def answer_timeout_s() -> float:
+    raw = os.environ.get("IB_MODEL_ANSWER_TIMEOUT_S", "").strip()
+    try:
+        val = float(raw) if raw else ANSWER_TIMEOUT_DEFAULT_S
+    except ValueError:
+        return ANSWER_TIMEOUT_DEFAULT_S
+    if val != val:                                  # NaN
+        return ANSWER_TIMEOUT_DEFAULT_S
+    return min(120.0, max(1.0, val))
 
 
 class ClaudeBackend:
@@ -72,7 +87,8 @@ class ClaudeBackend:
             raise RuntimeError(REFUSED)
         actual = 0.0
         try:
-            resp = self._api().with_options(timeout=ANSWER_TIMEOUT_S).beta.messages.create(
+            # no SDK retry: the timeout is the whole wait, then the quoted answer is served
+            resp = self._api().with_options(timeout=answer_timeout_s(), max_retries=0).beta.messages.create(
                 model=name, max_tokens=ANSWER_MAX_TOKENS,
                 system=[{"type": "text", "text": system or "You are a helpful assistant.",
                          "cache_control": {"type": "ephemeral"}}],
