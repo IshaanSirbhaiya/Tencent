@@ -11,6 +11,10 @@ Every feature, who can use it, where it is and the test that proves it:
 [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since the 16 Oct submission:
 [CHANGELOG.md](docs/finals/CHANGELOG.md).
 
+**Platform and Tencent.** The Walnut platform underneath (21 packages), which parts answer questions,
+which are ways to ask or views, and the verified test figures: [docs/PLATFORM.md](docs/PLATFORM.md).
+The Tencent tools used in the build, with evidence: [README, Built with Tencent](README.md#built-with-tencent).
+
 ---
 
 ## Finals build
@@ -248,7 +252,7 @@ bash; the commands are in [README.md → Fallback](README.md#fallback-start-each
   git-ignored) with one of these, then restart (`demo_up.sh stop`, then `start`; or restart terminal 1):
 
   ```bash
-  # Tencent TokenHub: Hy3, with deepseek-v4.1-flash as backup
+  # Tencent TokenHub: Hy3 first, then the optional stand-in model
   TOKENHUB_API_KEY=<your TokenHub key>
   ```
 
@@ -410,7 +414,7 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
   boundaries, and ran a security review on Tencent Hunyuan `hy3`; then it fixed its own code after a Codex
   review. Every session's transcript is kept: [docs/tencent/DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md).
 - **WorkBuddy** is the second front door, including an audit assistant for compliance.
-- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with `deepseek-v4.1-flash` as backup (wired in,
+- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with an optional stand-in model behind it (wired in,
   not yet run live; see [Honest limits](#honest-limits)).
 - **Lighthouse:** a hardened deploy kit (Docker, HTTPS, passcode-gated demo) is in
   [deploy/lighthouse/](deploy/lighthouse/README.md).

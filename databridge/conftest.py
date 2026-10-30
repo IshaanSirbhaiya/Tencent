@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 
 
-def pytest_configure(config):                                        # noqa: ARG001
+def pytest_configure(config):
     os.environ["DATABRIDGE_FORCE_GOLD"] = "1"
     # The gateway and the MCP servers open ONE shared, FILE-backed graph store
     # (`WALNUT_GRAPH_DB_PATH`, default `var/graph/workspace.db`). A test must never write into the
@@ -34,3 +34,13 @@ def pytest_configure(config):                                        # noqa: ARG
     # The automation TriggerEngine must never fire real schedules or spawn MCP servers because some
     # unrelated test booted the gateway. Explicit OFF; a test of the engine turns it on itself.
     os.environ["WALNUT_AUTOMATION_ENGINE"] = "0"
+    # Child processes. `[tool.pytest.ini_options] pythonpath` puts the packages on THIS process's
+    # sys.path only; the venv does not install them. A test that starts a child Python (the
+    # ledger's cross-process append lock in core, the ontology-state writers in graph) then fails
+    # with `ModuleNotFoundError: databridge_core` for a reason that has nothing to do with what it
+    # tests. Exporting the same paths makes the child see what the parent sees, and adds nothing
+    # the parent could not already import.
+    extra = [str(p) for p in config.getini("pythonpath")]
+    if extra:
+        current = os.environ.get("PYTHONPATH", "")
+        os.environ["PYTHONPATH"] = os.pathsep.join([*extra, *([current] if current else [])])
