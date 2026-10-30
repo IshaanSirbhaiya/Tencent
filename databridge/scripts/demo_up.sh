@@ -54,7 +54,14 @@ case "${1:-start}" in
 esac
 
 FRESH=0; [ "${2:-}" = "--fresh" ] && FRESH=1
-if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local; set +a; fi
+if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local; set +a
+elif [ "${ALLOW_DEV_KEYS:-0}" != "1" ]; then
+  # Without the local keys the Brain would start on its dev-default keys and could not append to the
+  # demo ledger (sign-in 503, Verify fails). Usually the CodeBuddy runner has the file moved aside.
+  echo "refusing to start: databridge/.env.ib.local is missing (is a CodeBuddy session running?)." >&2
+  echo "Wait for it to finish, or set ALLOW_DEV_KEYS=1 for a throwaway state dir." >&2
+  exit 3
+fi
 if [ -z "${IB_FORCE_OFFLINE:-}" ]; then
   # Live Tencent Hunyuan when TokenHub answers for this account; otherwise the honest fallback.
   if "$PY" scripts/hy3_check.py --quiet; then IB_FORCE_OFFLINE=0; else IB_FORCE_OFFLINE=1; fi
