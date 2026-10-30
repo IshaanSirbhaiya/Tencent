@@ -37,8 +37,7 @@ export const PERSONAS: Persona[] = [
     suggestions: [
       "What's the latest runbook for the payment-service incident?",
       "What's the status of the database migration project and were there any blockers raised in Slack last week?",
-      'How do we drain a Kubernetes node pool safely?',
-      'What are the current SLO burn-rate alert thresholds?',
+      'When can the break-glass database role be used and who revokes it?',
     ],
   },
   {
@@ -60,10 +59,10 @@ export const PERSONAS: Persona[] = [
     role: 'Security',
     note: 'SEC space, Jira security level, #sec-incident-q3',
     suggestions: [
-      'Show me the security incident report from the Q3 breach.',
+      'How many merchant accounts were affected in the Q3 breach?',
       'What is the status of the Q3 incident containment?',
       'Which dependency CVEs are still open?',
-      'When is the next secret rotation due?',
+      'When is the next settlement key rotation window?',
     ],
   },
   {
@@ -74,7 +73,6 @@ export const PERSONAS: Persona[] = [
     note: 'Audit console access; reveals are reasoned and logged',
     suggestions: [
       'When is the technology risk audit evidence pack due?',
-      'Where is the data retention schedule?',
       'Show me the security incident report from the Q3 breach.',
       "What's the status of the database migration project?",
     ],
@@ -103,7 +101,6 @@ export const PERSONAS: Persona[] = [
       "Why has Velquarry Trading's account been restricted, and what should I tell the customer?",
       "Why has Bayfront Spice Traders' account been restricted, and what should I tell the customer?",
       'Has a suspicious transaction report been filed on Velquarry Trading?',
-      'Can we offer multi-currency accounts to a Singapore SME?',
     ],
   },
   {
@@ -126,10 +123,7 @@ export const PERSONAS: Persona[] = [
     role: 'Platform simulator',
     note: 'Operates the demo platforms; no audit access',
     suggestions: [
-      'Who is on the IT on-call rotation this week?',
       "What's the latest runbook for the payment-service incident?",
-      'Where is the data retention schedule?',
-      'What are the current SLO burn-rate alert thresholds?',
     ],
   },
 ];
