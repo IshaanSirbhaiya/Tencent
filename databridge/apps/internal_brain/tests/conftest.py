@@ -14,3 +14,15 @@ for rel in ("apps/internal_brain", "apps/mock_platforms", "packages/core", "pack
     p = str(_ROOT / rel)
     if p not in sys.path:
         sys.path.insert(0, p)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _no_standin_model_from_the_environment(monkeypatch):
+    """No test builds an app that reaches the opt-in stand-in model from the developer's shell:
+    the key and the switches are cleared for every test (a test that wants one sets them)."""
+    for k in ("ANTHROPIC_API_KEY", "IB_CLAUDE", "IB_CLAUDE_BUDGET_USD", "IB_CLAUDE_FAST",
+              "IB_CLAUDE_EFFORT", "IB_CLAUDE_ANSWER_EFFORT", "IB_CLAUDE_USER_LIMIT"):
+        monkeypatch.delenv(k, raising=False)

@@ -65,7 +65,7 @@ def build_services(cfg: Optional[IbConfig] = None, *, chain: Optional[ModelChain
     ledger = AccessLedger(cfg, external=sink)
     answers = AnswerStore(cfg)
     if chain is None:
-        # Hy3 via TokenHub when it is live; else Claude when a key is set (claude.py); else none
+        # Hy3 via TokenHub when it is live; else the opt-in stand-in (claude.py, IB_CLAUDE=1); else none
         from .claude import claude_chain
         chain = ModelChain.tokenhub() or claude_chain(cfg.var_root / "views")
     pipeline = Pipeline(index=index, directory=directory, connectors=connectors, ledger=ledger,

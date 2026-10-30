@@ -113,7 +113,7 @@ def test_claude_decides_after_the_record_and_the_live_recheck(tmp_path):
     real = svc.ledger.append
     svc.ledger.append = lambda ev: (order.append(ev.kind), real(ev))[1]
     d = _decide(jd, rid, "Show the Indonesian SME FX margin by market as a table").json()
-    assert d["render"] == "page" and d["decided_by"] == "claude" and d["title"] == "FX margin by market"
+    assert d["render"] == "page" and d["decided_by"] == "model" and d["title"] == "FX margin by market"
     assert [o for o in order if o == "claude" or o.startswith("deliverable.")] == [
         "deliverable.requested", "claude", "deliverable.created"]
     created = _events(svc, "deliverable.created")[-1]
@@ -160,7 +160,7 @@ def test_claude_page_values_are_checked_and_styles_are_enums(tmp_path):
     _with_claude(app, svc, _page_reply(blocks))
     v = _build(jd, rid, "a table in black").json()
     assert v["status"] == "ready" and v["generated"] == "model"
-    assert v["model"] == {"provider": "anthropic", "model": "claude-opus-5-5", "fallback_used": False}
+    assert v["model"] == {"provider": "standin", "model": "standin-1", "fallback_used": False}
     data = _data(v)
     by = {b["type"]: b for b in data["blocks"]}
     assert data["meta"]["accent"] == "green"
@@ -337,7 +337,7 @@ def test_claude_answers_go_through_the_grounding_wall(tmp_path):
             assert ans["model"] == {"provider": "deterministic", "model": "extractive-v1",
                                     "fallback_used": True}
         else:
-            assert ans["model"] == {"provider": "anthropic", "model": "claude-opus-5-5",
+            assert ans["model"] == {"provider": "standin", "model": "standin-1",
                                     "fallback_used": False}
             # the wall tags each value where it stands ("0.4 [C1]% FX margin"); the web gathers them
             assert re.sub(r"\s*\[C\d+\]", "", ans["answer"]) == \

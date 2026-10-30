@@ -218,6 +218,9 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         return {"models": {"provider": llmmod.provider_label() if configured else None,
                            "chain": llmmod.configured_models(),
                            "active": chain is not None,
+                           # "tencent-tokenhub" | "openai-compatible" | "standin" (a neutral id:
+                           # never the stand-in's provider name) | None
+                           "active_provider": getattr(chain, "provider", None) if chain is not None else None,
                            "active_chain": list(chain.models) if chain is not None else [],
                            "fallback": {"provider": "deterministic", "model": "extractive-v1"}},
                 "key_configured": configured,
@@ -569,7 +572,7 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         actions=svc.actions, ledger=svc.ledger, projection=svc.projection, index=svc.index,
         connectors=svc.connectors, directory=svc.directory,
         chain=getattr(svc.pipeline, "chain", None),
-        # Claude composes pages when ANTHROPIC_API_KEY is set and the IB is not forced offline
+        # a model composes pages only when opted in (IB_CLAUDE=1 + key, never IB_FORCE_OFFLINE=1)
         composer=view_composer.ClaudeComposer.from_env(svc.cfg.var_root / "views"),
         enabled=bool(getattr(svc.cfg, "deliverables", False)), sync=_trace_sync)
     view_routes.mount(app, app.state.views, current, _employee)

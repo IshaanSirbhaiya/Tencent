@@ -59,7 +59,7 @@ def mount(app: FastAPI, service: ViewService, current: Callable,
     async def rewrite(request: Request, user: DirectoryUser = Depends(current)):
         """A standalone search question from MY message and MY previous question (both my own
         words; no source is read, nothing is recorded: the question then asked is ledgered by
-        ``/ib/ask`` as usual). Claude when connected; otherwise the message unchanged."""
+        ``/ib/ask`` as usual). The model when connected; otherwise the message unchanged."""
         employee(user)
         if not service.enabled:
             raise HTTPException(404, NOT_FOUND)

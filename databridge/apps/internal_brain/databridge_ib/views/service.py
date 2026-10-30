@@ -186,7 +186,7 @@ class ViewService:
             fallback = code
             if got is not None:
                 allowed = blocks.allowed_words(evidence, ctx.question) | pagecheck.PAGE_WORDS
-                render, decided_by, model = got.render, "claude", info
+                render, decided_by, model = got.render, "model", info
                 title = blocks.checked_label(got.title[:pagecheck.LIMIT], allowed,
                                              limit=pagecheck.LIMIT) or ""
         if decided_by == "rules":

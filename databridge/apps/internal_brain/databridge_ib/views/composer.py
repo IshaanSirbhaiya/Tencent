@@ -41,6 +41,15 @@ log = logging.getLogger("databridge_ib.views.composer")
 
 MODEL = "claude-opus-5-5"
 PROVIDER = "anthropic"
+#: what the browser, /ib/status and the ledger see for this model: a neutral stand-in id, never
+#: the provider or the real model id (founder decision: user-facing labels name Hy3 only)
+PUBLIC_PROVIDER, PUBLIC_MODEL = "standin", "standin-1"
+
+
+def claude_enabled() -> bool:
+    """Opt-in only: ``IB_CLAUDE=1`` and a key, and never when the IB is forced offline."""
+    return (os.environ.get("IB_CLAUDE") == "1" and bool(os.environ.get("ANTHROPIC_API_KEY"))
+            and os.environ.get("IB_FORCE_OFFLINE") != "1")
 #: list prices, US$ per million tokens (claude-opus-5-5); thinking is billed as output. Fast mode
 #: (research preview, Claude API only) runs the same model faster at twice the price.
 PRICE_IN, PRICE_OUT, PRICE_CACHE_READ, PRICE_CACHE_WRITE = 4.0, 20.0, 0.20, 5.0
@@ -106,7 +115,7 @@ class Budget:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps({"usd": round(s.usd, 6), "calls": s.calls,
-                                       "cap": self.cap, "model": MODEL}), encoding="utf-8")
+                                       "cap": self.cap, "model": PUBLIC_MODEL}), encoding="utf-8")
             os.replace(tmp, self.path)
 
 
@@ -201,9 +210,9 @@ class ClaudeComposer:
 
     @classmethod
     def from_env(cls, state_dir: Path) -> Optional["ClaudeComposer"]:
-        """A composer when a key is configured and ``IB_CLAUDE`` is not ``0``; else None."""
-        # its own switch: IB_FORCE_OFFLINE is about the Hy3 chain (off whenever TokenHub is not live)
-        if not os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("IB_CLAUDE", "1") == "0":
+        """A composer only when opted in (``claude_enabled``: ``IB_CLAUDE=1`` and a key, and not
+        ``IB_FORCE_OFFLINE=1``); else None. Off by default."""
+        if not claude_enabled():
             return None
         return cls(state_dir=state_dir)
 
@@ -215,7 +224,7 @@ class ClaudeComposer:
 
     def status(self) -> dict[str, Any]:
         s = self.budget.spent()
-        return {"provider": PROVIDER, "model": self.model, "spent_usd": round(s.usd, 4),
+        return {"provider": PUBLIC_PROVIDER, "model": PUBLIC_MODEL, "spent_usd": round(s.usd, 4),
                 "cap_usd": self.budget.cap, "calls": s.calls,
                 "available": s.usd < self.budget.cap}
 
@@ -271,7 +280,7 @@ class ClaudeComposer:
             if parsed is None:
                 return None, None, "invalid_output"
             served = str(getattr(resp, "model", "") or self.model)
-            return parsed, ModelInfo(provider=PROVIDER, model=served,
+            return parsed, ModelInfo(provider=PUBLIC_PROVIDER, model=PUBLIC_MODEL,
                                      fallback_used=served != self.model), "none"
         except (ValidationError, ValueError):
             return None, None, "invalid_output"
@@ -335,4 +344,5 @@ def _headers(context: str) -> str:
     return "\n".join(line for line in context.splitlines() if line.startswith("[C"))[:4_000]
 
 
-__all__ = ["ClaudeComposer", "Budget", "cost_usd", "MODEL", "PROVIDER"]
+__all__ = ["ClaudeComposer", "Budget", "cost_usd", "claude_enabled", "MODEL", "PROVIDER",
+           "PUBLIC_MODEL", "PUBLIC_PROVIDER"]

@@ -96,6 +96,19 @@ envfile_read() {
     set -a; . ./.env.ib.local </dev/null >/dev/null 2>&1; set +a
     for k in $SHARED_KEYS; do printf '%s\0%s\0' "$k" "${!k-}"; done )
 }
+# Keys only the Internal Brain may hold: the model keys and the opt-in stand-in model's switches. They
+# reach the Brain from the parent shell or from .env.ib.local (sourced only in the Brain's subshell),
+# and are unset in every other child (mock platforms, seeder, engine, Next), as TOKENHUB_API_KEY is.
+IB_ONLY_KEYS="TOKENHUB_API_KEY ANTHROPIC_API_KEY IB_CLAUDE IB_CLAUDE_BUDGET_USD IB_CLAUDE_FAST \
+IB_CLAUDE_EFFORT IB_CLAUDE_ANSWER_EFFORT IB_CLAUDE_USER_LIMIT"
+# For the banner only: is the opt-in stand-in model on for the Brain? Decided in a throw-away subshell
+# that sources the file the way the Brain does; it prints "on" or "off", never a key or a value.
+standin_state() {
+  ( set +eu
+    if [ -f .env.ib.local ]; then set -a; . ./.env.ib.local </dev/null >/dev/null 2>&1; set +a; fi
+    if [ "${IB_CLAUDE:-}" = "1" ] && [ -n "${ANTHROPIC_API_KEY:-}" ] && [ "${_S_IB_FORCE_OFFLINE:-}" != "1" ]
+    then echo on; else echo off; fi )
+}
 # The values this script settles on (forced switches, then the file, then defaults), copied into
 # private, unexported names _S_<KEY>, so the Brain's subshell can put them back after it sources the
 # file. A key that is unset stays unset (a child's own default then applies), never "".
@@ -195,7 +208,7 @@ SEED=0; [ ! -d "$STATE/ledger" ] && SEED=1
 echo "[1/5] mock platforms :8200"
 if need_start 8200 http://127.0.0.1:8200/health; then
   ( exec </dev/null >"$LOGS/mock.log" 2>&1
-    unset TOKENHUB_API_KEY                     # SECURITY 15.15: even when the parent shell has it
+    unset $IB_ONLY_KEYS                        # SECURITY 15.15: even when the parent shell has them
     export_settled MOCK_SVC_TOKEN MOCK_ADMIN_TOKEN MOCK_WEBHOOK_SECRET
     PYTHONPATH="apps/mock_platforms" MOCK_WEBHOOK_URL="http://127.0.0.1:8100" nohup "$PY" -m mock_platforms --port 8200 & )
 fi
@@ -216,7 +229,7 @@ wait_http http://127.0.0.1:8100/health 180 || { echo "Internal Brain did not sta
 
 if [ "$SEED" = "1" ]; then
   echo "[3/5] seeding labelled demo history (about 2 minutes)"
-  ( unset TOKENHUB_API_KEY
+  ( unset $IB_ONLY_KEYS
     export_settled IB_DEMO_PASSCODE MOCK_ADMIN_TOKEN
     "$PY" scripts/seed_demo_activity.py --base http://127.0.0.1:8100 >"$LOGS/seed.log" 2>&1 ) \
     || echo "  seeding reported a problem; see $LOGS/seed.log (the demo still works)"
@@ -226,14 +239,14 @@ else
 fi
 
 echo "[4/5] Walnut engine gateway :8300"
-( unset TOKENHUB_API_KEY; exec bash scripts/run_walnut_original.sh start ) >"$LOGS/engine.log" 2>&1 || echo "  engine did not start; see $LOGS/engine.log (only /dev/brain needs it)"
+( unset $IB_ONLY_KEYS; exec bash scripts/run_walnut_original.sh start ) >"$LOGS/engine.log" 2>&1 || echo "  engine did not start; see $LOGS/engine.log (only /dev/brain needs it)"
 
 echo "[5/5] web app :3100"
 if need_start 3100 http://127.0.0.1:3100/login; then
-  ( unset TOKENHUB_API_KEY; cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 npx next build >"$ROOT/$LOGS/web-build.log" 2>&1 ) \
+  ( unset $IB_ONLY_KEYS; cd "$WEB" && NEXT_TELEMETRY_DISABLED=1 WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 npx next build >"$ROOT/$LOGS/web-build.log" 2>&1 ) \
     || { echo "web build failed; see $LOGS/web-build.log" >&2; exit 1; }
   ( exec </dev/null >"$LOGS/web.log" 2>&1
-    unset TOKENHUB_API_KEY
+    unset $IB_ONLY_KEYS
     cd "$WEB" && WALNUT_PROXY=1 IB_API_URL=http://127.0.0.1:8100 nohup npx next start -H 127.0.0.1 -p 3100 & )
 fi
 wait_http http://127.0.0.1:3100/login 120 || { echo "web app did not start; see $LOGS/web.log" >&2; exit 1; }
@@ -245,7 +258,7 @@ Walnut DataBridge is up.
   Presenter         http://127.0.0.1:3100/compare?present=1
   Developer         http://127.0.0.1:3100/dev
   Live AI           IB_FORCE_OFFLINE=$IB_FORCE_OFFLINE (0 = Tencent Hunyuan Hy3 via TokenHub)
-  Page composer     $( [ -n "${ANTHROPIC_API_KEY:-}" ] && [ "${IB_CLAUDE:-1}" != "0" ] && echo "Claude (cap US\$${IB_CLAUDE_BUDGET_USD:-10})" || echo "rules (no Claude key, or IB_CLAUDE=0)")
+  AI stand-in       $( [ "$(standin_state)" = on ] && echo "on (opt-in; spend-capped)" || echo "off (opt-in only; pages are laid out by rules)")
   Logs              $LOGS/
 Stop with: bash scripts/demo_up.sh stop
 EOF

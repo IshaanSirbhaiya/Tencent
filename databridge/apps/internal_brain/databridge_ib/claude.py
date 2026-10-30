@@ -5,7 +5,9 @@ A Walnut harness backend (``databridge_harness.Backend``) calling Claude through
 model sees only passages that passed Gate 1 and the live Gate 2; the harness records the call;
 ``IbGroundedNarrator`` runs the grounding wall on the text; any failure falls back to the quoted
 answer, which says so. The chain is used only when TokenHub is not configured (or forced
-offline), ``ANTHROPIC_API_KEY`` is set and ``IB_CLAUDE`` is not ``0``.
+offline), and only when opted in: ``IB_CLAUDE=1`` and ``ANTHROPIC_API_KEY`` set, never under
+``IB_FORCE_OFFLINE=1`` (``composer.claude_enabled``). Off by default. Outside this module the model
+is the neutral ``standin/standin-1`` (answers, /ib/status, the ledger): never the provider name.
 
 It shares the page composer's spend cap (the same file, ``views/composer.Budget``) and has its own
 service-wide rate limit. The key is read from the environment and never logged.
@@ -22,7 +24,8 @@ from typing import Any, Optional
 from databridge_harness.backends import RawCompletion
 
 from .llm import ModelChain
-from .views.composer import (GLOBAL_RATE, MODEL, PRICE_IN, PRICE_OUT, Budget, _Window, cost_usd)
+from .views.composer import (GLOBAL_RATE, MODEL, PRICE_IN, PRICE_OUT, PUBLIC_MODEL, PUBLIC_PROVIDER,
+                             Budget, _Window, claude_enabled, cost_usd)
 
 log = logging.getLogger("databridge_ib.claude")
 
@@ -78,7 +81,7 @@ class ClaudeBackend:
             u = resp.usage
             return RawCompletion(text=text, tokens_in=int(getattr(u, "input_tokens", 0) or 0),
                                  tokens_out=int(getattr(u, "output_tokens", 0) or 0),
-                                 cost_usd=actual, model_used=str(getattr(resp, "model", name)))
+                                 cost_usd=actual, model_used=PUBLIC_MODEL)
         finally:
             self.budget.settle(worst, actual)
 
@@ -90,18 +93,19 @@ def _config_for(model: str) -> dict:
 
 
 def claude_chain(state_dir: Path, *, client: Any = None) -> Optional[ModelChain]:
-    """Claude as the answer chain, or None (no key, or ``IB_CLAUDE=0``)."""
-    if client is None and (not os.environ.get("ANTHROPIC_API_KEY")
-                           or os.environ.get("IB_CLAUDE", "1") == "0"):
+    """Claude as the answer chain, or None unless opted in (``claude_enabled``). ``client`` (a
+    test double) skips the switch."""
+    if client is None and not claude_enabled():
         return None
     from databridge_harness import Harness
     cap = float(os.environ.get("IB_CLAUDE_BUDGET_USD", "10"))
     backend = ClaudeBackend(Budget.for_path(Path(state_dir) / "claude_spend.json", cap),
                             client=client, effort=os.environ.get("IB_CLAUDE_ANSWER_EFFORT", "low"))
 
-    def factory(model: str):
-        return Harness(backend, config=copy.deepcopy(_config_for(model)), profile="cloud", cache=None)
-    return ModelChain(models=[MODEL], harness_factory=factory, provider="anthropic")
+    def factory(_public: str):
+        return Harness(backend, config=copy.deepcopy(_config_for(MODEL)), profile="cloud", cache=None)
+    # the chain's names are what answers and /ib/status show: the neutral stand-in id
+    return ModelChain(models=[PUBLIC_MODEL], harness_factory=factory, provider=PUBLIC_PROVIDER)
 
 
 __all__ = ["ClaudeBackend", "claude_chain"]
