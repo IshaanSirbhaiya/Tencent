@@ -17,13 +17,13 @@ Tick each one as you go. The why for every demo-day item is in
   - D-31: Act's rate-limit and proposal state stays in memory (lost on restart);
   - D-32: the 简体中文 `L` flip is cut from the 5:00;
   - D-33: once `P` has started, `Esc` never hides the HUD; `H` does.
-- [ ] **Upload folder picker: build or skip?** The upload sheet takes a Drive folder **id** (a labelled field with a hint); there is no route that lists folders. A picker by name needs a small backend route plus a review before Monday's freeze. Your call: say "build" or "skip" (skip keeps today's id field).
+- [x] **Upload folder picker**: built and tested on 30 Oct (D-34): the sheet lists, by name, only the folders the person can write to.
 - [x] **New cover in Miora** (done 30 Oct: option 2 chosen, every size in `submission/06_cover/finals/`): paste [COVER_MIORA_PROMPT.md](COVER_MIORA_PROMPT.md) and send me the best image.
 
 ## Sat 31 Oct
 
 - [ ] **Hallway test**: 5 people × 20 min ([rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)). Send me the notes; I'll write the report, the fix log and the tester line on the proof slide. No test, no line: the `[TESTER]` sentence is deleted from the run sheet (never invented).
-- [ ] **Laptop checks** (when you're back on the laptop): pull the latest `final_v1.x`; run **Start Walnut Demo** once with `--fresh` (the world changed and is verified) so the live graph shows the new world, then refresh `live_kit/ABSENCE_PROOF.txt`; run `demo_day.ps1` once (edited in the cloud, never run there); press `B` at every step on the stage profile; let me run the Codex review of the cloud work.
+- [x] **Laptop checks** (done 30 Oct evening): the cloud work was pulled; the Windows suites passed (1,131 backend); `demo_day.ps1` was run for real (a port bug was found and fixed); `--fresh` reset passed; `B` works at every step; the absence proof was refreshed (12/12); the Codex review of the cloud work was run.
 - [ ] **Video: ON HOLD until teammates' updates land** (your call). When you're ready, tell me; I re-record the scenes (about 15 min), then you record the narration against `submission/finals_video/narration_cues.md` and I merge it, exactly like last time.
 - [ ] **Decide the stage roles** (default: Ishaan speaks, Dev drives, Mehul is the compliance voice, Aaruni is the Tencent voice) and rehearse twice with [rubric/demo_story/RUN_SHEET.md](rubric/demo_story/RUN_SHEET.md).
 - [ ] **Allow me screen control once** for the WorkBuddy GUI test (I'll ask first). The steps are in [WORKBUDDY_GUI_TEST.md](rubric/ai_innovation/WORKBUDDY_GUI_TEST.md): prompts 1–4 use the two employee connectors; prompts 5–6 run from the `IB compliance` workspace folder, because the compliance connector is no longer in the shared WorkBuddy list (D-30).
