@@ -1,5 +1,24 @@
 # Cloud handoff: Walnut DataBridge finals build (written Fri 30 Oct 2026, ~11:45 SGT)
 
+## Questions for Ishaan (needs you or the laptop; the cloud session keeps going on everything else)
+
+Updated by the cloud session, Fri 30 Oct 2026 (started ~11:45 SGT).
+
+1. **Organiser email (before 23:59 SGT today).** `docs/finals/ORGANISER_UPDATE.md` will point at the
+   newest verified branch with current numbers; you send it.
+2. **Hy3 / TokenHub activation.** Still 402. Until it's live every footer says "Quoted from sources
+   (no model)" and the mock defaults to that too. After you activate it: `hy3_check.py`, then the eval re-run.
+3. **Codex review** of everything the cloud built (no Codex in the cloud). Scope list is in §7.
+4. **WorkBuddy GUI test** and a real clip C (needs your OK for screen control).
+5. **Video re-record and narration** (on hold until you say so).
+6. **Hallway test (Sat)**: one real `fixlog.json` line, or delete the `[TESTER]` line.
+7. **Laptop-only checks:** `Start Walnut Demo.cmd` (with `--fresh` only because the world changed and
+   is verified), refresh `live_kit/ABSENCE_PROOF.txt`, and press `B` at every step on the stage profile.
+   `demo_day.ps1` was edited in the cloud and could not be run here (no PowerShell), so run
+   it once before trusting it.
+8. **Decision to confirm:** the grow beat is now opt-in per tab (`/present?grow=1`) and never on the
+   Space path. The default script is 11 steps (00–10).
+
 **Read this first in any new or cloud session.** It is the full end-to-end context. The founder
 (Ishaan) is away with no internet. Continue the work here; when he is back, the local session pulls
 this branch and carries on.
