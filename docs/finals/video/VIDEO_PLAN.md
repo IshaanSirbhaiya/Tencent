@@ -30,8 +30,8 @@ every new feature attached to the beat it strengthens ("and now it also..."), ne
     Hy3 wired but not live, said plainly. [beats 10 to 12]
 11. **Teammates' features (placeholders, 22 s in the main cut).** Voice, just-in-time UI, dots: added after the merge;
     left out until their clips exist.
-12. **The numbers, how we built it, thanks (1:14).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,131
-    backend and 166 browser tests, none failing (20 s) · about US$1.3M a year, an estimate, break-even about 7 minutes a
+12. **The numbers, how we built it, thanks (1:14).** 7,374 requests with 0 leaks, 400 pairs with 0 differences, 1,274
+    backend and 185 browser tests, none failing (20 s) · about US$1.3M a year, an estimate, break-even about 7 minutes a
     week, Tencent Cloud as the target host (21 s) · built with CodeBuddy, nine sessions (12 s) · Miora (8 s) · "Answers
     you can prove", one pilot team, thanks (13 s). [beats 13 and 14]
 
@@ -61,7 +61,7 @@ sound), but it uses the same stack the team is using, so it needs the founder's 
       use `FINALS_HY3=1`, re-shoot 02, 04, 05 and 13, and run the assembler with `--hy3`.
 - [ ] **Truth check:** `python docs/finals/video/assemble_finals.py --self-test` passes (it compares every
       number the script says with `eval_summary.json`: 7,374 requests / 0 leaks; 400 pairs / 0 differences;
-      1,152 injection attempts / 0 hard failures; 1,131 backend and 166 browser tests; nine CodeBuddy sessions).
+      1,152 injection attempts / 0 hard failures; 1,274 backend and 185 browser tests; nine CodeBuddy sessions).
 - [ ] **Display** at 1920×1080, 100% scaling (Windows Settings → Display). The recorder is headless at
       1536×864 and does not depend on the screen, but ffmpeg, the playback check and the voice-over session
       do. Close other windows.
@@ -210,7 +210,7 @@ after it). New times are from the latest test assembly; they move a little with 
 | 4:41–5:04 | 10 WorkBuddy: three stills (connectors, two people, compliance) | People don't want another app; each connector has its own signed token | → | **12** Ask from WorkBuddy (4:51–5:08) | The same real window captures (connectors; two people) | "A second front door… Jordan's connector gets Jordan's answer, and Ken's gets Ken's" | **Keep** (same captures; the compliance still is dropped for time) |
 | 5:04–5:41 | 11 What's underneath: the original Walnut screens at :3300 (graph, brain + time slider, evidence chain, ontology) | Every fact has a source; drag the slider and the knowledge rewinds; follow a value to the exact row | → | **10** The Walnut engine (4:09–4:39) | The same engine, now inside DataBridge (Developer → Walnut engine): snapshot counts, Company brain time slider, Provenance chain | Same lines, mostly verbatim | **Changed** (re-shot in the new UI; the old clip `05_video/clips/11_walnut_original.webm` still works as a fallback) |
 | 5:41–6:02 | 12 How it fits together: trust-boundary card; Hy3 line | Two checks, grounding, audit; [otherwise] answers quoted until a TokenHub key is added | → | **05** + **09** (live), and **13** Tencent Hy3 (5:07–5:21) | Mission control's model chain: Hy3 → DeepSeek → quoted fallback, "Extractive only" | "Answers are quoted from the sources until Hy3 is switched on, through exactly the same checks" | **Changed** (live status instead of a card; honest wording kept) |
-| 6:02–6:12 | 13 The numbers card | ~6,000 adversarial requests, 0 leaks; 400 pairs, 0 differences | → | **14** The proof (5:20–5:38) | The app's proof slide (0 / 7,374; 0 / 400; 0 / 1,152) + label: 1,131 backend and 166 browser tests (30 Oct, commit 831297e) | Exact numbers plus the test counts | **Changed** (new slide, updated numbers) |
+| 6:02–6:12 | 13 The numbers card | ~6,000 adversarial requests, 0 leaks; 400 pairs, 0 differences | → | **14** The proof (5:20–5:38) | The app's proof slide (0 / 7,374; 0 / 400; 0 / 1,152) + label: 1,274 backend and 185 browser tests (30 Oct evening, cloud clean checkout) | Exact numbers plus the test counts | **Changed** (new slide, updated numbers) |
 | — | (no equivalent) | | → | **15** What it's worth (5:38–5:57) | The app's business slide: ≈ US$1.3M a year (estimate), break-even about 7 min/week | Estimate, not a measurement; pays for itself at about seven minutes a week | **New** |
 | 6:12–6:28 | 14 Built with, thanks: closing card | CodeBuddy mapped boundaries, built the connector, reviewed security; thanks | → | **11** Built with CodeBuddy (4:38–4:51) and **16** Close (5:57–6:08) | CodeBuddy card (the security-review session); the app's close slide with the QR code | CodeBuddy lines moved next to the other Tencent beats; close with the tagline and the ask | **Changed** |
 

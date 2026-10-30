@@ -56,8 +56,8 @@ The recorder never uses the login chips (it signs in through `/api/ib/auth/demo-
   engine and Ken-label counts are no longer hard-coded (867 / 932 / 24); the Chinese label says "the user screens";
   06b uses the Add sheet's real test ids, waits for "Posted to Slack" and closes the sheet before switching mode.
 - `assemble_finals.py`: reads `eval_summary.json` and `video_constants.json`; the proof pill is built from them
-  ("Plus 1,131 backend and 166 browser tests passing, none failing"); `check_script_numbers()` compares the spoken
-  numbers (7,374 / 400 / 1,131 / 166 / nine) with the evidence and flags 5,958, 754, 124, 976, "six CodeBuddy" and a
+  ("Plus 1,278 backend and 185 browser tests, none failing"; 1,278 collected, 1,274 pass, 4 skipped, from the 30 Oct evening cloud run); `check_script_numbers()` compares the spoken
+  numbers (7,374 / 400 / 1,274 / 185 / nine) with the evidence and flags 5,958, 754, 124, 976, "six CodeBuddy" and a
   stale or non-zero summary; it runs in `--self-test` and on every cue-sheet write. It accepts `[ONLY IF HY3 LIVE]`
   (and the old `[if Hy3 is on]`).
 - New `video_constants.json` (CodeBuddy sessions 9; the old video, 6:28).

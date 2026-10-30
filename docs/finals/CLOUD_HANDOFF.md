@@ -1,5 +1,22 @@
 # >>> CLOUD SESSION 2 START HERE (laptop battery dying, Fri 30 Oct ~18:30 SGT) <<<
 
+## Results (cloud session 2)
+
+Clean-checkout run in the cloud, Fri 30 Oct 2026 evening (Linux, Python 3.13, `IB_FORCE_OFFLINE=1`), branch
+`final_v1.2-cloud` (to become `final_v1.3`). Everything below this block is the hand-off as written (history).
+
+- IB backend: **1,274 passed, 0 failed, 4 skipped**.
+- Web e2e (Playwright, mock): **185 passed, 0 failed, 42 skipped**.
+- Mock platforms 159 passed; fixtures 47 passed; web `tsc` clean.
+- Leak eval (re-run this evening): 0 leaks / 7,374; 0/400 P2; 0 injection hard failures in 1,152; recall 100%.
+- Tours split (D-36): done.
+- Presenter test hardened.
+- The a11y simulator tests now quiet the Developer tour offer.
+- `/ib/map` in-flight fix: the in-flight build is keyed by session.
+- `final_v1.3` moved to the verified commit.
+- Graph galaxy finished on `feat/graph-galaxy` at `d4ae49e` (not merged).
+- The teammate branch `final_mehulupdates` is being merged on `final_v1.4` (WIP).
+
 **State at hand-off:** branch `final_v1.2`. This commit is everything on the laptop, including WORK IN
 PROGRESS from two agents that were still running (see "Unverified at hand-off" below). `final_v1.3` on
 origin is still the old cloud commit `1076517`. Do NOT move it until the checks below pass.

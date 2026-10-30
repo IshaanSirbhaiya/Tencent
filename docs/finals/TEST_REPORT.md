@@ -1,9 +1,26 @@
 # Test report: Playwright suite (mock mode)
 
-30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0` for the earlier run (the current run below is on `final_v1.2`, now `final_v1.3`). Config: `playwright.config.ts`
+30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0` for the earliest run (the current run below is on `final_v1.2-cloud`, to become `final_v1.3`). Config: `playwright.config.ts`
 (builds with `npm run build:mock`, serves on 127.0.0.1:3101, one worker).
 
-## Current result (30 Oct 2026, cloud)
+## Current result (30 Oct 2026, evening, cloud clean checkout)
+
+Run on Fri 30 Oct 2026, evening, in the cloud from a clean checkout (Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) on
+branch `final_v1.2-cloud` (to become `final_v1.3`), with `playwright.config.ts` in mock mode. This run covers the
+round-4 fixes and the cloud session 2 changes ([CHANGELOG.md](CHANGELOG.md), "30 Oct 2026, night (cloud session 2)").
+
+| Suite | Result |
+|---|---|
+| Web e2e (Playwright, mock) | **185 passed, 0 failed, 42 skipped** |
+| IB backend (`apps/internal_brain/tests`) | **1,274 passed, 0 failed, 4 skipped** |
+| Mock platforms | 159 passed |
+| Fixtures (enterprise) | 47 passed |
+| Web `tsc --noEmit` | clean |
+| Leak eval (re-run this evening) | 0 leaks / 7,374; 0 / 400 pairs differ; 0 injection hard failures in 1,152; recall 100% |
+
+`a11y-shell*.spec.ts` has its own config and is not in the e2e count.
+
+## Earlier result (30 Oct 2026, afternoon, cloud; history)
 
 Run on Fri 30 Oct 2026 in the cloud (Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) on the committed tree at
 `d8f8de7`/`831297e`, branch `final_v1.2`, with `playwright.config.ts` in mock mode. Every spec that config runs is
@@ -14,7 +31,7 @@ included, among them `act.spec.ts`, `grow.spec.ts`, `deliverables.spec.ts` and `
 Same run, other suites: IB backend (`apps/internal_brain/tests`) 1,131 passed, 0 failed; mock platforms 154 passed;
 fixtures (enterprise) 47 passed; web `tsc --noEmit` clean.
 
-The sections below are the earlier 30 Oct run on `final_v1.0` (124 passed), kept as history.
+The sections below are the earliest 30 Oct run on `final_v1.0` (124 passed), kept as history.
 
 ## 1. Result (earlier run, `final_v1.0`)
 

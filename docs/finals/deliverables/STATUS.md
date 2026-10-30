@@ -49,7 +49,7 @@ Kill switch ON in `scripts/demo_up.sh` and `scripts/run_local_demo.sh` (the `.cm
 | `tests/test_deliverables.py` (21 tests: T1-T13 + label/unit attacks from the model, revoked source + export recheck, source edit between create and export, rate limit, kill switch, budget/busy) | **21 passed** |
 | `tests/test_deliverables_eval.py` (T16: eval detectors through deliverables + CSV with an adversarial echo model, small world, real connectors) | **1 passed** |
 | `tests/test_act.py` after the shared edits | **21 passed** (cloud run, 30 Oct, commit 831297e; 19 at the checkpoint) |
-| Full IB suite, latest (cloud, 30 Oct, Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, commit 831297e) | **1,131 passed, 0 failed** |
+| Full IB suite, latest (cloud clean checkout, 30 Oct evening, Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`) | **1,274 passed, 0 failed, 4 skipped** |
 | Full IB suite at the checkpoint (21 min, superseded by the row above) | **1038 passed, 2 failed**: `test_connector_drive.py::test_markdown_and_csv` and `::test_crawl_full_then_quiet`. Both are in the Drive connector, which the upload agent is editing (`connectors/drive.py`); no deliverables file is involved. Confirm with that agent (next step 1). |
 | `npx tsc --noEmit` | **clean** |
 | `tests/e2e/deliverables.spec.ts` (mock, headless, port 3128, `deliverables.config.ts`, axe in dark + light) | **4 passed**, 0 axe serious/critical |

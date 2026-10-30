@@ -8,8 +8,8 @@ where it is, how to try it, the rules it keeps, the tests that prove it, and its
 Branch `final_v1.3` was verified at commit `1076517` (30 Oct 2026). **Updated on the laptop, 30 Oct evening
 (branch `final_v1.2`):** the rows marked *evening* below (presenter mouse controls, the upload folder picker, Act
 v3.2, the Deliverables wording and `.pptx` notes) describe round-4 fixes that are **in the working tree and not
-committed yet**, and **no full test re-run covers them yet: re-run pending (final integration).** Test counts
-quoted in this file (1,131 backend, 166 web) are from the cloud run at `831297e`. What changed and when:
+committed yet** at the time of writing; they are now committed on `final_v1.2-cloud` (to become `final_v1.3`). Test counts
+quoted in this file (1,274 backend, 185 web) are from the clean-checkout cloud run on the evening of 30 Oct, which covers them. What changed and when:
 [CHANGELOG.md](CHANGELOG.md) ("30 Oct 2026, evening (laptop)"). Planned and not built: the "Demo story" app mode
 ([section 13](#13-act-and-what-is-planned)).
 
@@ -21,7 +21,7 @@ quoted in this file (1,131 backend, 166 web) are from the cloud run at `831297e`
 | Platforms | Mock Slack, Confluence, Jira and Drive with the real APIs' shapes, permission models and webhooks. Not run against a live tenant |
 | Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Not live yet** (TokenHub activation pending; every model call returns HTTP 402 with code 401006). Until then answers say "Quoted from sources (no model)" |
 | Sign-in | A demo login standing in for single sign-on. No password; optional passcode (`IB_DEMO_PASSCODE`) |
-| Numbers | **Re-run pending (final integration): the counts below predate the evening round-4 fixes.** 1,131 backend tests pass, 0 fail (30 Oct, cloud: Linux, Python 3.13, commit `831297e`). Web e2e (Playwright, mock mode): 166 passed, 0 failed, 41 skipped; the skipped specs need the live stack, the engine proxy or Hy3 ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 7,374 requests, 0 of 400 pairs differ, 0 injection hard failures in 1,152 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
+| Numbers | 1,274 backend tests pass, 0 fail, 4 skipped (30 Oct, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`). Web e2e (Playwright, mock mode): 185 passed, 0 failed, 42 skipped; the skipped specs need the live stack, the engine proxy or Hy3 ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 7,374 requests, 0 of 400 pairs differ, 0 injection hard failures in 1,152 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
 
 ### The rules every feature keeps
 
@@ -110,7 +110,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 | Where | `/` composer (`components/user/Composer.tsx`, `useDictation.ts`, `lib/i18n/voice.ts`) |
 | How | 1. Press the microphone. 2. Speak. 3. Read the text, edit it, then press **Ask** yourself (Esc stops listening) |
 | Guarantees | Never auto-sends: the person always presses Ask. No audio reaches our servers and nothing is stored by the app (the browser's speech service does the recognising). Accessible name and state; hidden, not broken, when the API is absent |
-| Tests | `voice.spec.ts` (2 tests: text goes in the box and nothing is asked, Esc stops, axe clean; button hidden without the API). In the 30 Oct cloud run (166 passed) |
+| Tests | `voice.spec.ts` (2 tests: text goes in the box and nothing is asked, Esc stops, axe clean; button hidden without the API). In the 30 Oct evening cloud run (185 passed) |
 | Screens | None yet |
 
 ### U4. Cited answer and sources sheet
@@ -517,7 +517,7 @@ Target WCAG 2.2 AA. Statement: [ACCESSIBILITY_STATEMENT.md](rubric/hcd_ux/ACCESS
 | A6 | **Voice dictation** as an alternative input ([U3](#u3-voice-dictation-new-1bc6b4c)) | `voice.spec.ts` | none yet |
 
 `a11y-shell.spec.ts` runs with its own config (`npx playwright test -c tests/e2e/a11y-shell.config.ts`)
-and is not in the 166 count ([TEST_REPORT.md §1](TEST_REPORT.md#not-in-this-run-a11y-shellspects)).
+and is not in the 185 count ([TEST_REPORT.md §1](TEST_REPORT.md#not-in-this-run-a11y-shellspects)).
 Not tested: a screen reader itself (NVDA / VoiceOver), and the hallway test with real people (pending).
 
 ## 9. Tooling and scripts
@@ -546,8 +546,8 @@ tests (Python 3.13) and the web typecheck (Node 20); and a Lighthouse deploy kit
 | Evidence | What it holds | File |
 |---|---|---|
 | Leak evaluation | 0 leaks / 7,374; 0 / 400 differential; 0 injection hard failures / 1,152; generated 30 Oct 03:27 UTC (11:27 SGT) on the finals pipeline | [RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](../../databridge/apps/internal_brain_web/public/eval_summary.json) |
-| Backend tests | **Re-run pending (final integration).** 1,131 passed, 0 failed at `831297e` (30 Oct, cloud: Linux, Python 3.13) | `databridge/apps/internal_brain/tests/` |
-| Web e2e | **Re-run pending (final integration).** 166 passed, 0 failed, 41 skipped (need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow` and `deliverables` (30 Oct, cloud, `831297e`) | [TEST_REPORT.md](TEST_REPORT.md) |
+| Backend tests | 1,274 passed, 0 failed, 4 skipped (30 Oct, evening, cloud clean checkout: Linux, Python 3.13, branch `final_v1.2-cloud`) | `databridge/apps/internal_brain/tests/` |
+| Web e2e | 185 passed, 0 failed, 42 skipped (need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow` and `deliverables` (30 Oct, evening, cloud clean checkout, branch `final_v1.2-cloud`) | [TEST_REPORT.md](TEST_REPORT.md) |
 | Live QA | Every page × persona against the real backend: 32 checks, 11 bugs fixed, issues listed | [QA_LIVE.md](QA_LIVE.md) |
 | Final reviews | Five models: security, UX, claims, code | [reviews/](reviews/final_opus_security.md) ([Opus security](reviews/final_opus_security.md) · [Sonnet UX](reviews/final_sonnet_ux.md) · [Haiku claims](reviews/final_haiku_claims.md) · [Codex](reviews/final_codex.md) · [Fable](reviews/final_fable.md)) |
 | Rubric pack | Each of the 10 criteria: seen live, in the app, to read | [rubric/README.md](rubric/README.md) |

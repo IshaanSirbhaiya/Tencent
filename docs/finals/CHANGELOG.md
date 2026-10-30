@@ -7,7 +7,7 @@ Every change since the 16 Oct 2026 submission, newest first, grouped by area. Ea
 
 All 93 commits after the submission (`acb18f0`), up to `1076517`, were made on 30 Oct 2026 (SGT). Times are SGT.
 
-Current evaluation numbers (run 30 Oct 11:27 SGT, final world, `eval_summary.json`): **0 leaks in 7,374 adversarial
+Current evaluation numbers (run 30 Oct 11:27 SGT, final world, `eval_summary.json`; re-run on the evening of 30 Oct, unchanged): **0 leaks in 7,374 adversarial
 requests**, 0 of 400 differential pairs, 0 injection hard failures in 1,152, recall 100% on both paths. A commit row
 below quotes the numbers of the run made at that commit.
 
@@ -27,9 +27,28 @@ everyday-company world. Their rows are in the areas below.
 | **Live Hy3** | Hy3 answers through TokenHub | Wired, **not live**: TokenHub answers 402 until activation (a person). `demo_up.sh` will switch it on by itself once [`hy3_check.py`](../../databridge/scripts/hy3_check.py) gets an answer |
 | **Demo story (app mode)** | A separate, mouse-driven way through the 11 steps for the booth and judges' hands-on time; the 5:00 stays on the keyboard presenter | **Plan only, nothing built.** [app_mode/PLAN_v2.md](app_mode/PLAN_v2.md); build window Sat 31 Oct or Sun 1 Nov |
 | **Teammate merge** (voice, just-in-time UI, dots) | Three feature branches merged one at a time into new branches | **Plan only, nothing merged.** [MERGE_PLAN.md](MERGE_PLAN.md) |
-| **Round-4 fixes, final integration** | The fixes in the "30 Oct 2026, evening (laptop)" section below | In the working tree, not committed; **full test re-run pending** (the 1,131 and 166 below are from the cloud run) |
 | **Pages beside the chat (just-in-time views)** | After each answer, page or chat is decided (Claude when connected); a page ("everything about the project, its people and what each did") opens in a canvas beside the chat, composed by Claude with every value checked against its source, rendered from A2UI v0.9 messages; changes in plain words ("make the table black"); the Xcode-like light Ask, the icon-rail sidebar (D-37, D-38, D-39) | Branch `final_mehulupdates`, not merged: `databridge_ib/views/` (`composer.py`, `pagespec.py`, `pagecheck.py`, `service.py`, `plan.py`, `blocks.py`, `a2ui.py`), `tests/test_views.py` (25) and `tests/test_views_composer.py` (14), web `components/views/`, `components/user/ViewCanvas.tsx`, `lib/navRail.ts`, `tests/e2e/views.spec.ts` (7, mock). Live with Claude on the generated world: decision 3 to 4 s, project page about 29 s, about US$0.05 a page. Claude also writes the chat answers while Hy3 is not live (D-40: grounding wall unchanged, 3.5 to 6 s), and follow-ups are rewritten into standalone questions. Full IB suite on the branch: 1,179 passed. Details: [FEATURE_CATALOGUE §13](FEATURE_CATALOGUE.md#13-pages-beside-the-chat-just-in-time-views-d-34-d-35-d-36) |
 | **Hallway test** | 5 people × 20 min; results into the fix log and the proof slide | Protocol ready ([HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)); Sat 31 Oct |
+
+## 30 Oct 2026, night (cloud session 2)
+
+Branch `final_v1.2-cloud` (to become `final_v1.3`). The round-4 fixes from the laptop section below were finished
+and tested here.
+
+**Test results** (clean-checkout run in the cloud, Fri 30 Oct evening; Linux, Python 3.13, `IB_FORCE_OFFLINE=1`):
+IB backend **1,274 passed, 0 failed, 4 skipped**; web e2e (Playwright, mock) **185 passed, 0
+failed, 42 skipped**; mock platforms 159 passed; fixtures 47 passed; web `tsc` clean. Leak eval re-run
+this evening, unchanged: 0 leaks / 7,374, 0/400 pairs differ, 0 injection hard failures in 1,152, recall 100%
+([TEST_REPORT.md](TEST_REPORT.md)).
+
+| Area | Change |
+|---|---|
+| Tours | Tours split (D-36) done |
+| Tests | Presenter test hardened; the a11y simulator tests now quiet the Developer tour offer |
+| Backend | `/ib/map`: the in-flight build is keyed by session |
+| Branches | `final_v1.3` moved to the verified commit |
+| Graph galaxy | Finished on `feat/graph-galaxy` at `d4ae49e`; **not merged** |
+| Teammate merge | `final_mehulupdates` is being merged on `final_v1.4` (work in progress) |
 
 ## 30 Oct 2026, evening (laptop)
 

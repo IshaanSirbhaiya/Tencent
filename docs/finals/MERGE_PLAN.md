@@ -359,7 +359,7 @@ $env:PYTHONPATH = "apps/internal_brain;packages/core;packages/harness;packages/a
 & $PY -m pytest apps/internal_brain/tests -q -p no:cacheprovider
 ```
 
-Expect the base count plus the new tests, 0 failed (last recorded: 1,131 passed at `831297e`).
+Expect the base count plus the new tests, 0 failed (last recorded: 1,274 passed, 0 failed, 4 skipped, clean checkout of `final_v1.2-cloud`, 30 Oct evening).
 
 ### 5.3 Mock platforms
 
@@ -388,7 +388,7 @@ Remove-Item Env:CI
 `CI=1` makes Playwright start its own mock server and not reuse one already on port 3101. Without
 it, the config's `reuseExistingServer` could test an **old** build from the main tree.
 
-Last recorded: 166 passed, 41 skipped (they need the live stack, the engine proxy or Hy3). The new
+Last recorded: 185 passed, 0 failed, 42 skipped (clean checkout of `final_v1.2-cloud`, 30 Oct evening; skipped specs need the live stack, the engine proxy or Hy3). The new
 features' specs must not be in the skipped group without a reason.
 
 ### 5.6 The eval: only when the backend or the world changed
