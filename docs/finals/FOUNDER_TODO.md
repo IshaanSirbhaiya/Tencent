@@ -13,7 +13,7 @@ Tick each one as you go. The why for every demo-day item is in
 ## Sat 31 Oct
 
 - [ ] **Hallway test**: 5 people × 20 min ([rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)). Send me the notes; I'll write the report, the fix log and the tester line on the proof slide.
-- [ ] **Record the narration** for the new video against `submission/finals_video/narration_cues.md` (steps in `submission/finals_video/README.md`) and send me the audio. Best done after I tell you the final re-record is done.
+- [ ] **Video: ON HOLD until teammates' updates land** (your call). When you're ready, tell me; I re-record the scenes (about 15 min), then you record the narration against `submission/finals_video/narration_cues.md` and I merge it, exactly like last time.
 - [ ] **Decide the stage roles** (default: Ishaan speaks, Dev drives, Mehul is the compliance voice, Aaruni is the Tencent voice) and rehearse twice with [rubric/demo_story/RUN_SHEET.md](rubric/demo_story/RUN_SHEET.md).
 - [ ] **Allow me screen control once** for the WorkBuddy GUI test (I'll ask first).
 
