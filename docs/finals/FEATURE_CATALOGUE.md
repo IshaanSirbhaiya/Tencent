@@ -310,10 +310,10 @@ Developer mode shows every page to everyone. Pages that need a role show a lock 
 |---|---|
 | What | Everything you can open as one WebGL graph (Sigma): Jordan 867 items, 17 places, 4 platforms; Ken 24. Search to focus, one-hop expand, a node panel (overview, passage, lineage, links), a table view, and "Compare two people" as two separately signed-in graphs |
 | Who | Anyone |
-| Where | `/dev/graph` → `GET /ib/graph`, `POST /ib/graph/openable`, `GET /ib/doc/{id}` |
+| Where | `/dev/graph` → `GET /ib/galaxy` (first load: the overview and the map from one live pass; one request per graph and per compare side), then `GET /ib/graph` (search, focus), `POST /ib/graph/openable`, `GET /ib/doc/{id}` |
 | How | 1. As `jdoe`, open **Knowledge graph**. 2. Search "migration" and select a node. 3. **Compare two people** → Ken |
 | Guarantees | R4: the graph and document view are identical with and without restricted documents; restricted and unknown documents give the same 404; no greyed placeholders. Edges come from authorised current versions; hidden counts are exact or absent; graph views are ledgered with counts only |
-| Tests | `graph.spec.ts` (7 tests, incl. "ken.ext: only his own places; nothing hints that more exists", keyboard pan/zoom); backend `test_graph_doc.py` (27 tests), `test_final_review_fixes.py` graph tests (edges, focus budget, search re-check) |
+| Tests | `galaxy.spec.ts` (3 tests: one `/ib/galaxy` per mount and per compare side, no `/ib/graph` or `/ib/map`; a new sign-in never reuses the previous person's request); backend `test_galaxy.py` (equal to `/ib/graph` + `/ib/map`, one live check per document, write-ahead, lost-webhook revocation, P2 differential, deadline, two people in turn); `graph.spec.ts` (7 tests, incl. "ken.ext: only his own places; nothing hints that more exists", keyboard pan/zoom); backend `test_graph_doc.py` (27 tests), `test_final_review_fixes.py` graph tests (edges, focus budget, search re-check) |
 | Screens | [graph/01-galaxy-dark.png](screens/graph/01-galaxy-dark.png) · [graph/03-panel-passage.png](screens/graph/03-panel-passage.png) · [graph/08-compare-jdoe-ken.png](screens/graph/08-compare-jdoe-ken.png) · [graph/11-mobile.png](screens/graph/11-mobile.png) · [live/dev-jdoe-graph-compare.png](screens/live/dev-jdoe-graph-compare.png) |
 
 ### D4. Walnut engine view

@@ -117,3 +117,31 @@ Fix 2 (`tests/test_connector_slack.py` plus a gates test):
 | Re-run the grow walk-up on stage, after `demo_day.ps1 start -Rebuild` | 15 min |
 
 Recommendation: ship Fix 1 before Demo Day. It halves the wait, needs no change to any hard rule, and its tests are mostly comparisons with the two existing views. Do Fix 2 only if the founder agrees that "read once per batch, within the same request" still counts as a live source check. Keep the 60 s timeout either way.
+
+## 7. Measured after Fix 1 (cloud, branch `feat/graph-galaxy`)
+
+Fix 1 is built: `GET /ib/galaxy` (`databridge_ib/galaxy.py`), one live pass under one 45 s deadline
+(`GALAXY_CHECK_TIMEOUT_S` = the map's own `MAP_CHECK_TIMEOUT_S`) on a dedicated 14-worker pool
+(`GALAXY_POOL`: the overview's 6 plus the map's 8, which the page used side by side). This replaces the
+"about 30 s on the map's 8-worker pool" proposed in §4. The map body gains one flag, `complete`
+(false when any check was undecided; no count of undecided items). `graph.viewed.docs_checked` means
+what it means on `/ib/graph`: the overview's documents handed to `authorize`, timeouts included. The web
+graph page and each compare side now make one `/ib/galaxy` request instead of `/ib/graph` + `/ib/map`.
+
+**Conditions.** Claude Code cloud container, 4 vCPUs, 30 Oct 2026 about 11:00 UTC, load average about 1
+(an idle `next start` mock server was running). In process: the `e2e_world.E2E` test world (real mock
+platforms app in process, real connectors, no sockets), FastAPI `TestClient`, `IB_FORCE_OFFLINE=1`,
+`limit=300`, one warm-up call, then 5 timed runs each. "Parallel" runs `/ib/graph` and `/ib/map` on two
+threads (what the page did); "sequential" runs them one after the other. The script was a scratch file
+(not committed) built on the `tests/test_galaxy.py` helpers.
+
+| Person | Readable docs | `check_access` calls (galaxy / graph+map) | `/ib/galaxy` median (min to max) | graph + map parallel | graph + map sequential |
+|---|---|---|---|---|---|
+| `jdoe` | 930 | 930 / 1,860 | **5.15 s** (4.82 to 5.33) | 10.55 s (10.09 to 11.10) | 11.15 s (10.77 to 12.16) |
+| `ken.ext` | 24 | 24 / 48 | 0.14 s (0.14 to 0.15) | 0.27 s (0.26 to 0.28) | 0.28 s (0.27 to 0.31) |
+| `ivy.guest` | 64 | 64 / 128 | 0.43 s (0.40 to 0.45) | 0.84 s (0.77 to 0.86) | 0.84 s (0.81 to 0.98) |
+
+So, in this container and in process, one page load makes half the live checks and takes about half the
+time (Jordan: 5.1 s instead of 10.5 s). **Not measured:** the stage (real sockets, a separate mock
+process, other work running), so the "about 12 s instead of about 25 s" in §4 is still an estimate.
+Fix 2 is not built.

@@ -30,6 +30,19 @@ everyday-company world. Their rows are in the areas below.
 | **Round-4 fixes, final integration** | The fixes in the "30 Oct 2026, evening (laptop)" section below | In the working tree, not committed; **full test re-run pending** (the 1,131 and 166 below are from the cloud run) |
 | **Hallway test** | 5 people × 20 min; results into the fix log and the proof slide | Protocol ready ([HALLWAY_TEST_PROTOCOL.md](rubric/hcd_ux/HALLWAY_TEST_PROTOCOL.md)); Sat 31 Oct |
 
+## 31 Oct (cloud) graph-galaxy
+
+Branch `feat/graph-galaxy` (not merged into any `final_*` branch). Graph perf Fix 1 of
+[live_growth/GRAPH_PERF_DIAGNOSIS.md](live_growth/GRAPH_PERF_DIAGNOSIS.md): the graph page's overview and map from
+one live pass.
+
+| Status | Change |
+|---|---|
+| Committed ([b84368a](https://github.com/IshaanSirbhaiya/Tencent/commit/b84368a)) | **`GET /ib/galaxy?limit=`**: one `authz.authorize` over the Gate-1 work list; the body is `{overview: <GET /ib/graph?limit= body>, map: <GET /ib/map body>}`; `graph.viewed` and `map.viewed` are appended before the response (a ledger failure is the 503). `/ib/graph` and `/ib/map` are unchanged |
+| Committed ([4cb973e](https://github.com/IshaanSirbhaiya/Tencent/commit/4cb973e)) | Review fixes: `graph.viewed.docs_checked` counts what `/ib/graph` counts (ids handed to `authorize`, timeouts included); a dedicated 14-worker pool and a 45 s budget (the map's own); the map body gains `complete` (a flag, never a count). New tests: two people in turn on one app, a forged or wrongly signed token is a 401, restricted ids asserted absent in the P2 differential, a readable id without an index row, limits 1, 7 and 120 |
+| Committed ([c987082](https://github.com/IshaanSirbhaiya/Tencent/commit/c987082)) | **Web**: `api.galaxy({limit})` and `graphApi(slot).galaxy`; the graph page and each compare side make one `/ib/galaxy` request instead of `/ib/graph` + `/ib/map`. The shared in-flight request is keyed to the signed-in session (the `sessionGen` / `forgetInFlight()` pattern of the lock branch, cherry-picked here for `mapInFlight` too). Proxy allows `GET ib/galaxy`; mock route `lib/mock/extra/galaxy.ts`; `tests/e2e/galaxy.spec.ts` (3 tests) |
+| Measured (cloud, in process) | Jordan: `/ib/galaxy` 5.15 s median against 10.55 s for `/ib/graph` + `/ib/map` in parallel, 930 live checks instead of 1,860. Conditions in the diagnosis §7. Stage not measured |
+
 ## 30 Oct 2026, evening (laptop)
 
 Written on the laptop after the cloud session. Branch `final_v1.2` (the cloud's `final_v1.3` pointer stays at
