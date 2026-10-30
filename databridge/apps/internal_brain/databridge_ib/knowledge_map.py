@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 from . import authz
 from .config import POLICY_VERSION
@@ -43,9 +43,21 @@ def build_map(user: DirectoryUser, *, index: Index, directory: Directory, ledger
     candidates = sorted(readable)
     ok, _ = authz.authorize(user, candidates, index=index, connectors=connectors,
                             readable=readable, timeout_s=timeout_s, pool=_MAP_POOL)
+    now = clock()
+    body, viewed = shape_map(user, candidates, ok, now)
+    ledger.append(viewed)
+    return body
+
+
+def shape_map(user: DirectoryUser, candidates: Iterable[str],
+              ok: Mapping[str, authz.AuthorizedDoc], now: datetime) -> tuple[dict, MapViewed]:
+    """The map body and its ``map.viewed`` event, built ONLY from the authorised snapshots in ``ok``
+    (``GET /ib/map`` and ``GET /ib/galaxy`` share this). A candidate without a snapshot (denied,
+    undecided or never checked) is left out and counts nowhere. Pure: no I/O, no ledger write; the
+    caller appends the event before it returns the body."""
     groups: dict[tuple[str, str], dict] = {}
     items: dict[tuple[str, str], list[dict]] = defaultdict(list)
-    for doc_id in candidates:
+    for doc_id in sorted(set(candidates)):
         s = ok.get(doc_id)
         if s is None:
             continue
@@ -68,11 +80,10 @@ def build_map(user: DirectoryUser, *, index: Index, directory: Directory, ledger
     n_docs = sum(p["count"] for p in platforms)
     n_containers = sum(len(p["containers"]) for p in platforms)
     n_returned = sum(len(c["items"]) for p in platforms for c in p["containers"])
-    now = clock()
-    ledger.append(MapViewed(sub=user.id, docs_listed=n_docs, items_returned=n_returned,
-                            containers_listed=n_containers, policy_version=POLICY_VERSION,
-                            event_time=now))
-    return {"as_of": now.isoformat(), "scope_note": SCOPE_NOTE, "sub": user.id,
-            "totals": {"items": n_docs, "containers": n_containers, "platforms": len(platforms)},
-            "platforms": platforms,
-            "freshness_note": "Each item was checked with its source just now."}
+    viewed = MapViewed(sub=user.id, docs_listed=n_docs, items_returned=n_returned,
+                       containers_listed=n_containers, policy_version=POLICY_VERSION,
+                       event_time=now)
+    return ({"as_of": now.isoformat(), "scope_note": SCOPE_NOTE, "sub": user.id,
+             "totals": {"items": n_docs, "containers": n_containers, "platforms": len(platforms)},
+             "platforms": platforms,
+             "freshness_note": "Each item was checked with its source just now."}, viewed)

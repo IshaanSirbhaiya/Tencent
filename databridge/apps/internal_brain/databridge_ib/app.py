@@ -31,6 +31,7 @@ from .index import Index
 from .ingest import Ingestor
 from . import actions as actmod
 from . import authz, docview, graph
+from .galaxy import build_galaxy
 from .knowledge_map import build_map
 from .llm import ModelChain
 from .config import POLICY_VERSION
@@ -577,6 +578,20 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             raise HTTPException(404, NOT_FOUND) from None
         except Exception as exc:                                    # noqa: BLE001
             log.error("graph failed: %s", type(exc).__name__)       # incl. ledger down: fail closed
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+
+    @app.get("/ib/galaxy")
+    def knowledge_galaxy(limit: int = Query(graph.DEFAULT_LIMIT, ge=1, le=graph.MAX_LIMIT),
+                         user: DirectoryUser = Depends(current)):
+        """The graph page's overview AND map from one live pass (galaxy.py): the two bodies of
+        ``GET /ib/graph?limit=`` and ``GET /ib/map``, both ledgered before returning."""
+        _employee(user)
+        try:
+            return build_galaxy(user, index=svc.index, directory=svc.directory, ledger=svc.ledger,
+                                connectors=svc.connectors,
+                                clock=lambda: datetime.now(timezone.utc), limit=limit)
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("galaxy failed: %s", type(exc).__name__)      # incl. ledger down: fail closed
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
 
     @app.post("/ib/graph/openable")

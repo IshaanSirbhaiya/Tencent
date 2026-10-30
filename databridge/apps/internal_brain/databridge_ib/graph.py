@@ -34,11 +34,18 @@ Rules (the map's, made version-safe; Codex and Opus plan reviews):
   failure is a 503.
 * **Bounded work.** A small dedicated worker pool (``authz.VIEW_POOL``), ONE monotonic deadline per
   call through checks and read-through, and a cap on the number of live checks per mode.
+* **One pass for two views** (``GET /ib/galaxy``, docs/finals/live_growth/GRAPH_PERF_DIAGNOSIS.md
+  Fix 1). The overview can be built from an :class:`OverviewChecks` decided by the caller in the
+  same request: the same Gate-1 view, the same work list (newest first, capped at
+  ``MAX_CHECKS_OVERVIEW``) and the same live ``authz.authorize`` verdicts. Nothing else changes:
+  ``complete`` is true only when the whole work list was decided, and every count is exact only
+  when every document it depends on was decided in that pass.
 """
 from __future__ import annotations
 
 import json
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Mapping, Optional
 
@@ -119,20 +126,54 @@ class _Gate1View:
         return [t for t, _ in self.out.get(d, ())] + [s for s, _ in self.inn.get(d, ())]
 
 
+def gate1_view(index: Index, readable: frozenset) -> _Gate1View:
+    """The Gate-1 structure the overview is built on (for a caller that checks it live itself)."""
+    return _Gate1View(index, readable)
+
+
+def overview_work(g1: _Gate1View) -> list[str]:
+    """The overview's live-check work list, in the order ``build_graph`` checks it: every Gate-1
+    document, newest first. Only the first ``MAX_CHECKS_OVERVIEW`` count for the overview."""
+    return g1.recent(g1.rows)
+
+
+@dataclass(frozen=True)
+class OverviewChecks:
+    """One live pass over :func:`overview_work` of ``g1``, decided by the caller in THIS request
+    (``GET /ib/galaxy``). ``ok`` holds the authorised snapshots, ``undecided`` the ids whose check or
+    read-through did not finish by the deadline, and ``attempted`` the ids handed to
+    ``authz.authorize`` (an id never attempted is not decided either)."""
+    g1: _Gate1View
+    ok: Mapping[str, authz.AuthorizedDoc]
+    undecided: frozenset
+    attempted: frozenset
+
+
 def build_graph(user: DirectoryUser, *, index: Index, directory: Directory, ledger: Any,
                 connectors: Mapping[str, Any], clock: Callable[[], datetime],
                 focus: Optional[str] = None, q: Optional[str] = None,
-                limit: int = DEFAULT_LIMIT, timeout_s: float = authz.VIEW_CHECK_TIMEOUT_S) -> dict:
+                limit: int = DEFAULT_LIMIT, timeout_s: float = authz.VIEW_CHECK_TIMEOUT_S,
+                pre: Optional[OverviewChecks] = None,
+                now: Optional[datetime] = None) -> dict:
     """The graph dict, or raises :class:`NotFound` (after ledgering it). Any ledger failure
-    propagates (the route answers 503)."""
+    propagates (the route answers 503).
+
+    ``pre`` (overview only): the live checks were already made in this request over
+    ``overview_work(pre.g1)``; the overview is built from them without another source call."""
     limit = max(1, min(int(limit), MAX_LIMIT))
-    now = clock()
-    epoch = getattr(directory, "epoch", 0)
-    readable = index.readable(user, epoch)                          # GATE 1
-    g1 = _Gate1View(index, readable)
+    now = now if now is not None else clock()
     focus = (focus or "").strip() or None
     q = (q or "").strip() or None
     mode = "focus" if focus else ("search" if q else "overview")
+    if pre is not None and mode != "overview":
+        raise ValueError("pre-authorised checks serve the overview only")
+    if pre is not None:
+        g1 = pre.g1
+        readable = g1.readable                                      # GATE 1, as checked
+    else:
+        epoch = getattr(directory, "epoch", 0)
+        readable = index.readable(user, epoch)                      # GATE 1
+        g1 = _Gate1View(index, readable)
     ranked: list[str] = []
     deadline = authz.deadline_in(timeout_s)
     ok: dict[str, authz.AuthorizedDoc] = {}
@@ -144,7 +185,7 @@ def build_graph(user: DirectoryUser, *, index: Index, directory: Directory, ledg
     # 1 — which documents to check live (all inside Gate 1)
     universe: list[str] = []
     if mode == "overview":
-        universe = g1.recent(g1.rows)
+        universe = overview_work(g1)
         cap = MAX_CHECKS_OVERVIEW
     elif mode == "search":
         window = parse_window(q, now)
@@ -203,7 +244,16 @@ def build_graph(user: DirectoryUser, *, index: Index, directory: Directory, ledg
     queue = [d for d in dict.fromkeys(universe) if d not in checked and d not in undecided]
     queued = set(universe)
     i = 0
-    while i < len(queue) and n_checked < cap and authz.remaining(deadline) > 0:
+    if pre is not None:
+        # the same work list and cap as the loop below, decided by the caller's single pass: an id
+        # it did not attempt, or did not decide by its deadline, is undecided here as well
+        covered = queue[:cap]
+        ok = {d: pre.ok[d] for d in covered if d in pre.ok}
+        undecided = {d for d in covered if d in pre.undecided or d not in pre.attempted}
+        checked = {d for d in covered if d not in undecided}
+        n_checked = len(checked)        # decided live; equals the loop's count when all were
+        i = len(covered)
+    while pre is None and i < len(queue) and n_checked < cap and authz.remaining(deadline) > 0:
         size = 1 if (i == 0 and doc_focus) else CHECK_BATCH
         batch = queue[i: i + min(size, cap - n_checked)]
         i += len(batch)
