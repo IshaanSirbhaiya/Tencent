@@ -1,4 +1,4 @@
-"""Deterministic generator for the Internal Brain synthetic world, "Company A" (CONTRACTS.md §1).
+"""Deterministic generator for the Internal Brain synthetic world, "Pandan Ledger" (CONTRACTS.md §1).
 
     python fixtures/enterprise/generate.py --seed 7 --now 2026-10-13T09:00:00+08:00 --scale demo
 
@@ -41,7 +41,7 @@ import workplace as W  # noqa: E402  (the everyday-company layer, planted after 
 GENERATOR_VERSION = "1"
 HERE = Path(__file__).resolve().parent
 TENANT = "companya"
-DOMAIN = "companya.example"
+DOMAIN = "pandanledger.example"
 PERSONAS = ("jdoe", "priya.sre", "ken.ext", "sara.sec", "maya.compliance", "leo.ops", "admin.it",
             "amy.am", "mlro.tan")
 #: directory users added by the fintech layer. They are kept out of the filler speaker pools and the
@@ -71,7 +71,7 @@ def long_date(d: date) -> str:
     return f"{d.day} {d.strftime('%B')} {d.year}"
 
 
-#: the markets Company A's entities serve. Market scoping is CONTENT (a first-line tag), never an
+#: the markets Pandan Ledger's entities serve. Market scoping is CONTENT (a first-line tag), never an
 #: access dimension: who may read a page is still decided only by the source platform's ACL.
 MARKETS = ("SG", "HK", "ID", "AU", "EU", "US")
 
@@ -929,7 +929,7 @@ class Builder:
         cdc_lapse = self.today + timedelta(days=18)
         rotation = self.today + timedelta(days=20)
         Q = self.quarter_label
-        pg_url = "https://companya.atlassian.net/wiki/spaces/{space}/pages/{id}"
+        pg_url = "https://pandanledger.atlassian.net/wiki/spaces/{space}/pages/{id}"
 
         # ---------------- Confluence: payment-gateway --------------------------------------
         plan_stmt = ("The migration moves the ledger from the self-managed Postgres 11 cluster to a "
@@ -1493,7 +1493,7 @@ class Builder:
 
         # ---------------- Confluence: market-scoped product pages (MK) -------------------------
         sg_stmt = ("Singapore SME customers on every plan can open a multi-currency account with "
-                   "Company A Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD "
+                   "Pandan Ledger Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD "
                    "wallets and a daily transfer limit of SGD 500,000.")
         c_sg = self.canary()
         sg = self.add_page(

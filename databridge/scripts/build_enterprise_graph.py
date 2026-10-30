@@ -1,4 +1,4 @@
-"""Build the Company A knowledge graph for the ORIGINAL Walnut screens (/graph, /brain, /evidence).
+"""Build the Pandan Ledger knowledge graph for the ORIGINAL Walnut screens (/graph, /brain, /evidence).
 
 Two steps, both deterministic:
 
@@ -19,7 +19,7 @@ Two steps, both deterministic:
 The graph is built AS ONE PERSON SEES IT (default jdoe; --as <persona>, or --as all for the
 unrestricted estate): only items that person may open, per the world generator's own permission
 rules. It is a build-time snapshot; packs/enterprise/ui.yaml offers only that one person.
-Synthetic data only (`companya.example`).
+Synthetic data only (`pandanledger.example`).
 """
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ ROWS_DIR = REPO / "fixtures" / "enterprise" / "graph_rows"
 DEFAULT_OUT = REPO / "var" / "graph" / "enterprise.db"
 PACK = "enterprise"
 
-#: Company A runs on Singapore time; Slack `ts` values are epoch seconds and are shown in it.
+#: Pandan Ledger runs on Singapore time; Slack `ts` values are epoch seconds and are shown in it.
 SGT = dt.timezone(dt.timedelta(hours=8))
 #: An issue key as it appears in prose ("DBMIG-14"). Only keys that exist in the estate are kept.
 ISSUE_KEY = re.compile(r"\b([A-Z][A-Z0-9]+-\d+)\b")

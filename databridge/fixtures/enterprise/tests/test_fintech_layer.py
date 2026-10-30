@@ -1,4 +1,4 @@
-"""The thin fintech layer of the Company A world (FC, MK, FEE, SENS): it only ADDS to the estate, its
+"""The thin fintech layer of the Pandan Ledger world (FC, MK, FEE, SENS): it only ADDS to the estate, its
 FinCrime compartment is sealed by source ACLs alone, market scope is content not access, the draft fee
 schedule is readable by nobody, and its sensitive values are published test values.
 

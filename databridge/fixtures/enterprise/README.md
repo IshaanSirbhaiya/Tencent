@@ -1,6 +1,6 @@
-# Company A: the Internal Brain's synthetic world
+# Pandan Ledger: the Internal Brain's synthetic world
 
-Company A is a fictional fintech on the `companya.example` domain. Everything in this folder is invented.
+Pandan Ledger is a fictional fintech on the `pandanledger.example` domain. Everything in this folder is invented.
 The contract is `docs/tencent/CONTRACTS.md` §1.
 
 ```powershell

@@ -1,4 +1,4 @@
-"""The everyday-company layer of the Company A world (scenario ``WP``): the handbook, IT and finance
+"""The everyday-company layer of the Pandan Ledger world (scenario ``WP``): the handbook, IT and finance
 knowledge any employee asks about (leave, hybrid work, the office, the IT helpdesk, expenses, payday,
 public holidays), plus ONE naturally restricted document (the salary bands, People leads only).
 
@@ -99,7 +99,7 @@ def build(b: "Builder") -> None:
                           parent=parent)
 
     home = page("people", "People & Workplace: start here",
-                "Purpose\n\nThis space is the employee handbook of Company A. It is open to all "
+                "Purpose\n\nThis space is the employee handbook of Pandan Ledger. It is open to all "
                 "employee. Contractors and guests use the onboarding pack their sponsor sends them."
                 "\n\nWhat is here\n\nLeave, hybrid work, the code of conduct, performance reviews, "
                 "the learning budget, referrals, the Singapore office guide, the IT helpdesk FAQ, "
@@ -125,7 +125,7 @@ def build(b: "Builder") -> None:
                  f"{cc_stmt} Childcare leave does not carry over.\n\nOther leave\n\nMarriage leave is "
                  "3 days. Compassionate leave is 3 days for an immediate family member. National "
                  "service reservist leave follows the call-up notice; upload the notice in the HR "
-                 "portal.\n\nThis page is Company A policy, written for a fictional company; it is "
+                 "portal.\n\nThis page is Pandan Ledger policy, written for a fictional company; it is "
                  "not legal advice.",
                  "melissa.k", 380, 34, 5, hid)
     b.plant("WP-annual-leave", SCENARIO, f"confluence:{leave['id']}", al_stmt, None)
@@ -137,7 +137,7 @@ def build(b: "Builder") -> None:
          "Eligible fathers get 4 weeks of paid paternity leave, to be taken within the first year "
          "of the child's birth.\n\nShared parental leave\n\nParents may share up to 10 weeks between "
          "them. Tell your manager and the People team at least one month before the leave starts."
-         "\n\nThis page is Company A policy, written for a fictional company; it is not legal advice.",
+         "\n\nThis page is Pandan Ledger policy, written for a fictional company; it is not legal advice.",
          "melissa.k", 300, 60, 3, hid)
 
     hy_stmt = ("All teams work from the Singapore office on two anchor days, Wednesday and "

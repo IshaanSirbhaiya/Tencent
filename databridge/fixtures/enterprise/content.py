@@ -1,4 +1,4 @@
-"""Content pools for the Company A synthetic estate (fictional fintech, companya.example).
+"""Content pools for the Pandan Ledger synthetic estate (fictional fintech, pandanledger.example).
 
 Everything here is invented. Text is assembled from these pools by ``generate.py`` with a seeded
 ``random.Random``; nothing reads the wall clock. Two rules the pools obey so the planted scenario

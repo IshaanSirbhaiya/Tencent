@@ -855,7 +855,7 @@
     "leo.ops"
    ],
    "scenario": "MK",
-   "statement": "Singapore SME customers on every plan can open a multi-currency account with Company A Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD wallets and a daily transfer limit of SGD 500,000."
+   "statement": "Singapore SME customers on every plan can open a multi-currency account with Pandan Ledger Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD wallets and a daily transfer limit of SGD 500,000."
   },
   {
    "applies_after": null,
@@ -29481,5 +29481,5 @@
    ]
   }
  },
- "world_sha256": "e3381d7122570db7744f63094b7fbcdf05617aedb1c5de0a22f4f3d5b48861b7"
+ "world_sha256": "03c35742c9115583bfdb35f1e95fd1947d67b09ea253b3a78ccc556c30e95523"
 }

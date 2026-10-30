@@ -1,4 +1,4 @@
-"""Tests for the Company A world generator (CONTRACTS.md §1).
+"""Tests for the Pandan Ledger world generator (CONTRACTS.md §1).
 
     .venv/Scripts/python.exe -m pytest fixtures/enterprise/tests -q        (from databridge/)
 
@@ -226,7 +226,7 @@ def test_schema_shape(world):
     assert set(world) == {"meta", "directory", "confluence", "jira", "slack", "drive", "facts",
                           "questions", "audit_replay"}
     _has(world["meta"], "meta")
-    assert world["meta"]["tenant"] == "companya" and world["meta"]["domain"] == "companya.example"
+    assert world["meta"]["tenant"] == "companya" and world["meta"]["domain"] == "pandanledger.example"
     for u in world["directory"]["users"]:
         _has(u, "user")
         assert u["employment"] in ("employee", "contractor")

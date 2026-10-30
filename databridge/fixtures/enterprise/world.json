@@ -3357,7 +3357,7 @@
    },
    {
     "author": "leo.ops",
-    "body": "[Applies to: SG entity]\n\nOffer\n\nSingapore SME customers on every plan can open a multi-currency account with Company A Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD wallets and a daily transfer limit of SGD 500,000.\n\nOnboarding\n\nStandard KYB is usually completed within one business day for Singapore-incorporated companies.\n\nOwner\n\nLeo Hartono, product operations.\n\nDocument ref: CNRY-7444e3",
+    "body": "[Applies to: SG entity]\n\nOffer\n\nSingapore SME customers on every plan can open a multi-currency account with Pandan Ledger Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD wallets and a daily transfer limit of SGD 500,000.\n\nOnboarding\n\nStandard KYB is usually completed within one business day for Singapore-incorporated companies.\n\nOwner\n\nLeo Hartono, product operations.\n\nDocument ref: CNRY-7444e3",
     "created": "2026-05-26T10:00:00+08:00",
     "history": [],
     "id": "cf-1205",
@@ -3433,7 +3433,7 @@
    },
    {
     "author": "siti.h",
-    "body": "Purpose\n\nThis space is the employee handbook of Company A. It is open to all employee. Contractors and guests use the onboarding pack their sponsor sends them.\n\nWhat is here\n\nLeave, hybrid work, the code of conduct, performance reviews, the learning budget, referrals, the Singapore office guide, the IT helpdesk FAQ, security awareness basics, the new joiner checklist, the 2026 public holidays and the org chart.\n\nWho owns it\n\nThe People team: Siti Halim (Head of People) and Melissa Koh (People partner). Ask in #hr-announcements or message Siti directly.",
+    "body": "Purpose\n\nThis space is the employee handbook of Pandan Ledger. It is open to all employee. Contractors and guests use the onboarding pack their sponsor sends them.\n\nWhat is here\n\nLeave, hybrid work, the code of conduct, performance reviews, the learning budget, referrals, the Singapore office guide, the IT helpdesk FAQ, security awareness basics, the new joiner checklist, the 2026 public holidays and the org chart.\n\nWho owns it\n\nThe People team: Siti Halim (Head of People) and Melissa Koh (People partner). Ask in #hr-announcements or message Siti directly.",
     "created": "2025-09-08T10:00:00+08:00",
     "history": [],
     "id": "cf-1210",
@@ -3447,7 +3447,7 @@
    },
    {
     "author": "melissa.k",
-    "body": "Annual leave\n\nFull-time employees get 18 days of paid annual leave each calendar year, and up to 5 unused days can be carried over into the following year, where they must be used by 31 March. New joiners accrue annual leave pro rata from their start date. Apply in the HR portal at least five working days ahead for anything longer than two days.\n\nMedical leave\n\nPaid medical leave is up to 14 days a year, and each day of medical leave needs a medical certificate (MC) from a registered doctor, uploaded to the HR portal within two working days. Hospitalisation leave of up to 60 days a year includes the 14 medical leave days.\n\nChildcare leave\n\nParents of a Singapore citizen child under seven get 6 days of paid childcare leave a year, and parents of any other child under seven get 2 days. Childcare leave does not carry over.\n\nOther leave\n\nMarriage leave is 3 days. Compassionate leave is 3 days for an immediate family member. National service reservist leave follows the call-up notice; upload the notice in the HR portal.\n\nThis page is Company A policy, written for a fictional company; it is not legal advice.",
+    "body": "Annual leave\n\nFull-time employees get 18 days of paid annual leave each calendar year, and up to 5 unused days can be carried over into the following year, where they must be used by 31 March. New joiners accrue annual leave pro rata from their start date. Apply in the HR portal at least five working days ahead for anything longer than two days.\n\nMedical leave\n\nPaid medical leave is up to 14 days a year, and each day of medical leave needs a medical certificate (MC) from a registered doctor, uploaded to the HR portal within two working days. Hospitalisation leave of up to 60 days a year includes the 14 medical leave days.\n\nChildcare leave\n\nParents of a Singapore citizen child under seven get 6 days of paid childcare leave a year, and parents of any other child under seven get 2 days. Childcare leave does not carry over.\n\nOther leave\n\nMarriage leave is 3 days. Compassionate leave is 3 days for an immediate family member. National service reservist leave follows the call-up notice; upload the notice in the HR portal.\n\nThis page is Pandan Ledger policy, written for a fictional company; it is not legal advice.",
     "created": "2025-09-28T10:00:00+08:00",
     "history": [],
     "id": "cf-1211",
@@ -3461,7 +3461,7 @@
    },
    {
     "author": "melissa.k",
-    "body": "Maternity\n\nEligible mothers get 16 weeks of paid maternity leave.\n\nPaternity\n\nEligible fathers get 4 weeks of paid paternity leave, to be taken within the first year of the child's birth.\n\nShared parental leave\n\nParents may share up to 10 weeks between them. Tell your manager and the People team at least one month before the leave starts.\n\nThis page is Company A policy, written for a fictional company; it is not legal advice.",
+    "body": "Maternity\n\nEligible mothers get 16 weeks of paid maternity leave.\n\nPaternity\n\nEligible fathers get 4 weeks of paid paternity leave, to be taken within the first year of the child's birth.\n\nShared parental leave\n\nParents may share up to 10 weeks between them. Tell your manager and the People team at least one month before the leave starts.\n\nThis page is Pandan Ledger policy, written for a fictional company; it is not legal advice.",
     "created": "2025-12-17T10:00:00+08:00",
     "history": [],
     "id": "cf-1212",
@@ -4028,7 +4028,7 @@
   "users": [
    {
     "active": true,
-    "email": "jdoe@companya.example",
+    "email": "jdoe@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4040,7 +4040,7 @@
     "name": "Jordan Doe",
     "platform_ids": {
      "confluence": "acc-jdoe",
-     "drive": "jdoe@companya.example",
+     "drive": "jdoe@pandanledger.example",
      "jira": "acc-jdoe",
      "slack": "U0JDOE"
     },
@@ -4050,7 +4050,7 @@
    },
    {
     "active": true,
-    "email": "priya.sre@companya.example",
+    "email": "priya.sre@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4062,7 +4062,7 @@
     "name": "Priya Raman",
     "platform_ids": {
      "confluence": "acc-priya.sre",
-     "drive": "priya.sre@companya.example",
+     "drive": "priya.sre@pandanledger.example",
      "jira": "acc-priya.sre",
      "slack": "U0PRIYASRE"
     },
@@ -4090,7 +4090,7 @@
    },
    {
     "active": true,
-    "email": "sara.sec@companya.example",
+    "email": "sara.sec@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4102,7 +4102,7 @@
     "name": "Sara Lindqvist",
     "platform_ids": {
      "confluence": "acc-sara.sec",
-     "drive": "sara.sec@companya.example",
+     "drive": "sara.sec@pandanledger.example",
      "jira": "acc-sara.sec",
      "slack": "U0SARASEC"
     },
@@ -4112,7 +4112,7 @@
    },
    {
     "active": true,
-    "email": "maya.compliance@companya.example",
+    "email": "maya.compliance@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-compliance",
@@ -4123,7 +4123,7 @@
     "name": "Maya Fernandes",
     "platform_ids": {
      "confluence": "acc-maya.compliance",
-     "drive": "maya.compliance@companya.example",
+     "drive": "maya.compliance@pandanledger.example",
      "jira": "acc-maya.compliance",
      "slack": "U0MAYACOMPLIANCE"
     },
@@ -4134,7 +4134,7 @@
    },
    {
     "active": true,
-    "email": "leo.ops@companya.example",
+    "email": "leo.ops@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-product",
@@ -4145,7 +4145,7 @@
     "name": "Leo Hartono",
     "platform_ids": {
      "confluence": "acc-leo.ops",
-     "drive": "leo.ops@companya.example",
+     "drive": "leo.ops@pandanledger.example",
      "jira": "acc-leo.ops",
      "slack": "U0LEOOPS"
     },
@@ -4155,7 +4155,7 @@
    },
    {
     "active": true,
-    "email": "admin.it@companya.example",
+    "email": "admin.it@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-it",
@@ -4166,7 +4166,7 @@
     "name": "Alex Mercer",
     "platform_ids": {
      "confluence": "acc-admin.it",
-     "drive": "admin.it@companya.example",
+     "drive": "admin.it@pandanledger.example",
      "jira": "acc-admin.it",
      "slack": "U0ADMINIT"
     },
@@ -4177,7 +4177,7 @@
    },
    {
     "active": true,
-    "email": "nina.k@companya.example",
+    "email": "nina.k@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4190,7 +4190,7 @@
     "name": "Nina Kowalski",
     "platform_ids": {
      "confluence": "acc-nina.k",
-     "drive": "nina.k@companya.example",
+     "drive": "nina.k@pandanledger.example",
      "jira": "acc-nina.k",
      "slack": "U0NINAK"
     },
@@ -4200,7 +4200,7 @@
    },
    {
     "active": true,
-    "email": "raj.m@companya.example",
+    "email": "raj.m@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4213,7 +4213,7 @@
     "name": "Rajesh Menon",
     "platform_ids": {
      "confluence": "acc-raj.m",
-     "drive": "raj.m@companya.example",
+     "drive": "raj.m@pandanledger.example",
      "jira": "acc-raj.m",
      "slack": "U0RAJM"
     },
@@ -4223,7 +4223,7 @@
    },
    {
     "active": true,
-    "email": "wei.l@companya.example",
+    "email": "wei.l@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4235,7 +4235,7 @@
     "name": "Wei Lin",
     "platform_ids": {
      "confluence": "acc-wei.l",
-     "drive": "wei.l@companya.example",
+     "drive": "wei.l@pandanledger.example",
      "jira": "acc-wei.l",
      "slack": "U0WEIL"
     },
@@ -4245,7 +4245,7 @@
    },
    {
     "active": true,
-    "email": "tom.b@companya.example",
+    "email": "tom.b@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4257,7 +4257,7 @@
     "name": "Tomas Barros",
     "platform_ids": {
      "confluence": "acc-tom.b",
-     "drive": "tom.b@companya.example",
+     "drive": "tom.b@pandanledger.example",
      "jira": "acc-tom.b",
      "slack": "U0TOMB"
     },
@@ -4267,7 +4267,7 @@
    },
    {
     "active": false,
-    "email": "sam.old@companya.example",
+    "email": "sam.old@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4279,7 +4279,7 @@
     "name": "Sam Okafor",
     "platform_ids": {
      "confluence": "acc-sam.old",
-     "drive": "sam.old@companya.example",
+     "drive": "sam.old@pandanledger.example",
      "jira": "acc-sam.old",
      "slack": "U0SAMOLD"
     },
@@ -4289,7 +4289,7 @@
    },
    {
     "active": true,
-    "email": "aisha.r@companya.example",
+    "email": "aisha.r@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4301,7 +4301,7 @@
     "name": "Aisha Rahman",
     "platform_ids": {
      "confluence": "acc-aisha.r",
-     "drive": "aisha.r@companya.example",
+     "drive": "aisha.r@pandanledger.example",
      "jira": "acc-aisha.r",
      "slack": "U0AISHAR"
     },
@@ -4311,7 +4311,7 @@
    },
    {
     "active": true,
-    "email": "dev.p@companya.example",
+    "email": "dev.p@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4323,7 +4323,7 @@
     "name": "Devansh Patel",
     "platform_ids": {
      "confluence": "acc-dev.p",
-     "drive": "dev.p@companya.example",
+     "drive": "dev.p@pandanledger.example",
      "jira": "acc-dev.p",
      "slack": "U0DEVP"
     },
@@ -4333,7 +4333,7 @@
    },
    {
     "active": true,
-    "email": "lena.h@companya.example",
+    "email": "lena.h@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4345,7 +4345,7 @@
     "name": "Lena Hoffmann",
     "platform_ids": {
      "confluence": "acc-lena.h",
-     "drive": "lena.h@companya.example",
+     "drive": "lena.h@pandanledger.example",
      "jira": "acc-lena.h",
      "slack": "U0LENAH"
     },
@@ -4355,7 +4355,7 @@
    },
    {
     "active": true,
-    "email": "omar.f@companya.example",
+    "email": "omar.f@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4367,7 +4367,7 @@
     "name": "Omar Farouk",
     "platform_ids": {
      "confluence": "acc-omar.f",
-     "drive": "omar.f@companya.example",
+     "drive": "omar.f@pandanledger.example",
      "jira": "acc-omar.f",
      "slack": "U0OMARF"
     },
@@ -4377,7 +4377,7 @@
    },
    {
     "active": true,
-    "email": "sophie.t@companya.example",
+    "email": "sophie.t@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4389,7 +4389,7 @@
     "name": "Sophie Tan",
     "platform_ids": {
      "confluence": "acc-sophie.t",
-     "drive": "sophie.t@companya.example",
+     "drive": "sophie.t@pandanledger.example",
      "jira": "acc-sophie.t",
      "slack": "U0SOPHIET"
     },
@@ -4399,7 +4399,7 @@
    },
    {
     "active": true,
-    "email": "kai.w@companya.example",
+    "email": "kai.w@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4411,7 +4411,7 @@
     "name": "Kai Wong",
     "platform_ids": {
      "confluence": "acc-kai.w",
-     "drive": "kai.w@companya.example",
+     "drive": "kai.w@pandanledger.example",
      "jira": "acc-kai.w",
      "slack": "U0KAIW"
     },
@@ -4421,7 +4421,7 @@
    },
    {
     "active": true,
-    "email": "yuki.s@companya.example",
+    "email": "yuki.s@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-data",
@@ -4433,7 +4433,7 @@
     "name": "Yuki Sato",
     "platform_ids": {
      "confluence": "acc-yuki.s",
-     "drive": "yuki.s@companya.example",
+     "drive": "yuki.s@pandanledger.example",
      "jira": "acc-yuki.s",
      "slack": "U0YUKIS"
     },
@@ -4443,7 +4443,7 @@
    },
    {
     "active": true,
-    "email": "elena.v@companya.example",
+    "email": "elena.v@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-eng",
@@ -4455,7 +4455,7 @@
     "name": "Elena Vasquez",
     "platform_ids": {
      "confluence": "acc-elena.v",
-     "drive": "elena.v@companya.example",
+     "drive": "elena.v@pandanledger.example",
      "jira": "acc-elena.v",
      "slack": "U0ELENAV"
     },
@@ -4465,7 +4465,7 @@
    },
    {
     "active": true,
-    "email": "hana.y@companya.example",
+    "email": "hana.y@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-product",
@@ -4476,7 +4476,7 @@
     "name": "Hana Yusuf",
     "platform_ids": {
      "confluence": "acc-hana.y",
-     "drive": "hana.y@companya.example",
+     "drive": "hana.y@pandanledger.example",
      "jira": "acc-hana.y",
      "slack": "U0HANAY"
     },
@@ -4486,7 +4486,7 @@
    },
    {
     "active": true,
-    "email": "marcus.l@companya.example",
+    "email": "marcus.l@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-product",
@@ -4497,7 +4497,7 @@
     "name": "Marcus Lee",
     "platform_ids": {
      "confluence": "acc-marcus.l",
-     "drive": "marcus.l@companya.example",
+     "drive": "marcus.l@pandanledger.example",
      "jira": "acc-marcus.l",
      "slack": "U0MARCUSL"
     },
@@ -4507,7 +4507,7 @@
    },
    {
     "active": true,
-    "email": "grace.o@companya.example",
+    "email": "grace.o@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-compliance",
@@ -4518,7 +4518,7 @@
     "name": "Grace Ong",
     "platform_ids": {
      "confluence": "acc-grace.o",
-     "drive": "grace.o@companya.example",
+     "drive": "grace.o@pandanledger.example",
      "jira": "acc-grace.o",
      "slack": "U0GRACEO"
     },
@@ -4528,7 +4528,7 @@
    },
    {
     "active": true,
-    "email": "ben.c@companya.example",
+    "email": "ben.c@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-finance",
@@ -4539,7 +4539,7 @@
     "name": "Benjamin Chua",
     "platform_ids": {
      "confluence": "acc-ben.c",
-     "drive": "ben.c@companya.example",
+     "drive": "ben.c@pandanledger.example",
      "jira": "acc-ben.c",
      "slack": "U0BENC"
     },
@@ -4549,7 +4549,7 @@
    },
    {
     "active": true,
-    "email": "farah.n@companya.example",
+    "email": "farah.n@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-staff",
@@ -4560,7 +4560,7 @@
     "name": "Farah Nasir",
     "platform_ids": {
      "confluence": "acc-farah.n",
-     "drive": "farah.n@companya.example",
+     "drive": "farah.n@pandanledger.example",
      "jira": "acc-farah.n",
      "slack": "U0FARAHN"
     },
@@ -4606,7 +4606,7 @@
    },
    {
     "active": true,
-    "email": "amy.am@companya.example",
+    "email": "amy.am@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-accounts",
@@ -4617,7 +4617,7 @@
     "name": "Amy Lim",
     "platform_ids": {
      "confluence": "acc-amy.am",
-     "drive": "amy.am@companya.example",
+     "drive": "amy.am@pandanledger.example",
      "jira": "acc-amy.am",
      "slack": "U0AMYAM"
     },
@@ -4627,7 +4627,7 @@
    },
    {
     "active": true,
-    "email": "joel.s@companya.example",
+    "email": "joel.s@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-accounts",
@@ -4638,7 +4638,7 @@
     "name": "Joel Santos",
     "platform_ids": {
      "confluence": "acc-joel.s",
-     "drive": "joel.s@companya.example",
+     "drive": "joel.s@pandanledger.example",
      "jira": "acc-joel.s",
      "slack": "U0JOELS"
     },
@@ -4648,7 +4648,7 @@
    },
    {
     "active": true,
-    "email": "mlro.tan@companya.example",
+    "email": "mlro.tan@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-fincrime",
@@ -4659,7 +4659,7 @@
     "name": "Rachel Tan",
     "platform_ids": {
      "confluence": "acc-mlro.tan",
-     "drive": "mlro.tan@companya.example",
+     "drive": "mlro.tan@pandanledger.example",
      "jira": "acc-mlro.tan",
      "slack": "U0MLROTAN"
     },
@@ -4669,7 +4669,7 @@
    },
    {
     "active": true,
-    "email": "noor.a@companya.example",
+    "email": "noor.a@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-fincrime",
@@ -4680,7 +4680,7 @@
     "name": "Noor Aziz",
     "platform_ids": {
      "confluence": "acc-noor.a",
-     "drive": "noor.a@companya.example",
+     "drive": "noor.a@pandanledger.example",
      "jira": "acc-noor.a",
      "slack": "U0NOORA"
     },
@@ -4690,7 +4690,7 @@
    },
    {
     "active": true,
-    "email": "daniel.g@companya.example",
+    "email": "daniel.g@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-fincrime",
@@ -4701,7 +4701,7 @@
     "name": "Daniel Goh",
     "platform_ids": {
      "confluence": "acc-daniel.g",
-     "drive": "daniel.g@companya.example",
+     "drive": "daniel.g@pandanledger.example",
      "jira": "acc-daniel.g",
      "slack": "U0DANIELG"
     },
@@ -4711,7 +4711,7 @@
    },
    {
     "active": true,
-    "email": "siti.h@companya.example",
+    "email": "siti.h@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-people",
@@ -4722,7 +4722,7 @@
     "name": "Siti Halim",
     "platform_ids": {
      "confluence": "acc-siti.h",
-     "drive": "siti.h@companya.example",
+     "drive": "siti.h@pandanledger.example",
      "jira": "acc-siti.h",
      "slack": "U0SITIH"
     },
@@ -4732,7 +4732,7 @@
    },
    {
     "active": true,
-    "email": "melissa.k@companya.example",
+    "email": "melissa.k@pandanledger.example",
     "employment": "employee",
     "groups": [
      "grp-people",
@@ -4743,7 +4743,7 @@
     "name": "Melissa Koh",
     "platform_ids": {
      "confluence": "acc-melissa.k",
-     "drive": "melissa.k@companya.example",
+     "drive": "melissa.k@pandanledger.example",
      "jira": "acc-melissa.k",
      "slack": "U0MELISSAK"
     },
@@ -5991,7 +5991,7 @@
     "permissions": [
      {
       "id": "pm-7",
-      "principal": "companya.example",
+      "principal": "pandanledger.example",
       "role": "reader",
       "type": "domain"
      }
@@ -6072,7 +6072,7 @@
     "permissions": [
      {
       "id": "pm-22",
-      "principal": "companya.example",
+      "principal": "pandanledger.example",
       "role": "reader",
       "type": "domain"
      },
@@ -6897,7 +6897,7 @@
     "leo.ops"
    ],
    "scenario": "MK",
-   "statement": "Singapore SME customers on every plan can open a multi-currency account with Company A Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD wallets and a daily transfer limit of SGD 500,000."
+   "statement": "Singapore SME customers on every plan can open a multi-currency account with Pandan Ledger Singapore after standard KYB, with SGD, USD, EUR, GBP, AUD and HKD wallets and a daily transfer limit of SGD 500,000."
   },
   {
    "applies_after": null,
@@ -9135,7 +9135,7 @@
      }
     ],
     "created": "2026-07-24T15:44:00+08:00",
-    "description": "Wave 4 of the DB Migration Plan (https://companya.atlassian.net/wiki/spaces/payment-gateway/pages/cf-1001). Cutover of the ledger database to the managed Postgres 16 cluster is planned for 24 October 2026, pending sign-off from the payments on-call lead. Runbook rehearsal is done in staging.\n\nRef: CNRY-abe5d2",
+    "description": "Wave 4 of the DB Migration Plan (https://pandanledger.atlassian.net/wiki/spaces/payment-gateway/pages/cf-1001). Cutover of the ledger database to the managed Postgres 16 cluster is planned for 24 October 2026, pending sign-off from the payments on-call lead. Runbook rehearsal is done in staging.\n\nRef: CNRY-abe5d2",
     "id": "20072",
     "key": "DBMIG-12",
     "links": [
@@ -9189,7 +9189,7 @@
      }
     ],
     "created": "2026-08-03T08:14:00+08:00",
-    "description": "DBMIG-14 is blocked because the dual-write shim drops idempotency keys for refunds created during the backfill window. See the DB Migration Plan: https://companya.atlassian.net/wiki/spaces/payment-gateway/pages/cf-1001\n\nRef: CNRY-2a4e18",
+    "description": "DBMIG-14 is blocked because the dual-write shim drops idempotency keys for refunds created during the backfill window. See the DB Migration Plan: https://pandanledger.atlassian.net/wiki/spaces/payment-gateway/pages/cf-1001\n\nRef: CNRY-2a4e18",
     "id": "20074",
     "key": "DBMIG-14",
     "links": [
@@ -13381,7 +13381,7 @@
   ]
  },
  "meta": {
-  "domain": "companya.example",
+  "domain": "pandanledger.example",
   "generator_version": "1",
   "now": "2026-10-13T09:00:00+08:00",
   "scale": "demo",
@@ -42721,7 +42721,7 @@
      },
      {
       "edited": false,
-      "text": "We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. Decision doc is ADR-7: https://companya.atlassian.net/wiki/spaces/payment-gateway/pages/cf-1003",
+      "text": "We agreed to issue short-lived access tokens of 10 minutes signed with ES256, with refresh tokens bound to the device key, and to retire the shared HMAC secret. Decision doc is ADR-7: https://pandanledger.atlassian.net/wiki/spaces/payment-gateway/pages/cf-1003",
       "ts": "1790835720.000115",
       "user": "omar.f"
      },

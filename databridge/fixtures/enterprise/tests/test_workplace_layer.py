@@ -1,4 +1,4 @@
-"""The everyday-company layer of the Company A world (scenario WP, ``workplace.py``): it only ADDS to
+"""The everyday-company layer of the Pandan Ledger world (scenario WP, ``workplace.py``): it only ADDS to
 the estate (the world without it is byte-identical to the world before it existed), its handbook,
 IT and finance documents are open to every employee and to nobody outside the company, its one
 restricted document (salary bands) is sealed by the source ACL alone, its wording cannot disturb the
@@ -26,6 +26,12 @@ from test_generator import ARGS, PERSONAS, Ref  # noqa: E402
 #: sha256 of world.json as committed before the workplace layer existed (generator run with the
 #: same arguments). The world built with the layer switched off must still hash to it.
 PRE_WORKPLACE_WORLD_SHA256 = "be21569dbfd75867da7d55e82ab671cc250e8c9cdb85261e0377b20a2d55f388"
+
+#: D-43 renamed the company after that sha was taken ("Company A" -> "Pandan Ledger", and its
+#: domains). The rename changes only these strings, so mapping them back must give the pinned world.
+RENAME_BACK = (("Pandan Ledger", "Company A"), ("pandanledger.example", "companya.example"),
+               ("pandanledger.atlassian.net", "companya.atlassian.net"),
+               ("pandanledger.slack.com", "companya.slack.com"))
 
 #: phrases reserved for the live-ingestion demo: they must not exist before the demo ingests them
 RESERVED_LIVE_PHRASES = ("wellness day", "authenticator pro", "rehearsal moved", "5 nov",
@@ -104,7 +110,11 @@ def _q(world, qid):
 # additive only
 # --------------------------------------------------------------------------------------------
 def test_world_without_the_layer_is_the_pre_layer_world(base):
-    assert hashlib.sha256(G.dumps(base)).hexdigest() == PRE_WORKPLACE_WORLD_SHA256
+    text = G.dumps(base).decode("utf-8")
+    assert "Company A" not in text and "companya.example" not in text
+    for new, old in RENAME_BACK:
+        text = text.replace(new, old)
+    assert hashlib.sha256(text.encode("utf-8")).hexdigest() == PRE_WORKPLACE_WORLD_SHA256
 
 
 def test_workplace_layer_only_adds(full, base):
