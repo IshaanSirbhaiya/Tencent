@@ -93,8 +93,8 @@ a vendor SDK (`packages/harness/databridge_harness/__init__.py:3-4`).
 
 ## 3. Where to see each capability
 
-1. **Finals app** (`bash databridge/scripts/demo_up.sh start`, port 3100): every answer uses rows 1 to 3
-   and 11. `/dev/brain` shows the Walnut graph (row 9) as `jdoe` sees it.
+1. **Finals app** (`bash databridge/scripts/demo_up.sh start`, port 3100): every answer uses rows 1 to 3,
+   and uploaded and Drive files are read with row 11. `/dev/brain` shows the Walnut graph (row 9) as `jdoe` sees it.
 2. **Original Walnut screens** (port 3300, started by the same script; details in
    [`databridge/apps/frontend/README.md`](../databridge/apps/frontend/README.md)): `/graph`, `/brain`,
    `/ontology`, `/evidence` and `/demo` on Company A. The sidebar also lists Sources (`/connectors`),
