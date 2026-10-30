@@ -43,6 +43,7 @@ test('same question, two people: deep link, header strips, cited answers, main s
   // Amy's answer never mentions the case (tipping-off): only the approved script.
   expect(a.toLowerCase()).not.toContain('velquarry');
   await expect(page.getByTestId('identical-marker')).toHaveCount(0);
+  await expect(page.getByTestId('different-marker')).toBeVisible();
 
   // The slot sessions did not overwrite the main one, and slots never reach the audit console.
   const main = await (await page.request.get('/api/ib/auth/whoami')).json();
@@ -81,6 +82,7 @@ test('same person, two questions: a restricted and a made-up company give identi
   expect(await left.getByTestId('scope-note').innerText()).toEqual(await right.getByTestId('scope-note').innerText());
   await expect(page.getByTestId('identical-marker')).toBeVisible();
   await expect(page.getByTestId('identical-marker')).toContainText('Identical responses');
+  await expect(page.getByTestId('different-marker')).toHaveCount(0);
   await expect(page.getByTestId('compare-announce')).toContainText('identical');
   // Never a hint that anything exists: no counts, no "hidden", no reasons.
   await expect(page.getByTestId('compare-results')).not.toContainText(/hidden|withheld|restricted document|not allowed|denied/i);
@@ -88,13 +90,16 @@ test('same person, two questions: a restricted and a made-up company give identi
   await expectAccessible(page, 'compare/person');
 });
 
-test('the marker is absent when the responses differ', async ({ page }) => {
+test('the identical marker is absent when the responses differ; the difference marker shows', async ({ page }) => {
   await login(page, 'jdoe');
   await page.goto(people('amy.am', 'ken.ext', QV));
   await askBoth(page);
   await expect(page.getByTestId('compare-c').getByTestId('refusal-text')).toHaveText(REFUSAL_TEXT);
   await expect(page.getByTestId('compare-b').getByTestId('citation-chip').first()).toBeVisible();
   await expect(page.getByTestId('identical-marker')).toHaveCount(0);
+  // Both answered and the responses differ: the marker between the columns says so, and only that.
+  await expect(page.getByTestId('different-marker')).toBeVisible();
+  await expect(page.getByTestId('different-marker')).toContainText('Different answers');
 });
 
 test('the mode toggle switches the form, and asking writes the deep link', async ({ page }) => {

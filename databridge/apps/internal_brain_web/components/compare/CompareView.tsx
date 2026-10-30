@@ -32,7 +32,7 @@ import { SourcesSheet, isRefusal, sameResponse } from './answerAdapter';
 import { cacheResult, cachedResult, forgetResult } from './cache';
 import { CompareColumn, useRole, type Side, type SlotId } from './CompareColumn';
 import { CompareSourceSheet } from './CompareSourceSheet';
-import { EqualityMarker } from './EqualityMarker';
+import { DifferenceMarker, EqualityMarker } from './EqualityMarker';
 import { CHOICES, parseSpec, sameSpec, specUrl, type CompareMode, type CompareSpec } from './params';
 
 const MAX_Q = 2000;
@@ -303,6 +303,7 @@ export function CompareView() {
   const lSide: Side = asked ? left : idle(draft.left, draft.q1);
   const rSide: Side = asked ? right : idle(draft.right, draft.q2);
   const identical = lSide.kind === 'done' && rSide.kind === 'done' && isRefusal(lSide.res) && isRefusal(rSide.res) && sameResponse(lSide.res, rSide.res);
+  const different = lSide.kind === 'done' && rSide.kind === 'done' && !sameResponse(lSide.res, rSide.res);
   const settled = !busy && (lSide.kind === 'done' || lSide.kind === 'error') && (rSide.kind === 'done' || rSide.kind === 'error');
   const label = (id: string) => `${personaById(id)?.name ?? id} — ${role(id)}`;
   const canAsk = !!draft.q1.trim() && !!draft.q2.trim();
@@ -433,7 +434,7 @@ export function CompareView() {
         aria-busy={busy}
       >
         <CompareColumn slot="b" side={lSide} progress={askB.step} mode={shown.mode} onCite={(i, el) => setSheet({ slot: 'b', index: i, opener: el ?? null })} />
-        {identical ? <EqualityMarker /> : <div aria-hidden className="hidden lg:block" />}
+        {identical ? <EqualityMarker /> : different ? <DifferenceMarker /> : <div aria-hidden className="hidden lg:block" />}
         <CompareColumn slot="c" side={rSide} progress={askC.step} mode={shown.mode} onCite={(i, el) => setSheet({ slot: 'c', index: i, opener: el ?? null })} />
       </div>
 
