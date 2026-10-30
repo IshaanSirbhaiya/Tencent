@@ -22,7 +22,7 @@ const fmt = (n) => Number(n).toLocaleString('en-US');
 const ev = JSON.parse(fs.readFileSync(path.join(web, 'public/eval_summary.json'), 'utf8'));
 const status = fs.readFileSync(path.join(repo, 'STATUS.md'), 'utf8');
 const m = status.match(/Playwright, axe\)\s*\|\s*(\d+) passed/);
-const browserTests = m ? Number(m[1]) : null; // browser count from STATUS.md (Playwright row: passed count; 166 in the 30 Oct cloud run)
+const browserTests = m ? Number(m[1]) : null; // browser count from STATUS.md (Playwright row: passed count; 185 in the 30 Oct evening cloud run)
 const roi = fs.readFileSync(path.join(repo, 'docs/finals/rubric/impact_feasibility/ROI_MODEL.md'), 'utf8');
 const base = roi.match(/Base \| 1\.5 \| US\$31 \| 600 × 1\.5 × 46 × 31 = \*\*US\$([\d,]+)\*\*/);
 const baseVal = base ? Number(base[1].replace(/,/g, '')) : null;

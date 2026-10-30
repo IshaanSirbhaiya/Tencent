@@ -438,15 +438,15 @@ makes it refuse a take that disagrees. The frame line is rules 1, 3 and 5 of `CL
 **Original beat:** 13 "The numbers" (we attacked it on purpose: adversarial requests, zero leaks; paired answers,
 zero differences). Upgraded: the app's own proof slide, the 30 Oct numbers and the test counts.
 **On screen:** the app's proof slide (`/present/proof`): 0 leaks in 7,374 adversarial requests, 0 differences in
-400 paired questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 1,131 backend + 166 browser tests
-(from `eval_summary.json`; 41 browser tests are skipped, so say "none failing", not "all passing").
-**Caption:** "Plus 1,131 backend and 166 browser tests passing, none failing".
+400 paired questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 1,278 backend + 185 browser tests
+(from `eval_summary.json`: 1,278 backend tests collected, 1,274 pass and 4 are skipped; 42 browser tests are skipped, so say "none failing", not "all passing").
+**Caption:** "Plus 1,278 backend and 185 browser tests, none failing".
 **Proof:** `databridge/apps/internal_brain_web/public/eval_summary.json` (`requests`, `leaks`, `differential`,
 `injection`, `tests`), `databridge/evals/internal_brain/RESULTS.md`, `docs/finals/TEST_REPORT.md`.
 
 > We didn't just demo it, we attacked it. Seven thousand three hundred and seventy-four adversarial requests:
-> zero leaks. Four hundred paired questions: zero differences. And one thousand one hundred and thirty-one backend
-> tests, plus a hundred and sixty-six browser tests, none failing.
+> zero leaks. Four hundred paired questions: zero differences. And one thousand two hundred and seventy-eight backend
+> tests, plus one hundred and eighty-five browser tests, none failing.
 
 ### 15 · What it's worth
 **Cuts:** 21 s in every cut.
@@ -541,7 +541,7 @@ Then run `python docs/finals/video/assemble_finals.py --hy3` so the cue sheet us
 | Line | Source | If it changed |
 |---|---|---|
 | 7,374 / 0 leaks; 400 / 0 differences; 1,152 injection attempts | `databridge/apps/internal_brain_web/public/eval_summary.json` (run 29 to 30 Oct) | Read the new numbers; the slide updates itself; `assemble_finals.py --self-test` fails if the script's words no longer match |
-| 1,131 backend, 166 browser tests | `eval_summary.json` `tests.backend` / `tests.e2e`; `docs/finals/TEST_REPORT.md` (cloud run 30 Oct, commit 831297e: 1,131 passed; e2e 166 passed, 0 failed, 41 skipped) | Say the new counts; the scene 14 caption reads the file |
+| 1,278 backend, 185 browser tests | `eval_summary.json` `tests.backend` / `tests.e2e`; `docs/finals/TEST_REPORT.md` (cloud clean checkout, 30 Oct evening, branch `final_v1.2-cloud`: 1,274 passed, 0 failed, 4 skipped; e2e 185 passed, 0 failed, 42 skipped) | Say the new counts; the scene 14 caption reads the file |
 | Nine CodeBuddy sessions | `video_constants.json` `codebuddy_sessions`; `docs/tencent/evidence/` | Edit the constant and the spoken word |
 | Graph and engine counts | Not spoken (the world is growing); the screen shows them | Nothing to change |
 | US$1.3M, 7 minutes | `docs/finals/rubric/impact_feasibility/value_calculator.spec.json` | Match the slide |

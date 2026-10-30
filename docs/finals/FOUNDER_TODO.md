@@ -5,7 +5,7 @@ Tick each one as you go. The why for every demo-day item is in
 
 ## Today, Fri 30 Oct (evening)
 
-- [ ] **Send the organiser email to Cindy before 23:59**: [ORGANISER_UPDATE.md](ORGANISER_UPDATE.md). The draft is ready and links **`final_v1.3`** (on GitHub it is at `1076517`, with the verified numbers: 1,131 backend tests, 166 browser tests, 0 leaks in 7,374). Hy3 is not live, so send the Hy3 line as written. Tonight's docs pass (this file, README branch name, WorkBuddy test) is not on `final_v1.3` yet: if you want judges to see it, say so and I'll commit it and move `final_v1.3` before you send.
+- [ ] **Send the organiser email to Cindy before 23:59**: [ORGANISER_UPDATE.md](ORGANISER_UPDATE.md). The draft is ready and links **`final_v1.3`** (moved to the verified commit of the clean cloud run on 30 Oct evening, with the verified numbers: 1,274 backend tests, 185 browser tests, 0 leaks in 7,374). Hy3 is not live, so send the Hy3 line as written. Tonight's docs pass (this file, README branch name, WorkBuddy test) is not on `final_v1.3` yet: if you want judges to see it, say so and I'll commit it and move `final_v1.3` before you send.
 - [ ] **Activate Hy3 in TokenHub.** Still 402 today. Console → TokenHub → Online Inference → activate **Hy3** and **DeepSeek V4 Flash** (balance or voucher needed). Then tell me "activated": I run `hy3_check.py`, switch it on and re-run the eval. Until then every answer says "Quoted from sources (no model)". Steps are in [MORNING_BRIEF.md](MORNING_BRIEF.md).
 - [ ] **Ask Xin Yi** whether the extra 5,000 credits cover TokenHub (message text is in the chat).
 - [ ] **Confirm the cloud decisions D-26 to D-33** in [DECISIONS.md](DECISIONS.md) (taken while you were away; say "OK" or which to undo):

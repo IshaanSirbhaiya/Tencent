@@ -130,7 +130,7 @@ The camera intro (0:00 to the first cue) already has your voice: stay quiet unti
 - **6:23** We didn't just demo it, we attacked it.
 - **6:26** Seven thousand three hundred and seventy-four adversarial requests: zero leaks.
 - **6:30** Four hundred paired questions: zero differences.
-- **6:33** And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
+- **6:33** And one thousand two hundred and seventy-eight backend tests, plus one hundred and eighty-five browser tests, none failing.
 
 ## 6:42–7:03 · 15 What it's worth
 

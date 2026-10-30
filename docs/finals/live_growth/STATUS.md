@@ -58,8 +58,8 @@ changes queue, add-document, engine refresh).
   deployed never on, L-5 allowlist + auth with the bootstrap app, engine refresh: publish into an OPEN db,
   429 after 1 start / 2 min, write-ahead ledger, 503 when ledger down, jdoe/admin only, failed build
   leaves the snapshot, single flight).
-- Full IB suite, latest (cloud, 30 Oct, Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, commit 831297e): **1,131 passed,
-  0 failed**. At this checkpoint it was **1036 passed, 2 failed** (22 min); those 2 were NOT this workstream:
+- Full IB suite, latest (cloud clean checkout, 30 Oct evening, Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch
+  `final_v1.2-cloud`): **1,274 passed, 0 failed, 4 skipped**. At this checkpoint it was **1036 passed, 2 failed** (22 min); those 2 were NOT this workstream:
   `test_connector_drive.py::test_markdown_and_csv` and `::test_crawl_full_then_quiet` (Drive connector
   returns None for the CSV/Markdown fixture `df-7`; `connectors/drive.py` belongs to the upload agent).
 - `npx tsc --noEmit`: clean.

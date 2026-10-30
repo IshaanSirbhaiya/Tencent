@@ -52,7 +52,7 @@ regulated firms hesitate to switch AI on.
 | "Restricted" vs "does not exist" differences | **0 / 400** | same file |
 | Prompt-injection failures | **0** in 1,152 injection-relevant requests | same file |
 | Tamper attacks caught | **6 / 6** | `submission/04_evidence/tamper_demo_output.txt` |
-| Automated tests | **1,131** backend tests passing, 0 failed (30 Oct, commit 831297e); 639 at submission (16 Oct); browser tests: 166 passed, 0 failed, 41 skipped (Playwright, mock mode, 30 Oct) | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
+| Automated tests | **1,274** backend tests passing, 0 failed, 4 skipped (30 Oct evening, cloud clean checkout, branch `final_v1.2-cloud`); 639 at submission (16 Oct); browser tests: 185 passed, 0 failed, 42 skipped (Playwright, mock mode, 30 Oct evening) | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
 
 How to read "0 / 7,374": see [EVIDENCE_NOTES.md](EVIDENCE_NOTES.md) §1.
 

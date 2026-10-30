@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-30T03:28:26.044022+00:00",
+ "generated_at": "2026-10-30T11:33:38.284059+00:00",
  "source": "evals/internal_brain/results.json",
- "git_sha": "e9d3dd27da19edfe20697a71a30781516b3e0afb",
+ "git_sha": "cef0ec769e7e177b37d370423073930d8aa70ac4",
  "stale": false,
- "run_date": "2026-10-30T03:27:29+00:00",
- "ib_code_sha256": "4fb75af01a825f1bd016e6b0bd2b4487c5aa62d7efb6fe78fdfe9717a31c69dd",
+ "run_date": "2026-10-30T10:39:38+00:00",
+ "ib_code_sha256": "e8a1d35c97a6f8e79d5967648cfa4243e3b7cb25a4a9eb268cc02346b1f07992",
  "full_run": true,
  "limit": 0,
  "leaks": 0,
@@ -46,7 +46,7 @@
  },
  "quality_findings": 14,
  "canaries_valid": true,
- "runtime_s": 116.7,
+ "runtime_s": 110.9,
  "per_mode": {
   "fake-capture": {
    "requests": 3687,
@@ -64,8 +64,8 @@
   }
  },
  "tests": {
-  "backend": 1131,
-  "e2e": 166
+  "backend": 1278,
+  "e2e": 185
  },
  "smoke": null,
  "note": "Numbers are from the latest full evaluation run."

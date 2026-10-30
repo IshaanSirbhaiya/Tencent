@@ -44,9 +44,9 @@ Since submission we have added:
 - **Deliverables from an answer:** a table or chart where every number is checked against its source line,
   with .csv and .pptx download.
 
-Test and eval status (30 Oct, on `final_v1.3`): 1,131 backend tests and 166 browser end-to-end tests pass,
-with 0 failures; the leak evaluation, re-run on the finals build, found 0 leaks in 7,374 adversarial
-requests, 0 differences in 400 paired questions and 0 failures in 1,152 injection-relevant requests. Hy3 via TokenHub
+Test and eval status (30 Oct, on `final_v1.3`, a clean run in the cloud): 1,274 backend tests pass with
+0 failures, and 185 browser end-to-end tests pass with 0 failures; the leak evaluation,
+re-run this evening on the final build, found 0 leaks in 7,374 adversarial requests, 0 differences in 400 paired questions and 0 failures in 1,152 injection-relevant requests. Hy3 via TokenHub
 is wired in; the live run is pending activation, so today's answers are quoted from the sources with the
 same checks. The platforms are mock servers that use the real APIs' shapes, and all data is synthetic.
 

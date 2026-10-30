@@ -164,8 +164,8 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Prompt injection planted on all four platforms | **0 hard failures** in 1,152 injection-relevant requests |
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 93.2% (quoted) to 97.1% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
-| Backend tests (Internal Brain) | **1,131 passed**, 0 failed (commit 831297e, 30 Oct 2026, cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
-| Web end-to-end tests (Playwright, axe checks) | 166 passed, 0 failed, 41 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, cloud: Linux, commit 831297e; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
+| Backend tests (Internal Brain) | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, to become `final_v1.3`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
+| Web end-to-end tests (Playwright, axe checks) | 185 passed, 0 failed, 42 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits

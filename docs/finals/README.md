@@ -4,7 +4,7 @@
 
 Everything written for the finals of the Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 (FinTech
 track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product inside it. Demo Day is
-3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are in the working tree, not committed; test re-run pending, final integration). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
+3 Nov 2026. Branch `final_v1.3` (`final_v1.0` is frozen); the laptop's 30 Oct evening work is on `final_v1.2` (the round-4 fixes are now committed on `final_v1.2-cloud`, to become `final_v1.3`, and covered by the clean-checkout cloud test run on the evening of 30 Oct). Judges should start at [../../INTERNAL_BRAIN.md](../../INTERNAL_BRAIN.md).
 
 | Start here | What it is |
 |---|---|
@@ -85,7 +85,7 @@ and the live Hy3 run.
 
 | File | What it holds |
 |---|---|
-| [TEST_REPORT.md](TEST_REPORT.md) | **Re-run pending (final integration)** after the evening fixes. The Playwright e2e suite on the finals UI: 166 passed, 0 failed, 41 skipped (need the live stack, the engine proxy or Hy3) in the 30 Oct cloud run at `831297e`; the earlier 124-passed run kept as history |
+| [TEST_REPORT.md](TEST_REPORT.md) | The Playwright e2e suite on the finals UI: 185 passed, 0 failed, 42 skipped (need the live stack, the engine proxy or Hy3) in the clean-checkout cloud run on the evening of 30 Oct (branch `final_v1.2-cloud`); the same run's backend, mock platform and fixture counts; the earlier runs (166 passed at `831297e`, 124 passed on `final_v1.0`) kept as history |
 | [QA_LIVE.md](QA_LIVE.md) | Every page × persona run against the live backend: 32 checks, 11 bugs fixed, 4 open issues (§4; two more fixed in 8582f4b) |
 | [../../databridge/evals/internal_brain/RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md) | The leak and injection evaluation, re-run 30 Oct on the finals pipeline |
 

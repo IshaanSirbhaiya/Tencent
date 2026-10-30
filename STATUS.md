@@ -5,8 +5,8 @@ Product: **Walnut DataBridge**, with **Internal Brain** as the ask product insid
 Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals/PLAN.md](docs/finals/PLAN.md).
 Every feature and its test: [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since
 the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md). As of branch `final_v1.3` (30 Oct, cloud)
-plus the laptop's evening work on `final_v1.2` (below; the round-4 fixes are in the working tree, **not committed**, and
-**no full test re-run covers them yet: re-run pending (final integration)**).
+plus the laptop's evening work on `final_v1.2` (below; the round-4 fixes are now committed on `final_v1.2-cloud`,
+to become `final_v1.3`, and the full test re-run on a clean checkout in the cloud on the evening of 30 Oct covers them).
 
 More 30 Oct evening documents: [MERGE_PLAN.md](docs/finals/MERGE_PLAN.md) (the teammate's three branches, nothing merged) ·
 [app_mode/PLAN_v2.md](docs/finals/app_mode/PLAN_v2.md) (the "Demo story" app mode, planned, not built) ·
@@ -54,11 +54,11 @@ More 30 Oct evening documents: [MERGE_PLAN.md](docs/finals/MERGE_PLAN.md) (the t
 
 | Check | Result | Where |
 |---|---|---|
-| Backend tests (Internal Brain) | **Re-run pending (final integration)**; the number is from the cloud run, before the evening fixes. **1,131 passed**, 0 failed, commit 831297e, 30 Oct 2026, cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1` | `databridge/apps/internal_brain/tests/` |
-| Mock platforms, fixtures, web typecheck | Mock platforms 154 passed; fixtures (enterprise) 47 passed; web `tsc --noEmit` clean (30 Oct 2026, cloud: Linux, commit 831297e) | `databridge/apps/mock_platforms/tests/`, `databridge/fixtures/`, `databridge/apps/internal_brain_web/` |
-| Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT; re-run again on this tree in the cloud after the day's backend changes, unchanged) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
+| Backend tests (Internal Brain) | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, to become `final_v1.3`) | `databridge/apps/internal_brain/tests/` |
+| Mock platforms, fixtures, web typecheck | Mock platforms 159 passed; fixtures (enterprise) 47 passed; web `tsc --noEmit` clean (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`) | `databridge/apps/mock_platforms/tests/`, `databridge/fixtures/`, `databridge/apps/internal_brain_web/` |
+| Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT; re-run again in the cloud on the evening of 30 Oct, unchanged) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152; recall 100% | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
-| Web end-to-end tests (Playwright, axe) | **Re-run pending (final integration)**; before the evening fixes. 166 passed, 0 failed, 41 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, cloud: Linux, commit 831297e; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Web end-to-end tests (Playwright, axe) | 185 passed, 0 failed, 42 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
 
 ## 3. Pending
 

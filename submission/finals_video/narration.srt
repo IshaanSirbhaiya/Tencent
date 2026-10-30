@@ -292,7 +292,7 @@ Four hundred paired questions: zero differences.
 
 74
 00:06:33,250 --> 00:06:40,450
-And one thousand one hundred and thirty-one backend tests, plus a hundred and sixty-six browser tests, none failing.
+And one thousand two hundred and seventy-eight backend tests, plus one hundred and eighty-five browser tests, none failing.
 
 75
 00:06:43,300 --> 00:06:45,100
