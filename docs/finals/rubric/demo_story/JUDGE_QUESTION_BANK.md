@@ -316,6 +316,22 @@ and gets the constant refusal for every one of them.
 
 **Weaker, do not lead with:** `jdoe` `How often are laptops refreshed?` answers correctly (three years, from the IT helpdesk FAQ) but opens with older `#random` chatter and a laptop-refresh draft from the original world.
 
+## New features: what to show when a judge says "can it also...?" (added 30 Oct)
+
+These are not new question strings. They are the click paths for the features added since the round-3 reviews, taken from the committed specs and contracts. **They were not re-run in this pass** (no servers were started); time each once on the stage stack before offering it. What to say aloud for each is in [QA_BANK.md](QA_BANK.md) Q26 to Q41. Demo features need the demo launcher (`IB_DEMO_FEATURES=1`, set only by `demo_up.sh`); Deliverables needs `/ib/status` to show `deliverables.enabled: true`.
+
+| # | Feature | Sign in as | Do this | Must show | Spec or test behind it | Say (QA_BANK) |
+|---|---|---|---|---|---|---|
+| N1 | Act: draft a reply | `amy.am` | Velquarry starter question, **Ask**, then **Draft the reply** | "Draft for your review"; wording only from the cited sources; nothing is sent | `act.spec.ts`; `test_act.py::test_draft_is_ledgered_first_with_a_digest_and_no_text`; `contracts/backend_v1.md` "v3" | Q26 |
+| N2 | Act: ticket after confirm | `jdoe` | His migration question, **Create a ticket**, **Create ticket in DBMIG** | Ticket `DBMIG-<n>` created only after the confirm click; link goes through the gated `/ib/open/` route | `act.spec.ts` (lines around "Create ticket in DBMIG"); `test_act.py::test_ticket_is_proposed_then_created_only_after_confirm`; `backend_v1.md` "Act v3.1" | Q26, Q27 |
+| N3 | Deliverables: table and chart | `leo.ops` | Ask `Can we offer multi-currency accounts to an Indonesian SME?`, then "Turn this answer into" Table or Chart (or `D` on stage) | Table and chart from the cited Drive source (df-3); FX margin by market SG 0.35, HK 0.35, ID 0.4 (as checked on 30 Oct against the mock world; re-check); a Download .csv and, when the response lists it, .pptx | `deliverables/STATUS.md` §2 (live API check); `test_deliverables.py`; `deliverables.spec.ts` | Q28, Q29 |
+| N4 | Deliverables: Analysis with no model | `leo.ops` | Same answer, **Analysis** | "Needs the model (Hy3)" while Hy3 is not live. Do not skip this: it is the honest line | `CHANGELOG.md` (`d8f8de7`); `deliverables/STATUS.md` (`needs_model`) | Q37 |
+| N5 | Live growth | `jdoe` and `ken.ext` | `/present?present=1&grow=1` after a sign-in; `P`, then `Space` x 5 | Jordan's note in "Just added"; Ken's side empty; Jordan answerable with citation, Ken the constant refusal | `presenter.spec.ts` "the ?grow=1 walk-up runs on Space alone"; `test_live_growth.py` (Ken tests) | Q30, Q31 |
+| N6 | Upload a file | `jdoe` or another employee with write access to the folder | **Add a document**, Upload tab, a sample from `docs/finals/live_kit/files/`; the folder is typed by id (no picker) | Drive stores it; it appears in the feed when the webhook arrives (the poll is a 120 s fallback); people who can open the folder get a cited answer, others the constant refusal | `contracts/uploads.md` §1 to §5; `test_uploads.py::test_live_kit_upload_end_to_end` | Q32, Q33 |
+| N7 | WorkBuddy extra tools | Jordan's WorkBuddy seat | Ask for the answer receipt or "what can I open" | Replies from the new MCP tools (`my_answer_receipt`, `what_can_i_open`); the compliance tools stay on their own seat or workspace (D-30) | `TENCENT_TOOLS_REPORT.md` §3; GUI retest still open (`WORKBUDDY_GUI_TEST.md`) | Q38 |
+
+**Do not offer live:** Summary (not built, D-29); scanned PDFs or images (no OCR, `uploads.md` §3); anything from the teammates' voice, just-in-time or "dots" work ([TEAM] placeholders in QA_BANK Q41); the mouse side buttons or app mode (planned, QA_BANK Q40). A live Hy3 answer is not shown until `/ib/status` shows Hy3 active and one answer was seen.
+
 ## Do not ask these live (checked, weak or risky)
 
 | Persona | Question | Why |
