@@ -50,5 +50,19 @@ re-run this evening on the final build, found 0 leaks in 7,374 adversarial reque
 is wired in; the live run is pending activation, so today's answers are quoted from the sources with the
 same checks. The platforms are mock servers that use the real APIs' shapes, and all data is synthetic.
 
+> **ALTERNATIVE model paragraph (model ON): read this note first.** The email above links
+> `final_v1.3`, which does **not** contain the stand-in model (it exists only from `final_v1.4`). Use the
+> alternative below **only if** the Project link above is changed to `final_v1.4` **and** `final_v1.4` has
+> been verified (tests and leak eval re-run on it). Otherwise keep the current paragraph above unchanged and
+> delete this block before sending. If you use it, it replaces the two sentences from "Hy3 via TokenHub is
+> wired in" to "with the same checks", and the "on `final_v1.3`" in the test line must be changed to the
+> verified branch.
+>
+> *Alternative:* "Hy3 via TokenHub is wired in; the live run is pending activation. Until then an external
+> stand-in model, switched on for the demo and off by default, writes answers from the cited, permitted
+> passages only, under the same two permission checks and the same grounding check, and its answers are
+> labelled as AI-generated, never as Hy3. The leak evaluation uses a capturing test model and the quoting
+> path, not the stand-in."
+
 Best regards,
 Ishaan Sirbhaiya, for Team Walnut (Ishaan, Dev, Mehul, Aaruni)

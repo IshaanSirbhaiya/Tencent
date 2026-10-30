@@ -48,6 +48,7 @@ this evening, unchanged: 0 leaks / 7,374, 0/400 pairs differ, 0 injection hard f
 | Backend | `/ib/map`: the in-flight build is keyed by session |
 | Branches | `final_v1.3` moved to the verified commit |
 | Graph galaxy | Finished on `feat/graph-galaxy` at `d4ae49e`; **not merged** |
+| Stand-in model ON (`final_v1.4`) | Neutral labels when the stand-in model answers: slides name Hy3/TokenHub only when `active_provider` is TokenHub; deliverable and draft by-lines say "AI-generated from your cited sources" (en + 简体中文); `demo_up.sh` keeps the stand-in on when TokenHub is not live and no TokenHub key is set; new `test_standin_labels.py`. Docs: "Model ON" variants of the honest-limits line (INTERNAL_BRAIN.md, README.md), QA_BANK section D, PRESENTER_KEYS HUD note, ORGANISER_UPDATE alternative paragraph (only with a verified `final_v1.4` link) |
 | Teammate merge | `final_mehulupdates` is being merged on `final_v1.4` (work in progress) |
 
 ## 30 Oct 2026, evening (laptop)

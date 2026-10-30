@@ -171,6 +171,11 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 ## 5. Honest limits
 
 - **Hy3 has not run live.** Wired; live run pending TokenHub activation.
+  *Model ON variant (when the stand-in model is on):* **Hy3 has not run live.** Wired; live run pending
+  TokenHub activation. Demo answers come from an external stand-in model, behind the same gates and
+  grounding check, labelled "AI-generated from your cited sources", never as Hy3. *Switch step:* use this
+  variant only after `/ib/status` on the stage laptop shows `models.active: true` and
+  `active_provider: "standin"`; otherwise keep the line above.
 - **The platforms are mocks** with the real API shapes. The connector code would be the same against a
   real tenant, but it has not been run against one.
 - **Demo history is replay.** About 300 questions were asked through the real pipeline by a script, with

@@ -253,7 +253,9 @@ bash; the commands are in [README.md → Fallback](README.md#fallback-start-each
   ```
 
   With a TokenHub key, `demo_up.sh` checks TokenHub first (`scripts/hy3_check.py --quiet`) and turns
-  the model on by itself only if it answers; set `IB_FORCE_OFFLINE=0` or `1` to decide yourself. To
+  the model on by itself only if it answers; set `IB_FORCE_OFFLINE=0` or `1` to decide yourself.
+  Without a TokenHub key, `demo_up.sh` stays online only when the opt-in stand-in model is switched on
+  in `.env.ib.local` (a configured TokenHub key always takes precedence over it). To
   check by hand: `PY scripts/hy3_check.py` (exit 0 live, 1 not live, 2 no key; today it reports
   401006, "not activated").
 
@@ -371,6 +373,15 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 - **Hy3 has not been run live.** The TokenHub call is wired in and tested with a capturing test model;
   the live run is pending TokenHub activation. All numbers above come from that capturing test model and
   the deterministic quoting path. Demo answers are quoted from the sources and say so.
+
+  *Model ON variant.* When the stand-in model is on: **Hy3 has not been run live.** The TokenHub call is
+  wired in and tested with a capturing test model; the live run is pending TokenHub activation. Demo answers
+  are written by an external stand-in model from the cited, permitted passages, pass the same grounding
+  check, and are labelled "AI-generated from your cited sources", never as Hy3. All numbers above come from
+  the capturing test model and the deterministic quoting path; the leak eval has no mode for the stand-in.
+  *Switch step:* the founder swaps this bullet for the Model ON variant only after the private model-ON
+  checks pass on the stage laptop (`/ib/status` shows `models.active: true` and
+  `active_provider: "standin"`); with the stand-in off, keep the bullet above.
 - **Demo history is replay.** `--fresh` seeds about 300 questions through the real pipeline with past
   dates. They are labelled `replay` in the ledger and in Analytics, which offers "Live only".
 - **Simulator Reset** now runs a full reconciliation, so a revocation is undone at once (fixed in 8582f4b,

@@ -34,6 +34,11 @@ Single-key shortcuts are a WCAG 2.1.4 risk. So:
 Everything on the run sheet must be reachable by these keys alone.
 
 The HUD's model dot reads "quoting (no model)" (引用模式（无模型）) when no model is live (stage QA 30 Oct #5).
+When the stand-in model is on: the model dot reads "live" (在线), never "quoting (no model)"; it shows
+whether *a* model is active, not which one. Hy3 and TokenHub appear on the slides and the preflight board
+only when `/ib/status` reports `active_provider: "tencent-tokenhub"`; with the stand-in they do not, and
+the preflight says "AI model active". Say "an AI model", never Hy3. If the dot drops back to "quoting (no
+model)" mid-run (spend cap reached or the stand-in switched off), use the default lines.
 
 Steps 05 (Verify) and 06 (tamper) are ready only once their result is on screen: the Verify result, or "Chain broken at entry N" (stage QA 30 Oct #3).
 
@@ -153,7 +158,7 @@ Three full-screen slides rendered by the app so the Stage theme and fonts match.
 **Business slide** (`/present/business`):
 - One number: about US$1.3M a year, labelled "estimate".
 - Four inputs on the slide (default case in the repo research: 600 staff, 90 minutes saved per person per week, US$31 an hour, 46 weeks). Confirm against the one-pager.
-- One Tencent stack line [ONLY IF HY3 LIVE for the Hy3 part; default: "WorkBuddy, CodeBuddy, TokenHub (Hy3 wired, live run pending); a Lighthouse deploy kit, no live instance"]. State only what is live ([HY3] check).
+- One Tencent stack line [ONLY IF HY3 LIVE for the Hy3 part; default: "WorkBuddy, CodeBuddy, TokenHub (Hy3 wired, live run pending); a Lighthouse deploy kit, no live instance"]. State only what is live ([HY3] check). When the stand-in model is on: the same default line; the stand-in is not a Tencent product and is not named.
 
 **Close slide** (`/present/close`):
 - The tagline in large type: "Answers you can prove."
