@@ -25,5 +25,5 @@ we never make.
 | Number | Caveat |
 |---|---|
 | **0 leaks in 7,374** adversarial requests | Capturing fake model + extractive path; Hy3 not live; re-run 30 Oct on the finals code |
-| **1,274 backend tests** passing, 0 failed, 4 skipped (30 Oct evening, branch `final_v1.2-cloud`) | Cloud clean-checkout run (Linux, Python 3.13); CI run on GitHub not yet recorded |
+| **1,274 backend tests** passing, 0 failed, 4 skipped (30 Oct evening, branch `final_v1.2-cloud`) | Cloud clean-checkout run (Linux, Python 3.13); CI on GitHub green: 17 successful runs on GitHub Actions, 29–30 Oct, 0 failed (backend tests + web typecheck); latest [run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962)|
 | **~20 ms** pipeline latency | Model time excluded; mock platforms on localhost |

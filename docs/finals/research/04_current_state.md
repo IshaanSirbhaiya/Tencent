@@ -418,7 +418,7 @@ Port 3101 is used only by the Playwright config (`playwright.config.ts:5`). Port
 5. **Refusal questions can get a loose answer.** RESULTS.md reports 14 cases where an expected refusal was answered from a related permitted page (for example "When is the next settlement key rotation?"). The relevance gate is lexical (`INTERNAL_BRAIN.md`, "Honest limits"). A judge who asks an off-script refusal question may get an irrelevant but permitted answer.
 
 **Latency and reliability**
-6. **The model has never run.** hy3 is pending a TokenHub key (`RESULTS.md`, `INTERNAL_BRAIN.md`). If a judge sets `IB_FORCE_OFFLINE=0`, latency and failure modes are unknown. The fallback is designed to work, but has not been timed.
+6. **Hy3 has not run live** (30 Oct: still true for Hy3; see STATUS). hy3 is pending a TokenHub key (`RESULTS.md`, `INTERNAL_BRAIN.md`). If a judge sets `IB_FORCE_OFFLINE=0`, latency and failure modes are unknown. The fallback is designed to work, but has not been timed.
 7. **Start-up takes about a minute** because `build_app` syncs every platform before uvicorn starts (`bootstrap.py:126-127`, `146`). The port does not open until then, so a demo started late will show "temporarily unavailable" until it is ready.
 8. **The map is slow by design.** Each item is checked live before listing (`INTERNAL_BRAIN.md`: "a big map takes a few seconds"). `api.map()` is deduplicated in the browser (`lib/api.ts:154-157`).
 9. **Gate 2 budget.** One batch gets 2 s in total (`pipeline.py:80`, `gates.py:44`), and linked objects get a second 2 s check (`pipeline.py:143`). Slow platforms silently drop documents (fail closed, so the answer is smaller, not wrong).
