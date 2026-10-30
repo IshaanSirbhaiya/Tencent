@@ -975,3 +975,26 @@ Response 200: the file bytes. Headers: `content-type` `text/csv; charset=utf-8` 
 Never a title, cell, label or sentence. They appear in `/audit/events`, the request's journey, the
 asker's receipt and `/audit/stats` (totals `deliverables_requested`, `deliverables_created`,
 `deliverables_exported`, `deliverables_failed`).
+
+# v5 (30 Oct): the answer's `model.reason_code` (Story 1 fixes, D-43, D-44)
+
+`model` on `/ib/ask`, `/ib/ask/stream`, the trace receipt, the journey and `answer.released` gains an
+optional `reason_code`. It is **omitted** when unset, so every other answer's bytes are unchanged.
+
+| `model` | Meaning | Label (EN) |
+|---|---|---|
+| a model's provider and id, `fallback_used: false` | the model wrote it (grounding wall passed) | "AI model" (named models keep their names) |
+| a model's provider and id, `fallback_used: true` | a second model in the chain wrote it after the first failed | as above; tooltip says a second model wrote it |
+| `deterministic`, `reason_code: "quoted_approved_script"`, `fallback_used: false` | D-43: the quote cites approved wording only; no model call | "Approved wording, quoted exactly" |
+| `deterministic`, `reason_code: "model_rejected_evidence"`, `fallback_used: true` | a model answered; its text failed the grounding wall or cited no released passage; the quote was served | "Quoted from sources: the AI wording did not pass the evidence check" |
+| `deterministic`, `reason_code: "model_unavailable"`, `fallback_used: true` | no model gave a usable reply (timeout, error, rate limit, empty); the quote was served | "Quoted from sources: the AI model did not reply in time" |
+| `deterministic`, no `reason_code`, `fallback_used: false` | no model is configured (or nothing was released: a refusal) | "Quoted from sources (no AI model on)" |
+
+```json
+"model": {"provider": "deterministic", "model": "extractive-v1", "fallback_used": true,
+          "reason_code": "model_rejected_evidence"}
+```
+
+The codes are `databridge_ib/narrate.py` `REASON_CODES`; the web maps them in
+`components/user/answerText.ts` (`answerSource`, `modelLabelKey`, `modelTipKey`), EN and 简体中文.
+`prompt_version` for answers is now `ib-prompt-2026-10-30.1` (the status-facts rule).

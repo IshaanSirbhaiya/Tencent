@@ -1167,3 +1167,34 @@ Details and tests: `docs/finals/reviews/round4_dispositions.md`, section "Opus w
 - `demo_up.sh` sources `.env.ib.local` only inside the Internal Brain's subshell; the other processes get only the shared values they must agree on (read once by bash in a throw-away subshell that prints only those keys, so the mocks, the seeder and the Brain hold the same strings). Next, the mock platforms, the seeder and the engine never receive the TokenHub key or the IB's signing keys from the key file, and `demo_up.sh` also removes `TOKENHUB_API_KEY` from their environment when the parent shell has it (round-5 Opus #2, #11). Other variables the parent shell holds are inherited as usual.
 - `hy3_check.py` refuses a `TOKENHUB_BASE` that is not https (plain http only to loopback) or that carries credentials, before the key is sent (exit 2; `tests/test_round2_kit.py`).
 - `fill_template.py` uses the server's CSV formula prefixes (full-width forms and Unicode spaces included) plus a leading double quote (`tests/test_round2_kit.py`).
+
+### 15.16 Story 1 workflow-test fixes (30 Oct): the approved-script skip, fallback reasons, log hygiene
+
+**Approved wording is quoted without a model call (D-43).** `pipeline.py` decides BEFORE any model call,
+from the released passages alone (both gates already applied): when the deterministic quoted answer
+cites approved scripts or templates and nothing else (`narrate.quote_only`, title marker
+`narrate.APPROVED_SCRIPT_TITLE`), it is served as is, with `model.reason_code: "quoted_approved_script"`.
+- Why the cited set and not the released set: the cited passages are exactly what is served and what a
+  model would re-word; up to 14 passages are released per ask, so requiring every released passage to be
+  a script would almost never fire. Both are functions of the released passages and the question only.
+- P2: a document the asker cannot open is never released, so it cannot change the decision. Tested with
+  paired worlds: a restricted "approved" script (`tests/test_quoted_script_skip.py`) and a restricted
+  non-script page worded to rank for the same question
+  (`tests/test_story1_fixes.py::test_a_hidden_non_script_document_does_not_change_the_skip`); real vs
+  non-existent customer stays byte-identical with the model on.
+- The leak eval accepts a skip only when it re-derives it: no model call, the answer equal to the
+  deterministic quote, every cited passage approved wording (`evals/internal_brain/capture.py`).
+
+**Fallback reasons.** A quoted answer after a model try carries `model_rejected_evidence` (the grounding
+wall refused the text, or it cited no released passage) or `model_unavailable` (timeout, error, empty).
+The reason comes from the model's behaviour on released passages only; with nothing released no model is
+called and no code is set, so it adds no restricted-vs-absent signal (`test_p2_holds_with_the_fallback_reasons`).
+The labels name no provider.
+
+**Log hygiene.** The HTTP client loggers (`httpx`, `httpx2`, `httpcore` and the SDK loggers) printed every
+request URL, including a model endpoint's host, at INFO. `bootstrap.configure_logging()` at start-up and
+`build_app()` set them to WARNING (`bootstrap.QUIET_LOGGERS`), so `ib.log` names no endpoint host or URL;
+their warnings and errors still log (`tests/test_story1_fixes.py::test_http_client_request_lines_never_reach_the_log`).
+
+**Bounded model wait.** The stand-in answer call waits at most `IB_MODEL_ANSWER_TIMEOUT_S` (default 12 s,
+1 to 120 s, no SDK retry); then the quoted answer is served with `model_unavailable`.
