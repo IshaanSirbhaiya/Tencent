@@ -330,8 +330,9 @@ def test_answers_are_quoted_when_the_daily_cap_is_used(tmp_path):
     chain = claude_chain(client=fake, guard=_guard(tmp_path / "g", daily_usd=0.0))
     app, svc = _world(tmp_path / "w", chain=chain)
     ans = _ask(_c(app, svc, "jdoe"))
+    # a cap refusal is "no model reply": the label says the model was unavailable (Story 1 fix #2)
     assert fake.calls == [] and ans["model"] == {"provider": "deterministic", "model": "extractive-v1",
-                                                 "fallback_used": True}
+                                                 "fallback_used": True, "reason_code": "model_unavailable"}
     assert ans["citations"]                                    # quoted from the sources
     rel = _events(svc, "answer.released")[-1]
     assert rel.model.model == "extractive-v1" and rel.model.fallback_used is True

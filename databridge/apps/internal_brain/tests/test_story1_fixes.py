@@ -410,7 +410,7 @@ def test_amys_measured_model_answer_is_inside_the_model_threshold():
     ({"provider": "deterministic", "model": "extractive-v1", "reason_code": "quoted_approved_script"},
      "approved wording, quoted"),
     ({"provider": "deterministic", "model": "extractive-v1", "fallback_used": True,
-      "reason_code": "model_unavailable"}, "quoted, the model did not reply in time"),
+      "reason_code": "model_unavailable"}, "quoted, the model was unavailable or too slow"),
 ])
 def test_preflight_rows_never_print_a_raw_model_id(model, want):
     got = _preflight().answer_by(model)

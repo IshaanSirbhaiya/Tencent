@@ -77,7 +77,7 @@ def ask_limit_s(model: Optional[dict], quoted_max_s: float = QUOTED_MAX_S,
 #: why a quoted answer was served (``model.reason_code``, docs/finals/backend_v1.md)
 _QUOTED_WHY = {"quoted_approved_script": "approved wording, quoted",
                "model_rejected_evidence": "quoted, the model's draft failed the evidence check",
-               "model_unavailable": "quoted, the model did not reply in time"}
+               "model_unavailable": "quoted, the model was unavailable or too slow"}
 
 
 def answer_by(model: Optional[dict]) -> str:

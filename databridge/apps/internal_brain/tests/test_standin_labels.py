@@ -149,8 +149,9 @@ def test_answer_badge_for_the_standin_is_neutral_in_both_languages():
     assert "if (m.provider === 'deterministic' || id.startsWith('extractive')) return 'extractive';" in ans
     assert "return 'ai';" in ans and "ai: 'answer.model.ai'" in ans
     user = _read("lib/i18n/user.ts")
-    assert "'answer.model.ai': 'AI-generated from your cited sources'" in user
-    assert "'answer.model.ai': '由 AI 根据您引用的来源生成'" in user
+    # Story 1 QA: the badge says "AI model" and the note beside it says "AI-generated" (once)
+    assert "'answer.model.ai': 'AI model'" in user
+    assert "'answer.model.ai': 'AI 模型'" in user
 
 
 def test_presenter_hud_says_quoting_only_without_a_model_and_slides_name_hy3_only_for_tokenhub():

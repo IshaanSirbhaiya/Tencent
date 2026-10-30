@@ -987,7 +987,7 @@ optional `reason_code`. It is **omitted** when unset, so every other answer's by
 | a model's provider and id, `fallback_used: true` | a second model in the chain wrote it after the first failed | as above; tooltip says a second model wrote it |
 | `deterministic`, `reason_code: "quoted_approved_script"`, `fallback_used: false` | D-43: the quote cites approved wording only; no model call | "Approved wording, quoted exactly" |
 | `deterministic`, `reason_code: "model_rejected_evidence"`, `fallback_used: true` | a model answered; its text failed the grounding wall or cited no released passage; the quote was served | "Quoted from sources: the AI wording did not pass the evidence check" |
-| `deterministic`, `reason_code: "model_unavailable"`, `fallback_used: true` | no model gave a usable reply (timeout, error, rate limit, empty); the quote was served | "Quoted from sources: the AI model did not reply in time" |
+| `deterministic`, `reason_code: "model_unavailable"`, `fallback_used: true` | no model gave a usable reply (timeout, error, rate limit, empty); the quote was served | "Quoted from sources: the AI model was unavailable or too slow" |
 | `deterministic`, no `reason_code`, `fallback_used: false` | no model is configured (or nothing was released: a refusal) | "Quoted from sources (no AI model on)" |
 
 ```json

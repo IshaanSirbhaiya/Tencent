@@ -22,7 +22,7 @@ Rules: one speaker at a time; hand-offs by name ("Mehul, over to the compliance 
 - **`R` is the recovery key**: after a confirm it signs every demo session in the browser out, clears the presenter state and returns to step 0. It restores nothing and never edits the real ledger (the tamper step only ever changes a copy).
 - **WorkBuddy question, one exact string everywhere:** `What's the status of the database migration project and were there any blockers raised in Slack last week?`
 - **Rachel's case page ("Open as page")**: the page beside the chat should open by itself for a case overview (D-44, the decide prompt). It is a model decision, so it is not guaranteed: if no page opens after Rachel's answer, click **"Open as page"** under the answer. That is the stage step; it builds the same checked page.
-- **Answer labels with a model on**: Amy's approved script is quoted on purpose and labelled "Approved wording, quoted exactly" (D-43). A quoted answer after a model try says why ("did not pass the evidence check" or "did not reply in time"). Never call a quoted answer "no model" while a model is on.
+- **Answer labels with a model on**: Amy's approved script is quoted on purpose and labelled "Approved wording, quoted exactly" (D-43). A quoted answer after a model try says why ("did not pass the evidence check" or "was unavailable or too slow"). Never call a quoted answer "no model" while a model is on.
 - **The Q&A warm-up** now starts at the proof step (08), not after step 01, so it never holds the sign-in that step 03 needs; a step waits at most 8 s for it.
 - Every line that names Hy3 as the author of an answer is tagged [ONLY IF HY3 LIVE] and has a default alternative ("quoted from the sources, with the same checks").
 
