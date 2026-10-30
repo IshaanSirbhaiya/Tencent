@@ -35,3 +35,30 @@ count note. H15–H17 needed no change. H7 (stale test counts) is done in the fi
 
 All five are done and tested. The table is in `docs/finals/deliverables/STATUS.md` §5.2. Item 4 (the PPTX
 formula guard, T15) was built in this session and fails when the guard is removed.
+
+## 5. Opus and Codex (Act, tools and kit), commit ca014cd unless noted
+
+| Finding | Disposition |
+|---|---|
+| Opus #1 / Codex #8: no Act rate limit; global proposal eviction | **Fixed.** Per person, 10 drafts or proposals and 10 confirms a minute, then 429 (`action.failed` stage `rate`). At most 5 pending proposals per person, and a new one evicts only that person's oldest. If the store is full of other people's proposals, the answer is a 409 `capacity`. Tests in `test_act_round2.py` |
+| Opus #2: ticket links expose restricted ids (rule 4) | **Fixed.** The ticket says "Source N" and links to an opaque `/ib/open/<hmac>`. That link runs Gate 1 and Gate 2 for whoever clicks it: 303 if they can open the source, otherwise the one 404. It writes `doc.viewed` first. Limit: one token per document |
+| Opus #5 / Codex #3: confirm doesn't re-check the cited sources | **Fixed.** Confirm re-runs the context check for the confirming user (409 `sources_changed`, without saying which source) |
+| Codex #1 (high) / Opus 409-after-timeout: an unknown Jira outcome is reported as "nothing changed" | **Fixed in the backend.** Timeout, 5xx or a malformed success returns 409 `outcome_unknown`. A repeat confirm replays the known result, and no second create is allowed while the outcome is unknown (15 min). No Jira retries. State is in memory only (documented in backend_v1 v3.1). The web copy is in §6 |
+| Codex #2 (high): cleanup kills unrelated processes | **Partly fixed.** `demo_up.sh` stop and `demo_day.ps1` stop only processes whose command line holds the repo path; any others are reported. PowerShell was not run in the cloud. Not done: recording our own PIDs, and `run_walnut_original.sh stop` (8300/3300) |
+| Opus: `check_absent.py` reads `count` | **Fixed:** it reads `documents_containing` (`test_round2_kit.py`) |
+| Opus smaller items | **Fixed:** `--fresh` refuses `..` and paths outside `var/`; `fill_template` takes a basename only, won't overwrite, and guards CSV formulas; `*.tok` is ignored; `hy3_check` needs real reply text (Codex 2b #1); the default summary is neutral. The presenter-P docstring was already correct |
+| Codex 2b #2: `fill_template` path traversal | **Fixed** (same as above) |
+| Codex 2b #3: a failed video re-record overwrites marks | **Not fixed.** The video is on hold; listed for the laptop session |
+
+## 6. Round-2b Opus (`round2b_opus_unreviewed.md`)
+
+| Finding | Disposition |
+|---|---|
+| M1: a model draft adds claims its sources never made | **Fixed** (7fa6319). Each draft sentence must take ≥ 80 % of its content words from the facts it is tagged with (CJK counted per character). Otherwise it is dropped, and the draft falls back to the cited sentences. The test uses the review's three sentences |
+| M2: MCP output unframed; three identities in one WorkBuddy | **Fixed** (2b339c8). Every source-derived string is framed as data, never instructions, and forged markers are neutralised. `--user-config` no longer writes `ib-compliance`; `--compliance-user-config` writes it alone. Tests prove the frame is present, not that an agent obeys it |
+| L3: the mock Jira checks the reporter, unlike real Jira | **Fixed** (2b339c8). The mock checks the caller, and a new e2e test shows the IB re-check alone refuses a revoked permission |
+| L4: voice keeps the mic on after Send | **Fixed** (2b339c8). Dictation stops on Send, busy or typing, and late results are dropped. e2e added |
+| L5: cheat sheet R/S/Esc wrong; D and 2 missing | **Fixed** (2b339c8), PDF rebuilt |
+| L6: passcode sent to any host | **Fixed** (2b339c8): loopback only unless `--allow-remote`, and never plain http to a remote host |
+| L7: the video hard-codes "Hy3 not switched on yet" | **Fixed** (2b339c8): the mark follows `/ib/status` |
+| Info: mic prompt on stage; dictation needs the network | **Not fixed.** Founder item: grant mic permission on the demo profile once, and don't use dictation in the offline rung |
