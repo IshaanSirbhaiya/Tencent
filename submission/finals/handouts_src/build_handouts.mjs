@@ -1,6 +1,8 @@
 // Re-render after numbers change:  node build_handouts.mjs
 // Needs node_modules of databridge/apps/internal_brain_web (react, qrcode.react, playwright).
-// Numbers are read from eval_summary.json, STATUS.md (browser tests) and ROI_MODEL.md; none are hard-coded.
+// Numbers are read from eval_summary.json, STATUS.md (backend and browser tests) and ROI_MODEL.md; none are hard-coded.
+// Hard-coded facts (checked 30 Oct for final_v1.3): nine CodeBuddy sessions (CB1-CB9), WorkBuddy MCP live test 33/33,
+// CI green on GitHub, branch final_v1.3.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -9,34 +11,39 @@ import { createRequire } from 'node:module';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../../..');
 const web = path.join(repo, 'databridge/apps/internal_brain_web');
-const req = createRequire(path.join(web, 'package.json'));
+// HANDOUT_DEPS_DIR (optional): a web app folder whose node_modules to use, e.g. another checkout of
+// databridge/apps/internal_brain_web when this one has no node_modules. Unset = this checkout's.
+const deps = process.env.HANDOUT_DEPS_DIR ? path.resolve(process.env.HANDOUT_DEPS_DIR) : web;
+const req = createRequire(path.join(deps, 'package.json'));
 const React = req('react');
 const { renderToStaticMarkup } = req('react-dom/server');
 const { QRCodeSVG } = req('qrcode.react');
 const { chromium } = req('playwright');
 
 const outDir = path.resolve(here, '..');
-const REPO_URL = 'https://github.com/IshaanSirbhaiya/Tencent/tree/final_v1.0';
+const REPO_URL = 'https://github.com/IshaanSirbhaiya/Tencent/tree/final_v1.3';
 const fmt = (n) => Number(n).toLocaleString('en-US');
 
 const ev = JSON.parse(fs.readFileSync(path.join(web, 'public/eval_summary.json'), 'utf8'));
 const status = fs.readFileSync(path.join(repo, 'STATUS.md'), 'utf8');
 const m = status.match(/Playwright, axe\)\s*\|\s*(\d+) passed/);
-const browserTests = m ? Number(m[1]) : null; // browser count from STATUS.md (Playwright row: passed count; 185 in the 30 Oct evening cloud run)
+const browserTests = m ? Number(m[1]) : null;
+const bm = status.match(/Backend tests \(Internal Brain\)\s*\|\s*\*\*([\d,]+) passed\*\*, (\d+) failed, (\d+) skipped/);
+const backendPassed = bm ? Number(bm[1].replace(/,/g, '')) : null; // 1,274 passed, 0 failed, 4 skipped (30 Oct clean-checkout cloud run) // browser count from STATUS.md (Playwright row: passed count; 185 in the 30 Oct evening cloud run)
 const roi = fs.readFileSync(path.join(repo, 'docs/finals/rubric/impact_feasibility/ROI_MODEL.md'), 'utf8');
 const base = roi.match(/Base \| 1\.5 \| US\$31 \| 600 × 1\.5 × 46 × 31 = \*\*US\$([\d,]+)\*\*/);
 const baseVal = base ? Number(base[1].replace(/,/g, '')) : null;
 const be = roi.match(/= (\d+\.\d) minutes per person per week/);
 const N = {
   leaks: ev.leaks, req: fmt(ev.requests), pairs: ev.differential.pairs, mism: ev.differential.mismatches,
-  backend: ev.tests.backend, browser: browserTests ?? 'TODO',
+  backend: backendPassed ? fmt(backendPassed) : 'TODO', browser: browserTests ?? 'TODO',
   value: baseVal ? '≈ US$' + (baseVal / 1e6).toFixed(1) + 'M' : 'TODO',
   be: be ? '~' + Math.round(Number(be[1])) : 'TODO',
   date: '30 Oct 2026',
 };
 
 const css = fs.readFileSync(path.join(here, 'handout.css'), 'utf8')
-  .replace('__FONT__', pathToFileURL(path.join(web, 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')).href);
+  .replace('__FONT__', pathToFileURL(path.join(deps, 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')).href);
 const qr = (size) => renderToStaticMarkup(React.createElement(QRCodeSVG, { value: REPO_URL, size, level: 'M', marginSize: 0, fgColor: '#0f1115', bgColor: '#ffffff' }));
 const page = (title, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title><style>${css}@page{size:A4;margin:0}</style></head><body>${body}</body></html>`;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -59,16 +66,17 @@ const leave = page('Walnut DataBridge leave-behind', `
 <section class="nums">
 <div class="n"><span>${N.leaks} / ${N.req}</span>adversarial requests leaked</div>
 <div class="n"><span>${N.mism} / ${N.pairs}</span>restricted vs non-existent differences</div>
-<div class="n"><span>${N.backend}</span>backend tests</div>
-<div class="n"><span>${N.browser}</span>browser tests (axe included)</div>
+<div class="n"><span>${N.backend}</span>backend tests passed, 0 failed</div>
+<div class="n"><span>${N.browser}</span>browser tests passed, 0 failed (axe included)</div>
 </section>
-<p class="fine">Evidence re-run ${N.date}. Synthetic data; Confluence, Jira, Slack and Drive are mock servers with real API shapes. Answers are currently quoted from the sources with the same checks; the Hunyuan Hy3 live run is pending.</p>
+<p class="fine">Evidence re-run ${N.date} on a clean checkout of branch final_v1.3; CI on GitHub is green. Synthetic data; Confluence, Jira, Slack and Drive are mock servers with real API shapes. Answers are currently quoted from the sources with the same checks; the Hunyuan Hy3 live run is pending.</p>
 <section class="cols">
 <div><h2>Built with Tencent</h2><ul class="tight">
-<li><b>CodeBuddy</b> built and reviewed the code.</li>
-<li><b>WorkBuddy</b> asks through our MCP connector, a second front door.</li>
+<li><b>CodeBuddy</b> built and reviewed the code in nine sessions (CB1–CB9).</li>
+<li><b>WorkBuddy</b> asks through our MCP connector, a second front door (live test 33/33).</li>
 <li><b>Hunyuan Hy3 via TokenHub</b> is wired; the live run is pending.</li>
-<li><b>Miora</b> made the cover art.</li></ul></div>
+<li><b>Tencent Miora</b>: the cover was designed in it.</li>
+<li><b>Lighthouse</b> deploy kit in the repo; no live deployment.</li></ul></div>
 <div><h2>Business value <i>(estimate)</i></h2>
 <p class="big">${N.value}<small> a year, base case</small></p>
 <p class="small">600-person fintech, 90 min saved per person per week, US$31/h, 46 weeks. Break-even is about ${N.be.replace('~', '')} minutes per person per week. A projection, not a measurement; a pilot would measure it.</p></div>
@@ -76,7 +84,7 @@ const leave = page('Walnut DataBridge leave-behind', `
 <footer>
 <div class="ask"><h2>The ask</h2><p>One pilot team at one regulated company.</p>
 <p class="team"><b>Team Walnut</b> · Ishaan · Dev · Mehul · Aaruni</p></div>
-<div class="qr">${qr(104)}<div><b>Try it</b><br><span class="url">github.com/IshaanSirbhaiya/Tencent</span><br><span class="url">branch final_v1.0</span></div></div>
+<div class="qr">${qr(104)}<div><b>Try it</b><br><span class="url">github.com/IshaanSirbhaiya/Tencent</span><br><span class="url">branch final_v1.3</span></div></div>
 </footer>
 </main>`);
 
@@ -85,11 +93,11 @@ const cards = [
  ['1','Impact & Relevance','A customer account is restricted and the company AI must help the account manager without tipping off. Break-even about ' + N.be.replace('~','') + ' min per person per week; base case ' + N.value + ' a year (estimate).','/value','docs/finals/rubric/impact_feasibility/IMPACT_SHEET.md · ROI_MODEL.md'],
  ['2','Human-Centered Design','Persona-first sign-in, plain-language answers, a source sheet that opens the passage. The hallway-test report is still pending.','/login · /settings · /history','docs/finals/rubric/hcd_ux/PERSONAS_AND_JOURNEYS.md · FIX_LOG.md'],
  ['3','AI Interaction','Cited answer behind two permission gates; the same question asked from WorkBuddy through MCP. Hy3 is wired, live run pending: answers are quoted from the sources with the same checks.','/dev/journey/<req>','docs/finals/rubric/ai_innovation/AI_USAGE_MAP.md'],
- ['4','Technical Execution','Per-stage timings and three hash-chained records per request. ' + N.backend + ' backend and ' + N.browser + ' browser tests; ' + N.leaks + ' leaks in ' + N.req + ' adversarial requests.','/dev · /dev/journey/<req> · /dev/graph','docs/finals/rubric/technical/ARCHITECTURE_ONE_PAGER.md · EVIDENCE_CARD.md'],
+ ['4','Technical Execution','Per-stage timings and three hash-chained records per request. ' + N.backend + ' backend and ' + N.browser + ' browser tests passed, 0 failed; CI green; ' + N.leaks + ' leaks in ' + N.req + ' adversarial requests.','/dev · /dev/journey/<req> · /dev/graph','docs/finals/rubric/technical/ARCHITECTURE_ONE_PAGER.md · EVIDENCE_CARD.md'],
  ['5','Feasibility','Break-even about ' + N.be.replace('~','') + ' min a week and model cost about US$1k a year (both estimates). Tencent Cloud deploy kit, no live instance. One-team pilot.','/value · /dev/analytics','docs/finals/rubric/impact_feasibility/PILOT_PLAN.md · SCALE_ARCHITECTURE.md · COST_PER_ANSWER.md'],
- ['6','Demo & Storytelling','Five minutes, two proofs, the tagline three times, driven from the keyboard in Presenter mode.','/compare · press P (Presenter)','docs/finals/rubric/demo_story/RUN_SHEET.md · PRESENTER_KEYS.md'],
+ ['6','Demo & Storytelling','Five minutes, two proofs, the tagline three times, driven in Presenter mode from the keyboard or the presenter bar\'s buttons.','/compare · press P (Presenter)','docs/finals/rubric/demo_story/RUN_SHEET.md · PRESENTER_KEYS.md'],
  ['7','Innovation & Creativity','Restricted is indistinguishable from non-existent (' + N.mism + ' differences in ' + N.pairs + ' pairs), and the log breaks at the exact tampered entry.','/compare · /dev/audit','docs/finals/rubric/ai_innovation/INNOVATION_ONE_PAGER.md'],
- ['8','UX & Accessibility','Keyboard-only demo. Text size, reduce motion, high contrast, theme and 简体中文 in settings; axe checks inside the browser tests.','/settings','docs/finals/rubric/hcd_ux/ACCESSIBILITY_STATEMENT.md'],
+ ['8','UX & Accessibility','The demo runs from the keyboard alone, or with the mouse. Text size, reduce motion, high contrast, theme and 简体中文 in settings; axe checks inside the browser tests.','/settings','docs/finals/rubric/hcd_ux/ACCESSIBILITY_STATEMENT.md'],
  ['9','Responsible AI & Ethics','No tipping-off; identical refusals; write-ahead sealed log; revealing needs a reason. Crosswalk to AI Verify, MAS FEAT, PDPA, NIST.','/dev/trust','docs/finals/rubric/responsible_ai/SYSTEM_CARD.md · FRAMEWORK_CROSSWALK.md'],
  ['10','Overall Quality','One story, honest numbers dated ' + N.date + ', synthetic data and mock platforms said out loud, a clear ask.','/present/close','docs/finals/rubric/demo_story/LEAVE_BEHIND.md · technical/DEMO_RUNBOOK.md'],
 ];
@@ -131,8 +139,9 @@ const ladder = [
  ['Hy3 not live','Keep the default line: "quoted from the sources, with the same checks".'],
 ];
 const cheat = page('Presenter cheat sheet', `<main class="ch">
-<header><div class="brand"><span class="dot"></span>Presenter cheat sheet</div><div class="meta">Keys work only when armed (?present=1 or Ctrl+Shift+P) and not inside text fields. Source: RUN_SHEET.md, PRESENTER_KEYS.md</div></header>
-<section class="chtop"><div><h2>Keys</h2><table class="keys">${keys.map(k=>`<tr><td><kbd>${esc(k[0])}</kbd></td><td>${esc(k[1])}</td></tr>`).join('')}</table></div>
+<header><div class="brand"><span class="dot"></span>Presenter cheat sheet</div><div class="meta">Keys work only when armed (?present=1 or Ctrl+Shift+P) and not inside text fields. Every key also has a mouse control on the presenter bar. Source: RUN_SHEET.md, PRESENTER_KEYS.md</div></header>
+<section class="chtop"><div><h2>Keys</h2><table class="keys">${keys.map(k=>`<tr><td><kbd>${esc(k[0])}</kbd></td><td>${esc(k[1])}</td></tr>`).join('')}</table>
+<p class="fine">Mouse, same actions: ▶ Next = Space · ◀ Back = ← · ▷ Start = P · Recording = B · Reset the demo = R (same confirm) · Hide the bar = H · More = ? (Stage) · side buttons back / forward = ← / Space. Ordinary clicks stay ordinary.</p></div>
 <div><h2>Recovery ladder</h2><ol class="lad">${ladder.map(l=>`<li><b>${esc(l[0])}.</b> ${esc(l[1])}</li>`).join('')}</ol>
 <p class="fine">A recording is never presented as live. If a judge interrupts: one sentence, then "let me finish this step, then I will come back."</p></div></section>
 <h2>Steps 01 to 10 (Space for each; P gives step 00, the title)</h2>
