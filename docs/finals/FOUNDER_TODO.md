@@ -51,6 +51,10 @@ Tick each one as you go. The why for every demo-day item is in
 - [ ] Time zone UTC+8 (Singapore).
 - [ ] Laptop and phone charged; HDMI/USB-C adapter packed.
 
+## Morning of Demo Day, Tue 3 Nov (before leaving)
+
+- [ ] After the last full rehearsal, double-click **Reset Walnut Demo** with `--fresh` (about 3 min). This keeps the audit log small, so step 01 stays at about 1.5 s; a big log slows every write. Then do one short check only. Close any graph or Grow tabs while presenting Compare. See [demo_day/STEP01_PERF_DIAGNOSIS.md](demo_day/STEP01_PERF_DIAGNOSIS.md).
+
 ## At the venue, Tue 3 Nov
 
 - [ ] Plug in the projector, Win+P → **Duplicate**.
