@@ -20,6 +20,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
+STATE="${IB_VAR:-var/ib-final}"
 # IB_WORLD=atlas picks the additive scenario world (Company A + Atlas) for the mocks AND the Brain,
 # with its own state, so var/ib-final is never indexed from a different world. Unset: the default
 # Company A world, exactly as before. Any other IB_WORLD value is a path and passes through as before.
@@ -29,8 +30,6 @@ if [ "${IB_WORLD:-}" = "atlas" ]; then
   [ -f "$WORLD_PIN" ] || { echo "missing $WORLD_PIN" >&2; exit 2; }
   export IB_WORLD="$WORLD_PIN" MOCK_WORLD_PATH="$WORLD_PIN"
   STATE="${IB_VAR:-var/ib-atlas}"
-else
-  STATE="${IB_VAR:-var/ib-final}"
 fi
 # the stand-in model's spend ledger (var/model_guard) is never the state and never inside it (D-42)
 . scripts/wipe_guard.sh
