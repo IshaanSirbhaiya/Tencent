@@ -226,7 +226,7 @@ export function ComplianceJourney({ j }: { j: JourneyV1 }) {
           )}
         </Section>
         <Section title="Sealed records" description="This request's records in the hash-chained access ledger.">
-          <LedgerChain items={(j.events ?? []).map((e) => ({ label: `#${e.seq}`, kind: e.kind, hash: e.hash, at: e.recorded_at ?? e.event_time }))} />
+          <LedgerChain items={(j.events ?? []).map((e) => ({ label: `#${e.seq}`, kind: e.kind, hash: e.hash, at: e.recorded_at ?? e.event_time, deliverable: e.deliverable }))} />
         </Section>
       </div>
     </div>

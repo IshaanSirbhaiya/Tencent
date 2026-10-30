@@ -11,6 +11,8 @@ export interface ChainItem {
   kind: string;
   hash: string;
   at?: string | null;
+  /** deliverable rows only: what was made ("view" is a page beside the chat, or its decision) */
+  deliverable?: string | null;
 }
 
 const KIND_NOTE: Record<string, string> = {
@@ -30,6 +32,10 @@ const KIND_NOTE: Record<string, string> = {
   'deliverable.created': 'before the table, chart or analysis was shown',
   'deliverable.exported': 'before the file left',
   'deliverable.failed': 'nothing was shown',
+  // deliverable="view": a page beside the chat, or the page-or-chat decision (not a deliverable)
+  'view:deliverable.requested': 'page: before its sources were re-checked or any model was called',
+  'view:deliverable.created': 'page: before the page or the page-or-chat decision was shown',
+  'view:deliverable.failed': 'page: nothing was shown',
 };
 // The same notes in Chinese (round-5 Opus #12 added action.requested to both).
 const KIND_NOTE_ZH: Record<string, string> = {
@@ -47,7 +53,15 @@ const KIND_NOTE_ZH: Record<string, string> = {
   'deliverable.created': '在显示表格、图表或分析之前',
   'deliverable.exported': '在文件发出之前',
   'deliverable.failed': '没有显示任何内容',
+  'view:deliverable.requested': '页面：在重新核对其来源或调用任何模型之前',
+  'view:deliverable.created': '页面：在显示页面或“页面/对话”决定之前',
+  'view:deliverable.failed': '页面：没有显示任何内容',
 };
+
+/** The note for one record: a view row ("view:<kind>") first, then the kind's own note. */
+function noteFor(notes: Record<string, string>, it: ChainItem): string | undefined {
+  return (it.deliverable === 'view' ? notes[`view:${it.kind}`] : undefined) ?? notes[it.kind];
+}
 
 /**
  * The request's sealed records drawn as a vertical hash chain. Each record's hash covers the one
@@ -75,7 +89,7 @@ export function LedgerChain({ items, testId = 'ledger-chain' }: { items: ChainIt
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-mono text-caption tabular-nums text-subtle">{it.label}</span>
               <span className="font-mono text-caption text-fg">{it.kind}</span>
-              {notes[it.kind] ? <span className="text-caption text-subtle">· {notes[it.kind]}</span> : null}
+              {noteFor(notes, it) ? <span className="text-caption text-subtle">· {noteFor(notes, it)}</span> : null}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
               <CodeHash value={it.hash} head={10} tail={6} label={`${it.kind} hash`} />

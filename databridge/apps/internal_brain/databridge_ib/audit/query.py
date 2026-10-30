@@ -499,8 +499,11 @@ class AuditProjection:
         by_doc = {d["doc_id"]: d for d in docs}
         for r in evs:
             d = json.loads(r["data"])
-            out["events"].append({"seq": r["seq"], "kind": r["kind"], "hash": r["hash"],
-                                  "event_time": r["event_time"], "recorded_at": r["recorded_at"]})
+            ev = {"seq": r["seq"], "kind": r["kind"], "hash": r["hash"],
+                  "event_time": r["event_time"], "recorded_at": r["recorded_at"]}
+            if str(r["kind"]).startswith("deliverable.") and d.get("deliverable"):
+                ev["deliverable"] = d.get("deliverable")        # a kind ("view", "table"), never text
+            out["events"].append(ev)
             out["synthetic_replay"] = out["synthetic_replay"] or bool(r["synthetic"])
             out["sub"] = out["sub"] or d.get("sub")
             k = r["kind"]

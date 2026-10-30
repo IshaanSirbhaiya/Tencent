@@ -110,7 +110,7 @@ export function Receipt({ r }: { r: TraceReceipt }) {
       </div>
 
       <Section title="Sealed records" description="Your request's records in the hash-chained ledger, in order.">
-        <LedgerChain items={(r.records ?? []).map((x) => ({ label: `Record ${x.ordinal}`, kind: x.kind, hash: x.hash }))} testId="receipt-chain" />
+        <LedgerChain items={(r.records ?? []).map((x) => ({ label: `Record ${x.ordinal}`, kind: x.kind, hash: x.hash, deliverable: x.deliverable }))} testId="receipt-chain" />
       </Section>
     </div>
   );

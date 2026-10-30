@@ -141,6 +141,16 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             totals["logins"] += 1
         elif k.startswith("action."):
             totals["actions_" + k.split(".", 1)[1]] += 1
+        elif k.startswith("deliverable.") and data.get("deliverable") == "view":
+            # a page-or-chat decision or a page beside the chat: counted apart, so the
+            # deliverables totals stay what people asked to have made
+            stage = data.get("stage")
+            if k == "deliverable.requested" and stage:
+                totals["views_sources_checked" if stage == "sources" else "views_rewrites"] += 1
+            else:
+                totals["views_" + k.split(".", 1)[1]] += 1
+                if k == "deliverable.created" and data.get("status") in ("page", "chat"):
+                    totals["views_decided_" + str(data.get("status"))] += 1
         elif k.startswith("deliverable.") and not (k == "deliverable.requested" and data.get("export_format")):
             totals["deliverables_" + k.split(".", 1)[1]] += 1   # round 4 B2: export rows are not requests
     allowed = sum(v for key, v in gate2_verdicts.items() if key in ALLOWED_VERDICTS)
@@ -172,6 +182,16 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             "deliverables_created": totals["deliverables_created"],
             "deliverables_exported": totals["deliverables_exported"],
             "deliverables_failed": totals["deliverables_failed"],
+            # views (deliverable="view"): requested/created/failed count the opening and closing rows
+            # of a decision or a page; decided_page/chat split the decisions; sources_checked and
+            # rewrites are the further write-ahead rows (extra documents, the follow-up rewrite)
+            "views_requested": totals["views_requested"],
+            "views_created": totals["views_created"],
+            "views_failed": totals["views_failed"],
+            "views_decided_page": totals["views_decided_page"],
+            "views_decided_chat": totals["views_decided_chat"],
+            "views_sources_checked": totals["views_sources_checked"],
+            "views_rewrites": totals["views_rewrites"],
         },
         # requests and documents are different units: two flows, never one funnel
         "requests_flow": {"asked": totals["requests"], "answered": totals["answered"],

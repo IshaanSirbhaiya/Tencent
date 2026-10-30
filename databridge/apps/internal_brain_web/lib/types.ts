@@ -438,6 +438,8 @@ export interface JourneyRecord {
   seq: number;
   kind: string;
   hash: string;
+  /** deliverable rows only: "view" for a page or its decision */
+  deliverable?: string;
   event_time?: string | null;
   recorded_at?: string | null;
 }
@@ -478,7 +480,7 @@ export interface TraceReceipt {
   dropped_sentences_count: number | null;
   citations: ReceiptCitation[];
   answer_sha256: string | null;
-  records: { ordinal: number; kind: string; hash: string }[];
+  records: { ordinal: number; kind: string; hash: string; deliverable?: string }[];
 }
 
 /** GET /ib/status: model chain and ledger health (no secrets). */
@@ -487,6 +489,8 @@ export interface IbStatus {
     provider: string | null;
     chain: string[];
     active: boolean;
+    /** "tencent-tokenhub" | "openai-compatible" | "standin" (neutral) | null */
+    active_provider?: string | null;
     active_chain: string[];
     fallback: { provider: string; model: string };
   };

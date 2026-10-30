@@ -443,7 +443,8 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                                for n, k in TRACE_STAGES],
                     "dropped_sentences_count": res.get("dropped_sentences_count"),
                     "citations": citations, "answer_sha256": res.get("answer_sha256"),
-                    "records": [{"ordinal": i + 1, "kind": e.get("kind"), "hash": e.get("hash")}
+                    "records": [{"ordinal": i + 1, "kind": e.get("kind"), "hash": e.get("hash"),
+                                 **({"deliverable": e["deliverable"]} if e.get("deliverable") else {})}
                                 for i, e in enumerate(res.get("events") or [])]}
             _record("ok", len(citations))
         except HTTPException:
