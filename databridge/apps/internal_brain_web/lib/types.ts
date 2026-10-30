@@ -22,6 +22,9 @@ export interface ModelInfo {
   provider: string; // "tencent-tokenhub" | "standin" | "deterministic"
   model: string; // "hy3" | "deepseek-v4.1-flash" | "extractive-v1"
   fallback_used?: boolean;
+  /** Why a quoted (deterministic) answer was served, when set: "quoted_approved_script" (no model
+   *  call: approved wording only), "model_rejected_evidence", "model_unavailable". */
+  reason_code?: string | null;
 }
 
 export interface AskResponse {

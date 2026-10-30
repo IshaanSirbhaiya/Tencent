@@ -103,7 +103,7 @@ export type DocKey = keyof typeof DOCS;
 
 // Honesty (rule 8): TokenHub is not activated, so the mock never labels a canned answer as written by a
 // model unless the build explicitly asks for it with NEXT_PUBLIC_IB_MOCK_MODEL=hy3 (UI work on the model
-// footer). The default everywhere (tests, dev, the offline stage fallback) is "Quoted from sources (no model)".
+// footer). The default everywhere (tests, dev, the offline stage fallback) is "Quoted from sources (no AI model on)".
 export const MOCK_MODEL_LABELS = process.env.NEXT_PUBLIC_IB_MOCK_MODEL === 'hy3';
 export const HY3: ModelInfo = MOCK_MODEL_LABELS
   ? { provider: 'tencent-tokenhub', model: 'hy3', fallback_used: false }
