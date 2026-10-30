@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { LiveAnnouncer } from '@/components/ui/announce';
 import { TooltipProvider } from '@/components/ui/overlays';
-import { ApiError, api } from '@/lib/api';
+import { ApiError, api, forgetInFlight } from '@/lib/api';
 import { claimSession } from '@/components/presenter/session';
 import { LangContext } from '@/lib/i18n';
 import { DEFAULT_PREFS, MODE_HOME, applyPrefs, loadPrefs, modeForPath, savePref, type Lang, type Mode, type Prefs } from '@/lib/prefs';
@@ -95,6 +95,7 @@ function announceSignedOut() {
 }
 
 function forgetIdentityCaches() {
+  forgetInFlight();
   try {
     const s = window.sessionStorage;
     const drop: string[] = [];

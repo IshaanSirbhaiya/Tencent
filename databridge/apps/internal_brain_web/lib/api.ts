@@ -141,25 +141,47 @@ function demoLogin(persona: string, passcode: string | undefined, slot?: Slot) {
   });
 }
 
-let mapInFlight: Promise<KnowledgeMap> | null = null;
+// The shared in-flight map request belongs to one signed-in person: every sign-in, switch and sign-out
+// starts a new generation, so a request still running for A is never handed to B (restricted ≡ non-existent).
+let sessionGen = 0;
+let mapInFlight: { gen: number; p: Promise<KnowledgeMap> } | null = null;
+const newSession = <T,>(p: Promise<T>): Promise<T> => {
+  sessionGen += 1;
+  mapInFlight = null;
+  return p.finally(() => {
+    sessionGen += 1;
+    mapInFlight = null;
+  });
+};
+
+/** Drop the shared in-flight requests: the signed-in person changed (also outside this tab). */
+export function forgetInFlight() {
+  sessionGen += 1;
+  mapInFlight = null;
+}
 
 export const api = {
   login: async (persona: string, passcode?: string) => {
-    const r = await demoLogin(persona, passcode);
+    const r = await newSession(demoLogin(persona, passcode));
     if (passcode) rememberPasscode(passcode);
     return r;
   },
   /** Switch the main session to another persona with the passcode given at sign-in (the tour). */
-  switchTo: (persona: string) => demoLogin(persona, storedPasscode()),
-  logout: () => call<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {} }),
+  switchTo: (persona: string) => newSession(demoLogin(persona, storedPasscode())),
+  logout: () => newSession(call<{ ok: boolean }>('/auth/logout', { method: 'POST', body: {} })),
   whoami: () => call<WhoAmI>('/auth/whoami'),
   ask: (question: string) => call<AskResponse>('/ib/ask', { method: 'POST', body: { question } }),
   history: () => call<{ items: HistoryItem[] }>('/ib/history'),
   // The IB checks every item live before listing it (several seconds for a big map), so concurrent
   // callers (e.g. a remount) share one in-flight request instead of starting another.
   map: (): Promise<KnowledgeMap> => {
-    if (!mapInFlight) mapInFlight = call<KnowledgeMap>('/ib/map').finally(() => (mapInFlight = null));
-    return mapInFlight;
+    if (mapInFlight && mapInFlight.gen === sessionGen) return mapInFlight.p;
+    const gen = sessionGen;
+    const p = call<KnowledgeMap>('/ib/map').finally(() => {
+      if (mapInFlight?.gen === gen) mapInFlight = null;
+    });
+    mapInFlight = { gen, p };
+    return p;
   },
   sources: async (): Promise<SourceStatus[]> => {
     const r = await call<{ sources: SourceStatus[] } | SourceStatus[]>('/ib/sources');
