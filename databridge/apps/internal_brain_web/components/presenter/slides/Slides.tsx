@@ -20,6 +20,8 @@ const REPO_TEXT = REPO_URL.replace(/^https:\/\//, '');
 
 const n = (v: number) => v.toLocaleString('en-SG');
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** eval_summary.json answer modes that are not a live model (scripts/eval_summary.py). */
+const TEST_MODES = new Set(['fake-capture', 'extractive']);
 
 /**
  * Is Hy3 through TokenHub live right now (GET /ib/status, read at view time)? null while unknown or
@@ -100,6 +102,10 @@ export function ProofSlide() {
   const leaks = isNum(e?.leaks) && isNum(e?.requests) ? e!.leaks! : null;
   const diffs = isNum(e?.differential?.mismatches) && isNum(e?.differential?.pairs) ? e!.differential!.mismatches! : null;
   const inj = isNum(e?.injection?.hard_failures) && isNum(e?.injection?.requests) ? e!.injection!.hard_failures! : null;
+  // The run's answer modes: a test model that records what it is sent ("fake-capture") and the
+  // quoting path ("extractive"). Say so whenever no live model was among them.
+  const modes = Object.keys(e?.per_mode ?? {});
+  const testModelOnly = leaks !== null && modes.length > 0 && modes.every((m) => TEST_MODES.has(m));
 
   return (
     <SlideFrame eyebrow={t('sl.proof.eyebrow')}>
@@ -126,6 +132,11 @@ export function ProofSlide() {
         </div>
       )}
       <div className="mt-[5vh] max-w-5xl space-y-3 text-[clamp(1rem,1.5vw,1.375rem)] leading-snug">
+        {testModelOnly ? (
+          <p className="text-muted" data-testid="proof-test-model">
+            {t('sl.proof.testModel')}
+          </p>
+        ) : null}
         {e?.stale && e.note ? (
           <p className="text-muted" data-testid="proof-note">
             {e.note}

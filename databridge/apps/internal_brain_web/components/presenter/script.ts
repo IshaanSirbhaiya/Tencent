@@ -204,7 +204,7 @@ export const STEPS: PresenterStep[] = [
   {
     id: 'business',
     title: 'Business',
-    say: 'Ishaan: "Aspire\'s team told us \'what can we offer this customer\' takes time today…" Say "estimate".',
+    say: 'Ishaan: "Aspire\'s team told us \'what can we offer this customer\' takes time today…" Say "projected".',
     url: '/present/business',
     clip: null,
     action: async (ctx) => ctx.go('/present/business'),

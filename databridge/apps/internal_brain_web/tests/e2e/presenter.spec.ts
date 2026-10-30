@@ -204,7 +204,7 @@ test('P then Space walks the whole script from the keyboard', async ({ page }) =
   await expectAccessible(page, 'presenter/proof');
   await next(page);
   await expect(page).toHaveURL(/\/present\/business$/);
-  await expect(page.getByTestId('business-estimate')).toHaveText('Estimate');
+  await expect(page.getByTestId('business-estimate')).toHaveText('Projected');
   // Big: what is spoken. Small: the exact value (600 × 1.5 h × 46 × US$31).
   await expect(page.getByTestId('business-value-rounded')).toHaveText(/≈\s*US\$1\.3M/);
   await expect(page.getByTestId('business-value-exact')).toContainText('US$1,283,400');
@@ -299,11 +299,17 @@ test('slides read their numbers from data files; a missing eval summary says "re
   await page.goto('/present/proof');
   await expect(page.getByTestId('proof-leaks')).toContainText('Re-run pending');
   await expect(page.getByTestId('proof-tester')).toHaveCount(0); // fixlog.json is empty
+  await expect(page.getByTestId('proof-test-model')).toHaveCount(0);
   await page.unroute('**/eval_summary.json');
   await page.goto('/present/proof');
   const ev = await (await page.request.get('/eval_summary.json')).json();
   await expect(page.getByTestId('proof-leaks')).toContainText(ev.requests.toLocaleString('en-SG'));
   await expect(page.getByTestId('proof-diffs')).toContainText(ev.differential.pairs.toLocaleString('en-SG'));
+  // The run used a test model and the quoting path, never a live model: the slide says so.
+  const modes = Object.keys(ev.per_mode ?? {});
+  if (modes.length && modes.every((m) => ['fake-capture', 'extractive'].includes(m))) {
+    await expect(page.getByTestId('proof-test-model')).toContainText('not with a live AI model');
+  }
 });
 
 test('slides name Hy3 and TokenHub only while the TokenHub chain is live', async ({ page }) => {
@@ -530,7 +536,8 @@ test('D then Esc puts the session back: ← to the journey shows the waterfall, 
   expect(await press(page)).toBe('ready'); // 05: Verify
   await expect(stepNo(page)).toHaveText('05');
 
-  // D: Leo's answer and its deliverables, from the warm-up cache; the main session is Leo meanwhile.
+  // D: Leo's answer and its deliverables, built on demand (the warm-up starts only at the Proof
+  // slide); the main session is Leo meanwhile.
   await page.waitForTimeout(450);
   await page.keyboard.press('d');
   await expect(page.getByTestId('presenter-deliver-answer')).toBeVisible({ timeout: 60_000 });
@@ -608,8 +615,8 @@ test('a ?grow=1 tab opened signed out picks up the grow steps once P signs someo
   await expect(bar(page)).toContainText('/ 13');
 });
 
-test('a shell sign-out during the P warm-up stays signed out: the warm-up never signs anyone back in (round-4 Opus #1)', async ({ page }) => {
-  test.setTimeout(120_000);
+test('the P warm-up starts at the Proof slide; a shell sign-out during it stays signed out (round-4 Opus #1, Story 1 fix)', async ({ page }) => {
+  test.setTimeout(240_000);
   await login(page, 'jdoe');
   await page.goto('/compare');
   await expect(page.getByLabel('Question for both')).toBeVisible();
@@ -629,24 +636,36 @@ test('a shell sign-out during the P warm-up stays signed out: the warm-up never 
   await page.keyboard.press('Control+Shift+P');
   await expect(bar(page)).toBeVisible();
   await page.keyboard.press('p');
-  // The title card comes first (stage QA 30 Oct #6); the warm-up waits until step 01's Compare has
-  // settled, so it never competes with the two live Compare asks (round-5 Opus cross-check #3).
+  // The title card comes first (stage QA 30 Oct #6).
   await expect(stepNo(page)).toHaveText('00');
   await expect.poll(() => barState(page)).toBe('ready');
   await page.waitForTimeout(1_000);
   expect(asked).toBe(false);
+  // 01 to 06: the warm-up never runs while a step may still sign someone in, so it never competes
+  // with the live Compare asks (round-5 Opus cross-check #3) nor holds up step 03's sign-in.
+  for (let i = 1; i <= 6; i++) {
+    expect(await press(page)).toBe('ready');
+    await expect(stepNo(page)).toHaveText(`0${i}`);
+  }
+  // 07: WorkBuddy, off-app (the ledger view).
   await next(page);
-  await expect(page).toHaveURL(/a=amy\.am&b=mlro\.tan/);
+  await expect(page).toHaveURL(/\/dev\/audit$/);
   await expect.poll(() => barState(page), { timeout: 30_000 }).not.toBe('busy');
-  await expect(page.getByTestId('compare-b').getByTestId('answer')).toBeVisible();
+  expect(asked).toBe(false);
+  // 08: the Proof slide starts it.
+  await next(page);
+  await expect(page).toHaveURL(/\/present\/proof$/);
   await expect.poll(() => asked, { timeout: 30_000 }).toBe(true);
+  // Back to step 07's ledger view (the app shell), then Sign out from the shell while the ask is held.
+  expect(await press(page, 'ArrowLeft')).toBe('ready');
+  await expect(page).toHaveURL(/\/dev\/audit/);
   await page.keyboard.press('s'); // Stage off: the shell's account menu shows again
   await page.locator('button:has([data-testid="whoami"])').first().click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await page.waitForTimeout(300);
   release();
   await expect(page).toHaveURL(/\/login/, { timeout: 30_000 });
-  // Give the warm-up, its deliverables and step 0 every chance to finish, then check nobody is signed in.
+  // Give the warm-up and its deliverables every chance to finish, then check nobody is signed in.
   await page.waitForTimeout(4_000);
   expect((await page.request.get('/api/ib/auth/whoami')).status()).toBe(401);
   await expect(page).toHaveURL(/\/login/);

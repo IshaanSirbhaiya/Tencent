@@ -20,6 +20,29 @@ export function serialSession<T>(fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
+/**
+ * Like `serialSession`, but waits for the work queued before it for at most `maxWaitMs`, then runs
+ * anyway (a presenter step must never wait forever behind a slow borrower such as the warm-up).
+ * Work queued after it still waits for it. Run early, it owns the session (`markSessionOwned`), so
+ * a borrower still running sees the change and never puts its previous person back over it.
+ */
+export function serialSessionWithin<T>(fn: () => Promise<T>, maxWaitMs: number): Promise<T> {
+  const before = chain;
+  const next = new Promise<T>((resolve, reject) => {
+    let ran = false;
+    const run = () => {
+      if (ran) return;
+      ran = true;
+      clearTimeout(timer);
+      fn().then(resolve, reject);
+    };
+    const timer = setTimeout(run, maxWaitMs);
+    before.then(run, run);
+  });
+  chain = next.catch(() => undefined);
+  return next;
+}
+
 /** How many times an owner changed the main session (compare before and after borrowing it). */
 export function sessionOwner(): number {
   return owner;
