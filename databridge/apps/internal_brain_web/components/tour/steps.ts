@@ -76,8 +76,65 @@ function typeInto(input: HTMLInputElement, text: string) {
 const ANSWER = '[data-tour="answer"]';
 const FIRST_CHIP = `${ANSWER} [data-testid="citation-chip"]`;
 const SHEET = '[data-testid="sources-sheet"]';
+const CANVAS = '[data-testid="view-canvas"][data-open="true"]';
+const CANVAS_SHEET = '[data-testid="view-canvas-sheet"]';
+const OPEN_PAGE = '[data-testid="view-open-page"]';
+const SHOW_PAGE = '[data-testid="view-show"]';
+const CHANGE_FORM = '[data-testid="view-change"]';
+const CHANGE_INPUT = '[data-testid="view-change-input"]';
+const CHANGE_SEND = '[data-testid="view-change-send"]';
+/** The change the "Change it in plain words" step types (a layout request; it adds no values). */
+export const TOUR_PAGE_CHANGE = 'make the table black';
 const KEN_URL = personUrl('ken.ext', Q_VELQUARRY, Q_BAYFRONT);
 const GRAPH_TOPICS = ['migration', 'audit', 'policy', 'incident', 'runbook'];
+
+/* ------------------------------------------------------------------ the page beside the chat */
+
+/** The page is open: the canvas beside the chat (>= 1024 px) or its full-screen sheet (narrower). */
+const canvasOpen = () => !!q(CANVAS) || !!q(CANVAS_SHEET);
+const canvasBusy = () => !!q(`${CANVAS} [data-testid="view-loading"]`) || !!q(`${CANVAS_SHEET} [data-testid="view-loading"]`);
+
+// A change sent from the canvas's change box in this page load (the tour's "change" step is done
+// once it was sent and the rebuilt page has arrived). A change typed in the chat shows a page-edit row.
+let pageChangeSent = false;
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'submit',
+    (e) => {
+      if (e.target instanceof Element && e.target.closest(CHANGE_FORM)) pageChangeSent = true;
+    },
+    true,
+  );
+}
+
+/** Close the sources sheet left open by the previous step (its own close button), so the page shows. */
+async function closeSourcesSheet() {
+  const close = q(`${SHEET} > div:first-child > button:last-child`);
+  if (!close) return;
+  close.click();
+  for (let i = 0; i < 20 && q(SHEET); i++) await sleep(50);
+  await sleep(150);
+}
+
+/** Open the latest answer as a page (asking the sample question first when there is no answer). */
+async function openPage(c: TourCtx) {
+  if (canvasOpen()) return;
+  await closeSourcesSheet();
+  if (!q(ANSWER)) {
+    if (!(await c.waitFor('[data-tour="ask-form"]', 10_000))) throw new Error('ask-form');
+    await sleep(120);
+    emitTourAction('ask-sample');
+    if (!(await c.waitFor(ANSWER, 60_000))) throw new Error('answer');
+  }
+  if (canvasOpen()) return; // the answer may open its page by itself
+  if (!(await c.waitFor(`${SHOW_PAGE}, ${OPEN_PAGE}`, 10_000))) throw new Error('open-page');
+  // the newest answer's control (the last one on the page)
+  const all = document.querySelectorAll<HTMLElement>(`${SHOW_PAGE}, ${OPEN_PAGE}`);
+  pageChangeSent = false;
+  all[all.length - 1]?.click();
+  for (let i = 0; i < 40 && !canvasOpen(); i++) await sleep(50);
+  if (!canvasOpen()) throw new Error('canvas');
+}
 
 /* ------------------------------------------------------------------ User mode: "Try it" */
 
@@ -168,6 +225,60 @@ export const USER_STEPS: TourStep[] = [
     done: () => !!q(SHEET),
     preferSide: true,
     check: 'source',
+  },
+  {
+    id: 'page',
+    title: () => 'u.page.title',
+    body: () => 'u.page.body',
+    doneBody: () => 'u.page.doneBody',
+    route: () => '/',
+    targets: () => [
+      { sel: CANVAS, spot: 'u.page.spotCanvas' },
+      { sel: CANVAS_SHEET, spot: 'u.page.spotCanvas' },
+      { sel: OPEN_PAGE, spot: 'u.page.spotButton' },
+      { sel: SHOW_PAGE, spot: 'u.page.spotButton' },
+      { sel: ANSWER, spot: 'u.ask.spotAnswer' },
+      { sel: '[data-tour="ask-form"]', spot: 'u.ask.spotForm' },
+    ],
+    act: () =>
+      canvasOpen()
+        ? null
+        : {
+            what: 'u.page.act',
+            run: openPage,
+          },
+    done: canvasOpen,
+  },
+  {
+    id: 'change',
+    title: () => 'u.change.title',
+    body: () => 'u.change.body',
+    doneBody: () => 'u.change.doneBody',
+    route: () => '/',
+    targets: () => [
+      { sel: CHANGE_FORM, spot: 'u.change.spotBox' },
+      { sel: CANVAS, spot: 'u.page.spotCanvas' },
+      { sel: CANVAS_SHEET, spot: 'u.page.spotCanvas' },
+      { sel: OPEN_PAGE, spot: 'u.page.spotButton' },
+      { sel: SHOW_PAGE, spot: 'u.page.spotButton' },
+      { sel: '[data-tour="ask-form"]', spot: 'u.ask.spotForm' },
+    ],
+    act: () => ({
+      what: 'u.change.act',
+      run: async (c) => {
+        await openPage(c);
+        // wait for the page (the change box is disabled while it is being built)
+        for (let i = 0; i < 600 && canvasBusy(); i++) await sleep(100);
+        const input = (await c.waitFor(CHANGE_INPUT, 10_000)) as HTMLInputElement | null;
+        if (!input || input.disabled) throw new Error('change-input');
+        typeInto(input, TOUR_PAGE_CHANGE);
+        await sleep(120); // let React enable the send button
+        const send = q(CHANGE_SEND) as HTMLButtonElement | null;
+        if (!send || send.disabled) throw new Error('change-send');
+        send.click();
+      },
+    }),
+    done: () => (pageChangeSent || !!q('[data-testid="page-edit"]')) && canvasOpen() && !canvasBusy(),
   },
   {
     id: 'ken',

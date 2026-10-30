@@ -36,7 +36,7 @@ const en = {
   'card.progress': 'Tour progress',
   'spot.label': 'Highlighted: {name}',
 
-  // User tour: "Try it" (4 steps)
+  // User tour: "Try it" (6 steps)
   'u.signin.title': 'Start as Jordan',
   'u.signin.body': 'Each person at this made-up company can open different things. Jordan is a backend engineer: pick his card to sign in.',
   'u.signin.doneBody': "You're signed in as Jordan. From now on, every answer is limited to what Jordan can open.",
@@ -60,6 +60,19 @@ const en = {
   'u.cite.spotChip': 'Citation 1',
   'u.cite.spotSheet': 'The source',
   'u.cite.spotPassage': 'The cited passage',
+
+  'u.page.title': 'Open it as a page',
+  'u.page.body': 'A long answer can become a page beside the chat. It is built only from this answer\'s sources, and every value on it is checked again. Click "Open as page" under the answer.',
+  'u.page.doneBody': 'The page opened beside the chat, built from the same sources as the answer.',
+  'u.page.act': 'open the answer as a page',
+  'u.page.spotButton': 'Open as page',
+  'u.page.spotCanvas': 'The page',
+
+  'u.change.title': 'Change it in plain words',
+  'u.change.body': 'Type a change into the box under the page, for example "make the table black", and send it. Only the layout changes; the words and numbers stay those of the sources.',
+  'u.change.doneBody': 'The page was rebuilt with your change, from the same sources. The layout can change; the words and numbers cannot.',
+  'u.change.act': 'ask for "make the table black"',
+  'u.change.spotBox': 'The change box',
 
   'u.ken.title': 'Now try Ken',
   'u.ken.body': 'Ken is an outside contractor. On the left he asks about a real company he is not cleared to see; on the right, about one that does not exist.',
@@ -174,6 +187,19 @@ const zh: Record<TourKey, string> = {
   'u.cite.spotChip': '引用 1',
   'u.cite.spotSheet': '来源',
   'u.cite.spotPassage': '被引用的段落',
+
+  'u.page.title': '把它打开成页面',
+  'u.page.body': '较长的回答可以在聊天旁边变成一个页面。页面只用这个回答的来源生成，上面的每个数值都会再检查一遍。点回答下方的“生成页面”。',
+  'u.page.doneBody': '页面已在聊天旁边打开，使用的来源与回答相同。',
+  'u.page.act': '把回答打开成页面',
+  'u.page.spotButton': '生成页面',
+  'u.page.spotCanvas': '页面',
+
+  'u.change.title': '用平常的话修改它',
+  'u.change.body': '在页面下方的输入框里写下修改，例如“make the table black”（把表格改成黑色），然后发送。只有排版会变；文字和数字仍然来自来源。',
+  'u.change.doneBody': '页面已按你的修改、用同样的来源重新生成。排版可以变，文字和数字不会变。',
+  'u.change.act': '请求“make the table black”',
+  'u.change.spotBox': '修改输入框',
 
   'u.ken.title': '再试试 Ken',
   'u.ken.body': 'Ken 是外部承包商。左边他问的是一家真实存在、但他无权查看的公司；右边问的是一家根本不存在的公司。',

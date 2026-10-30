@@ -5,8 +5,9 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 //
 // Two tours, one per mode (components/tour/steps.ts holds the steps). They are separate (DECISIONS
 // D-36): neither one starts, resumes or offers the other; each offers itself on first entry to its mode.
-//   user  "Try it", 4 steps (~45 s): sign in as Jordan, ask, open citation [1], Ken's two refusals;
-//         then a 3-item checklist card.
+//   user  "Try it", 6 steps: sign in as Jordan, ask, open citation [1], open the answer as a page
+//         beside the chat, change that page in plain words, Ken's two refusals; then a 3-item
+//         checklist card (the page steps add no checklist item).
 //   dev   5 steps: Mission control, the journey of your last answer, the knowledge graph, the Trust
 //         centre, and (compliance) analytics + audit verify; Finish on the last step ends it.
 //
@@ -20,8 +21,8 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 export type TourId = 'user' | 'dev';
 
-/** Number of steps per tour (the user tour also has a closing checklist card at index 4). */
-export const TOUR_LENGTH: Record<TourId, number> = { user: 4, dev: 5 };
+/** Number of steps per tour (the user tour also has a closing checklist card at index TOUR_LENGTH.user). */
+export const TOUR_LENGTH: Record<TourId, number> = { user: 6, dev: 5 };
 
 export interface TourState {
   open: boolean;
@@ -142,7 +143,7 @@ export function closeTour() {
   set({ ...state, open: false, entry: null });
 }
 
-/** Go to a step (beyond the last closes the tour; the user tour's index 4 is the checklist). */
+/** Go to a step (beyond the last closes the tour; the user tour's index TOUR_LENGTH.user is the checklist). */
 export function goToStep(step: number) {
   if (step < 0) return;
   const max = TOUR_LENGTH[state.tour] + (state.tour === 'user' ? 1 : 0);

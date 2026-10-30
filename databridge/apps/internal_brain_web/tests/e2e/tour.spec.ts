@@ -2,7 +2,8 @@ import { type Page, expect, test } from '@playwright/test';
 import { expectAccessible, login } from './helpers';
 
 // The guided tours (components/tour/*), in mock mode.
-//   User "Try it": sign in as Jordan → ask → citation [1] → Ken's two refusals → checklist.
+//   User "Try it": sign in as Jordan → ask → citation [1] → open as page → change the page in
+//   plain words → Ken's two refusals → checklist.
 //   Developer: Mission control → journey → graph → Trust centre → analytics + audit verify.
 // The two are separate (D-36): each mode offers its own tour on first entry, with its own flag.
 // Every step is driven with "Do it for me", so the real pages do the work.
@@ -26,7 +27,7 @@ test('user tour runs end to end with "Do it for me", from the sign-in link', asy
   // 1 → 2: the link signed in as Jordan and moved on by itself.
   await page.waitForURL((u) => u.pathname === '/');
   await expect(page.getByTestId('whoami')).toContainText('jdoe');
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
   await expect(card(page).getByRole('heading', { name: 'Ask the suggested question' })).toBeVisible();
   await expect(page.getByTestId('tour-spotlight')).toBeVisible();
   await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', /^Highlighted: /);
@@ -41,7 +42,7 @@ test('user tour runs end to end with "Do it for me", from the sign-in link', asy
   await next(page);
 
   // 3: citation [1] opens the sources sheet; the card moves into the sheet (inside its focus trap).
-  await expect(counter(page)).toContainText('Step 3 of 4');
+  await expect(counter(page)).toContainText('Step 3 of 6');
   await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', 'Highlighted: Citation 1');
   await doIt(page);
   const sheet = page.getByTestId('sources-sheet');
@@ -52,8 +53,16 @@ test('user tour runs end to end with "Do it for me", from the sign-in link', asy
   await expectAccessible(page, 'tour/user-step3-sheet');
   await next(page);
 
-  // 4: Compare, same person two questions: Ken on a real-but-restricted company vs a made-up one.
-  await expect(counter(page)).toContainText('Step 4 of 4');
+  // 4 and 5: the page beside the chat (run with "Do it for me" in their own test below).
+  await expect(counter(page)).toContainText('Step 4 of 6');
+  await expect(card(page).getByRole('heading', { name: 'Open it as a page' })).toBeVisible();
+  await next(page);
+  await expect(counter(page)).toContainText('Step 5 of 6');
+  await expect(card(page).getByRole('heading', { name: 'Change it in plain words' })).toBeVisible();
+  await next(page);
+
+  // 6: Compare, same person two questions: Ken on a real-but-restricted company vs a made-up one.
+  await expect(counter(page)).toContainText('Step 6 of 6');
   await page.waitForURL((u) => u.pathname === '/compare' && u.searchParams.get('mode') === 'person' && u.searchParams.get('p') === 'ken.ext');
   await expect(sheet).toHaveCount(0);
   await doIt(page);
@@ -78,6 +87,53 @@ test('user tour runs end to end with "Do it for me", from the sign-in link', asy
   await expect(card(page)).toHaveCount(0);
   expect(new URL(page.url()).pathname).toBe('/compare');
   await expect(page.getByTestId('mode-switch').getByRole('radio', { name: 'User' })).toHaveAttribute('aria-checked', 'true');
+});
+
+test('user tour: "Open it as a page" and "Change it in plain words" with "Do it for me" (mock)', async ({ page }) => {
+  test.setTimeout(240_000);
+  await login(page, 'jdoe');
+  await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
+  await expect(counter(page)).toContainText('Step 2 of 6');
+
+  // 2 and 3: ask, then open citation [1] (the sources sheet stays open into step 4).
+  await doIt(page);
+  await expect(page.getByTestId('answer')).toBeVisible({ timeout: 60_000 });
+  await next(page);
+  await expect(counter(page)).toContainText('Step 3 of 6');
+  await doIt(page);
+  await expect(page.getByTestId('sources-sheet')).toBeVisible();
+  await next(page);
+
+  // 4: "Do it for me" closes the sheet and presses "Open as page"; the canvas opens beside the chat.
+  await expect(counter(page)).toContainText('Step 4 of 6');
+  await expect(card(page).getByRole('heading', { name: 'Open it as a page' })).toBeVisible();
+  await expect(card(page).getByRole('button', { name: 'Do it for me: open the answer as a page' })).toBeVisible();
+  await doIt(page);
+  await expect(page.getByTestId('sources-sheet')).toHaveCount(0);
+  await expect(page.getByTestId('view-canvas')).toHaveAttribute('data-open', 'true', { timeout: 30_000 });
+  await expect(page.getByTestId('view-in-canvas')).toBeVisible();
+  await expect(card(page).getByTestId('tour-step-done')).toBeVisible();
+  await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', 'Highlighted: The page');
+  await expect(page.getByTestId('view-canvas').getByTestId('view-loading')).toHaveCount(0, { timeout: 30_000 });
+  await next(page);
+
+  // 5: "Do it for me" types the change into the change box and sends it; the page is rebuilt.
+  await expect(counter(page)).toContainText('Step 5 of 6');
+  await expect(card(page).getByRole('heading', { name: 'Change it in plain words' })).toBeVisible();
+  await expect(page.getByTestId('tour-spotlight')).toHaveAttribute('aria-label', 'Highlighted: The change box');
+  const built = page.waitForRequest((r) => r.method() === 'POST' && /\/ib\/views(\?|$)/.test(r.url()) && (r.postData() ?? '').includes('make the table black'));
+  await doIt(page);
+  await built;
+  await expect(card(page).getByTestId('tour-step-done')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('view-canvas')).toHaveAttribute('data-open', 'true');
+  await expect(page.getByTestId('view-canvas').getByTestId('view-loading')).toHaveCount(0);
+  await expect(page.getByTestId('view-change-input')).toHaveValue('');
+  await expectAccessible(page, 'tour/user-step5-page');
+  await next(page);
+
+  // 6: Ken, unchanged.
+  await expect(counter(page)).toContainText('Step 6 of 6');
+  await expect(card(page).getByRole('heading', { name: 'Now try Ken' })).toBeVisible();
 });
 
 const offer = (page: Page) => page.getByTestId('tour-offer');
@@ -143,7 +199,7 @@ test('switching mode never carries a tour across; the header button starts the c
   await login(page, 'jdoe');
   await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
   await expect(counter(page)).toContainText('Try it');
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
 
   // Into Developer mode: the user tour closes, nothing starts by itself, only the dev offer shows.
   await page.getByTestId('mode-switch').getByRole('radio', { name: 'Developer' }).click();
@@ -167,7 +223,7 @@ test('switching mode never carries a tour across; the header button starts the c
   await expect(card(page)).toHaveCount(0);
   await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
   await expect(counter(page)).toContainText('Try it');
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
 });
 
 test('Skip closes the tour and retires the first-visit offer (light theme, axe)', async ({ page }) => {
@@ -183,7 +239,7 @@ test('Skip closes the tour and retires the first-visit offer (light theme, axe)'
   await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
   await expect(card(page)).toBeVisible();
   // Already Jordan: the tour starts at the ask step.
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
   await expect(page.getByTestId('tour-spotlight')).toBeVisible();
   await expectAccessible(page, 'tour/user-step2-light');
   await card(page).getByRole('button', { name: 'Skip tour' }).click();
@@ -201,7 +257,7 @@ test('keyboard only: Enter starts, Do it for me, arrows move, Esc closes and foc
   await launch.focus();
   await page.keyboard.press('Enter');
   await expect(card(page)).toBeFocused();
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
 
   // Tab to "Do it for me" (inside the card) and press Enter.
   for (let i = 0; i < 8; i++) {
@@ -215,9 +271,9 @@ test('keyboard only: Enter starts, Do it for me, arrows move, Esc closes and foc
   await expect(card(page).getByTestId('tour-next')).toBeFocused();
 
   await page.keyboard.press('ArrowRight');
-  await expect(counter(page)).toContainText('Step 3 of 4');
+  await expect(counter(page)).toContainText('Step 3 of 6');
   await page.keyboard.press('ArrowLeft');
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
   await page.keyboard.press('Escape');
   await expect(card(page)).toHaveCount(0);
   await expect(launch).toBeFocused();
@@ -290,7 +346,7 @@ test('missing anchor: the card centres with a fallback note', async ({ page }) =
   test.setTimeout(90_000);
   await login(page, 'jdoe');
   await page.getByRole('banner').getByRole('button', { name: 'Take the tour' }).click();
-  await expect(counter(page)).toContainText('Step 2 of 4');
+  await expect(counter(page)).toContainText('Step 2 of 6');
   // Step 3 with no answer on screen and nothing to click: hide every anchor it could use.
   await page.addStyleTag({ content: '[data-tour], [data-testid="starter"] { display: none !important; }' });
   await next(page);
