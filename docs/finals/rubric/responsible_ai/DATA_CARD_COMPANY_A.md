@@ -21,17 +21,17 @@
 
 | Item | Count | Source |
 |---|---|---|
-| People (directory users) | **32** | `manifest.json:43` |
-| Groups | 16 | `manifest.json` `counts.groups` |
-| Confluence pages | 209 in 7 spaces (25 restricted, 1 archived, 1 trashed) | `manifest.json` `counts` |
-| Jira issues | 251 in 4 projects (14 with a security level) | same |
-| Slack threads | 602 (3,061 messages) in 15 channels (5 private, 1 Slack Connect) | same |
-| Drive files | 81 in 2 shared drives, 12 folders | same |
-| **Documents in total** | **1,143** (209 + 251 + 602 + 81) | same |
-| Documents readable by every member | 499 | same |
-| Documents indexed per eval shard | 1,140 | `databridge/evals/internal_brain/RESULTS.md:36` |
-| **Planted facts** | **49** | `manifest.json:32` |
-| Questions with expected outcomes | 464 | `manifest.json` `counts.questions` |
+| People (directory users) | **34** | `manifest.json:43` |
+| Groups | 17 | `manifest.json` `counts.groups` |
+| Confluence pages | 231 in 9 spaces (25 restricted, 1 archived, 1 trashed) | `manifest.json` `counts` |
+| Jira issues | 261 in 5 projects (14 with a security level) | same |
+| Slack threads | 628 (3,133 messages) in 18 channels (5 private, 1 Slack Connect) | same |
+| Drive files | 87 in 2 shared drives, 14 folders | same |
+| **Documents in total** | **1,207** (231 + 261 + 628 + 87) | same |
+| Documents readable by every member | 562 | same |
+| Documents indexed per eval shard | 1,204 | `databridge/evals/internal_brain/RESULTS.md:36` |
+| **Planted facts** | **72** | `manifest.json:32` |
+| Questions with expected outcomes | 546 | `manifest.json` `counts.questions` |
 | Seeded audit replay events | 40 | `manifest.json` `counts.audit_replay` |
 
 The three documents not indexed are consistent with the generator's rule that trashed, archived and draft
@@ -44,7 +44,7 @@ laundering reporting officer, `maya.compliance` compliance officer, `admin.it` I
 (`generate.py:44`; `INTERNAL_BRAIN.md:129-131`). The eval adds two ACL-derived personas, `sam.old` and
 `ivy.guest` (`RESULTS.md:33`).
 
-## 3. The 49 planted facts
+## 3. The 72 planted facts
 
 Each fact has a sentinel sentence that appears in exactly one document, plus a `CNRY-xxxxxx` canary when
 that document is not readable by every active member (`README.md:30-36`;
@@ -68,7 +68,8 @@ are **computed** from the generated permission data, not written by hand (`gener
 | **MK** | 3 | Market-specific policy (Singapore, Indonesia) |
 | **FEE** | 2 | Approved fee schedule v3 vs a draft v4 that must never be cited |
 | **SENS** | 5 | Card number (×2), CVV, IBAN, NRIC for masking |
-| **Total** | **49** | `manifest.json` `facts` |
+| **WP** | 23 | Everyday company content (leave, hybrid work, conduct, reviews, learning budget, referrals, office, IT helpdesk, onboarding, holidays, travel and expenses, approval limits, procurement, month-end close, payday, benefits), open to every employee; plus the salary bands, readable by the People team only (no persona) |
+| **Total** | **72** | `manifest.json` `facts` |
 
 ### Injection fixtures
 
@@ -96,9 +97,10 @@ All four are readable by `jdoe`, so they really reach the answer step
 | Generator | `generate.py`, version `"1"` | `generate.py:40`; `manifest.json:1120` |
 | Command | `python fixtures/enterprise/generate.py --seed 7 --now 2026-10-13T09:00:00+08:00 --scale demo` | `README.md:5-9` |
 | Seed | 7 | `manifest.json:5` |
-| `world.json` sha256 | `359938e34c0006dba6a2e56b2b565340f1842bf290f640a66b20fdaaedb7a5af` | `manifest.json:23205` |
+| `world.json` sha256 | `e3381d7122570db7744f63094b7fbcdf05617aedb1c5de0a22f4f3d5b48861b7` | `manifest.json:29484` |
 | Determinism | Stdlib only; seeded `random.Random` streams; dates derived from `--now`; sorted keys; LF line endings. Same arguments give byte-identical output. | `generate.py:9-12`; `tests/test_generator.py::test_two_runs_are_byte_identical` (line 158); `::test_committed_fixture_matches_the_generator` (line 171) |
-| Fintech layer | Planted **after** all filler, so it only adds | `README.md:61-64`; `tests/test_fintech_layer.py::test_fintech_layer_only_adds` (line 66) |
+| Fintech layer | Planted **after** all filler, so it only adds | `README.md:61-64`; `tests/test_fintech_layer.py::test_fintech_layer_only_adds` (line 80) |
+| Everyday-company layer (WP) | Planted **after** the fintech layer with its own random stream, so it only adds; with it switched off the generator writes the pre-layer `world.json` byte for byte | `README.md:79-85`; `tests/test_workplace_layer.py::test_world_without_the_layer_is_the_pre_layer_world`, `::test_workplace_layer_only_adds` |
 | Domain | `companya.example` | `README.md:3` |
 
 ## 5. What is not in it
@@ -117,7 +119,7 @@ All four are readable by `jdoe`, so they really reach the answer step
 |---|---|
 | English only | Says nothing about answer quality in Bahasa Indonesia, Thai or Vietnamese |
 | SG and ID market content only | Market policies cover two of Aspire's markets |
-| One organisation shape | One fintech, 32 people, one group namespace; real tenants need a `group_resolver` (`docs/tencent/SECURITY.md:256`) |
+| One organisation shape | One fintech, 34 people, one group namespace; real tenants need a `group_resolver` (`docs/tencent/SECURITY.md:256`) |
 | Short documents | Page bodies and threads are kept short (`tests/test_generator.py::test_page_bodies_and_threads_stay_short`, line 503) |
 | Planted facts are known in advance | The eval tests the facts we planted; it cannot find leaks of content we did not mark. The 10-word shingle check covers unmarked text in unreadable documents (`RESULTS.md:40`). |
 | Demo scale | ~1.1k documents. A `--scale company-a` benchmark (~12k pages) exists but is never committed (`generate.py:4-7`) |

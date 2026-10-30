@@ -501,3 +501,229 @@ whenever `stale` is true.
 
 No new event kinds. `audit.query` gains `op: "tamper-demo"` rows (`outcome`: `started`, `ok`,
 `rejected`, `error`) and the parser fields above on `op: "ask"` rows.
+
+
+---
+
+# v3 (30 Oct): Act on an answer (draft a reply, create a follow-up ticket)
+
+Code: `actions.py`, `app.py` (routes), `connectors/jira.py` (`projects`, `creatable`, `create_issue`),
+`llm.py` (`ModelChain.draft`). Tests: `tests/test_act.py`, `tests/test_act_e2e.py`,
+`databridge/apps/mock_platforms/tests/test_mock_jira_create.py`. Security: `docs/tencent/SECURITY.md`
+§15.11. The general rules at the top of this file apply (401, 403, the one 404, the one 503).
+
+## Proxy allowlist (v3 additions)
+
+| Method | Path | Slot (compare/View-as) |
+|---|---|---|
+| POST | `/ib/act/draft` | **no** (main session only) |
+| POST | `/ib/act/ticket/propose` | no |
+| POST | `/ib/act/ticket/confirm` | no |
+| POST | `/ib/act/ticket/cancel` | no |
+
+One pattern in `app/api/ib/[...path]/route.ts`: `^ib\/act\/(draft|ticket\/(propose|confirm|cancel))$`.
+
+## Status codes (all four routes)
+
+| Status | Body | When |
+|---|---|---|
+| 200 | below | |
+| 404 | `{"detail": "not found"}` | ONE answer for: someone else's request, an unknown id, a refused or failed answer, an answer whose cited documents the person can no longer open, an unknown / someone else's / used / expired proposal |
+| 409 | `{"error": "unavailable", "message": "A follow-up ticket can't be created from this answer. Nothing was changed."}` | ONE polite message for every reason a ticket cannot be proposed or created (no create permission, a source error, a revoked permission, a failed create). Never a reason |
+| 422 | | a body with an unknown key (any identity field), a bad `kind`, a blank or too long summary, a `project` outside the proposal's `projects` |
+| 503 | `{"error": "temporarily unavailable"}` | the ledger could not record the call (nothing happened), or the stored answer does not match its sealed digest |
+
+## POST /ib/act/draft
+
+Request: `{"req_id": "<one of MY request ids>", "kind": "reply"}` (`kind`: `reply` (default) or `message`).
+
+Response 200:
+
+```json
+{
+  "action_id": "64f8ad25…", "kind": "reply", "status": "draft", "label": "Draft for your review",
+  "req_id": "…",
+  "greeting": "Hello,",
+  "opener": "Thank you for getting in touch.",
+  "body": [{"text": "Your account is undergoing a routine review in line with our regulatory obligations.",
+            "tags": ["C1"]}],
+  "closing": "If you have any other questions, please let me know.\n\nKind regards,\nAmy Lim",
+  "text": "Hello,\n\nThank you for getting in touch. Your account is …\n\nIf you have …\n\nKind regards,\nAmy Lim",
+  "citations": [{"tag": "C1", "doc_id": "confluence:cf-1204", "platform": "confluence", "kind": "page",
+                 "container": "cx", "container_name": "Customer Experience", "title": "…",
+                 "version": "5", "updated_at": "…", "deep_link": "…"}],
+  "model": {"provider": "deterministic", "model": "approved-script-v1", "fallback_used": false},
+  "prompt_version": "ib-draft-2026-10-30.1",
+  "sent": false, "scope_note": "…", "as_of": "…"
+}
+```
+
+- `body` sentences come only from the cited sentences of that answer whose documents pass Gate 1 and a live
+  Gate 2 now. `tags` are the ANSWER's own tags (`C1` …): number them with the answer's `citations` order.
+- `text` is the whole draft without tags (what Copy puts on the clipboard).
+- `model.model`: `approved-script-v1` (approved wording used word for word; no model asked),
+  `draft-template-v1` (the cited sentences; `fallback_used: true` when the model was asked and its draft
+  was not usable), or the model that wrote it (`hy3`, `deepseek-v4.1-flash`).
+- The Brain never sends a draft. Ledger: `action.proposed` before the response.
+
+## POST /ib/act/ticket/propose
+
+Request: `{"req_id": "…"}`. Nothing is created.
+
+```json
+{
+  "proposal_id": "9a1c…", "action_id": "9a1c…", "kind": "ticket", "status": "proposed", "req_id": "…",
+  "project": {"key": "DBMIG", "name": "Database Migration"},
+  "projects": [{"key": "DBMIG", "name": "Database Migration"}, {"key": "AUTH", "name": "Auth Service"},
+               {"key": "PAY", "name": "Payments"}],
+  "issue_type": "Task",
+  "summary": "Follow-up: What's the status of the database migration project …",
+  "summary_max": 200,
+  "description": "Follow-up created from an Internal Brain answer (request …).\n\nSources (each link opens only for people the source system allows):\n\n[1] https://…\n[2] https://…",
+  "citations": [ … same shape as the draft's … ],
+  "expires_at": "…", "scope_note": "…", "as_of": "…"
+}
+```
+
+- `projects` = the projects where the person may create issues, checked live at the source (cited
+  projects first); `project` is the first. Show a picker only when there is more than one.
+- `description` is fixed (links only, no titles or text). Show it read-only, exactly as sent.
+- The proposal is the caller's alone, usable once, and expires after 15 minutes (`expires_at`).
+- Ledger: `action.proposed` (target, option count) before the response; a 409 writes `action.failed`.
+
+## POST /ib/act/ticket/confirm
+
+Request: `{"proposal_id": "…", "summary": "optional edit", "project": "optional key from projects"}`.
+The summary is made one line (control characters become spaces), 1..200 characters.
+
+```json
+{
+  "status": "created", "action_id": "9a1c…", "req_id": "…",
+  "project": {"key": "DBMIG", "name": "Database Migration"},
+  "summary": "Chase the replica lag blocker before the wave 4 cutover",
+  "issue": {"key": "DBMIG-13", "url": "https://companya.atlassian.net/browse/DBMIG-13", "doc_id": "jira:DBMIG-13"},
+  "as_of": "…"
+}
+```
+
+Order: `action.confirmed` (write-ahead) → live "Create issues" re-check → one `POST /rest/api/3/issue`
+with the person as reporter → `action.executed` (or `action.failed` and the 409). The mock Jira sends a
+`content.changed` webhook, so the new issue is indexed and appears in the Brain for whoever may browse it.
+
+## POST /ib/act/ticket/cancel
+
+Request: `{"proposal_id": "…"}` → `{"status": "cancelled", "action_id": "…"}`. Ledger: `action.rejected`.
+
+## Ledger event kinds (v3)
+
+| Kind | Fields (besides `kind`, `req_id` = the answer's request, `event_time`, `synthetic_replay`) |
+|---|---|
+| `action.proposed` | `sub`, `action_id`, `action` (`draft.reply`/`draft.message`/`ticket.create`), `cited_docs`, `doc_ids`, `sentences`, `target`, `options`, `model`, `digest` (SHA-256 of the draft or proposal; never its text), `policy_version` |
+| `action.confirmed` | `sub`, `action_id`, `action`, `target`, `summary_edited`, `digest` (of exactly what will be sent) |
+| `action.executed` | `sub`, `action_id`, `action`, `target`, `result_ref` (the issue key) |
+| `action.failed` | `sub`, `action_id?`, `action?`, `stage` (`lookup`/`propose`/`confirm`/`execute`), `reason_code` (ledger only). A failed lookup has `req_id: null` |
+| `action.rejected` | `sub`, `action_id`, `action` |
+
+They appear in `/audit/events` (filter `kind`), in the request's `/audit/journey/{req}` `events` and the
+asker's `/ib/trace/{req}` `records`, and in `/audit/stats` `kinds` plus the new totals
+`actions_proposed`, `actions_confirmed`, `actions_executed`, `actions_failed`, `actions_rejected`.
+`answer.released.citations[]` now also carries each citation's `tag`.
+
+## Mock platforms (v3)
+
+- `POST /jira/rest/api/3/issue` (svc or admin token): Jira Cloud's create shape (`fields.project`,
+  `summary` ≤ 255 and one line, `issuetype` Task/Story/Bug, `description` ADF, `reporter.accountId`,
+  `labels`). 201 `{id, key, self}`; 400 `{"errorMessages": [], "errors": {"<field>": "…"}}`; 403 when the
+  reporter may not create issues in the project. A `content.changed` webhook follows.
+- `POST /jira/rest/api/3/permissions/check` accepts `CREATE_ISSUES` for `projects`: a project's `create`
+  holders from `world.json`, by default its `Developers` role (Viewers browse, they do not create).
+
+## Demo-proof features (v4, 30 Oct): live growth, add a document, absence check, engine refresh (D-24)
+
+Plan: `docs/finals/live_growth/PLAN.md`. Security: `docs/tencent/SECURITY.md` §15.13. Code: `live.py`,
+`sim.py`, `engine_refresh.py`, `bootstrap.py`. Tests: `test_live_growth.py`, `test_sim_add_document.py`,
+`test_demo_features.py`.
+
+**Toggle.** All five routes below exist only when the IB runs with `IB_DEMO_FEATURES=1` and NOT
+`IB_DEPLOYED=1`. Off, they are not mounted: every call is the framework's unknown-route 404
+(`{"detail": "Not Found"}`), byte-identical to any other unknown path, signed in or not. Only
+`databridge/scripts/demo_up.sh` sets the flag (with `IB_ENGINE_URL`, `IB_ENGINE_TOKEN` for the engine
+refresh). `POST /sim/upload-file` (contract `uploads.md`) follows the same two switches.
+
+**`GET /ib/status`** gains `"demo_features": true | false` (true only when the routes are mounted). The web
+app shows the demo controls only when this is true AND the viewer turned "Demo features" on in Settings
+(localStorage `ib-demo-features=1`) or the Presenter is armed.
+
+### GET /ib/graph/changes
+
+Query: `since` (optional, opaque, at most 400 characters; longer is 422). Any employee role. Main session
+and Compare slots (proxy: already in `ALLOWED` and `SLOT_ALLOWED`).
+
+200, always exactly these keys:
+
+```json
+{"cursor": "<opaque>", "nodes": [GraphNode], "edges": [GraphEdge]}
+```
+
+- Nodes: a `doc` node per changed document the caller can open NOW (new in the index, or a new version),
+  its `container` and `platform` nodes, its author's `person` node, and documents it links to or mentions
+  that the caller can open now. Same shapes as `/ib/graph`; `count`, `degree_hidden_safe` and `more` are
+  `null` (keep the numbers you already have).
+- Edges: `contains` (platform → container, container → doc), `authored` (person → doc), `links` and
+  `mentions` between nodes in this reply only.
+- No cursor, or one that is malformed, forged, someone else's or older than 10 minutes: a NEW window,
+  `nodes: []`, `edges: []`, a fresh cursor, nothing back-filled.
+- Deletions and revocations are never sent; the next full `/ib/graph` load shows them.
+- A change the caller cannot open is indistinguishable from no change (same keys, empty lists, the same
+  cursor for the same clock). No counts, no sequence numbers, no reasons.
+- Ledger: `graph.viewed` with `mode: "changes"` (counts only) when a window opens and for each non-empty
+  reply, before the reply. 401 / 403 / 503 as usual; never a 404 while mounted.
+- Client: poll every 2 s (Stage theme) or 3 s; stop on 401/403/404 and while the tab is hidden or the
+  viewer paused; back off on 503 (x2 up to 30 s).
+
+### POST /sim/add-document
+
+Body (closed; no author field, ever):
+
+```json
+{"platform": "slack", "target": "C0DBMIG", "text": "1..2000 characters"}
+```
+
+(`platform: "confluence"` with a `title` ≤ 120 exists for `admin_it`; the stage UI offers Slack only.)
+`target` matches `^[A-Za-z0-9][A-Za-z0-9_.\-]{0,63}$`; HTML tags are stripped; empty after stripping is 422.
+
+200: `{"ok": true, "doc_id": "slack:C0DBMIG:<ts>", "platform": "slack", "container": "C0DBMIG", "at": "<iso>"}`.
+
+Refusals: every one (demo sign-in off, deployed, role, unknown or unreadable channel, not a member at the
+source now, no platform account, source unreachable) is `404 {"detail": "not found"}`; more than 5 posts
+per person per minute is `429 {"detail": "too many requests"}`. Reasons go to the ledger only
+(`request.failed`, `stage: "sim.add-document"`). A successful post writes nothing to the access ledger:
+the note reaches the index through the mock's signed webhook, masked, and every later read is ledgered by
+its own read path. `/sim/reset` removes it from the source and the index.
+
+### POST /sim/check-absent
+
+Body `{"phrase": "3..80 characters"}`. `admin_it` only, demo sign-in on, 10 per minute.
+200: `{"phrase", "documents_containing": <int>, "checked_at", "index_size": <int>}` over the WHOLE index
+(ignores ACLs, hence operators only). Ledgered write-ahead as `audit.query` with
+`filter: {"op": "sim.check-absent", "phrase_chars", "phrase_sha256"}`. Refusals: the same 404; 429.
+
+### POST /sim/engine-refresh and POST /sim/engine-status
+
+Body `{}`. `admin_it` or jdoe (the snapshot's person), demo sign-in on; others get the 404. Both are POSTs
+so the proxy's existing `sim/<name>` rule covers them.
+
+200, both routes:
+
+```json
+{"state": "idle | running | done | failed", "step": "building | publishing | reloading | null",
+ "started_at": "<iso> | null", "finished_at": "<iso> | null", "snapshot_at": "<iso> | null",
+ "reloaded": true | false | null}
+```
+
+- `engine-refresh` starts a background job (about a minute): `scripts/build_enterprise_graph.py --as jdoe`
+  into a side file, then an in-place SQLite online-backup copy into `var/graph/enterprise.db`, then the
+  IB calls the gateway's `POST /graph/reload` server-side. While a job runs it returns that job's status;
+  a second start within 2 minutes of the last is `429 {"detail": "too many requests"}`. A start is
+  ledgered write-ahead (`ingest.sync`, `detail.reason: "engine.refresh"`); a ledger failure is 503.
+- `engine-status` reads the status. The UI polls it every 2 s while `state` is `running`.

@@ -1,0 +1,279 @@
+"""``extract_files``: the safe-parsing rules for uploaded files, without the platforms.
+
+Every reader is one of Walnut's convert readers, run in a worker process. These tests build their
+files here (python-docx / openpyxl / python-pptx; a PDF is written by hand)."""
+from __future__ import annotations
+
+import io
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from databridge_ib import extract_files as X
+
+docx = pytest.importorskip("docx")
+openpyxl = pytest.importorskip("openpyxl")
+pptx = pytest.importorskip("pptx")
+
+ROOT = Path(__file__).resolve().parents[3]                      # databridge/
+KIT = ROOT.parent / "docs" / "finals" / "live_kit" / "files"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def worker():
+    if not X.warm():
+        pytest.skip("the convert readers cannot be imported here")
+
+
+def _docx(*paras: str) -> bytes:
+    d = docx.Document()
+    for p in paras:
+        d.add_paragraph(p)
+    b = io.BytesIO()
+    d.save(b)
+    return b.getvalue()
+
+
+def pdf(pages: list[str]) -> bytes:
+    """A text PDF with one line per page, written by hand."""
+    n = len(pages)
+    objs: list[bytes] = [b"<< /Type /Catalog /Pages 2 0 R >>",
+                         b"<< /Type /Pages /Kids [%s] /Count %d >>" % (
+                             b" ".join(b"%d 0 R" % (4 + 2 * i) for i in range(n)), n),
+                         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+    for i, text in enumerate(pages):
+        content = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
+        objs.append(b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents %d 0 R "
+                    b"/Resources << /Font << /F1 3 0 R >> >> >>" % (5 + 2 * i))
+        objs.append(b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream")
+    out, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    out += b"".join(b"%010d 00000 n \n" % o for o in offs)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+    return out
+
+
+def _replace_member(data: bytes, name: str, payload: bytes) -> bytes:
+    src = zipfile.ZipFile(io.BytesIO(data))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for i in src.infolist():
+            z.writestr(i, payload if i.filename == name else src.read(i))
+    return buf.getvalue()
+
+
+def _reason(kind: str, data: bytes, **kw) -> str:
+    with pytest.raises(X.Refused) as ei:
+        X.extract(kind, data, **kw)
+    return ei.value.reason
+
+
+# ---------------------------------------------------------------------------------------------
+# the convert readers are reachable on the Internal Brain's own PYTHONPATH
+# ---------------------------------------------------------------------------------------------
+def test_readers_import_on_the_demo_pythonpath_without_packages_convert():
+    """``scripts/demo_up.sh`` starts the IB with IB_PATH, which does not list packages/convert:
+    extract_files finds it by itself (appended to sys.path, so it shadows nothing)."""
+    ib_path = re.search(r'^IB_PATH="([^"]+)"', (ROOT / "scripts" / "demo_up.sh").read_text(
+        encoding="utf-8"), re.M).group(1)
+    assert "packages/convert" not in ib_path
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(
+        str(ROOT / p) for p in ib_path.replace("${SEP}", "|").split("|")))
+    code = ("import sys; from databridge_ib import extract_files as X; "
+            "print(X.extract('csv', b'a,b\\n1,2\\n')); "
+            "print(sys.path.index(str(X._CONVERT)) == len(sys.path) - 1)")
+    out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True,
+                         text=True, timeout=300)
+    assert out.returncode == 0, out.stderr[-2000:]
+    assert out.stdout.split("\n")[:2] == ["Row 1: a=1, b=2", "True"]
+
+
+
+# ---------------------------------------------------------------------------------------------
+# readers and flattening
+# ---------------------------------------------------------------------------------------------
+def test_pdf_text_is_extracted_and_the_page_cap_holds():
+    assert "Thornvale audit" in X.extract("pdf", pdf(["Thornvale audit is due"]))
+    assert _reason("pdf", pdf([f"page {i}" for i in range(X.PDF_MAX_PAGES + 1)])) == "pdf_pages"
+    assert "page 49" in X.extract("pdf", pdf([f"page {i}" for i in range(X.PDF_MAX_PAGES)]))
+
+
+def test_xlsx_uses_the_header_row_and_keeps_title_lines():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Fees"
+    for r in (["Quillon fee schedule (draft)"], [], ["Plan", "Fee"], ["Growth", "0.30%"],
+              ["Approval: committee on 18 November"]):
+        ws.append(r)
+    b = io.BytesIO()
+    wb.save(b)
+    text = X.extract("xlsx", b.getvalue())
+    assert "Sheet: Fees" in text and "Quillon fee schedule (draft)" in text
+    assert "Row 1: Plan=Growth, Fee=0.30%" in text
+    assert "Approval: committee on 18 November" in text and "Plan=Approval" not in text
+
+
+def test_text_is_capped_and_cleaned():
+    text = X.extract("txt", ("Sentence of filler text. " * 20_000).encode())
+    assert len(text) <= X.MAX_TEXT_CHARS
+    dirty = "Cafe\u0301 <b>bold</b> a < b\u202e\u200b\x07 <!-- note --> end"
+    assert X.clean_text(dirty) == "Café bold a < b  end"
+
+
+# ---------------------------------------------------------------------------------------------
+# refusals
+# ---------------------------------------------------------------------------------------------
+def test_xml_dtd_and_entities_are_refused_before_any_reader():
+    base = _docx("Plain paragraph")
+    doc = zipfile.ZipFile(io.BytesIO(base)).read("word/document.xml")
+    head, rest = doc.split(b"?>", 1)
+    xxe = head + b'?><!DOCTYPE w [<!ENTITY x SYSTEM "file:///C:/Windows/win.ini">]>' + rest
+    lol = head + b'?><!DOCTYPE w [<!ENTITY a "aaaaaaaa"><!ENTITY b "&a;&a;&a;&a;">]>' + rest
+    for payload in (xxe, lol):
+        assert _reason("docx", _replace_member(base, "word/document.xml", payload)) == "xml_dtd"
+
+
+def test_zip_entry_count_cap():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        for i in range(X.ZIP_MAX_ENTRIES):
+            z.writestr(f"word/p{i}.xml", "<a/>")
+    assert _reason("docx", buf.getvalue()) == "zip_entries"
+
+
+def test_macro_enabled_content_type_is_refused():
+    base = _docx("x")
+    ct = zipfile.ZipFile(io.BytesIO(base)).read("[Content_Types].xml").replace(
+        b"document.main+xml", b"document.macroEnabled.main+xml")
+    assert _reason("docx", _replace_member(base, "[Content_Types].xml", ct)) == "macros"
+    assert X.kind_for_filename("plan.docm") is None and X.kind_for_filename("a.xlsm") is None
+
+
+def test_kind_is_decided_by_extension_and_checked_against_the_bytes():
+    assert X.kind_for_filename("../x/Plan.DOCX") == "docx"
+    assert X.kind_for_filename(".pdf") is None and X.kind_for_filename("noext") is None
+    assert _reason("pdf", _docx("x")) == "magic_mismatch"
+    assert _reason("xlsx", _docx("x")) == "magic_mismatch"
+    assert _reason("csv", b"\xff\xfe") == "not_utf8"
+
+
+def test_a_read_past_the_time_budget_is_killed_with_its_worker():
+    pid = X.worker_pid()
+    t0 = time.monotonic()
+    with pytest.raises(X.Refused) as ei:
+        X.run_in_worker(time.sleep, (60,), 1.0)
+    assert ei.value.reason == "time_budget" and time.monotonic() - t0 < 10
+    assert X.worker_pid() is None                       # the process running it is gone
+    if pid:
+        assert not _alive(pid)
+    assert "ok" in X.extract("txt", b"ok")              # a fresh worker serves the next file
+    assert X.worker_pid() not in (None, pid)
+
+
+def _alive(pid: int) -> bool:
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+    import ctypes
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x1000, False, pid)                            # QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    code = ctypes.c_ulong()
+    k.GetExitCodeProcess(h, ctypes.byref(code))
+    k.CloseHandle(h)
+    return code.value == 259                                         # STILL_ACTIVE
+
+
+# ---------------------------------------------------------------------------------------------
+# WhatsApp chat exports
+# ---------------------------------------------------------------------------------------------
+ANDROID = ("24/10/2026, 02:13 - Messages and calls are end-to-end encrypted. No one outside of this "
+           "chat can read them.\n"
+           "24/10/2026, 02:13 - Mira created group \"Ops\"\n"
+           "24/10/2026, 02:14 - Mira: Varnholt cutover moved\n"
+           "to Thursday 21:00\n"
+           "24/10/2026, 02:15 - Raj: <Media omitted>\n"
+           "24/10/2026, 02:16 - +65 9000 0000: ok\n")
+IOS = ("\u200e[12/10/26, 9:04:11\u202fPM] Mira: Kestrelmoor rollback is approved\n"
+       "[12/10/26, 9:05:02\u202fPM] Raj: \u200eimage omitted\n"
+       "[12/10/26, 9:06:00\u202fPM] Raj: thanks\n")
+
+
+def test_whatsapp_android_export_is_one_paragraph_per_message():
+    out = X.whatsapp_text(ANDROID)
+    paras = out.split("\n\n")
+    assert paras[0] == ("WhatsApp chat export: 2 messages from +65 9000 0000, Mira, "
+                        "24/10/2026 to 24/10/2026.")
+    assert paras[1:] == ["24/10/2026 02:14, Mira: Varnholt cutover moved to Thursday 21:00",
+                         "24/10/2026 02:16, +65 9000 0000: ok"]
+    assert "encrypted" not in out and "created group" not in out and "omitted" not in out
+
+
+def test_whatsapp_ios_export():
+    out = X.whatsapp_text(IOS)
+    assert "12/10/26 9:04:11 PM, Mira: Kestrelmoor rollback is approved" in out
+    assert "12/10/26 9:06:00 PM, Raj: thanks" in out and "omitted" not in out
+
+
+def test_extract_txt_rewrites_a_chat_and_leaves_other_text_alone():
+    assert X.extract("txt", ANDROID.encode()).split("\n\n")[1].startswith("24/10/2026 02:14, Mira:")
+    plain = "Meeting at 10:00 - agenda below\nItem: budget\n"
+    assert X.whatsapp_text(plain) is None and not X.is_whatsapp(plain)
+
+
+def test_no_world_text_file_is_mistaken_for_a_chat():
+    world = json.loads((ROOT / "fixtures" / "enterprise" / "world.json").read_text(encoding="utf-8"))
+    texts = [f.get("content") or "" for f in world["drive"]["files"]]
+    assert texts and not any(X.is_whatsapp(t) for t in texts)
+
+
+# ---------------------------------------------------------------------------------------------
+# the live-kit sample files (docs/finals/live_kit/files, built by make_files.py)
+# ---------------------------------------------------------------------------------------------
+def _kit_samples() -> list[dict]:
+    p = ROOT / "apps" / "internal_brain_web" / "public" / "finals" / "live_samples.json"
+    if not p.is_file():
+        return []
+    return [s for s in json.loads(p.read_text(encoding="utf-8"))["samples"] if s["kind"] == "upload"]
+
+
+@pytest.mark.parametrize("sample", _kit_samples(), ids=lambda s: s["id"])
+def test_every_live_kit_file_extracts_with_its_proof_phrase(sample):
+    path = ROOT.parent / sample["file"]["path"]
+    if not path.is_file():
+        pytest.skip("run docs/finals/live_kit/make_files.py")
+    kind = X.kind_for_filename(path.name)
+    assert kind is not None
+    text = X.extract(kind, path.read_bytes())
+    assert sample["proof_phrase"].lower() in " ".join(text.split()).lower()
+
+
+def test_every_whitelisted_format_has_its_reader_in_this_environment():
+    """All seven formats are readable with the installed libraries (python-docx, python-pptx,
+    python-calamine, pypdfium2). A missing library switches off only the formats that need it."""
+    assert sorted(X.available_kinds()) == sorted(X.KIND_MIME)
+
+
+def test_a_missing_library_switches_off_only_its_formats(monkeypatch):
+    monkeypatch.setattr(X, "_READERS", {k: v for k, v in X._READERS.items() if k != "_pdfium"})
+    monkeypatch.setattr(X, "_MISSING", {"_pdfium"})
+    with pytest.raises(X.Refused) as ei:
+        X._readers_for("pdf")
+    assert ei.value.reason == "unavailable"
+    assert set(X._readers_for("csv")) == {"csv"}

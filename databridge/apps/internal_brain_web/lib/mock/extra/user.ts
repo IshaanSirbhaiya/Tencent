@@ -531,3 +531,11 @@ export const handle: MockHandler = async ({ req, path, method, sub }) => {
 
   return null;
 };
+
+/* ------------------------------------------------------------------ for the Act mock (act.ts) */
+
+/** Citation metadata of one of this area's extra documents (the Act mock cites them by id). */
+export function extraDocMeta(docId: string): MockDoc | null {
+  const d = EXTRA_BY_ID.get(docId);
+  return d ? { ...d } : null;
+}

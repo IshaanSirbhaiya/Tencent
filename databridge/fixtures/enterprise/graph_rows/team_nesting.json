@@ -61,6 +61,11 @@
    "row": "grp-staff/grp-it"
   },
   {
+   "child": "grp-people",
+   "parent": "grp-staff",
+   "row": "grp-staff/grp-people"
+  },
+  {
    "child": "grp-product",
    "parent": "grp-staff",
    "row": "grp-staff/grp-product"

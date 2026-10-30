@@ -22,15 +22,15 @@ export PYTHONPATH="apps/internal_brain:packages/core:packages/harness:packages/a
 
 | # | Claim | Number | Proof | Reproduce |
 |---|---|---|---|---|
-| 1 | Leaks in adversarial requests | **0 / 5,958** (2,979 probes × 2 paths) (re-run 30 Oct) | `RESULTS.md:9-13` | `PY -m evals.internal_brain.run` (1-10 min; exits 1 on any leak, `databridge/evals/internal_brain/run.py:237-240`) |
-| 2 | 95% upper bound on per-request leak rate | **0.1007%** per path (rule of three, 3/N) (re-run 30 Oct) | `RESULTS.md:11` | same |
-| 3 | Requests where the model received passages | **683**, payload leak bound 0.4392% (re-run 30 Oct) | `RESULTS.md:12` | same |
+| 1 | Leaks in adversarial requests | **0 / 7,374** (3,687 probes × 2 paths) (re-run 30 Oct) | `RESULTS.md:9-13` | `PY -m evals.internal_brain.run` (1-10 min; exits 1 on any leak, `databridge/evals/internal_brain/run.py:237-240`) |
+| 2 | 95% upper bound on per-request leak rate | **0.0814%** per path (rule of three, 3/N) (re-run 30 Oct) | `RESULTS.md:11` | same |
+| 3 | Requests where the model received passages | **1,047**, payload leak bound 0.2865% (re-run 30 Oct) | `RESULTS.md:12` | same |
 | 4 | Restricted vs non-existent (P2) | **0 mismatches / 400**; control rebuild 0 (re-run 30 Oct) | `RESULTS.md:16, 101-108` | same; unit: `PY -m pytest tests/test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted` |
-| 5 | Injection hard failures | **0 / 976** injection-relevant requests (re-run 30 Oct) | `RESULTS.md:17, 110-116` | same |
+| 5 | Injection hard failures | **0 / 1,152** injection-relevant requests (re-run 30 Oct) | `RESULTS.md:17, 110-116` | same |
 | 6 | Released recall on positive probes | **100%** both paths (re-run 30 Oct) | `RESULTS.md:18` | same |
-| 7 | Cited recall | **96.4%** model path, **87.8%** extractive (re-run 30 Oct) | `RESULTS.md:131, 141` | same |
+| 7 | Cited recall | **97.1%** model path, **93.2%** extractive (re-run 30 Oct) | `RESULTS.md:131, 141` | same |
 | 8 | Eval canaries valid | Leaky config caught **18 / 20**; deny-all **0%** utility (re-run 30 Oct) | `RESULTS.md:143-146` | same; unit: `PY -m pytest tests/test_eval_smoke.py::test_eval_canary_detects_a_leaky_pipeline` |
-| 9 | Requests needing no model call | **2,296 / 2,979** on the model path (re-run 30 Oct) | `RESULTS.md:49` | same |
+| 9 | Requests needing no model call | **2,640 / 3,687** on the model path (re-run 30 Oct) | `RESULTS.md:49` | same |
 | 10 | Mean pipeline latency, model excluded | **19.8 ms** (model path), **19.0 ms** (extractive) (14 Oct run; not re-measured) | `RESULTS.md:49-50` | same |
 | 11 | Backend tests (Internal Brain) | **754 passed**, run 30 Oct on Windows, Python 3.13, commit 7bf3246 (639 at submission, `INTERNAL_BRAIN.md`) | `databridge/apps/internal_brain/tests/` | `PY -m pytest apps/internal_brain/tests -q` |
 | 12 | Synthetic-world generator tests | **35 passed**, run 30 Oct | `databridge/fixtures/enterprise/tests/` | `PY -m pytest fixtures/enterprise/tests -q` |

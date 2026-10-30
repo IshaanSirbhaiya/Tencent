@@ -12,7 +12,7 @@ Rules:
 
 | # | Question | Answer (about 15 s) | Lead | Source in repo |
 |---|---|---|---|---|
-| 1 | How do you know it does not leak? | "We attacked it: 5,958 requests, zero leaks, and 400 paired questions asked two ways, zero differences. No test proves forever; the evals are in the repo and anyone can rerun them." [V] | Dev | `databridge/evals/internal_brain/RESULTS.md` |
+| 1 | How do you know it does not leak? | "We attacked it: 7,374 requests, zero leaks, and 400 paired questions asked two ways, zero differences. No test proves forever; the evals are in the repo and anyone can rerun them." [V] | Dev | `databridge/evals/internal_brain/RESULTS.md` |
 | 2 | Is the permission check inside the model? | "No. It runs before the model. A document the asker cannot open never enters the prompt, so the model cannot reveal it." | Dev | `CLAUDE.md` rule 1; `INTERNAL_BRAIN.md` |
 | 3 | What if the source system's permissions change? | "There is a second check at the source, live, just before release. Any error, timeout or rate-limit means deny." | Dev | `CLAUDE.md` rule 1 |
 | 4 | What does the audit trail give a regulator? | "Each ask, retrieval decision and answer is written before it is released, hash-chained so an edit is detectable. You saw a change get caught." | Mehul | `CLAUDE.md` rule 3; `scripts/tamper_demo.py` |
@@ -43,7 +43,7 @@ Rules:
 | Question | Honest answer |
 |---|---|
 | Did the 14 answer-quality findings leak anything? | "No. 7 questions expected a refusal but were answered from related pages the asker could open. None was a leak; all are listed in `RESULTS.md`." |
-| How good is recall? | "Allowed documents reach the answer step 100% of the time in our tests; the answer cites the expected source 87.8% to 96.4% of the time, depending on how you count." (`INTERNAL_BRAIN.md`) |
+| How good is recall? | "Allowed documents reach the answer step 100% of the time in our tests; the answer cites the expected source 93.2% to 97.1% of the time, depending on how you count." (`INTERNAL_BRAIN.md`) |
 | Is it accessible? | "We target WCAG 2.2 AA with automated, keyboard and screen-reader passes. We do not claim compliance." |
 | How many people did you test with? | Use the filled usability report. If not filled: "Not yet reported." Never guess |
 | Does the UI tell the user something is hidden? | "No. That would break our own rule: restricted and non-existent must look the same." |

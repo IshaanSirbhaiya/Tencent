@@ -35,7 +35,10 @@ from databridge_core.decision_ledger import LEDGER_EVENT, DecisionLedger, Decisi
 from pydantic import ValidationError
 
 from ..config import IbConfig
-from ..models import (EVENT_KINDS, IB_EVENT, AnchorPublished, AnswerReleased, AuditQueryEvent,
+from ..models import (DeliverableCreated, DeliverableExported, DeliverableFailed,  # noqa: I001
+                      DeliverableRequested)
+from ..models import (EVENT_KINDS, IB_EVENT, ActionConfirmed, ActionExecuted, ActionFailed,
+                      ActionProposed, ActionRejected, AnchorPublished, AnswerReleased, AuditQueryEvent,
                       AuditReveal, DocViewed, EventBase, GraphViewed, MapViewed, RequestAccepted,
                       RequestFailed, RetrievalDecided, SessionStarted, SourceChangeEvent,
                       TraceViewed)
@@ -61,6 +64,15 @@ _MODELS: dict[str, type[EventBase]] = {
     "graph.viewed": GraphViewed,
     "doc.viewed": DocViewed,
     "trace.viewed": TraceViewed,
+    "action.proposed": ActionProposed,
+    "action.confirmed": ActionConfirmed,
+    "action.executed": ActionExecuted,
+    "action.failed": ActionFailed,
+    "action.rejected": ActionRejected,
+    "deliverable.requested": DeliverableRequested,
+    "deliverable.created": DeliverableCreated,
+    "deliverable.exported": DeliverableExported,
+    "deliverable.failed": DeliverableFailed,
 }
 
 

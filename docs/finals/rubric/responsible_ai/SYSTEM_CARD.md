@@ -64,7 +64,7 @@ scope statement above is the control.
 
 | Item | Statement | Evidence |
 |---|---|---|
-| Source data | Synthetic "Company A": 32 people, 1,143 documents, 49 planted facts | [DATA_CARD_COMPANY_A.md](DATA_CARD_COMPANY_A.md) |
+| Source data | Synthetic "Company A": 34 people, 1,207 documents, 72 planted facts | [DATA_CARD_COMPANY_A.md](DATA_CARD_COMPANY_A.md) |
 | Training | None. No model is trained or fine-tuned on any data. | No training code in `databridge/apps/internal_brain/` |
 | Sent to the model | Per question only: the system prompt, at most 14 released passages (at most 2 per document) and the question | `databridge_ib/pipeline.py:34-35, 147`; `docs/tencent/DATA_FLOWS.md:18` |
 | Masked before indexing | Card numbers (first 6 + last 4), card security codes, NRIC/FIN, IBANs | `databridge_ib/ingest.py:64, 102`; `databridge_ib/pipeline.py:232`; `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` (line 206) |
@@ -90,12 +90,12 @@ scope statement above is the control.
 
 | Measure | Result | Source |
 |---|---|---|
-| Leaks | 0 of 5,958 requests; 95% upper bound 0.1007% per request per path (re-run 30 Oct) | `RESULTS.md:9-11` |
-| Requests where the fake model received passages | 683; 95% upper bound on payload leak rate 0.4392% (re-run 30 Oct) | `RESULTS.md:12` |
+| Leaks | 0 of 7,374 requests; 95% upper bound 0.0814% per request per path (re-run 30 Oct) | `RESULTS.md:9-11` |
+| Requests where the fake model received passages | 1,047; 95% upper bound on payload leak rate 0.2865% (re-run 30 Oct) | `RESULTS.md:12` |
 | Restricted vs non-existent (P2) | 400 compared, 0 mismatches; control rebuild 0 (re-run 30 Oct) | `RESULTS.md:16, 101-108` |
-| Injection hard failures | 0 in 976 injection-relevant requests (re-run 30 Oct) | `RESULTS.md:17, 110-116` |
+| Injection hard failures | 0 in 1,152 injection-relevant requests (re-run 30 Oct) | `RESULTS.md:17, 110-116` |
 | Released recall on positive probes | 100% on both paths (re-run 30 Oct) | `RESULTS.md:18` |
-| Cited recall | 96.4% (fake model), 87.8% (extractive) (re-run 30 Oct) | `RESULTS.md:131, 141` |
+| Cited recall | 97.1% (fake model), 93.2% (extractive) (re-run 30 Oct) | `RESULTS.md:131, 141` |
 | Eval canaries | Valid: leaky config caught on 18 of 20; deny-all scores 0% utility (re-run 30 Oct) | `RESULTS.md:143-146` |
 | Backend tests | 754 passed, 30 Oct, commit 7bf3246 | `python -m pytest apps/internal_brain/tests -q` (see [EVIDENCE_CARD.md](../technical/EVIDENCE_CARD.md)) |
 | Real-model run (Hy3) | **Not run** | `RESULTS.md:30` |

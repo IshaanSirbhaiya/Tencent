@@ -73,6 +73,7 @@ def create_app(world_path: str | Path | None = None, *, webhook_sink: Optional[S
     app.include_router(jira.router, prefix="/jira/rest/api/3", tags=["jira"])
     app.include_router(drive.router, prefix="/drive/v3", tags=["drive"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
+    from .uploads import router as drive_upload_router; app.include_router(drive_upload_router, prefix="/admin", tags=["admin"])  # POST /admin/drive/files/upload
 
     @app.get("/health")
     def health() -> dict:

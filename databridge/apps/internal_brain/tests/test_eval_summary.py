@@ -38,7 +38,7 @@ def test_summary_matches_the_eval_output(tmp_path):
     out = tmp_path / "eval_summary.json"
     assert mod.main(["--out", str(out), "--no-collect"]) == 0
     body = json.loads(out.read_text(encoding="utf-8"))
-    assert body["leaks"] == h["leaks"] and body["tests"] == {"backend": None, "e2e": 38}
+    assert body["leaks"] == h["leaks"] and body["tests"] == {"backend": None, "e2e": 124}   # the --e2e default (TEST_REPORT.md)
     assert body["stale"] in (True, False, None) and body["note"]
 
 

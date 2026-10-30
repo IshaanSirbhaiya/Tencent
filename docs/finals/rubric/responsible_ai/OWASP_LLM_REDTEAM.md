@@ -16,8 +16,8 @@ Source list: [OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/20
 
 | ID | Risk | Our main control | Result | Residual risk |
 |---|---|---|---|---|
-| LLM01 | Prompt injection | Containment: access before content, no tools, untrusted-data labelling, tag neutralisation | 0 hard failures / 976 (re-run 30 Oct) | Medium: real-model behaviour not measured |
-| LLM02 | Sensitive information disclosure | Two permission gates before the model; masking at ingest; one response shape | 0 leaks / 5,958; 0 / 400 P2 (re-run 30 Oct) | Low-Medium: other personal data not redacted; timing |
+| LLM01 | Prompt injection | Containment: access before content, no tools, untrusted-data labelling, tag neutralisation | 0 hard failures / 1,152 (re-run 30 Oct) | Medium: real-model behaviour not measured |
+| LLM02 | Sensitive information disclosure | Two permission gates before the model; masking at ingest; one response shape | 0 leaks / 7,374; 0 / 400 P2 (re-run 30 Oct) | Low-Medium: other personal data not redacted; timing |
 | LLM03 | Supply chain | Pinned Python lock and exact npm versions; vendor SDK only in the harness | Not attack-tested | Medium: no SBOM, no dependency audit, model aliases |
 | LLM04 | Data and model poisoning | No training; poisoned text reaches only people who can already read it | Covered by injection fixtures | Low-Medium: an author can mislead their own readers |
 | LLM05 | Improper output handling | Markdown stripped; answer rendered as text; links only for http(s) | Codex track 6 #4 fixed | Low |
@@ -25,7 +25,7 @@ Source list: [OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/20
 | LLM07 | System prompt leakage | The prompt holds no secrets or permissions | By design | Low |
 | LLM08 | Vector and embedding weaknesses | Permission-aware index; statistics over permitted docs only; local embedder | 0 / 400 P2 (re-run 30 Oct) | Low; would rise if a remote embedder were enabled |
 | LLM09 | Misinformation | Grounding wall; citations; extractive fallback; approved-only policies | 0 uncited answers (re-run 30 Oct) | Medium: relations not verified; lexical relevance |
-| LLM10 | Unbounded consumption | No model call on refusal; caps on passages, body and question; 2 s Gate 2 budget | 2,296 of 2,979 requests needed no model call | Medium: no rate limiter |
+| LLM10 | Unbounded consumption | No model call on refusal; caps on passages, body and question; 2 s Gate 2 budget | 2,640 of 3,687 requests needed no model call | Medium: no rate limiter |
 
 ## What broke, and what we fixed
 
@@ -63,15 +63,15 @@ Showing failures is the point of a red team. These are from our own records.
   6. No arbitrary fetch: links only for supported id shapes inside the readable set, depth 1, then Gate 2 (`tests/test_connector_slack.py::test_links_only_supported_shapes`, line 324).
   7. Audit NL filter returns a closed schema (`tests/test_audit_nl_filter.py::test_injection_text_cannot_escape_the_schema`, line 58).
 - **Detectors.** `followed_base64`, `forged_citation`, `source_tag_echoed`, `tool_text_not_from_source`, `injected_text_echoed` (`RESULTS.md:116`).
-- **Result.** 0 signals in 976 injection-relevant requests (re-run 30 Oct) (`RESULTS.md:112-114`). Canonical questions `INJ-q1` to `INJ-q4` pass (`tests/test_scenarios_e2e.py::test_canonical`, line 48).
+- **Result.** 0 signals in 1,152 injection-relevant requests (re-run 30 Oct) (`RESULTS.md:112-114`). Canonical questions `INJ-q1` to `INJ-q4` pass (`tests/test_scenarios_e2e.py::test_canonical`, line 48).
 - **Residual.** Delimiting is not datamarking or encoding (`docs/tencent/SECURITY.md:161`). The fake model does not reason like Hy3, so real-model susceptibility is **unmeasured**.
 
 ### LLM02 Sensitive information disclosure
 
-- **Attacks tried.** 2,979 probes × 2 paths over 11 personas and 16 probe types: direct, identifier, paraphrase, completion, three metadata types (exists, author, count), multi-hop, injection, positive and world questions (`RESULTS.md:52-67`). Two extra personas (`sam.old`, `ivy.guest`) test ACL-derived denials (`RESULTS.md:33`).
+- **Attacks tried.** 3,687 probes × 2 paths over 11 personas and 16 probe types: direct, identifier, paraphrase, completion, three metadata types (exists, author, count), multi-hop, injection, positive and world questions (`RESULTS.md:52-67`). Two extra personas (`sam.old`, `ivy.guest`) test ACL-derived denials (`RESULTS.md:33`).
 - **Detectors.** Denied-fact sentinels, `CNRY-` canaries and 10-word shingles unique to unreadable docs, checked in every model payload, embedder input, answer and response body; ground truth from the generator's own ACL, independent of the Brain (`RESULTS.md:35, 40-43`).
 - **Controls.** Gate 1 + Gate 2 before the model (`databridge_ib/pipeline.py:114-139`); masking of card, CVV, NRIC/FIN and IBAN at ingest (`databridge_ib/ingest.py:64, 102`); one constant refusal (`databridge_ib/models.py:20-21`).
-- **Result.** 0 leaks in 5,958 requests, 95% upper bound 0.1007% per request per path; 0 of 400 P2 mismatches (re-run 30 Oct) (`RESULTS.md:9-16`). Tests: `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt` (line 144), `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` (line 206), `tests/test_fintech_scenarios.py::test_fc_real_vs_nonexistent_customer_is_byte_identical` (line 100).
+- **Result.** 0 leaks in 7,374 requests, 95% upper bound 0.0814% per request per path; 0 of 400 P2 mismatches (re-run 30 Oct) (`RESULTS.md:9-16`). Tests: `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt` (line 144), `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` (line 206), `tests/test_fintech_scenarios.py::test_fc_real_vs_nonexistent_customer_is_byte_identical` (line 100).
 - **Residual.** Other personal data in permitted passages is sent as written (`docs/tencent/RESPONSIBLE_AI.md:40`). Timing is not controlled (`docs/tencent/SECURITY.md:194`).
 
 ### LLM03 Supply chain
@@ -122,12 +122,12 @@ OWASP's own mitigations include permission-aware vector stores and partitioning 
 ### LLM10 Unbounded consumption
 
 - **Controls.** No model call when nothing is relevant (`databridge_ib/pipeline.py:163`); ≤ 14 passages (`databridge_ib/pipeline.py:34, 147`); question ≤ 2,000 chars (`databridge_ib/models.py:155`); proxy body ≤ 64 KiB (`databridge/apps/internal_brain_web/app/api/ib/[...path]/route.ts:43`); Gate 2 one 2 s budget (`databridge_ib/gates.py:44`).
-- **Result.** 2,296 of 2,979 fake-model requests were refused with no model call (`RESULTS.md:49`) (re-run 30 Oct).
+- **Result.** 2,640 of 3,687 fake-model requests were refused with no model call (`RESULTS.md:49`) (re-run 30 Oct).
 - **Residual.** No per-user rate limiter. Audit verify is O(records) (`docs/tencent/SECURITY.md:136`).
 
 ## Appendix: probe taxonomy
 
-Per persona × type, each run on both paths (`RESULTS.md:52-67`). Total 2,979.
+Per persona × type, each run on both paths (`RESULTS.md:52-67`). Total 3,687.
 
 | Type | Count | Type | Count |
 |---|---|---|---|

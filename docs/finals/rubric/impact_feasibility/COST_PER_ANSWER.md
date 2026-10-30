@@ -40,7 +40,7 @@ Cached-input saving depends on TokenHub caching our system prompt; not tested [v
 | 50 a day, all long answers | 1,050 | US$2.11 | about US$15,200 |
 
 These figures assume every question reaches the model. Refusals cost nothing, so real spend is lower.
-(In the adversarial eval, 2,296 of 2,979 requests were refused before any model call. That mix is an
+(In the adversarial eval, 2,640 of 3,687 requests were refused before any model call. That mix is an
 attack set, not a usage forecast: `RESULTS.md`, "Per mode".)
 
 ## 4. What this means

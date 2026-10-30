@@ -22,6 +22,7 @@ import {
   type PackRegistry,
 } from '@/lib/engine-api';
 import { CompanyBrainTab } from './CompanyBrainTab';
+import { EngineRefreshButton } from './EngineRefreshButton';
 import { KnowledgeGraphTab } from './KnowledgeGraphTab';
 import { OntologyTab } from './OntologyTab';
 import { buildPalette } from './palette';
@@ -70,6 +71,8 @@ function SnapshotBanner({ hubs, facets }: { hubs: GraphNeighborhood | null; face
             {t('engine.banner.mock')}
           </Badge>
         ) : null}
+        {/* demo-only (D-24): renders nothing unless demo features are on */}
+        <EngineRefreshButton />
       </div>
     </div>
   );

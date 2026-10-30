@@ -602,3 +602,201 @@ export interface AuditAskV2 {
   parser_fallback?: boolean | null;
   notes?: string | string[] | null;
 }
+
+// ---- act ----
+/** POST /ib/act/draft: a reply (or message) draft built only from the cited sentences of one of
+ *  the asker's own released answers. Never sent by the Brain. */
+export interface ActCitation {
+  tag: string;
+  doc_id: string;
+  platform: Platform;
+  kind: string;
+  container: string;
+  container_name: string;
+  title: string;
+  version: string;
+  updated_at: string;
+  deep_link: string;
+}
+export interface ActDraft {
+  action_id: string;
+  kind: 'reply' | 'message';
+  status: 'draft';
+  label: string;
+  req_id: string;
+  greeting: string;
+  opener: string;
+  body: { text: string; tags: string[] }[];
+  closing: string;
+  /** The whole draft as plain text, without citation tags (what Copy puts on the clipboard). */
+  text: string;
+  citations: ActCitation[];
+  model: ModelInfo;
+  prompt_version: string;
+  sent: false;
+  scope_note: string;
+  as_of: string;
+}
+/** POST /ib/act/ticket/propose: nothing is created until the person confirms. */
+export interface TicketProposal {
+  proposal_id: string;
+  action_id: string;
+  kind: 'ticket';
+  status: 'proposed';
+  req_id: string;
+  project: { key: string; name: string };
+  /** Only projects the person may create issues in (checked live at the source). */
+  projects: { key: string; name: string }[];
+  issue_type: string;
+  summary: string;
+  summary_max: number;
+  description: string;
+  citations: ActCitation[];
+  expires_at: string;
+  scope_note: string;
+  as_of: string;
+}
+/** POST /ib/act/ticket/confirm. */
+export interface TicketCreated {
+  status: 'created';
+  action_id: string;
+  req_id: string;
+  project: { key: string; name: string };
+  summary: string;
+  issue: { key: string; url: string; doc_id: string };
+  as_of: string;
+}
+
+// ---- live-growth ----
+// Demo-proof features (D-24): mounted on the server only when IB_DEMO_FEATURES=1 (never deployed).
+/** GET /ib/status also says whether the demo-proof routes are mounted (declaration merging). */
+export interface IbStatus {
+  demo_features?: boolean;
+}
+/** GET /ib/graph/changes?since=<cursor>: only documents the caller can open now, in /ib/graph shapes.
+ *  `count`, `degree_hidden_safe` and `more` are null (keep the numbers you already have). */
+export interface GraphChanges {
+  cursor: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+/** POST /sim/add-document: a note posted AS the signed-in person (no author field, ever). */
+export interface AddDocumentBody {
+  platform: 'slack';
+  target: string;
+  text: string;
+}
+export interface AddDocumentResult {
+  ok: boolean;
+  doc_id: string;
+  platform: 'slack' | 'confluence';
+  container: string;
+  at: string;
+}
+/** POST /sim/upload-file (JSON with base64 content; the proxy allows 7 MB for this route). */
+export interface UploadFileBody {
+  filename: string;
+  content_b64: string;
+  folder: string;
+  title?: string;
+}
+export interface UploadFileResult {
+  ok: boolean;
+  doc_id: string;
+  container: string;
+  kind: string;
+  at: string;
+}
+/** POST /sim/engine-refresh and /sim/engine-status: the engine snapshot rebuild (no counts). */
+export interface EngineRefreshStatus {
+  state: 'idle' | 'running' | 'done' | 'failed';
+  step: 'building' | 'publishing' | 'reloading' | null;
+  started_at: string | null;
+  finished_at: string | null;
+  snapshot_at: string | null;
+  reloaded: boolean | null;
+}
+
+// ---- deliverables (POST /ib/deliverables; IB_DELIVERABLES=1, D-25) ----
+/** GET /ib/status says which deliverable kinds this server offers (declaration merging). */
+export interface IbStatus {
+  deliverables?: DeliverablesStatus;
+}
+export type DeliverableKind = 'table' | 'chart' | 'analysis';
+export interface DeliverablesStatus {
+  enabled: boolean;
+  /** a model is configured; without one, only table and chart (copied from the sources) */
+  model: boolean;
+  kinds: DeliverableKind[];
+  exports: { csv: boolean; pptx: boolean };
+}
+export interface DeliverCitation extends ActCitation {
+  /** the number this source has in the answer's own citation list */
+  n: number;
+  cited_version: string;
+  changed_since_answer: boolean;
+  checked_at: string;
+}
+export interface DeliverCheck {
+  values_proposed: number;
+  values_kept: number;
+  values_dropped: number;
+  items_proposed: number;
+  items_kept: number;
+  items_dropped: number;
+  names_dropped: number;
+}
+export interface DeliverSentence {
+  text: string;
+  tags: string[];
+}
+export interface DeliverCell {
+  text: string;
+  tags: string[];
+  numeric: boolean;
+}
+export interface DeliverTable {
+  source: 'model' | 'source_table' | 'cited_facts';
+  from_tag?: string;
+  columns: string[];
+  rows: DeliverCell[][];
+  truncated: boolean;
+}
+export interface DeliverPoint {
+  x: string;
+  value: number;
+  /** the number exactly as written in the source */
+  raw: string;
+  tag: string;
+}
+export interface DeliverChart {
+  type: 'bar' | 'line';
+  drawn_as_bar: boolean;
+  x_label: string;
+  y_label: string;
+  unit: 'percent' | 'currency' | 'days' | 'hours' | 'number';
+  currency: string | null;
+  series: { name: string; points: DeliverPoint[] }[];
+  from_tag?: string;
+}
+export interface DeliverAnalysis {
+  sections: { heading: 'Key facts' | 'Trends' | 'Risks' | 'What changed'; sentences: DeliverSentence[] }[];
+}
+export interface Deliverable {
+  deliverable_id: string;
+  req_id: string;
+  kind: DeliverableKind;
+  status: 'ready' | 'needs_model' | 'insufficient';
+  label: string;
+  title: string;
+  generated: 'model' | 'deterministic' | 'none';
+  model: ModelInfo | null;
+  check: DeliverCheck;
+  content: DeliverTable | DeliverChart | DeliverAnalysis | null;
+  citations: DeliverCitation[];
+  exports: ('csv' | 'pptx')[];
+  fallback: string;
+  prompt_version: string;
+  scope_note: string;
+  as_of: string;
+}

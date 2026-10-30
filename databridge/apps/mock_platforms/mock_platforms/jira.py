@@ -6,7 +6,13 @@
   [ASC|DESC]``. Anything else is a 400, as real Jira rejects unparseable JQL.
 * v3 returns rich text (description, comment bodies) as **ADF** documents, like the real API.
 * ``permissions/check`` (admin token only) = Browse (role actors + users/groups + reporter/assignee
-  holders) AND, when the issue has a security level, level membership.
+  holders) AND, when the issue has a security level, level membership; ``CREATE_ISSUES`` for
+  projects (``World.jira_can_create``: the project's ``create`` holders, by default its
+  ``Developers`` role).
+* ``POST issue`` creates an issue the way Jira Cloud's ``POST /rest/api/3/issue`` does (fields
+  ``project``, ``summary``, ``issuetype``, ``description`` as ADF, optional ``reporter`` and
+  ``labels``); 201 ``{id, key, self}``. The reporter (the person the issue is created for) must hold
+  "Create issues" in the project, otherwise a 403 like Jira's. A ``content.changed`` webhook follows.
 """
 from __future__ import annotations
 
@@ -22,6 +28,9 @@ from .state import World
 P = "jira"
 router = APIRouter(dependencies=[Depends(platform_auth(P))])
 BROWSE = "BROWSE_PROJECTS"
+CREATE = "CREATE_ISSUES"
+ISSUE_TYPES = ("Task", "Story", "Bug")
+MAX_SUMMARY = 255
 
 
 def _base(request: Request) -> str:
@@ -242,6 +251,70 @@ def get_issue(request: Request, key_or_id: str, fields: Optional[str] = None):
         return issue_obj(w, request, _issue(w, key_or_id), fields)
 
 
+def _adf_to_text(node: Any) -> str:
+    """Plain text of an ADF document: one paragraph per block, text nodes joined."""
+    if not isinstance(node, dict):
+        return ""
+    paras = []
+    for block in node.get("content") or []:
+        if isinstance(block, dict):
+            paras.append("".join(str(t.get("text", "")) for t in block.get("content") or []
+                                 if isinstance(t, dict)))
+    return "\n\n".join(p for p in paras if p)
+
+
+def _field_error(field: str, message: str) -> PlatformError:
+    err = PlatformError(P, 400, "invalid_request", message)
+    err.field = field                                   # type: ignore[attr-defined]
+    return err
+
+
+@router.post("/issue", status_code=201)
+def create_issue(request: Request, body: dict = Body(...)):
+    """Jira Cloud ``POST /rest/api/3/issue`` (subset). The issue is created for ``reporter`` (the
+    Internal Brain passes the asker's own account id); that account must hold Create issues."""
+    w = world(request)
+    f = body.get("fields") if isinstance(body, dict) else None
+    if not isinstance(f, dict):
+        raise _field_error("fields", "fields is required")
+    proj_ref = f.get("project") if isinstance(f.get("project"), dict) else {}
+    summary = f.get("summary")
+    itype = (f.get("issuetype") or {}).get("name") if isinstance(f.get("issuetype"), dict) else None
+    if not isinstance(summary, str) or not summary.strip() or len(summary) > MAX_SUMMARY \
+            or "\n" in summary:
+        raise _field_error("summary", "You must specify a summary of the issue.")
+    if itype not in ISSUE_TYPES:
+        raise _field_error("issuetype", "The issue type selected is invalid.")
+    labels = f.get("labels") or []
+    if not isinstance(labels, list) or not all(isinstance(x, str) and x and " " not in x
+                                               for x in labels):
+        raise _field_error("labels", "Labels must be strings without spaces.")
+    with w.lock:
+        try:
+            proj = _project(w, str(proj_ref.get("key") or proj_ref.get("id") or ""))
+        except PlatformError:
+            raise _field_error("project", "valid project is required") from None
+        rep = f.get("reporter")
+        account = rep.get("accountId") if isinstance(rep, dict) else None
+        uid = w.ib_id(P, account) if account else None
+        if uid is None or not w.jira_can_create(uid, proj["key"]):
+            raise PlatformError(P, 403, "forbidden",
+                                "You do not have permission to create issues in this project.")
+        key, iid = w.next_issue(proj["key"])
+        now = w.now_iso()
+        issue = {"id": iid, "key": key, "project": proj["key"], "summary": summary.strip(),
+                 "description": _adf_to_text(f.get("description")), "status": "To Do",
+                 "issuetype": itype, "reporter": uid, "assignee": None, "security_level": None,
+                 "labels": list(labels), "comments": [], "links": [], "created": now,
+                 "updated": now}
+        w.issues[key] = issue
+        w.issue_by_id[iid] = key
+        out = {"id": iid, "key": key, "self": f"{_base(request)}/issue/{iid}"}
+    # outside the world lock: an in-process webhook sink may read the new issue back
+    request.app.state.webhooks.emit(P, "content.changed", [key], at=now, user=uid)
+    return out
+
+
 @router.get("/securitylevel/{level_id}")
 def get_security_level(request: Request, level_id: str):
     w = world(request)
@@ -400,6 +473,14 @@ def permissions_check(request: Request, body: dict = Body(...)):
                         except PlatformError:
                             continue
                         if w.jira_can_browse_project(uid, pk):
+                            allowed_projects.append(pid)
+                elif perm == CREATE and uid is not None:
+                    for pid in projects:
+                        try:
+                            pk = _project(w, str(pid))["key"]
+                        except PlatformError:
+                            continue
+                        if w.jira_can_create(uid, pk):
                             allowed_projects.append(pid)
                 out.append({"permission": perm, "issues": allowed_issues,
                             "projects": allowed_projects})

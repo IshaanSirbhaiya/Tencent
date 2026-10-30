@@ -27,14 +27,28 @@ def full():
     return json.loads(wb), m
 
 
-@pytest.fixture(scope="module")
-def base():
-    """The same world with the fintech layer switched off."""
+def _build(*, fintech: bool, workplace: bool) -> dict:
     from datetime import datetime
     b = G.Builder(ARGS["seed"], datetime.fromisoformat(ARGS["now"]), ARGS["scale"])
-    b.build_fintech = lambda: None
-    b.build_fintech_questions = lambda: None
+    if not fintech:
+        b.build_fintech = lambda: None
+        b.build_fintech_questions = lambda: None
+    if not workplace:                       # the later workplace layer (test_workplace_layer.py)
+        b.build_workplace = lambda: None
+        b.build_workplace_questions = lambda: None
     return b.build()
+
+
+@pytest.fixture(scope="module")
+def base():
+    """The world as it was before the fintech layer: both later layers switched off."""
+    return _build(fintech=False, workplace=False)
+
+
+@pytest.fixture(scope="module")
+def with_fintech():
+    """The world with the fintech layer and without the later workplace layer."""
+    return _build(fintech=True, workplace=False)
 
 
 @pytest.fixture(scope="module")
@@ -63,8 +77,8 @@ def _q(world, qid):
 # --------------------------------------------------------------------------------------------
 # additive only
 # --------------------------------------------------------------------------------------------
-def test_fintech_layer_only_adds(full, base):
-    world = full[0]
+def test_fintech_layer_only_adds(with_fintech, base):
+    world = with_fintech
     for plat, coll, key in (("confluence", "pages", "id"), ("jira", "issues", "key"),
                             ("drive", "files", "id"), ("drive", "folders", "id"),
                             ("confluence", "spaces", "key")):

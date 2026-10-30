@@ -1,0 +1,144 @@
+'use client';
+// Q&A beat "Dev, D." (docs/finals/deliverables/review_fable.md §5): P's warm-up signs Leo in,
+// asks Q_DELIVER and builds every deliverable kind the server offers for that one answer, then
+// restores whoever was signed in. The result is cached in this tab (TTL 90 min, the server's
+// export store TTL; R rebuilds it). D signs Leo in and opens the cached panel at once: no model
+// call inside a 15-second beat. Every build is still a real, ledgered request.
+import { useSyncExternalStore } from 'react';
+import { deliverablesStatus } from '@/components/user/DeliverSheet';
+import { api, deliverApi } from '@/lib/api';
+import type { AskResponse, Deliverable, DeliverableKind } from '@/lib/types';
+
+export const DELIVER_PERSONA = 'leo.ops';
+/** Cites the SG/HK/ID pricing sheet (drive:df-3) for Leo in the synthetic world (checked 30 Oct). */
+export const Q_DELIVER = 'Can we offer multi-currency accounts to an Indonesian SME?';
+export const DELIVER_TTL_MS = 90 * 60 * 1000;
+const KEY = 'ib.presenter.deliver';
+
+export interface DeliverCache {
+  at: number;
+  response: AskResponse;
+  deliverables: Partial<Record<DeliverableKind, Deliverable>>;
+  kinds: DeliverableKind[];
+}
+
+type Serial = <T>(fn: () => Promise<T>) => Promise<T>;
+
+function readCache(): DeliverCache | null {
+  try {
+    const raw = sessionStorage.getItem(KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as DeliverCache;
+    return Date.now() - c.at < DELIVER_TTL_MS ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(c: DeliverCache | null) {
+  try {
+    if (c) sessionStorage.setItem(KEY, JSON.stringify(c));
+    else sessionStorage.removeItem(KEY);
+  } catch {
+    /* storage blocked: D then builds on demand */
+  }
+}
+
+export function clearDeliverCache() {
+  writeCache(null);
+}
+
+let warming: Promise<DeliverCache | null> | null = null;
+
+/** Build Leo's deliverables in the main session, then put the previous session back. */
+export function warmDeliverables(serial: Serial): Promise<DeliverCache | null> {
+  if (warming) return warming;
+  warming = serial(async () => {
+    let prev: string | null = null;
+    try {
+      prev = (await api.whoami()).sub;
+    } catch {
+      /* signed out */
+    }
+    try {
+      if (prev !== DELIVER_PERSONA) await api.switchTo(DELIVER_PERSONA);
+      const st = await deliverablesStatus(); // the kill switch is off: nothing to build
+      if (!st) return null;
+      const response = await api.ask(Q_DELIVER);
+      if (!response.citations.length) return null;
+      const deliverables: DeliverCache['deliverables'] = {};
+      for (const k of st.kinds) {
+        try {
+          deliverables[k] = await deliverApi.create(response.request_id, k);
+        } catch {
+          /* that tab builds on demand */
+        }
+      }
+      const c: DeliverCache = { at: Date.now(), response, deliverables, kinds: st.kinds };
+      writeCache(c);
+      return c;
+    } catch {
+      return null;
+    } finally {
+      try {
+        if (prev && prev !== DELIVER_PERSONA) await api.switchTo(prev);
+        else if (!prev) await api.logout();
+      } catch {
+        /* the next step signs its own persona in */
+      }
+    }
+  }).finally(() => {
+    warming = null;
+  });
+  return warming;
+}
+
+/* ------------------------------------------------------------- the overlay's state */
+
+export interface DeliverOverlayState {
+  open: boolean;
+  cache: DeliverCache | null;
+  kind: DeliverableKind;
+}
+let state: DeliverOverlayState = { open: false, cache: null, kind: 'table' };
+const listeners = new Set<() => void>();
+function set(next: Partial<DeliverOverlayState>) {
+  state = { ...state, ...next };
+  listeners.forEach((l) => l());
+}
+export function useDeliverOverlay(): DeliverOverlayState {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => state,
+    () => state,
+  );
+}
+export function setDeliverKind(kind: DeliverableKind) {
+  set({ kind });
+}
+export function closeDeliverOverlay() {
+  set({ open: false });
+}
+
+/** D: Leo signed in, the cached panel open (Chart when the model wrote it, else Table). */
+export async function openDeliverables(serial: Serial, refresh: () => Promise<unknown> | undefined): Promise<boolean> {
+  const cache = readCache() ?? (await warmDeliverables(serial));
+  if (!cache) return false;
+  await serial(async () => {
+    let sub: string | null = null;
+    try {
+      sub = (await api.whoami()).sub;
+    } catch {
+      /* signed out */
+    }
+    if (sub !== DELIVER_PERSONA) await api.switchTo(DELIVER_PERSONA);
+    await refresh();
+  });
+  const chart = cache.deliverables.chart;
+  const kind: DeliverableKind = chart && chart.status === 'ready' && chart.generated === 'model' ? 'chart' : cache.kinds.includes('table') ? 'table' : cache.kinds[0];
+  set({ open: true, cache, kind });
+  return true;
+}

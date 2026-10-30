@@ -19,7 +19,7 @@ Tagline: **"Answers you can prove."** Product: Walnut DataBridge (Internal Brain
 - Every sentence points at a passage the asker can open, re-checked at the source before release.
 - A tamper in a copy of the log is caught at an exact entry.
 - A second front door: WorkBuddy calls the same tool with Jordan's signed token, same gates, same ledger.
-- 5,958 adversarial requests, 0 leaks (generated 14 Oct, capturing test model; re-run before 3 Nov).
+- 7,374 adversarial requests, 0 leaks (generated 14 Oct, capturing test model; re-run before 3 Nov).
 
 ## Open dependencies (flag to the coordinator)
 

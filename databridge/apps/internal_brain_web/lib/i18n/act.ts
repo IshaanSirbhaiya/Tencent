@@ -1,0 +1,116 @@
+// "Act on this answer" strings (draft a reply, create a follow-up ticket), English + 简体中文.
+// The draft and ticket text themselves are never translated: they are shown exactly as the API
+// returns them.
+import { defineMessages } from '.';
+
+const actEn = {
+  'act.heading': 'Act on this answer',
+  'act.draft': 'Draft a reply',
+  'act.ticket': 'Create follow-up ticket',
+  'act.hint': 'Uses only the sources cited above. Nothing is sent or created without you.',
+
+  /* draft sheet */
+  'act.draft.title': 'Draft for your review',
+  'act.draft.desc': 'Built only from the sources this answer cited. It is not sent.',
+  'act.draft.loading': 'Drafting from the cited sources…',
+  'act.draft.notSent': 'Not sent. Copy it, or edit it here first.',
+  'act.draft.sources': 'Cited in this draft',
+  'act.draft.copy': 'Copy',
+  'act.draft.copied': 'Draft copied',
+  'act.draft.copyFailed': 'Couldn’t copy. Select the text and copy it instead.',
+  'act.draft.edit': 'Edit before sending',
+  'act.draft.editing': 'Your edits stay on this page only.',
+  'act.draft.editLabel': 'Draft text',
+  'act.draft.reset': 'Undo my edits',
+  'act.draft.by.model': 'Written by {model}, checked against the cited sources',
+  'act.draft.by.template': 'Built from the cited sentences',
+  'act.draft.by.script': 'Uses the approved wording, word for word',
+  'act.draft.by.fallback': 'The AI draft did not pass the source check, so the cited sentences are used',
+  'act.draft.recorded': 'Recorded in the audit trail before it was shown.',
+
+  /* ticket sheet */
+  'act.ticket.title': 'Create a follow-up ticket',
+  'act.ticket.desc': 'Nothing is created until you confirm.',
+  'act.ticket.loading': 'Checking where you can create tickets…',
+  'act.ticket.project': 'Project',
+  'act.ticket.projectHint': 'Only projects where Jira lets you create issues.',
+  'act.ticket.summary': 'Summary',
+  'act.ticket.summaryHint': '{n} of {max} characters',
+  'act.ticket.type': 'Type',
+  'act.ticket.description': 'Description',
+  'act.ticket.descriptionHint': 'Links only: each opens only for people the source allows.',
+  'act.ticket.sources': 'Linked in this ticket',
+  'act.ticket.confirm': 'Create ticket',
+  'act.ticket.cancel': 'Cancel',
+  'act.ticket.creating': 'Creating…',
+  'act.ticket.confirmNote': 'Created in your name. Recorded in the audit trail first.',
+  'act.ticket.created': 'Ticket {key} created',
+  'act.ticket.createdBody': '{key} is in {project}. You are the reporter.',
+  'act.ticket.open': 'Open {key}',
+  'act.ticket.cancelled': 'Cancelled. Nothing was created.',
+  'act.ticket.expired': 'This proposal is no longer available. Start again from the answer.',
+  'act.ticket.unavailable': 'A follow-up ticket can’t be created from this answer. Nothing was changed.',
+
+  /* shared */
+  'act.nothing': 'There is nothing in this answer to act on.',
+  'act.nothingHint': 'Only sources you can still open are used.',
+  'act.error': 'This is temporarily unavailable. Nothing was sent or created.',
+  'act.retry': 'Try again',
+  'act.close': 'Close',
+} as const;
+
+const actZh: Record<keyof typeof actEn, string> = {
+  'act.heading': '基于此回答采取行动',
+  'act.draft': '起草回复',
+  'act.ticket': '创建跟进工单',
+  'act.hint': '仅使用上方引用的来源。未经你确认，不会发送或创建任何内容。',
+
+  'act.draft.title': '草稿，请你审阅',
+  'act.draft.desc': '仅根据此回答引用的来源生成，不会发送。',
+  'act.draft.loading': '正在根据引用来源起草…',
+  'act.draft.notSent': '尚未发送。可复制，或先在此处编辑。',
+  'act.draft.sources': '此草稿引用的来源',
+  'act.draft.copy': '复制',
+  'act.draft.copied': '草稿已复制',
+  'act.draft.copyFailed': '无法复制，请选中文本后手动复制。',
+  'act.draft.edit': '发送前编辑',
+  'act.draft.editing': '你的修改只保留在此页面。',
+  'act.draft.editLabel': '草稿文本',
+  'act.draft.reset': '撤销我的修改',
+  'act.draft.by.model': '由 {model} 撰写，并已对照引用来源检查',
+  'act.draft.by.template': '由引用的句子组成',
+  'act.draft.by.script': '逐字使用已批准的话术',
+  'act.draft.by.fallback': 'AI 草稿未通过来源检查，因此使用引用的句子',
+  'act.draft.recorded': '展示前已记录到审计日志。',
+
+  'act.ticket.title': '创建跟进工单',
+  'act.ticket.desc': '在你确认之前不会创建任何内容。',
+  'act.ticket.loading': '正在检查你可以在哪里创建工单…',
+  'act.ticket.project': '项目',
+  'act.ticket.projectHint': '只列出 Jira 允许你创建事项的项目。',
+  'act.ticket.summary': '摘要',
+  'act.ticket.summaryHint': '{n} / {max} 个字符',
+  'act.ticket.type': '类型',
+  'act.ticket.description': '描述',
+  'act.ticket.descriptionHint': '仅包含链接：每个链接只对来源系统允许的人开放。',
+  'act.ticket.sources': '此工单链接的来源',
+  'act.ticket.confirm': '创建工单',
+  'act.ticket.cancel': '取消',
+  'act.ticket.creating': '正在创建…',
+  'act.ticket.confirmNote': '以你的名义创建。会先记录到审计日志。',
+  'act.ticket.created': '已创建工单 {key}',
+  'act.ticket.createdBody': '{key} 位于 {project}。报告人是你。',
+  'act.ticket.open': '打开 {key}',
+  'act.ticket.cancelled': '已取消，未创建任何内容。',
+  'act.ticket.expired': '此提议已失效，请从回答重新开始。',
+  'act.ticket.unavailable': '无法根据此回答创建跟进工单。未做任何更改。',
+
+  'act.nothing': '此回答中没有可以采取行动的内容。',
+  'act.nothingHint': '只会使用你目前仍可打开的来源。',
+  'act.error': '暂时无法使用。未发送或创建任何内容。',
+  'act.retry': '重试',
+  'act.close': '关闭',
+};
+
+export const actMessages = defineMessages({ en: actEn, zh: actZh });
+export type ActKey = keyof typeof actEn;

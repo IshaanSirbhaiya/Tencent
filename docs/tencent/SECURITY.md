@@ -660,3 +660,252 @@ refused call never reaches the ledger), `::test_trusted_hosts_follow_deployment`
 
 **Limit.** An IB bound to a LAN address (`IB_HOST=0.0.0.0`) answers only to the names above unless
 `IB_ALLOWED_HOSTS` lists the LAN name or address.
+
+### 15.11 Actions: draft a reply, create a follow-up ticket (`POST /ib/act/*`)
+
+After an answer the asker can act on it (`actions.py`; contracts in `docs/finals/contracts/backend_v1.md`
+v3; plan in `docs/finals/rubric/ai_innovation/AGENTIC_ROADMAP.md` §1). The rules below are the ask
+pipeline's rules applied to a second, separate step. Tests: `tests/test_act.py`, `tests/test_act_e2e.py`,
+`databridge/apps/mock_platforms/tests/test_mock_jira_create.py`.
+
+**Identity.** Every route takes its person from the session only. The bodies are closed schemas
+(`extra="forbid"`): `{req_id, kind}`, `{req_id}`, `{proposal_id, summary?, project?}`, `{proposal_id}`; a
+`user`, `sub`, `as` or `reporter` field is a 422. Roles come from the directory, as everywhere
+(`test_act.py::test_bodies_carry_no_identity`).
+
+**What an action may use.** Only the person's OWN released answer for that request id:
+- ownership is checked before anything is reconstructed (`AuditProjection.owns`), so another person's
+  request, an unknown id, a refused answer and a failed request are the same 404 bytes
+  (`::test_someone_elses_request_unknown_and_refused_are_one_404`);
+- the answer text comes from the content store and must hash to the `answer_sha256` sealed in that
+  request's `answer.released`; a mismatch is a 503, never a draft;
+- only its CITED sentences are used (each carries `[Cn]` tags; `answer.released` now records each
+  citation's `tag`), and a sentence is kept only when every document it cites passes Gate 1 and a live
+  Gate 2 again now (`authz.authorize`). A document revoked since the answer drops out; with nothing left,
+  the same 404 (`::test_a_revoked_citation_is_dropped_and_all_revoked_is_404`);
+- paired worlds: a refused restricted question, a question answered next to restricted content, and the
+  same questions in a world without that content give identical draft, proposal and confirm responses
+  and identical created tickets (`::test_restricted_question_equals_a_world_without_it_for_draft_and_propose`);
+  the account manager's draft for the restricted customer equals the draft for a customer that does not
+  exist (`test_act_e2e.py::test_restricted_customer_draft_equals_nonexistent_customer_draft`).
+
+**The model.** When a model chain is configured it writes the draft body only (`ModelChain.draft`): the
+same chain as answers, no tools, a fixed system prompt, and Walnut's grounding wall over a context made
+of the sentences above; our code keeps only sentences tagged to that context and drops sentences
+addressed to an AI. An ungrounded draft falls back to the cited sentences
+(`::test_model_draft_is_grounded_and_sees_only_my_cited_sentences`,
+`::test_ungrounded_model_draft_falls_back_to_the_template`). When a cited sentence gives approved wording
+("Tell the customer only that ..."), the reply is exactly that wording (pronouns changed) and no model is
+asked (`test_act_e2e.py::test_account_manager_draft_is_the_approved_script_only`). The model never
+chooses a project, recipient or action, and the Brain never sends a draft.
+
+**The ticket.** The project comes from a closed set: the projects in which the person may create issues,
+checked LIVE at the source like Gate 2 (Jira `POST permissions/check` with `CREATE_ISSUES`, admin client,
+one attempt, 2 s; any error, timeout or 429 is "no"). A `project` sent on confirm must be in that set
+(422 otherwise). The description holds the request id and the cited documents' LINKS only, never titles
+or answer text, because other people who browse the project may not be able to open them. Confirm
+re-checks the create permission live, then our code calls `POST /rest/api/3/issue` ONCE (no retry; the
+reporter is the person's own account); the mock refuses a reporter without "Create issues" (403). A
+proposal is the proposer's alone, usable once, and expires after 15 minutes
+(`::test_a_proposal_is_mine_alone`, `::test_project_is_a_closed_set_and_the_summary_is_validated`). The
+create call lives in `connectors/jira.py`, which imports no model code (`::test_the_executor_is_model_free`).
+
+**One polite message.** No create permission, a source error at propose, a permission revoked between
+propose and confirm, and a failed create all return the same 409 body (`{"error": "unavailable",
+"message": "A follow-up ticket can't be created from this answer. Nothing was changed."}`); the reason is
+in the ledger only (`::test_write_denied_at_the_source_is_one_polite_message`).
+
+**Write-ahead ledger.** New kinds (`models.EVENT_KINDS`, `audit/ledger.py`, `audit/stats.py` totals):
+`action.proposed` (kind, action id, cited document ids and count, sentence count, target project, option
+count, the model, a SHA-256 digest of the draft or proposal; never its text) is sealed BEFORE a draft or
+proposal is returned; `action.confirmed` (with the digest of exactly what will be sent) BEFORE the create;
+then `action.executed` (the new issue key) or `action.failed` (stage and reason code). `action.rejected`
+records a cancel. Every call writes one record before it answers, including a failed lookup, which is
+recorded WITHOUT the requested id, so an attempt on someone else's request does not appear in that
+person's receipt. A ledger outage is 503 and nothing happens (`::test_draft_ledger_down_is_503_and_no_draft`,
+`::test_ledger_down_at_propose_or_confirm_is_503_and_nothing_is_created`). Action records carry the
+answer's `req_id`, so they appear in that request's compliance journey and in the asker's own receipt.
+
+**Limits.**
+- Create, then record, is not atomic: if the ledger fails after the issue was created, the person gets a
+  503 and the issue exists; `action.confirmed` (with the payload digest) is already on record. This is the
+  same gap as the dispatcher's (`apps/dispatcher/dispatcher.py`).
+- A ticket's links (URLs with ids) are visible to whoever can browse the target project; the content
+  behind each link is not.
+- Proposals live in the IB process's memory: a restart drops them (the confirm is then a 404).
+- The draft's sentences are the answer's sentences as released: a cited document's access is re-checked,
+  its content is not re-read.
+- The approved-wording rule recognises "tell / inform / advise the customer (only) that ..."; other
+  phrasings fall back to the cited sentences (or the model draft), which the person reviews before use.
+
+### 15.12 Uploading a real file (`POST /sim/upload-file`, demo only)
+
+A presenter uploads a Word, Excel, PowerPoint, PDF, CSV, Markdown or text file (a WhatsApp chat export is
+a text file) into a Drive folder as the signed-in person; the Brain learns it through Drive's signed
+webhook, like any Drive change (`uploads.py`, `extract_files.py`, `connectors/drive.py`,
+`databridge/apps/mock_platforms/mock_platforms/uploads.py`; contract `docs/finals/contracts/uploads.md`).
+Tests: `tests/test_uploads.py`, `tests/test_extract_files.py`,
+`databridge/apps/mock_platforms/tests/test_mock_drive_upload.py`.
+
+**Switched off unless both demo switches are on.** `IB_DEMO_LOGIN=1` and `IB_DEMO_FEATURES=1`; refused when
+`IB_DEPLOYED=1`, for every person, `admin_it` included
+(`test_uploads.py::test_demo_only_switches_refuse_everyone_including_admin_it`).
+
+**Identity and permission.** The uploader is the session's person; the body is a closed schema (an
+`owner`, `user` or `sub` field is a refusal) and Drive records the person's own account as the uploader
+(`::test_the_body_names_no_person_and_the_owner_is_the_signed_in_person`). An employee needs WRITE on the
+folder (`writer`, `fileOrganizer`, `organizer`, `owner`; direct, group or company domain), read LIVE from
+Drive at upload time with one attempt; read access is not enough, and any source error or 429 is a
+refusal (`::test_write_permission_is_required_and_read_is_not_enough`,
+`::test_write_permission_is_read_live_from_drive`, `::test_a_source_error_on_the_live_check_is_a_refusal`).
+`admin_it` may upload into any existing folder. The new file gets no direct permission: it inherits the
+folder's, so who can read it is decided by Drive, and the index learns it from Drive's ACL like any file
+(`::test_restricted_upload_equals_non_existent_for_a_person_without_folder_access`; the live-kit run
+checks the vendor guest gets the file only where the folder lets him read,
+`::test_live_kit_upload_end_to_end`).
+
+**Untrusted bytes.** In this order, all fail closed:
+1. the body is at most 7 MiB, checked on `Content-Length` and while streaming, before JSON parsing or
+   base64 decoding (`::test_oversized_body_is_refused_before_decoding`); the file is at most 5 MiB decoded;
+2. extension whitelist (no `.docm` / `.xlsm` / `.pptm`, no legacy binary Office formats) and a magic-byte
+   check (OOXML zip with its own part folder, `%PDF-`, strict UTF-8 without NUL);
+3. zip limits for docx / xlsx / pptx: at most 2,000 entries, 64 MiB uncompressed (declared sizes AND
+   streamed, so a member that lies is caught), a ratio cap, no encrypted members, no absolute or `..`
+   names;
+4. no `<!DOCTYPE` or `<!ENTITY` in any XML part, so no reader sees an external entity (XXE) or an
+   entity-expansion bomb (`test_extract_files.py::test_xml_dtd_and_entities_are_refused_before_any_reader`);
+5. macros: a `vbaProject.bin` member or a macro-enabled content type is refused; nothing is ever executed
+   (the readers only read text);
+6. PDF: at most 50 pages; no OCR;
+7. the reader runs in a separate worker process with a 15 s budget; past it the worker process is killed,
+   so a runaway parse cannot keep using CPU or memory in the Brain
+   (`::test_a_read_past_the_time_budget_is_killed_with_its_worker`);
+8. the text is NFC-normalised, control, zero-width and bidi-override characters and HTML tags are
+   removed, it is capped at 200,000 characters, and a file without text is refused.
+The readers are Walnut's own convert readers, imported, not changed (`packages/convert`). The connector runs
+the same checks again when it fetches an Office, PDF or CSV file; a Markdown or text file is stored
+already cleaned and is read as text, like every other Drive text file.
+
+**Masking.** The extracted text goes through the ingest path, so cards, card security codes, NRIC/FIN and
+IBANs are masked before the index holds it (`::test_card_and_nric_inside_a_docx_are_masked`,
+`::test_card_number_inside_an_xlsx_is_masked`; every live-kit file is checked to leave nothing for the
+masker to find).
+
+**Filename.** Display only: tags and path parts dropped, reserved and control characters removed,
+capped at 120 characters with the whitelisted extension. Drive keeps the bytes in memory under a
+generated id (`up-<hex>`); no name is ever used as a path (`::test_text_is_cleaned_and_the_name_is_display_only`).
+
+**One refusal, ledgered.** Every refusal is the same `404 {"detail": "not found"}` bytes, whatever the
+reason (`::test_every_refusal_is_byte_identical`); the reason is in the access ledger only, as
+`request.failed` with `stage="sim.upload-file"`. At most 5 attempts per person per minute
+(`::test_rate_limit_five_per_minute`).
+
+**Reset.** `/sim/reset` reloads the platforms, so the files are gone; the index is reconciled, and the
+reset hook `uploads.reset_uploads` drops any uploaded row still indexed and clears the rate window
+(`::test_sim_reset_removes_uploads`, `::test_reset_hook_drops_a_lingering_upload_and_clears_the_rate_window`).
+
+**Limits.**
+- The parsers are third-party code (python-docx, python-pptx, calamine and openpyxl, PDFium) running on
+  untrusted bytes. They run after the byte checks, in a worker process that is killed on overrun; a
+  memory blow-up inside the budget is bounded only by the 5 MiB file and the 64 MiB zip cap.
+- The worker runs one file at a time; a second upload waits for it (up to 60 s, then a refusal).
+- Phone numbers in a WhatsApp export are not masked.
+- Uploads live in the mock platforms' memory and in the index until the next reset.
+
+### 15.13 Demo-proof features: live growth, add a document, the absence check, engine refresh (D-24)
+
+"Watch the brain grow" (plan: `docs/finals/live_growth/PLAN.md`; contracts: `docs/finals/contracts/backend_v1.md`
+"Demo-proof features"). Code: `live.py`, `sim.py`, `engine_refresh.py`, `bootstrap.py`. Tests in
+`databridge/apps/internal_brain/tests/`: `test_live_growth.py`, `test_sim_add_document.py`,
+`test_demo_features.py`.
+
+**A server toggle, off by default.** `IB_DEMO_FEATURES=1` mounts `GET /ib/graph/changes`, `POST /sim/add-document`,
+`POST /sim/check-absent`, `POST /sim/engine-refresh` and `POST /sim/engine-status`; it is ignored when
+`IB_DEPLOYED=1` (`IbConfig.demo_features_on`). Off, the routes are not mounted at all, so each answers
+byte-for-byte what an unknown route answers, signed in or not
+(`test_demo_features.py::test_off_every_demo_route_is_the_unknown_route_404`,
+`::test_a_deployment_never_turns_them_on`, `::test_off_by_default`). `GET /ib/status` reports
+`demo_features` (`::test_status_reports_the_flag`). Only `databridge/scripts/demo_up.sh` sets the flag.
+The web app shows the controls only when the server says so AND the viewer turned "Demo features" on in
+Settings (or the Presenter is armed), each labelled "Demo"; hiding is a convenience, the server enforces
+every rule. With the toggle on, the app as `bootstrap.build_app` builds it passes the route allowlist and
+every non-public route needs a session (`::test_on_routes_are_mounted_allowlisted_and_need_a_session`,
+PLAN L-5). That check now walks included routers: FastAPI 0.143 keeps an included router as one lazy
+entry in `app.routes`, so `app.mounted_paths` uses the new `app.iter_routes`. Before this, the allowlist
+check in `create_app` never saw `/sim/*` or `/audit/*` (all of them were on allowed prefixes anyway).
+
+**`GET /ib/graph/changes?since=<cursor>` (live growth).** Any employee role; identity from the session.
+- Candidates are documents new in the index, or whose version changed, since the cursor's time,
+  intersected with the caller's Gate-1 readable set BEFORE any source call, then authorised live with
+  `authz.authorize` (Gate 2 plus the version-bound read-through) under ONE deadline, newest first, at most
+  200. The cap of 25 applies AFTER the live check; an undecided candidate is simply not shown.
+- A change the caller cannot open is indistinguishable from no change. Ken's reply after a note in a
+  channel he is not in is byte-identical, cursor included, to his reply in a world without the note, and
+  his poll makes no source call
+  (`test_live_growth.py::test_note_never_reaches_ken_byte_identical_and_without_a_source_call`). His
+  `/ib/graph` and `/ib/map` are unchanged (`::test_ken_graph_and_map_unchanged_by_the_note`). A link from
+  a new note to a document he cannot open adds no node and no edge
+  (`::test_link_to_a_document_ken_cannot_open_adds_no_node_or_edge`).
+- The cursor is `base64url(json{v, s, t}).HMAC` under a key derived from the token key. `s` is the caller
+  and `t` the tracker's mark AT REPLY, never a document's stamp, so a filtered, denied, undecided or
+  capped candidate changes nothing the caller can decode, and a source revocation without a webhook
+  gives the same empty reply (`::test_cursor_payload_is_caller_and_clock_only_even_when_a_candidate_is_denied`).
+  A cursor that is someone else's, forged, garbage or older than 10 minutes starts a new empty window with
+  no back-fill (`::test_foreign_forged_garbage_or_expired_cursor_starts_a_new_window`). The cap is after
+  the live check (`::test_cap_applies_after_the_live_check`).
+- Write-ahead ledger, counts only: `graph.viewed` with `mode="changes"` when a window opens and for every
+  non-empty reply. An empty poll inside a window returned nothing and is not ledgered. A ledger failure
+  is a 503 (`::test_polls_are_ledgered_as_changes_not_focus`, `::test_ledger_down_on_a_non_empty_poll_is_503`).
+- `/sim/reset` re-baselines the tracker after its full reconciliation, so a reset is not a burst of
+  "updated" documents, and the note is gone from the source, the index and `/ib/doc`
+  (`::test_reset_removes_the_note_and_rebaselines_the_feed`).
+
+**`POST /sim/add-document` (a Slack note as the signed-in person).** The body is closed and names no
+author; the author is the session's own platform account (`test_sim_add_document.py::test_body_is_validated`,
+`::test_added_note_reaches_the_index_by_webhook_and_the_author_can_open_it`). Refused for everyone when
+demo sign-in is off or the server is deployed, `admin_it` included
+(`::test_demo_login_off_refuses_everyone_with_the_same_404`, `::test_deployed_refuses_everyone`). The
+channel must already be in the poster's Gate-1 set, and the poster must be a member AT THE SOURCE at post
+time (`::test_live_membership_is_checked_at_post_time`); employees post to Slack only. Every refusal is
+the same `404 {"detail": "not found"}`, with the reason in the ledger only
+(`::test_unreadable_channel_is_the_same_404_as_an_unknown_one`, `::test_a1_ken_refusals_are_byte_identical`).
+At most 5 posts per person per minute, then 429 (`::test_rate_limit_five_per_minute`). The IB never
+indexes the posted text directly: the mock's signed webhook makes the ingestor re-fetch and mask it, so
+card numbers and NRIC are masked in the index, the excerpt and the answer, and never reach the ledger
+(`test_live_growth.py::test_sensitive_values_in_a_note_are_masked_everywhere`). The note is answerable at
+once, with a citation, by members of the channel (jdoe and Priya). Ken's refusal is the constant one,
+identical to his refusal for a made-up topic and to his answer before the note
+(`::test_added_note_is_answerable_by_members_and_ken_gets_the_constant_refusal`).
+
+**`POST /sim/check-absent` ("not in the brain yet").** Counts documents in the WHOLE index containing a
+phrase, so it is `admin_it` only, demo sign-in on, 10 per minute. It returns the count and the index
+size, never a title or id, and ledgers the phrase's length and SHA-256, never the phrase
+(`test_sim_add_document.py::test_check_absent_counts_before_and_after_an_added_note`,
+`::test_check_absent_is_operators_only_with_the_constant_refusal`,
+`::test_check_absent_refused_when_demo_login_off_or_deployed`).
+
+**`POST /sim/engine-refresh`, `POST /sim/engine-status` (the engine snapshot on `/dev/brain`).** `admin_it`
+or the snapshot's own person (jdoe), demo sign-in on; anyone else gets the simulator's constant 404
+(`test_demo_features.py::test_engine_refresh_is_jdoe_or_admin_only_with_demo_login`). One job at a time
+and at most one start per 2 minutes, then 429 (`::test_engine_refresh_once_per_two_minutes_and_ledgered_write_ahead`,
+`::test_background_job_is_single_flight`). A start is ledgered write-ahead as `ingest.sync`
+(`detail.reason="engine.refresh"`); a ledger failure is a 503 and nothing runs
+(`::test_engine_refresh_ledger_down_is_503_and_nothing_runs`). The stock build script runs into a side
+file, and the result is copied INTO the live snapshot with SQLite's online backup, which works while the
+gateway holds the file open; a failed build never touches the live snapshot
+(`::test_engine_refresh_rebuilds_publishes_in_place_and_reloads`,
+`::test_a_failed_build_never_touches_the_live_snapshot`). The IB then asks the gateway to reload with the
+gateway's local dev token, server-side; the browser never holds it. The status has no counts, paths or
+build output.
+
+**Limits.**
+- Polling, not push: a note appears within one poll (2 to 3 s) after its webhook is applied. A lost
+  webhook waits for the poller (`IB_POLL_S`, 120 s on the demo stack).
+- Deletions and revocations are not sent on the feed; an open graph shows them on its next full load.
+- The remaining timing channel (a Gate-1 document revoked at the source without a webhook is checked
+  live) is the same one `/ib/graph` has (section 15.1). Gate 1 removes every document outside the
+  caller's set before any source call.
+- The tracker and the rate limits live in the IB process's memory.
+- The engine snapshot is built from the world file, so a note added live appears in the Internal Brain's
+  graph, not in the engine snapshot. The build rewrites `fixtures/enterprise/graph_rows/*.json`
+  deterministically from `world.json` (byte-identical to the current rows while the world is unchanged).

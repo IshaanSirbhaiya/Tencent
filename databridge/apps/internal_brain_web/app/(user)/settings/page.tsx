@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Page } from '@/components/shell/Page';
 import { usePrefs } from '@/components/shell/Providers';
 import { Button, Card, CardBody, CardDescription, CardHeader, CardTitle, Dialog, DialogClose, DialogContent, SegmentedControl, Separator, SwitchField } from '@/components/ui';
+import { DemoFeaturesSetting } from '@/components/sim/DemoFeatures';
 import { Toaster, toast } from '@/components/user/Toast';
 import { clearLocalData } from '@/components/user/local';
 import { translate, useI18n, useMessages, type Lang } from '@/lib/i18n';
@@ -133,6 +134,9 @@ export default function SettingsPage() {
             <SwitchField label={core('settings.devMode')} hint={core('settings.devModeHint')} checked={mode === 'dev'} onCheckedChange={(v) => switchMode(v ? 'dev' : 'user')} />
           </CardBody>
         </Card>
+
+        {/* demo-proof features (D-24): renders nothing unless the server has them on */}
+        <DemoFeaturesSetting />
 
         <Card aria-labelledby="set-tour">
           <CardHeader>

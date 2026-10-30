@@ -116,11 +116,11 @@ Aspire asked for three things. This is where to see each one:
 | Aspire asked for | What the Brain does | Where to see it | Proof |
 |---|---|---|---|
 | Knowledge across tools | One cited answer from all four platforms | **Ask** as `jdoe` | `test_scenarios_e2e.py::test_canonical` |
-| Restrictions per person | Each person's answer uses only what they can open; "restricted" looks exactly like "doesn't exist" | **Compare** (Amy beside Rachel; Ken's two questions), **Knowledge graph** | 0 leaks in 5,958 requests; 0 of 400 paired answers differ |
+| Restrictions per person | Each person's answer uses only what they can open; "restricted" looks exactly like "doesn't exist" | **Compare** (Amy beside Rachel; Ken's two questions), **Knowledge graph** | 0 leaks in 7,374 requests; 0 of 400 paired answers differ |
 | Security logging and an audit trail | Every question and decision is logged before the answer is shown, and the log is tamper-evident | **Audit** as `maya.compliance` → **Verify audit chain** and the tamper demo; **Journey** | `test_audit_tamper.py`, `test_tamper_demo_route.py`, `test_audit_query.py::test_s5_reconstruction` |
 
-Everything runs on a synthetic fintech called **Company A** (32 people, 209 Confluence pages, 251 Jira
-issues, 602 Slack threads, 81 Drive files). No real company or customer data is used anywhere.
+Everything runs on a synthetic fintech called **Company A** (34 people, 231 Confluence pages, 261 Jira
+issues, 628 Slack threads, 87 Drive files). No real company or customer data is used anywhere.
 
 **What's real and what's simulated.** The four platforms are mock servers that speak the real APIs'
 shapes (their permission models, webhooks, errors and rate limits); we have not run against a live
@@ -316,10 +316,10 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 
 | What | Result | Where |
 |---|---|---|
-| Restricted content in any answer, prompt or response | **0 leaks** in 5,958 adversarial requests (2,979 probes, each run on both answer paths; 95% upper bound 0.10% per request on each path) | `RESULTS.md` |
+| Restricted content in any answer, prompt or response | **0 leaks** in 7,374 adversarial requests (3,687 probes, each run on both answer paths; 95% upper bound 0.08% per request on each path) | `RESULTS.md` |
 | "Restricted" vs "doesn't exist" | **0 differences** across 400 paired answers | `RESULTS.md` |
-| Prompt injection planted on all four platforms | **0 failures** in 976 injection-relevant requests | `RESULTS.md` |
-| Allowed sources reaching the answer step | **100%** of 196 positive probes; the answer cites the expected source in 87.8% (quoted path) to 96.4% (model path) | `RESULTS.md` |
+| Prompt injection planted on all four platforms | **0 failures** in 1,152 injection-relevant requests | `RESULTS.md` |
+| Allowed sources reaching the answer step | **100%** of 442 positive probes; the answer cites the expected source in 93.2% (quoted path) to 97.1% (model path) | `RESULTS.md` |
 | Map identical with and without restricted documents | test | `test_knowledge_map.py::test_map_is_identical_with_and_without_restricted_docs` |
 | Audit log edits, deletions, truncation, rollback, edited stored answers | detected | `test_audit_tamper.py`, `test_audit_verify_content.py` |
 | Knowledge graph and document view identical with and without restricted documents; restricted and unknown documents give the same 404 | tests | `test_graph_doc.py::test_graph_is_identical_with_and_without_restricted_docs`, `::test_doc_restricted_and_unknown_are_the_same_404` |
@@ -391,7 +391,7 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
   questions (on each answer path) from related pages the asker can open. None was a leak; all are listed
   in `RESULTS.md`.
 - **Recall depends on what you count.** 100% is the share of allowed documents that reach the answer
-  step. The share of answers that cite the expected source is 87.8% to 96.4%.
+  step. The share of answers that cite the expected source is 93.2% to 97.1%.
 
 ## What's inside
 

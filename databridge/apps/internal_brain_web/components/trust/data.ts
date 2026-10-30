@@ -237,7 +237,7 @@ export const OWASP: { id: string; risk: string; control: string; residual: strin
 export const NEVER: { never: string; instead: string; why: string }[] = [
   { never: 'Compliant with MAS / PDPA / AI Verify / ISO 42001', instead: 'Mapped to, with the gap list', why: 'No regulator or auditor has assessed it; it runs on synthetic data' },
   { never: 'Certified or audited', instead: 'Self-assessed; reviewed by AI models and the team', why: 'Every review so far is by AI models or by us; no human third party' },
-  { never: 'Zero risk, unhackable, leak-proof', instead: '0 leaks in 5,958 requests, with a 95% upper bound of 0.10% per request', why: 'Absence of observed leaks is not proof of absence' },
+  { never: 'Zero risk, unhackable, leak-proof', instead: '0 leaks in 7,374 requests, with a 95% upper bound of 0.08% per request', why: 'Absence of observed leaks is not proof of absence' },
   { never: 'Runs on Hy3', instead: 'Hy3 is wired in and tested with a capturing model; the live run waits on Tencent account verification', why: 'No live Hy3 call had succeeded when the evidence pack was written' },
   { never: 'Tested on real Slack, Confluence, Jira and Drive', instead: 'Mock platforms with the real APIs’ shapes; same connector code', why: 'There is no live tenant' },
   { never: 'Bias-free or fair', instead: 'Same rules for every role; quality per role published, uneven in places', why: 'See FAIRNESS_NOTE.md' },

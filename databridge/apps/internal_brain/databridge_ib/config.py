@@ -94,6 +94,25 @@ class IbConfig:
     public_origin: str = field(default_factory=lambda: _env("IB_PUBLIC_ORIGIN"))
     #: extra Host names, comma-separated (e.g. a LAN name for a rehearsal); empty by default
     extra_hosts: str = field(default_factory=lambda: _env("IB_ALLOWED_HOSTS"))
+    #: the demo-proof features (live growth ``GET /ib/graph/changes``, ``POST /sim/add-document``,
+    #: ``/sim/check-absent``, ``/sim/engine-refresh``): OFF unless ``IB_DEMO_FEATURES=1``, and never
+    #: on a deployment (``demo_features_on``). Off, their routes are not mounted at all, so they
+    #: answer exactly what an unknown route answers (D-24).
+    demo_features: bool = field(default_factory=lambda: _env("IB_DEMO_FEATURES") == "1")
+    #: deliverables from an answer (``deliverables/``): a KILL SWITCH, not a demo-only switch (D-25).
+    #: Off unless ``IB_DELIVERABLES=1``; read at start-up, so turning it off needs an IB restart.
+    #: Off, ``/ib/deliverables*`` answer the not-found body and record nothing.
+    deliverables: bool = field(default_factory=lambda: _env("IB_DELIVERABLES") == "1")
+    #: the Walnut engine snapshot the demo-only engine refresh rebuilds, and the gateway it asks to
+    #: reload (server-side only; the token is the gateway's local dev token, never sent to a browser)
+    engine_graph_db: Path = field(default_factory=lambda: Path(
+        _env("IB_ENGINE_GRAPH_DB") or DATABRIDGE_ROOT / "var" / "graph" / "enterprise.db"))
+    engine_url: str = field(default_factory=lambda: _env("IB_ENGINE_URL", "http://127.0.0.1:8300"))
+    engine_token: str = field(default_factory=lambda: _env("IB_ENGINE_TOKEN"))
+
+    @property
+    def demo_features_on(self) -> bool:
+        return bool(self.demo_features) and not bool(self.deployed)
 
     def trusted_hosts(self) -> list[str]:
         """The Host allowlist: loopback always; when deployed, ``IB_PUBLIC_ORIGIN``'s host; when

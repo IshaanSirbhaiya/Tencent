@@ -51,6 +51,11 @@
    "name": "payments leads"
   },
   {
+   "direct_members": 2,
+   "id": "grp-people",
+   "name": "people and workplace"
+  },
+  {
    "direct_members": 3,
    "id": "grp-platform-eng",
    "name": "platform engineering"

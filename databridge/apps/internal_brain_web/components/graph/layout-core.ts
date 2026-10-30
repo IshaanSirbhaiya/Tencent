@@ -18,11 +18,40 @@ const GAP = 6;
 
 export type Positions = Record<string, [number, number]>;
 
-interface Circle {
+export interface Circle {
   id: string;
   r: number;
   x: number;
   y: number;
+}
+
+/** Sunflower slot k of a disc centred on (cx, cy): where its k-th document (sorted by id) sits. */
+export const docSlot = (cx: number, cy: number, k: number): [number, number] => {
+  const r = DOC_STEP * Math.sqrt(k + 1) + 2.2;
+  const a = (k + 1) * GOLDEN;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+};
+
+/** The radius of a place's disc holding `count` documents. */
+export const discRadius = (count: number): number => DOC_STEP * Math.sqrt(count + 1) + 4;
+
+export const LAYOUT_GAP = GAP;
+
+/**
+ * The first free spot for a circle of radius `r` on the same outward spiral `pack()` uses (angle
+ * step 0.21, distance step 0.45), starting `dist` away from `origin`. Places a NEW disc next to an
+ * existing galaxy without moving anything (live growth, docs/finals/live_growth/PLAN.md §5).
+ */
+export function placeAround(origin: [number, number], dist: number, r: number, obstacles: Circle[], startAngle: number): [number, number] {
+  const free = (x: number, y: number) => obstacles.every((c) => Math.hypot(c.x - x, c.y - y) >= c.r + r + GAP);
+  for (let k = 0; k < 20000; k++) {
+    const a = startAngle + k * 0.21;
+    const d = dist + k * 0.45;
+    const x = origin[0] + d * Math.cos(a);
+    const y = origin[1] + d * Math.sin(a);
+    if (free(x, y)) return [x, y];
+  }
+  return [origin[0] + dist * 3, origin[1]];
 }
 
 /** Greedy deterministic packing: biggest first, each on the first free spot of an outward spiral. */
@@ -60,7 +89,7 @@ export function computeLayout(nodes: LayoutInputNode[], edges: LayoutInputEdge[]
     const k = n.container && byId.has(n.container) ? n.container : '';
     (docsOf.get(k) ?? docsOf.set(k, []).get(k)!).push(n.id);
   }
-  const discR = (count: number) => DOC_STEP * Math.sqrt(count + 1) + 4;
+  const discR = discRadius;
 
   // 1-2: discs packed per platform (relative to the platform hub)
   const containers = nodes.filter((n) => n.kind === 'container');
@@ -96,9 +125,7 @@ export function computeLayout(nodes: LayoutInputNode[], edges: LayoutInputEdge[]
     const [cx, cy] = out[cid] ?? [0, 0];
     ids.sort();
     ids.forEach((id, k) => {
-      const r = DOC_STEP * Math.sqrt(k + 1) + 2.2;
-      const a = (k + 1) * GOLDEN;
-      out[id] = [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+      out[id] = docSlot(cx, cy, k);
     });
   }
 

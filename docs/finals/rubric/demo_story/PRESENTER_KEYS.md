@@ -92,7 +92,7 @@ Three full-screen slides rendered by the app so the Stage theme and fonts match.
 
 **Proof slide** (`/present/proof`):
 - Three large numbers, each with its source in small type:
-  - `5,958` adversarial requests, `0` leaks (`databridge/evals/internal_brain/RESULTS.md`).
+  - `7,374` adversarial requests, `0` leaks (`databridge/evals/internal_brain/RESULTS.md`).
   - `400` paired questions, `0` differences (same file).
   - A tester line, taken verbatim from `FIX_LOG.md`. If no real row exists, **do not render this line**.
 - One CodeBuddy line, only the facts in the repo.

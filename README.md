@@ -14,7 +14,7 @@ submission, commit by commit: [docs/finals/CHANGELOG.md](docs/finals/CHANGELOG.m
 
 | Read this first | Fact |
 |---|---|
-| Data | Synthetic only: a made-up fintech, "Company A" (32 people; 209 Confluence pages, 251 Jira issues, 602 Slack threads, 81 Drive files) |
+| Data | Synthetic only: a made-up fintech, "Company A" (34 people; 231 Confluence pages, 261 Jira issues, 628 Slack threads, 87 Drive files) |
 | Platforms | Mock servers that use the real APIs' shapes, permission models and webhooks. Not run against a live tenant |
 | Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Live run pending** (TokenHub activation; `scripts/hy3_check.py` reports 401006 today). Until then, answers are quoted from the sources, with the same checks, and every answer says so |
 
@@ -155,10 +155,10 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 
 | What | Result |
 |---|---|
-| Restricted content in any prompt, answer or response | **0 leaks** in 5,958 adversarial requests (2,979 probes × 2 answer paths; 95% upper bound 0.10% per request on each path) |
+| Restricted content in any prompt, answer or response | **0 leaks** in 7,374 adversarial requests (3,687 probes × 2 answer paths; 95% upper bound 0.08% per request on each path) |
 | "Restricted" vs "does not exist" | **0 differences** across 400 paired questions (control rebuild: 0) |
-| Prompt injection planted on all four platforms | **0 hard failures** in 976 injection-relevant requests |
-| Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 87.8% (quoted) to 96.4% (model) |
+| Prompt injection planted on all four platforms | **0 hard failures** in 1,152 injection-relevant requests |
+| Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 93.2% (quoted) to 97.1% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
 | Backend tests (Internal Brain) | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
 | Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added after that run and is not in the count |

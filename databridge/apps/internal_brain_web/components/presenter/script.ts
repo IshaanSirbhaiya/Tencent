@@ -48,6 +48,9 @@ export type StepId =
   | 'title'
   | 'compare-people'
   | 'compare-person'
+  | 'grow'
+  | 'grow-post'
+  | 'grow-ask'
   | 'citation'
   | 'journey'
   | 'verify'
@@ -196,10 +199,78 @@ export const STEPS: PresenterStep[] = [
   },
 ];
 
+// ---- live growth (demo-proof, D-24; docs/finals/live_growth/PLAN.md §11) --------------------------
+// Three steps after the Ken beat, present ONLY while demo features are on (server + viewer):
+// fill the note on Jordan's graph next to Ken's, post it, then ask both of them.
+/** The agreed stage sample "shard3-resume" (synthetic; builds on the S1 blocker in #db-migration). */
+export const NOTE_GROW =
+  'Update on DBMIG-12: replica tuning on ledger-shard-3 is done; the copy job resumes Thursday 5 Nov 2026, 21:00 SGT from batch 1,812. On-call for the restart: priya.sre.';
+export const Q_GROW = 'When does the ledger-shard-3 copy job resume?';
+export const GROW_CHANNEL = 'C0DBMIG';
+const GROW_URL = '/dev/graph?compare=ken.ext';
+
+export const GROW_STEPS: PresenterStep[] = [
+  {
+    id: 'grow',
+    title: 'The brain grows: the note, ready to post',
+    say: 'Ishaan: "And when something new happens at work?" The note is pre-filled in Jordan\'s Add box; Ken is on the right.',
+    url: GROW_URL,
+    clip: null,
+    action: async (ctx) => {
+      await ctx.signInMain('jdoe');
+      await ctx.go(GROW_URL);
+      if ((await ctx.call('graph.addNote', { channel: GROW_CHANNEL, text: NOTE_GROW, post: false }, 20_000)) !== 'ok') fail('graph not ready');
+    },
+  },
+  {
+    id: 'grow-post',
+    title: 'Post it: it pulses into Jordan\'s graph, Ken sees nothing',
+    say: 'Ishaan: "Jordan posts in the database-migration channel… there it is, seconds later. Ken\'s side: nothing."',
+    url: GROW_URL,
+    clip: null,
+    action: async (ctx) => {
+      if ((await ctx.call('graph.addNote', { post: true }, 10_000)) !== 'ok') fail('post');
+    },
+  },
+  {
+    id: 'grow-ask',
+    title: 'Ask both: Jordan gets it cited, Ken the refusal',
+    say: 'Ishaan: "And it is already answerable, with the citation."',
+    url: peopleUrl('jdoe', 'ken.ext', Q_GROW),
+    clip: null,
+    action: async (ctx) => {
+      const spec: CompareSpec = { mode: 'people', left: 'jdoe', right: 'ken.ext', q1: Q_GROW, q2: Q_GROW };
+      await ctx.go(peopleUrl(spec.left, spec.right, Q_GROW));
+      if ((await ctx.call('compare-run', spec, 15_000)) !== 'ok') fail('compare-run');
+    },
+  },
+];
+
+/**
+ * Put the grow steps into STEPS (right after the Ken beat) or take them out. STEPS keeps its
+ * identity, so every reader sees the change on its next render. Returns true when it changed.
+ */
+export function setGrowSteps(on: boolean): boolean {
+  const at = STEPS.findIndex((s) => s.id === 'grow');
+  if (on && at < 0) {
+    const ken = STEPS.findIndex((s) => s.id === 'compare-person');
+    STEPS.splice(ken + 1, 0, ...GROW_STEPS);
+    return true;
+  }
+  if (!on && at >= 0) {
+    STEPS.splice(at, GROW_STEPS.length);
+    return true;
+  }
+  return false;
+}
+
 export const STEP_KEY: Record<StepId, PresenterKey> = {
   title: 'step.title',
   'compare-people': 'step.compare-people',
   'compare-person': 'step.compare-person',
+  grow: 'step.grow',
+  'grow-post': 'step.grow-post',
+  'grow-ask': 'step.grow-ask',
   citation: 'step.citation',
   journey: 'step.journey',
   verify: 'step.verify',

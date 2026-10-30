@@ -29,7 +29,7 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | Check | Result | Where |
 |---|---|---|
 | Backend tests (Internal Brain) | **754 passed**, commit 7bf3246, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
-| Leak evaluation (re-run on the finals pipeline, 30 Oct 06:09 SGT) | 0 leaks in 5,958 requests; 0 of 400 pairs differ; 0 injection hard failures in 976 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
+| Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 | Web end-to-end tests (Playwright, axe) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added afterwards and is not in the count | `databridge/apps/internal_brain_web/tests/e2e/` |
 

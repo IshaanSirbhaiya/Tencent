@@ -175,7 +175,9 @@ def extractive_answer(passages: Sequence[Passage], question: str, *, max_sentenc
         have = {a: [r for r in scored if a in set(tokens(r[3]))] for a in anc}
         useful = {a: rows for a, rows in have.items() if 2 <= len(rows) < len(scored)}
         if useful:
-            scored = min(useful.values(), key=len)
+            # ties broken by the anchor itself: ``anc`` is a set, so its order changes with
+            # PYTHONHASHSEED, and the answer must not change between processes (P2 control)
+            scored = useful[min(useful, key=lambda a: (len(useful[a]), a))]
     scored.sort()
     # cross-platform first: the best sentence of each platform whose best match is at least half as
     # strong as the overall best, then the remaining slots by score

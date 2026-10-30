@@ -67,6 +67,14 @@ if [ -z "${IB_FORCE_OFFLINE:-}" ]; then
   if "$PY" scripts/hy3_check.py --quiet; then IB_FORCE_OFFLINE=0; else IB_FORCE_OFFLINE=1; fi
 fi
 export IB_FORCE_OFFLINE IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
+# Demo-proof features (D-24): live growth, "Add a document", the absence check and the engine
+# refresh. Set ONLY here, for this local demo stack (off by default everywhere else; never on a
+# deployment). Viewers still turn them on in Settings. The engine refresh asks the local gateway
+# (:8300, WALNUT_DEV_AUTH=1) to reload with its fixed local dev token, server-side only.
+export IB_DEMO_FEATURES=1 IB_ENGINE_URL="${IB_ENGINE_URL:-http://127.0.0.1:8300}" IB_ENGINE_TOKEN="${IB_ENGINE_TOKEN:-dev-local-only}"
+# Deliverables from an answer (D-25): a KILL SWITCH, not a demo-only switch. On here; to turn
+# it off, unset it and restart the IB (it is read at start-up).
+export IB_DELIVERABLES="${IB_DELIVERABLES:-1}"
 export IB_REPLAY_KEY="${IB_REPLAY_KEY:-$("$PY" -c 'import secrets; print(secrets.token_hex(16))')}"
 
 if [ "$FRESH" = "1" ]; then

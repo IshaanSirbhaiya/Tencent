@@ -6,7 +6,8 @@
 // place; every other edge is an edge from /ib/graph. Responses from search and one-hop focus are
 // merged in later (mergeResponse), each new node placed next to the node it grew from.
 import Graph from 'graphology';
-import type { GraphEdgeKind, GraphNode, GraphNodeKind, KnowledgeGraph, KnowledgeMap, Platform } from '@/lib/types';
+import type { GraphEdge, GraphEdgeKind, GraphNode, GraphNodeKind, KnowledgeGraph, KnowledgeMap, Platform } from '@/lib/types';
+import { type Circle, discRadius, docSlot, LAYOUT_GAP, placeAround } from './layout-core';
 
 export interface NodeAttrs {
   label: string;
@@ -29,6 +30,8 @@ export interface NodeAttrs {
   size: number;
   /** ms timestamp when merged in (drives the short fade); 0 for the initial galaxy. */
   born: number;
+  /** Live growth: when this document arrived (or changed) from GET /ib/graph/changes (drives the pulse). */
+  fresh: { at: number; kind: 'new' | 'updated' } | null;
 }
 
 export interface EdgeAttrs {
@@ -66,6 +69,7 @@ const blank = (n: Partial<NodeAttrs> & Pick<NodeAttrs, 'label' | 'kind'>): NodeA
   y: 0,
   size: 1,
   born: 0,
+  fresh: null,
   ...n,
 });
 
@@ -222,6 +226,133 @@ export function mergeResponse(g: KGraph, resp: KnowledgeGraph, anchorId: string 
   }
   resize(g);
   return { ids, added };
+}
+
+/**
+ * Merge a live-growth delta (GET /ib/graph/changes) WITHOUT a re-layout (docs/finals/live_growth/PLAN.md §5):
+ * every existing node keeps its exact x/y; a new document takes the next sunflower slot of its
+ * place's disc (inside the existing disc), a new place goes on the first free spot of the packing
+ * spiral around its platform hub, a new person sits at the centre of what they connect to, pushed
+ * out of discs and away from other people. Counts are never overwritten with the delta's nulls.
+ * Deterministic: the same graph plus the same delta gives the same positions.
+ */
+export function mergeDelta(g: KGraph, resp: { nodes: GraphNode[]; edges: GraphEdge[] }, now: number): { added: string[]; updated: string[] } {
+  const added: string[] = [];
+  const updated: string[] = [];
+  const docsIn = (cid: string) => g.filterNodes((_id, a) => a.kind === 'doc' && a.container === cid).length;
+  const discs = (): Circle[] => g.filterNodes((_id, a) => a.kind === 'container').map((id) => {
+    const a = g.getNodeAttributes(id);
+    return { id, x: a.x, y: a.y, r: discRadius(docsIn(id)) };
+  });
+  const ordered = [...resp.nodes].sort((a, b) => rankKind(a.kind) - rankKind(b.kind) || (a.id < b.id ? -1 : 1));
+  for (const n of ordered) {
+    if (g.hasNode(n.id)) {
+      const cur = g.getNodeAttributes(n.id);
+      const changed = n.kind === 'doc' && !!n.version && !!cur.version && n.version !== cur.version;
+      g.mergeNodeAttributes(n.id, {
+        label: n.label || cur.label,
+        version: n.version ?? cur.version,
+        updatedAt: n.updated_at ?? cur.updatedAt,
+        deepLink: n.deep_link ?? cur.deepLink,
+        containerName: n.container_name ?? cur.containerName,
+        docKind: n.doc_kind ?? cur.docKind,
+        count: n.count === null || n.count === undefined ? cur.count : n.count,
+        ...(changed ? { fresh: { at: now, kind: 'updated' as const } } : {}),
+      });
+      if (changed) updated.push(n.id);
+      continue;
+    }
+    const a = attrsOf(n);
+    if (n.count === null || n.count === undefined) a.count = null;
+    let x = 0;
+    let y = 0;
+    if (n.kind === 'doc' && n.container && g.hasNode(n.container)) {
+      const c = g.getNodeAttributes(n.container);
+      [x, y] = docSlot(c.x, c.y, docsIn(n.container));
+    } else if (n.kind === 'container') {
+      const hubId = n.platform ? `platform:${n.platform}` : null;
+      const obstacles = discs();
+      let origin: [number, number];
+      if (hubId && g.hasNode(hubId)) {
+        const h = g.getNodeAttributes(hubId);
+        origin = [h.x, h.y];
+      } else {
+        let maxX = -Infinity;
+        let cy = 0;
+        g.forEachNode((_id, at) => {
+          if (at.x > maxX) {
+            maxX = at.x;
+            cy = at.y;
+          }
+        });
+        origin = [Number.isFinite(maxX) ? maxX + 12 : 0, cy];
+      }
+      [x, y] = placeAround(origin, 9 + discRadius(1) + LAYOUT_GAP, discRadius(1), obstacles, hashAngle(n.id));
+    } else if (n.kind === 'person') {
+      const ends = resp.edges.filter((e) => e.source === n.id || e.target === n.id).map((e) => (e.source === n.id ? e.target : e.source)).filter((id) => g.hasNode(id));
+      for (const id of ends) {
+        x += g.getNodeAttribute(id, 'x');
+        y += g.getNodeAttribute(id, 'y');
+      }
+      if (ends.length) {
+        x /= ends.length;
+        y /= ends.length;
+      }
+      const ang = hashAngle(n.id);
+      for (let pass = 0; pass < 3; pass++) {
+        for (const c of discs()) {
+          const d = Math.hypot(x - c.x, y - c.y);
+          if (d < c.r + 2.5) {
+            const ux = d > 0.01 ? (x - c.x) / d : Math.cos(ang);
+            const uy = d > 0.01 ? (y - c.y) / d : Math.sin(ang);
+            x = c.x + ux * (c.r + 3);
+            y = c.y + uy * (c.r + 3);
+          }
+        }
+        g.forEachNode((id, at) => {
+          if (at.kind !== 'person') return;
+          const d = Math.hypot(x - at.x, y - at.y);
+          if (d >= 12) return;
+          const ux = d > 0.01 ? (x - at.x) / d : Math.cos(ang);
+          const uy = d > 0.01 ? (y - at.y) / d : Math.sin(ang);
+          x = at.x + ux * 12;
+          y = at.y + uy * 12;
+        });
+      }
+    } else if (n.kind === 'platform') {
+      let maxX = -Infinity;
+      g.forEachNode((_id, at) => {
+        maxX = Math.max(maxX, at.x);
+      });
+      x = Number.isFinite(maxX) ? maxX + 40 : 0;
+    } else {
+      // a document whose place is unknown (should not happen: the delta sends the place)
+      const hub = n.platform && g.hasNode(`platform:${n.platform}`) ? g.getNodeAttributes(`platform:${n.platform}`) : { x: 0, y: 0 };
+      const k = added.length + 1;
+      const r = 6 + 1.1 * Math.sqrt(k);
+      const ang = k * 2.399963 + hashAngle(n.id);
+      x = hub.x + r * Math.cos(ang);
+      y = hub.y + r * Math.sin(ang);
+    }
+    g.addNode(n.id, { ...a, x, y, born: now, fresh: n.kind === 'doc' ? { at: now, kind: 'new' } : null });
+    added.push(n.id);
+  }
+  for (const e of resp.edges) {
+    if (!g.hasNode(e.source) || !g.hasNode(e.target)) continue;
+    const key = edgeKey(e.source, e.target, e.kind);
+    if (!g.hasEdge(key)) g.addEdgeWithKey(key, e.source, e.target, { kind: e.kind, weight: e.weight ?? 1, born: now });
+    // person → document: also the galaxy's person → place summary edge, so the person reads as connected
+    if (e.kind === 'authored' && added.includes(e.target)) {
+      const cid = g.getNodeAttribute(e.target, 'container');
+      if (cid && g.hasNode(cid)) {
+        const sk = edgeKey(e.source, cid, 'authored');
+        if (g.hasEdge(sk)) g.updateEdgeAttribute(sk, 'weight', (w) => (w ?? 0) + 1);
+        else g.addEdgeWithKey(sk, e.source, cid, { kind: 'authored', weight: 1, born: now });
+      }
+    }
+  }
+  resize(g);
+  return { added, updated };
 }
 
 const rankKind = (k: GraphNodeKind) => (k === 'platform' ? 0 : k === 'container' ? 1 : k === 'person' ? 2 : 3);

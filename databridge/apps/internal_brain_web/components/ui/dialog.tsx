@@ -80,7 +80,7 @@ export const DialogContent = forwardRef<HTMLDivElement, PanelProps & { size?: 's
 });
 
 /** Side panel. Right by default (details, sources, node panels); full width on phones. */
-export const SheetContent = forwardRef<HTMLDivElement, PanelProps & { side?: 'right' | 'left'; width?: 'sm' | 'md' | 'lg' }>(function SheetContent(
+export const SheetContent = forwardRef<HTMLDivElement, PanelProps & { side?: 'right' | 'left'; width?: 'sm' | 'md' | 'lg' | 'xl' }>(function SheetContent(
   { title, description, headerActions, footer, closeLabel = 'Close', side = 'right', width = 'md', className, bodyClassName, children, ...rest },
   ref,
 ) {
@@ -95,6 +95,7 @@ export const SheetContent = forwardRef<HTMLDivElement, PanelProps & { side?: 'ri
           width === 'sm' && 'sm:max-w-sm',
           width === 'md' && 'sm:max-w-md',
           width === 'lg' && 'sm:max-w-2xl',
+          width === 'xl' && 'sm:max-w-4xl',
           className,
         )}
         {...(description ? {} : { 'aria-describedby': undefined })}

@@ -28,31 +28,32 @@ measure what we can.
 | 4 | **Denial is not unfairness.** A contractor seeing less is the company's own access policy, mirrored from the source, not created by us. | Gate 1 compiles native permissions; Gate 2 asks the source (`docs/tencent/ARCHITECTURE.md:141-145`) | By design |
 | 5 | **Equal refusal.** Everyone who is refused gets the same words, whatever the reason. | `databridge_ib/models.py:20-21` | P2: 0 / 400 (re-run 30 Oct) |
 
-## 3. Quality of service by role (14 Oct run, not re-checked)
+## 3. Quality of service by role (30 Oct run)
 
 Released recall (the share of allowed documents that reach the answer step) is **100% for every persona
-on both paths** (`RESULTS.md:122-141`). Cited recall (the answer cites the expected source) varies:
+on both paths** (`RESULTS.md:118-141`). Cited recall (the answer cites the expected source) varies:
 
 | Persona | Role | Positive probes | Cited recall, model path | Cited recall, extractive | World must-cite, model path |
 |---|---|---|---|---|---|
-| `admin.it` | IT admin | 10 | 100.0% | 80.0% | n/a |
-| `jdoe` | Backend engineer | 44 | 95.5% | 86.4% | 90.0% |
+| `admin.it` | IT admin | 51 | 98.0% | 94.1% | 100.0% (3 questions) |
+| `jdoe` | Backend engineer | 85 | 96.5% | 91.8% | 86.7% |
 | `ken.ext` | Contractor | 4 | 100.0% | 100.0% | 100.0% |
-| `leo.ops` | Product / ops | 36 | 97.2% | 94.4% | 84.6% |
-| `maya.compliance` | Compliance | 12 | 100.0% | 83.3% | 100.0% |
-| `priya.sre` | On-call SRE | 46 | 95.7% | 87.0% | 100.0% |
-| `sara.sec` | Security | 44 | 95.5% | 86.4% | 100.0% |
-| `amy.am` | Account manager | 0 | n/a | n/a | 100.0% (2 questions) |
-| `mlro.tan` | MLRO | 0 | n/a | n/a | **71.4%** (7 questions) |
-| **All** | | 196 | 96.4% | 87.8% | 89.6% |
+| `leo.ops` | Product / ops | 77 | 97.4% | 96.1% | 88.2% |
+| `maya.compliance` | Compliance | 53 | 98.1% | 94.3% | 100.0% |
+| `priya.sre` | On-call SRE | 87 | 96.6% | 92.0% | 100.0% |
+| `sara.sec` | Security | 85 | 96.5% | 91.8% | 100.0% |
+| `amy.am` | Account manager | 0 | n/a | n/a | 100.0% (6 questions) |
+| `mlro.tan` | MLRO | 0 | n/a | n/a | 90.0% (10 questions) |
+| **All** | | 442 | 97.1% | 93.2% | 93.6% |
 
-Source: `RESULTS.md:122-141`.
+Source: `RESULTS.md:118-141`. The positive probes grew from 196 to 442 when the everyday-company layer
+(leave, expenses, IT helpdesk, office; open to every employee) was added to the world on 30 Oct.
 
 **Where it is uneven, and why we think so.**
-- `mlro.tan` world must-cite is 71.4% on the model path (5 of 7). The extractive path scores 100% for the
-  same questions (`RESULTS.md:138`). Small sample (7). We have not diagnosed the cause.
-- The extractive path is weaker for `admin.it` (80.0%) and `maya.compliance` (83.3%), both on small samples
-  (10 and 12 probes).
+- World must-cite on the model path is lowest for `jdoe` (86.7%, 13 of 15) and `leo.ops` (88.2%, 15 of
+  17). The extractive path scores 100% on the same questions for both (`RESULTS.md:134, 136`). We have not
+  diagnosed the cause.
+- The extractive path is weakest for `jdoe` and `sara.sec` (91.8%) and `priya.sre` (92.0%).
 - `amy.am` and `mlro.tan` have no generated positive probes, only world questions. Their coverage is thin.
 - The 7 expected-refusal questions answered from related pages (`RESULTS.md:24`) fall on `admin.it`,
   `amy.am`, `leo.ops`, `maya.compliance` and `mlro.tan`. This is a relevance issue, not access.

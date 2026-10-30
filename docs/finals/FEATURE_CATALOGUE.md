@@ -13,11 +13,11 @@ Branch `final_v1.0`, as of commit `f0f84bd` (30 Oct 2026). What changed and when
 
 | Fact | Detail |
 |---|---|
-| Data | Synthetic only: "Company A", a made-up fintech (32 people; 209 Confluence pages, 251 Jira issues, 602 Slack threads, 81 Drive files) |
+| Data | Synthetic only: "Company A", a made-up fintech (34 people; 231 Confluence pages, 261 Jira issues, 628 Slack threads, 87 Drive files) |
 | Platforms | Mock Slack, Confluence, Jira and Drive with the real APIs' shapes, permission models and webhooks. Not run against a live tenant |
 | Tencent Hy3 | Wired in through TokenHub and tested with a capturing test model. **Not live yet** (TokenHub activation pending; every call returns 401006). Until then answers say "Quoted from sources (no model)" |
 | Sign-in | A demo login standing in for single sign-on. No password; optional passcode (`IB_DEMO_PASSCODE`) |
-| Numbers | 754 backend tests pass (commit `7bf3246`). 124 web e2e tests pass, 0 fail, 38 environment-gated skips ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 5,958 requests, 0 of 400 pairs differ, 0 injection hard failures in 976 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
+| Numbers | 754 backend tests pass (commit `7bf3246`). 124 web e2e tests pass, 0 fail, 38 environment-gated skips ([TEST_REPORT.md](TEST_REPORT.md)). Leak eval: 0 leaks in 7,374 requests, 0 of 400 pairs differ, 0 injection hard failures in 1,152 ([RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md)) |
 
 ### The rules every feature keeps
 
@@ -64,6 +64,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 8. [Accessibility and i18n](#8-accessibility-and-i18n): A1 to A6
 9. [Tooling and scripts](#9-tooling-and-scripts): T1 to T10
 10. [Evidence](#10-evidence)
+11. [Demo-proof features](#11-demo-proof-features-behind-a-toggle-d-24): G1 Watch the brain grow · G2 Add a document · G3 Not in the brain yet · G4 Engine refresh · G5 The toggle
 
 ---
 
@@ -471,12 +472,12 @@ denials. The replay switch is refused in a deployed config. Tests: `test_seed_pl
 | X2 | <a id="x2-web-proxy-allowlist-to-the-brain"></a>**Web proxy allowlist to the Brain**: closed path list (no `/webhooks`), plain segments only, POSTs same-origin with JSON ≤ 64 KiB, loopback Host and no cross-site GETs (`bc8414c`), only the session cookie forwarded, upstream 5xx replaced | `app/api/ib/[...path]/route.ts` | `proxy.spec.ts` (4 tests) |
 | X3 | **Engine view gating** (`bc8414c`): the engine snapshot is readable only by its own persona; the proxy is off by default and GET-only | `app/api/walnut/[...path]/route.ts` | `engine-proxy.spec.ts`, `engine.spec.ts` ([D4](#d4-walnut-engine-view)) |
 | X4 | **SSE held gate events** (`7bf3246`): gate1/gate2 sent only when the decision is sealed, so stream timing cannot tell a stale-denied document from an absent one | `app.py` `/ib/ask/stream` | `test_final_review_fixes.py::test_gate1_and_gate2_are_held_until_the_checks_are_sealed` |
-| X5 | **Two gates before any model; deny on error** | `gates.py`, `pipeline.py` | `test_pipeline_core.py`; eval 0 leaks / 5,958 |
+| X5 | **Two gates before any model; deny on error** | `gates.py`, `pipeline.py` | `test_pipeline_core.py`; eval 0 leaks / 7,374 |
 | X6 | **Write-ahead, hash-chained, sealed ledger** with off-host head publication | `audit/ledger.py`, `audit/anchor.py` | `test_audit_ledger.py`, `test_audit_tamper.py`, `test_audit_verify_content.py` |
 | X7 | **Card and ID masking before indexing** | `sensitive.py` | `test_sensitive.py`, `test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` |
 | X8 | **One deadline through read-through; caps after live auth** (`7bf3246`) | `authz.py`, `graph.py`, `docview.py` | `test_final_review_fixes.py::test_read_through_is_bounded_by_the_same_deadline`, `::test_checks_past_the_deadline_are_denied_and_undecided` |
 | X9 | **Deployed config refuses dev keys and demo login without passcode** | `config.py` | `test_config_deployable.py` (5 tests) |
-| X10 | **Prompt injection contained** on all four platforms | grounding, `narrate.py` | eval: 0 hard failures in 976 injection-relevant requests |
+| X10 | **Prompt injection contained** on all four platforms | grounding, `narrate.py` | eval: 0 hard failures in 1,152 injection-relevant requests |
 
 The full threat model and every review finding: [SECURITY.md](../tencent/SECURITY.md), in particular
 [§15](../tencent/SECURITY.md#15-developer-views-and-the-finals-v2-additions-30-oct). Final reviews:
@@ -524,7 +525,7 @@ tests (Python 3.13) and the web typecheck (Node 20); and a Lighthouse deploy kit
 
 | Evidence | What it holds | File |
 |---|---|---|
-| Leak evaluation | 0 leaks / 5,958; 0 / 400 differential; 0 injection hard failures / 976; generated 29 Oct 22:09 UTC (30 Oct 06:09 SGT) on the finals pipeline | [RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](../../databridge/apps/internal_brain_web/public/eval_summary.json) |
+| Leak evaluation | 0 leaks / 7,374; 0 / 400 differential; 0 injection hard failures / 1,152; generated 30 Oct 03:27 UTC (11:27 SGT) on the finals pipeline | [RESULTS.md](../../databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](../../databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Backend tests | 754 passed at `7bf3246` | `databridge/apps/internal_brain/tests/` |
 | Web e2e | 124 passed, 0 failed, 38 env-gated skips, three consecutive runs | [TEST_REPORT.md](TEST_REPORT.md) |
 | Live QA | Every page × persona against the real backend: 32 checks, 11 bugs fixed, issues listed | [QA_LIVE.md](QA_LIVE.md) |
@@ -534,3 +535,68 @@ tests (Python 3.13) and the web typecheck (Node 20); and a Lighthouse deploy kit
 | Backup clips | A, B and C for the presenter **B** key | `databridge/apps/internal_brain_web/public/clips/` ([P4](#p4-backup-clips-new-baf8a07)) |
 | Printable handouts | A4 leave-behind with a QR code, one judge card per rubric criterion, the presenter cheat-sheet; numbers read from `eval_summary.json`, STATUS.md and ROI_MODEL.md by a generator | `submission/finals/` ([submission/README.md](../../submission/README.md)) |
 | Submission (16 Oct) | Deck, video, cover, CodeBuddy and WorkBuddy evidence | [submission/README.md](../../submission/README.md) |
+
+---
+
+## 11. Demo-proof features (behind a toggle, D-24)
+
+Stage props, not product surfaces: off for normal users. The server mounts their routes only with
+`IB_DEMO_FEATURES=1` (set only by `databridge/scripts/demo_up.sh`; ignored when `IB_DEPLOYED=1`), and the
+web shows them only when `/ib/status` says `demo_features: true` AND the viewer turned **Demo features**
+on in Settings (or the Presenter is armed). Each control carries a "Demo" badge. Security notes:
+`docs/tencent/SECURITY.md` §15.13; contracts: `docs/finals/contracts/backend_v1.md` "Demo-proof features";
+plan: [live_growth/PLAN.md](live_growth/PLAN.md).
+
+### G1. Watch the brain grow
+
+| | |
+|---|---|
+| What | The knowledge graph polls a permission-filtered change feed; a new document fades into its place's disc at the next free slot (nothing else moves), pulses twice, keeps an accent for 10 s, and is listed under **Just added** ("Slack · #db-migration · new thread · just now", "your note · appeared 2.8 s after you posted"). A **Live updates** switch pauses polling. Reduced motion: a static accent and label for 30 s |
+| Who | Anyone signed in, for what they can open |
+| Where | `/dev/graph` (Explore and Compare) → `GET /ib/graph/changes` |
+| How | 1. Settings → Demo features on. 2. As `jdoe`, open `/dev/graph?add=1` and post the note. 3. Watch the node arrive; **Show** flies to it |
+| Guarantees | Ken's reply after a note he cannot open is byte-identical (cursor included) to a world without it, and his poll makes no source call; the cursor holds only the caller and the clock; the cap applies after the live check; polls are ledgered as `graph.viewed` `mode="changes"` (counts only) |
+| Tests | `test_live_growth.py` (11 tests: L1 to L9, A6 to A9); `grow.spec.ts` (6: hidden by default, post and feed, pause stops polling, Compare: only the poster receives it, plus 3 layout unit tests: existing positions exactly unchanged, deterministic, `computeLayout` unchanged) |
+| Screens | [grow/04-pulse-and-just-added.png](screens/grow/04-pulse-and-just-added.png) · [grow/05-show-new-node.png](screens/grow/05-show-new-node.png) · [grow/06-ken-nothing-new.png](screens/grow/06-ken-nothing-new.png) |
+
+### G2. Add a document
+
+| | |
+|---|---|
+| What | A sheet with two tabs: **Slack note** (channel list built only from the person's own map; 2,000-character counter) and **Upload a file** (Word, Excel, PowerPoint, PDF, CSV, Markdown, text, WhatsApp export; sample files listed) |
+| Who | The signed-in person, as themselves (no author field); demo sign-in on |
+| Where | `/dev/graph` toolbar → `POST /sim/add-document`, `POST /sim/upload-file` |
+| How | **Add a document** → pick `#db-migration` → paste the note → **Post to Slack** |
+| Guarantees | Live membership checked at the source at post time; one 404 for every refusal; 5 per minute; the IB never indexes the text directly (signed webhook, re-fetch, mask); answerable at once with a citation by channel members, the constant refusal for Ken; reset removes it |
+| Tests | `test_sim_add_document.py` (20 tests, 29 runs, incl. validation, live membership, A1 byte-identical refusals, rate limit, deployed); `test_live_growth.py::test_added_note_is_answerable_by_members_and_ken_gets_the_constant_refusal`, `::test_sensitive_values_in_a_note_are_masked_everywhere`; uploads: `test_uploads.py` |
+| Screens | [grow/02-add-sheet-prefilled.png](screens/grow/02-add-sheet-prefilled.png) · [grow/03-posted.png](screens/grow/03-posted.png) · [grow/07-compare-jdoe-cited-ken-refused.png](screens/grow/07-compare-jdoe-cited-ken-refused.png) |
+
+### G3. Not in the brain yet
+
+| | |
+|---|---|
+| What | An operator's count of indexed documents containing a phrase, before and after a note: 0, then 1, then 0 after reset (live run, 30 Oct) |
+| Who | `admin_it` only (it looks past permissions); demo sign-in on |
+| Where | `POST /sim/check-absent` (no UI; used from the rehearsal script) |
+| Guarantees | Count and index size only, never a title or id; the phrase is ledgered as its length and SHA-256 |
+| Tests | `test_sim_add_document.py::test_check_absent_*` (3) |
+
+### G4. Engine refresh
+
+| | |
+|---|---|
+| What | **Refresh snapshot** on `/dev/brain` rebuilds the Walnut engine snapshot (`build_enterprise_graph.py --as jdoe`) in the background and the engine reloads it; the button shows the step and the seconds (34 s on the demo laptop) |
+| Who | jdoe (the snapshot's person) or `admin_it`; one start per 2 minutes |
+| Where | `/dev/brain` → `POST /sim/engine-refresh`, `POST /sim/engine-status`; the IB calls the gateway's `POST /graph/reload` server-side |
+| Guarantees | Write-ahead `ingest.sync` record; a failed build never touches the live snapshot; the gateway token never reaches the browser; the snapshot is built from the world file, so a live note is not in it |
+| Tests | `test_demo_features.py` (6 engine tests) |
+| Screens | [grow/08-engine-refresh-running.png](screens/grow/08-engine-refresh-running.png) · [grow/09-engine-refresh-done.png](screens/grow/09-engine-refresh-done.png) |
+
+### G5. The toggle
+
+| | |
+|---|---|
+| What | Settings → **Demo features** (shown only on a server with them on); off by default, stored in this browser |
+| Guarantees | Toggle off on the server: all five routes are the unknown-route 404, signed in or not; `/ib/status` says `demo_features`; with it on, the routes are allowlisted and need a session |
+| Tests | `test_demo_features.py` (5 toggle tests); `grow.spec.ts` "hidden by default" |
+| Screens | [grow/01-settings-demo-toggle.png](screens/grow/01-settings-demo-toggle.png) · [grow/10-after-reset.png](screens/grow/10-after-reset.png) |

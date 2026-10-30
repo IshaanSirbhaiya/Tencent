@@ -258,6 +258,27 @@ class World:
                 return True
         return False
 
+    def jira_can_create(self, uid: Optional[str], project_key: str) -> bool:
+        """"Create issues" in a project. The world may give a project a ``create`` holder set
+        (``roles``/``users``/``groups``); without one, Jira's default scheme applies here: the
+        project's ``Developers`` role (Viewers can browse but not create)."""
+        if uid is None or not self.active(uid):
+            return False
+        proj = self.projects.get(project_key)
+        if proj is None:
+            return False
+        c = proj.get("create") or {"roles": ["Developers"]}
+        if self._in_roles(uid, project_key, c.get("roles", [])):
+            return True
+        return self.in_principals(uid, c.get("users", []), c.get("groups", []))
+
+    def next_issue(self, project_key: str) -> tuple[str, str]:
+        """``(key, id)`` for a new issue in ``project_key``: the next number and the next id."""
+        nums = [int(k.rsplit("-", 1)[1]) for k, i in self.issues.items()
+                if i.get("project") == project_key and k.rsplit("-", 1)[-1].isdigit()]
+        ids = [int(i["id"]) for i in self.issues.values() if str(i.get("id", "")).isdigit()]
+        return f"{project_key}-{max(nums, default=0) + 1}", str(max(ids, default=20000) + 1)
+
     def jira_can_browse_issue(self, uid: Optional[str], issue_key: str) -> bool:
         issue = self.issues.get(issue_key)
         if issue is None or uid is None or not self.active(uid):

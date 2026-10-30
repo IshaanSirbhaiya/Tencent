@@ -192,7 +192,11 @@ IB_EVENT = "ib_event"
 EVENT_KINDS = ("request.accepted", "retrieval.decided", "answer.released", "request.failed",
                "audit.query", "audit.reveal", "acl.changed", "membership.changed",
                "directory.changed", "ingest.sync", "anchor.published", "map.viewed", "auth.login",
-               "graph.viewed", "doc.viewed", "trace.viewed")
+               "graph.viewed", "doc.viewed", "trace.viewed",
+               "action.proposed", "action.confirmed", "action.executed", "action.failed",
+               "action.rejected",
+               "deliverable.requested", "deliverable.created", "deliverable.exported",
+               "deliverable.failed")
 
 
 class Gate2Decision(_Frozen):
@@ -237,7 +241,7 @@ class AnswerReleased(EventBase):
     answer_sha256: str
     answer_ref: str                                 # key in the separate content store
     refused: bool
-    citations: tuple[dict[str, Any], ...]          # {doc_id, version, content_checked_at, authz_checked_at}
+    citations: tuple[dict[str, Any], ...]   # {doc_id, version, tag, content_checked_at, authz_checked_at}
     dropped_sentences_count: int = 0
     latency_ms: int
     # per-stage timings in ms (accept, gate1, gate2, seal, compose, release) for the developer
@@ -286,7 +290,7 @@ class GraphViewed(EventBase):
     record); everything returned was confirmed in the same call."""
     kind: Literal["graph.viewed"] = "graph.viewed"
     sub: str
-    mode: Literal["overview", "focus", "search", "openable"]
+    mode: Literal["overview", "focus", "search", "openable", "changes"]
     outcome: Literal["ok", "not_found"] = "ok"
     nodes_returned: int = 0
     docs_returned: int = 0
@@ -312,6 +316,136 @@ class TraceViewed(EventBase):
     sub: str
     outcome: Literal["ok", "not_found", "error"] = "ok"     # error: the receipt could not be built
     citations_returned: int = 0
+
+
+#: what an "Act" action does (actions.py). ``draft.*`` never leaves the Brain; ``ticket.create``
+#: creates an issue in the source after the person confirms.
+ActionKind = Literal["draft.reply", "draft.message", "ticket.create"]
+
+
+class ActionProposed(EventBase):
+    """An action was prepared from one of the asker's OWN released answers (``req_id``) and is about
+    to be shown to them. Written BEFORE the draft or proposal leaves the service. Counts, ids and a
+    digest only: never the draft or the proposal text."""
+    kind: Literal["action.proposed"] = "action.proposed"
+    sub: str
+    action_id: str
+    action: ActionKind
+    cited_docs: int                                 # cited documents the action was built from
+    doc_ids: tuple[str, ...] = ()                   # those documents (each openable now)
+    sentences: int = 0                              # draft sentences (0 for a ticket proposal)
+    target: Optional[str] = None                    # ticket: the project key (a validated choice)
+    options: int = 0                                # ticket: projects the person may create in
+    model: Optional[ModelInfo] = None               # draft: who wrote it (model or deterministic)
+    digest: str                                     # sha256 of the draft / the proposal payload
+    policy_version: str
+
+
+class ActionConfirmed(EventBase):
+    """The person confirmed a proposed action. Written BEFORE anything changes in the source."""
+    kind: Literal["action.confirmed"] = "action.confirmed"
+    sub: str
+    action_id: str
+    action: ActionKind
+    target: str
+    summary_edited: bool = False
+    digest: str                                     # sha256 of exactly what will be sent
+
+
+class ActionExecuted(EventBase):
+    """Our code (never the model) carried out a confirmed action. ``result_ref`` is the source's id
+    for what was created (an issue key)."""
+    kind: Literal["action.executed"] = "action.executed"
+    sub: str
+    action_id: str
+    action: ActionKind
+    target: str
+    result_ref: str
+
+
+class ActionFailed(EventBase):
+    """An action could not be prepared or carried out. ``reason_code`` is ledger-only, never
+    returned to the person (they get one polite message for every reason)."""
+    kind: Literal["action.failed"] = "action.failed"
+    sub: str
+    action_id: Optional[str] = None
+    action: Optional[ActionKind] = None
+    stage: Literal["lookup", "propose", "confirm", "execute"]
+    reason_code: str
+
+
+class ActionRejected(EventBase):
+    """The person cancelled a proposed action; nothing was changed."""
+    kind: Literal["action.rejected"] = "action.rejected"
+    sub: str
+    action_id: str
+    action: ActionKind
+
+
+#: what a deliverable is built as (deliverables/; docs/finals/deliverables/PLAN.md)
+DeliverableKind = Literal["table", "chart", "analysis", "summary", "slides"]
+
+
+class DeliverableRequested(EventBase):
+    """A deliverable was asked for from one of the asker's OWN requests. Written after the cheap
+    ownership check and BEFORE the cited sources are re-checked live or any model is called."""
+    kind: Literal["deliverable.requested"] = "deliverable.requested"
+    sub: str
+    deliverable_id: str
+    deliverable: DeliverableKind
+    model_planned: bool = False
+    policy_version: str
+
+
+class DeliverableCreated(EventBase):
+    """A deliverable is about to be shown. Written BEFORE the response. Counts, ids and digests
+    only: never a title, a cell, a sentence or a label."""
+    kind: Literal["deliverable.created"] = "deliverable.created"
+    sub: str
+    deliverable_id: str
+    deliverable: DeliverableKind
+    status: Literal["ready", "needs_model", "insufficient"]
+    generated: Literal["model", "deterministic", "none"]
+    model: Optional[ModelInfo] = None
+    prompt_version: str
+    cited_docs: int = 0
+    doc_ids: tuple[str, ...] = ()
+    context_chars: int = 0
+    context_digest: str = ""                        # sha256 of exactly what the model was shown
+    items_proposed: int = 0
+    items_kept: int = 0
+    items_dropped: int = 0
+    values_proposed: int = 0
+    values_kept: int = 0
+    values_dropped: int = 0
+    names_dropped: int = 0
+    fallback: str = "none"      # none|no_model|model_error|invalid_output|nothing_passed|timeout|busy
+    digest: str                                     # sha256 of the canonical JSON shown
+    policy_version: str
+
+
+class DeliverableExported(EventBase):
+    """A file was built from a stored, checked deliverable. Written BEFORE the bytes leave."""
+    kind: Literal["deliverable.exported"] = "deliverable.exported"
+    sub: str
+    deliverable_id: str
+    deliverable: DeliverableKind
+    format: Literal["csv", "pptx"]
+    bytes: int
+    digest: str                                     # sha256 of the file
+    items_dropped_on_recheck: int = 0
+
+
+class DeliverableFailed(EventBase):
+    """A deliverable could not be looked up, built or exported. ``reason_code`` is ledger-only. A
+    failed lookup carries no request or deliverable id (an attempt on someone else's request must
+    not show up in their receipt)."""
+    kind: Literal["deliverable.failed"] = "deliverable.failed"
+    sub: str
+    deliverable_id: Optional[str] = None
+    deliverable: Optional[DeliverableKind] = None
+    stage: Literal["lookup", "rate", "generate", "export"]
+    reason_code: str
 
 
 class AuditReveal(EventBase):

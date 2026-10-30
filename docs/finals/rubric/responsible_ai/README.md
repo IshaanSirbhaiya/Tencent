@@ -16,7 +16,7 @@ on the finals code on 30 Oct and match `eval_summary.json`; latency and per-role
 | [OWASP_LLM_REDTEAM.md](OWASP_LLM_REDTEAM.md) | Each OWASP LLM Top 10 (2025) risk: control, test, result, residual; what broke and how we fixed it | "Did you attack it?" |
 | [FRAMEWORK_CROSSWALK.md](FRAMEWORK_CROSSWALK.md) | AI Verify, IMDA GenAI framework, MAS FEAT, MAS AI guidelines, PDPA, ISO/IEC 42001, NIST AI RMF, EU AI Act: met / partial / gap | "How does this map to MAS / AI Verify?" |
 | [AI_VERIFY_SELF_ASSESSMENT.md](AI_VERIFY_SELF_ASSESSMENT.md) | The 11 AI Verify principles, one by one | "Have you run AI Verify?" |
-| [DATA_CARD_COMPANY_A.md](DATA_CARD_COMPANY_A.md) | The synthetic world: 32 people, 1,143 documents, 49 planted facts; generator and seed | "Where did your data come from?" |
+| [DATA_CARD_COMPANY_A.md](DATA_CARD_COMPANY_A.md) | The synthetic world: 34 people, 1,207 documents, 72 planted facts; generator and seed | "Where did your data come from?" |
 | [HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md](HUMAN_OVERSIGHT_AND_INCIDENT_RUNBOOK.md) | Who oversees what; automatic escalation; five incident procedures | "What if something goes wrong?" |
 | [PRIVACY_IMPACT_SUMMARY.md](PRIVACY_IMPACT_SUMMARY.md) | What personal data is held, where, who sees it, what leaves; PDPA table | "What goes to Tencent's model?" |
 | [EXPLAINABILITY.md](EXPLAINABILITY.md) | What each audience can see about an answer, and why we never explain a refusal | "Can a user tell why they got this answer?" |
@@ -28,7 +28,7 @@ ARCHITECTURE, DATA_FLOWS). Technical evidence: [../technical/](../technical/READ
 
 ## Five facts to remember
 
-1. **0 leaks in 5,958 adversarial requests** (95% upper bound 0.10% per request per path), with canaries that prove the test can fail. Re-run pending. (`RESULTS.md:9-19`)
+1. **0 leaks in 7,374 adversarial requests** (95% upper bound 0.08% per request per path), with canaries that prove the test can fail. Re-run pending. (`RESULTS.md:9-19`)
 2. **Restricted and non-existent look byte-identical:** 0 of 400 pairs differ. Re-run pending. (`RESULTS.md:16`)
 3. **The model has no tools** and never chooses an identity. (`databridge/apps/internal_brain/databridge_ib/llm.py:91-92`)
 4. **Every answer is logged before it is shown;** if the log fails, there is no answer. (`databridge/apps/internal_brain/tests/test_app_routes.py::test_ledger_failure_is_503`)
@@ -40,7 +40,7 @@ ARCHITECTURE, DATA_FLOWS). Technical evidence: [../technical/](../technical/READ
 |---|---|---|
 | "Compliant with MAS / PDPA / AI Verify / ISO 42001" | "Mapped to", with the gap list | No regulator or auditor has assessed it; it runs on synthetic data |
 | "Certified" or "audited" | "Self-assessed", "reviewed by AI models and the team" | Every review so far is by AI models (Codex, CodeBuddy, Claude) or by us; no human third party |
-| "Zero risk", "unhackable", "leak-proof" | "0 in 5,958, with a 95% upper bound of 0.10% per request" | Absence of observed leaks is not proof of absence |
+| "Zero risk", "unhackable", "leak-proof" | "0 in 7,374, with a 95% upper bound of 0.08% per request" | Absence of observed leaks is not proof of absence |
 | "Runs on Hy3" / "Hy3 answers" | "Hy3 is wired in and tested with a capturing model; the live run waits on Tencent account verification" | No live Hy3 call has succeeded (`docs/finals/PLAN.md` §3.4) |
 | "Tested on real Slack / Confluence / Jira / Drive" | "Mock platforms with the real APIs' shapes; same connector code, injected base URL" | No live tenant (`INTERNAL_BRAIN.md:245-246`) |
 | "Bias-free" or "fair" | "Same rules for every role; quality per role published, uneven in places" | See [FAIRNESS_NOTE.md](FAIRNESS_NOTE.md) |

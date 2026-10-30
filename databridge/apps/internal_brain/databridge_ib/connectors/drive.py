@@ -2,10 +2,15 @@
 
 Documents: one ``SourceDoc`` per FILE, ``doc_id = "drive:<file id>"``, ``kind="file"``,
 ``container`` = shared-drive id, ``container_name`` = drive name, ``version`` = ``str(version)``.
-Only text-like files are indexed: ``text/plain``, ``text/markdown``, ``text/csv``, Google Docs
-(exported as ``text/plain``) and Google Sheets (exported as ``text/csv``). Every other mimeType
-(images, PDFs, slides, binaries) is SKIPPED — never indexed, so never answerable; folders are not
-documents.
+Text-like files are indexed as text: ``text/plain`` (a WhatsApp chat export is rewritten one
+message per paragraph, ``extract_files.whatsapp_text``), ``text/markdown``, Google Docs (exported
+as ``text/plain``) and Google Sheets (exported as ``text/csv``). Uploaded Office, PDF and CSV files
+(Word ``.docx``, Excel ``.xlsx``, PowerPoint ``.pptx``, ``application/pdf``, ``text/csv``) are
+downloaded (``alt=media``, at most ``extract_files.MAX_FILE_BYTES``) and their text is extracted
+with Walnut's own convert readers (``databridge_ib.extract_files``: magic-byte, zip-bomb, XML DTD,
+macro, page and time limits, in a worker process; any failure ⇒ the file is skipped, never
+indexed). Every other mimeType (images, Google
+Slides, other binaries) is SKIPPED — never indexed, so never answerable; folders are not documents.
 
 Permission semantics compiled into ``AclExpr`` (inheritance WIDENS)::
 
@@ -80,6 +85,17 @@ READ_PLAN: dict[str, tuple[tuple[str, Optional[str]], ...]] = {
     GDOC: (("export", "text/plain"), ("media", None)),
     GSHEET: (("export", "text/csv"), ("export", "text/plain"), ("media", None)),
 }
+#: Office / PDF / CSV files: downloaded as bytes and read by the convert readers (extract_files).
+#: A CSV becomes "Row N: column=value" lines: a raw CSV line is not answerable. (The world has no
+#: text/csv file; Google Sheets keep their own export plan above.)
+EXTRACT_MIMES = (
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/pdf",
+    "text/csv",
+)
+READ_PLAN.update({m: (("extract", None),) for m in EXTRACT_MIMES})
 READ_ROLES = {"owner", "organizer", "fileOrganizer", "writer", "commenter", "reader"}
 _FILE_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
@@ -260,14 +276,45 @@ class DriveConnector:
     def _content(self, meta: Mapping[str, Any]) -> Optional[str]:
         fid = str(meta["id"])
         for how, target in READ_PLAN.get(str(meta.get("mimeType") or ""), ()):
+            if how == "extract":
+                return self._extracted(meta)
             if how == "export":
                 resp = self._call(f"files/{fid}/export", {"mimeType": target}, ok=(400, 403, 404))
             else:
                 resp = self._call(f"files/{fid}", {"alt": "media", "supportsAllDrives": "true"},
                                   ok=(400, 403, 404))
             if resp.is_success:
+                if meta.get("mimeType") == "text/plain":
+                    # a WhatsApp "Export chat" file: one paragraph per message, system lines out
+                    # (extract_files.whatsapp_text; any other text is returned unchanged)
+                    from .. import extract_files as X
+                    return X.whatsapp_text(resp.text) or resp.text
                 return resp.text
         return None                                 # gone, or no strategy the source accepted
+
+    def _extracted(self, meta: Mapping[str, Any]) -> Optional[str]:
+        """An Office / PDF / CSV file's text via Walnut's convert readers; None (skip the file) when
+        it is too large, gone, or refused by any extraction check (fail closed, never indexed)."""
+        from .. import extract_files as X
+        kind = X.EXTRACT_MIME_KIND.get(str(meta.get("mimeType") or ""))
+        try:
+            declared = int(meta.get("size") or 0)
+        except (TypeError, ValueError):
+            return None
+        if kind is None or declared > X.MAX_FILE_BYTES:
+            return None
+        resp = self._call(f"files/{meta['id']}", {"alt": "media", "supportsAllDrives": "true"},
+                          ok=(400, 403, 404))
+        if not resp.is_success or len(resp.content) > X.MAX_FILE_BYTES:
+            return None
+        try:
+            return X.extract(kind, resp.content)
+        except X.Refused as exc:
+            if kind == "csv" and exc.reason == "no_text":
+                # a CSV with a header and no rows passed every check but has no "Row N" line:
+                # index its (cleaned) text as before, rather than dropping the file
+                return X.clean_text(resp.content.decode("utf-8")) or None
+            return None
 
     def _build_doc(self, meta: Mapping[str, Any], text: str) -> SourceDoc:
         fid = str(meta["id"])

@@ -9,6 +9,7 @@
 import { clearCompareCache } from '@/components/compare/cache';
 import { ApiError, analyticsApi, api, ibHealth, slotLogout, withSlotLocks } from '@/lib/api';
 import { callPresenter } from './bus';
+import { clearDeliverCache, openDeliverables, warmDeliverables } from './deliver';
 import { STEPS, stepUrl, type StepCtx } from './script';
 import { applyStage } from './stage';
 import { clearPresenter, getPresenter, setPresenter, type Dot } from './store';
@@ -145,6 +146,8 @@ export function start() {
   applyStage(true);
   setPresenter({ armed: true, stage: true, hidden: false });
   flashLegend();
+  // Q&A beat D: build Leo's deliverables first (serialised, so step 0's sign-in waits for it)
+  void warmDeliverables(serialSession);
   void runStep(0, 'forward');
   void refreshHealth();
 }
@@ -178,10 +181,12 @@ export async function resetDemo() {
     await serialSession(() => Promise.allSettled([api.logout(), signSlotsOut()]));
     clearCompareCache();
     clearPresenter();
+    clearDeliverCache();
   } finally {
     resetting = false;
     setPresenter({ resetting: false });
   }
+  void warmDeliverables(serialSession); // R rebuilds the D cache
   await runStep(0, 'forward');
   void refreshHealth();
 }
@@ -301,6 +306,11 @@ function onKeyDown(e: KeyboardEvent) {
       e.preventDefault();
       if (s.busy) return; // the running step owns the page
       void callPresenter('compare-open-citation', { n: 2 }, 0);
+      return;
+    case 'd':
+      e.preventDefault();
+      if (s.busy || s.resetting) return;
+      void openDeliverables(serialSession, () => host?.refreshSession());
       return;
     case 'escape':
       e.preventDefault();

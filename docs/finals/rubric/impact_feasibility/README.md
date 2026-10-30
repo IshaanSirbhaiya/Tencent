@@ -17,7 +17,7 @@ Every number is linked to a source or a repo file; estimates are labelled.
 | [RISK_REGISTER.md](RISK_REGISTER.md) | 14 risks, each with a mitigation and its test or file | Q&A |
 | [PRICING_GTM.md](PRICING_GTM.md) | Price, unit economics, go-to-market (all estimates) | Q&A |
 | [CERTIFICATION_PATH.md](CERTIFICATION_PATH.md) | From Tencent Cloud's MTCS L3/OSPAR attestations (to confirm) to Cyber Trust and SOC 2 | Q&A |
-| [EVIDENCE_NOTES.md](EVIDENCE_NOTES.md) | How to read 0/5,958 (0.10% per path vs 0.05% pooled), all measured numbers, what is not measured | Before anyone quotes a number |
+| [EVIDENCE_NOTES.md](EVIDENCE_NOTES.md) | How to read 0/7,374 (0.08% per path vs 0.04% pooled), all measured numbers, what is not measured | Before anyone quotes a number |
 
 ## Stage one-liners
 
@@ -28,7 +28,7 @@ Every number is linked to a source or a repo file; estimates are labelled.
 3. "MAS issued its AI risk guidelines on 7 October. From October 2027 every FI needs an AI inventory and controls."
 4. "Same question, two people, two different answers, and each one is correct for that person."
 5. "It pays for itself if each person saves seven minutes a week. APQC measured nearly three hours a week spent searching."
-6. "Aspire already promises customers its AI only sees what the user may see. We make that promise for Aspire's own staff, and we measured it: zero leaks in 5,958 attack requests."
+6. "Aspire already promises customers its AI only sees what the user may see. We make that promise for Aspire's own staff, and we measured it: zero leaks in 7,374 attack requests."
 
 **Feasibility**
 
@@ -43,7 +43,7 @@ Every number is linked to a source or a repo file; estimates are labelled.
 
 | Question | Answer |
 |---|---|
-| Isn't this Glean or Copilot? | They copy permissions into an index or trim inside one tenant. We re-check each passage with the source at answer time, deny on error, and prove it: 0 leaks in 5,958 requests. |
+| Isn't this Glean or Copilot? | They copy permissions into an index or trim inside one tenant. We re-check each passage with the source at answer time, deny on error, and prove it: 0 leaks in 7,374 requests. |
 | Who is the user? | The account manager who needs a per-market answer now, the on-call engineer at 3 a.m., and the compliance officer who must prove who saw what. |
 | Is US$1.3M real? | It's a projection: 600 × 1.5 h × 46 weeks × US$31. Break-even is 7 minutes a week. The pilot measures the real figure. |
 | Why should Aspire care? | Faster answers for staff; readiness for MAS AI-risk rules by Oct 2027; and AspireOS bank clients will ask Aspire these same questions. |
@@ -56,4 +56,4 @@ Every number is linked to a source or a repo file; estimates are labelled.
 | Who maintains it? | Narrow scope, safety tests on every change, and a design-partner pilot that funds maintenance. |
 | Certifications? | None of our own yet. Tencent's MTCS L3 and OSPAR for hosting; pen test and AI Verify in the pilot; Cyber Trust within six months; then SOC 2. |
 | How is it priced? | About US$10 a seat a month (estimate). At that price a person breaks even on five minutes a week. |
-| How do you get 0.10% from 0 / 5,958? | It's 0 in 2,979 on each answer path; rule of three gives 3 ÷ 2,979 ≈ 0.10%. Pooling both paths (0.05%) would count each probe twice. |
+| How do you get 0.08% from 0 / 7,374? | It's 0 in 3,687 on each answer path; rule of three gives 3 ÷ 3,687 ≈ 0.08%. Pooling both paths (0.04%) would count each probe twice. |

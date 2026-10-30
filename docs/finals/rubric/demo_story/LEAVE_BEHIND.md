@@ -17,7 +17,7 @@ A permission-aware answer engine for a regulated company's Confluence, Jira, Sla
 (Paths: `Tencent/submission/` once captured: TO FILL.)
 
 **4. Three proof numbers** (each with its source)
-- 5,958 adversarial requests checked, 0 leaks. `databridge/evals/internal_brain/RESULTS.md`
+- 7,374 adversarial requests checked, 0 leaks. `databridge/evals/internal_brain/RESULTS.md`
 - 400 paired questions (restricted vs non-existent), 0 differences. Same file.
 - Usability: TO FILL (only from the filled report: n, tasks, mean SUS and range, or "not yet reported").
 Note on the page: the real-model (Hy3) run was pending when the evals were generated; the numbers come from a capturing test model and the quoting path. Keep this note unless the evals are re-run with Hy3.

@@ -37,6 +37,8 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^ib\/graph\/openable$/ },
   // Act on an answer: main session only (never in a compare slot)
   { method: 'POST', re: /^ib\/act\/(draft|ticket\/(propose|confirm|cancel))$/ },
+  // Deliverables from an answer (IB_DELIVERABLES=1): main session only (never in a compare slot)
+  { method: 'POST', re: /^ib\/deliverables(\/export)?$/ },
   { method: 'GET', re: new RegExp(`^ib\\/doc\\/${DOC_ID}$`) },
   { method: 'GET', re: /^audit\/(events|verify|stats)$/ },
   { method: 'GET', re: /^audit\/journey\/[A-Za-z0-9_-]{1,200}$/ },
@@ -294,10 +296,26 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
     out = new NextResponse(payload, { status: upstream.status });
     const uct = upstream.headers.get('content-type');
     if (uct) out.headers.set('content-type', uct);
+    // The deliverables export only: relay the file name the IB built from fixed parts, and only
+    // when it is exactly that shape (nothing else from upstream; never on another route).
+    const disposition = exportDisposition(path, upstream);
+    if (disposition) {
+      out.headers.set('content-disposition', disposition);
+      out.headers.set('x-content-type-options', 'nosniff');
+    }
   }
   out.headers.set('cache-control', 'no-store');
   relayCookies(upstream.headers.getSetCookie(), out, slot);
   return out;
+}
+
+/** The export route's `content-disposition`, accepted only in this exact fixed shape. */
+const EXPORT_DISPOSITION = /^attachment; filename="walnut-[a-z]+-[0-9a-f]{8}-\d{8}\.(pptx|csv)"$/;
+
+function exportDisposition(path: string, upstream: Response): string | null {
+  if (path !== 'ib/deliverables/export' || upstream.status !== 200) return null;
+  const v = upstream.headers.get('content-disposition');
+  return v && EXPORT_DISPOSITION.test(v) ? v : null;
 }
 
 export { handle as GET, handle as POST };

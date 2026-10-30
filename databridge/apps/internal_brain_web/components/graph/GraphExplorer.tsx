@@ -3,24 +3,30 @@
 // search-to-focus, one-hop growth, working set, legend filters, node panel and table view.
 // Used once for Explore and twice (main session + compare slot b) for Compare. Every response is
 // checked against the session it is meant to belong to; a mismatch shows the error state instead.
-import { Check, Circle, Loader2, Network, RefreshCw, Table2, Undo2, Workflow } from 'lucide-react';
+import { Check, Circle, FilePlus2, Loader2, Network, RefreshCw, Table2, Undo2, Workflow } from 'lucide-react';
 import Link from 'next/link';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Button, EmptyState, SegmentedControl } from '@/components/ui';
+import { Badge, Button, EmptyState, SegmentedControl, Sheet } from '@/components/ui';
+import { usePresenterHandler } from '@/components/presenter/bus';
+import { usePresenter } from '@/components/presenter/store';
+import { AddDocumentSheet, type Channel, useAddNote } from '@/components/sim/AddDocumentSheet';
+import { useDemoFeatures } from '@/components/sim/demo';
 import { ApiError, graphApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { fmtTime } from '@/lib/format';
 import { useMessages } from '@/lib/i18n';
 import { graphMessages } from '@/lib/i18n/graph';
-import type { KnowledgeGraph, KnowledgeMap, Platform } from '@/lib/types';
+import type { GraphChanges, KnowledgeGraph, KnowledgeMap, Platform } from '@/lib/types';
 import { Legend, MapControls, useReducedMotion } from './bits';
 import { fmtCount } from './format';
 import { type CanvasHandle, type CanvasView, GraphCanvas } from './GraphCanvas';
 import { GraphTable } from './GraphTable';
 import { applyLayout } from './layout';
-import { buildGalaxy, type KGraph, mergeResponse } from './model';
+import { containerLabel, type FeedItem, FEED_MAX, LiveFeed } from './LiveFeed';
+import { buildGalaxy, type KGraph, mergeDelta, mergeResponse } from './model';
 import { NodePanel } from './NodePanel';
 import { type SearchHandle, type SearchHit, SearchBox } from './SearchBox';
+import { postedAt, useLiveChanges } from './useLiveChanges';
 
 export const WORKING_SET_CAP = 400;
 const OVERVIEW_LIMIT = 300;
@@ -93,6 +99,14 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
   const subRef = useRef<string | null>(null);
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
+  // live growth and "Add a document": demo-proof features (D-24), shown only when the server AND
+  // this viewer turned them on (components/sim/demo.ts)
+  const demo = useDemoFeatures();
+  const presenter = usePresenter();
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const frozen = useRef(false);
+  const lastAnnounce = useRef(0);
 
   useImperativeHandle(ref, () => ({ docIds: () => (graphRef.current ? graphRef.current.filterNodes((_id, a) => a.kind === 'doc') : []) }), []);
 
@@ -308,6 +322,93 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
     if (id) flyLater(id);
   }, [flyLater]);
 
+  // ---------------------------------------------------------------- live growth (demo-proof)
+  const channels: Channel[] = useMemo(
+    () => (map?.platforms.find((p) => p.platform === 'slack')?.containers ?? []).map((c) => ({ id: c.container, name: c.name })).sort((a, b) => (a.name < b.name ? -1 : 1)),
+    [map],
+  );
+  const note = useAddNote(channels);
+
+  const onDelta = useCallback(
+    (d: GraphChanges) => {
+      const g = graphRef.current;
+      if (!g) return;
+      if (!frozen.current) {
+        canvas.current?.freezeFrame();
+        frozen.current = true;
+      }
+      const now = performance.now();
+      const { added, updated } = mergeDelta(g, d, now);
+      if (scope) addToScope(d.nodes.map((n) => n.id));
+      setVersion((v) => v + 1);
+      canvas.current?.animate();
+      const received = Date.now();
+      const items: FeedItem[] = [...added, ...updated]
+        .filter((id) => g.hasNode(id) && g.getNodeAttribute(id, 'kind') === 'doc')
+        .map((id) => {
+          const a = g.getNodeAttributes(id);
+          const at = postedAt(id);
+          return {
+            id,
+            label: a.label,
+            platform: a.platform,
+            containerName: a.containerName,
+            docKind: a.docKind,
+            change: updated.includes(id) ? 'updated' : 'new',
+            receivedAt: received,
+            afterS: at !== null && added.includes(id) ? Math.max(0, (received - at) / 1000) : null,
+          };
+        });
+      if (!items.length) return;
+      setFeed((f) => [...items, ...f].slice(0, FEED_MAX * 2));
+      if (received - lastAnnounce.current >= 3000) {
+        lastAnnounce.current = received;
+        const first = items[0];
+        const what = [first.platform === 'drive' ? 'Google Drive' : first.platform, containerLabel(first.platform, first.containerName), first.change === 'updated' ? t('live.updated') : first.label].filter(Boolean).join(', ');
+        setAnnounce(t('live.announce', { n: items.length, what }));
+      }
+    },
+    [scope, addToScope, t],
+  );
+  const live = useLiveChanges({ enabled: demo.on && phase.kind === 'ready', slot, intervalMs: presenter.stage ? 2000 : 3000, epoch: graph, onDelta });
+
+  // a world reset elsewhere (SimConsole) reloads this graph; a new galaxy starts a new feed window
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const ch = new BroadcastChannel('ib-live');
+    ch.onmessage = (e) => {
+      if ((e.data as { type?: string })?.type === 'reset') {
+        setFeed([]);
+        setAttempt((a) => a + 1);
+      }
+    };
+    return () => ch.close();
+  }, []);
+  useEffect(() => {
+    frozen.current = false;
+  }, [graph]);
+
+  // /dev/graph?add=1 opens the sheet once the graph is ready (main session, demo features on)
+  useEffect(() => {
+    if (!urlState || slot !== 'a' || !demo.on || phase.kind !== 'ready') return;
+    if (new URLSearchParams(window.location.search).get('add') === '1') setAddOpen(true);
+  }, [urlState, slot, demo.on, phase.kind]);
+
+  // Presenter: graph.addNote { channel, text, post:false } fills the sheet; { post:true } posts it
+  usePresenterHandler(slot === 'a' ? 'graph.addNote' : `graph.addNote.${slot}`, async (arg) => {
+    if (slot !== 'a' || !demo.on || phase.kind !== 'ready') return false;
+    const a = (arg ?? {}) as { channel?: string; text?: string; post?: boolean };
+    if (!a.post) {
+      if (a.channel && channels.some((c) => c.id === a.channel)) note.setChannel(a.channel);
+      if (typeof a.text === 'string') note.setText(a.text);
+      note.setStatus({ kind: 'idle' });
+      setAddOpen(true);
+      return true;
+    }
+    setAddOpen(true);
+    return (await note.post()) ? true : 'failed';
+  });
+
   const toggle = (set: Set<string>, v: string) => {
     const n = new Set(set);
     if (n.has(v)) n.delete(v);
@@ -415,6 +516,17 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
           </div>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
+          {slot === 'a' && demo.on ? (
+            <Sheet open={addOpen} onOpenChange={setAddOpen}>
+              <Button size="sm" variant="secondary" icon={FilePlus2} onClick={() => setAddOpen(true)} data-testid={`${testId}-add`}>
+                {t('add.open')}
+                <Badge tone="warn" className="ml-1.5">
+                  {t('demo.badge')}
+                </Badge>
+              </Button>
+              <AddDocumentSheet note={note} channels={channels} testId={`${testId}-addsheet`} />
+            </Sheet>
+          ) : null}
           {compact ? null : (
             <p className="hidden text-caption text-muted xl:block" title={t('stats.source')}>
               <span className="tabular-nums">{summary}</span>
@@ -479,6 +591,19 @@ export const GraphExplorer = forwardRef<ExplorerHandle, Props>(function GraphExp
           ) : (
             <>
               <div className="pointer-events-none absolute right-3 top-3 z-10 flex flex-col items-end gap-2">
+                {demo.on ? (
+                  <LiveFeed
+                    items={feed}
+                    state={live.state}
+                    paused={live.paused}
+                    onPause={live.setPaused}
+                    onShow={(id) => {
+                      if (graphRef.current?.hasNode(id)) select(id, { fly: true });
+                    }}
+                    compact={compact}
+                    testId={`${testId}-live`}
+                  />
+                ) : null}
                 <Legend
                   platforms={platforms}
                   hiddenPlatforms={hiddenPlatforms}

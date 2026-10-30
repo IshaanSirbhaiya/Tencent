@@ -448,10 +448,11 @@ def test_user_groups_are_the_expanded_membership(world, ref):
 def test_estate_has_the_planned_shape(world, ref):
     pages = world["confluence"]["pages"]
     assert {s["key"] for s in world["confluence"]["spaces"]} == {
-        "payment-gateway", "runbooks", "SEC", "product", "compliance", "fincrime", "cx"}
+        "payment-gateway", "runbooks", "SEC", "product", "compliance", "fincrime", "cx",
+        "people", "finops"}
     sec = next(s for s in world["confluence"]["spaces"] if s["key"] == "SEC")
     assert sec["read"] == {"users": [], "groups": ["grp-security"]}
-    assert 180 <= len(pages) <= 220
+    assert 200 <= len(pages) <= 260
     assert [p["status"] for p in pages].count("trashed") == 1
     assert [p["status"] for p in pages].count("archived") == 1
     assert [p["status"] for p in pages].count("draft") == 1
@@ -479,25 +480,28 @@ def test_estate_has_the_planned_shape(world, ref):
         assert readers == ref.active(x & y & ref.ug(next(
             s for s in world["confluence"]["spaces"] if s["key"] == child["space"])["read"]))
         assert readers < y, "the intersection case must exclude someone named on the child"
-    assert {p["key"] for p in world["jira"]["projects"]} == {"PAY", "DBMIG", "AUTH", "SEC"}
-    assert 230 <= len(world["jira"]["issues"]) <= 270
+    assert {p["key"] for p in world["jira"]["projects"]} == {"PAY", "DBMIG", "AUTH", "SEC", "ITHELP"}
+    assert 240 <= len(world["jira"]["issues"]) <= 280
     assert 10 <= sum(1 for i in world["jira"]["issues"] if i["security_level"]) <= 20
     assert all(f"PAY-{n}" in {i["key"] for i in world["jira"]["issues"]} for n in range(201, 206))
     chans = world["slack"]["channels"]
-    assert len(chans) == 15
+    # 14 core channels, #fincrime-cases (fintech layer), and the workplace layer's public
+    # #hr-announcements, #it-helpdesk and #office-sg
+    assert len(chans) == 18
     assert sum(c["type"] == "private" for c in chans) == 5
     assert [c["name"] for c in chans if c["type"] == "connect"] == ["vendor-acme"]
-    assert 550 <= len(world["slack"]["threads"]) <= 650
+    assert 580 <= len(world["slack"]["threads"]) <= 680
     assert all(2 <= len(t["messages"]) <= 8 for t in world["slack"]["threads"])
     assert any(m["edited"] for t in world["slack"]["threads"] for m in t["messages"])
     assert {d["name"] for d in world["drive"]["drives"]} == {"Engineering", "Company"}
     names = {f["name"] for f in world["drive"]["folders"]}
     assert {"Postmortems", "Pricing & Offers", "Vendor share"} <= names
-    assert sum(f["inherited_permissions_disabled"] for f in world["drive"]["folders"]) == 2
+    # Security (core), FinCrime case files (fintech layer), Compensation (workplace layer)
+    assert sum(f["inherited_permissions_disabled"] for f in world["drive"]["folders"]) == 3
     anyone = [f for f in world["drive"]["files"]
               if any(p["type"] == "anyone" for p in f["permissions"])]
     assert len(anyone) == 1 and ref.can_read(f"drive:{anyone[0]['id']}") == set()
-    assert 70 <= len(world["drive"]["files"]) <= 90
+    assert 75 <= len(world["drive"]["files"]) <= 100
 
 
 def test_page_bodies_and_threads_stay_short(world):

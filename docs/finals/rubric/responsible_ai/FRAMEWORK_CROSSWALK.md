@@ -23,7 +23,7 @@
 | C5 | **Grounding wall + extractive fallback** | `databridge_ib/narrate.py:129-197`; `tests/test_llm_chain.py::test_ungrounded_number_refused_by_grounding_wall` |
 | C6 | **One response shape** (restricted ≡ non-existent) | `databridge_ib/models.py:18-21, 179-185`; P2 0 / 400 (re-run 30 Oct) |
 | C7 | **Masking at ingest** (card, CVV, NRIC/FIN, IBAN) | `databridge_ib/ingest.py:64, 102`; `tests/test_sensitive.py`; `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` |
-| C8 | **No tools for the model**; injection containment | `databridge_ib/llm.py:91-92`; `databridge_ib/narrate.py:31-67`; injection 0 / 976 (re-run 30 Oct) |
+| C8 | **No tools for the model**; injection containment | `databridge_ib/llm.py:91-92`; `databridge_ib/narrate.py:31-67`; injection 0 / 1,152 (re-run 30 Oct) |
 | C9 | **Kill switch** `IB_FORCE_OFFLINE=1` | `databridge_ib/llm.py:78-79`; `tests/test_model_config.py::test_force_offline_wins_over_any_key` |
 | C10 | **Reasoned reveal + role-segregated audit** | `databridge_ib/audit/routes.py:46, 84, 183-222`; `tests/test_audit_routes.py::test_reveal_requires_reason_and_is_ledgered`, `::test_non_compliance_roles_forbidden` |
 | C11 | **Leak and injection eval with canaries** | `databridge/evals/internal_brain/run.py`; `RESULTS.md:143-146`; `tests/test_eval_smoke.py::test_eval_canary_detects_a_leaky_pipeline` |

@@ -17,6 +17,17 @@ const KIND_NOTE: Record<string, string> = {
   'retrieval.decided': 'before any model call',
   'answer.released': 'before the response left',
   'request.failed': 'failed closed',
+  // Act on an answer (POST /ib/act/*): the same request id, sealed in the same chain
+  'action.proposed': 'before the draft or proposal was shown',
+  'action.confirmed': 'confirmed by the person, before anything changed',
+  'action.executed': 'created in the source by our code',
+  'action.failed': 'nothing changed',
+  'action.rejected': 'cancelled; nothing changed',
+  // Deliverables from an answer (POST /ib/deliverables*): counts and digests only, never the text
+  'deliverable.requested': 'before the sources were re-checked or any model was called',
+  'deliverable.created': 'before the table, chart or analysis was shown',
+  'deliverable.exported': 'before the file left',
+  'deliverable.failed': 'nothing was shown',
 };
 
 /**

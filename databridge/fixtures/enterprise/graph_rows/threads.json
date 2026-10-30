@@ -1860,6 +1860,17 @@
    "title": "#general: Devansh is organising the lunch-and-learn, ping them with ideas"
   },
   {
+   "created": "2026-08-29T16:30:00+08:00",
+   "doc_id": "slack:C0GENERAL:1787992200.003231",
+   "id": "C0GENERAL-1787992200.003231",
+   "last_reply": "2026-08-29T17:03:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0GENERAL",
+   "starter": "siti.h",
+   "title": "#general: Town hall on Thursday at 16:00 in Tiong Bahru and online: company upd…"
+  },
+  {
    "created": "2026-09-03T10:40:00+08:00",
    "doc_id": "slack:C0GENERAL:1788403200.002370",
    "id": "C0GENERAL-1788403200.002370",
@@ -1924,6 +1935,17 @@
    "space": "slack-C0GENERAL",
    "starter": "aisha.r",
    "title": "#general: anyone know who to ask about the meeting-free Wednesdays?"
+  },
+  {
+   "created": "2026-09-16T10:00:00+08:00",
+   "doc_id": "slack:C0GENERAL:1789524000.003218",
+   "id": "C0GENERAL-1789524000.003218",
+   "last_reply": "2026-09-16T11:09:00+08:00",
+   "messages": 4,
+   "participants": 4,
+   "space": "slack-C0GENERAL",
+   "starter": "siti.h",
+   "title": "#general: Please welcome Melissa Koh, our new People partner! Melissa looks aft…"
   },
   {
    "created": "2026-09-16T18:39:00+08:00",
@@ -2014,6 +2036,17 @@
    "title": "#general: reminder: the office move is on Wednesday this week"
   },
   {
+   "created": "2026-09-23T17:10:00+08:00",
+   "doc_id": "slack:C0GENERAL:1790154600.003229",
+   "id": "C0GENERAL-1790154600.003229",
+   "last_reply": "2026-09-23T17:30:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0GENERAL",
+   "starter": "melissa.k",
+   "title": "#general: Reminder: the office is closed on Monday 9 November for Deepavali. Ha…"
+  },
+  {
    "created": "2026-09-23T18:44:00+08:00",
    "doc_id": "slack:C0GENERAL:1790160240.001523",
    "id": "C0GENERAL-1790160240.001523",
@@ -2034,6 +2067,17 @@
    "space": "slack-C0GENERAL",
    "starter": "yuki.s",
    "title": "#general: Sara is organising the all-hands, ping them with ideas"
+  },
+  {
+   "created": "2026-09-30T11:45:00+08:00",
+   "doc_id": "slack:C0GENERAL:1790739900.003226",
+   "id": "C0GENERAL-1790739900.003226",
+   "last_reply": "2026-09-30T12:08:00+08:00",
+   "messages": 3,
+   "participants": 3,
+   "space": "slack-C0GENERAL",
+   "starter": "melissa.k",
+   "title": "#general: Deepavali potluck lunch on Friday 6 November at 12:30 in the pantry.…"
   },
   {
    "created": "2026-10-01T17:26:00+08:00",
@@ -2080,6 +2124,17 @@
    "title": "#general: who's coming to the all-hands? need numbers by tomorrow"
   },
   {
+   "created": "2026-10-07T15:00:00+08:00",
+   "doc_id": "slack:C0GENERAL:1791356400.003222",
+   "id": "C0GENERAL-1791356400.003222",
+   "last_reply": "2026-10-07T15:54:00+08:00",
+   "messages": 4,
+   "participants": 3,
+   "space": "slack-C0GENERAL",
+   "starter": "siti.h",
+   "title": "#general: Save the date: The year-end party is on Friday 11 December from 18:30…"
+  },
+  {
    "created": "2026-10-08T16:14:00+08:00",
    "doc_id": "slack:C0GENERAL:1791447240.001700",
    "id": "C0GENERAL-1791447240.001700",
@@ -2100,6 +2155,83 @@
    "space": "slack-C0GENERAL",
    "starter": "hana.y",
    "title": "#general: the handbook page on meeting-free Wednesdays has been updated, please…"
+  },
+  {
+   "created": "2026-08-04T10:20:00+08:00",
+   "doc_id": "slack:C0HRANN:1785810000.003178",
+   "id": "C0HRANN-1785810000.003178",
+   "last_reply": "2026-08-04T10:45:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0HRANN",
+   "starter": "melissa.k",
+   "title": "#hr-announcements: We are hiring for six roles across engineering and product. Refer a f…"
+  },
+  {
+   "created": "2026-08-19T14:10:00+08:00",
+   "doc_id": "slack:C0HRANN:1787119800.003175",
+   "id": "C0HRANN-1787119800.003175",
+   "last_reply": "2026-08-19T14:53:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0HRANN",
+   "starter": "siti.h",
+   "title": "#hr-announcements: Health screening is back: book a free annual health screening at any…"
+  },
+  {
+   "created": "2026-09-03T11:00:00+08:00",
+   "doc_id": "slack:C0HRANN:1788404400.003165",
+   "id": "C0HRANN-1788404400.003165",
+   "last_reply": "2026-09-03T11:11:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0HRANN",
+   "starter": "siti.h",
+   "title": "#hr-announcements: Performance reviews: self-reviews for this half open on 1 December in…"
+  },
+  {
+   "created": "2026-09-10T09:45:00+08:00",
+   "doc_id": "slack:C0HRANN:1789004700.003172",
+   "id": "C0HRANN-1789004700.003172",
+   "last_reply": "2026-09-10T10:10:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0HRANN",
+   "starter": "melissa.k",
+   "title": "#hr-announcements: Annual leave carry-over: up to 5 days roll into the new year. Anythin…"
+  },
+  {
+   "created": "2026-09-17T15:30:00+08:00",
+   "doc_id": "slack:C0HRANN:1789630200.003168",
+   "id": "C0HRANN-1789630200.003168",
+   "last_reply": "2026-09-17T15:51:00+08:00",
+   "messages": 4,
+   "participants": 3,
+   "space": "slack-C0HRANN",
+   "starter": "melissa.k",
+   "title": "#hr-announcements: Use it or lose it: learning budget that is not spent by 31 December d…"
+  },
+  {
+   "created": "2026-09-24T10:05:00+08:00",
+   "doc_id": "slack:C0HRANN:1790215500.003162",
+   "id": "C0HRANN-1790215500.003162",
+   "last_reply": "2026-09-24T10:42:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0HRANN",
+   "starter": "siti.h",
+   "title": "#hr-announcements: Reminder: Payday is the 25th of each month, and when the 25th falls o…"
+  },
+  {
+   "created": "2026-10-01T16:40:00+08:00",
+   "doc_id": "slack:C0HRANN:1790844000.003181",
+   "id": "C0HRANN-1790844000.003181",
+   "last_reply": "2026-10-01T16:49:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0HRANN",
+   "starter": "joel.s",
+   "title": "#hr-announcements: Quick one: my daughter is four. Where do I see the childcare leave I…"
   },
   {
    "created": "2026-06-16T17:24:00+08:00",
@@ -2694,6 +2826,160 @@
    "space": "slack-C0INCID",
    "starter": "yuki.s",
    "title": "#incidents: heads up: deploying the Terraform state to staging in 10 minutes"
+  },
+  {
+   "created": "2026-08-14T16:20:00+08:00",
+   "doc_id": "slack:C0ITHELP:1786695600.003202",
+   "id": "C0ITHELP-1786695600.003202",
+   "last_reply": "2026-08-14T16:38:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "dev.p",
+   "title": "#it-helpdesk: Guest Wi-Fi for a visitor tomorrow?"
+  },
+  {
+   "created": "2026-08-27T14:45:00+08:00",
+   "doc_id": "slack:C0ITHELP:1787813100.003200",
+   "id": "C0ITHELP-1787813100.003200",
+   "last_reply": "2026-08-27T15:03:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "yuki.s",
+   "title": "#it-helpdesk: Can we get a diagramming tool on the software centre?"
+  },
+  {
+   "created": "2026-09-08T10:50:00+08:00",
+   "doc_id": "slack:C0ITHELP:1788835800.003191",
+   "id": "C0ITHELP-1788835800.003191",
+   "last_reply": "2026-09-08T11:02:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "sophie.t",
+   "title": "#it-helpdesk: My laptop is almost four years old and very slow. Can I get a new one?"
+  },
+  {
+   "created": "2026-09-15T09:10:00+08:00",
+   "doc_id": "slack:C0ITHELP:1789434600.003198",
+   "id": "C0ITHELP-1789434600.003198",
+   "last_reply": "2026-09-15T09:16:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "melissa.k",
+   "title": "#it-helpdesk: Hi, I start properly on Monday. Where do I pick up my laptop?"
+  },
+  {
+   "created": "2026-09-22T13:15:00+08:00",
+   "doc_id": "slack:C0ITHELP:1790054100.003188",
+   "id": "C0ITHELP-1790054100.003188",
+   "last_reply": "2026-09-22T14:04:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "hana.y",
+   "title": "#it-helpdesk: I am locked out of my laptop after a few wrong passwords. Help?"
+  },
+  {
+   "created": "2026-09-29T11:30:00+08:00",
+   "doc_id": "slack:C0ITHELP:1790652600.003193",
+   "id": "C0ITHELP-1790652600.003193",
+   "last_reply": "2026-09-29T12:05:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "sara.sec",
+   "title": "#it-helpdesk: Heads-up: this morning's phishing exercise email went to everyone. If…"
+  },
+  {
+   "created": "2026-10-04T15:05:00+08:00",
+   "doc_id": "slack:C0ITHELP:1791097500.003196",
+   "id": "C0ITHELP-1791097500.003196",
+   "last_reply": "2026-10-04T15:08:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0ITHELP",
+   "starter": "marcus.l",
+   "title": "#it-helpdesk: The screen in Katong shows no signal from my laptop."
+  },
+  {
+   "created": "2026-10-06T09:25:00+08:00",
+   "doc_id": "slack:C0ITHELP:1791249900.003183",
+   "id": "C0ITHELP-1791249900.003183",
+   "last_reply": "2026-10-06T11:07:00+08:00",
+   "messages": 5,
+   "participants": 3,
+   "space": "slack-C0ITHELP",
+   "starter": "wei.l",
+   "title": "#it-helpdesk: Is anyone else's VPN dropping all the time? Working from home today."
+  },
+  {
+   "created": "2026-08-24T15:25:00+08:00",
+   "doc_id": "slack:C0OFFICESG:1787556300.003216",
+   "id": "C0OFFICESG-1787556300.003216",
+   "last_reply": "2026-08-24T15:37:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0OFFICESG",
+   "starter": "farah.n",
+   "title": "#office-sg: Found a blue umbrella and a water bottle in Joo Chiat."
+  },
+  {
+   "created": "2026-09-05T11:05:00+08:00",
+   "doc_id": "slack:C0OFFICESG:1788577500.003214",
+   "id": "C0OFFICESG-1788577500.003214",
+   "last_reply": "2026-09-05T11:20:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0OFFICESG",
+   "starter": "leo.ops",
+   "title": "#office-sg: Tiong Bahru is booked all day Thursday but nobody is in it. Can we fr…"
+  },
+  {
+   "created": "2026-09-19T09:40:00+08:00",
+   "doc_id": "slack:C0OFFICESG:1789782000.003212",
+   "id": "C0OFFICESG-1789782000.003212",
+   "last_reply": "2026-09-19T10:00:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0OFFICESG",
+   "starter": "melissa.k",
+   "title": "#office-sg: Lift maintenance: lift 3 is out of service this week. Lifts 1, 2 and…"
+  },
+  {
+   "created": "2026-09-26T12:30:00+08:00",
+   "doc_id": "slack:C0OFFICESG:1790397000.003210",
+   "id": "C0OFFICESG-1790397000.003210",
+   "last_reply": "2026-09-26T12:52:00+08:00",
+   "messages": 2,
+   "participants": 2,
+   "space": "slack-C0OFFICESG",
+   "starter": "melissa.k",
+   "title": "#office-sg: Pantry reminder: the fridge is cleared on Fridays at 17:00. Label any…"
+  },
+  {
+   "created": "2026-10-03T10:15:00+08:00",
+   "doc_id": "slack:C0OFFICESG:1790993700.003207",
+   "id": "C0OFFICESG-1790993700.003207",
+   "last_reply": "2026-10-03T10:28:00+08:00",
+   "messages": 3,
+   "participants": 2,
+   "space": "slack-C0OFFICESG",
+   "starter": "melissa.k",
+   "title": "#office-sg: Fire drill on Wednesday 21 October at 15:00. Leave by the nearest sta…"
+  },
+  {
+   "created": "2026-10-09T16:00:00+08:00",
+   "doc_id": "slack:C0OFFICESG:1791532800.003204",
+   "id": "C0OFFICESG-1791532800.003204",
+   "last_reply": "2026-10-09T16:53:00+08:00",
+   "messages": 3,
+   "participants": 3,
+   "space": "slack-C0OFFICESG",
+   "starter": "melissa.k",
+   "title": "#office-sg: Aircon notice: the building turns off the aircon on level 12 for serv…"
   },
   {
    "created": "2026-06-16T12:45:00+08:00",

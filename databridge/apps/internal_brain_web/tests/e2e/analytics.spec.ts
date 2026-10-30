@@ -151,7 +151,7 @@ test.describe('analytics', () => {
     await expect(page.getByTestId('replay-notice')).toContainText('seeded demo history');
     await expect(page.getByTestId('request-sankey')).toContainText('Answered');
     await expect(page.getByTestId('doc-funnel')).toContainText('Cited in an answer');
-    await expect(page.getByTestId('eval-panel')).toContainText('/ 5,958');
+    await expect(page.getByTestId('eval-panel')).toContainText('/ 7,374');
     for (const id of ['chart-daily', 'chart-sankey', 'chart-doc-funnel', 'chart-reasons', 'chart-latency', 'chart-models', 'chart-channels']) {
       const card = page.getByTestId(id);
       await card.getByTestId('view-as-table').click();

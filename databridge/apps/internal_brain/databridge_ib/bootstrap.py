@@ -134,11 +134,23 @@ def build_app(cfg: Optional[IbConfig] = None, *, sync: bool = True, poll_s: Opti
                                  sink=svc.anchor_sink, llm=audit_filter_parser(svc),
                                  llm_fallback=True)
 
+    reset_hooks: list = []                    # run after /sim/reset (the live tracker's rebaseline)
     app = create_app(svc, audit_router_factory=audit_factory,
-                     sim_router_factory=lambda cur, rr: make_sim_router(svc.cfg, rr,
-                                                                           ingestor=svc.ingestor))
+                     sim_router_factory=lambda cur, rr: make_sim_router(
+                         svc.cfg, rr, ingestor=svc.ingestor, current=cur, ledger=svc.ledger,
+                         on_reset=lambda: [h() for h in reset_hooks]))
     if sync:
         svc.ingestor.sync_all()
+    # live growth (GET /ib/graph/changes), a demo-proof feature (D-24): mounted only when
+    # IB_DEMO_FEATURES=1 and not deployed, so off it answers what an unknown route answers. Built
+    # after the initial sync, so its baseline is the synced index and only later changes are deltas.
+    if svc.cfg.demo_features_on:
+        from .app import principal_dependency
+        from .live import make_live_router
+        live_router = make_live_router(svc, principal_dependency(lambda: app.state.svc))
+        reset_hooks.append(live_router.tracker.rebaseline)
+        app.include_router(live_router)
+    from .uploads import mount_uploads_router; mount_uploads_router(app, svc, reset_hooks)  # POST /sim/upload-file (+ reset hook)
     if poll_s:
         from .freshness.poller import Poller
         Poller(svc.ingestor, poll_s).start()

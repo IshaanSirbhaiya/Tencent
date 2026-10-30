@@ -16,7 +16,16 @@ export interface CanvasHandle {
   fit: (ids?: Iterable<string>) => void;
   zoom: (dir: 1 | -1) => void;
   pan: (dx: number, dy: number) => void;
+  /** Live growth: keep repainting while fresh nodes pulse (or schedule the reduced-motion end). */
+  animate: () => void;
+  /** Freeze the camera's frame before the first live merge, so a new node never rescales the view. */
+  freezeFrame: () => void;
 }
+
+/** Live growth (PLAN §2.2): two size beats in 1.8 s, an accent that decays over 10 s, 30 s static under reduced motion. */
+export const FRESH_MS = 10_000;
+export const FRESH_RM_MS = 30_000;
+const PULSE_MS = 1_800;
 
 export interface CanvasView {
   selected: string | null;
@@ -58,6 +67,8 @@ export const GraphCanvas = forwardRef<CanvasHandle, Props>(function GraphCanvas(
   const motionRef = useRef(reducedMotion);
   const palRef = useRef<Palette | null>(null);
   const egoRef = useRef<Set<string>>(new Set());
+  const animateRef = useRef<() => void>(() => {});
+  const freezeRef = useRef<() => void>(() => {});
   const cbRef = useRef({ onSelect, onContextLost, onReady });
   cbRef.current = { onSelect, onContextLost, onReady };
   motionRef.current = reducedMotion;
@@ -184,6 +195,23 @@ export const GraphCanvas = forwardRef<CanvasHandle, Props>(function GraphCanvas(
             out.zIndex = 0;
           }
         }
+        if (a.fresh && !(v.selected && node !== v.selected && !egoRef.current.has(node))) {
+          // a fresh document: accent that decays, a forced label and (new only) two size beats;
+          // under reduced motion a solid accent and a label for 30 s, with no size change
+          const age = performance.now() - a.fresh.at;
+          const rm = motionRef.current;
+          if (age >= 0 && age < (rm ? FRESH_RM_MS : FRESH_MS)) {
+            if (rm) c = p.accent;
+            else {
+              c = mix(c, p.accent, 0.9 * (1 - age / FRESH_MS));
+              if (a.fresh.kind === 'new' && age < PULSE_MS) out.size = (out.size ?? a.size) * (1 + 0.5 * Math.abs(Math.sin((Math.PI * age) / 900)));
+            }
+            out.label = short;
+            out.forceLabel = true;
+            out.labelColor = css(p.fg);
+            out.zIndex = Math.max(out.zIndex ?? 0, 5);
+          }
+        }
         if (a.born && !motionRef.current) {
           const t = (performance.now() - a.born) / FADE_MS;
           if (t < 1) c = mix(p.bg, c, Math.max(0, t));
@@ -297,6 +325,27 @@ export const GraphCanvas = forwardRef<CanvasHandle, Props>(function GraphCanvas(
       graph.on('nodeAdded', onAdded);
       cleanups.push(() => graph.off('nodeAdded', onAdded));
 
+      // live growth: repaint for the whole pulse and decay; under reduced motion only at the end
+      let rmTimer: ReturnType<typeof setTimeout> | null = null;
+      animateRef.current = () => {
+        if (motionRef.current) {
+          s.refresh();
+          if (rmTimer) clearTimeout(rmTimer);
+          rmTimer = setTimeout(() => s.refresh({ skipIndexation: true }), FRESH_RM_MS + 50);
+          return;
+        }
+        fadeUntil = Math.max(fadeUntil, performance.now() + FRESH_MS + 60);
+        if (!raf) raf = requestAnimationFrame(tick);
+      };
+      freezeRef.current = () => {
+        if (!s.getCustomBBox()) s.setCustomBBox(s.getBBox());
+      };
+      cleanups.push(() => {
+        if (rmTimer) clearTimeout(rmTimer);
+        animateRef.current = () => {};
+        freezeRef.current = () => {};
+      });
+
       // theme / contrast changes repaint with the new tokens
       const mo = new MutationObserver(() => {
         palRef.current = readPalette(el);
@@ -387,6 +436,12 @@ export const GraphCanvas = forwardRef<CanvasHandle, Props>(function GraphCanvas(
         const target = { x: st.x + dx * 0.18 * st.ratio, y: st.y + dy * 0.18 * st.ratio };
         if (motionRef.current) cam.setState(target);
         else void cam.animate(target, { duration: 160 });
+      },
+      animate() {
+        animateRef.current();
+      },
+      freezeFrame() {
+        freezeRef.current();
       },
     }),
     [],

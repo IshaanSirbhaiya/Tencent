@@ -7,6 +7,8 @@
 //   const ask = useAskProgress({ slot: 'b' }); <AskProgressLine step={ask.step} />
 export { AnswerCard, AnswerText, ModelLabel, SourceCard, type AnswerCardProps } from './AnswerCard';
 export { SourcesSheet, type SourcesSheetProps } from './SourcesSheet';
+export { ActRow, ActSheet, type ActMode, type ActSheetProps } from './ActSheet';
+export { DeliverRow, DeliverSheet, deliverablesStatus, type DeliverSheetProps } from './DeliverSheet';
 export { CitationChip } from './CitationChip';
 export { RefusalCard } from './RefusalCard';
 export { AskProgressLine } from './AskProgressLine';

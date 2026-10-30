@@ -10,13 +10,15 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useSession } from '@/components/shell';
 import { useLang } from '@/lib/i18n';
 import { ClipOverlay } from './ClipOverlay';
+import { DeliverOverlay } from './DeliverOverlay';
 import { installPresenterKeys, setArmed, setHost, setStage } from './controller';
 import { PresenterBar } from './PresenterBar';
 import { ResetConfirm } from './ResetConfirm';
 import { applyStage } from './stage';
-import { getPresenter, usePresenter } from './store';
+import { getPresenter, setPresenter, usePresenter } from './store';
 import { WorkBuddyCard } from './WorkBuddyCard';
-import { STEPS } from './script';
+import { setGrowSteps, STEPS } from './script';
+import { useDemoFeatures } from '@/components/sim/demo';
 
 /** Pages the script itself drives; the bar stays there after the last step. */
 const PRESENTER_PAGE = /^\/(present(\/|$)|compare$|dev\/journey(\/|$)|dev\/audit$)/;
@@ -55,6 +57,11 @@ export function PresenterRoot() {
   const { lang, setLang } = useLang();
   const s = usePresenter();
   const owner = useIsOwner();
+  // the live-growth steps exist only while demo features are on (D-24)
+  const demo = useDemoFeatures();
+  useEffect(() => {
+    if (setGrowSteps(demo.on)) setPresenter((p) => ({ step: Math.min(p.step, STEPS.length - 1) }));
+  }, [demo.on]);
   const langRef = useRef(lang);
   langRef.current = lang;
 
@@ -98,6 +105,7 @@ export function PresenterRoot() {
       <>
         <ClipOverlay />
         <ResetConfirm />
+        <DeliverOverlay />
       </>
     );
   return (
@@ -106,6 +114,7 @@ export function PresenterRoot() {
       {!s.hidden ? <PresenterBar /> : null}
       <ClipOverlay />
       <ResetConfirm />
+      <DeliverOverlay />
     </>
   );
 }

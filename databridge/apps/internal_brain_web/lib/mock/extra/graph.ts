@@ -15,6 +15,7 @@ import type { DocView, GraphEdge, GraphNode, KnowledgeGraph, MapItem, Platform }
 import { DOCS, ROLES, SCOPE_NOTE, type DocKey, type MockState } from '../fixtures';
 import { buildMap } from '../map';
 import type { MockHandler } from './types';
+import { handle as analytics } from './analytics';
 
 const FRESHNESS = 'Every document shown was checked with its source just now.';
 const PLATFORM_ORDER: Platform[] = ['confluence', 'jira', 'slack', 'drive'];
@@ -586,7 +587,115 @@ const unavailable = () => json({ error: 'temporarily unavailable' }, 503);
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const EMPLOYEE = ['employee', 'compliance_officer', 'admin_it'];
 
-export const handle: MockHandler = async ({ req, path, method, sub, roles }) => {
+/* ------------------------------------------------------------------ live growth (demo-proof, D-24) */
+// The mock server has demo features ON (it is never a deployment); the viewer's own Settings toggle
+// still decides whether the controls show. A posted note is queued for the poster's next poll of
+// GET /ib/graph/changes, once, like the real feed delivers it once.
+
+interface MockLive {
+  pending: Map<string, { nodes: GraphNode[]; edges: GraphEdge[] }[]>;
+  seq: number;
+  posts: Map<string, number[]>;
+  engine: { state: 'idle' | 'running' | 'done' | 'failed'; started: number | null; finished: number | null; last: number | null };
+}
+const live: MockLive = ((globalThis as Record<string, unknown>).__ibMockLive as MockLive) ?? {
+  pending: new Map(),
+  seq: 0,
+  posts: new Map(),
+  engine: { state: 'idle', started: null, finished: null, last: null },
+};
+(globalThis as Record<string, unknown>).__ibMockLive = live;
+const ENGINE_MS = 6000;
+
+async function liveHandle({ req, path, method, sub, roles }: Parameters<MockHandler>[0]): Promise<NextResponse | null> {
+  if (path === 'ib/status' && method === 'GET') {
+    const r = await analytics({ req, path, method, sub, roles });
+    if (!r) return null;
+    const body = (await r.json()) as Record<string, unknown>;
+    return json({ ...body, demo_features: true });
+  }
+  if (path === 'ib/graph/changes' && method === 'GET') {
+    if (!roles.some((r) => EMPLOYEE.includes(r))) return json({ detail: 'forbidden' }, 403);
+    await wait(80);
+    const q = live.pending.get(sub) ?? [];
+    live.pending.set(sub, []);
+    const nodes = new Map<string, GraphNode>();
+    const edges = new Map<string, GraphEdge>();
+    for (const d of q) {
+      d.nodes.forEach((n) => nodes.set(n.id, n));
+      d.edges.forEach((e) => edges.set(`${e.source}|${e.target}|${e.kind}`, e));
+    }
+    return json({ cursor: `m.${sub.length}.${Date.now()}`, nodes: [...nodes.values()], edges: [...edges.values()] });
+  }
+  if (path === 'sim/add-document' && method === 'POST') {
+    let body: { platform?: unknown; target?: unknown; text?: unknown } = {};
+    try {
+      body = await req.json();
+    } catch {
+      return json({ detail: 'invalid body' }, 422);
+    }
+    const text = typeof body.text === 'string' ? body.text.replace(/<[^>]{0,2000}>/g, '').trim() : '';
+    const target = typeof body.target === 'string' ? body.target : '';
+    if (body.platform !== 'slack' || !text || text.length > 2000 || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(target)) return json({ detail: 'invalid body' }, 422);
+    const now = Date.now();
+    const hits = (live.posts.get(sub) ?? []).filter((t) => now - t < 60_000);
+    if (hits.length >= 5) return json({ detail: 'too many requests' }, 429);
+    const map = buildMap(sub, mockState(), SCOPE_NOTE);
+    const ch = map.platforms.find((p) => p.platform === 'slack')?.containers.find((c) => c.container === target);
+    if (!ch) return notFound(); // not a channel this person can read: the one refusal
+    live.posts.set(sub, [...hits, now]);
+    await wait(240);
+    const ts = `${Math.floor(now / 1000)}.${String(++live.seq).padStart(6, '0')}`;
+    const id = `slack:${target}:${ts}`;
+    const cid = `container:slack:${target}`;
+    const base = { degree_hidden_safe: null, more: null } as const;
+    const delta = {
+      nodes: [
+        { id, kind: 'doc', platform: 'slack', label: text.split('\n')[0].slice(0, 80), container: cid, container_name: ch.name, doc_kind: 'thread', version: '1', updated_at: new Date(now).toISOString(), deep_link: `https://companya.slack.example/archives/${target}/p${ts.replace('.', '')}`, ...base },
+        { id: cid, kind: 'container', platform: 'slack', label: ch.name, container: null, count: null, ...base },
+        { id: 'platform:slack', kind: 'platform', platform: 'slack', label: 'slack', container: null, count: null, ...base },
+        { id: `person:${sub}`, kind: 'person', platform: null, label: STAFF[sub] ?? sub, container: null, count: null, ...base },
+      ] as GraphNode[],
+      edges: [
+        { source: cid, target: id, kind: 'contains' },
+        { source: 'platform:slack', target: cid, kind: 'contains' },
+        { source: `person:${sub}`, target: id, kind: 'authored' },
+      ] as GraphEdge[],
+    };
+    // delivered after a short "webhook" delay, to the poster's own feed only
+    setTimeout(() => live.pending.set(sub, [...(live.pending.get(sub) ?? []), delta]), 700);
+    return json({ ok: true, doc_id: id, platform: 'slack', container: target, at: new Date(now).toISOString() });
+  }
+  if ((path === 'sim/engine-refresh' || path === 'sim/engine-status') && method === 'POST') {
+    if (!(roles.includes('admin_it') || sub === 'jdoe')) return notFound();
+    const e = live.engine;
+    const now = Date.now();
+    if (e.state === 'running' && e.started && now - e.started >= ENGINE_MS) Object.assign(e, { state: 'done', finished: e.started + ENGINE_MS });
+    if (path === 'sim/engine-refresh' && e.state !== 'running') {
+      if (e.last && now - e.last < 120_000) return json({ detail: 'too many requests' }, 429);
+      Object.assign(e, { state: 'running', started: now, finished: null, last: now });
+    }
+    const el = e.started ? now - e.started : 0;
+    const iso = (t: number | null) => (t ? new Date(t).toISOString() : null);
+    return json({
+      state: e.state,
+      step: e.state === 'running' ? (el < ENGINE_MS * 0.7 ? 'building' : el < ENGINE_MS * 0.9 ? 'publishing' : 'reloading') : null,
+      started_at: iso(e.started),
+      finished_at: iso(e.finished),
+      snapshot_at: iso(e.finished ?? now - 3_600_000),
+      reloaded: e.state === 'done' ? true : null,
+    });
+  }
+  return null;
+}
+
+export const handle: MockHandler = async (ctx) => {
+  const lr = await liveHandle(ctx);
+  if (lr) return lr;
+  return graphHandle(ctx);
+};
+
+const graphHandle: MockHandler = async ({ req, path, method, sub, roles }) => {
   const isGraph = path === 'ib/graph' && method === 'GET';
   const isOpenable = path === 'ib/graph/openable' && method === 'POST';
   const isDoc = path.startsWith('ib/doc/') && method === 'GET';

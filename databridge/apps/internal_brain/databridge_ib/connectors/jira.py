@@ -65,6 +65,9 @@ SEC_UNREADABLE = "!unreadable"
 #: Atlassian account ids (24-hex, "<n>:<uuid>") and the synthetic world's "acc-…" form
 _NATIVE_ACCOUNT = re.compile(r"^(?:[0-9a-f]{24}|\d+:[0-9a-f-]{36}|acc-[A-Za-z0-9._-]+)$")
 BROWSE = "BROWSE_PROJECTS"
+CREATE = "CREATE_ISSUES"
+#: creating an issue is one non-retried call; a little longer than a Gate-2 check
+CREATE_TIMEOUT_S = 5.0
 CURSOR_VERSION = 1
 OVERLAP = timedelta(minutes=2)
 _KEY = re.compile(r"^[A-Z][A-Z0-9_]{0,19}-\d{1,9}$")
@@ -481,6 +484,90 @@ class JiraConnector:
         if known_version and known_version != current:
             return verdict("drift_material", "updated_since_indexed", current)
         return verdict("verified", "ok", current)
+
+    # ---------------------------------------------------------------------------------------
+    # Act: "Create issues" (actions.py, AGENTIC_ROADMAP.md §1). No model is involved here; these
+    # are called only by our own code, the create only after the person confirmed.
+    # ---------------------------------------------------------------------------------------
+    def projects(self) -> list[dict[str, str]]:
+        """Every project the service account can list, ``[{id, key, name}]``, read to the end.
+        One attempt per page with the Gate-2 timeout (interactive, never retried at length)."""
+        out: list[dict[str, str]] = []
+        start, guard = 0, PageGuard("jira project/search", gate2=True)
+        while True:
+            guard.next_page(start)
+            resp = request_gate2(self.client, "GET", self._url("project/search"),
+                                 params={"startAt": start, "maxResults": 50})
+            data = json_of(resp, gate2=True)
+            vals = data.get("values") if isinstance(data, dict) else None
+            if not isinstance(vals, list):
+                raise SourceFailure("source_bad_payload", resp.status_code)
+            for p in vals:
+                if isinstance(p, dict) and p.get("key") and p.get("id") is not None:
+                    out.append({"id": str(p["id"]), "key": str(p["key"]),
+                                "name": str(p.get("name") or p["key"])})
+            if data.get("isLast") is not False or not vals:
+                return out
+            start += len(vals)
+
+    def creatable(self, user: DirectoryUser, projects: Sequence[Mapping[str, str]]
+                  ) -> tuple[list[str], str]:
+        """``(project keys the person may CREATE issues in, reason_code)``: a LIVE check at the
+        source, like Gate 2 but for "Create issues" (``POST permissions/check`` with the admin
+        client, ``CREATE_ISSUES`` for the projects). Fail closed: any error, timeout, 429, odd
+        payload, missing identity or missing admin client gives ``[]`` (the reason is ledger-only)."""
+        if not user.active:
+            return [], "deactivated"
+        account = user.platform_ids.get(PLATFORM)
+        if not account:
+            return [], "no_platform_identity"
+        if self.admin_client is None:
+            return [], "no_admin_checker"
+        ids = {str(p["id"]): str(p["key"]) for p in projects if p.get("id") and p.get("key")}
+        if not ids:
+            return [], "no_projects"
+        try:
+            resp = request_gate2(self.admin_client, "POST", self._url("permissions/check"),
+                                 json_body={"accountId": account, "projectPermissions": [
+                                     {"projects": [int(i) if i.isdigit() else i for i in ids],
+                                      "permissions": [CREATE]}]})
+            data = json_of(resp, gate2=True)
+            entries = data.get("projectPermissions") if isinstance(data, dict) else None
+            if not isinstance(entries, list):
+                return [], "source_bad_payload"
+            mine = [e for e in entries if isinstance(e, dict) and e.get("permission") == CREATE]
+            if len(mine) != 1 or not isinstance(mine[0].get("projects"), list):
+                return [], "source_ambiguous"
+            allowed = {str(x) for x in mine[0]["projects"]}
+        except SourceFailure as exc:
+            return [], exc.reason
+        except Exception:                                   # noqa: BLE001 — fail closed, always
+            return [], "source_error"
+        keys = [k for i, k in ids.items() if i in allowed]
+        return keys, ("ok" if keys else "not_permitted")
+
+    def create_issue(self, user: DirectoryUser, project_key: str, summary: str,
+                     description: str) -> dict[str, str]:
+        """Create a Task in ``project_key`` for ``user`` (the reporter is the person's own account)
+        with ``POST issue``. ONE attempt, no retry (creating is not idempotent). Returns
+        ``{key, id, deep_link}``; raises ``SourceFailure`` on any failure."""
+        account = user.platform_ids.get(PLATFORM)
+        if not account:
+            raise SourceFailure("no_platform_identity")
+        paras = [p for p in description.split("\n\n") if p.strip()]
+        body = {"fields": {
+            "project": {"key": project_key}, "summary": summary,
+            "issuetype": {"name": "Task"}, "reporter": {"accountId": account},
+            "labels": ["internal-brain"],
+            "description": {"type": "doc", "version": 1, "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": p}]} for p in paras]}}}
+        resp = request_gate2(self.client, "POST", self._url("issue"), json_body=body,
+                             timeout_s=CREATE_TIMEOUT_S)
+        data = json_of(resp, gate2=True)
+        key = str(data.get("key") or "") if isinstance(data, dict) else ""
+        if not _KEY.match(key) or not key.startswith(project_key + "-"):
+            raise SourceFailure("source_bad_payload", resp.status_code)
+        return {"key": key, "id": str(data.get("id") or ""), "deep_link": self.deep_link(key)}
 
     # ---------------------------------------------------------------------------------------
     # crawl

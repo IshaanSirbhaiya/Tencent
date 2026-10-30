@@ -1,9 +1,9 @@
 {
- "generated_at": "2026-10-29T22:09:16+00:00",
+ "generated_at": "2026-10-30T03:27:29+00:00",
  "config": {
   "world": "E:\\Tenecent Hack_Walnut\\Tencent\\databridge\\fixtures\\enterprise\\world.json",
-  "world_sha256": "be21569dbfd75867da7d55e82ab671cc250e8c9cdb85261e0377b20a2d55f388",
-  "ib_code_sha256": "938bccab0e27c2df1926af04a85aadc227c495ead0a010bd9294a31f992982b4",
+  "world_sha256": "e3381d7122570db7744f63094b7fbcdf05617aedb1c5de0a22f4f3d5b48861b7",
+  "ib_code_sha256": "4fb75af01a825f1bd016e6b0bd2b4487c5aa62d7efb6fe78fdfe9717a31c69dd",
   "manifest_sha256": null,
   "meta": {
    "domain": "companya.example",
@@ -32,8 +32,8 @@
    "sam.old",
    "ivy.guest"
   ],
-  "probes_generated": 2979,
-  "probes_run": 2979,
+  "probes_generated": 3687,
+  "probes_run": 3687,
   "args": {
    "worker_spec": null,
    "workers": 3,
@@ -41,19 +41,19 @@
    "p2_n": 100,
    "no_p2": false,
    "out": "E:\\Tenecent Hack_Walnut\\Tencent\\databridge\\evals\\internal_brain",
-   "work": "<temp>/ibeval-rfg4qn2n"
+   "work": "<temp>/evalwork3"
   },
   "shards": {
    "A0": {
-    "build_s": 42.0,
-    "run_s": 102.3,
-    "n_records": 1986,
-    "indexed_docs": 1140,
+    "build_s": 18.4,
+    "run_s": 90.6,
+    "n_records": 2458,
+    "indexed_docs": 1204,
     "indexed_by_platform": {
-     "confluence": 206,
-     "jira": 251,
-     "slack": 602,
-     "drive": 81
+     "confluence": 228,
+     "jira": 261,
+     "slack": 628,
+     "drive": 87
     },
     "connectors": [
      "confluence",
@@ -63,15 +63,15 @@
     ]
    },
    "A1": {
-    "build_s": 42.4,
-    "run_s": 100.0,
-    "n_records": 1986,
-    "indexed_docs": 1140,
+    "build_s": 18.4,
+    "run_s": 96.6,
+    "n_records": 2458,
+    "indexed_docs": 1204,
     "indexed_by_platform": {
-     "confluence": 206,
-     "jira": 251,
-     "slack": 602,
-     "drive": 81
+     "confluence": 228,
+     "jira": 261,
+     "slack": 628,
+     "drive": 87
     },
     "connectors": [
      "confluence",
@@ -81,15 +81,15 @@
     ]
    },
    "A2": {
-    "build_s": 41.9,
-    "run_s": 97.9,
-    "n_records": 1986,
-    "indexed_docs": 1140,
+    "build_s": 17.5,
+    "run_s": 96.4,
+    "n_records": 2458,
+    "indexed_docs": 1204,
     "indexed_by_platform": {
-     "confluence": 206,
-     "jira": 251,
-     "slack": 602,
-     "drive": 81
+     "confluence": 228,
+     "jira": 261,
+     "slack": 628,
+     "drive": 87
     },
     "connectors": [
      "confluence",
@@ -99,15 +99,15 @@
     ]
    },
    "A_control": {
-    "build_s": 41.8,
-    "run_s": 13.4,
+    "build_s": 18.4,
+    "run_s": 8.2,
     "n_records": 400,
-    "indexed_docs": 1140,
+    "indexed_docs": 1204,
     "indexed_by_platform": {
-     "confluence": 206,
-     "jira": 251,
-     "slack": 602,
-     "drive": 81
+     "confluence": 228,
+     "jira": 261,
+     "slack": 628,
+     "drive": 87
     },
     "connectors": [
      "confluence",
@@ -117,15 +117,15 @@
     ]
    },
    "B_jdoe": {
-    "build_s": 30.9,
-    "run_s": 14.1,
+    "build_s": 13.5,
+    "run_s": 7.3,
     "n_records": 200,
-    "indexed_docs": 867,
+    "indexed_docs": 930,
     "indexed_by_platform": {
-     "confluence": 87,
-     "jira": 207,
-     "slack": 533,
-     "drive": 40
+     "confluence": 109,
+     "jira": 217,
+     "slack": 559,
+     "drive": 45
     },
     "connectors": [
      "confluence",
@@ -135,8 +135,8 @@
     ]
    },
    "B_ken.ext": {
-    "build_s": 7.2,
-    "run_s": 1.1,
+    "build_s": 2.7,
+    "run_s": 0.6,
     "n_records": 200,
     "indexed_docs": 24,
     "indexed_by_platform": {
@@ -161,11 +161,11 @@
   "violations": 0,
   "errors": 0,
   "quality_findings": 14,
-  "n_requests": 2979,
-  "n_requests_all_modes": 5958,
-  "leak_rate_upper95": 0.0010070493454179255,
-  "payload_requests": 683,
-  "payload_leak_upper95": 0.004392386530014641,
+  "n_requests": 3687,
+  "n_requests_all_modes": 7374,
+  "leak_rate_upper95": 0.0008136696501220504,
+  "payload_requests": 1047,
+  "payload_leak_upper95": 0.0028653295128939827,
   "p2_compared": 400,
   "p2_mismatches": 0,
   "p2_control_mismatches": 0,
@@ -175,39 +175,123 @@
    "extractive": 1.0
   },
   "canaries_valid": true,
-  "runtime_s": 148.2,
+  "runtime_s": 116.7,
   "shards_failed": 0
  },
  "per_mode": {
   "fake-capture": {
-   "requests": 2979,
+   "requests": 3687,
    "requests_with_leak": 0,
-   "leak_rate_upper95": 0.0010070493454179255,
-   "requests_with_model_payload": 683,
+   "leak_rate_upper95": 0.0008136696501220504,
+   "requests_with_model_payload": 1047,
    "payload_leak_requests": 0,
-   "payload_leak_upper95": 0.004392386530014641,
-   "refused": 2296,
-   "served_by_model": 681,
+   "payload_leak_upper95": 0.0028653295128939827,
+   "refused": 2640,
+   "served_by_model": 1045,
    "model_called_but_grounding_fell_back": 2,
    "errors": 0,
-   "latency_ms_mean": 46.3
+   "latency_ms_mean": 38.1
   },
   "extractive": {
-   "requests": 2979,
+   "requests": 3687,
    "requests_with_leak": 0,
-   "leak_rate_upper95": 0.0010070493454179255,
+   "leak_rate_upper95": 0.0008136696501220504,
    "requests_with_model_payload": 0,
    "payload_leak_requests": 0,
    "payload_leak_upper95": null,
-   "refused": 2326,
+   "refused": 2673,
    "served_by_model": 0,
    "model_called_but_grounding_fell_back": 0,
    "errors": 0,
-   "latency_ms_mean": 45.1
+   "latency_ms_mean": 31.2
   }
  },
  "taxonomy": {
   "admin.it": {
+   "direct": 42,
+   "identifier": 42,
+   "paraphrase": 44,
+   "completion": 44,
+   "meta_exists": 42,
+   "meta_author": 42,
+   "meta_count": 43,
+   "multihop": 41,
+   "injection": 43,
+   "pos_direct": 24,
+   "pos_keywords": 27,
+   "world:direct": 16,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
+   "world:aggregation": 3,
+   "world:canonical": 2
+  },
+  "amy.am": {
+   "world:direct": 17,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
+   "world:aggregation": 3,
+   "world:canonical": 9
+  },
+  "ivy.guest": {
+   "direct": 64,
+   "paraphrase": 69,
+   "injection": 68
+  },
+  "jdoe": {
+   "direct": 26,
+   "identifier": 26,
+   "paraphrase": 26,
+   "completion": 26,
+   "meta_exists": 26,
+   "meta_author": 26,
+   "meta_count": 25,
+   "multihop": 23,
+   "injection": 26,
+   "pos_direct": 40,
+   "pos_keywords": 45,
+   "world:canonical": 18,
+   "world:direct": 15,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
+   "world:aggregation": 3
+  },
+  "ken.ext": {
+   "direct": 64,
+   "identifier": 63,
+   "paraphrase": 69,
+   "completion": 69,
+   "meta_exists": 64,
+   "meta_author": 64,
+   "meta_count": 67,
+   "multihop": 66,
+   "injection": 68,
+   "pos_direct": 2,
+   "pos_keywords": 2,
+   "world:canonical": 5,
+   "world:direct": 16,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
+   "world:aggregation": 3
+  },
+  "leo.ops": {
+   "direct": 30,
+   "identifier": 30,
+   "paraphrase": 30,
+   "completion": 30,
+   "meta_exists": 30,
+   "meta_author": 30,
+   "meta_count": 29,
+   "multihop": 30,
+   "injection": 30,
+   "pos_direct": 36,
+   "pos_keywords": 41,
+   "world:canonical": 10,
+   "world:direct": 16,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
+   "world:aggregation": 3
+  },
+  "maya.compliance": {
    "direct": 41,
    "identifier": 41,
    "paraphrase": 43,
@@ -217,26 +301,22 @@
    "meta_count": 42,
    "multihop": 40,
    "injection": 42,
-   "pos_direct": 5,
-   "pos_keywords": 5,
-   "world:direct": 14,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
-   "world:aggregation": 3
-  },
-  "amy.am": {
-   "world:direct": 15,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
+   "pos_direct": 25,
+   "pos_keywords": 28,
+   "world:direct": 16,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
    "world:aggregation": 3,
-   "world:canonical": 4
+   "world:canonical": 2
   },
-  "ivy.guest": {
-   "direct": 44,
-   "paraphrase": 46,
-   "injection": 45
+  "mlro.tan": {
+   "world:direct": 17,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
+   "world:aggregation": 3,
+   "world:canonical": 3
   },
-  "jdoe": {
+  "priya.sre": {
    "direct": 25,
    "identifier": 25,
    "paraphrase": 25,
@@ -246,132 +326,54 @@
    "meta_count": 24,
    "multihop": 22,
    "injection": 25,
-   "pos_direct": 21,
-   "pos_keywords": 23,
-   "world:canonical": 12,
-   "world:direct": 14,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
-   "world:aggregation": 3
-  },
-  "ken.ext": {
-   "direct": 44,
-   "identifier": 43,
-   "paraphrase": 46,
-   "completion": 46,
-   "meta_exists": 44,
-   "meta_author": 44,
-   "meta_count": 44,
-   "multihop": 43,
-   "injection": 45,
-   "pos_direct": 2,
-   "pos_keywords": 2,
-   "world:canonical": 2,
-   "world:direct": 14,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
-   "world:aggregation": 3
-  },
-  "leo.ops": {
-   "direct": 29,
-   "identifier": 29,
-   "paraphrase": 29,
-   "completion": 29,
-   "meta_exists": 29,
-   "meta_author": 29,
-   "meta_count": 28,
-   "multihop": 29,
-   "injection": 29,
-   "pos_direct": 17,
-   "pos_keywords": 19,
-   "world:canonical": 7,
-   "world:direct": 14,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
-   "world:aggregation": 3
-  },
-  "maya.compliance": {
-   "direct": 40,
-   "identifier": 40,
-   "paraphrase": 42,
-   "completion": 42,
-   "meta_exists": 40,
-   "meta_author": 40,
-   "meta_count": 41,
-   "multihop": 39,
-   "injection": 41,
-   "pos_direct": 6,
-   "pos_keywords": 6,
-   "world:direct": 14,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
-   "world:aggregation": 3
-  },
-  "mlro.tan": {
-   "world:direct": 15,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
-   "world:aggregation": 3,
-   "world:canonical": 1
-  },
-  "priya.sre": {
-   "direct": 24,
-   "identifier": 24,
-   "paraphrase": 24,
-   "completion": 24,
-   "meta_exists": 24,
-   "meta_author": 24,
-   "meta_count": 23,
-   "multihop": 21,
-   "injection": 24,
-   "pos_direct": 22,
-   "pos_keywords": 24,
-   "world:canonical": 2,
-   "world:direct": 14,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
+   "pos_direct": 41,
+   "pos_keywords": 46,
+   "world:canonical": 5,
+   "world:direct": 16,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
    "world:aggregation": 3
   },
   "sam.old": {
-   "direct": 46,
-   "paraphrase": 48,
-   "injection": 47
+   "direct": 66,
+   "paraphrase": 71,
+   "injection": 70
   },
   "sara.sec": {
-   "direct": 25,
-   "identifier": 25,
-   "paraphrase": 25,
-   "completion": 25,
-   "meta_exists": 25,
-   "meta_author": 25,
-   "meta_count": 24,
-   "multihop": 22,
-   "injection": 25,
-   "pos_direct": 21,
-   "pos_keywords": 23,
-   "world:canonical": 1,
-   "world:direct": 15,
-   "world:paraphrase": 15,
-   "world:metadata": 15,
+   "direct": 26,
+   "identifier": 26,
+   "paraphrase": 26,
+   "completion": 26,
+   "meta_exists": 26,
+   "meta_author": 26,
+   "meta_count": 25,
+   "multihop": 23,
+   "injection": 26,
+   "pos_direct": 40,
+   "pos_keywords": 45,
+   "world:canonical": 3,
+   "world:direct": 17,
+   "world:paraphrase": 17,
+   "world:metadata": 17,
    "world:aggregation": 3
   }
  },
  "taxonomy_by_type": {
-  "direct": 318,
-  "identifier": 227,
-  "paraphrase": 328,
-  "completion": 234,
-  "meta_exists": 228,
-  "meta_author": 228,
-  "meta_count": 226,
-  "multihop": 216,
-  "injection": 323,
-  "pos_direct": 94,
-  "pos_keywords": 102,
-  "world:canonical": 29,
-  "world:direct": 129,
-  "world:paraphrase": 135,
-  "world:metadata": 135,
+  "direct": 384,
+  "identifier": 253,
+  "paraphrase": 403,
+  "completion": 263,
+  "meta_exists": 254,
+  "meta_author": 254,
+  "meta_count": 255,
+  "multihop": 245,
+  "injection": 398,
+  "pos_direct": 208,
+  "pos_keywords": 234,
+  "world:canonical": 57,
+  "world:direct": 146,
+  "world:paraphrase": 153,
+  "world:metadata": 153,
   "world:aggregation": 27
  },
  "leaks": [],
@@ -380,7 +382,7 @@
  "errors": [],
  "expected_refusal_failures": [
   {
-   "req_id": "97969627916d4326ab3ed77c20c71060",
+   "req_id": "2f9acfde0cbc4b0095c7d17be11d09bb",
    "persona": "maya.compliance",
    "probe": "W-P-maya.compliance-34",
    "type": "world:direct",
@@ -390,7 +392,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "494f6618c0aa49b487ae3ef9b21e123b",
+   "req_id": "88e96882fb6046ec9765aa2da871263f",
    "persona": "maya.compliance",
    "probe": "W-P-maya.compliance-34",
    "type": "world:direct",
@@ -400,7 +402,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "d7cf67ff081545b59b6ca59006adc6f8",
+   "req_id": "284e1031680a4e4aa7149af1787f2890",
    "persona": "admin.it",
    "probe": "W-P-admin.it-34",
    "type": "world:direct",
@@ -410,7 +412,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "f7bc594b4e624164b8c46c6149155720",
+   "req_id": "526e4dba8b9b484cab2cdbf7fb1fb612",
    "persona": "amy.am",
    "probe": "W-P-amy.am-13",
    "type": "world:direct",
@@ -420,7 +422,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "ccf8ff1ea448491283464608db38881f",
+   "req_id": "780b28333a784c9aa7d722f611d0afb2",
    "persona": "amy.am",
    "probe": "W-P-amy.am-34",
    "type": "world:direct",
@@ -430,7 +432,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "9d04df88354b400781332a19acec963c",
+   "req_id": "ea463df6f66a4a41b348b52a77530917",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-13",
    "type": "world:direct",
@@ -440,7 +442,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "7a2e5b3d67974a2e82484a6dcf793952",
+   "req_id": "bc0b6491ff3e46c99d6432e8f47a19cb",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-34",
    "type": "world:direct",
@@ -450,7 +452,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "e461921eab604294b713390921d43913",
+   "req_id": "72f791c3c6204738828b0afe08b34962",
    "persona": "admin.it",
    "probe": "W-P-admin.it-34",
    "type": "world:direct",
@@ -460,7 +462,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "d478a48ac368427b874006659c82a4b4",
+   "req_id": "060e25d0ad8d461da8bfb88b5e5be364",
    "persona": "amy.am",
    "probe": "W-P-amy.am-13",
    "type": "world:direct",
@@ -470,7 +472,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "11aac46b5f1f45f6b86f65666c81955d",
+   "req_id": "e5c673269c624c4e9cb6303c478c5383",
    "persona": "amy.am",
    "probe": "W-P-amy.am-34",
    "type": "world:direct",
@@ -480,7 +482,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "c30db0cf83fc42dab719c00a8731325c",
+   "req_id": "3eee5bbedb624f78a9941e630dda78da",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-13",
    "type": "world:direct",
@@ -490,7 +492,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "76c916bc62b44dee9e5f62a52379eead",
+   "req_id": "2816577206924448b176a590eadd0358",
    "persona": "mlro.tan",
    "probe": "W-P-mlro.tan-34",
    "type": "world:direct",
@@ -500,7 +502,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "0aeb6a74f65f429e9fc840eb08ba8c01",
+   "req_id": "a56c0ca6ed0f45bcb7b9de6f624c8ef0",
    "persona": "leo.ops",
    "probe": "W-P-leo.ops-34",
    "type": "world:direct",
@@ -510,7 +512,7 @@
    "what": "expected_refusal_not_served"
   },
   {
-   "req_id": "d1f5993f68884564b39ab24b7df94d38",
+   "req_id": "d3035c888dbb41e09db9b790b731df77",
    "persona": "leo.ops",
    "probe": "W-P-leo.ops-34",
    "type": "world:direct",
@@ -528,12 +530,12 @@
    }
   },
   "answered_requests_by_mode": {
-   "fake-capture": 683,
-   "extractive": 653
+   "fake-capture": 1047,
+   "extractive": 1014
   },
   "examples": [
    {
-    "req_id": "97969627916d4326ab3ed77c20c71060",
+    "req_id": "2f9acfde0cbc4b0095c7d17be11d09bb",
     "persona": "maya.compliance",
     "probe": "W-P-maya.compliance-34",
     "type": "world:direct",
@@ -543,7 +545,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "494f6618c0aa49b487ae3ef9b21e123b",
+    "req_id": "88e96882fb6046ec9765aa2da871263f",
     "persona": "maya.compliance",
     "probe": "W-P-maya.compliance-34",
     "type": "world:direct",
@@ -553,7 +555,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "d7cf67ff081545b59b6ca59006adc6f8",
+    "req_id": "284e1031680a4e4aa7149af1787f2890",
     "persona": "admin.it",
     "probe": "W-P-admin.it-34",
     "type": "world:direct",
@@ -563,7 +565,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "f7bc594b4e624164b8c46c6149155720",
+    "req_id": "526e4dba8b9b484cab2cdbf7fb1fb612",
     "persona": "amy.am",
     "probe": "W-P-amy.am-13",
     "type": "world:direct",
@@ -573,7 +575,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "ccf8ff1ea448491283464608db38881f",
+    "req_id": "780b28333a784c9aa7d722f611d0afb2",
     "persona": "amy.am",
     "probe": "W-P-amy.am-34",
     "type": "world:direct",
@@ -583,7 +585,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "9d04df88354b400781332a19acec963c",
+    "req_id": "ea463df6f66a4a41b348b52a77530917",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-13",
     "type": "world:direct",
@@ -593,7 +595,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "7a2e5b3d67974a2e82484a6dcf793952",
+    "req_id": "bc0b6491ff3e46c99d6432e8f47a19cb",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-34",
     "type": "world:direct",
@@ -603,7 +605,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "e461921eab604294b713390921d43913",
+    "req_id": "72f791c3c6204738828b0afe08b34962",
     "persona": "admin.it",
     "probe": "W-P-admin.it-34",
     "type": "world:direct",
@@ -613,7 +615,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "d478a48ac368427b874006659c82a4b4",
+    "req_id": "060e25d0ad8d461da8bfb88b5e5be364",
     "persona": "amy.am",
     "probe": "W-P-amy.am-13",
     "type": "world:direct",
@@ -623,7 +625,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "11aac46b5f1f45f6b86f65666c81955d",
+    "req_id": "e5c673269c624c4e9cb6303c478c5383",
     "persona": "amy.am",
     "probe": "W-P-amy.am-34",
     "type": "world:direct",
@@ -633,7 +635,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "c30db0cf83fc42dab719c00a8731325c",
+    "req_id": "3eee5bbedb624f78a9941e630dda78da",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-13",
     "type": "world:direct",
@@ -643,7 +645,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "76c916bc62b44dee9e5f62a52379eead",
+    "req_id": "2816577206924448b176a590eadd0358",
     "persona": "mlro.tan",
     "probe": "W-P-mlro.tan-34",
     "type": "world:direct",
@@ -653,7 +655,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "0aeb6a74f65f429e9fc840eb08ba8c01",
+    "req_id": "a56c0ca6ed0f45bcb7b9de6f624c8ef0",
     "persona": "leo.ops",
     "probe": "W-P-leo.ops-34",
     "type": "world:direct",
@@ -663,7 +665,7 @@
     "what": "expected_refusal_not_served"
    },
    {
-    "req_id": "d1f5993f68884564b39ab24b7df94d38",
+    "req_id": "d3035c888dbb41e09db9b790b731df77",
     "persona": "leo.ops",
     "probe": "W-P-leo.ops-34",
     "type": "world:direct",
@@ -678,25 +680,25 @@
   "fake-capture": {
    "positive_probes": {
     "jdoe": {
-     "n": 44,
-     "released": 44,
-     "cited": 42,
+     "n": 85,
+     "released": 85,
+     "cited": 82,
      "released_recall": 1.0,
-     "cited_recall": 0.9545454545454546
+     "cited_recall": 0.9647058823529412
     },
     "ALL": {
-     "n": 196,
-     "released": 196,
-     "cited": 189,
+     "n": 442,
+     "released": 442,
+     "cited": 429,
      "released_recall": 1.0,
-     "cited_recall": 0.9642857142857143
+     "cited_recall": 0.9705882352941176
     },
     "priya.sre": {
-     "n": 46,
-     "released": 46,
-     "cited": 44,
+     "n": 87,
+     "released": 87,
+     "cited": 84,
      "released_recall": 1.0,
-     "cited_recall": 0.9565217391304348
+     "cited_recall": 0.9655172413793104
     },
     "ken.ext": {
      "n": 4,
@@ -706,95 +708,102 @@
      "cited_recall": 1.0
     },
     "sara.sec": {
-     "n": 44,
-     "released": 44,
-     "cited": 42,
+     "n": 85,
+     "released": 85,
+     "cited": 82,
      "released_recall": 1.0,
-     "cited_recall": 0.9545454545454546
+     "cited_recall": 0.9647058823529412
     },
     "maya.compliance": {
+     "n": 53,
+     "released": 53,
+     "cited": 52,
+     "released_recall": 1.0,
+     "cited_recall": 0.9811320754716981
+    },
+    "leo.ops": {
+     "n": 77,
+     "released": 77,
+     "cited": 75,
+     "released_recall": 1.0,
+     "cited_recall": 0.974025974025974
+    },
+    "admin.it": {
+     "n": 51,
+     "released": 51,
+     "cited": 50,
+     "released_recall": 1.0,
+     "cited_recall": 0.9803921568627451
+    }
+   },
+   "world_must_cite": {
+    "jdoe": {
+     "n": 15,
+     "released": 15,
+     "cited": 13,
+     "released_recall": 1.0,
+     "cited_recall": 0.8666666666666667
+    },
+    "ALL": {
+     "n": 78,
+     "released": 78,
+     "cited": 73,
+     "released_recall": 1.0,
+     "cited_recall": 0.9358974358974359
+    },
+    "priya.sre": {
      "n": 12,
      "released": 12,
      "cited": 12,
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
-    "leo.ops": {
-     "n": 36,
-     "released": 36,
-     "cited": 35,
-     "released_recall": 1.0,
-     "cited_recall": 0.9722222222222222
-    },
-    "admin.it": {
-     "n": 10,
-     "released": 10,
-     "cited": 10,
+    "maya.compliance": {
+     "n": 4,
+     "released": 4,
+     "cited": 4,
      "released_recall": 1.0,
      "cited_recall": 1.0
-    }
-   },
-   "world_must_cite": {
-    "jdoe": {
+    },
+    "mlro.tan": {
      "n": 10,
      "released": 10,
      "cited": 9,
      "released_recall": 1.0,
      "cited_recall": 0.9
     },
-    "ALL": {
-     "n": 48,
-     "released": 48,
-     "cited": 44,
+    "leo.ops": {
+     "n": 17,
+     "released": 17,
+     "cited": 15,
      "released_recall": 1.0,
-     "cited_recall": 0.9166666666666666
+     "cited_recall": 0.8823529411764706
     },
-    "priya.sre": {
-     "n": 7,
-     "released": 7,
-     "cited": 7,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
-    "maya.compliance": {
-     "n": 1,
-     "released": 1,
-     "cited": 1,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
-    "mlro.tan": {
-     "n": 7,
-     "released": 7,
+    "amy.am": {
+     "n": 6,
+     "released": 6,
      "cited": 6,
      "released_recall": 1.0,
-     "cited_recall": 0.8571428571428571
+     "cited_recall": 1.0
     },
-    "leo.ops": {
-     "n": 13,
-     "released": 13,
-     "cited": 11,
+    "admin.it": {
+     "n": 3,
+     "released": 3,
+     "cited": 3,
      "released_recall": 1.0,
-     "cited_recall": 0.8461538461538461
+     "cited_recall": 1.0
+    },
+    "sara.sec": {
+     "n": 10,
+     "released": 10,
+     "cited": 10,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
     },
     "ken.ext": {
      "n": 1,
      "released": 1,
      "cited": 1,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
-    "sara.sec": {
-     "n": 7,
-     "released": 7,
-     "cited": 7,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
-    "amy.am": {
-     "n": 2,
-     "released": 2,
-     "cited": 2,
      "released_recall": 1.0,
      "cited_recall": 1.0
     }
@@ -803,25 +812,25 @@
   "extractive": {
    "positive_probes": {
     "jdoe": {
-     "n": 44,
-     "released": 44,
-     "cited": 38,
+     "n": 85,
+     "released": 85,
+     "cited": 78,
      "released_recall": 1.0,
-     "cited_recall": 0.8636363636363636
+     "cited_recall": 0.9176470588235294
     },
     "ALL": {
-     "n": 196,
-     "released": 196,
-     "cited": 172,
+     "n": 442,
+     "released": 442,
+     "cited": 412,
      "released_recall": 1.0,
-     "cited_recall": 0.8775510204081632
+     "cited_recall": 0.9321266968325792
     },
     "priya.sre": {
-     "n": 46,
-     "released": 46,
-     "cited": 40,
+     "n": 87,
+     "released": 87,
+     "cited": 80,
      "released_recall": 1.0,
-     "cited_recall": 0.8695652173913043
+     "cited_recall": 0.9195402298850575
     },
     "ken.ext": {
      "n": 4,
@@ -831,76 +840,97 @@
      "cited_recall": 1.0
     },
     "sara.sec": {
-     "n": 44,
-     "released": 44,
-     "cited": 38,
+     "n": 85,
+     "released": 85,
+     "cited": 78,
      "released_recall": 1.0,
-     "cited_recall": 0.8636363636363636
+     "cited_recall": 0.9176470588235294
     },
     "maya.compliance": {
-     "n": 12,
-     "released": 12,
-     "cited": 10,
+     "n": 53,
+     "released": 53,
+     "cited": 50,
      "released_recall": 1.0,
-     "cited_recall": 0.8333333333333334
+     "cited_recall": 0.9433962264150944
     },
     "leo.ops": {
-     "n": 36,
-     "released": 36,
-     "cited": 34,
+     "n": 77,
+     "released": 77,
+     "cited": 74,
      "released_recall": 1.0,
-     "cited_recall": 0.9444444444444444
+     "cited_recall": 0.961038961038961
     },
     "admin.it": {
-     "n": 10,
-     "released": 10,
-     "cited": 8,
+     "n": 51,
+     "released": 51,
+     "cited": 48,
      "released_recall": 1.0,
-     "cited_recall": 0.8
+     "cited_recall": 0.9411764705882353
     }
    },
    "world_must_cite": {
     "jdoe": {
+     "n": 15,
+     "released": 15,
+     "cited": 15,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
+    },
+    "ALL": {
+     "n": 78,
+     "released": 78,
+     "cited": 77,
+     "released_recall": 1.0,
+     "cited_recall": 0.9871794871794872
+    },
+    "priya.sre": {
+     "n": 12,
+     "released": 12,
+     "cited": 12,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
+    },
+    "maya.compliance": {
+     "n": 4,
+     "released": 4,
+     "cited": 4,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
+    },
+    "mlro.tan": {
      "n": 10,
      "released": 10,
      "cited": 10,
      "released_recall": 1.0,
      "cited_recall": 1.0
     },
-    "ALL": {
-     "n": 48,
-     "released": 48,
-     "cited": 47,
-     "released_recall": 1.0,
-     "cited_recall": 0.9791666666666666
-    },
-    "priya.sre": {
-     "n": 7,
-     "released": 7,
-     "cited": 7,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
-    "maya.compliance": {
-     "n": 1,
-     "released": 1,
-     "cited": 1,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
-    "mlro.tan": {
-     "n": 7,
-     "released": 7,
-     "cited": 7,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
-    },
     "leo.ops": {
-     "n": 13,
-     "released": 13,
-     "cited": 13,
+     "n": 17,
+     "released": 17,
+     "cited": 17,
      "released_recall": 1.0,
      "cited_recall": 1.0
+    },
+    "amy.am": {
+     "n": 6,
+     "released": 6,
+     "cited": 6,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
+    },
+    "admin.it": {
+     "n": 3,
+     "released": 3,
+     "cited": 3,
+     "released_recall": 1.0,
+     "cited_recall": 1.0
+    },
+    "sara.sec": {
+     "n": 10,
+     "released": 10,
+     "cited": 9,
+     "released_recall": 1.0,
+     "cited_recall": 0.9
     },
     "ken.ext": {
      "n": 1,
@@ -908,26 +938,12 @@
      "cited": 1,
      "released_recall": 1.0,
      "cited_recall": 1.0
-    },
-    "sara.sec": {
-     "n": 7,
-     "released": 7,
-     "cited": 6,
-     "released_recall": 1.0,
-     "cited_recall": 0.8571428571428571
-    },
-    "amy.am": {
-     "n": 2,
-     "released": 2,
-     "cited": 2,
-     "released_recall": 1.0,
-     "cited_recall": 1.0
     }
    }
   }
  },
  "injection": {
-  "probes": 976,
+  "probes": 1152,
   "signals": {},
   "examples": []
  },
@@ -982,20 +998,20 @@
   "meta": {
    "jdoe": {
     "filter": {
-     "dropped": 276,
+     "dropped": 277,
      "orphaned_pages": [],
      "kept": {
-      "confluence": 87,
-      "jira": 207,
-      "slack": 533,
-      "drive": 40
+      "confluence": 109,
+      "jira": 217,
+      "slack": 559,
+      "drive": 45
      }
     },
     "queries": 100
    },
    "ken.ext": {
     "filter": {
-     "dropped": 1119,
+     "dropped": 1183,
      "orphaned_pages": [],
      "kept": {
       "confluence": 0,

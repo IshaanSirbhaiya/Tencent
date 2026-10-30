@@ -51,7 +51,7 @@ def provider_label() -> str:
 
 
 def _config_for(model: str) -> dict:
-    return {"routing": {TASK: "ib_model", "embed": "ib_embed"},
+    return {"routing": {TASK: "ib_model", "ib_deliver": "ib_model", "embed": "ib_embed"},
             "aliases": {"ib_model": {"model": f"openai/{model}"},
                         "ib_embed": {"model": "openai/kinfra-text-embedding-0.6b"}},
             "profiles": {"cloud": {}, "airgapped": {}}}
@@ -87,8 +87,20 @@ class ModelChain:
 
     def answer(self, context: str, question: str) -> tuple[Optional[str], Optional[ModelInfo], list[str]]:
         """``(grounded_text | None, model_info | None, notes)``. None ⇒ caller serves extractive."""
+        return self._grounded(IB_SYSTEM_PROMPT, context, question)
+
+    def draft(self, system_prompt: str, context: str, instruction: str
+              ) -> tuple[Optional[str], Optional[ModelInfo], list[str]]:
+        """A draft (``actions.py``) under the SAME grounding wall as an answer: the context is the
+        asker's own released, cited passages; no tools are passed; a sentence that binds to no
+        passage is dropped and an unsupported value or name refuses the draft. None ⇒ the caller
+        builds the deterministic draft."""
+        return self._grounded(system_prompt, context, instruction)
+
+    def _grounded(self, system_prompt: str, context: str, question: str
+                  ) -> tuple[Optional[str], Optional[ModelInfo], list[str]]:
         notes: list[str] = []
-        messages = [{"role": "system", "content": IB_SYSTEM_PROMPT},
+        messages = [{"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message(context, question)}]
         for i, model in enumerate(self.models):
             try:

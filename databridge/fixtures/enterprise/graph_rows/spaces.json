@@ -3,10 +3,30 @@
   {
    "container": "Confluence space",
    "created": null,
+   "id": "confluence-finops",
+   "key": "finops",
+   "label": "Finance Ops (Confluence space)",
+   "name": "Finance Ops",
+   "platform": "Confluence",
+   "visibility": "restricted"
+  },
+  {
+   "container": "Confluence space",
+   "created": null,
    "id": "confluence-payment-gateway",
    "key": "payment-gateway",
    "label": "Payment Gateway (Confluence space)",
    "name": "Payment Gateway",
+   "platform": "Confluence",
+   "visibility": "restricted"
+  },
+  {
+   "container": "Confluence space",
+   "created": null,
+   "id": "confluence-people",
+   "key": "people",
+   "label": "People & Workplace (Confluence space)",
+   "name": "People & Workplace",
    "platform": "Confluence",
    "visibility": "restricted"
   },
@@ -63,6 +83,16 @@
   {
    "container": "Jira project",
    "created": null,
+   "id": "jira-ITHELP",
+   "key": "ITHELP",
+   "label": "IT Helpdesk (Jira ITHELP)",
+   "name": "IT Helpdesk",
+   "platform": "Jira",
+   "visibility": "project roles"
+  },
+  {
+   "container": "Jira project",
+   "created": null,
    "id": "jira-PAY",
    "key": "PAY",
    "label": "Payments (Jira PAY)",
@@ -112,11 +142,41 @@
   },
   {
    "container": "Slack channel",
+   "created": "2024-11-12T09:00:00+08:00",
+   "id": "slack-C0HRANN",
+   "key": "C0HRANN",
+   "label": "#hr-announcements",
+   "name": "#hr-announcements",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
    "created": "2025-01-01T09:00:00+08:00",
    "id": "slack-C0INCID",
    "key": "C0INCID",
    "label": "#incidents",
    "name": "#incidents",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2025-01-01T09:00:00+08:00",
+   "id": "slack-C0ITHELP",
+   "key": "C0ITHELP",
+   "label": "#it-helpdesk",
+   "name": "#it-helpdesk",
+   "platform": "Slack",
+   "visibility": "public"
+  },
+  {
+   "container": "Slack channel",
+   "created": "2025-06-20T09:00:00+08:00",
+   "id": "slack-C0OFFICESG",
+   "key": "C0OFFICESG",
+   "label": "#office-sg",
+   "name": "#office-sg",
    "platform": "Slack",
    "visibility": "public"
   },

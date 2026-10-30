@@ -11,6 +11,8 @@ import { useLang, useMessages } from '@/lib/i18n';
 import { userMessages } from '@/lib/i18n/user';
 import type { AskResponse, Citation } from '@/lib/types';
 import { MODEL_KEY, TAG_RE, checkedAgoKey, followUpQuestion, followUps, isRefusal, modelKind, plainAnswer, secondsSince, speakerParts, versionText } from './answerText';
+import { ActRow } from './ActSheet';
+import { DeliverRow } from './DeliverSheet';
 import { CitationChip } from './CitationChip';
 import { getFeedback, setFeedback, type FeedbackKind } from './local';
 import { RefusalCard } from './RefusalCard';
@@ -291,6 +293,8 @@ export const AnswerCard = forwardRef<HTMLHeadingElement, AnswerCardProps>(functi
 
       <div className={cn('flex flex-col gap-3', compact ? 'mt-3' : 'mt-4')}>
         <ActionsRow response={response} compact={compact} showJourney={showJourney} />
+        {!compact && !refused ? <ActRow response={response} /> : null}
+        {!compact && !refused ? <DeliverRow response={response} onCite={onCite} /> : null}
         {fus.length ? (
           <div>
             <h3 className="sr-only">{t('answer.followups')}</h3>

@@ -62,11 +62,11 @@ s.26 (transfer limitation).
 | Measure | Evidence |
 |---|---|
 | At most 14 passages, 2 per document, per question | `databridge_ib/pipeline.py:34-35, 147` |
-| No model call on refusal (2,296 of 2,979 fake-model requests, re-run 30 Oct) | `databridge_ib/pipeline.py:163`; `RESULTS.md:49` |
+| No model call on refusal (2,640 of 3,687 fake-model requests, re-run 30 Oct) | `databridge_ib/pipeline.py:163`; `RESULTS.md:49` |
 | Masking of card, CVV, NRIC/FIN and IBAN before the index | `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` (line 206); `tests/test_sensitive.py` |
 | Ids and hashes, not text, in the ledger | `tests/test_audit_ledger.py::test_answer_text_never_in_ledger` |
 | Local embeddings | `databridge_ib/index.py:159-168` |
-| Restricted content never reaches the model | `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt` (line 144); 0 leaks / 5,958 (re-run 30 Oct) |
+| Restricted content never reaches the model | `tests/test_pipeline_core.py::test_p1_restricted_never_in_any_prompt` (line 144); 0 leaks / 7,374 (re-run 30 Oct) |
 | Session token never visible to browser JavaScript | `docs/tencent/SECURITY.md:55` |
 
 **Not covered:** other personal data inside permitted passages (names, phone numbers, addresses) is sent

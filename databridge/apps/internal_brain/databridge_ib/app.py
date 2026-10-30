@@ -15,7 +15,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Literal, Mapping, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -28,6 +28,7 @@ from .connectors.base import SourceConnector, WebhookRejected
 from .directory import Directory
 from .index import Index
 from .ingest import Ingestor
+from . import actions as actmod
 from . import authz, docview, graph
 from .knowledge_map import build_map
 from .llm import ModelChain
@@ -59,6 +60,30 @@ class OpenableBody(BaseModel):
     doc_ids: list[str] = Field(max_length=graph.MAX_OPENABLE)
 
 
+# -- Act (actions.py): no identity field in any body; the person is the token's subject ----------
+class ActDraftBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    req_id: str = Field(min_length=1, max_length=200)
+    kind: Literal["reply", "message"] = "reply"
+
+
+class ActProposeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    req_id: str = Field(min_length=1, max_length=200)
+
+
+class ActConfirmBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    proposal_id: str = Field(min_length=1, max_length=200)
+    summary: Optional[str] = Field(None, max_length=actmod.SUMMARY_MAX * 2)
+    project: Optional[str] = Field(None, min_length=1, max_length=40)
+
+
+class ActCancelBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    proposal_id: str = Field(min_length=1, max_length=200)
+
+
 @dataclass
 class Services:
     cfg: IbConfig
@@ -70,6 +95,7 @@ class Services:
     pipeline: Pipeline
     ingestor: Ingestor
     projection: Any = None
+    actions: Any = None                     # actions.ActionService (built by create_app if None)
 
 
 def principal_dependency(svc_getter: Callable[[], Services]):
@@ -194,7 +220,11 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
                            "fallback": {"provider": "deterministic", "model": "extractive-v1"}},
                 "key_configured": configured,
                 "force_offline": os.environ.get("IB_FORCE_OFFLINE") == "1",
-                "ledger": {"ok": _ledger_ok()}}
+                "ledger": {"ok": _ledger_ok()},
+                # the demo-proof features are mounted (IB_DEMO_FEATURES=1, not deployed; D-24)
+                "demo_features": bool(getattr(svc.cfg, "demo_features_on", False)),
+                # deliverables from an answer (IB_DELIVERABLES=1; D-25): which kinds are offered
+                "deliverables": app.state.deliverables.status()}
 
     # -- auth --------------------------------------------------------------------------------
     @app.post("/auth/demo-login")
@@ -422,6 +452,66 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
             return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
         return body
 
+    # -- act on an answer (actions.py; AGENTIC_ROADMAP.md §1) ----------------------------------
+    if svc.actions is None:
+        svc.actions = actmod.ActionService(
+            index=svc.index, directory=svc.directory, connectors=svc.connectors,
+            ledger=svc.ledger, answers=svc.answers, projection=svc.projection,
+            chain=getattr(svc.pipeline, "chain", None), sync=_trace_sync)
+
+    def _act(fn: Callable[[], Any], what: str):
+        """One error mapping for every action route: 404 (one body for every not-found case),
+        409 (one polite message for every reason a ticket cannot be made), 422, else 503."""
+        try:
+            return fn()
+        except actmod.NotFound:
+            raise HTTPException(404, NOT_FOUND) from None
+        except actmod.Unavailable:
+            return JSONResponse(status_code=409, content={
+                "error": "unavailable", "message": actmod.TICKET_UNAVAILABLE})
+        except ValueError:
+            raise HTTPException(422, "invalid") from None
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("%s failed: %s", what, type(exc).__name__)    # incl. ledger down: no action
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+
+    @app.post("/ib/act/draft")
+    def act_draft(body: ActDraftBody, user: DirectoryUser = Depends(current)):
+        """A reply (or message) DRAFT built only from the cited sentences of one of MY released
+        answers whose documents I can still open; never sent. ``action.proposed`` first."""
+        _employee(user)
+        return _act(lambda: svc.actions.draft(user, body.req_id, body.kind), "act draft")
+
+    @app.post("/ib/act/ticket/propose")
+    def act_ticket_propose(body: ActProposeBody, user: DirectoryUser = Depends(current)):
+        """Propose a follow-up Jira issue in a project I may create issues in (checked live at
+        the source). Nothing is created; ``action.proposed`` first."""
+        _employee(user)
+        return _act(lambda: svc.actions.propose_ticket(user, body.req_id), "act propose")
+
+    @app.post("/ib/act/ticket/confirm")
+    def act_ticket_confirm(body: ActConfirmBody, user: DirectoryUser = Depends(current)):
+        """Create MY confirmed proposal: ``action.confirmed``, a live create-permission re-check,
+        one create call by our code, then ``action.executed`` (or ``action.failed``)."""
+        _employee(user)
+        return _act(lambda: svc.actions.confirm_ticket(user, body.proposal_id,
+                                                       summary=body.summary,
+                                                       project=body.project), "act confirm")
+
+    @app.post("/ib/act/ticket/cancel")
+    def act_ticket_cancel(body: ActCancelBody, user: DirectoryUser = Depends(current)):
+        _employee(user)
+        return _act(lambda: svc.actions.cancel_ticket(user, body.proposal_id), "act cancel")
+
+    # -- deliverables from an answer (deliverables/; built on the Act context above) ------------
+    from .deliverables import routes as deliv_routes, service as deliv_service
+    app.state.deliverables = deliv_service.DeliverableService(
+        actions=svc.actions, ledger=svc.ledger, projection=svc.projection, index=svc.index,
+        connectors=svc.connectors, directory=svc.directory,
+        chain=getattr(svc.pipeline, "chain", None),
+        enabled=bool(getattr(svc.cfg, "deliverables", False)), sync=_trace_sync)
+    deliv_routes.mount(app, app.state.deliverables, current, _employee)
+
     # -- developer views: graph and document (authz.py rules; ledgered before returning) -------
     @app.get("/ib/graph")
     def knowledge_graph(focus: Optional[str] = Query(None, max_length=300),
@@ -513,5 +603,18 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
     return app
 
 
+def iter_routes(app: FastAPI):
+    """Every route, including those of included routers: FastAPI 0.143 keeps an included router as
+    one lazy ``_IncludedRouter`` entry in ``app.routes`` (no ``path``), so a check over
+    ``app.routes`` alone would never see ``/sim/*`` or ``/audit/*``."""
+    def walk(routes):
+        for r in routes:
+            if callable(getattr(r, "effective_candidates", None)):
+                yield from walk(r.effective_candidates())
+            else:
+                yield r
+    yield from walk(app.routes)
+
+
 def mounted_paths(app: FastAPI) -> list[str]:
-    return sorted({getattr(r, "path", "") for r in app.routes})
+    return sorted({getattr(r, "path", "") for r in iter_routes(app)})

@@ -31,12 +31,12 @@ measurement.
 
 | Item | Value | Type | Source |
 |---|---|---|---|
-| Fake-model requests refused with **no model call** | 2,296 of 2,979 (77%) | Measured 30 Oct (`eval_summary.json`) | `RESULTS.md:49` |
-| Requests where the model received passages | 683 of 2,979 (23%) | Measured 30 Oct (`eval_summary.json`) | `RESULTS.md:12, 49` |
-| Model answers replaced after grounding | 2 of 683 | Measured, **fake model** (14 Oct run; not re-measured) | `RESULTS.md:49` |
+| Fake-model requests refused with **no model call** | 2,640 of 3,687 (72%) | Measured 30 Oct (`eval_summary.json`) | `RESULTS.md:49` |
+| Requests where the model received passages | 1,047 of 3,687 (28%) | Measured 30 Oct (`eval_summary.json`) | `RESULTS.md:12, 49` |
+| Model answers replaced after grounding | 2 of 1,047 | Measured, **fake model** (30 Oct run) | `RESULTS.md:49` |
 
 **Caveat.** The eval is adversarial: most probes ask for things the persona may not see, so it refuses
-far more often than real users would. Do not use 77% as a forecast of real traffic.
+far more often than real users would. Do not use 72% as a forecast of real traffic.
 
 ## 3. Model cost per answered question (estimate)
 

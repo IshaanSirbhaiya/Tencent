@@ -48,13 +48,13 @@ regulated firms hesitate to switch AI on.
 
 | Measure | Result | Evidence |
 |---|---|---|
-| Leaks in adversarial requests | **0 / 5,958** (2,979 probes × 2 answer paths) | `databridge/evals/internal_brain/RESULTS.md` |
+| Leaks in adversarial requests | **0 / 7,374** (3,687 probes × 2 answer paths) | `databridge/evals/internal_brain/RESULTS.md` |
 | "Restricted" vs "does not exist" differences | **0 / 400** | same file |
-| Prompt-injection failures | **0** in 976 injection-relevant requests | same file |
+| Prompt-injection failures | **0** in 1,152 injection-relevant requests | same file |
 | Tamper attacks caught | **6 / 6** | `submission/04_evidence/tamper_demo_output.txt` |
 | Automated tests | **754** backend tests passing (30 Oct, commit 7bf3246); 639 at submission (16 Oct); browser tests: 124 passed, 0 failed (30 Oct) | `databridge/apps/internal_brain/tests/`, `databridge/apps/internal_brain_web/tests/e2e/` |
 
-How to read "0 / 5,958": see [EVIDENCE_NOTES.md](EVIDENCE_NOTES.md) §1.
+How to read "0 / 7,374": see [EVIDENCE_NOTES.md](EVIDENCE_NOTES.md) §1.
 
 ## 6. Value (projection, not a measurement)
 

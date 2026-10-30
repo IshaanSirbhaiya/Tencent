@@ -19,6 +19,9 @@ if [ -f .env.ib.local ]; then
   set +a
 fi
 export IB_FORCE_OFFLINE="${IB_FORCE_OFFLINE:-1}" IB_DEMO_LOGIN=1 IB_POLL_S="${IB_POLL_S:-120}" IB_VAR="$STATE"
+# Deliverables from an answer (D-25): a KILL SWITCH, not a demo-only switch. On here; to turn
+# it off, unset it and restart the IB (it is read at start-up).
+export IB_DELIVERABLES="${IB_DELIVERABLES:-1}"
 mkdir -p "$STATE"
 PYTHONPATH="apps/mock_platforms" MOCK_WEBHOOK_URL="http://127.0.0.1:8100" \
   "$PY" -m mock_platforms --port 8200 > "$STATE/mock.log" 2>&1 &

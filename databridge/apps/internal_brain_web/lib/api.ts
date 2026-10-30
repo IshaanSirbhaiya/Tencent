@@ -466,3 +466,60 @@ export function slotLogout(slot: Exclude<Slot, 'a'>) {
 export function ibHealth() {
   return call<{ ok: boolean }>('/health');
 }
+
+// ---- act ----
+/** Act on an answer. Identity is the session: no call names a person. 404 = nothing to act on
+ *  (one answer for every reason); 409 = a ticket can't be created (one polite message). */
+export const actApi = {
+  draft: (reqId: string, kind: 'reply' | 'message' = 'reply') =>
+    call<import('./types').ActDraft>('/ib/act/draft', { method: 'POST', body: { req_id: reqId, kind } }),
+  proposeTicket: (reqId: string) =>
+    call<import('./types').TicketProposal>('/ib/act/ticket/propose', { method: 'POST', body: { req_id: reqId } }),
+  confirmTicket: (proposalId: string, edits: { summary?: string; project?: string } = {}) =>
+    call<import('./types').TicketCreated>('/ib/act/ticket/confirm', { method: 'POST', body: { proposal_id: proposalId, ...edits } }),
+  cancelTicket: (proposalId: string) =>
+    call<{ status: 'cancelled'; action_id: string }>('/ib/act/ticket/cancel', { method: 'POST', body: { proposal_id: proposalId } }),
+};
+
+// ---- live-growth ----
+/** Demo-proof features (D-24). Every route here is mounted only when the server runs with
+ *  IB_DEMO_FEATURES=1; off, each is an ordinary 404. Identity is the session: nothing names a person. */
+export const liveApi = {
+  /** The permission-filtered change feed; `slot` picks the Compare session (x-ib-slot). */
+  changes: (since: string | null, slot: Slot = 'a') =>
+    call<import('./types').GraphChanges>(`/ib/graph/changes${since ? `?since=${encodeURIComponent(since)}` : ''}`, { slot: slot === 'a' ? undefined : slot }),
+  /** Post a Slack note as the signed-in person (main session only). 404 = refused (one answer), 429 = too many. */
+  addDocument: (body: import('./types').AddDocumentBody) =>
+    call<import('./types').AddDocumentResult>('/sim/add-document', { method: 'POST', body }),
+  uploadFile: (body: import('./types').UploadFileBody) =>
+    call<import('./types').UploadFileResult>('/sim/upload-file', { method: 'POST', body }),
+  engineRefresh: () => call<import('./types').EngineRefreshStatus>('/sim/engine-refresh', { method: 'POST', body: {} }),
+  engineStatus: () => call<import('./types').EngineRefreshStatus>('/sim/engine-status', { method: 'POST', body: {} }),
+};
+
+// ---- deliverables from an answer (POST /ib/deliverables; main session only) ----
+export const deliverApi = {
+  /** A table, chart or analysis from one of MY released answers. 404 = nothing to build (one answer). */
+  create: (reqId: string, kind: import('./types').DeliverableKind) =>
+    call<import('./types').Deliverable>('/ib/deliverables', { method: 'POST', body: { req_id: reqId, kind } }),
+  /** The file, built on the server from the stored, checked deliverable. Name from the server's
+   *  fixed-shape `content-disposition`, else a fixed fallback. */
+  exportFile: async (deliverableId: string, format: 'csv' | 'pptx'): Promise<{ blob: Blob; name: string }> => {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}/ib/deliverables/export`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ deliverable_id: deliverableId, format }),
+        signal: deadline(),
+      });
+    } catch {
+      throw new ApiError(0, 'network');
+    }
+    if (!res.ok) throw new ApiError(res.status, res.statusText);
+    const m = /filename="(walnut-[a-z]+-[0-9a-f]{8}-\d{8}\.(?:pptx|csv))"/.exec(res.headers.get('content-disposition') ?? '');
+    return { blob: await res.blob(), name: m ? m[1] : `walnut-deliverable.${format}` };
+  },
+};

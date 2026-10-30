@@ -226,7 +226,7 @@ class Pipeline:
         self.ledger.append(AnswerReleased(
             sub=user.id, model=model, prompt_version=narrate.PROMPT_VERSION, answer_sha256=sha,
             answer_ref=ref, refused=refused,
-            citations=tuple({"doc_id": c.doc_id, "version": c.version,
+            citations=tuple({"doc_id": c.doc_id, "version": c.version, "tag": c.tag,
                              "content_checked_at": c.content_checked_at.isoformat(),
                              "authz_checked_at": c.authz_checked_at.isoformat()} for c in citations),
             dropped_sentences_count=dropped, latency_ms=int((time.perf_counter() - t0) * 1000),

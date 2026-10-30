@@ -54,18 +54,18 @@ How to read every number: [../impact_feasibility/EVIDENCE_NOTES.md](../impact_fe
 | Does the audit search use an LLM? | Rules run first. Only when they recognise nothing does a model parser (Hy3, then DeepSeek) get the question and the clock, never a ledger row; its output must pass a closed schema, or we fall back to the rules. It is wired and tested; the live Hy3 run is pending. |
 | Why no embeddings? | Embedding at ingest would send every chunk to a provider before access is decided. We rank with BM25 over the asker's permitted chunks only, so statistics leak nothing. |
 | What if TokenHub is down on stage? | The chain falls to DeepSeek, then to quotes; the answer is labelled. The demo continues. |
-| How do you measure quality? | 0 leaks in 5,958 requests; 0 / 400 differential; 0 injection failures; 100% of allowed sources reach the answer step; 87.8-96.4% cite the expected source. No faithfulness score yet. |
+| How do you measure quality? | 0 leaks in 7,374 requests; 0 / 400 differential; 0 injection failures; 100% of allowed sources reach the answer step; 93.2-97.1% cite the expected source. No faithfulness score yet. |
 | Copilot and Glean respect permissions. What's new? | They copy permissions into an index or trim within one tenant. We re-check each passage live and prove a refusal looks exactly like nothing. Neither claim is in their public docs. |
 | Could Glean add this tomorrow? | Possibly. The differential test suite and the write-ahead ledger are the parts that are hard to retrofit. |
 | Multi-agent? | Not today. We chose depth of proof over number of agents. Act and voice are next, under the same rules. |
 | What did you reuse? | Walnut's ledger, grounding wall and provenance model, which are ours from before. New: the gates, compilers, differential test, compartment, MCP connectors and web app. |
-| What is 0.10%? | Rule of three on 0 leaks in 2,979 requests per answer path. Pooled over both paths it would be 0.05%, but the paths share probes, so we quote 0.10%. |
+| What is 0.08%? | Rule of three on 0 leaks in 3,687 requests per answer path. Pooled over both paths it would be 0.04%, but the paths share probes, so we quote 0.08%. |
 
 ## Evidence note: the rule-of-three bound
 
-0 leaks in 5,958 requests = 2,979 probes, each run once on the model path and once on the extractive path.
-- **Per answer path (our claim):** 3 ÷ 2,979 ≈ **0.10%** (exact one-sided 95%: 0.1005%). `RESULTS.md` reports 0.1007%.
-- **Pooled (not our claim):** 3 ÷ 5,958 ≈ **0.05%**. Pooling counts each probe twice, so it overstates confidence.
-- **Model actually saw text:** 0 in 683 → about 0.44%.
+0 leaks in 7,374 requests = 3,687 probes, each run once on the model path and once on the extractive path.
+- **Per answer path (our claim):** 3 ÷ 3,687 ≈ **0.08%** (exact one-sided 95%: 0.0812%). `RESULTS.md` reports 0.0814%.
+- **Pooled (not our claim):** 3 ÷ 7,374 ≈ **0.04%**. Pooling counts each probe twice, so it overstates confidence.
+- **Model actually saw text:** 0 in 1,047 → about 0.29%.
 
 Full explanation: [EVIDENCE_NOTES.md](../impact_feasibility/EVIDENCE_NOTES.md) §1.

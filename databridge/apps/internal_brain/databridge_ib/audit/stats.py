@@ -138,6 +138,10 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             totals["trace_views"] += 1
         elif k == "auth.login":
             totals["logins"] += 1
+        elif k.startswith("action."):
+            totals["actions_" + k.split(".", 1)[1]] += 1
+        elif k.startswith("deliverable."):
+            totals["deliverables_" + k.split(".", 1)[1]] += 1
     allowed = sum(v for key, v in gate2_verdicts.items() if key in ALLOWED_VERDICTS)
     gate2_total = sum(gate2_verdicts.values())
     finished = totals["answered"] + totals["refused"]
@@ -158,6 +162,15 @@ def compute_stats(events: Iterable[Any], *, now: dt.datetime, days: int = 30,
             "syncs": totals["syncs"], "map_views": totals["map_views"], "logins": totals["logins"],
             "graph_views": totals["graph_views"], "doc_views": totals["doc_views"],
             "trace_views": totals["trace_views"],
+            "actions_proposed": totals["actions_proposed"],
+            "actions_confirmed": totals["actions_confirmed"],
+            "actions_executed": totals["actions_executed"],
+            "actions_failed": totals["actions_failed"],
+            "actions_rejected": totals["actions_rejected"],
+            "deliverables_requested": totals["deliverables_requested"],
+            "deliverables_created": totals["deliverables_created"],
+            "deliverables_exported": totals["deliverables_exported"],
+            "deliverables_failed": totals["deliverables_failed"],
         },
         # requests and documents are different units: two flows, never one funnel
         "requests_flow": {"asked": totals["requests"], "answered": totals["answered"],

@@ -75,3 +75,29 @@ New personas: `amy.am` (account manager: `grp-accounts`, inside `grp-staff`; rea
 
 `manifest.json` also lists `p2_pairs`: question pairs whose two responses must be byte-identical apart from
 the request id and timestamps, with the same citations.
+
+## The everyday-company layer (WP)
+
+`Builder.build_workplace()` (`workplace.py`) runs **after** the fintech layer with its own random stream
+(`companya/<seed>/workplace`), so it only adds. With the layer switched off, the generator still writes the
+pre-layer `world.json` byte for byte (`tests/test_workplace_layer.py::test_world_without_the_layer_is_the_pre_layer_world`
+checks its sha256). The only existing records that change are membership lists that grow: `grp-staff` gains
+the new `grp-people` group, `#general` and `#random` gain the two new People-team users, and existing
+questions' `must_not_contain_facts` gain the new facts each persona is denied (the README rule above).
+
+| What | Who can read it |
+|---|---|
+| Directory: `siti.h` (Head of People) and `melissa.k` (People partner) in `grp-people`, inside `grp-staff` | - |
+| Confluence space `people` ("People & Workplace": leave, parental leave, hybrid work, code of conduct, performance reviews, learning budget, referral bonus, Singapore office guide, IT helpdesk FAQ, security basics, onboarding checklist, the 2026 holiday calendar, org chart, safety) | every employee (`grp-staff`) |
+| Confluence space `finops` ("Finance Ops": travel and expenses, approval limits, procurement, month-end close, corporate cards, supplier onboarding) | every employee |
+| Jira project `ITHELP` (10 helpdesk requests, one of them the VPN fix) | every employee |
+| Slack `#hr-announcements`, `#it-helpdesk`, `#office-sg` (public) and a few `#general` threads (payday, year-end party, Deepavali) | every member |
+| Drive folder "People" (benefits summary, expense form guide, floor plan, leave and learning how-tos) | the company domain |
+| Drive folder "Compensation (People leads only)", inheritance stopped: `Salary bands 2026` | `grp-people` only (no persona) |
+
+23 facts (`WP-*`), 28 questions (`WP-q1`..`WP-q28`) and 6 probe questions per persona. `WP-q19`..`WP-q24` are
+three P2 pairs (the real, People-only salary bands vs "vesting bands", which never existed) for `jdoe`,
+`amy.am` and `ken.ext`; `WP-q25` checks that the Slack Connect contractor `ken.ext` cannot read the
+handbook. The open documents avoid the vocabulary of earlier scenario questions, so they cannot change an
+earlier answer, and they never mention the three topics kept back for live ingestion during the demo.
+Leave numbers, allowances and dates are this fictional company's own policy, not legal or HR advice.

@@ -40,8 +40,11 @@ def error_body(platform: str, status: int, code: str, message: str) -> dict[str,
 
 
 async def platform_error_handler(_request: Request, exc: PlatformError) -> JSONResponse:
-    return JSONResponse(error_body(exc.platform, exc.status, exc.code, exc.message),
-                        status_code=exc.status, headers=exc.headers)
+    body = error_body(exc.platform, exc.status, exc.code, exc.message)
+    field = getattr(exc, "field", None)
+    if field and exc.platform == "jira":            # Jira names the offending field in ``errors``
+        body = {"errorMessages": [], "errors": {field: exc.message}}
+    return JSONResponse(body, status_code=exc.status, headers=exc.headers)
 
 
 def world(request: Request) -> World:
