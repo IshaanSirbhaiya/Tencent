@@ -1,5 +1,5 @@
-ABSENCE PROOF  2026-10-30T10:42:50+08:00
-world.json sha256 e05050c35f51f40a   samples live_samples.json
+ABSENCE PROOF  2026-10-30T16:33:53+08:00
+world.json sha256 e3381d7122570db7   samples live_samples.json
 mode: HTTP http://127.0.0.1:8100
 refusal text: I couldn't find an answer to that in the sources you can access.
 
