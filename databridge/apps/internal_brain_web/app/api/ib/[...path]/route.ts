@@ -35,6 +35,8 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'GET', re: /^ib\/graph$/ },
   { method: 'GET', re: /^ib\/graph\/changes$/ },
   { method: 'POST', re: /^ib\/graph\/openable$/ },
+  // Act on an answer: main session only (never in a compare slot)
+  { method: 'POST', re: /^ib\/act\/(draft|ticket\/(propose|confirm|cancel))$/ },
   { method: 'GET', re: new RegExp(`^ib\\/doc\\/${DOC_ID}$`) },
   { method: 'GET', re: /^audit\/(events|verify|stats)$/ },
   { method: 'GET', re: /^audit\/journey\/[A-Za-z0-9_-]{1,200}$/ },
@@ -45,6 +47,9 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
 
 const COOKIE = 'ib_session';
 const MAX_BODY = 64 * 1024;
+// The one exception: a demo file upload (JSON with base64 content, a 5 MB file is ~6.7 MB encoded).
+const MAX_UPLOAD_BODY = 7 * 1024 * 1024;
+const UPLOAD_PATH = 'sim/upload-file';
 const DEADLINE_MS = 90_000;
 const UNAVAILABLE = 'The service is unavailable. Please try again.';
 
@@ -109,8 +114,8 @@ function sameOrigin(req: NextRequest): boolean {
 class TooLarge extends Error {}
 
 /** Read the request body, at most MAX_BODY bytes, giving up when the deadline fires. */
-async function readBody(req: NextRequest, signal: AbortSignal): Promise<Uint8Array> {
-  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY) throw new TooLarge();
+async function readBody(req: NextRequest, signal: AbortSignal, max: number = MAX_BODY): Promise<Uint8Array> {
+  if (Number(req.headers.get('content-length') ?? 0) > max) throw new TooLarge();
   if (!req.body) return new Uint8Array(0);
   const reader = req.body.getReader();
   const stop = () => void reader.cancel().catch(() => undefined);
@@ -122,7 +127,7 @@ async function readBody(req: NextRequest, signal: AbortSignal): Promise<Uint8Arr
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > MAX_BODY) {
+      if (total > max) {
         stop();
         throw new TooLarge();
       }
@@ -215,7 +220,7 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   if (method === 'POST') {
     if (!sameOrigin(req)) return fail(403, 'forbidden');
     try {
-      body = await readBody(req, signal);
+      body = await readBody(req, signal, path === UPLOAD_PATH ? MAX_UPLOAD_BODY : MAX_BODY);
     } catch (e) {
       if (e instanceof TooLarge) return fail(413, 'too large');
       return NextResponse.json({ error: 'temporarily unavailable' }, { status: 503 });
