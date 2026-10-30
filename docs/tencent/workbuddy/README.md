@@ -56,10 +56,37 @@ This is how our screenshots were taken.
 - **Same question, two people.** The engineer's connector returns an answer with cited sources. The
   contractor's connector returns the constant scope note, with no counts and no reason. A restricted
   document looks the same as one that does not exist.
-- **Compliance connector.** It has three extra tools: `audit_events`, `audit_doc_accessors` and
-  `audit_verify`. Ask it who accessed a document, then ask it to verify the audit chain. It should report the
-  chain as intact.
+- **Compliance connector.** Its tools: `audit_events`, `audit_doc_accessors`, `audit_verify`, and (finals)
+  `org_activity_summary` and `run_tamper_demo`. Ask it who accessed a document, then ask it to verify the
+  audit chain. It should report the chain as intact.
 - The connector panel lists all three connectors as enabled.
+
+## The finals tools (CodeBuddy session CB8)
+
+The connectors gained tools for the finals features. Nothing changes in the setup: WorkBuddy starts the
+servers from the repository, so the new tools appear after you restart WorkBuddy (or re-run
+`workbuddy_setup.py`, which also mints fresh tokens).
+
+| Connector | Tool | What it calls | What it returns |
+|---|---|---|---|
+| ib-as-jdoe, ib-as-ken | `ask_internal_brain(question)` | `POST /ib/ask` | The answer, citations, `answered as <sub>` and now the `request id` |
+| ib-as-jdoe, ib-as-ken | `my_recent_questions()` | `GET /ib/history` | The caller's own recent questions |
+| ib-as-jdoe, ib-as-ken | `my_answer_receipt(request_id)` | `GET /ib/trace/{id}` | The receipt of one of the caller's OWN answers: stages, model, the sources they can still open, sealed record hashes. Another person's id and an unknown id give the same sentence |
+| ib-as-jdoe, ib-as-ken | `what_can_i_open()` | `GET /ib/map` | Counts only: items, containers and platforms the caller can open. No titles, no ids |
+| ib-compliance | `org_activity_summary(days)` | `GET /audit/stats` | Headline numbers: requests, answered, refused, the document funnel, latency, models, channels (`workbuddy-mcp` shows here) |
+| ib-compliance | `audit_verify()` | `GET /audit/verify` | Chain, seals, external head, and the stored-answer content check |
+| ib-compliance | `run_tamper_demo()` | `POST /audit/tamper-demo` | The tamper scenarios on a temporary COPY of the ledger; the real log is never edited |
+
+The rules stay the same: no tool takes a user, persona or name; the person is the connector's token; the
+audit tools refuse an employee token (HTTP 403).
+
+**The Walnut skill.** [`WALNUT_SKILL.md`](WALNUT_SKILL.md) (written by CodeBuddy, CB9) is the instruction
+text for a WorkBuddy skill or custom expert named Walnut. It tells the agent to pass the question word for
+word, relay citations exactly, treat the scope note as the whole answer, and never name a person. Paste it
+in **Experts · Skills**, switch it on for the chat, then use its six demo questions.
+
+The exact retest steps, prompts and screenshots: [`docs/finals/rubric/ai_innovation/WORKBUDDY_GUI_TEST.md`](../../finals/rubric/ai_innovation/WORKBUDDY_GUI_TEST.md).
+A programmatic run of every tool against the live Brain: [`workbuddy_live_test.md`](../../finals/rubric/ai_innovation/workbuddy_live_test.md).
 
 ## Doing it by hand
 
@@ -92,7 +119,9 @@ Then create `.workbuddy/mcp.json` in the project root:
 ```
 
 For a compliance officer, use `databridge_ib.audit_mcp_server` in `args`. It exposes `audit_events`,
-`audit_doc_accessors` and `audit_verify`, plus `ask_internal_brain`.
+`audit_doc_accessors`, `audit_verify`, `org_activity_summary` and `run_tamper_demo`. (It does not ask
+questions: to ask as the officer, add a second connector with `databridge_ib.mcp_server` and the same
+token.)
 
 Ready-to-edit examples (each has a placeholder token):
 

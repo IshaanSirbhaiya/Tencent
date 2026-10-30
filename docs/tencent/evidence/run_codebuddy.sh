@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the CodeBuddy build sessions CB1-CB5 headless, one at a time, from the repo root.
+# Runs the CodeBuddy build sessions (CB1-CB9) headless, one at a time, from the repo root.
 # Each session's full stream-json transcript is kept as proof of CodeBuddy usage.
 #   bash docs/tencent/evidence/run_codebuddy.sh cb1 cb2 ...
 set -u
@@ -8,12 +8,13 @@ EV="$ROOT/docs/tencent/evidence"
 cd "$ROOT"
 # CodeBuddy must never be able to read the secrets file (CB3 read it despite being told not to and
 # its transcript captured the keys; they were redacted and rotated). Park the file OUTSIDE the
-# repository for the whole run and always put it back.
+# repository for the whole run and always put it back. Do NOT start or restart the demo stack while a
+# session runs: the Brain would come up on its dev keys (30 Oct, DEV_PROCESS.md).
 SECRETS="$ROOT/databridge/.env.ib.local"; PARKED="$ROOT/../.env.ib.local.parked-during-codebuddy"
 if [ -f "$SECRETS" ]; then mv "$SECRETS" "$PARKED"; trap 'mv "$PARKED" "$SECRETS"' EXIT; fi
 for s in "$@"; do
   case "$s" in
-    cb1|cb5) model="hy3" ;;
+    cb1|cb5|cb7|cb9) model="hy3" ;;
     *) model="default-model" ;;
   esac
   prompt="$(cat "$EV/codebuddy_prompts/_rules.md" "$EV/codebuddy_prompts/$s.md")"

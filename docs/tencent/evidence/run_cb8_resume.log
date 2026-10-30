@@ -1,0 +1,4 @@
+[10:17:48] start cb8 resume (session 01a18a94-435f-70fc-83d3-e287156eb41c, model default-model)
+[10:18:52] end cb8 resume rc=0
+[10:20:30] start cb8 resume 2 (same session, model default-model)
+[10:24:26] end cb8 resume 2 rc=0

@@ -32,6 +32,9 @@ from .models import SCOPE_NOTE, DirectoryUser, DocViewed
 EXCERPT_CHARS = 1200
 MAX_LINKS = 12
 MAX_LINK_CHECKS = 240               # work cap on live link-target checks per view
+#: the longest id a view will look up (the ledger keeps the first 300 characters); a longer id is the
+#: same 404 as an unknown one, decided after the write-ahead record (CodeBuddy finals review CB7 F7)
+MAX_DOC_ID = 300
 
 
 class NotFound(Exception):
@@ -48,6 +51,8 @@ def view_doc(user: DirectoryUser, doc_id: str, *, index: Index, directory: Direc
     # 1 — write-ahead, before any decision (a failure propagates: the route answers 503)
     ledger.append(DocViewed(sub=user.id, doc_id=str(doc_id)[:300], with_query=bool(q),
                             policy_version=POLICY_VERSION, event_time=now))
+    if not doc_id or len(doc_id) > MAX_DOC_ID:          # never a real id: no index or source lookup
+        raise NotFound()
     # 2 — Gate 1 + Gate 2 + read-through
     readable = index.readable(user, getattr(directory, "epoch", 0))
     ok, _ = authz.authorize(user, [doc_id], index=index, connectors=connectors, readable=readable,

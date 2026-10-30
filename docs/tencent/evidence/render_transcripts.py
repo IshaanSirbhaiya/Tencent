@@ -22,6 +22,10 @@ SESSIONS = [
     ("cb4", "Model-chain tests"),
     ("cb5", "Security review"),
     ("cb6", "Harden connectors after Codex review"),
+    ("cb7", "Finals: security review of the finals backend"),
+    ("cb8", "Finals: WorkBuddy connector upgrade (stopped by a CodeBuddy rate limit)"),
+    ("cb8_part3", "Finals: connector upgrade, same session resumed: tests", "cb8_resume"),
+    ("cb9", "Finals: WorkBuddy Walnut skill"),
 ]
 CSS = """
 :root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0d1117;color:#e6edf3;
@@ -57,9 +61,15 @@ def _short(obj, n=220) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
-def render(sid: str, title: str) -> str:
+def _label(sid: str) -> str:
+    """cb8 -> CB8; cb8_part3 -> CB8 (resumed)."""
+    base, _, part = sid.partition("_part")
+    return base.upper() + (" (resumed)" if part else "")
+
+
+def render(sid: str, title: str, prompt_name: str | None = None) -> str:
     ev = _load(HERE / f"codebuddy_{sid}.jsonl")
-    prompt = (HERE / "codebuddy_prompts" / f"{sid}.md").read_text(encoding="utf-8").strip()
+    prompt = (HERE / "codebuddy_prompts" / f"{prompt_name or sid}.md").read_text(encoding="utf-8").strip()
     init = next((e for e in ev if e.get("type") == "system" and e.get("subtype") == "init"), {})
     result = next((e for e in reversed(ev) if e.get("type") == "result"), {})
     model = init.get("model") or next((e["message"].get("model") for e in ev
@@ -88,14 +98,16 @@ def render(sid: str, title: str) -> str:
                              + (f'<div class="res">{html.escape(res)}</div>' if res else "") + "</div>")
     if steps and result.get("result"):
         steps.pop()                                          # the last text is the final summary
-    final = html.escape(str(result.get("result") or "(no final summary)"))
+    stopped = "; ".join(str(x) for x in (result.get("errors") or []))
+    final = html.escape(str(result.get("result") or (f"(no final summary: the run stopped on {stopped})"
+                                                     if stopped else "(no final summary)")))
     chips = [f"model: {model}", f"turns: {result.get('num_turns', '?')}",
              f"duration: {round((result.get('duration_ms') or 0) / 1000)} s",
              f"outcome: {result.get('subtype', '?')}", f"session: {str(init.get('session_id', '?'))[:13]}…"]
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>CodeBuddy {sid.upper()}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>CodeBuddy {_label(sid)}</title>
 <style>{CSS}</style></head><body><div class="wrap">
-<div class="top"><div class="logo">CB</div><div><h1>CodeBuddy session {sid.upper()}: {html.escape(title)}</h1>
+<div class="top"><div class="logo">CB</div><div><h1>CodeBuddy session {_label(sid)}: {html.escape(title)}</h1>
 <div class="sub">Rendered from the CodeBuddy CLI transcript docs/tencent/evidence/codebuddy_{sid}.jsonl
 (working directory {html.escape(str(init.get('cwd', '?')))})</div></div></div>
 <div class="meta">{''.join(f'<span class="chip">{html.escape(c)}</span>' for c in chips)}</div>
@@ -109,9 +121,9 @@ CodeBuddy use</div></div></body></html>"""
 def main() -> int:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "submission" / "01_codebuddy" / "html"
     out.mkdir(parents=True, exist_ok=True)
-    for sid, title in SESSIONS:
+    for sid, title, *prompt_name in SESSIONS:
         if (HERE / f"codebuddy_{sid}.jsonl").exists():
-            (out / f"{sid}.html").write_text(render(sid, title), encoding="utf-8")
+            (out / f"{sid}.html").write_text(render(sid, title, *prompt_name), encoding="utf-8")
             print("wrote", out / f"{sid}.html")
     return 0
 

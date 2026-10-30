@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -22,6 +22,10 @@ CHANNEL = "workbuddy-mcp"
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 _SANITIZED_ERR = "Internal Brain API returned a malformed response."
+# /ib/trace returns 404 for both an unknown id and another person's id (rule 4): the two are
+# indistinguishable to the caller, so the receipt tool answers one fixed sentence.
+_NOT_FOUND_RECEIPT = "No receipt found for that request id in your own requests."
+_MAX_REQ_ID = 200
 
 
 def _base_url() -> str:
@@ -147,6 +151,87 @@ def _format_history(items: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _format_receipt(data: dict[str, Any]) -> str:
+    """A short readable receipt from a /ib/trace response."""
+    question = data.get("question") or "(no question)"
+    status = data.get("status") or "?"
+    model = data.get("model") or {}
+    if isinstance(model, dict):
+        model_label = f"{model.get('provider', '?')}/{model.get('model', '?')}"
+    else:
+        model_label = "?"
+    lat = data.get("latency_ms_rounded")
+    lat_label = f"{lat} ms" if isinstance(lat, int) else "?"
+    channel = data.get("channel") or "?"
+    lines = [f"Question: {question}",
+             f"Status: {status}",
+             f"Channel: {channel}",
+             f"Model: {model_label}",
+             f"Latency: {lat_label}"]
+    stages = data.get("stages") or []
+    if isinstance(stages, list):
+        stage_parts = [f"{s.get('name', '?')}:{s.get('status', '?')}"
+                       for s in stages if isinstance(s, dict)]
+        if stage_parts:
+            lines.append("Stages: " + ", ".join(stage_parts))
+    citations = data.get("citations") or []
+    if isinstance(citations, list):
+        cited = [c for c in citations if isinstance(c, dict)]
+        if cited:
+            lines.append("Cited documents you can open:")
+            for c in cited:
+                title = c.get("title") or "?"
+                platform = c.get("platform") or "?"
+                link = c.get("deep_link") or ""
+                version = c.get("cited_version") or c.get("version") or "?"
+                lines.append(f"  - [{platform}] {title} (v{version}) {link}".rstrip())
+        else:
+            lines.append("Cited documents you can open: (none)")
+    records = data.get("records") or []
+    if isinstance(records, list):
+        recs = [r for r in records if isinstance(r, dict)]
+        if recs:
+            lines.append("Sealed records:")
+            for r in recs:
+                kind = r.get("kind") or "?"
+                h = r.get("hash") or ""
+                lines.append(f"  - {kind}: {str(h)[:12]}")
+    return "\n".join(lines)
+
+
+def _format_map(data: dict[str, Any]) -> str:
+    """A SHORT summary of the caller's own access from a /ib/map response."""
+    totals = data.get("totals") or {}
+    if not isinstance(totals, dict):
+        totals = {}
+    n_items = totals.get("items", 0)
+    n_containers = totals.get("containers", 0)
+    n_platforms = totals.get("platforms", 0)
+    lines = [f"You can open {n_items} item(s) across {n_containers} container(s) "
+             f"on {n_platforms} platform(s)."]
+    platforms = data.get("platforms") or []
+    if isinstance(platforms, list):
+        for p in platforms:
+            if not isinstance(p, dict):
+                continue
+            pname = p.get("platform") or "?"
+            pcount = p.get("count", 0)
+            lines.append(f"- {pname}: {pcount} item(s)")
+            containers = p.get("containers") or []
+            if isinstance(containers, list):
+                # at most 8 per platform, largest first
+                sorted_c = sorted([c for c in containers if isinstance(c, dict)],
+                                  key=lambda c: c.get("count", 0), reverse=True)[:8]
+                for c in sorted_c:
+                    cname = c.get("name") or c.get("container") or "?"
+                    ccount = c.get("count", 0)
+                    lines.append(f"    - {cname}: {ccount}")
+    scope = data.get("scope_note")
+    if scope:
+        lines.append(f"Scope: {scope}")
+    return "\n".join(lines)
+
+
 def build_server() -> FastMCP:
     """Construct the FastMCP server. Exposed for tests (and for ``main``)."""
     mcp = FastMCP("walnut-internal-brain",
@@ -172,6 +257,7 @@ def build_server() -> FastMCP:
             if json_err:
                 return json_err
             answer = data.get("answer") or ""
+            request_id = data.get("request_id") or ""
             citations_raw = data.get("citations") or []
             if not isinstance(citations_raw, list):
                 citations_raw = []
@@ -191,6 +277,8 @@ def build_server() -> FastMCP:
                 "",
                 f"answered as {sub}",
             ]
+            if request_id:
+                parts.append(f"request id: {request_id}")
             return "\n".join(parts)
         finally:
             client.close()
@@ -212,6 +300,53 @@ def build_server() -> FastMCP:
                 items = []
             items = [it for it in items if isinstance(it, dict)]
             return _format_history(items)
+        finally:
+            client.close()
+
+    @mcp.tool()
+    def my_answer_receipt(request_id: str) -> str:
+        """Return a short readable receipt for one of the caller's own requests (from
+        /ib/trace/{request_id}): the question, status, model, latency, stage names with ok/skipped,
+        the cited documents still openable, and the sealed record kinds with the first 12 hex of
+        each hash. An unknown id and another person's id both return one fixed sentence.
+        Identity comes only from IB_TOKEN.
+
+        Args:
+            request_id: The request id returned by ask_internal_brain (1-200 chars).
+        """
+        if not request_id or request_id in (".", "..") or len(request_id) > _MAX_REQ_ID:
+            return _NOT_FOUND_RECEIPT
+        encoded = quote(request_id, safe="")
+        client = _client()
+        try:
+            resp, err = _http_get(client, f"/ib/trace/{encoded}")
+            if err:
+                # A 404 (unknown id or another person's id) is indistinguishable (rule 4).
+                if resp is not None and resp.status_code == 404:
+                    return _NOT_FOUND_RECEIPT
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            return _format_receipt(data)
+        finally:
+            client.close()
+
+    @mcp.tool()
+    def what_can_i_open() -> str:
+        """Return a SHORT summary of the caller's own access (from /ib/map): total items, containers
+        and platforms; per platform its item count and its containers (name and count, at most 8 per
+        platform, largest first); and the scope note. Never lists item titles or document ids.
+        Identity comes only from IB_TOKEN."""
+        client = _client()
+        try:
+            resp, err = _http_get(client, "/ib/map")
+            if err:
+                return err
+            data, json_err = _safe_json(resp)
+            if json_err:
+                return json_err
+            return _format_map(data)
         finally:
             client.close()
 
