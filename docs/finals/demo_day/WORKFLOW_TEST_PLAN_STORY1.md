@@ -108,3 +108,47 @@ Each check runs through the API (scripted, repeatable) **and** once through the 
 2. F8: the stage line becomes "a **projected** US$1.3M a year".
 3. F9: say "0 leaks" with the model on only after the model-on eval passes.
 4. Voice on stage uses the browser's speech service (honest limit #9). A typed fallback is ready.
+
+## 5. How to run the checker
+
+The generic runner is `databridge/scripts/workflow_check.py` (built 30 Oct 2026). It reads a steps file
+(JSON, or YAML with PyYAML) and runs every step through the real HTTP API of a running Internal Brain:
+demo sign-in, `/ib/ask`, `/ib/status`, `/ib/graph/openable` + `/ib/doc/{id}` (citation re-check), the
+act / deliverable / view routes, and Maya's `/audit/journey/{req_id}` and `/audit/verify`. The full step
+schema is in the script's docstring; `databridge/scripts/workflow_steps/sample_no_model.json` is a worked
+example (Amy/Rachel/Ken on Velquarry, Ken's Bayfront refusal byte-identical to his Velquarry one,
+Jordan's starter, a deliverable, Maya's journey checks, FinCrime canaries that must never appear).
+
+Step fields: `id`, `persona`, `question`, `same_as` (byte-identical after stripping `request_id`,
+`as_of`, `*_checked_at`), and `expect.{contains, not_contains, refusal, citations_min, cite_recheck,
+model_label: "neutral", model_answered, max_latency_ms, ledger}`, plus an optional `action`
+(`draft` | `ticket_propose` | `deliverable` | `view`) with its own `expect`. A `not_contains` term written
+`/…/` is a regex (use `/\bSTR\b/` so "restricted" is not a hit).
+
+On the laptop, model ON (from `databridge/`, with the Brain already started by `Start Walnut Demo`
+and the stand-in switched on per the private checklist):
+
+```bash
+# env names only; values come from databridge/.env.ib.local, never typed into a doc
+#   IB_DEMO_LOGIN=1, IB_DELIVERABLES=1 (server side), IB_DEMO_PASSCODE (if the server sets one)
+#   IB_BASE_URL (optional; default http://127.0.0.1:8100)
+.venv/Scripts/python scripts/workflow_check.py scripts/workflow_steps/sample_no_model.json \
+    --out ../docs/finals/demo_day/workflow_results/run1.json
+.venv/Scripts/python scripts/workflow_check.py STEPS.json --only amy_velquarry,ken_bayfront
+```
+
+- With the model on, add `"model_answered": true` to the steps whose answer must come from the model
+  (the sample leaves it out, so the same file passes on both paths); `model_label: "neutral"` then
+  checks that the label is neither the provider, nor Hy3/TokenHub (unless `/ib/status` says TokenHub
+  is active), nor "no model".
+- Exit code 0 only when every step passed; 1 when one failed; 2 for a bad steps file or no server.
+  Run it 3 times for A7 (`max_latency_ms` checks one ask; this script's own wall clock).
+- In the cloud it runs in-process with no model: `apps/internal_brain/tests/test_workflow_check.py`.
+
+**What `cite_recheck` proves, and what it does not:** every cited document is openable by that persona
+*at check time* (the API's own Gate 1 + live Gate 2 check, `/ib/graph/openable`, and `/ib/doc/{id}` 200).
+It does not prove that each sentence is supported by its source (that is the grounding step inside
+the Brain), nor what was openable at answer time, nor that no restricted passage reached the model
+(C4: read `considered`/`released` in Maya's journey or the leak eval). Also: a draft ledgers
+`action.proposed` on the request's journey (`action.requested` carries no request id, so it is not
+in the journey).
