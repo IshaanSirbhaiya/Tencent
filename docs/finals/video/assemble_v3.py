@@ -92,14 +92,15 @@ PARTS = [
     {"id": "C1", "kind": "camera"},
     {"id": "C2", "kind": "film", "optional": True},
     {"id": "C3", "kind": "slides"},
-    {"id": "T1", "kind": "card", "card": CARD_COMPANY, "seconds": 3.5},
+    {"id": "T1", "kind": "card", "card": CARD_COMPANY, "png": "T1_company", "seconds": 3.5},
     # C4 and C5: the team's films, with their OWN voice-over, exactly as recorded (founder's order, 30 Oct): not
     # cut, re-timed or re-voiced; only the model label blurred and the frame scaled (atlas_film.py). A_C5 is laid
     # under the Call film only if that film has no sound at all.
     {"id": "C4", "kind": "team_film", "film": "atlas", "block": "C4", "plan_seconds": 89.2},
-    {"id": "T2", "kind": "card", "card": CARD_HINGE, "seconds": 4.0},
-    {"id": "C5", "kind": "team_film", "film": "call", "block": "C5", "fallback_audio": "A_C5",
-     "plan_seconds": 75},                                  # the team's speech doc: about 70-75 s
+    {"id": "T2", "kind": "card", "card": CARD_HINGE, "png": "T2_hinge", "seconds": 4.0},
+    # The Call arrived as two clips, Amy then Rachel, each with its own voice (founder, 22:31)
+    {"id": "C5a", "kind": "team_film", "film": "call_amy", "block": "C5", "plan_seconds": 52.3},
+    {"id": "C5b", "kind": "team_film", "film": "call_rachel", "block": "C5", "plan_seconds": 31.7},
     {"id": "C6a", "kind": "narrated", "block": "C6a", "audio": "B_C6a", "lo": 0.8, "hi": 1.8,
      "clips": [("C6_1_graph", False), ("C6_2_ken", False), ("C6_3_journey", False), ("C6_4_audit", False),
                ("C6_5_engine", False), ("C6_5b_platform", True)]},
@@ -109,7 +110,7 @@ PARTS = [
      "stills": [(0, "film:C6_workbuddy", "Tencent WorkBuddy · calling Walnut through MCP"),
                 (2, "card:11_codebuddy.png", ""), (3, "card:20_miora.png", ""), (4, "card:13b_deploy.png", PILL_TENCENT)]},
     {"id": "C6c", "kind": "narrated", "block": "C6c", "audio": "B_C6c", "lo": 0.7, "hi": 1.6, "clips": [("C6_7_proof", False)]},
-    {"id": "C7", "kind": "card", "card": CARD_CLOSE, "block": "C7", "audio": "A_C7"},
+    {"id": "C7", "kind": "card", "card": CARD_CLOSE, "png": "C7_close", "block": "C7", "audio": "A_C7"},
 ]
 PREVIEW_ALIAS = {"A_C5": ["B_C5"]}                         # the placeholder voice has The Call as B_C5
 BANNED_SPOKEN = ("str has been filed", "11 of 37", "by phone", "runs on tencent hunyuan", "hy3 answered",
@@ -286,8 +287,11 @@ def _font(size: int, bold=True):
     return ImageFont.load_default()
 
 
-def card_png(lines: tuple[str, str], out: Path) -> Path:
-    """A plain dark card: a big first line, a quieter second line, the Walnut DataBridge mark at the top."""
+def card_png(lines: tuple[str, str], out: Path, name: str | None = None) -> Path:
+    """The team's card <v3>/work/cards/<name>.png when it exists (the main session draws them); else a plain dark
+    card drawn here: a big first line, a quieter second line, the Walnut DataBridge mark at the top."""
+    if name and (V3 / "work" / "cards" / f"{name}.png").exists():
+        return V3 / "work" / "cards" / f"{name}.png"
     from PIL import Image, ImageDraw
     img = Image.new("RGB", (W, H), (10, 11, 13))
     d = ImageDraw.Draw(img)
@@ -336,8 +340,8 @@ def own_sound(src: Path, vf: str, out: Path, length: float | None = None) -> flo
     return duration(out)
 
 
-def silent_card(lines, seconds: float, out: Path, work: Path) -> float:
-    png = card_png(lines, work / f"{out.stem}.png")
+def silent_card(lines, seconds: float, out: Path, work: Path, name: str | None = None) -> float:
+    png = card_png(lines, work / f"{out.stem}.png", name)
     v = work / f"{out.stem}_v.mp4"
     still(png, seconds, v, work)
     run(["ffmpeg", "-y", "-i", str(v), "-f", "lavfi", "-t", f"{seconds:.2f}", "-i", "anullsrc=r=48000:cl=stereo",
@@ -386,7 +390,7 @@ def film_source(part: dict, args) -> tuple[Path | None, list[tuple[float, float]
     clean = V3 / "work" / f"{name}_clean.mp4"
     report = V3 / "work" / f"{name}_film.json"
     if not clean.exists():
-        raw = [V3 / f"{name}_film{e}" for e in FILM_EXT if (V3 / f"{name}_film{e}").exists()]
+        raw = [V3 / f"{n}{e}" for n in (f"{name}_film", name) for e in FILM_EXT if (V3 / f"{n}{e}").exists()]
         why = (f"{raw[0].name} is not cleaned yet: python atlas_film.py --film {raw[0]} --out {clean}" if raw
                else f"no {name} film in {V3}")
         return None, [], [why]
@@ -534,7 +538,8 @@ def stills_part(part: dict, args, work: Path, out: Path, preview: bool) -> tuple
             notes.append("WorkBuddy: the 15 Oct still (no live capture yet)")
             src = REPO / "submission" / "02_workbuddy" / name
         else:
-            src = REPO / "submission" / "finals_video" / "cards" / name
+            src = next((d / name for d in (V3 / "work" / "cards", REPO / "submission" / "finals_video" / "cards")
+                        if (d / name).exists()), REPO / "submission" / "finals_video" / "cards" / name)
         if not src.exists():
             if not preview:
                 raise SystemExit(f"REFUSED C6b: {src} missing (node docs/finals/video/record_finals.cjs cards)")
@@ -682,10 +687,10 @@ def self_test() -> int:
         assert norm(words(n)) in text, f"the narration never says {words(n)}"
     # every part with narration has its block; names as the coordinator gave them
     assert [p["audio"] for p in PARTS if p.get("audio")] == ["B_C6a", "A_C6b", "B_C6c", "A_C7"]
-    assert [p["id"] for p in PARTS if p["kind"] == "team_film"] == ["C4", "C5"]
+    assert [p["id"] for p in PARTS if p["kind"] == "team_film"] == ["C4", "C5a", "C5b"]
     assert not any("captions" in p or "lo" in p for p in PARTS if p["kind"] == "team_film"), "the films are not re-timed"
     assert CARD_HINGE[1] == "Can it keep a secret?" and "not live yet" in PILL_TENCENT
-    assert [p["id"] for p in PARTS] == ["C1", "C2", "C3", "T1", "C4", "T2", "C5", "C6a", "C6b", "C6c", "C7"]
+    assert [p["id"] for p in PARTS] == ["C1", "C2", "C3", "T1", "C4", "T2", "C5a", "C5b", "C6a", "C6b", "C6c", "C7"]
     assert all(p["block"] in bl for p in PARTS if p.get("block"))
     assert "Pandan" not in json.dumps(PARTS) and CARD_COMPANY[0] == "Company A"
     # narration files: any of the extensions, the placeholder folder only for a preview
@@ -733,7 +738,7 @@ def self_test() -> int:
     assert abs(shift_cuts(50.0, [(35.8, 42.1), (70.3, 76.6)]) - (50.0 - 6.3)) < 1e-9
     # the timeline: under 8:00 with the placeholder lengths (as a human reads them) and the AI film at 1:00
     lengths = {"B_C4": 56.3, "A_C5": 60.8, "B_C6a": 69.8, "B_C6c": 11.7, "A_C6b": 25.9, "A_C7": 13.6}
-    tot = 10.1 + 60 + 79.8 + 3.5 + 4.0 + 89.2 + 75 + sum(v * HUMAN + LEAD + TAIL for k, v in lengths.items()
+    tot = 10.1 + 61 + 79.8 + 3.5 + 4.0 + 89.2 + 52.3 + 31.7 + sum(v * HUMAN + LEAD + TAIL for k, v in lengths.items()
                                                          if k not in ("B_C4", "A_C5"))
     assert tot < MAX_MAIN, tot
     # subtitles, cue sheet, filters
@@ -816,7 +821,7 @@ def main() -> int:
                 cues += [{"part": "C3", "para": 1, "start": t + length * sum(w[:i]) / sum(w),
                           "end": t + length * sum(w[:i + 1]) / sum(w), "text": x, "abs": True} for i, x in enumerate(lines)]
             elif p["kind"] == "card" and not p.get("audio"):
-                length, note = silent_card(p["card"], p["seconds"], out, work), "card"
+                length, note = silent_card(p["card"], p["seconds"], out, work, p.get("png")), "card"
             elif p["kind"] == "card":                         # the close: the card under A_C7
                 paras = blocks()[p["block"]]
                 audio = narration_file(p["audio"], a.preview)
@@ -825,7 +830,7 @@ def main() -> int:
                 speech = duration(audio) if audio else sum(map(nwords, paras)) / WPS
                 length = LEAD + speech + TAIL + 1.0
                 v = work / "close_v.mp4"
-                still(card_png(p["card"], work / "close.png"), length, v, work)
+                still(card_png(p["card"], work / "close.png", p.get("png")), length, v, work)
                 with_narration(v, audio, length, out)
                 note = f"close card, {audio.name if audio else 'no narration'}"
                 pc = [{"part": p["id"], "para": 1, "start": LEAD, "end": LEAD + speech, "text": " ".join(paras)}]

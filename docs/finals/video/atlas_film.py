@@ -56,8 +56,11 @@ MODEL_BOX = (658, 333, 759, 353)
 ATLAS_WAITS = [(35.8, 42.1), (70.3, 76.6)]
 CUTS: list[tuple[float, float]] = []
 TARGET_LUFS = -16.0
-DETECT_MIN, HALF_MIN = 0.55, 0.72       # template-match scores that count as the label (whole word / half word)
-VERIFY_MAX = 0.45                        # after blurring, no frame may score above this
+# Template-match scores (measured on the Atlas film, 30 Oct): the real label scores 0.85-1.0; ordinary text
+# never above 0.78 (whole words and halves alike), with nothing in between. So a hit is >= 0.85 (a half word
+# >= 0.88), and after blurring no frame may score 0.82 or more.
+DETECT_MIN, HALF_MIN = 0.85, 0.88
+VERIFY_MAX = 0.82
 PAD_PX, PAD_FRAMES = 8, 4
 
 
@@ -212,19 +215,21 @@ def stream_seconds(path: Path, kind: str) -> float | None:
 def detect(film: Path, cw: int, ch: int, temps, cache: Path) -> dict[int, list]:
     """Pass 1: the label's hits per frame. Kept in <v3>/work (outside git) so a re-render need not search again."""
     cv2, _ = _cv()
-    key = {"film": str(film), "bytes": film.stat().st_size, "mtime": int(film.stat().st_mtime), "size": [cw, ch],
-           "thresholds": [DETECT_MIN, HALF_MIN], "pad": PAD_FRAMES}
+    key = {"film": str(film), "bytes": film.stat().st_size, "mtime": int(film.stat().st_mtime), "size": [cw, ch]}
     if cache.exists():
         c = json.loads(cache.read_text(encoding="utf-8"))
-        if c.get("key") == key:
-            print("film: label hits read from the cache")
-            return {int(k): [tuple(h) for h in v] for k, v in c["hits"].items()}
+        lo = c.get("key", {}).get("thresholds") or c.get("thresholds") or [9, 9]
+        if {k: v for k, v in c.get("key", {}).items() if k in key} == key and lo[0] <= DETECT_MIN and lo[1] <= HALF_MIN:
+            print("film: label hits read from the cache (re-filtered at the current thresholds)")
+            keep = lambda h: h[5] >= (HALF_MIN if "-" in h[4] else DETECT_MIN)  # noqa: E731
+            out = {int(k): [tuple(h) for h in v if keep(h)] for k, v in c["hits"].items()}
+            return {k: v for k, v in out.items() if v}
     hits: dict[int, list] = {}
     for i, (_, f) in enumerate(frames(film, cw, ch)):
         hs, _ = find(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY), temps)
         if hs:
             hits[i] = hs
-    cache.write_text(json.dumps({"key": key, "hits": hits}), encoding="utf-8")
+    cache.write_text(json.dumps({"key": {**key, "thresholds": [DETECT_MIN, HALF_MIN]}, "hits": hits}), encoding="utf-8")
     return hits
 
 
