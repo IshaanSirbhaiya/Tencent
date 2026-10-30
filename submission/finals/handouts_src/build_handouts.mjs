@@ -16,7 +16,7 @@ const { QRCodeSVG } = req('qrcode.react');
 const { chromium } = req('playwright');
 
 const outDir = path.resolve(here, '..');
-const REPO_URL = 'https://github.com/IshaanSirbhaiya/Tencent/tree/final_v1.0';
+const REPO_URL = 'https://github.com/IshaanSirbhaiya/Tencent/tree/final_v1.3';
 const fmt = (n) => Number(n).toLocaleString('en-US');
 
 const ev = JSON.parse(fs.readFileSync(path.join(web, 'public/eval_summary.json'), 'utf8'));
@@ -53,7 +53,7 @@ const leave = page('Walnut DataBridge leave-behind', `
 <li><b>Two permission gates before the model</b>, plus a re-check at the source just before release.</li>
 <li><b>Keeps a sealed, hash-chained log</b> of every request, so any change shows up.</li></ul></div>
 <div><h2>Two proofs</h2>
-<div class="proof"><b>Restricted looks exactly like non-existent.</b> Ken asks about a real customer he may not see and about a company that does not exist: the two refusals are identical, byte for byte. <span class="k">${N.mism} differences in ${N.pairs} paired questions.</span></div>
+<div class="proof"><b>Restricted looks exactly like non-existent.</b> Ken asks about a customer in the demo data that he may not see and about a company that does not exist: the two refusals are identical, byte for byte. <span class="k">${N.mism} differences in ${N.pairs} paired questions.</span></div>
 <div class="proof"><b>Tamper-evident audit.</b> Change one decision in a copy of the log and Verify breaks at that exact entry.</div></div>
 </section>
 <section class="nums">
@@ -65,7 +65,7 @@ const leave = page('Walnut DataBridge leave-behind', `
 <p class="fine">Evidence re-run ${N.date}. Synthetic data; Confluence, Jira, Slack and Drive are mock servers with real API shapes. Answers are currently quoted from the sources with the same checks; the Hunyuan Hy3 live run is pending.</p>
 <section class="cols">
 <div><h2>Built with Tencent</h2><ul class="tight">
-<li><b>CodeBuddy</b> built and reviewed the code.</li>
+<li><b>CodeBuddy</b> built the WorkBuddy connectors, the token tool, the model-chain tests and the skill, and ran two security reviews (nine sessions, transcripts in the repo).</li>
 <li><b>WorkBuddy</b> asks through our MCP connector, a second front door.</li>
 <li><b>Hunyuan Hy3 via TokenHub</b> is wired; the live run is pending.</li>
 <li><b>Miora</b> made the cover art.</li></ul></div>
@@ -76,7 +76,7 @@ const leave = page('Walnut DataBridge leave-behind', `
 <footer>
 <div class="ask"><h2>The ask</h2><p>One pilot team at one regulated company.</p>
 <p class="team"><b>Team Walnut</b> · Ishaan · Dev · Mehul · Aaruni</p></div>
-<div class="qr">${qr(104)}<div><b>Try it</b><br><span class="url">github.com/IshaanSirbhaiya/Tencent</span><br><span class="url">branch final_v1.0</span></div></div>
+<div class="qr">${qr(104)}<div><b>Try it</b><br><span class="url">github.com/IshaanSirbhaiya/Tencent</span><br><span class="url">branch final_v1.3</span></div></div>
 </footer>
 </main>`);
 
@@ -89,7 +89,7 @@ const cards = [
  ['5','Feasibility','Break-even about ' + N.be.replace('~','') + ' min a week and model cost about US$1k a year (both estimates). Tencent Cloud deploy kit, no live instance. One-team pilot.','/value · /dev/analytics','docs/finals/rubric/impact_feasibility/PILOT_PLAN.md · SCALE_ARCHITECTURE.md · COST_PER_ANSWER.md'],
  ['6','Demo & Storytelling','Five minutes, two proofs, the tagline three times, driven from the keyboard in Presenter mode.','/compare · press P (Presenter)','docs/finals/rubric/demo_story/RUN_SHEET.md · PRESENTER_KEYS.md'],
  ['7','Innovation & Creativity','Restricted is indistinguishable from non-existent (' + N.mism + ' differences in ' + N.pairs + ' pairs), and the log breaks at the exact tampered entry.','/compare · /dev/audit','docs/finals/rubric/ai_innovation/INNOVATION_ONE_PAGER.md'],
- ['8','UX & Accessibility','Keyboard-only demo. Text size, reduce motion, high contrast, theme and 简体中文 in settings; axe checks inside the browser tests.','/settings','docs/finals/rubric/hcd_ux/ACCESSIBILITY_STATEMENT.md'],
+ ['8','UX & Accessibility','Keyboard-driven demo (clickable controls as the fallback). Text size, reduce motion, high contrast, theme and 简体中文 in settings; axe checks inside the browser tests.','/settings','docs/finals/rubric/hcd_ux/ACCESSIBILITY_STATEMENT.md'],
  ['9','Responsible AI & Ethics','No tipping-off; identical refusals; write-ahead sealed log; revealing needs a reason. Crosswalk to AI Verify, MAS FEAT, PDPA, NIST.','/dev/trust','docs/finals/rubric/responsible_ai/SYSTEM_CARD.md · FRAMEWORK_CROSSWALK.md'],
  ['10','Overall Quality','One story, honest numbers dated ' + N.date + ', synthetic data and mock platforms said out loud, a clear ask.','/present/close','docs/finals/rubric/demo_story/LEAVE_BEHIND.md · technical/DEMO_RUNBOOK.md'],
 ];
@@ -106,8 +106,8 @@ const judge = page('Judge cards', sheets.join(''));
 // 30 Oct, round 2b finding 5). R asks to confirm, then signs every demo session out and goes to step 00;
 // it restores nothing. While a dialog (source sheet, reset confirm) is open the presenter keys are off
 // and Esc closes the dialog. Once P has started the script, Esc never hides the bar (it only brings a
-// hidden bar back); H hides it (round-3 Fable #1). Esc on D's panel signs the previous person back in.
-// The language flip is cut from the 5:00 (round-3 Fable #8).
+// hidden bar back); H hides it (round-3 review #1). Esc on D's panel signs the previous person back in.
+// The language flip is cut from the 5:00 (round-3 review #8).
 const keys = [['P','Start: Stage on, step 00'],['Space','Next step (failed step: retry)'],['→','Skip to the next step'],['←','Back one step'],['B','Fallback clip (again = live)'],['R','Reset, after a confirm: all demo sessions signed out, step 00'],['L','English / 简体中文'],['S','Stage theme on / off'],['D','Deliverables: Leo, his panel (Esc: back to the previous person)'],['2','Open citation 2 (Compare)'],['?','Key help'],['Esc','Close a sheet or dialog; never hides the bar once started'],['H','Hide / show the bar']];
 // Mirrors STEPS in databridge/apps/internal_brain_web/components/presenter/script.ts (HUD 00 to 10;
 // P gives 00, the title). The grow steps (?grow=1) are a Q&A walk-up, never on this path.

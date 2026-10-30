@@ -45,7 +45,7 @@ const en = {
   'u.signin.spotMenu': 'The signed-in person',
 
   'u.ask.title': 'Ask the suggested question',
-  'u.ask.body': 'Pick the first suggestion. The real question runs: two permission checks, the model, then a grounding check before any text appears.',
+  'u.ask.body': 'Pick the first suggestion. The real question runs: two permission checks, then the answer (written by the model when one is on, otherwise quoted from the sources), then a grounding check before any text appears.',
   'u.ask.doneBody': 'Each claim carries a numbered citation, and each citation points to a passage Jordan can open right now.',
   'u.ask.act': 'ask the suggested question',
   'u.ask.spotStarter': 'The suggested question',
@@ -75,7 +75,7 @@ const en = {
   'u.change.spotBox': 'The change box',
 
   'u.ken.title': 'Now try Ken',
-  'u.ken.body': 'Ken is an outside contractor. On the left he asks about a real company he is not cleared to see; on the right, about one that does not exist.',
+  'u.ken.body': 'Ken is an outside contractor. On the left he asks about a company in the demo data that he is not cleared to see; on the right, about one that does not exist.',
   'u.ken.doneBody': 'The two refusals are identical, byte for byte. Nothing tells Ken that the first company exists.',
   'u.ken.act': "ask both of Ken's questions",
   'u.ken.spotForm': "Ken's two questions",
@@ -172,7 +172,7 @@ const zh: Record<TourKey, string> = {
   'u.signin.spotMenu': '当前登录的人',
 
   'u.ask.title': '提出建议的问题',
-  'u.ask.body': '点第一个建议问题。系统会真实运行：两道权限检查、模型生成，文字出现前还要通过依据核查。',
+  'u.ask.body': '点第一个建议问题。系统会真实运行：两道权限检查，然后生成答案（开启模型时由模型撰写，否则直接引用来源原文），文字出现前还要通过依据核查。',
   'u.ask.doneBody': '每个结论都带有编号引用，每个引用都指向 Jordan 此刻能打开的一段原文。',
   'u.ask.act': '提出建议的问题',
   'u.ask.spotStarter': '建议的问题',
@@ -202,7 +202,7 @@ const zh: Record<TourKey, string> = {
   'u.change.spotBox': '修改输入框',
 
   'u.ken.title': '再试试 Ken',
-  'u.ken.body': 'Ken 是外部承包商。左边他问的是一家真实存在、但他无权查看的公司；右边问的是一家根本不存在的公司。',
+  'u.ken.body': 'Ken 是外部承包商。左边他问的是一家存在于演示数据中、但他无权查看的公司；右边问的是一家根本不存在的公司。',
   'u.ken.doneBody': '两个拒答完全相同，逐字节一致。没有任何迹象让 Ken 知道第一家公司存在。',
   'u.ken.act': '提出 Ken 的两个问题',
   'u.ken.spotForm': 'Ken 的两个问题',

@@ -22,7 +22,7 @@ Tick each one as you go. The why for every demo-day item is in
 
 ## After the teammate merge
 
-- [ ] **Remind Claude:** after the just-in-time UI merge, extend the **User-mode tour** with its steps (noted in [MERGE_PLAN.md](MERGE_PLAN.md)).
+- [ ] **Remind the build assistant:** after the just-in-time UI merge, extend the **User-mode tour** with its steps (noted in [MERGE_PLAN.md](MERGE_PLAN.md)).
 
 ## Sat 31 Oct
 

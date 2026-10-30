@@ -1,12 +1,12 @@
 # Test report: Playwright suite (mock mode)
 
-30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0` for the earliest run (the current run below is on `final_v1.2-cloud`, to become `final_v1.3`). Config: `playwright.config.ts`
+30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0` for the earliest run (the current run below is on `final_v1.2-cloud`, now locked as `final_v1.3`). Config: `playwright.config.ts`
 (builds with `npm run build:mock`, serves on 127.0.0.1:3101, one worker).
 
 ## Current result (30 Oct 2026, evening, cloud clean checkout)
 
 Run on Fri 30 Oct 2026, evening, in the cloud from a clean checkout (Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) on
-branch `final_v1.2-cloud` (to become `final_v1.3`), with `playwright.config.ts` in mock mode. This run covers the
+branch `final_v1.2-cloud` (now locked as `final_v1.3`), with `playwright.config.ts` in mock mode. This run covers the
 round-4 fixes and the cloud session 2 changes ([CHANGELOG.md](CHANGELOG.md), "30 Oct 2026, night (cloud session 2)").
 
 | Suite | Result |
@@ -39,7 +39,7 @@ Three consecutive full runs from a fresh build, no retries: **124 passed, 0 fail
 (17.0 min, 11.4 min, 9.9 min; the first was slowed by other agents using the machine). No flaky test seen in those
 three runs. `tsc` is clean for the app (`npx tsc -p tsconfig.json --noEmit`) and for the test files.
 
-Not in this count (added after these runs; re-run pending): `voice.spec.ts`, `act.spec.ts` (5), `grow.spec.ts` (6) and
+Not in this count (added after these runs; since run: all of them are in the 185-pass cloud run at the top of this file): `voice.spec.ts`, `act.spec.ts` (5), `grow.spec.ts` (6) and
 `deliverables*.spec.ts` (5).
 
 Note: `tsconfig.json` excludes `tests/`, so the command in the brief never checks test files. I checked them with a

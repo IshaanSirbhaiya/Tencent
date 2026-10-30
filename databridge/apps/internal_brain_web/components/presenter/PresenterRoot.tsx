@@ -58,7 +58,7 @@ export function PresenterRoot() {
   const s = usePresenter();
   const owner = useIsOwner();
   // The live-growth steps exist only while demo features are on (D-24) AND this tab opted in with
-  // ?grow=1 (round-2 Fable #1): never on the default Space path.
+  // ?grow=1 (round-2 review #1): never on the default Space path.
   const demo = useDemoFeatures();
   useEffect(() => {
     // read ?grow=1 on every page change, even before demo features are known (a signed-out tab):

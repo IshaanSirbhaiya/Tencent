@@ -34,7 +34,7 @@ export const CONTROLS: Control[] = [
       'test_pipeline_core.py::test_p1_restricted_never_in_any_prompt',
       'test_pipeline_core.py::test_p2_differential_world_with_and_without_restricted',
       'test_scenarios_e2e.py::test_s4_revocation_without_webhook',
-      'databridge/evals/internal_brain/run.py (leak eval with canaries; re-run pending)',
+      'databridge/evals/internal_brain/run.py (leak eval with canaries; re-run 30 Oct: 0 leaks in 7,374 requests)',
     ],
     live: { href: '/compare', label: 'Same question, two people' },
   },
@@ -72,7 +72,7 @@ export const CONTROLS: Control[] = [
     proof: [
       'test_scenarios_e2e.py::test_s3_existing_vs_nonexistent_identical',
       'test_fintech_scenarios.py::test_fc_real_vs_nonexistent_customer_is_byte_identical',
-      'databridge/evals/internal_brain/run.py (P2 differential, 400 pairs; re-run pending)',
+      'databridge/evals/internal_brain/run.py (P2 differential, 400 pairs; re-run 30 Oct: 0 of 400 differ)',
     ],
     live: { href: '/compare', label: 'Real vs made-up question' },
   },
@@ -244,7 +244,7 @@ export const NEVER: { never: string; instead: string; why: string }[] = [
   { never: 'Explains every decision to the user', instead: 'Explains every answer; never explains a refusal, by design', why: 'Explaining a denial leaks that something exists' },
   { never: 'Human in the loop', instead: 'Humans stay the authority on access; compliance can reconstruct and reveal; no review queue yet', why: 'No review queue is built' },
   { never: 'Production-ready', instead: 'Prototype with a deploy kit; no live deployment', why: 'Not deployed' },
-  { never: 'Current eval numbers without the caveat', instead: 'From the 14 Oct run; re-run pending', why: 'They predate the 30 Oct pipeline edits' },
+  { never: 'Current eval numbers without the caveat', instead: 'From the 30 Oct run on the finals pipeline (0 leaks in 7,374 requests); the 14 Oct figures are history', why: 'The 14 Oct figures predate the 30 Oct pipeline edits' },
   { never: 'Any Aspire customer count or licence status', instead: '—', why: 'Not verified' },
 ];
 

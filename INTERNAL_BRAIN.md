@@ -331,8 +331,9 @@ under `databridge/apps/internal_brain/tests/` unless shown otherwise.
 | Tamper demo runs on a copy; the live log's bytes are unchanged | tests | `test_tamper_demo_route.py` |
 | Live stage events never time the permission checks (Gate 1 and Gate 2 are sent only once the decision is sealed); a foreign `Host` header is refused before any route | tests | `test_final_review_fixes.py::test_gate1_and_gate2_are_held_until_the_checks_are_sealed`, `::test_a_foreign_host_header_is_refused_before_any_route` |
 | The engine snapshot is readable only by the persona it was built for | tests | `internal_brain_web/tests/e2e/engine-proxy.spec.ts`, `engine.spec.ts` |
-| Automated tests, Internal Brain | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, to become `final_v1.3`; 639 at submission) | `databridge/apps/internal_brain/tests/` |
+| Automated tests, Internal Brain | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, now locked as `final_v1.3`; 639 at submission) | `databridge/apps/internal_brain/tests/` |
 | Web end-to-end tests (Playwright, including axe accessibility checks) | 185 passed, 0 failed, 42 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
+| CI on GitHub (backend tests on Python 3.13, web typecheck on Node 20) | Green: 17 successful GitHub Actions runs, 29–30 Oct, 0 failed (superseded pushes were cancelled, not failed); latest [run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962); the workflow also runs on `final_v1.2-cloud`, `final_v1.3` and `final_v1.4` |
 | Live QA of every page against the real backend | 32 checks, 11 bugs fixed, 4 open issues listed | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 The evaluation's own canaries prove it can fail: a deliberately leaky configuration (both checks
@@ -408,8 +409,9 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
 
 ## What's inside
 
-- **The Walnut evidence engine** underneath: provenance pointers, the sealed ledger, the grounding wall
-  and the model harness. The Internal Brain uses it by import and does not modify it.
+- **Parts of the Walnut platform**, imported unchanged: `core` (source pointers, the sealed ledger, value
+  forms), the model harness, `convert` (file readers) and the gateway's grounding wall. The Internal Brain keeps
+  its own permission-first retrieval index; it does not use the platform's retrieval package.
 - **The Internal Brain** on top: the permission compilers, the two checks, the audit log and console,
   the web app, the mock platforms, the Company A world, the fintech rules, the WorkBuddy connectors, the
   evaluation and the original-screen configuration.

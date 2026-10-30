@@ -186,7 +186,7 @@ export const STEPS: PresenterStep[] = [
   {
     id: 'workbuddy',
     title: 'WorkBuddy (off-app)',
-    say: 'Mehul: "Aaruni, Tencent." Aaruni: "Tencent is inside the product. Jordan is on call at 3 a.m. and asks from WorkBuddy."',
+    say: 'Mehul: "Aaruni, Tencent." Aaruni: "Tencent's WorkBuddy is a second front door to the product. Jordan is on call at 3 a.m. and asks from WorkBuddy."',
     url: '/dev/audit',
     clip: CLIPS.C,
     offApp: true,
@@ -269,7 +269,7 @@ export const GROW_STEPS: PresenterStep[] = [
 
 /**
  * The grow beat is opt-in per tab: `?grow=1` turns it on, `?grow=0` off (sessionStorage, this tab
- * only). Demo features alone never put it on the Space path (round-2 Fable #1: the 5:00 script is
+ * only). Demo features alone never put it on the Space path (round-2 review #1: the 5:00 script is
  * always the run sheet's steps). Returns whether this tab opted in.
  */
 const GROW_KEY = 'ib.presenter.grow';

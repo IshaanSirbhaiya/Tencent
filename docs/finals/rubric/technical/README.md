@@ -14,7 +14,7 @@ on the finals code on 30 Oct and match `eval_summary.json`; latency is from the 
 | [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) | Start every service; pre-flight checks; ten failures and their fallbacks | (Team use, before and during the demo) |
 
 CI: [`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml) runs the Internal Brain pytest
-suite (Python 3.13) and the web app typecheck (Node 20) on every push and pull request to `final_v1.0` and
+suite (Python 3.13) and the web app typecheck (Node 20) on every push and pull request to `final_v1.0`, `final_v1.2-cloud`, `final_v1.3`, `final_v1.4` and
 `Tencent`.
 
 Responsible AI evidence: [../responsible_ai/](../responsible_ai/README.md), including the list of claims

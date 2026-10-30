@@ -135,7 +135,7 @@ Outline (one page, numbered, every number with its source):
 2. The problem in three numbers: Gartner 47%; APQC 2.8 h/week; Copilot CW1226324 (Jan 2026).
 3. Why now: MAS AIRM issued 7 Oct 2026, Sections 3-4 apply from 7 Oct 2027; PDPA 10% of turnover.
 4. What we change: "answers only from what you're allowed to open, and proof afterwards". Two gates, sealed audit.
-5. Measured proof: 0 / 7,374 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 1,131 backend tests and 166 browser tests passing (30 Oct, commit 831297e; docs/finals/TEST_REPORT.md).
+5. Measured proof: 0 / 7,374 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 1,131 backend tests and 166 browser tests passing (30 Oct, commit 831297e; docs/finals/TEST_REPORT.md). *(update 30 Oct: now 1,274 backend and 185 browser tests passing in the clean-checkout cloud run.)*
 6. Value (projection): break-even 7 min/person/week; base US$1.3M/yr; range US$0.44M-4.1M; assumptions in one line.
 7. Relevance to Aspire: covers all five scenarios; matches Aspire's own MCP permission promise; extends to AspireOS bank clients.
 8. Limits: synthetic data, mock platforms with real API shapes, no live tenant yet.

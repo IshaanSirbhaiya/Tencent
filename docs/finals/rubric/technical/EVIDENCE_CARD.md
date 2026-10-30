@@ -75,7 +75,7 @@ Run any one with `PY -m pytest "<path>::<name>" -q` (path under `apps/internal_b
 | Codex track 4 + CodeBuddy (Hy3) | MCP, tokens; app, auth, pipeline | 10 + 7 | Written | `docs/tencent/SECURITY.md:283-313`; `docs/tencent/reviews/codebuddy_security_review.md` |
 | Codex track 5 | Map, audit content | 9 + 1 note | Written | `docs/tencent/SECURITY.md:316-331` |
 | Codex track 6 | Web app | 10 | Written | `docs/tencent/SECURITY.md:353-369` |
-| Codex track 7 + Claude rounds | Fix verification; security, accuracy, first run | — | Written | `docs/tencent/SECURITY.md:334-393` |
+| Codex track 7 + two further AI review rounds | Fix verification; security, accuracy, first run | — | Written | `docs/tencent/SECURITY.md:334-393` |
 
 All reviewers are AI models or the team. No human third-party review.
 

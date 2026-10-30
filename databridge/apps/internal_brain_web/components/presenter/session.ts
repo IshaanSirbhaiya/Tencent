@@ -1,4 +1,4 @@
-// One queue for every change of who is signed in to the MAIN session (round-4 Opus #1, #13).
+// One queue for every change of who is signed in to the MAIN session (round-4 review #1, #13).
 //
 // The presenter (step sign-ins, P's deliverables warm-up, D and its restore, R's sign-outs) and the
 // shell (Sign out, persona switch: components/shell/Providers.tsx) all run their session changes

@@ -47,7 +47,7 @@ class Superseded extends Error {
 
 /* ------------------------------------------------- session serialisation */
 // Session-changing work (the main demo sign-in, Reset's sign-outs, and the shell's Sign out and
-// persona switch) runs one at a time, in order, through ./session.ts (round-4 Opus #1), so Reset
+// persona switch) runs one at a time, in order, through ./session.ts (round-4 review #1), so Reset
 // can never interleave with a sign-in that is halfway through.
 
 /** The shell signed out or switched persona while this step was running: it stops, it does not override. */
@@ -168,7 +168,7 @@ export async function runStep(i: number, dir: 'forward' | 'back' = 'forward') {
 }
 
 /*
- * D's warm-up waits until the first Compare step has settled (round-5 Opus cross-check #3): it
+ * D's warm-up waits until the first Compare step has settled (round-5 review cross-check #3): it
  * runs one more live ask and its deliverables, so it must not compete with the two live Compare
  * asks of step 01. It starts once step 01 has finished (or failed, or was skipped past), while the
  * presenter speaks over step 01's answers; Compare uses its own slot sessions, so borrowing the
@@ -294,7 +294,7 @@ function typing(t: EventTarget | null): boolean {
 
 /**
  * A dialog that has the keyboard (sources sheet, reset confirm, recording, D's panel). The grow
- * step's Add sheet is presenter-owned (`data-presenter-owned`, round-3 Fable #1): the script put it
+ * step's Add sheet is presenter-owned (`data-presenter-owned`, round-3 review #1): the script put it
  * there and Space keeps driving the script over it.
  */
 const openDialog = () => document.querySelector('[role="dialog"]:not([data-presenter-owned]),[role="alertdialog"]');
@@ -549,7 +549,7 @@ function onSideButton(e: MouseEvent) {
  */
 /**
  * Whether the page is at a step's URL: the same path AND every query parameter the step's URL sets
- * (round-5 Opus cross-check #1). Steps 05 to 07 all live on /dev/audit (?verify=1, ?tamper=1, plain),
+ * (round-5 review cross-check #1). Steps 05 to 07 all live on /dev/audit (?verify=1, ?tamper=1, plain),
  * so a path-only match took Back from step 07's ?latest=1 entry to step 07's own /dev/audit entry as
  * "back to step 06" and re-ran the tamper demo. Extra parameters the page adds itself are allowed.
  */

@@ -330,7 +330,7 @@ const SCENES = {
   } },
   '03_ken_identical': { who: 'ken.ext', mode: 'user', async run(page) {                  // ~24 s
     await goto(page, `${WEB}/compare?mode=person&p=ken.ext&q1=${encodeURIComponent(QV)}&q2=${encodeURIComponent(QB)}`, 1.0);
-    mark(page, 'Ken · outside contractor: a real customer vs a made-up one', 4.5);
+    mark(page, 'Ken · outside contractor: a customer in the demo data vs a made-up one', 4.5);
     await read(page, page.locator('#cmp-q1'), 1.6);
     await read(page, page.locator('#cmp-q2'), 1.6);
     await click(page, page.getByRole('button', { name: 'Ask both' }), 0);

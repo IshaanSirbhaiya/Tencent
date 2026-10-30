@@ -123,7 +123,7 @@ other people see a lock card that explains why.
 | Mode | Page | URL | Sign in as | What it shows |
 |---|---|---|---|---|
 | User | **Ask** | `/` | anyone | One composer, with optional voice dictation (browser speech, English / 简体中文, never sends by itself). Live stage events while the request runs, then a cited answer with `[n]` chips. A source opens a sheet with the passage, version and "checked live" time. Refusals are one constant text |
-| User | **Compare** | `/compare` | anyone | Same question, two people (Amy vs Rachel on Velquarry); or one person, two questions (Ken: a real company vs a made-up one, marked "Identical responses") |
+| User | **Compare** | `/compare` | anyone | Same question, two people (Amy vs Rachel on Velquarry); or one person, two questions (Ken: a company in the demo data vs a made-up one, marked "Identical responses") |
 | User | **History** | `/history` | anyone | Your own questions by day; a row opens your request receipt |
 | User | **Settings** | `/settings` | anyone | English / 简体中文, theme, text size, reduce motion, high contrast, replay tour |
 | User | **Value** | `/value` | anyone | ROI calculator; every input is visible and the result is labelled an estimate |
@@ -180,8 +180,9 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Prompt injection planted on all four platforms | **0 hard failures** in 1,152 injection-relevant requests |
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 93.2% (quoted) to 97.1% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
-| Backend tests (Internal Brain) | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, to become `final_v1.3`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
+| Backend tests (Internal Brain) | **1,274 passed**, 0 failed, 4 skipped (30 Oct 2026, evening, cloud clean checkout: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, branch `final_v1.2-cloud`, now locked as `final_v1.3`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
 | Web end-to-end tests (Playwright, axe checks) | 185 passed, 0 failed, 42 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, evening, cloud clean checkout: Linux, branch `final_v1.2-cloud`; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
+| CI on GitHub (backend tests on Python 3.13, web typecheck on Node 20) | Green: 17 successful GitHub Actions runs, 29–30 Oct, 0 failed (superseded pushes were cancelled, not failed); latest [run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962); the workflow also runs on `final_v1.2-cloud`, `final_v1.3` and `final_v1.4` |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits

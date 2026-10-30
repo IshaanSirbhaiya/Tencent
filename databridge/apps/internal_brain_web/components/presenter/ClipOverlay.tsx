@@ -21,7 +21,7 @@ export function ClipOverlay() {
 
   return (
     <>
-    {/* A polite live region that is always mounted (round-5 Opus cross-check #2): a region that
+    {/* A polite live region that is always mounted (round-5 review cross-check #2): a region that
         appears together with its text is often not announced; this one only changes its text. */}
     <div
       role="status"
