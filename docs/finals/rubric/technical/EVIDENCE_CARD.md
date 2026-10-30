@@ -84,5 +84,5 @@ All reviewers are AI models or the team. No human third-party review.
 | Gap | Status |
 |---|---|
 | Live Hy3 run | `RESULTS.md:30`: PENDING (no TokenHub key that works yet) |
-| CI run on GitHub | Workflow added 30 Oct (`.github/workflows/ci.yml`); first run result not yet recorded |
+| CI on GitHub | Workflow `.github/workflows/ci.yml` (backend tests on Python 3.13 + web typecheck): green: 17 successful runs on GitHub Actions, 29–30 Oct, 0 failed (backend tests + web typecheck); latest [run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962) |
 | Load test, large ledger | Not written (`docs/tencent/SECURITY.md:330`) |
