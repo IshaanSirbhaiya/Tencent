@@ -68,6 +68,7 @@ const userEn = {
 
   /* answer */
   'answer.heading': 'Answer',
+  'answer.model.ai': 'AI-generated from your cited sources',
   'answer.model.hy3': 'Tencent Hunyuan Hy3',
   'answer.model.deepseek': 'DeepSeek',
   'answer.model.extractive': 'Quoted from sources (no model)',
@@ -256,6 +257,7 @@ const userZh: Record<UserKey, string> = {
   'progress.verify': '正在核对引用',
 
   'answer.heading': '回答',
+  'answer.model.ai': '由 AI 根据您引用的来源生成',
   'answer.model.hy3': '腾讯混元 Hy3',
   'answer.model.deepseek': 'DeepSeek',
   'answer.model.extractive': '直接引自来源（未使用模型）',

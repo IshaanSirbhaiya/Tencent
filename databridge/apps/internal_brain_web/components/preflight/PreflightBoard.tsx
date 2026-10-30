@@ -125,13 +125,21 @@ export function PreflightBoard({ services, report, serverNow, mock }: { services
     try {
       const r = await fetch('/api/ib/ib/status', { cache: 'no-store', headers: { accept: 'application/json' } });
       if (r.ok) {
-        const s = (await r.json()) as { models?: { active?: boolean; active_chain?: string[] }; ledger?: { ok?: boolean | null } };
+        const s = (await r.json()) as { models?: { active?: boolean; active_provider?: string | null; active_chain?: string[] }; ledger?: { ok?: boolean | null } };
         const live = !!s.models?.active;
+        // Hy3 is named only when the active chain IS TokenHub/Hy3; any other model is neutral
+        const hy3 = live && s.models?.active_provider === 'tencent-tokenhub';
         setModelLive({
           key: 'model-now',
-          label: mock ? 'Model now: mock fixtures' : live ? 'Model now: Tencent Hunyuan live' : 'Model now: extractive fallback',
+          label: mock ? 'Model now: mock fixtures' : hy3 ? 'Model now: Tencent Hunyuan live' : live ? 'Model now: AI model active' : 'Model now: extractive fallback',
           status: mock ? 'info' : live ? 'pass' : 'warn',
-          detail: mock ? 'offline build' : live ? (s.models?.active_chain ?? []).join(', ') : 'answers are quoted from the sources; say so, never claim Hy3',
+          detail: mock
+            ? 'offline build'
+            : hy3
+              ? (s.models?.active_chain ?? []).join(', ')
+              : live
+                ? 'an AI model answers from the cited sources; never claim Hy3'
+                : 'answers are quoted from the sources; say so, never claim Hy3',
         });
       } else {
         setModelLive({ key: 'model-now', label: 'Model now: sign in to see', status: 'info', detail: 'this browser is not signed in; the Start script result is above' });

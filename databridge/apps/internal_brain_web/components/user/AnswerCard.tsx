@@ -96,11 +96,11 @@ export function AnswerText({ response, onCite, className }: { response: AskRespo
 export function ModelLabel({ model, className }: { model: AskResponse['model']; className?: string }) {
   const t = useMessages(userMessages);
   const kind = modelKind(model);
-  const label = kind === 'other' ? `${model.provider} · ${model.model}` : t(MODEL_KEY[kind]);
+  const label = t(MODEL_KEY[kind]);
   const isModel = kind !== 'extractive';
   return (
     <span className={cn('inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-caption text-muted', className)}>
-      <span className="inline-flex items-center gap-1" title={model.fallback_used ? t('answer.model.fallbackTip') : `${model.provider} / ${model.model}`}>
+      <span className="inline-flex items-center gap-1" title={model.fallback_used ? t('answer.model.fallbackTip') : kind === 'ai' ? label : `${model.provider} / ${model.model}`}>
         <Cpu aria-hidden className="h-3.5 w-3.5 text-subtle" />
         <span data-testid="model-badge">{label}</span>
       </span>

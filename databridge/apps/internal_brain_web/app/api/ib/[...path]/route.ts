@@ -43,7 +43,7 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^ib\/deliverables(\/export)?$/ },
   // Just-in-time views of an answer (same switch as deliverables): main session only
   { method: 'POST', re: /^ib\/views$/ },
-  // A follow-up rewritten into a standalone search question (Claude; main session only)
+  // A follow-up rewritten into a standalone search question (the model; main session only)
   { method: 'POST', re: /^ib\/rewrite$/ },
   { method: 'GET', re: new RegExp(`^ib\\/doc\\/${DOC_ID}$`) },
   { method: 'GET', re: /^audit\/(events|verify|stats)$/ },

@@ -19,7 +19,7 @@ export interface Citation {
 }
 
 export interface ModelInfo {
-  provider: string; // "tencent-tokenhub" | "deterministic"
+  provider: string; // "tencent-tokenhub" | "standin" | "deterministic"
   model: string; // "hy3" | "deepseek-v4.1-flash" | "extractive-v1"
   fallback_used?: boolean;
 }
@@ -818,14 +818,14 @@ export interface ViewsStatus {
   /** a model is connected; without one, the layout is picked by rules from the instruction */
   model: boolean;
   blocks: ViewBlockKind[];
-  /** Claude composes pages (the key is configured; it may be over its spend cap) */
+  /** a model composes pages (it may be over its spend cap); provider and model are neutral ids */
   composer?: { provider: string; model: string; available: boolean };
 }
 /** POST /ib/views mode "decide": does this answer open a page, or stay in the chat? */
 export interface JitDecision {
   render: 'page' | 'chat';
   title: string;
-  decided_by: 'claude' | 'rules';
+  decided_by: 'model' | 'rules';
   view_id?: string;
 }
 /** One A2UI v0.9 message (createSurface, updateComponents or updateDataModel). */

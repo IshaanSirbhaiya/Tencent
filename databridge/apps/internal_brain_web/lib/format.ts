@@ -67,7 +67,7 @@ export function modelLabel(m: { provider: string; model: string; fallback_used?:
   if (m.provider === 'deterministic' || id.startsWith('extractive')) return 'Deterministic extractive';
   if (id.includes('hy3') || id.includes('hunyuan')) return 'Tencent Hunyuan hy3';
   if (id.includes('deepseek')) return 'DeepSeek (fallback)';
-  return `${m.provider} · ${m.model}`;
+  return 'AI model'; // any other model: never the provider or its id
 }
 
 export function truncHash(h: string, n = 12): string {

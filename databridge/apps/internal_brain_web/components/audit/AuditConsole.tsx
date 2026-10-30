@@ -77,7 +77,7 @@ function modelName(m?: string | null): string {
   if (!m) return 'a model';
   if (/^hy3/i.test(m)) return 'Tencent Hunyuan Hy3';
   if (/deepseek/i.test(m)) return `DeepSeek (${m})`;
-  return m;
+  return 'an AI model'; // any other model: never its provider or id
 }
 
 /** Scroll a panel to the top of the view (instantly when motion is reduced). */

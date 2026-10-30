@@ -64,7 +64,7 @@ export function modelName(key: string): { label: string; detail: string; kind: '
   if (provider === 'deterministic' || m.startsWith('extractive')) return { label: 'Extractive (no model)', detail: key, kind: 'extractive' };
   if (m.includes('hy3') || m.includes('hunyuan')) return { label: 'Hy3', detail: key, kind: 'primary' };
   if (m.includes('deepseek')) return { label: 'DeepSeek (fallback)', detail: key, kind: 'fallback' };
-  return { label: model || key, detail: key, kind: 'other' };
+  return { label: 'AI model', detail: 'AI model', kind: 'other' }; // never the provider or its id
 }
 
 export function modelInfoName(m: { provider: string; model: string } | null | undefined): string {

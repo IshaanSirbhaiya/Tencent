@@ -4,7 +4,7 @@
 // view uses the Xcode-like tokens (.ask-x in globals.css).
 //
 // The canvas: after each answer the Brain is asked whether it needs a page (POST /ib/views
-// mode "decide"; Claude decides when connected, else the rules). A simple answer stays in the
+// mode "decide"; the model decides when connected, else the rules). A simple answer stays in the
 // chat. When a page is right ("everything about the project and its people"), the chat moves left,
 // the sidebar shrinks to its icons and the page is built in the canvas on the right (ViewCanvas);
 // below 1024 px it opens as a full-screen sheet. While a page is open, a short request about its
@@ -187,7 +187,7 @@ export default function AskPage() {
       setAnnounce(t('ask.announce.start'));
       try {
         // A follow-up ("what was said in Slack?") or a long question becomes one standalone
-        // search question first (Claude, when connected); the chat shows what was searched.
+        // search question first (the model, when connected); the chat shows what was searched.
         let asked = text;
         if (previous || text.split(/\s+/).length > 14) {
           const st = await viewsStatus();

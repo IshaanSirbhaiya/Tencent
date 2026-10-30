@@ -15,7 +15,7 @@ import { z } from 'zod';
 import { PlatformIcon } from '@/components/PlatformIcon';
 import { CitationChip } from '@/components/user/CitationChip';
 import { ChartView, TableView, type Numbering, type T as DeliverT } from '@/components/user/DeliverSheet';
-import { speakerName, speakerParts } from '@/components/user/answerText';
+import { modelKind, speakerName, speakerParts } from '@/components/user/answerText';
 import { cn } from '@/lib/cn';
 import { placeLabel } from '@/lib/format';
 import type { ViewMessageKey } from '@/lib/i18n/view';
@@ -192,12 +192,16 @@ const WalnutPage = createComponentImplementation(PageApi, ({ props, buildChild }
   const { t, lang } = useEnv();
   const meta = Meta.safeParse(props.meta);
   const m = meta.success ? meta.data : null;
+  // only Hy3 (and its DeepSeek fallback) is named; any other model is "an AI model"
+  const named = !!m?.model && ['hy3', 'deepseek'].includes(modelKind(m.model));
   const by =
     !m || m.generated !== 'model' || !m.model
       ? t('view.by.rules')
-      : m.model.fallback_used
-        ? t('view.by.fallbackModel', { model: m.model.model })
-        : t('view.by.model', { model: m.model.model });
+      : !named
+        ? t(m.model.fallback_used ? 'view.by.fallbackAi' : 'view.by.ai')
+        : m.model.fallback_used
+          ? t('view.by.fallbackModel', { model: m.model.model })
+          : t('view.by.model', { model: m.model.model });
   const kids = (Array.isArray(props.children) ? props.children : []) as unknown[];
   return (
     <article
@@ -486,7 +490,7 @@ const WalnutMissing = createComponentImplementation(DataApi('WalnutMissing'), ({
 });
 
 
-/* ------------------------------------------------------------------- composed pages (Claude) */
+/* ------------------------------------------------------------------- composed pages (model) */
 
 /** The accent a page asked for, as a colour (each AA with white text). */
 export const ACCENT: Record<string, string> = {

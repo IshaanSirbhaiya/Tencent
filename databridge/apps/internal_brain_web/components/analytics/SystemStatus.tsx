@@ -56,7 +56,7 @@ export function Freshness({ sources, now }: { sources: SourceStatus[] | null; no
   );
 }
 
-const MODEL_LABEL: Record<string, string> = { hy3: 'Hy3', 'deepseek-v4.1-flash': 'DeepSeek V4.1 Flash' };
+const MODEL_LABEL: Record<string, string> = { hy3: 'Hy3', 'deepseek-v4.1-flash': 'DeepSeek V4.1 Flash', 'standin-1': 'AI model' };
 
 /** The model chain and ledger health from /ib/status. Unknown fields render as "not reported". */
 export function ModelStatus({ status, unavailable }: { status: IbStatus | null; unavailable?: boolean }) {

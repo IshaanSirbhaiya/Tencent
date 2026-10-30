@@ -529,7 +529,7 @@ export const viewApi = {
   /** My message as a standalone search question (my previous question as context). */
   rewrite: (question: string, previous: string) =>
     call<{ question: string; rewritten: boolean }>('/ib/rewrite', { method: 'POST', body: { question: question.slice(0, 2000), previous: previous.slice(0, 2000) } }),
-  /** Page or chat for MY answer: Claude decides when connected, else the rules (`question` as asked). */
+  /** Page or chat for MY answer: the model decides when connected, else the rules (`question` as asked). */
   decide: (reqId: string, question: string) =>
     call<import('./types').JitDecision>('/ib/views', { method: 'POST', body: { req_id: reqId, instruction: question.slice(0, 300), mode: 'decide' } }),
 };

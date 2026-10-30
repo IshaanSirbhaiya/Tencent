@@ -64,18 +64,21 @@ export function isRefusal(r: AskResponse): boolean {
   return r.citations.length === 0;
 }
 
-export type ModelKind = 'hy3' | 'deepseek' | 'extractive' | 'other';
+/** 'ai': any other model (a stand-in or a bring-your-own endpoint). Its label is neutral: it never
+ *  names the provider or the model id (founder decision: only Hy3 is named). */
+export type ModelKind = 'hy3' | 'deepseek' | 'extractive' | 'ai';
 
 export function modelKind(m: ModelInfo | null | undefined): ModelKind {
-  if (!m) return 'other';
+  if (!m) return 'ai';
   const id = m.model.toLowerCase();
   if (m.provider === 'deterministic' || id.startsWith('extractive')) return 'extractive';
   if (id.includes('hy3') || id.includes('hunyuan')) return 'hy3';
   if (id.includes('deepseek')) return 'deepseek';
-  return 'other';
+  return 'ai';
 }
 
-export const MODEL_KEY: Record<Exclude<ModelKind, 'other'>, UserKey> = {
+export const MODEL_KEY: Record<ModelKind, UserKey> = {
+  ai: 'answer.model.ai',
   hy3: 'answer.model.hy3',
   deepseek: 'answer.model.deepseek',
   extractive: 'answer.model.extractive',
