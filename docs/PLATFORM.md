@@ -119,8 +119,8 @@ through the same rule (`authz.py:1-12`). Tests: `test_connector_confluence.py`, 
 the real API shapes (`databridge/apps/mock_platforms`).
 
 **A4. Model step.** All model calls go through `databridge_harness.Harness` (`databridge_ib/llm.py:81`).
-The chain starts with Tencent Hunyuan (Hy3) on TokenHub (`DEFAULT_CHAIN`, `llm.py:30`), then an optional
-stand-in model, then the extractive path, which quotes the released passages and needs no model
+The chain starts with Tencent Hunyuan (Hy3) on TokenHub (`DEFAULT_CHAIN`, `llm.py:30`), then DeepSeek V4
+Flash on the same TokenHub, then the extractive path, which quotes the released passages and needs no model
 (`narrate.py:1-6`). `scripts/hy3_check.py` reports whether TokenHub answers; Hy3 has not run live in this
 product. Tests: `test_llm_chain.py` and `test_model_config.py`, 9 passed (with a capturing test model,
 no live call); harness 36 passed. Screen: `/dev/analytics` shows which model answered.

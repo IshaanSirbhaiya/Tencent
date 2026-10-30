@@ -30,7 +30,7 @@ test runs and screens, is **[docs/PLATFORM.md](docs/PLATFORM.md)**.
 | **Convert and materialise** | Convert between CSV, Excel, JSON, Parquet, Arrow, XML, YAML, HTML and Markdown tables, PDF, DOCX, PPTX, email and images; materialise a dataset as a hashed plan that re-executes to the same bytes, with a receipt | [`convert`](databridge/packages/convert), [`materialise`](databridge/packages/materialise) | 65 files; convert 519 passed, 18 skipped, 2 need the optional `readability-lxml` module ([note c](docs/PLATFORM.md#7-notes-on-the-test-runs)); materialise 371 passed | **Yes** (convert reads uploads and Drive files) |
 | **Grounding wall with source pointers** | Binds each sentence of an answer to a cited passage and drops what it cannot bind; values carry `SourcePointer`s | [`gateway/llm.py`](databridge/apps/gateway/databridge_gateway/llm.py), [`core/provenance.py`](databridge/packages/core/databridge_core/provenance.py) | 5 files; 54 passed | **Yes** |
 | **Sealed, hash-chained ledger** | Every request is written ahead, sealed and chained; an edit by anyone without the sealing key breaks verification | [`core/decision_ledger.py`](databridge/packages/core/databridge_core/decision_ledger.py), [`databridge_ib/audit/`](databridge/apps/internal_brain/databridge_ib/audit) | core 13 files: 276 passed, 1 fails on Linux only (pydantic recursion depth, [note e](docs/PLATFORM.md#7-notes-on-the-test-runs)); Internal Brain audit 10 files: 124 passed | **Yes** |
-| **Model harness** | The only code allowed to call a model; Tencent Hunyuan (Hy3) via TokenHub when activated, otherwise an optional stand-in model or the extractive path | [`packages/harness`](databridge/packages/harness) | 7 files; 36 passed | **Yes** |
+| **Model harness** | The only code allowed to call a model; Tencent Hunyuan (Hy3) via TokenHub when activated, then DeepSeek V4 Flash on the same TokenHub, otherwise the extractive path | [`packages/harness`](databridge/packages/harness) | 7 files; 36 passed | **Yes** |
 | **Evals** | Platform evals (schema annotation, SQL, intake, retrieval), and the Internal Brain leak evaluation: 0 leaks in 7,374 requests | [`packages/evals`](databridge/packages/evals), [`RESULTS.md`](databridge/evals/internal_brain/RESULTS.md) | 6 files; 23 passed | Checks the answers |
 
 Test counts are `test_*.py` files; every result was re-run package by package on 30 Oct in the cloud
@@ -124,7 +124,7 @@ Sign in by picking a person. There is no password; the demo sign-in stands in fo
 on by itself (`IB_FORCE_OFFLINE=0`) only if TokenHub answers; otherwise it keeps the quoted answer. Set
 `IB_FORCE_OFFLINE` yourself to override. Check by hand from `databridge/`:
 `.venv/Scripts/python scripts/hy3_check.py` (exit 0 live, 1 not live, 2 no key; the key is never
-printed). The chain is Hy3, then an optional stand-in model, then the quoted answer. This has not yet run live
+printed). The chain is Hy3, then DeepSeek V4 Flash (both on TokenHub), then the quoted answer. This has not yet run live
 (see the table above).
 
 ### Fallback: start each part by hand
@@ -250,7 +250,7 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | **CodeBuddy** | Nine build sessions (CB1–CB9). CB1–CB6 (14–15 Oct) drew the trust boundaries, built both WorkBuddy connectors and the token tool, wrote the model-chain tests, ran a security review, then fixed its own code after a Codex review. CB7–CB9 (30 Oct) worked on the finals code: a security review of the finals backend, the WorkBuddy connector upgrade, the Walnut WorkBuddy skill | [DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md), transcripts in `docs/tencent/evidence/`, screenshots in `submission/01_codebuddy/` |
 | **WorkBuddy** | The Brain's second front door: three connectors (ask as Jordan, ask as Ken, compliance audit), each carrying its own signed token. The compliance connector is never in the same WorkBuddy connector list as the employee ones (its own workspace, or `--compliance-user-config` on a separate seat; D-30) | [WorkBuddy guide](docs/tencent/workbuddy/README.md), screenshots in `submission/02_workbuddy/` |
 | **Hunyuan Hy3** | The model behind CodeBuddy sessions CB1, CB5, CB7 and CB9; configured as the first model in the Brain's answer chain and as the audit search's fallback parser (rules run first, the model only when they recognise nothing); wired, not yet run live | CodeBuddy transcripts; `databridge/apps/internal_brain/databridge_ib/llm.py`, `audit/nl_llm.py` |
-| **TokenHub** | The Brain's model gateway (Hy3, then an optional stand-in model). Wired in and tested; live run pending activation | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
+| **TokenHub** | The Brain's model gateway (Hy3, then DeepSeek V4 Flash). Wired in and tested; live run pending activation | `llm.py`, `tests/test_llm_chain.py`, `tests/test_model_config.py` |
 | **Lighthouse** | A hardened one-command deploy kit (HTTPS, passcode-gated demo, only ports 80/443 open); no live instance because Lighthouse was unavailable during the event | [deploy/lighthouse/](deploy/lighthouse/README.md) |
 | **Miora** | Tencent's AI design agent made the cover art from our written brief; we added the title | `submission/06_cover/` |
 

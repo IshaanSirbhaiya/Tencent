@@ -252,7 +252,7 @@ bash; the commands are in [README.md → Fallback](README.md#fallback-start-each
   git-ignored) with one of these, then restart (`demo_up.sh stop`, then `start`; or restart terminal 1):
 
   ```bash
-  # Tencent TokenHub: Hy3 first, then the optional stand-in model
+  # Tencent TokenHub: Hy3 first, then DeepSeek V4 Flash
   TOKENHUB_API_KEY=<your TokenHub key>
   ```
 
@@ -414,7 +414,7 @@ Mapping to MAS TRM, the MAS AI Risk Management Guidelines, PDPA and PCI DSS, wit
   boundaries, and ran a security review on Tencent Hunyuan `hy3`; then it fixed its own code after a Codex
   review. Every session's transcript is kept: [docs/tencent/DEV_PROCESS.md](docs/tencent/DEV_PROCESS.md).
 - **WorkBuddy** is the second front door, including an audit assistant for compliance.
-- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with an optional stand-in model behind it (wired in,
+- **TokenHub** (Singapore) serves Tencent Hunyuan `hy3`, with DeepSeek V4 Flash behind it (wired in,
   not yet run live; see [Honest limits](#honest-limits)).
 - **Lighthouse:** a hardened deploy kit (Docker, HTTPS, passcode-gated demo) is in
   [deploy/lighthouse/](deploy/lighthouse/README.md).
