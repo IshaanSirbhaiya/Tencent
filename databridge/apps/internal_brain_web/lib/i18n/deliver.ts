@@ -68,7 +68,7 @@ const deliverEn = {
   'deliver.sources.analysis': 'Cited in this analysis',
   'deliver.recorded': 'Recorded in the audit trail before it was shown.',
 
-  'deliver.needsModel': 'This needs an AI model. Its draft didn’t pass the source check, so nothing was written.',
+  'deliver.needsModel': 'The AI model ran, but it didn’t produce anything that passed the source check, so nothing was written.',
   'deliver.noModel': 'Needs an AI model. No model is connected on this build; the table and chart are built from the sources.',
   'deliver.insufficient': 'Not enough numbers from your sources to draw a chart.',
   'deliver.showTable': 'Show the table instead',
@@ -146,7 +146,7 @@ const deliverZh: Record<DeliverKey, string> = {
   'deliver.sources.analysis': '此分析引用的来源',
   'deliver.recorded': '在显示之前已记录到审计轨迹。',
 
-  'deliver.needsModel': '此功能需要 AI 模型。模型的输出未通过来源核对，因此没有生成任何内容。',
+  'deliver.needsModel': 'AI 模型已运行，但其输出未通过来源核对，因此没有生成任何内容。',
   'deliver.noModel': '此功能需要 AI 模型。此版本未连接模型；表格和图表直接根据来源生成。',
   'deliver.insufficient': '你的来源中没有足够的数字来绘制图表。',
   'deliver.showTable': '改为显示表格',
