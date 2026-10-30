@@ -1,0 +1,2 @@
+item,owner,status,due,notes
+{{ITEM}},{{OWNER}},{{STATUS}},{{DUE}},{{SENTENCE}}

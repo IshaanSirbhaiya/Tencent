@@ -1,0 +1,27 @@
+24/10/2026, 02:13 - Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.
+24/10/2026, 02:13 - Priya Raman created group "Ops on-call"
+24/10/2026, 02:14 - Devansh Patel: Paged: authorisation success rate under 95% for 5 min. Looking now
+24/10/2026, 02:15 - Devansh Patel: Dashboard shows a spike of retries from the settlement side, not the card network
+24/10/2026, 02:17 - Aisha Rahman: I'm up. Card-network gateway certificates all fine, checked expiry
+24/10/2026, 02:19 - Devansh Patel: Status page? Merchants not complaining yet
+24/10/2026, 02:20 - Aisha Rahman: Holding off, success rate already back at 98%
+24/10/2026, 02:26 - Devansh Patel: Recovered fully at 02:24. Will write it up in the morning
+24/10/2026, 08:41 - Priya Raman: Morning. Read the thread. Was this the same alert from PAY-204?
+24/10/2026, 08:43 - Devansh Patel: Yes, the PAY-204 success-rate alert. First real page since it shipped
+24/10/2026, 08:50 - Jordan Doe: Settlement job logs show a burst at 02:10. Checking the retry config
+24/10/2026, 09:12 - Jordan Doe: Found it: retry backoff was set to 0 after Thursday's config change
+24/10/2026, 09:15 - Priya Raman: Root cause for Saturday's alert: the settlement retry job resent 3,400 authorisations in one burst at 02:10, which tripped the PAY-204 success-rate alert; no customer impact.
+24/10/2026, 09:16 - Priya Raman: Jordan can you restore the backoff today?
+24/10/2026, 09:18 - Jordan Doe: On it. PR up in 30 min, backoff back to 2s with jitter
+24/10/2026, 09:40 - Aisha Rahman: Should we raise the alert threshold so retries don't page?
+24/10/2026, 09:42 - Priya Raman: No. It did its job. Keep PAY-204 as is
+24/10/2026, 10:05 - Jordan Doe: Backoff fix merged and deployed to prod-sg
+24/10/2026, 10:06 - Devansh Patel: Thanks. I'll watch tonight's settlement run
+25/10/2026, 02:20 - Devansh Patel: Settlement run clean. No retries above baseline
+25/10/2026, 02:21 - Aisha Rahman: Nice. Going back to sleep
+25/10/2026, 09:30 - Priya Raman: Writing the note for Monday standup. Anything else to add?
+25/10/2026, 09:34 - Jordan Doe: Add a config check so backoff can't be 0 again
+25/10/2026, 09:35 - Priya Raman: Good idea, I'll raise it with Nina on Monday
+25/10/2026, 09:37 - Aisha Rahman: Also thank Dev for the fast triage at 2am
+25/10/2026, 09:38 - Priya Raman: Will do. Closing this chat thread for the weekend
+25/10/2026, 09:39 - Devansh Patel: Thanks all

@@ -1,0 +1,5 @@
+{{DATE}}, 09:00 - Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them.
+{{DATE}}, 09:00 - {{PERSON_A}} created group "{{GROUP}}"
+{{DATE}}, 09:05 - {{PERSON_B}}: Morning. Anything to flag?
+{{DATE}}, 09:07 - {{PERSON_A}}: {{SENTENCE}}
+{{DATE}}, 09:09 - {{PERSON_B}}: Got it, thanks.

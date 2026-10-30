@@ -1,0 +1,142 @@
+ABSENCE PROOF  2026-10-30T10:42:50+08:00
+world.json sha256 e05050c35f51f40a   samples live_samples.json
+mode: HTTP http://127.0.0.1:8100
+refusal text: I couldn't find an answer to that in the sources you can access.
+
+[PASS] shard3-resume  (slack-note, extends)
+    ok   channel #db-migration (C0DBMIG) exists in world.json
+    ok   jdoe is a member of #db-migration
+    ok   the note text contains the proof phrase
+    ok   note is 167 chars (limit 2000)
+    ok   jdoe (who asks after ingest) is a member of the channel
+    ok   proof_phrase 'copy job resumes' is absent from world.json
+    ok   BEFORE: jdoe asks 'What is the restart time for the copy job?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'When does the ledger-shard-3 copy job resume?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] wellness-day  (slack-note, new-topic)
+    ok   channel #hr-announcements (C0HRANN) exists in world.json
+    ok   melissa.k is a member of #hr-announcements
+    ok   the note text contains the proof phrase
+    ok   note is 197 chars (limit 2000)
+    ok   hana.y (who asks after ingest) is a member of the channel
+    ok   proof_phrase 'wellness day' is absent from world.json
+    ok   BEFORE: hana.y asks 'When is the company wellness day in November 2026?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'When is the company wellness day, and do I need to apply for leave?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] mfa-authenticator  (slack-note, extends)
+    ok   channel #it-helpdesk (C0ITHELP) exists in world.json
+    ok   admin.it is a member of #it-helpdesk
+    ok   the note text contains the proof phrase
+    ok   note is 164 chars (limit 2000)
+    ok   jdoe (who asks after ingest) is a member of the channel
+    ok   proof_phrase 'authenticator pro' is absent from world.json
+    ok   BEFORE: jdoe asks 'When does MFA move to Authenticator Pro?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'When does MFA move to Authenticator Pro, and when do SMS codes stop working?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] deepavali-bridge  (slack-note, changes-a-fact)
+    ok   channel #hr-announcements (C0HRANN) exists in world.json
+    ok   melissa.k is a member of #hr-announcements
+    ok   the note text contains the proof phrase
+    ok   note is 144 chars (limit 2000)
+    ok   hana.y (who asks after ingest) is a member of the channel
+    ok   proof_phrase 'bridge day' is absent from world.json
+    ok   BEFORE: hana.y asks 'Do we get an extra day off on 10 Nov?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'Is the office closed on Tuesday 10 November 2026?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] fincrime-twist  (slack-note, permission-twist)
+    ok   channel #fincrime-cases (C0FINCRIME) exists in world.json
+    ok   mlro.tan is a member of #fincrime-cases
+    ok   the note text contains the proof phrase
+    ok   note is 139 chars (limit 2000)
+    ok   mlro.tan (who asks after ingest) is a member of the channel
+    ok   proof_phrase 'Nightjar Logistics' is absent from world.json
+    ok   BEFORE: mlro.tan asks 'Is enhanced due diligence on Nightjar Logistics complete?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'Is enhanced due diligence on Nightjar Logistics complete?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+    ok   OUTSIDER (before): amy.am asks 'Is enhanced due diligence on Nightjar Logistics complete?' -> constant refusal, 0 citations
+    ok   OUTSIDER (before): answer does not contain the proof phrase
+
+[PASS] vendor-review  (slack-note, permission-twist)
+    ok   channel #vendor-acme (C0VACME) exists in world.json
+    ok   leo.ops is a member of #vendor-acme
+    ok   the note text contains the proof phrase
+    ok   note is 134 chars (limit 2000)
+    ok   leo.ops (who asks after ingest) is a member of the channel
+    ok   proof_phrase 'business review is booked' is absent from world.json
+    ok   BEFORE: leo.ops asks 'When is the quarterly business review with the vendor?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+
+[PASS] up-cutover-docx  (upload, changes-a-fact)
+    ok   folder 'DB Migration' (fd-3) exists in world.json
+    ok   admin.it can write to 'DB Migration' (admin.it: anywhere)
+    ok   file exists: DB Migration — Wave 4 cutover plan v2.docx
+    ok   file is 38106 bytes (< 1 MB)
+    ok   proof_phrase '14 November 2026, 22:00' is absent from world.json
+    ok   BEFORE: priya.sre asks 'What is the fallback date if the go/no-go call says no-go?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'When is the wave 4 ledger cutover now, and what is the fallback date?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] up-fx-xlsx  (upload, new-topic)
+    ok   folder 'Pricing & Offers' (fd-6) exists in world.json
+    ok   leo.ops can write to 'Pricing & Offers' (admin.it: anywhere)
+    ok   file exists: Q4 FX fee schedule — SG & ID (draft for review).xlsx
+    ok   file is 7130 bytes (< 1 MB)
+    ok   proof_phrase 'pricing committee on 18 November 2026' is absent from world.json
+    ok   BEFORE: leo.ops asks 'What is the proposed Q4 fee for SG FX conversion on the Growth SME plan?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'What does the Q4 draft propose for the SG FX conversion fee on the Growth SME plan, and when is it approved?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] up-postmortem-pptx  (upload, extends)
+    ok   folder 'Postmortems' (fd-1) exists in world.json
+    ok   admin.it can write to 'Postmortems' (admin.it: anywhere)
+    ok   file exists: Payment outage — post-incident review.pptx
+    ok   file is 36836 bytes (< 1 MB)
+    ok   proof_phrase 'must close by 30 November 2026' is absent from world.json
+    ok   BEFORE: jdoe asks 'Who must close all five follow-up tickets by 30 November 2026?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'What did the post-incident review decide about the deadline for PAY-201 to PAY-205?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] up-whatsapp-oncall  (upload, extends)
+    ok   folder 'SRE Ops' (fd-4) exists in world.json
+    ok   admin.it can write to 'SRE Ops' (admin.it: anywhere)
+    ok   file exists: WhatsApp Chat with Ops on-call.txt
+    ok   file is 2488 bytes (< 1 MB)
+    ok   proof_phrase 'retry job resent 3,400' is absent from world.json
+    ok   BEFORE: jdoe asks 'What did the settlement retry job resend in one burst?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'What caused the PAY-204 success-rate alert on 24 October?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+[PASS] up-vendor-csv  (upload, permission-twist)
+    ok   folder 'Vendor share' (fd-7) exists in world.json
+    ok   leo.ops can write to 'Vendor share' (admin.it: anywhere)
+    ok   file exists: vendor-sla-tracker.csv
+    ok   file is 901 bytes (< 1 MB)
+    ok   proof_phrase 'SLA credit of SGD 1,800' is absent from world.json
+    ok   BEFORE: leo.ops asks 'Who is owed an SLA credit by Acme Vendor for October?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+
+[PASS] up-buddy-md  (upload, new-topic)
+    ok   folder 'People' (fd-13) exists in world.json
+    ok   melissa.k can write to 'People' (admin.it: anywhere)
+    ok   file exists: Onboarding buddy guide.md
+    ok   file is 1053 bytes (< 1 MB)
+    ok   proof_phrase 'buddy coffee allowance' is absent from world.json
+    ok   BEFORE: hana.y asks 'Is there a buddy coffee allowance for onboarding buddies?' -> constant refusal, 0 citations
+    ok   BEFORE: answer does not contain the proof phrase
+    ok   KEN (before): ken.ext asks 'How much is the buddy coffee allowance, and who do I message to volunteer?' -> constant refusal, 0 citations
+    ok   KEN (before): answer does not contain the proof phrase
+
+RESULT: all checks passed

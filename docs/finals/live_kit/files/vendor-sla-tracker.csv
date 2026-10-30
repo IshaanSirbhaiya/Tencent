@@ -1,0 +1,9 @@
+month,service,vendor,severity,tickets,sla_target,breaches,sla_credit_sgd,vendor_contact,company_owner,notes
+2026-07,KYC OCR,Acme Vendor,Sev 1,1,4h response,0,0,ken.ext,hana.y,Within SLA
+2026-07,KYC OCR,Acme Vendor,Sev 2,6,next business day,0,0,ken.ext,hana.y,Within SLA
+2026-08,KYC OCR,Acme Vendor,Sev 1,2,4h response,0,0,ken.ext,hana.y,Within SLA
+2026-08,KYC OCR,Acme Vendor,Sev 2,4,next business day,1,0,ken.ext,hana.y,One Sev 2 answered after 30h
+2026-09,KYC OCR,Acme Vendor,Sev 1,1,4h response,0,0,ken.ext,leo.ops,Within SLA
+2026-09,KYC OCR,Acme Vendor,Sev 2,5,next business day,0,0,ken.ext,leo.ops,Within SLA
+2026-10,KYC OCR,Acme Vendor,Sev 1,3,4h response,2,1800,ken.ext,leo.ops,"October: 2 Sev 1 SLA breaches on the KYC OCR service (passport MRZ outage); SLA credit of SGD 1,800 owed by Acme Vendor"
+2026-10,KYC OCR,Acme Vendor,Sev 2,7,next business day,0,0,ken.ext,leo.ops,Within SLA
