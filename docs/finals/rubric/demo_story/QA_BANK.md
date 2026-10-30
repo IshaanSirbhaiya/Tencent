@@ -1,5 +1,8 @@
 # Q&A bank: 25 questions, about 15 seconds each
 
+> Questions judges ask **the team** are below. For questions to **ask the product live** (verified answers per persona), see [JUDGE_QUESTION_BANK.md](JUDGE_QUESTION_BANK.md).
+
+
 Rules:
 - Pause one beat, repeat the question in about six words, answer in one sentence, stop. Bridge to the tagline only if it is natural.
 - Every fact below comes from a file in this repo (shown in the last column). **[EST]** = an estimate, say "estimate". **[V]** = re-check on the morning of 3 Nov; if it cannot be traced, delete the claim.
