@@ -962,7 +962,17 @@ function selfTest() {
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
-(async () => {
+// record_v3.cjs (the finals video v3) reuses the take handling and the human-like input from here.
+// Requiring this file only loads these helpers; it records nothing.
+module.exports = {
+  installCursor, moveTo, bringIntoView, pointAt, hover, click, type, read, scrollBy, pause, jitter, ease,
+  mark, slow, oneOf, MARKS, POS, checkTake, finishTake, writeAtomic, takeId, expectedLabels,
+  reseed: (s) => { seed = s; },
+  /** another window size (v3 records at 1440 wide): bringIntoView() and read() keep to it */
+  setView: (w, h) => { VIEW.width = w; VIEW.height = h; },
+};
+
+if (require.main === module) (async () => {
   if (process.argv.includes('--self-test')) { selfTest(); return; }
   ({ chromium } = require(path.join(webDir, 'node_modules/playwright')));
   fs.mkdirSync(OUT, { recursive: true });

@@ -88,3 +88,6 @@ databridge/fixtures/hackathon/ocr_samples/*__typed.txt
 
 # regenerable video intermediates (docs/tencent/video/record_scenes.cjs)
 submission/05_video/clips/
+
+# finals video v3/v4: every take, narration file, film and render (run outputs and media, never committed)
+/submission/finals_video/v3/
