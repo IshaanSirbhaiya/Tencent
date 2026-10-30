@@ -5,7 +5,7 @@
 // Test names are relative to databridge/apps/internal_brain/tests/ unless they start with a folder.
 
 export const REPO = 'https://github.com/IshaanSirbhaiya/Tencent';
-export const BRANCH = 'final_v1.0';
+export const BRANCH = 'final_v1.4';
 export const RAI_DIR = `${REPO}/blob/${BRANCH}/docs/finals/rubric/responsible_ai`;
 
 export type ControlIcon = 'filter' | 'key' | 'ledger' | 'shape' | 'ground' | 'reveal' | 'mask';
