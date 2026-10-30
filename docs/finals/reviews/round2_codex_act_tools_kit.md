@@ -69,3 +69,19 @@ Verification: source/diff review; PowerShell AST parsing (zero syntax errors); i
 - Green preflight does not prove Hy3 answered; the presenter guidance can be wrong (finding 6).
 - Avoid restarting the Brain with an Act proposal open: it becomes expired. Reopen the sheet for a fresh proposal only when no earlier create has an uncertain outcome.
 - Read-access revocation and empty-policy revocation demonstrations can produce unexpected successful creates (findings 3 and 7).
+
+## Extended scope (round 2b)
+
+Seven-minute, read-only extension begun 2026-10-30. Reviewed current HEAD `d045411` and working-tree code; this is newer than the first review's HEAD. Existing findings above are preserved. Findings are saved incrementally below. No live probes, servers, GUI, or generators were executed.
+
+1. **Medium — The Hy3 readiness probe accepts any successful JSON response as a working model.**
+   - **File:line:** `databridge/scripts/hy3_check.py:44`, `hy3_check.py:45`, `hy3_check.py:46`; `databridge/scripts/demo_up.sh:67`.
+   - **Finding (confirmed):** `check()` only JSON-decodes the response and returns live. It never checks `choices`, message content, an error envelope returned with HTTP 200, or whether any completion was produced. A valid JSON response such as `{}` enables the live chain and the LIVE label without proving inference worked. This is an additional false-positive source beyond round 2 finding 6's configured-versus-used model distinction.
+   - **Repro:** Stub `urlopen` with an HTTP-success response containing `{}` or `{"choices": []}`. `check()` returns true and `main()` exits 0 when this is the first model.
+   - **Fix:** Validate the completion response schema and require nonempty assistant output; report malformed/empty completions as unavailable. Keep configured model identity separate from the fixed “Hy3” label when `IB_MODELS` overrides the default.
+
+2. **Medium — The template CLI can overwrite files outside its advertised output directory.**
+   - **File:line:** `docs/finals/live_kit/templates/fill_template.py:36`, `fill_template.py:52`, `fill_template.py:53`, `fill_template.py:54`.
+   - **Finding (confirmed):** `--name` is joined directly to `templates/out` and written without checking containment or collisions. An absolute name discards the output directory; `../` traverses it. The default TXT filename also incorporates unsanitized `--group`. A mistaken filename can overwrite another demo artifact or repository file. This is a local CLI correctness issue, not a remote attack claim.
+   - **Repro:** In a disposable copy, supply `--name ../template_note.md`; the existing template is overwritten rather than a file under `out` being generated. A Windows absolute `--name` similarly replaces the base path. No such write was performed during review.
+   - **Fix:** Accept a basename only, reject separators/absolute paths, resolve and enforce containment under `out`, and refuse overwriting an existing file unless explicitly requested.

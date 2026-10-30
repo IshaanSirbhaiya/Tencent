@@ -193,6 +193,23 @@ ArrowLeft after a stuck step dropped to /present with no HUD.
   - a reset step in the rehearsal checklist; a PROPOSED line in PRESENTER_KEYS.
 - Laptop-only: `demo_up.sh stop/status` can't see the ports on this laptop (netstat is empty); use a
   health-probe-based stop.
+
+**World expansion checkpoint** (full detail in `WORLD_EXPANSION_STATUS.md`): VERIFIED and kept.
+- Append-only, record by record against HEAD.
+- 464 pre-existing questions give byte-identical answers; the 4 demo moments pass.
+- **Full eval on the new world:** 0 leaks / 7,374, 0/400 P2, 0/1,152 injection, recall 100%.
+  `eval_summary.json` regenerated (e2e 124).
+- **Fixed a real determinism bug** in `narrate.py` (tie-break by set order), with
+  `test_narrate_determinism.py`.
+- **New counts:** 34 people, 17 groups; 231 pages; 261 issues; 628 threads / 3,133 messages; 87
+  files; 1,207 docs (1,204 indexed); 72 facts; 546 questions. Docs updated to them.
+- **Next:**
+  - re-run the full IB suite and put the count in STATUS and FEATURE_CATALOGUE (they still say 754);
+  - on the laptop, `demo_up.sh start --fresh`, then refresh `live_kit/ABSENCE_PROOF.txt`;
+  - re-run the eval if `databridge_ib` changes again.
+- **Number consistency (Fable item 2):** the canonical numbers are now 7,374 / 400 / 1,152. Replace
+  every "5,958" and "976" in the handouts, slides.json, CHANGELOG and ORGANISER_UPDATE, then rebuild the
+  handout PDFs.
 **Opus and Codex:** were still running at hand-off. If their files are missing, re-run Opus in the
 cloud on `git diff 7bf3246..final_v1.2 -- databridge/`; Codex waits for the laptop.
 

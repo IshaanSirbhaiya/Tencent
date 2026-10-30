@@ -49,7 +49,7 @@ Kill switch ON in `scripts/demo_up.sh` and `scripts/run_local_demo.sh` (the `.cm
 | `tests/test_deliverables.py` (21 tests: T1-T13 + label/unit attacks from the model, revoked source + export recheck, source edit between create and export, rate limit, kill switch, budget/busy) | **21 passed** |
 | `tests/test_deliverables_eval.py` (T16: eval detectors through deliverables + CSV with an adversarial echo model, small world, real connectors) | **1 passed** |
 | `tests/test_act.py` after the shared edits | **19 passed** |
-| Full IB suite | Run started; it had reached >90% with 2 `F` marks early (around 20-27%) when the checkpoint came; the run did not finish in time. **Not verified green. Next step 1.** |
+| Full IB suite (finished after the checkpoint, 21 min) | **1038 passed, 2 failed**: `test_connector_drive.py::test_markdown_and_csv` and `::test_crawl_full_then_quiet`. Both are in the Drive connector, which the upload agent is editing (`connectors/drive.py`); no deliverables file is involved. Confirm with that agent (next step 1). |
 | `npx tsc --noEmit` | **clean** |
 | `tests/e2e/deliverables.spec.ts` (mock, headless, port 3128, `deliverables.config.ts`, axe in dark + light) | **4 passed**, 0 axe serious/critical |
 | Live API check (scratch IB :8128 with `IB_DELIVERABLES=1`, same mock platforms :8200, `IB_FORCE_OFFLINE=1`) as `leo.ops`, "Can we offer multi-currency accounts to an Indonesian SME?" | cites `drive:df-3` as C2; Table = source-table-v1; Chart = source-chart-v1 "FX margin by market" SG 0.35 / HK 0.35 / ID 0.4; Analysis = `needs_model` (no model); both CSV exports 200 with `walnut-<kind>-217ff91e-20261030.csv`; receipt shows `deliverable.requested/created/exported` |

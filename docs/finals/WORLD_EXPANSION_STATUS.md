@@ -62,7 +62,7 @@ Verdict: append-only. Kept, not restored.
 | All 6 manifest P2 pairs (incl. 3 new WP pairs) | byte-identical |
 | Live-ingestion kit (12 samples): proof phrase absent; before-question, Ken and outsider refused | 37 of 37 checks pass |
 | Full leak eval (`IB_FORCE_OFFLINE=1 python -m evals.internal_brain.run`) | 0 leaks in 7,374 requests (3,687 probes × 2); 95% UB 0.0814% per path; 0 of 400 P2 pairs differ; control 0; injection 0 hard failures in 1,152; utility 100% both paths; canaries valid; 14 quality findings (same 7 ids × 2 as before) |
-| Full IB suite | Previous run on this world (before the title change and the narrate fix): 891 passed, 3 failed, all in the untracked `test_uploads.py` (another session's uncommitted upload work; not world related). Final re-run was in progress at checkpoint: no failures up to 62% |
+| Full IB suite | Previous run on this world (before the title change and the narrate fix): 891 passed, 3 failed, all in the untracked `test_uploads.py` (another session's uncommitted upload work; not world related). Final re-run was in progress at checkpoint (hard stop): no failures up to ~92%; summary line not reached |
 
 ## 4. New counts
 

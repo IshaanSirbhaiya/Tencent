@@ -125,3 +125,36 @@ reason is in the access ledger only: `request.failed` with `stage="sim.upload-fi
 - Office files are parsed by third-party libraries (python-docx, python-pptx, calamine, openpyxl) and
   PDFs by PDFium, in the worker process, after the byte checks above; a parser bug could crash or hang
   the worker, which is then killed and replaced, and the file is refused.
+
+## 8. STATUS / next steps (checkpoint, 30 Oct)
+
+**Done.** Route `uploads.py` (behind `IB_DEMO_LOGIN=1` + `IB_DEMO_FEATURES=1`, refused when `IB_DEPLOYED=1`);
+`extract_files.py` (byte checks, XML DTD refusal, per-format reader loading, spawn worker with a killed-on-overrun
+15 s budget, WhatsApp parser); `connectors/drive.py` (Office / PDF / CSV extracted on fetch, WhatsApp `.txt`
+rewritten); mock Drive upload (`mock_platforms/uploads.py`, one mount line in `mock_platforms/app.py`);
+reset hook: `bootstrap.py` line `mount_uploads_router(app, svc, reset_hooks)` puts `uploads.reset_uploads`
+first in the `/sim/reset` hooks (no `sim.py` change needed). SECURITY.md §15.12 written.
+
+**Tested.**
+- `tests/test_uploads.py`: 53 passed (every format incl. both WhatsApp forms, the six live-kit files end to
+  end with before/after and Ken, masking, write permission live, switches, byte-identical refusal, body
+  limit before decoding, rate limit, reset).
+- `tests/test_extract_files.py`: 21 passed.
+- `apps/mock_platforms/tests`: 151 passed.
+- Full IB suite, run 1: 944 passed, 2 failed (`test_connector_drive.py::test_markdown_and_csv`,
+  `::test_crawl_full_then_quiet`: the fake Drive's `df-7` is a header-only CSV, `a,b`, which extraction
+  turned into "no text", so the file was skipped). FIXED: a header-only CSV is indexed as its cleaned text
+  (`DriveConnector._extracted`); `test_connector_drive.py` now 65 passed. Full-suite run 2 was at 90 % with
+  no failure when the session stopped; re-run it to confirm.
+
+**Left / gotchas.**
+- `python-pptx` and `pypdfium2` are installed in `.venv` but NOT in `requirements-lock.txt`. A fresh install
+  from the lock loses pptx and pdf, and (because `databridge_convert/adapters/source/__init__.py` imports
+  every document reader) docx, md and txt too; csv and xlsx keep working. Add `python-pptx==1.0.2` and
+  `pypdfium2==5.14.0` to the lock (not done: no unvetted install or lock change by this agent).
+- `IB_DEMO_FEATURES` is read from `cfg.demo_features` if `IbConfig` gets that field, else from the
+  environment (`uploads.demo_features_on`). Restart the IB with both switches for the stage.
+- The extraction worker starts with the route (about 5 to 10 s); `test_uploads.py` takes about 80 s
+  (one shared E2E world). The worker is per process; it is killed on budget overrun and restarted.
+- `docs/finals/live_kit/make_files.py` builds no PDF; PDF is covered by hand-built PDFs in the tests.
+- Phone numbers in WhatsApp exports are not masked.
