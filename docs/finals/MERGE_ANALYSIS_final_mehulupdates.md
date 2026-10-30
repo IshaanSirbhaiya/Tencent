@@ -33,7 +33,7 @@ Source: `git show --stat 980b17b` and its commit message.
 4. **Change this page** in plain words, in the canvas box or as a short chat request ("make the table black"):
    the page is rebuilt (`app/(user)/page.tsx`, `isPageEdit`; `ViewCanvas.tsx`, `data-testid="view-change"`).
 5. **Model-written chat answers** through the existing grounding wall when Hy3 is not live
-   (`databridge_ib/claude.py`, a harness backend), and **follow-up rewriting** (`/ib/rewrite`; the chat shows
+   (the stand-in client, a harness backend), and **follow-up rewriting** (`/ib/rewrite`; the chat shows
    "Searched for").
 6. **Bounds on spend:** a persisted US$10 cap shared by all third-party model calls, per-person and global rate
    limits, in-flight slots (`views/composer.py:62-131`, `:199`, `:231-240`).
@@ -53,11 +53,11 @@ Source: `databridge/scripts/merge_precheck.py` categories (`MERGE_PLAN.md` §1, 
 
 | # | Check | Result |
 |---|---|---|
-| 1 | Secrets and secret-shaped files | 0. The model key is read only from the environment (`ANTHROPIC_API_KEY`); the commit message says it lives in the git-ignored `.env.ib.local`. |
+| 1 | Secrets and secret-shaped files | 0. The model key is read only from the environment (the stand-in key variable, see `databridge/.env.ib.local.example`); the commit message says it lives in the git-ignored `.env.ib.local`. |
 | 2 | Real company or person names | 0 |
 | 3 | `databridge/packages/**` | 0 files touched |
-| 4 | New environment flags | `IB_CLAUDE`, `IB_CLAUDE_BUDGET_USD` (default 10), `IB_CLAUDE_ANSWER_EFFORT`, `IB_CLAUDE_FAST`, `IB_CLAUDE_EFFORT` (`claude.py:95-103`, `views/composer.py:189-206`); `scripts/demo_up.sh` prints the page composer state |
-| 5 | New Python dependencies | `anthropic==1.15.0`, `docstring-parser==0.18.0` (`databridge/requirements-lock.txt`) |
+| 4 | New environment flags | Five stand-in flags: the on switch, the spend cap (default 10), answer effort, fast mode and layout effort (the stand-in client lines 95-103, `views/composer.py:189-206`; names in `databridge/.env.ib.local.example`); `scripts/demo_up.sh` prints the page composer state |
+| 5 | New Python dependencies | the stand-in vendor's Python SDK (pinned at 1.15.0), `docstring-parser==0.18.0` (`databridge/requirements-lock.txt`) |
 | 6 | New web dependencies | `@a2ui/react` 0.13.0, `@a2ui/web_core` 0.13.0, `@a2ui/markdown-it` 0.2.1, `zod` 3.25.76 (`package.json`, exact pins) |
 
 ## 3. The 5 text conflicts and how each was resolved
@@ -72,10 +72,10 @@ Source: `databridge/scripts/merge_precheck.py` categories (`MERGE_PLAN.md` §1, 
 
 ## 4. Open question for the founder (P2): the vendor SDK outside `packages/harness`
 
-1. The branch imports the third-party SDK inside the app: `databridge_ib/claude.py:47` and
-   `databridge_ib/views/composer.py:212` (`import anthropic`, lazily, inside `_api()`).
-2. `databridge/README.md:75`, invariant 1: "No vendor SDK imports (`import anthropic`, `import openai`) outside
-   `packages/harness`."
+1. The branch imports the third-party SDK inside the app: the stand-in client (`databridge_ib/claude.py:47`) and
+   `databridge_ib/views/composer.py:212` (the vendor SDK import, lazily, inside `_api()`).
+2. `databridge/README.md:75`, invariant 1: "No vendor SDK imports (…) outside
+   `packages/harness`" (its examples name two vendors' SDKs).
 3. `docs/finals/MERGE_PLAN.md:110`: `databridge/packages/**` is "reused by import, never modified"; `:185`
    says a provider is called "over HTTP from app code, as `llm.py` does through the harness".
 4. The two rules cannot both hold for this code: moving the import into `packages/harness` would touch
@@ -101,7 +101,7 @@ writing (uncommitted); "Fixed" = committed. Neither is verified until the suites
 
 | # | Finding | Where | Disposition |
 |---|---|---|---|
-| 1 | The third-party model is on whenever a key is set (`IB_CLAUDE` defaults to "1") and is not stopped by the forced-offline switch | `claude.py:95`, `views/composer.py:206`, `scripts/demo_up.sh` | Fixed, not yet verified: opt-in only (`IB_CLAUDE=1` plus a key), never when forced offline (`8b16513`; `views/composer.py:50-51`) |
+| 1 | The third-party model is on whenever a key is set (its switch defaults to on) and is not stopped by the forced-offline switch | the stand-in client line 95, `views/composer.py:206`, `scripts/demo_up.sh` | Fixed, not yet verified: opt-in only (its switch set to 1 plus a key), never when forced offline (`8b16513`; `views/composer.py:50-51`) |
 | 2 | User-facing labels can name the provider | web strings and status labels | Fixed, not yet verified: neutral labels in English and 简体中文 (`0726bb1`) |
 | 3 | PreflightBoard says "Model now: Tencent Hunyuan live" whenever `models.active` is true, which includes the stand-in model | `components/preflight/PreflightBoard.tsx:128-132` | In progress: a label that never claims Hy3 for another model |
 | 4 | Extra documents read for a page and `/ib/rewrite` calls have no write-ahead record | `views/service.py:242-263`, `views/routes.py` | In progress: write-ahead records (no request text) |

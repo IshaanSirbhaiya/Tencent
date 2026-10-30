@@ -71,7 +71,7 @@ From [PLAN.md §2](PLAN.md#2-hard-rules-unchanged-they-are-the-product). Entries
 11. [Demo-proof features](#11-demo-proof-features-behind-a-toggle-d-24): G1 Watch the brain grow · G2 Add a document · G3 Not in the brain yet · G4 Engine refresh · G5 The toggle
 12. [Deliverables from an answer](#12-deliverables-from-an-answer-kill-switch-d-25): V1 Table, chart, analysis (P0) · V2 Slides export (P1)
 13. [Act, and what is planned](#13-act-and-what-is-planned): K1 Act v3.2 · K2 Proxy open-link check · Planned: the "Demo story" app mode (not built)
-14. [Pages beside the chat (just-in-time views)](#14-pages-beside-the-chat-just-in-time-views-d-37-d-38-d-39): J1 Page or chat · J2 The page, composed by Claude · J3 The canvas and the Xcode-like Ask
+14. [Pages beside the chat (just-in-time views)](#14-pages-beside-the-chat-just-in-time-views-d-37-d-38-d-39): J1 Page or chat · J2 The page, composed by the AI page composer · J3 The canvas and the Xcode-like Ask
 
 ---
 
@@ -702,18 +702,18 @@ An intelligence layer on top of the Brain, in the Ask view only. Same kill switc
 | | |
 |---|---|
 | What | After each answer the Brain is asked whether it needs a page (`POST /ib/views` mode `decide`). A simple answer ("What is the SG FX fee?") stays in the chat. A question that needs structure ("I am the new project lead: tell me everything about the project, its people and what each person has done") opens a page in the canvas beside the chat. **Open as page** under any answer builds one on request |
-| Who decides | **Claude** (`claude-opus-5-5`, effort low) when `ANTHROPIC_API_KEY` is set and `IB_CLAUDE` is not `0`; otherwise the rules (`views/plan.py` `wants_page`). A question under 7 words with no structure word stays in the chat without a call and without a record |
+| Who decides | **The stand-in model** (an external model, effort low) when it is switched on and its key is set (`databridge/.env.ib.local.example`); otherwise the rules (`views/plan.py` `wants_page`). A question under 7 words with no structure word stays in the chat without a call and without a record |
 | Guarantees | Ownership first; `deliverable.requested` before the live re-check and before the call; the decision is recorded as `deliverable.created` with status `page`/`chat` (counts and digests only); someone else's or an unknown answer is the one 404 |
 | Tests | `test_views_composer.py::test_a_short_question_stays_in_the_chat_without_a_call_or_a_record`, `::test_claude_decides_after_the_record_and_the_live_recheck`, `::test_someone_elses_answer_is_the_one_404_for_decide_too`; web `views.spec.ts` "a simple answer stays in the chat", "a question that asks for structure opens its page by itself" |
 
-### J2. The page: composed by Claude, every value checked
+### J2. The page: composed by the AI page composer, every value checked
 
 | | |
 |---|---|
-| What | Claude lays the page out freely: a hero summary, stat tiles, prose, **a section per person with what each one did** (expandable), tables (tone `black`/`white`/`tinted`, so "a table in black" is a black table), cards, callouts, a timeline, a chart, the chat threads, every source under its own headings. Accent colour from a closed list. Without Claude the rules lay it out (facts, table, chart, steps, timeline, conversations, by document) |
+| What | The AI page composer lays the page out freely: a hero summary, stat tiles, prose, **a section per person with what each one did** (expandable), tables (tone `black`/`white`/`tinted`, so "a table in black" is a black table), cards, callouts, a timeline, a chart, the chat threads, every source under its own headings. Accent colour from a closed list. Without it the rules lay it out (facts, table, chart, steps, timeline, conversations, by document) |
 | Sources | The answer's cited documents, then up to 12 more of the asker's documents on the same subject (the same Jira project, Slack channel, Confluence space or Drive folder first, then a search on the cited titles), all over the asker's permitted set only (Gate 1) and each checked live (Gate 2 + read-through) |
 | Guarantees | Every sentence passes `check_sentence` against its own tags; every table cell's words and numbers occur in its tagged source; a stat's value occurs in its source; a person's name is in the sources (or is the display name of a handle that speaks in them); headings use the person's words, the sources' words or plain page words; anything else is dropped and counted. Styles are enums: no colour codes, CSS or HTML reach the page. Paired worlds with and without the restricted note give identical pages AND identical prompts. The request text never reaches the ledger |
-| Bounds | A hard spend cap (`IB_CLAUDE_BUDGET_USD`, default 10, kept in `var/.../views/claude_spend.json`; a call is refused unless its upper-bound cost still fits); 6 calls a minute per person, 20 for the service, 2 in flight; one deadline per call (25 s decide, 120 s page). A refusal, an error, a timeout, a bad reply or the cap: the rules build the page |
+| Bounds | A hard spend cap (default US$10, set in `.env.ib.local`, kept in `var/.../views/claude_spend.json`; a call is refused unless its upper-bound cost still fits); 6 calls a minute per person, 20 for the service, 2 in flight; one deadline per call (25 s decide, 120 s page). A refusal, an error, a timeout, a bad reply or the cap: the rules build the page |
 | Measured | On the generated world, live (30 Oct): the decision 3 to 4 s; the project page 29 s with 10 sources, 4 people and their roles, 43 of 74 proposed items kept; about US$0.05 per page |
 | Tests | `test_views_composer.py` (14, fake client): `::test_claude_page_values_are_checked_and_styles_are_enums`, `::test_restricted_documents_never_reach_claude_or_the_page`, `::test_the_request_text_never_reaches_the_ledger`, `::test_the_spend_cap_stops_calls_and_survives_a_restart`, `::test_rate_limits_are_per_person_and_global`, `::test_failures_fall_back_to_the_rules`, `::test_ledger_down_before_claude_means_no_call`, `::test_read_page_is_lenient_per_block`; `test_views.py` (25: the rules, A2UI, rule 4, the ledger) |
 

@@ -34,7 +34,7 @@ person, action) · Caption (the small label at the lower left) · Proof (the tes
 then the voice-over, in `>` lines. Only `>` lines are spoken; `TODO` lines are placeholders and are never read.
 
 **Model lines (founder, 31 Oct: the stand-in model is ON for the demo and the video).** Hy3 is wired in through
-TokenHub but not live (as of 30 Oct it has not answered live). With the stand-in on (D-41, `IB_CLAUDE=1`), the app
+TokenHub but not live (as of 30 Oct it has not answered live). With the stand-in on (D-41, its switch set in `.env.ib.local`), the app
 labels every answer "AI-generated from your cited sources": the model sees only passages that passed Gate 1 and
 Gate 2, and the grounding check runs on what it writes. Say it that way. Never say an answer was "quoted from the
 sources (no model)" (that is the model-OFF label), never say Hy3 or Hunyuan answered, and never name the stand-in's
@@ -611,7 +611,7 @@ Then run `python docs/finals/video/assemble_finals.py --hy3` so the cue sheet us
 | Graph and engine counts | Not spoken (the world is growing); the screen shows them | Nothing to change |
 | US$1.3M, 7 minutes | `docs/finals/rubric/impact_feasibility/value_calculator.spec.json` | Match the slide |
 | "Tipping off" line | Run sheet, beat 0:15 | Keep the wording as written |
-| "AI-generated from your cited sources" (13) | the answer label `answer.model.ai` in `lib/i18n/user.ts`; the stand-in on (D-41, `IB_CLAUDE=1`), named only `standin/standin-1` | If the model is off for the take, run the cue sheet with `--model-off` |
+| "AI-generated from your cited sources" (13) | the answer label `answer.model.ai` in `lib/i18n/user.ts`; the stand-in on (D-41, switched on in `.env.ib.local`), named only `standin/standin-1` | If the model is off for the take, run the cue sheet with `--model-off` |
 | "Wired for Tencent's Hunyuan" (01), "wired in through TokenHub" (13) | `STATUS.md`, `/ib/status`; Hy3 not live as of 30 Oct | If Hy3 answers live, say "running on Tencent's Hunyuan" in 01 and read the [ONLY IF HY3 LIVE] line in 13 |
 | "nine recorded sessions, including security reviews that found real bugs" (11) | `README.md` CodeBuddy table (CB1–CB9); `DEV_PROCESS.md` (CB5: 7 findings, fixed; CB7: F7 fixed with tests) | Match the README |
 | "The cover was designed in Tencent Miora" (20) | `submission/06_cover/finals/README.md` (made in Miora, 30 Oct) | If the cover changes, update the card |
