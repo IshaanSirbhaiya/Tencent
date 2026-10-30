@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Judge cards</title><style>@font-face{font-family:Inter;src:url("file:///E:/Tenecent%20Hack_Walnut/Tencent/databridge/apps/internal_brain_web/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");font-weight:100 900}
+:root{--bg:#fff;--fg:#0f1115;--muted:#4d5460;--line:#e4e6ea;--raised:#f3f4f6;--accent:#4c54c8}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#fff;color:var(--fg);font-family:Inter,system-ui,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+h1{font-size:38px;letter-spacing:-.02em;line-height:1.05}
+h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;font-weight:700}
+h2 i{text-transform:none;letter-spacing:0;font-style:normal;color:var(--muted)}
+.brand{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+.dot{width:12px;height:12px;border-radius:3px;background:var(--accent);display:inline-block}
+.meta{font-size:9.5px;color:var(--muted)}
+.fine{font-size:9px;color:var(--muted);line-height:1.4}
+/* leave-behind */
+.lb{width:210mm;height:297mm;padding:12mm 13mm;display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.lb header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:7px}
+.lede{font-size:13.5px;line-height:1.45;color:var(--muted)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.lb ul{padding-left:15px;font-size:11.5px;line-height:1.4;display:flex;flex-direction:column;gap:4px}
+.lb ul.tight{gap:3px}
+.proof{font-size:11px;line-height:1.4;background:var(--raised);border-left:3px solid var(--accent);padding:6px 9px;border-radius:4px;margin-bottom:6px}
+.proof .k{display:block;font-weight:700;color:var(--accent);margin-top:2px}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.n{border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:10px;color:var(--muted);line-height:1.3}
+.n span{display:block;font-size:22px;font-weight:800;color:var(--fg);letter-spacing:-.02em}
+.big{font-size:30px;font-weight:800;letter-spacing:-.02em}.big small{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
+.small{font-size:10.5px;color:var(--muted);line-height:1.4;margin-top:3px}
+.lb footer{margin-top:auto;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;gap:14px}
+.ask p{font-size:15px;font-weight:700;line-height:1.3}.ask .team{font-size:11px;font-weight:500;color:var(--muted);margin-top:4px}
+.qr{display:flex;gap:10px;align-items:center;font-size:11px;line-height:1.5}.qr svg{border:1px solid var(--line);padding:5px;border-radius:4px;background:#fff}
+.url{font-family:ui-monospace,Consolas,monospace;font-size:10.5px}
+/* judge cards */
+.sheet{width:210mm;height:297mm;display:grid;grid-template-columns:105mm 105mm;grid-template-rows:148.5mm 148.5mm;page-break-after:always;break-after:page}
+.card{padding:9mm 8mm 7mm;border:.4mm dashed #b8bcc4;display:flex;flex-direction:column;gap:7px;position:relative;overflow:hidden}
+.no{font-size:30px;font-weight:800;color:var(--accent);line-height:1}.no small{font-size:13px;color:var(--muted);font-weight:600}
+.card h3{font-size:19px;letter-spacing:-.01em;line-height:1.15}
+.proofl{font-size:12.5px;line-height:1.45}
+dl{margin-top:auto}dt{font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--muted);margin-top:6px}
+dd{font-size:11px;line-height:1.4;margin-top:1px}.mono{font-family:ui-monospace,Consolas,monospace;font-size:10px;word-break:break-word}
+.cf{font-size:8.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:4px;margin-top:6px}
+/* cheat sheet */
+.ch{width:210mm;height:297mm;padding:11mm 12mm;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.ch header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:6px;gap:12px}
+.chtop{display:grid;grid-template-columns:1fr 1.25fr;gap:16px}
+table{border-collapse:collapse;width:100%}
+.keys td{padding:3px 4px;font-size:11px;border-bottom:1px solid var(--line)}.keys td:first-child{width:52px}
+kbd{display:inline-block;min-width:34px;text-align:center;font:700 12px ui-monospace,Consolas,monospace;border:1px solid #a0a6b1;border-bottom-width:2px;border-radius:4px;padding:1px 6px;background:var(--raised)}
+.lad{padding-left:16px;font-size:10.5px;line-height:1.4;display:flex;flex-direction:column;gap:4px;margin-bottom:6px}
+.steps th{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:3px 5px;border-bottom:2px solid #a0a6b1}
+.steps td{padding:5px;font-size:10.5px;line-height:1.35;border-bottom:1px solid var(--line);vertical-align:top}
+.steps td:nth-child(1){font-weight:800;color:var(--accent);width:20px}.steps td:nth-child(2){width:34px;color:var(--muted)}.steps td:nth-child(3){width:130px}
+/* size-up pass: fill the pages, larger print */
+.lb{gap:15px}.lb h1{font-size:50px}.lb .lede{font-size:16.5px}.lb h2{font-size:12.5px}
+.lb ul{font-size:14px;gap:7px}.lb .proof{font-size:13px;padding:9px 11px;margin-bottom:9px}
+.n{padding:11px 12px;font-size:11.5px}.n span{font-size:29px}
+.lb .fine{font-size:10.5px}.big{font-size:42px}.big small{font-size:14px}.small{font-size:12.5px}
+.ask p{font-size:19px}.ask .team{font-size:13px}.qr{font-size:13px}.qr svg{width:130px;height:130px}.url{font-size:12px}
+.card{padding:11mm 10mm 8mm;gap:10px}.no{font-size:40px}.card h3{font-size:25px}.proofl{font-size:16px;line-height:1.5}
+dt{font-size:10.5px}dd{font-size:13px}.mono{font-size:12px}.cf{font-size:10px}
+.ch{gap:12px}.ch h2{font-size:13px}.keys td{padding:6px 5px;font-size:13.5px}kbd{font-size:14px;padding:3px 8px}
+.lad{font-size:12.5px;gap:7px}.ch .fine{font-size:11px}.steps th{font-size:10.5px}.steps td{padding:8px 6px;font-size:12.5px}
+.steps td:nth-child(3){width:150px}.steps td:nth-child(2){width:42px}.ch .brand{font-size:19px}
+@page{size:A4;margin:0}</style></head><body><section class="sheet"><article class="card"><div class="no">1<small>/10</small></div><h3>Impact &amp; Relevance</h3>
+<p class="proofl">A customer account is restricted and the company AI must help the account manager without tipping off. Break-even about 7 min per person per week; base case ≈ US$1.3M a year (estimate).</p>
+<dl><dt>See it in the app</dt><dd class="mono">/value</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/impact_feasibility/IMPACT_SHEET.md · ROI_MODEL.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">2<small>/10</small></div><h3>Human-Centered Design</h3>
+<p class="proofl">Persona-first sign-in, plain-language answers, a source sheet that opens the passage. The hallway-test report is still pending.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/login · /settings · /history</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/hcd_ux/PERSONAS_AND_JOURNEYS.md · FIX_LOG.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">3<small>/10</small></div><h3>AI Interaction</h3>
+<p class="proofl">Cited answer behind two permission gates; the same question asked from WorkBuddy through MCP. Hy3 is wired, live run pending: answers are quoted from the sources with the same checks.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/dev/journey/&lt;req></dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/ai_innovation/AI_USAGE_MAP.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">4<small>/10</small></div><h3>Technical Execution</h3>
+<p class="proofl">Per-stage timings and three hash-chained records per request. 754 backend and 124 browser tests; 0 leaks in 5,958 adversarial requests.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/dev · /dev/journey/&lt;req> · /dev/graph</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/technical/ARCHITECTURE_ONE_PAGER.md · EVIDENCE_CARD.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article></section><section class="sheet"><article class="card"><div class="no">5<small>/10</small></div><h3>Feasibility</h3>
+<p class="proofl">Break-even about 7 min a week and model cost about US$1k a year (both estimates). Tencent Cloud deploy kit, no live instance. One-team pilot.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/value · /dev/analytics</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/impact_feasibility/PILOT_PLAN.md · SCALE_ARCHITECTURE.md · COST_PER_ANSWER.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">6<small>/10</small></div><h3>Demo &amp; Storytelling</h3>
+<p class="proofl">Five minutes, two proofs, the tagline three times, driven from the keyboard in Presenter mode.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/compare · press P (Presenter)</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/demo_story/RUN_SHEET.md · PRESENTER_KEYS.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">7<small>/10</small></div><h3>Innovation &amp; Creativity</h3>
+<p class="proofl">Restricted is indistinguishable from non-existent (0 differences in 400 pairs), and the log breaks at the exact tampered entry.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/compare · /dev/audit</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/ai_innovation/INNOVATION_ONE_PAGER.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">8<small>/10</small></div><h3>UX &amp; Accessibility</h3>
+<p class="proofl">Keyboard-only demo. Text size, reduce motion, high contrast, theme and 简体中文 in settings; axe checks inside the browser tests.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/settings</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/hcd_ux/ACCESSIBILITY_STATEMENT.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article></section><section class="sheet"><article class="card"><div class="no">9<small>/10</small></div><h3>Responsible AI &amp; Ethics</h3>
+<p class="proofl">No tipping-off; identical refusals; write-ahead sealed log; revealing needs a reason. Crosswalk to AI Verify, MAS FEAT, PDPA, NIST.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/dev/trust</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/responsible_ai/SYSTEM_CARD.md · FRAMEWORK_CROSSWALK.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article><article class="card"><div class="no">10<small>/10</small></div><h3>Overall Quality</h3>
+<p class="proofl">One story, honest numbers dated 30 Oct 2026, synthetic data and mock platforms said out loud, a clear ask.</p>
+<dl><dt>See it in the app</dt><dd class="mono">/present/close</dd><dt>Read it in the repo</dt><dd class="mono">docs/finals/rubric/demo_story/LEAVE_BEHIND.md · technical/DEMO_RUNBOOK.md</dd></dl>
+<div class="cf">Walnut DataBridge · numbers 30 Oct 2026 · synthetic data</div></article></section></body></html>

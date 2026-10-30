@@ -178,7 +178,7 @@ def main(argv=None) -> int:
     ap.add_argument("--smoke", type=Path, default=None,
                     help="directory of a smaller (--limit) run made after the last code change")
     ap.add_argument("--out", type=Path, default=OUT)
-    ap.add_argument("--e2e", type=int, default=38, help="Playwright e2e test count")
+    ap.add_argument("--e2e", type=int, default=124, help="Playwright e2e tests passed (docs/finals/TEST_REPORT.md)")
     ap.add_argument("--no-collect", action="store_true")
     args = ap.parse_args(argv)
     summary, source = load(args.eval_dir)
