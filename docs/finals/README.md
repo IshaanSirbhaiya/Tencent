@@ -10,6 +10,7 @@ track). Product: **Walnut DataBridge**; "Internal Brain" is the ask product insi
 |---|---|
 | [FEATURE_CATALOGUE.md](FEATURE_CATALOGUE.md) | Every user-visible feature and backend capability: who can use it, where, how, the rules it keeps, its tests and screenshots |
 | [CHANGELOG.md](CHANGELOG.md) | Every change since the 16 Oct submission, newest first, by area, with commit links; plus what is in progress |
+| [../PLATFORM.md](../PLATFORM.md) | The Walnut platform in this repo: all 21 packages, what each does, its tests and screens, and which ones the Internal Brain uses to answer |
 
 ## 1. Plan and decisions
 

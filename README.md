@@ -6,6 +6,22 @@ Walnut DataBridge gives staff at a regulated fintech one place to ask a question
 Jira, Slack and Google Drive. **Internal Brain**, the ask product inside it, answers only from what the
 asker may open, checks each source live, and writes every step to a tamper-evident audit log.
 
+### The platform underneath
+
+Internal Brain runs on **Walnut**, a data platform of 21 packages in `databridge/packages/`, with its own
+web app (`databridge/apps/frontend`, port 3300). Each item below names its package and its test files:
+
+- **Connect sources:** adapter contract and policy (`adapter`), MCP ingest with crawl plans and screening (`mcp_ingest`), **adapter agents** that keep sources synced and fresh (`adapter_agents`), schema ingest (`ingest`, `semantic`)
+- **Know:** a typed, time-aware **knowledge graph** where every value points to its source (`graph`), passage retrieval (`retrieval`)
+- **Ask across sources:** the **federated engine** (plan, delegate to each adapter agent, combine exactly; `federated`), the **orchestrator** (`orchestrator`)
+- **Shape data:** **convert** between file and table formats (`convert`), **materialise** reproducible datasets with receipts (`materialise`)
+- **Agents:** declarations compiled into grants (`agentdef`, `workflow_spec`), a governed runtime with human approval (`agent_runtime`), plain-English automations (`automation`), a send gate (`outbox`)
+- **Trust:** source pointers and the sealed decision ledger (`core`), the grounding wall, and one door to any model (`harness`)
+
+Internal Brain uses `core` (ledger), the grounding wall, `harness` and `convert` to answer; the rest are
+platform capabilities shown in the original screens. Full inventory, with file:line, tests and screens:
+**[docs/PLATFORM.md](docs/PLATFORM.md)**.
+
 Tencent Cloud AI CAN DO IT Hackathon Singapore 2026 · FinTech track (Aspire) · Team Walnut, finalist.
 This is the **finals build** (branch `final_v1.3`) for Demo Day, 3 Nov 2026. The judge's guide is
 [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). Every feature, who can use it, and the test behind it:
