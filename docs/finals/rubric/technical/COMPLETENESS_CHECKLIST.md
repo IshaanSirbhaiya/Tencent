@@ -8,7 +8,7 @@
 > RESULTS.md (14 Oct run); headline numbers re-run on the finals code, 30 Oct.
 
 **Score: 10 Done, 8 Partial, 4 Missing.** One change since the research: CI moved from Missing to Partial
-(the workflow exists; it has not yet run green on GitHub).
+(the workflow is green on GitHub: 17 successful runs, 29–30 Oct, 0 failed; latest run 40990413962).
 
 | # | Capability | Status | Evidence | Gap / next step |
 |---|---|---|---|---|
@@ -21,10 +21,10 @@
 | 7 | Generation | **Partial** | Hy3 → deepseek-v4.1-flash → extractive (`databridge_ib/llm.py:29-30, 88-104`); `tests/test_llm_chain.py` | **Hy3 never called live** (TokenHub 402 / 401006 on 30 Oct, `docs/finals/PLAN.md` §3.4) |
 | 8 | Grounding and citations | **Done** | Walnut grounding wall; versioned citations with `authz_checked_at` (`databridge_ib/models.py:158-170`); 0 uncited answers in the final run | Relations between facts not verified; one valid citation is enough (Codex track 1 #15) |
 | 9 | Evaluation harness | **Done** | `PY -m evals.internal_brain.run`; exits 1 on any leak (`databridge/evals/internal_brain/run.py:237-240`); canaries valid (`RESULTS.md:143-146`) | No real-model run |
-| 10 | Security review | **Done** (one gap) | Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds (`docs/tencent/SECURITY.md:124-393`) | Track 1 (35 findings) has no written disposition; 3, 9, 11, 12, 15 open |
+| 10 | Security review | **Done** (one gap) | Codex tracks 1-7, CodeBuddy on Hy3, two further AI review rounds (`docs/tencent/SECURITY.md:124-393`) | Track 1 (35 findings) has no written disposition; 3, 9, 11, 12, 15 open |
 | 11 | Audit and observability | **Partial** | Write-ahead sealed ledger, external head, `/audit/verify`. **New 30 Oct:** per-stage timings (`databridge_ib/pipeline.py:185-188`), `/audit/stats`, `/audit/journey`, `/ib/trace` (`tests/test_dev_views.py`) | No alerting or tracing system; no service-account monitoring (TRM 9.2.2); timing not controlled |
 | 12 | Deployment | **Partial** | `deploy/lighthouse/` (Caddy, Docker Compose, `smoke.sh`); `assert_deployable` refuses dev keys (`databridge_ib/config.py:48-66`) | No live instance; demo runs on the laptop (`docs/finals/DECISIONS.md` D-03) |
-| 13 | CI | **Partial** (was Missing) | `.github/workflows/ci.yml`: backend pytest on Python 3.13 and web typecheck on Node 20, on push and PR to `final_v1.0` and `Tencent` | Not yet run green on GitHub; no eval or Playwright job yet |
+| 13 | CI | **Partial** (was Missing) | `.github/workflows/ci.yml`: backend pytest on Python 3.13 and web typecheck on Node 20, on push and PR to `final_v1.0`, `final_v1.2-cloud`, `final_v1.3`, `final_v1.4` and `Tencent` | Green: 17 successful GitHub Actions runs, 29–30 Oct, 0 failed ([run 40990413962](https://github.com/IshaanSirbhaiya/Tencent/actions/runs/40990413962)); no eval or Playwright job yet |
 | 14 | Cost control | **Partial** | Refusals make no model call (2,640 of 3,687, `RESULTS.md:49`); ≤ 14 passages, 2 per doc (`databridge_ib/pipeline.py:34-35`); fallback chain | No per-user rate limit or budget; no token accounting |
 | 15 | Fallbacks and kill switch | **Done** | Extractive fallback; `IB_FORCE_OFFLINE=1` (`databridge_ib/llm.py:78-79`); ledger failure → 503 | Kill switch is global and needs a restart |
 | 16 | Sensitive data | **Done** | Card, CVV, NRIC/FIN, IBAN masked before index and model (`databridge_ib/ingest.py:64, 102`); `tests/test_fintech_scenarios.py::test_sens_raw_values_appear_nowhere_in_the_index` | Other personal data not redacted |

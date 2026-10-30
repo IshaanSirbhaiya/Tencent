@@ -1,7 +1,7 @@
 # Red-team report against the OWASP Top 10 for LLM Applications (2025)
 
 > **Status.** Self-assessed, 30 Oct 2026. Attacks were run by our own eval harness and by AI reviewers
-> (Codex, CodeBuddy on Hy3, Claude). No human third-party penetration test. Synthetic data only.
+> (Codex, CodeBuddy on Hy3 and further AI review seats; see `docs/tencent/DEV_PROCESS.md`). No human third-party penetration test. Synthetic data only.
 >
 > **References.** `databridge_ib/…` = `databridge/apps/internal_brain/databridge_ib/…`; `tests/…` =
 > `databridge/apps/internal_brain/tests/…`. Line numbers refer to commit `e5406b9` (read them with `git show e5406b9:<path>`); the code is being edited this week, so the function or test name is the stable part.
@@ -39,7 +39,7 @@ Showing failures is the point of a red team. These are from our own records.
 | Codex track 2 | 23 ledger findings, incl. a stale external head passing and reveal returning mismatched text | Fixed or stated as residual, each with a test | `docs/tencent/SECURITY.md:124-151` |
 | Codex track 3 | 34 connector and masking findings (fail-open parsing, NBSP-hidden card numbers) | Fixed or documented; masking hardened | `docs/tencent/SECURITY.md:226-281` |
 | Codex track 6 | Web proxy: `%2e%2e` path tricks, no CSRF check, any URL scheme in links | All ten fixed | `docs/tencent/SECURITY.md:353-369`; `databridge/apps/internal_brain_web/tests/e2e/proxy.spec.ts` |
-| Opus review | The eval exited 0 even with leaks | It now exits 1 on any leak, violation, P2 mismatch or invalid canary | `docs/tencent/SECURITY.md:339`; `databridge/evals/internal_brain/run.py:237-240` |
+| Independent AI review | The eval exited 0 even with leaks | It now exits 1 on any leak, violation, P2 mismatch or invalid canary | `docs/tencent/SECURITY.md:339`; `databridge/evals/internal_brain/run.py:237-240` |
 
 ## Detail per risk
 

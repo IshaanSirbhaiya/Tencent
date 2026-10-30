@@ -18,16 +18,16 @@ Single-key shortcuts are a WCAG 2.1.4 risk. So:
 
 | Key | Action |
 |---|---|
-| `P` | Arm and start. Applies the Stage theme and shows step 00 (the title card) at once; Leo's deliverables warm-up for `D` runs in the background once step 01's Compare has settled, so it never competes with the two live Compare asks (stage QA 30 Oct #6: it used to run first and P took 4.7 to 6.5 s; round-5 Opus cross-check #3). Pressed again: returns to step 00 without resetting the sandbox |
+| `P` | Arm and start. Applies the Stage theme and shows step 00 (the title card) at once; Leo's deliverables warm-up for `D` runs in the background once step 01's Compare has settled, so it never competes with the two live Compare asks (stage QA 30 Oct #6: it used to run first and P took 4.7 to 6.5 s; round-5 review cross-check #3). Pressed again: returns to step 00 without resetting the sandbox |
 | `Space` | Run the next step. The HUD shows what the next step will do. Debounce: ignore a second press within 400 ms |
-| `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end. Over an open sheet (the sources sheet in step 03, `D`'s panel) `B` closes the sheet and plays the clip; it never closes the reset confirm. On a step with no clip (the slides, 08 to 10, and the grow steps) `B` leaves the slide up and shows "No recording for this step" for 2.5 s, announced to screen readers (stage QA 30 Oct #2, #4). That includes Q&A: at step 10 with `D`'s panel open, `B` shows the note and leaves the panel open (round-5 Opus cross-check #4) |
+| `B` | Fallback: full-screen overlay plays the local clip for the current step (A, B or C), muted, from a local file; `B` again returns to live. No network. Target under 300 ms to start, under 3 s end to end. Over an open sheet (the sources sheet in step 03, `D`'s panel) `B` closes the sheet and plays the clip; it never closes the reset confirm. On a step with no clip (the slides, 08 to 10, and the grow steps) `B` leaves the slide up and shows "No recording for this step" for 2.5 s, announced to screen readers (stage QA 30 Oct #2, #4). That includes Q&A: at step 10 with `D`'s panel open, `B` shows the note and leaves the panel open (round-5 review cross-check #4) |
 | `R` | Reset: restores the tamper sandbox copy, clears the ask boxes, re-warms the model, returns to step 00. Never edits the real ledger |
-| `Esc` | **The Esc rule** (round-3 Fable #1, `controller.ts`). With a sheet or dialog open, `Esc` closes it through its own handler (sources sheet, reset confirm, `D`'s panel, the grow step's Add sheet) and never touches the HUD. Once `P` has started the script, `Esc` with nothing open **never hides the HUD**; it only brings a hidden HUD back. Before `P`, `Esc` hides or shows the HUD as before. While a dialog is open the other presenter keys are ignored, except over the grow step's Add sheet, which the script opened itself (`data-presenter-owned`): `Space` keeps driving the script there |
+| `Esc` | **The Esc rule** (round-3 review #1, `controller.ts`). With a sheet or dialog open, `Esc` closes it through its own handler (sources sheet, reset confirm, `D`'s panel, the grow step's Add sheet) and never touches the HUD. Once `P` has started the script, `Esc` with nothing open **never hides the HUD**; it only brings a hidden HUD back. Before `P`, `Esc` hides or shows the HUD as before. While a dialog is open the other presenter keys are ignored, except over the grow step's Add sheet, which the script opened itself (`data-presenter-owned`): `Space` keeps driving the script there |
 | `H` | Hides or shows the HUD on purpose, at any time |
 | `ArrowLeft` | Back one step. `ArrowRight` skips a failed step |
-| `L` | Toggles English and 简体中文. Not used in the 5:00 (the flip was cut, round-3 Fable #8: Developer pages stay English) |
+| `L` | Toggles English and 简体中文. Not used in the 5:00 (the flip was cut, round-3 review #8: Developer pages stay English) |
 | `S` | Stage theme on or off |
-| `D` | Q&A: signs Leo in and opens his **pre-built** Deliverables panel (built by the `P` warm-up, kept 12 minutes; after that `D` builds a fresh one, round-4 Opus #7). `Esc` closes it and signs back in whoever was signed in before `D` (round-3 Fable #2), unless a step, `R` or the shell signed someone else in meanwhile (round-4 Opus #13). If the shell signs out or switches persona while `D` is still building, `D` stops: it never signs Leo in afterwards (round-5 Codex #9), so `←` to the journey shows the waterfall; the journey step's `←` also signs Maya in again on its own |
+| `D` | Q&A: signs Leo in and opens his **pre-built** Deliverables panel (built by the `P` warm-up, kept 12 minutes; after that `D` builds a fresh one, round-4 review #7). `Esc` closes it and signs back in whoever was signed in before `D` (round-3 review #2), unless a step, `R` or the shell signed someone else in meanwhile (round-4 review #13). If the shell signs out or switches persona while `D` is still building, `D` stops: it never signs Leo in afterwards (round-5 Codex #9), so `←` to the journey shows the waterfall; the journey step's `←` also signs Maya in again on its own |
 | `2` | Opens citation [2] on the current Compare page |
 | `?` | Key legend |
 
@@ -37,7 +37,7 @@ The HUD's model dot reads "quoting (no model)" (引用模式（无模型）) whe
 
 Steps 05 (Verify) and 06 (tamper) are ready only once their result is on screen: the Verify result, or "Chain broken at entry N" (stage QA 30 Oct #3).
 
-**One session queue (round-4 Opus #1).** Every change of who is signed in to the main session (a step's sign-in, `P`'s warm-up, `D` and its `Esc`, `R`, and the shell's Sign out and persona switch) runs one at a time through `components/presenter/session.ts`. A Sign out or persona switch from the shell wins: work already queued stops and never signs anyone back in over it.
+**One session queue (round-4 review #1).** Every change of who is signed in to the main session (a step's sign-in, `P`'s warm-up, `D` and its `Esc`, `R`, and the shell's Sign out and persona switch) runs one at a time through `components/presenter/session.ts`. A Sign out or persona switch from the shell wins: work already queued stops and never signs anyone back in over it.
 
 ## 2a. Mouse
 
@@ -60,7 +60,7 @@ Every control has a tooltip with its key (for example "Next (Space)"), an access
 
 **Ordinary clicks are never taken over.** Presenter mode listens only for the two side buttons; links, the app's own navigation, answer cards and every other click work as on any website, armed or not (`presenter.spec.ts` "armed: ordinary clicks stay ordinary").
 
-**Browser Back and Forward** (toolbar, `Alt+←`, or a side button the browser handled anyway). Rule: when the browser goes back to the **previous step's page** (the same path and every query parameter that step's URL sets, so `/dev/audit` is not step 06's `/dev/audit?tamper=1`; round-5 Opus cross-check #1), that is Back: the script steps back with it (re-opening that page, and its session where the step needs one), so the bar and the page agree. Any other history move (Forward, or Back to a page the driver opened by clicking around) is left to the browser: the step number stays, and the next ▶ or `Space` opens its own page as usual. It is ignored while a step runs (the step owns the page; at worst it says "did not finish" and `Space` retries) and for one second after a side button. Why not "sync the step to the page": several steps share a page (01, 03 and the grow-ask step are all `/compare`; 05 to 07 are all `/dev/audit`), so the page alone cannot name the step, and running a step's action from a history move could ask or sign someone in by surprise.
+**Browser Back and Forward** (toolbar, `Alt+←`, or a side button the browser handled anyway). Rule: when the browser goes back to the **previous step's page** (the same path and every query parameter that step's URL sets, so `/dev/audit` is not step 06's `/dev/audit?tamper=1`; round-5 review cross-check #1), that is Back: the script steps back with it (re-opening that page, and its session where the step needs one), so the bar and the page agree. Any other history move (Forward, or Back to a page the driver opened by clicking around) is left to the browser: the step number stays, and the next ▶ or `Space` opens its own page as usual. It is ignored while a step runs (the step owns the page; at worst it says "did not finish" and `Space` retries) and for one second after a side button. Why not "sync the step to the page": several steps share a page (01, 03 and the grow-ask step are all `/compare`; 05 to 07 are all `/dev/audit`), so the page alone cannot name the step, and running a step's action from a history move could ask or sign someone in by surprise.
 
 ## 3. Stage theme
 
@@ -103,7 +103,7 @@ This is the live order. Step ids and URLs are copied from `components/presenter/
 | 04 | `journey` | `Space` | 1:40 | `/dev/journey/<req>` (Rachel's `req_id`) | Session switches to `maya.compliance`. Opens on the waterfall: real milliseconds per stage, model name, three ledger records with sequence and hash (D-16) |
 | 05 | `verify` | `Space` | 2:10 | `/dev/audit?verify=1` | **Verify** on the live ledger. Green: intact |
 | 06 | `tamper` | `Space` | 2:20 | `/dev/audit?tamper=1` | **Sandbox tamper, then Verify**: one Gate-2 decision changes in a temporary **copy** of the log, 'forbidden' to 'verified' (spoken: "denied to allowed"), and the copy is verified. Red: "broken at entry N". The real chain is never edited (D-19) |
-| 07 | `workbuddy` | `Space` | 2:35 | `/dev/audit` | **Off-app** (see §7). The bar shows the WorkBuddy card; Dev switches window (Alt+Tab). Back in the app, the newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus, not on a key. No language flip (cut, round-3 Fable #8) |
+| 07 | `workbuddy` | `Space` | 2:35 | `/dev/audit` | **Off-app** (see §7). The bar shows the WorkBuddy card; Dev switches window (Alt+Tab). Back in the app, the newest row, channel `workbuddy-mcp` (Jordan), appears when the window regains focus, not on a key. No language flip (cut, round-3 review #8) |
 | 08 | `proof` | `Space` | 3:20 | `/present/proof` | **Proof slide** |
 | 09 | `business` | `Space` | 3:50 | `/present/business` | **Business slide** |
 | 10 | `close` | `Space` | 4:30 | `/present/close` | **Close slide** |
@@ -112,9 +112,9 @@ This is the live order. Step ids and URLs are copied from `components/presenter/
 **Live growth is never on the Space path.** The three grow steps (`grow`, `grow-post`, `grow-ask`,
 after the Ken beat) are added only when demo features are on (D-24) **and** the tab was opened with
 `?grow=1` (stored for this tab; `?grow=0` turns it off). Without `?grow=1` the HUD counts `/ 10`;
-with it, `/ 13`. Use it for a Q&A walk-up only (round-2 Fable #1; test in `presenter.spec.ts`).
+with it, `/ 13`. Use it for a Q&A walk-up only (round-2 review #1; test in `presenter.spec.ts`).
 
-The grow walk-up, keys only (round-3 Fable #1; `presenter.spec.ts` "the ?grow=1 walk-up runs on Space
+The grow walk-up, keys only (round-3 review #1; `presenter.spec.ts` "the ?grow=1 walk-up runs on Space
 alone"):
 1. **Open the `?grow=1` tab after a sign-in exists** (`/present?present=1&grow=1`): `/ib/status` needs a
    session. A tab opened signed out keeps the opt-in and picks the grow steps up once `P` signs someone in

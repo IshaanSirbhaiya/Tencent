@@ -164,5 +164,5 @@ tenant is connected, and when Hy3 (or any model) goes live.
 |---|---|---|
 | 13 Oct 2026 | First eval run: 0 leaks; 6 forged-citation injection failures; 102 uncited model answers | `docs/tencent/SECURITY.md:178-183`; `docs/tencent/RESPONSIBLE_AI.md:37` |
 | 14 Oct 2026 | Fixes in `8b5eb57` and `d69ab97`; final run: 0 leaks, 0 injection failures, 0 uncited answers | `RESULTS.md:3` |
-| 15 Oct 2026 | Codex tracks 5-7 and two Claude review rounds; fixes recorded | `docs/tencent/SECURITY.md:316-393` |
+| 15 Oct 2026 | Codex tracks 5-7 and two further AI review rounds; fixes recorded | `docs/tencent/SECURITY.md:316-393` |
 | 30 Oct 2026 | Per-stage timings, `/audit/stats`, `/audit/journey`, `/ib/trace` (`e5406b9`). Eval re-run 30 Oct. | `git show e5406b9`; `tests/test_dev_views.py` |

@@ -4,7 +4,7 @@ Walnut DataBridge (Internal Brain) · Tencent Cloud AI CAN DO IT Hackathon Singa
 Demo Day 3 Nov 2026.
 
 Every claim in these files links to a file and line, a test or an eval in this repo. Everything is
-self-assessed by the team, on synthetic data. Eval numbers come from
+self-assessed by the team, on synthetic data. Which AI tools were used to build and review it: [DEV_PROCESS.md](../../../tencent/DEV_PROCESS.md#build-tools-the-one-statement). Eval numbers come from
 [RESULTS.md](../../../../databridge/evals/internal_brain/RESULTS.md) (run of 14 Oct). The headline numbers were re-run
 on the finals code on 30 Oct and match `eval_summary.json`; latency and per-role figures are from the 14 Oct run.
 
@@ -28,8 +28,8 @@ ARCHITECTURE, DATA_FLOWS). Technical evidence: [../technical/](../technical/READ
 
 ## Five facts to remember
 
-1. **0 leaks in 7,374 adversarial requests** (95% upper bound 0.08% per request per path), with canaries that prove the test can fail. Re-run pending. (`RESULTS.md:9-19`)
-2. **Restricted and non-existent look byte-identical:** 0 of 400 pairs differ. Re-run pending. (`RESULTS.md:16`)
+1. **0 leaks in 7,374 adversarial requests** (95% upper bound 0.08% per request per path), with canaries that prove the test can fail. Re-run on the finals pipeline 30 Oct and again in the cloud. (`RESULTS.md:9-19`)
+2. **Restricted and non-existent look byte-identical:** 0 of 400 pairs differ. Re-run 30 Oct. (`RESULTS.md:16`)
 3. **The model has no tools** and never chooses an identity. (`databridge/apps/internal_brain/databridge_ib/llm.py:91-92`)
 4. **Every answer is logged before it is shown;** if the log fails, there is no answer. (`databridge/apps/internal_brain/tests/test_app_routes.py::test_ledger_failure_is_503`)
 5. **Hy3 has not run live yet.** Every number comes from a capturing fake model or the extractive path.
@@ -39,7 +39,7 @@ ARCHITECTURE, DATA_FLOWS). Technical evidence: [../technical/](../technical/READ
 | Never say | Say instead | Why |
 |---|---|---|
 | "Compliant with MAS / PDPA / AI Verify / ISO 42001" | "Mapped to", with the gap list | No regulator or auditor has assessed it; it runs on synthetic data |
-| "Certified" or "audited" | "Self-assessed", "reviewed by AI models and the team" | Every review so far is by AI models (Codex, CodeBuddy, Claude) or by us; no human third party |
+| "Certified" or "audited" | "Self-assessed", "reviewed by AI models and the team" | Every review so far is by AI models (which ones: [DEV_PROCESS.md](../../../tencent/DEV_PROCESS.md#build-tools-the-one-statement)) or by us; no human third party |
 | "Zero risk", "unhackable", "leak-proof" | "0 in 7,374, with a 95% upper bound of 0.08% per request" | Absence of observed leaks is not proof of absence |
 | "Runs on Hy3" / "Hy3 answers" | "Hy3 is wired in and tested with a capturing model; the live run waits on Tencent account verification" | No live Hy3 call has succeeded (`docs/finals/PLAN.md` §3.4) |
 | "Tested on real Slack / Confluence / Jira / Drive" | "Mock platforms with the real APIs' shapes; same connector code, injected base URL" | No live tenant (`INTERNAL_BRAIN.md:245-246`) |

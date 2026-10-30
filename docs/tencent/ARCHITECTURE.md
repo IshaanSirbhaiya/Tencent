@@ -239,8 +239,10 @@ The Internal Brain imports `databridge_core` (`DecisionLedger`), `databridge_har
 `bind_sentences`, `unsupported_named_terms`). The grounding functions are loaded by file path, so the
 legacy gateway's routes are never imported.
 
-The Internal Brain does not modify `packages/core`, `packages/harness`, `packages/retrieval`,
-`packages/adapter` or `apps/gateway`; it uses them by import.
+The Internal Brain does not modify `packages/core`, `packages/harness`, `packages/convert`,
+`packages/adapter` or `apps/gateway`; it imports `core` (ledger, value forms), `harness`, `convert` (file readers)
+and the gateway's grounding wall. It does not use `packages/retrieval`: it keeps its own permission-first index
+(`databridge_ib/index.py`).
 
 ## 8. Developer views and their guarantees
 
