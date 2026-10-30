@@ -13,7 +13,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button, Sheet, SheetContent, Skeleton } from '@/components/ui';
 import { viewNumbering } from '@/components/views/numbering';
-import { ApiError, analyticsApi, viewApi } from '@/lib/api';
+import { ApiError, analyticsApi, onSessionChange, viewApi } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { useMessages } from '@/lib/i18n';
 import { viewMessages, type ViewMessageKey } from '@/lib/i18n/view';
@@ -43,7 +43,11 @@ export function wantsView(question: string | undefined): boolean {
 /* ------------------------------------------------------------------------------- status */
 
 let statusOnce: Promise<ViewsStatus | null> | null = null;
-/** /ib/status's views block, fetched once per page load (the switch needs an IB restart). */
+// The status is read as the signed-in person: a new sign-in, switch or sign-out reads it again.
+onSessionChange(() => {
+  statusOnce = null;
+});
+/** /ib/status's views block, fetched once per signed-in session (the switch needs an IB restart). */
 export function viewsStatus(): Promise<ViewsStatus | null> {
   if (!statusOnce) {
     statusOnce = analyticsApi

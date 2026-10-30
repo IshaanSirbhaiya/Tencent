@@ -145,19 +145,34 @@ function demoLogin(persona: string, passcode: string | undefined, slot?: Slot) {
 // starts a new generation, so a request still running for A is never handed to B (restricted ≡ non-existent).
 let sessionGen = 0;
 let mapInFlight: { gen: number; p: Promise<KnowledgeMap> } | null = null;
-const newSession = <T,>(p: Promise<T>): Promise<T> => {
+// Per-person caches kept outside this module (e.g. the views status in ViewRow) register here and
+// are dropped with the in-flight requests whenever the signed-in person may have changed.
+const sessionResets = new Set<() => void>();
+/** Run `reset` whenever the signed-in person may change (sign-in, switch, sign-out, another tab). */
+export function onSessionChange(reset: () => void): () => void {
+  sessionResets.add(reset);
+  return () => sessionResets.delete(reset);
+}
+function resetSession() {
   sessionGen += 1;
   mapInFlight = null;
-  return p.finally(() => {
-    sessionGen += 1;
-    mapInFlight = null;
-  });
+  for (const fn of sessionResets) {
+    try {
+      fn();
+    } catch {
+      /* a cache that cannot reset must not stop the others */
+    }
+  }
+}
+
+const newSession = <T,>(p: Promise<T>): Promise<T> => {
+  resetSession();
+  return p.finally(resetSession);
 };
 
-/** Drop the shared in-flight requests: the signed-in person changed (also outside this tab). */
+/** Drop the shared in-flight requests and per-person caches: the signed-in person changed (also outside this tab). */
 export function forgetInFlight() {
-  sessionGen += 1;
-  mapInFlight = null;
+  resetSession();
 }
 
 export const api = {

@@ -131,6 +131,17 @@ export default function AskPage() {
     [buildView],
   );
 
+  // A page belongs to the person it was built for: when the signed-in sub changes (a switch, a
+  // sign-out, another tab), the open page closes and the cached pages are dropped.
+  const pageSub = useRef<string | undefined>(me?.sub);
+  useEffect(() => {
+    if (pageSub.current === me?.sub) return;
+    pageSub.current = me?.sub;
+    viewSeq.current++;
+    setCanvas(null);
+    pages.current.clear();
+  }, [me?.sub]);
+
   // The sidebar shrinks to its icons while a page is open beside the chat.
   useEffect(() => {
     autoNavRail(canvas !== null && inlineCanvas);
