@@ -32,7 +32,7 @@ Every number is linked to a source or a repo file; estimates are labelled.
 
 **Feasibility**
 
-1. "It runs today: 754 backend tests, and a leak harness that re-runs on any company's permissions."
+1. "It runs today: 1,131 backend tests, and a leak harness that re-runs on any company's permissions."
 2. "An answer costs under a tenth of a US cent on Hy3, at list price. Refusals cost nothing, because they never reach the model."
 3. "Slack's 2025 terms bar indexing its data for AI. Its answer is live search as the user. That's already how our Gate 2 works."
 4. "The design targets Tencent Cloud Singapore, which holds MTCS Level 3 and OSPAR. A one-command Lighthouse deploy kit is included; we have no live instance. Hy3's open weights would let a bank host the model itself."

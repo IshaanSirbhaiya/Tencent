@@ -14,7 +14,7 @@
 |---|---|---|
 | Python env | `cd databridge && py -3.13 -m venv .venv && .venv/Scripts/python -m pip install -r requirements-lock.txt` | `PY --version` is 3.13 |
 | Web deps | `cd databridge/apps/internal_brain_web && npm install` | no errors |
-| Tests green | `cd databridge && PY -m pytest apps/internal_brain/tests -q` | 754 passed on 30 Oct at commit 7bf3246 |
+| Tests green | `cd databridge && PY -m pytest apps/internal_brain/tests -q` | 1,131 passed, 0 failed on 30 Oct at commit 831297e (cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) |
 | Optional: Hy3 | Create `databridge/.env.ib.local` (git-ignored) with `TOKENHUB_API_KEY=<key>` and `IB_FORCE_OFFLINE=0` | See §4, failure 1 |
 | Optional: WorkBuddy | `cd databridge && PY scripts/workbuddy_setup.py --user-config`; restart WorkBuddy; press **Trust** on each connector | Two employee connectors appear; compliance runs from the `IB compliance` workspace folder (`docs/tencent/workbuddy/README.md`) |
 

@@ -3,7 +3,20 @@
 30 Oct 2026. Web app `databridge/apps/internal_brain_web`, branch `final_v1.0`. Config: `playwright.config.ts`
 (builds with `npm run build:mock`, serves on 127.0.0.1:3101, one worker).
 
-## 1. Result
+## Current result (30 Oct 2026, cloud)
+
+Run on Fri 30 Oct 2026 in the cloud (Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) on the committed tree at
+`d8f8de7`/`831297e`, branch `final_v1.2`, with `playwright.config.ts` in mock mode. Every spec that config runs is
+included, among them `act.spec.ts`, `grow.spec.ts`, `deliverables.spec.ts` and `voice.spec.ts`:
+**166 passed, 0 failed, 41 skipped**. The skipped specs need the live stack, the engine proxy or Hy3.
+`a11y-shell*.spec.ts` has its own config and is not in this count.
+
+Same run, other suites: IB backend (`apps/internal_brain/tests`) 1,131 passed, 0 failed; mock platforms 154 passed;
+fixtures (enterprise) 47 passed; web `tsc --noEmit` clean.
+
+The sections below are the earlier 30 Oct run on `final_v1.0` (124 passed), kept as history.
+
+## 1. Result (earlier run, `final_v1.0`)
 
 Three consecutive full runs from a fresh build, no retries: **124 passed, 0 failed, 38 skipped** each time
 (17.0 min, 11.4 min, 9.9 min; the first was slowed by other agents using the machine). No flaky test seen in those

@@ -176,11 +176,11 @@ question through Jordan's and Ken's connectors with two different answers.
 
 ### 14 · The proof (5:20–5:38)
 **On screen:** the app's proof slide: 0 leaks in 7,374 adversarial requests, 0 differences in 400 paired
-questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 754 backend + 124 browser tests.
+questions, 0 hard failures in 1,152 prompt-injection attempts. Label: 1,131 backend + 166 browser tests.
 
 > We didn't just demo it, we attacked it. Five thousand nine hundred and fifty-eight adversarial
-> requests: zero leaks. Four hundred paired questions: zero differences. And seven hundred and fifty-four
-> backend tests, plus a hundred and twenty-four browser tests, all passing.
+> requests: zero leaks. Four hundred paired questions: zero differences. And one thousand one hundred and
+> thirty-one backend tests, plus a hundred and sixty-six browser tests, all passing.
 
 ### 15 · What it's worth (5:38–5:57)
 **On screen:** the app's business slide: about US$1.3M a year (estimate), break-even about 7 minutes per
@@ -213,7 +213,7 @@ Then run `python docs/finals/video/assemble_finals.py --hy3` so the cue sheet us
 | Line | Source | If it changed |
 |---|---|---|
 | 7,374 / 0 leaks; 400 / 0 differences; 1,152 injection attempts | `databridge/apps/internal_brain_web/public/eval_summary.json` (run 29–30 Oct) | Read the new numbers; the slide updates itself |
-| 754 backend, 124 browser tests | `eval_summary.json` `tests.backend`; `docs/finals/TEST_REPORT.md` (124 passed, 0 failed) | Say the new counts and edit the scene 14 label in `assemble_finals.py` |
+| 1,131 backend, 166 browser tests | `eval_summary.json` `tests.backend` / `tests.e2e`; `docs/finals/TEST_REPORT.md` (cloud run 30 Oct, commit 831297e: 1,131 passed; e2e 166 passed, 0 failed, 41 skipped) | Say the new counts and edit the scene 14 label in `assemble_finals.py` |
 | Graph and engine counts | Not spoken any more (the world is growing); the screen shows them | Nothing to change |
 | US$1.3M, 7 minutes | `docs/finals/rubric/impact_feasibility/value_calculator.spec.json` (600 people, 90 min/week, US$31/h, 46 weeks, US$100,000/yr) | Match the slide |
 | "Tipping off" line | Run sheet, beat 0:15 | Keep the wording as written |

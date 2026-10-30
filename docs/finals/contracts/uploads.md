@@ -146,12 +146,13 @@ first in the `/sim/reset` hooks (no `sim.py` change needed). SECURITY.md §15.12
   end with before/after and Ken, masking, write permission live, switches, byte-identical refusal, body
   limit before decoding, rate limit, reset).
 - `tests/test_extract_files.py`: 21 passed.
-- `apps/mock_platforms/tests`: 154 tests collected (30 Oct); last recorded pass 151. Re-run before 3 Nov.
+- `apps/mock_platforms/tests`: 154 passed (cloud run, 30 Oct, commit 831297e).
 - Full IB suite, run 1: 944 passed, 2 failed (`test_connector_drive.py::test_markdown_and_csv`,
   `::test_crawl_full_then_quiet`: the fake Drive's `df-7` is a header-only CSV, `a,b`, which extraction
   turned into "no text", so the file was skipped). FIXED: a header-only CSV is indexed as its cleaned text
   (`DriveConnector._extracted`); `test_connector_drive.py` now 65 passed. Full-suite run 2 (after the fix):
-  1040 passed, 0 failed.
+  1040 passed, 0 failed. Latest full run (cloud, 30 Oct, Linux, Python 3.13, commit 831297e): 1,131 passed,
+  0 failed.
 
 **Left / gotchas.**
 - `python-pptx==1.0.2`, `XlsxWriter==3.2.9` and `pypdfium2==5.14.0` are pinned in

@@ -80,7 +80,7 @@ SEGMENTS = [
      {"pills": [(1.0, 5.0, "One question, Jordan's and Ken's connectors: two answers")]}),
     ("clip", "13_hy3_status.webm", 15, "13 Tencent Hy3", {}),
     ("card", "14_proof.png", 18, "14 The proof",
-     {"pills": [(9.5, 7.0, "Plus 754 backend tests and 124 browser tests, all passing")]}),
+     {"pills": [(9.5, 7.0, "Plus 1,131 backend tests and 166 browser tests, all passing")]}),
     ("card", "15_business.png", 19, "15 What it's worth", {}),
     ("card", "16_close.png", 11, "16 Close", {}),
 ]

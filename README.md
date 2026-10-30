@@ -164,8 +164,8 @@ They use a capturing test model and the quoted-answer path, not live Hy3.
 | Prompt injection planted on all four platforms | **0 hard failures** in 1,152 injection-relevant requests |
 | Allowed sources reaching the answer step | **100%** on both paths; the answer cites the expected source in 93.2% (quoted) to 97.1% (model) |
 | Eval canaries | A leaky configuration is caught; deny-everything scores 0% usefulness |
-| Backend tests (Internal Brain) | **754 passed** (commit 7bf3246, 30 Oct 2026, Windows, Python 3.13) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
-| Web end-to-end tests (Playwright, axe checks) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added after that run and is not in the count; `act.spec.ts` (8), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending |
+| Backend tests (Internal Brain) | **1,131 passed**, 0 failed (commit 831297e, 30 Oct 2026, cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1`) · from `databridge/`: `.venv/bin/python -m pytest apps/internal_brain/tests -q` (Windows: `.venv\Scripts\python`) |
+| Web end-to-end tests (Playwright, axe checks) | 166 passed, 0 failed, 41 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, cloud: Linux, commit 831297e; [TEST_REPORT](docs/finals/TEST_REPORT.md)) |
 | Live QA against the real backend | 32 checks of page and persona, 11 bugs found and fixed, 4 open issues listed: [QA_LIVE.md](docs/finals/QA_LIVE.md) |
 
 ## 5. Honest limits

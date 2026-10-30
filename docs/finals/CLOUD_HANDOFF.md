@@ -4,8 +4,8 @@
 
 Updated by the cloud session, Fri 30 Oct 2026 (started ~11:45 SGT).
 
-1. **Organiser email (before 23:59 SGT today).** `docs/finals/ORGANISER_UPDATE.md` will point at the
-   newest verified branch with current numbers; you send it.
+1. **Organiser email (before 23:59 SGT today).** `docs/finals/ORGANISER_UPDATE.md` is ready: it links
+   `final_v1.3` with the verified numbers below. Read it and send it.
 2. **Hy3 / TokenHub activation.** Still 402. Until it's live every footer says "Quoted from sources
    (no model)" and the mock defaults to that too. After you activate it: `hy3_check.py`, then the eval re-run.
 3. **Codex review** of everything the cloud built (no Codex in the cloud). Scope list is in §7.
@@ -16,8 +16,43 @@ Updated by the cloud session, Fri 30 Oct 2026 (started ~11:45 SGT).
    is verified), refresh `live_kit/ABSENCE_PROOF.txt`, and press `B` at every step on the stage profile.
    `demo_day.ps1` was edited in the cloud and could not be run here (no PowerShell), so run
    it once before trusting it.
-8. **Decision to confirm:** the grow beat is now opt-in per tab (`/present?grow=1`) and never on the
-   Space path. The default script is 11 steps (00–10).
+8. **Decisions to confirm** (taken in the cloud, logged as D-26 to D-33 in `DECISIONS.md`):
+   - the grow beat is opt-in per tab (`/present?grow=1`) and never on the Space path; the default script
+     is 11 steps (00–10);
+   - the 简体中文 `L` flip is cut from the 5:00;
+   - once `P` has started, `Esc` never hides the HUD (`H` does);
+   - the Summary deliverable is not built;
+   - the compliance connector stays out of the shared WorkBuddy config. This may change the WorkBuddy GUI
+     test prompts that name `ib-compliance`: see `WORKBUDDY_GUI_TEST.md`.
+9. **Codex 2b #3 (video):** a failed re-record overwrites the marks of the previous good take. Fix it before
+   the next recording (`record_finals.cjs`, `assemble_finals.py`).
+10. **Upload folder by name:** the upload sheet takes a Drive folder id (no folder-list route exists).
+    A name picker needs a small backend route; that is your call.
+
+## Cloud session results (Fri 30 Oct, ~11:45 to ~15:30 SGT)
+
+Branch `final_v1.3` (cut from `final_v1.2` at the end of this session). Verified on the committed tree
+(Linux, Python 3.13, `IB_FORCE_OFFLINE=1`):
+
+| Suite | Result |
+|---|---|
+| IB backend | **1,131 passed**, 0 failed |
+| Web e2e (Playwright, mock) | **166 passed**, 0 failed, 41 skipped (they need the live stack, the engine proxy or Hy3) |
+| Mock platforms | 154 passed |
+| Fixtures | 47 passed |
+| Web `tsc --noEmit` | clean |
+| Leak eval (re-run on this tree) | 0 leaks / 7,374, 0/400 P2, 1,152 injection-relevant, unchanged |
+
+What landed: all round-2 findings (`reviews/round2_dispositions.md`); the round-2b review of the
+unreviewed scope and its fixes; round-3 four-seat reviews (Opus, Sonnet, Haiku, Fable) of Deliverables,
+live growth and uploads, and their fixes (`reviews/round3_dispositions.md`); Deliverables P0 confirmed and
+P1 Slides (.pptx with the formula guard); one number set; test counts in every doc; handouts rebuilt.
+Lock file: `opencv-python-headless` and `XlsxWriter` pinned (a fresh install failed 13 upload tests without OpenCV).
+Fable's round-3 score: 79/100. Its open items are founder or laptop items (above).
+
+Setup in the cloud: the web e2e needs `launchOptions.executablePath: '/opt/pw-browsers/chromium'`
+(Playwright 1.48 is pinned); an untracked `playwright.cloud.config.ts` did that. Handouts:
+`CHROMIUM_PATH=/opt/pw-browsers/chromium node build_handouts.mjs`.
 
 **Read this first in any new or cloud session.** It is the full end-to-end context. The founder
 (Ishaan) is away with no internet. Continue the work here; when he is back, the local session pulls
@@ -75,7 +110,7 @@ The founder's working rules:
 
 - **Backend:** developer views (stats, journey, trace receipt, graph, doc, status, SSE stages,
   tamper demo, the Hy3 audit parser), simulator reconcile, the version-bound authz helper, Host
-  allowlist. **754 tests at the last full run.**
+  allowlist. **1,131 passed, 0 failed** (cloud run, 30 Oct, Linux, Python 3.13, `IB_FORCE_OFFLINE=1`, commit `831297e`).
 - **Eval:** full eval re-run, 0 leaks / 5,958, 0/400 differential, 0 injection failures.
 - **Web:**
   - User mode;
@@ -83,7 +118,7 @@ The founder's working rules:
   - Presenter (10-step keyboard script, Stage theme, slides);
   - Developer mode: Mission control, Journey, Knowledge graph, Walnut engine, Analytics, Audit with
     the sandbox tamper demo, Simulator, Trust centre, Value calculator;
-  - tours, voice dictation, preflight board. **124 e2e passing.**
+  - tours, voice dictation, preflight board. **Playwright e2e (mock mode): 166 passed, 0 failed, 41 skipped** (cloud run, 30 Oct, `831297e`; skipped = needs the live stack, the engine proxy or Hy3).
 - **Evidence pack** for all 10 criteria (`docs/finals/rubric/README.md`); the demo story, run sheet,
   Q&A banks, handouts, backup clips A/B/C.
 - **Tencent tools:** CodeBuddy CB1–CB9 (CB7–CB9 on the finals code), the WorkBuddy MCP connector
@@ -301,7 +336,7 @@ the Opus re-run.
 1. **Make each WIP track pass its own tests,** then the FULL suites:
    - IB backend (from `databridge/`):
      `PYTHONPATH="apps/internal_brain:packages/core:packages/harness:packages/adapter:packages/retrieval" python -m pytest apps/internal_brain/tests -q -p no:cacheprovider`
-     (on Linux use `:` separators; the expectation is 754+ green);
+     (on Linux use `:` separators; the last cloud run, 30 Oct at `831297e`, was 1,131 passed, 0 failed);
    - the mock platforms: `PYTHONPATH=apps/mock_platforms python -m pytest apps/mock_platforms/tests -q`;
    - the fixtures: `python -m pytest fixtures/enterprise/tests -q`;
    - web: `cd apps/internal_brain_web && npm ci && npx tsc --noEmit && npx playwright install chromium && npx playwright test` (it builds the mock and runs on 3101).

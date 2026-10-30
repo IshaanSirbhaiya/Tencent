@@ -14,7 +14,7 @@ Repo facts come from `INTERNAL_BRAIN.md`, `docs/tencent/{SECURITY,RESPONSIBLE_AI
 ## 0. Summary in ten lines
 
 1. Technical judges score three things: does it run live, is the architecture sound and legible, and is there evidence beyond the demo (tests, evals, reviews).
-2. We have unusually strong evidence: 0 leaks in 7,374 requests, 0 of 400 differential mismatches, 0 injection failures in 1,152 requests, 733 backend tests, a Playwright suite (see docs/finals/TEST_REPORT.md), and recorded security reviews (Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds) with written dispositions for all but Codex track 1.
+2. We have unusually strong evidence: 0 leaks in 7,374 requests, 0 of 400 differential mismatches, 0 injection failures in 1,152 requests, 1,131 backend tests, 166 Playwright tests passing (30 Oct, commit 831297e; docs/finals/TEST_REPORT.md), and recorded security reviews (Codex tracks 1-7, CodeBuddy on Hy3, two Claude rounds) with written dispositions for all but Codex track 1.
 3. Our biggest technical gap is that **Hy3 has never run live**. Every number comes from a capturing fake model or the extractive path. Close this before 3 Nov if TokenHub verification has cleared. If it has not, say so first, in one sentence.
 4. Other gaps: a CI workflow exists (`.github/workflows/ci.yml`) but its first GitHub run is not yet recorded, no live deployment (the Lighthouse kit exists but has never run), no real SSO, retrieval is lexical only, and there is no human review queue or feedback loop.
 5. For Responsible AI, Singapore judges will think in **AI Verify (11 principles)**, **IMDA's GenAI framework (2024)**, the **agentic framework (Jan 2026)**, the **IMDA Starter Kit's four risks**, **MAS FEAT/Veritas** and the new **MAS AI Risk Management Guidelines (7 Oct 2026)**.
@@ -93,7 +93,7 @@ All paths below are new files under `docs/finals/rubric/` unless shown otherwise
 | # | Artefact | File | Outline | Where it shows in the demo |
 |---|---|---|---|---|
 | T1 | **Architecture one-pager** | `technical/ARCHITECTURE_ONE_PAGER.md` + `technical/architecture.png` | (a) The request path as 6 boxes: token → Gate 1 → Gate 2 → sealed ledger → Hy3 → grounding wall → one response shape. (b) Trust boundaries TB1-TB9 as small badges. (c) Tencent products marked: TokenHub/Hy3, WorkBuddy MCP, CodeBuddy (built and reviewed), Lighthouse kit. (d) "Fail closed" marks on every arrow that can fail. (e) A footer listing what is mocked | One slide, 15 seconds, right after the problem. Reuse `ARCHITECTURE.md`'s mermaid diagrams, simplified |
-| T2 | **Evidence card** (test and eval dashboard) | `technical/EVIDENCE_CARD.md` plus the in-app Trust center (R9) | One table: test counts (733 backend; browser run in docs/finals/TEST_REPORT.md), the eval headline (RESULTS.md), the canaries, review rounds and finding counts, and **one command each** to reproduce | A 10-second slide; Trust center during Q&A |
+| T2 | **Evidence card** (test and eval dashboard) | `technical/EVIDENCE_CARD.md` plus the in-app Trust center (R9) | One table: test counts (1,131 backend; 166 browser, docs/finals/TEST_REPORT.md), the eval headline (RESULTS.md), the canaries, review rounds and finding counts, and **one command each** to reproduce | A 10-second slide; Trust center during Q&A |
 | T3 | **Completeness checklist** | `technical/COMPLETENESS_CHECKLIST.md` | Table 1.3 above, with Done/Partial/Missing and the next step for each row | Appendix slide; hand it over when a judge asks "is this production-ready?" |
 | T4 | **CI badge** | `.github/workflows/ib.yml` (code change, outside this research) | Jobs: `pytest apps/internal_brain/tests -q`; `python -m evals.internal_brain.run --limit 60` (fails on any leak); `npm run e2e` in mock mode | A green badge on the README and the evidence slide. It closes the "no CI" gap in about 1 hour |
 | T5 | **Live Hy3 run** | Re-run the eval with `TOKENHUB_API_KEY`; append a "hy3" mode to `RESULTS.md` | Same checks; publish any non-zero count (the doc already promises this) | Ask one question live on Hy3 with the model name shown in the answer. If it is still blocked, show the extractive answer and say why in one sentence |
@@ -106,7 +106,7 @@ All paths below are new files under `docs/finals/rubric/` unless shown otherwise
 1. "Everything you see is running on this laptop now: four platforms, the Brain and the web app. Nothing is pre-recorded."
 2. "Two checks run before the model sees a word. The second asks Slack, Confluence, Jira or Drive live. If they don't answer in two seconds, the answer is no."
 3. "We attacked it 7,374 times. Zero leaks. And we proved the test can fail: switch the checks off and it catches 18 of 20 leaks."
-4. "733 backend tests, a browser suite, and ten security review passes, including one CodeBuddy ran on Hunyuan Hy3. Every finding is written down with its fix."
+4. "1,131 backend tests, 166 browser tests, and ten security review passes, including one CodeBuddy ran on Hunyuan Hy3. Every finding is written down with its fix."
 5. "If the audit log can't be written, you get no answer. Watch." (T7)
 6. "Same connector code for mock and real: only the base URL changes."
 7. If Hy3 has run: "This answer was written by Hunyuan Hy3 through TokenHub, and it went through exactly the same checks." If not: "Hy3 is wired in and tested. Tencent account verification is pending, so today's answers are quoted from the sources, and that is the safer path anyway."
@@ -447,7 +447,7 @@ model".
 | 0:40-0:55 | Architecture one-pager (T1) | Two gates, ledger, Tencent stack | "Filter what goes in" |
 | 0:55-2:40 | Live demo: Ask (R8 strip), Compare (L1), revocation, injection (L2) | Live, end to end | Explainability, anti-tipping-off, injection |
 | 2:40-3:20 | Audit + tamper (L3) | Write-ahead, 503 on failure (T7) | Accountability |
-| 3:20-4:10 | Evidence slide (T2) + Trust center glimpse (R9) | 7,374 / 0, canaries, 733 backend tests, CI badge | Crosswalk: AI Verify, Starter Kit, MAS AIRG |
+| 3:20-4:10 | Evidence slide (T2) + Trust center glimpse (R9) | 7,374 / 0, canaries, 1,131 backend tests, CI badge | Crosswalk: AI Verify, Starter Kit, MAS AIRG |
 | 4:10-5:00 | Honest limits + rollout with Aspire | Mocked tenants, Hy3 status | "What we don't do yet" |
 
 ---

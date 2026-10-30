@@ -43,8 +43,8 @@ every commit since the submission: [CHANGELOG.md](CHANGELOG.md).
 | **Developer mode** | Mission control (live pipeline); request journey (compliance waterfall + employee receipt); permission-aware **knowledge graph** (two people side by side); **Walnut engine** (graph, time slider, provenance, ontology; Jordan only); **analytics**; **audit** (plain-English search, Verify chain, **sandbox tamper demo**); simulator; **Trust centre**; value calculator |
 | **Tours** | User "Try it" (45 s) and Developer tours, with "Do it for me" |
 | **Hy3** | Wired, not live (401006). `scripts/hy3_check.py` checks TokenHub; `demo_up.sh` turns Hy3 on by itself as soon as it answers |
-| **Backend** | **754 tests pass**; full eval re-run on the final code: **0 leaks / 7,374**, **0 / 400** differential, 0 injection failures in 1,152 |
-| **Web e2e** | **124 passed, 0 failed**, 38 environment-gated skips, three runs in a row ([TEST_REPORT.md](TEST_REPORT.md)); `voice.spec.ts` added since |
+| **Backend** | **1,131 tests pass**, 0 fail (cloud run, 30 Oct, Linux, Python 3.13, `831297e`); full eval re-run on the final code: **0 leaks / 7,374**, **0 / 400** differential, 0 injection failures in 1,152 |
+| **Web e2e** | **166 passed, 0 failed**, 41 skipped (need the live stack, the engine proxy or Hy3); mock mode, all specs in `playwright.config.ts` incl. act, grow, deliverables (cloud run, 30 Oct, `831297e`; [TEST_REPORT.md](TEST_REPORT.md)) |
 | **Security** | Five-model final review: no high or critical issue left; all findings fixed (Host allowlist against DNS rebinding, held gate events in the stream, stale graph edges, engine view only for its own persona, and more) |
 | **Evidence** | Every one of the 10 rubric criteria has deliverables: [rubric/README.md](rubric/README.md). Printable handouts (leave-behind, judge cards, presenter cheat-sheet) in `submission/finals/` |
 | **Docs** | README quick start, INTERNAL_BRAIN 10-minute walk-through, STATUS, feature catalogue, changelog, ARCHITECTURE §8, SECURITY §15 |

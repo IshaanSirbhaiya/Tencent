@@ -1,8 +1,8 @@
 # Update for the organisers (send to Cindy before Fri 30 Oct 23:59)
 
-**Status: READY TO SEND**, as of 30 Oct 2026. Every bullet below is shipped on `final_v1.0`. Before
-sending, check one line: if Hy3 has been activated and run live by then, change the Hy3 line; otherwise
-send it as written.
+**Status: READY TO SEND**, as of 30 Oct 2026 (cloud session). Every bullet below is shipped and tested on
+`final_v1.3`. Before sending, check one line: if Hy3 has been activated and run live by then, change the
+Hy3 line; otherwise send it as written.
 
 ---
 
@@ -14,7 +14,7 @@ Hi Cindy,
 Thank you again for selecting Team Walnut as a FinTech finalist. Here are our updated materials for the
 judges:
 
-- **Project link:** https://github.com/IshaanSirbhaiya/Tencent/tree/final_v1.0
+- **Project link:** https://github.com/IshaanSirbhaiya/Tencent/tree/final_v1.3
   - Start at `INTERNAL_BRAIN.md` (a 10-minute guided walk-through).
   - The evidence for each of the 10 judging criteria is in `docs/finals/rubric/README.md`.
 - **Demo video:** https://youtu.be/fr9wqHWsijY (unchanged)
@@ -39,9 +39,14 @@ Since submission we have added:
 - A **Trust centre** mapping each control to Singapore and international frameworks (MAS, PDPA, AI Verify, OWASP) and to the test that proves it.
 - A **presenter mode** and **interactive tours** for both modes.
 - An **evidence pack** for every rubric criterion.
+- **Act on an answer:** draft a reply built only from the answer's cited sentences (never sent), or
+  propose a follow-up ticket that is created only after the person confirms; both are sealed in the audit log.
+- **Deliverables from an answer:** a table or chart where every number is checked against its source line,
+  with .csv and .pptx download.
 
-Test and eval status (30 Oct): 754 backend tests and 124 browser end-to-end tests pass (commit 7bf3246); the leak evaluation, re-run on the finals build,
-found 0 leaks in 7,374 adversarial requests and 0 differences in 400 paired questions. Hy3 via TokenHub
+Test and eval status (30 Oct, on `final_v1.3`): 1,131 backend tests and 166 browser end-to-end tests pass,
+with 0 failures; the leak evaluation, re-run on the finals build, found 0 leaks in 7,374 adversarial
+requests, 0 differences in 400 paired questions and 0 failures in 1,152 injection-relevant requests. Hy3 via TokenHub
 is wired in; the live run is pending activation, so today's answers are quoted from the sources with the
 same checks. The platforms are mock servers that use the real APIs' shapes, and all data is synthetic.
 

@@ -135,7 +135,7 @@ Outline (one page, numbered, every number with its source):
 2. The problem in three numbers: Gartner 47%; APQC 2.8 h/week; Copilot CW1226324 (Jan 2026).
 3. Why now: MAS AIRM issued 7 Oct 2026, Sections 3-4 apply from 7 Oct 2027; PDPA 10% of turnover.
 4. What we change: "answers only from what you're allowed to open, and proof afterwards". Two gates, sealed audit.
-5. Measured proof: 0 / 7,374 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 733 backend tests; browser run: see docs/finals/TEST_REPORT.md.
+5. Measured proof: 0 / 7,374 adversarial; 0 / 400 differential; 6 / 6 tamper attacks caught; 1,131 backend tests and 166 browser tests passing (30 Oct, commit 831297e; docs/finals/TEST_REPORT.md).
 6. Value (projection): break-even 7 min/person/week; base US$1.3M/yr; range US$0.44M-4.1M; assumptions in one line.
 7. Relevance to Aspire: covers all five scenarios; matches Aspire's own MCP permission promise; extends to AspireOS bank clients.
 8. Limits: synthetic data, mock platforms with real API shapes, no live tenant yet.
@@ -317,7 +317,7 @@ The 200-firm figure is an assumption to be replaced with a MAS FID count **[veri
 | R10 | Never tested on a live tenant | Certain / High | Shadow-mode weeks 2-4 re-run the leak harness on real permissions before any user | Pilot step |
 | R11 | Unsupported content (PDF, slides, images skipped) | Certain / Medium | Clearly scoped; roadmap: text extraction with the same ACL rules | Documented |
 | R12 | Adoption: people don't change habits | Medium / High | Front doors where people already work (WorkBuddy; Slack later); pilot metrics weekly | Built (WorkBuddy) |
-| R13 | Small team maintaining a security product | High / High | Narrow scope; 733 backend tests; browser run: see docs/finals/TEST_REPORT.md and the leak harness in CI; seek a design-partner contract; certification path above | Honest answer in Q&A |
+| R13 | Small team maintaining a security product | High / High | Narrow scope; 1,131 backend tests and 166 browser tests (docs/finals/TEST_REPORT.md) and the leak harness in CI; seek a design-partner contract; certification path above | Honest answer in Q&A |
 | R14 | Ledger growth and retention | Low / Low | Retention policy per MAS record-keeping needs; external anchor; answer text outside the ledger (built) | Partly built |
 
 ### 3.4 Our concrete deliverables for Feasibility
@@ -353,7 +353,7 @@ Without these, cost and latency remain estimates. Say so.
 
 ### 3.5 Proof points to say on stage (Feasibility)
 
-1. "It runs today: 733 backend tests (browser run: see docs/finals/TEST_REPORT.md), and the leak harness re-runs on any company's permissions."
+1. "It runs today: 1,131 backend tests and 166 browser tests (docs/finals/TEST_REPORT.md), and the leak harness re-runs on any company's permissions."
 2. "An answer costs under a tenth of a US cent on Hy3. Refusals cost nothing, because they never reach the model."
 3. "Slack and Atlassian tightened their APIs in 2025 and 2026. The market is moving to checking the source live, as the user. That's already how our Gate 2 works."
 4. "The design targets Tencent Cloud Singapore, which already holds MTCS Level 3 and OSPAR. A one-command Lighthouse deploy kit is included; no live instance. Hy3's open weights mean a bank can host the model itself."

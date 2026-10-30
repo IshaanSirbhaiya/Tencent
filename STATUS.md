@@ -1,10 +1,10 @@
 # Status
 
-**Date:** 30 Oct 2026. Branch `final_v1.2`. Team Walnut is a FinTech finalist; Demo Day is Tue 3 Nov 2026.
+**Date:** 30 Oct 2026. Branch `final_v1.3`. Team Walnut is a FinTech finalist; Demo Day is Tue 3 Nov 2026.
 Product: **Walnut DataBridge**, with **Internal Brain** as the ask product inside it.
 Start at [INTERNAL_BRAIN.md](INTERNAL_BRAIN.md). The finals plan is [docs/finals/PLAN.md](docs/finals/PLAN.md).
 Every feature and its test: [FEATURE_CATALOGUE.md](docs/finals/FEATURE_CATALOGUE.md). Every change since
-the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md). As of branch `final_v1.2` (30 Oct).
+the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md). As of branch `final_v1.3` (30 Oct).
 
 ## 1. Built
 
@@ -36,10 +36,11 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 
 | Check | Result | Where |
 |---|---|---|
-| Backend tests (Internal Brain) | **754 passed**, commit 7bf3246, 30 Oct 2026, Windows, Python 3.13 | `databridge/apps/internal_brain/tests/` |
-| Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
+| Backend tests (Internal Brain) | **1,131 passed**, 0 failed, commit 831297e, 30 Oct 2026, cloud: Linux, Python 3.13, `IB_FORCE_OFFLINE=1` | `databridge/apps/internal_brain/tests/` |
+| Mock platforms, fixtures, web typecheck | Mock platforms 154 passed; fixtures (enterprise) 47 passed; web `tsc --noEmit` clean (30 Oct 2026, cloud: Linux, commit 831297e) | `databridge/apps/mock_platforms/tests/`, `databridge/fixtures/`, `databridge/apps/internal_brain_web/` |
+| Leak evaluation (re-run on the finals pipeline, 30 Oct 11:27 SGT; re-run again on this tree in the cloud after the day's backend changes, unchanged) | 0 leaks in 7,374 requests; 0 of 400 pairs differ; 0 injection hard failures in 1,152 | [RESULTS.md](databridge/evals/internal_brain/RESULTS.md), [eval_summary.json](databridge/apps/internal_brain_web/public/eval_summary.json) |
 | Live QA of every page against the real backend | 32 checks; 11 bugs fixed; 4 open issues | [QA_LIVE.md](docs/finals/QA_LIVE.md) |
-| Web end-to-end tests (Playwright, axe) | 124 passed, 0 failed, 38 environment-gated skips (3 consecutive full runs, 30 Oct; [TEST_REPORT](docs/finals/TEST_REPORT.md)). `voice.spec.ts` (2 tests) was added afterwards and is not in the count; `act.spec.ts` (8), `grow.spec.ts` (6) and `deliverables*.spec.ts` (5) came after that run too and are not in the count; re-run pending | `databridge/apps/internal_brain_web/tests/e2e/` |
+| Web end-to-end tests (Playwright, axe) | 166 passed, 0 failed, 41 skipped (the skipped specs need the live stack, the engine proxy or Hy3); mock mode, every spec `playwright.config.ts` runs, including `act`, `grow`, `deliverables` and `voice` (30 Oct 2026, cloud: Linux, commit 831297e; [TEST_REPORT](docs/finals/TEST_REPORT.md)) | `databridge/apps/internal_brain_web/tests/e2e/` |
 
 ## 3. Pending
 
@@ -50,6 +51,8 @@ the submission, and what is in progress: [CHANGELOG.md](docs/finals/CHANGELOG.md
 | **Venue rehearsal** | Team, Mon 2 Nov 16:00–17:00 (mandatory) | Run sheet: [RUN_SHEET.md](docs/finals/rubric/demo_story/RUN_SHEET.md); checklist: [VENUE_TECH_CHECKLIST.md](docs/finals/rubric/demo_story/VENUE_TECH_CHECKLIST.md) |
 | In progress, not committed: the new demo video (on hold) | Build team | Listed in [CHANGELOG.md → In progress](docs/finals/CHANGELOG.md#in-progress) |
 | Re-record the backup clips | Build team, after the Monday freeze | Entry numbers and timings can change |
+| **Codex review** of the cloud session's work | Ishaan's laptop | No Codex in the cloud. Scope: everything after commit 9632dd2 (see `docs/finals/CLOUD_HANDOFF.md`) |
+| `demo_day.ps1` run once | Ishaan's laptop | Edited in the cloud to stop only this repo's processes; PowerShell was not run there |
 | Lighthouse server | Tencent (sold out) | Optional. The local run is the documented path |
 
 ## 4. At submission (16 Oct), for the record
