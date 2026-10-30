@@ -17,7 +17,9 @@ ROOT="$(pwd)"
 STATE="${IB_VAR:-var/ib-final}"
 LOGS="$STATE/logs"
 WEB="apps/internal_brain_web"
-PY=".venv/Scripts/python.exe"; [ -x "$PY" ] || PY=".venv/bin/python"
+# Absolute interpreter path: the command line of every Python service we start then names this
+# repo, which is how `stop` tells our processes from someone else's on the same port.
+PY="$ROOT/.venv/Scripts/python.exe"; [ -x "$PY" ] || PY="$ROOT/.venv/bin/python"
 SEP="$("$PY" -c 'import os; print(os.pathsep)')"
 IB_PATH="apps/internal_brain${SEP}packages/core${SEP}packages/harness${SEP}packages/adapter${SEP}packages/retrieval"
 
@@ -28,8 +30,47 @@ port_pids() {
     lsof -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null | sort -u
   fi
 }
+# The forms this repo's path can take in a command line (lower case, forward slashes).
+repo_marks() {
+  printf '%s\n' "$ROOT" | tr 'A-Z\\' 'a-z/'
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$ROOT" | tr 'A-Z\\' 'a-z/'
+    cygpath -m "$ROOT" | tr 'A-Z\\' 'a-z/'
+  fi
+}
+# A process's command line and (where the OS shows it) its working directory.
+proc_info() {
+  if [ "${OS:-}" = "Windows_NT" ]; then
+    powershell.exe -NoProfile -NonInteractive -Command \
+      "(Get-CimInstance Win32_Process -Filter 'ProcessId=$1').CommandLine" 2>/dev/null || true
+  elif [ -r "/proc/$1/cmdline" ]; then
+    tr '\0' ' ' <"/proc/$1/cmdline" 2>/dev/null || true; echo
+    readlink "/proc/$1/cwd" 2>/dev/null || true
+  else
+    ps -o args= -p "$1" 2>/dev/null || true
+    lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' || true
+  fi
+}
+# True only when the process's command line (or working directory) names this repo.
+owned() {
+  local info m
+  info="$(proc_info "$1" | tr 'A-Z\\' 'a-z/' | sed 's|$|/|')"   # "/repo" must not match "/repo-other"
+  [ -n "$info" ] || return 1
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    case "$info" in *"$m/"*) return 0 ;; esac
+  done <<MARKS
+$(repo_marks)
+MARKS
+  return 1
+}
+# Stop only this repo's processes on a port; anything else there is reported, never killed.
 stop_port() {
   for pid in $(port_pids "$1"); do
+    if ! owned "$pid"; then
+      echo "  port $1: process $pid is not part of this repo ($ROOT); not stopping it" >&2
+      continue
+    fi
     if [ "${OS:-}" = "Windows_NT" ]; then taskkill //PID "$pid" //T //F >/dev/null 2>&1 || true
     else kill "$pid" 2>/dev/null || true; fi
   done
@@ -79,7 +120,17 @@ export IB_REPLAY_KEY="${IB_REPLAY_KEY:-$("$PY" -c 'import secrets; print(secrets
 
 if [ "$FRESH" = "1" ]; then
   for p in 8100 8200; do stop_port "$p"; done
-  case "$STATE" in var/*) rm -rf "$STATE" ;; *) echo "refusing to wipe $STATE (not under var/)" >&2; exit 2 ;; esac
+  # Only a plain path under var/: no "..", no absolute path, and it must still resolve inside var/.
+  case "$STATE" in
+    *..*|/*|*\\*) echo "refusing to wipe $STATE (not a plain path under var/)" >&2; exit 2 ;;
+    var/?*) ;;
+    *) echo "refusing to wipe $STATE (not under var/)" >&2; exit 2 ;;
+  esac
+  if [ -e "$STATE" ]; then
+    REAL_STATE="$(cd "$STATE" && pwd -P)"; REAL_VAR="$(cd var && pwd -P)"
+    case "$REAL_STATE" in "$REAL_VAR"/?*) rm -rf "$STATE" ;;
+      *) echo "refusing to wipe $STATE (resolves outside var/)" >&2; exit 2 ;; esac
+  fi
 fi
 mkdir -p "$LOGS"
 SEED=0; [ ! -d "$STATE/ledger" ] && SEED=1

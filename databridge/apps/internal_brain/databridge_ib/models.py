@@ -370,7 +370,7 @@ class ActionFailed(EventBase):
     sub: str
     action_id: Optional[str] = None
     action: Optional[ActionKind] = None
-    stage: Literal["lookup", "propose", "confirm", "execute"]
+    stage: Literal["lookup", "propose", "confirm", "execute", "rate"]
     reason_code: str
 
 

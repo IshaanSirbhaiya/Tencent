@@ -3,6 +3,7 @@
     python docs/finals/live_kit/check_absent.py shard3-resume        # one sample
     python docs/finals/live_kit/check_absent.py --all                # every sample
     python docs/finals/live_kit/check_absent.py --all --base http://127.0.0.1:8100
+    (a non-loopback --base is refused unless --allow-remote, and then only over https)
     python docs/finals/live_kit/check_absent.py --all --offline      # world checks only, no HTTP
     python docs/finals/live_kit/check_absent.py --all --sim          # ALSO call /sim/check-absent (admin.it)
 
@@ -37,6 +38,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
@@ -104,6 +106,15 @@ class Client:
             return json.loads(r.read())
 
 
+def sim_absent(r: dict) -> tuple[bool, str]:
+    """Read ``/sim/check-absent``'s reply (``{"documents_containing": n, "index_size": m}``).
+    Passes only when the count is present and exactly 0; a missing or non-integer count fails."""
+    n = r.get("documents_containing") if isinstance(r, dict) else None
+    ok = isinstance(n, int) and not isinstance(n, bool) and n == 0
+    size = r.get("index_size") if isinstance(r, dict) else None
+    return ok, f"/sim/check-absent: documents_containing={n} of {size} indexed docs"
+
+
 def run_sample(s: dict, w: World, base: str | None, use_sim: bool, refusal: str) -> list[tuple[bool, str]]:
     res: list[tuple[bool, str]] = []
 
@@ -154,10 +165,34 @@ def run_sample(s: dict, w: World, base: str | None, use_sim: bool, refusal: str)
     if use_sim:
         try:
             r = Client(base, "admin.it").post("/sim/check-absent", {"phrase": s["proof_phrase"]})
-            rec(r.get("count") == 0, f"/sim/check-absent: count={r.get('count')} of {r.get('index_size', r.get('documents'))} indexed docs")
+            rec(*sim_absent(r))
         except Exception as e:  # noqa: BLE001
             rec(False, f"/sim/check-absent failed: {type(e).__name__}: {e}")
     return res
+
+
+_LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def origin_error(url: str, allow_remote: bool) -> str | None:
+    """Why *url* must not receive the demo sign-in (and IB_DEMO_PASSCODE), or None when it may.
+
+    Round 2b finding 6: loopback only by default. A non-loopback host needs --allow-remote, and even
+    then plain http is refused, so the passcode never crosses a network in clear text.
+    """
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.hostname:
+        return f"{url!r} is not an http(s) origin"
+    if p.username or p.password:
+        return "the origin must not contain credentials"
+    if p.hostname.lower() in _LOOPBACK:
+        return None
+    if not allow_remote:
+        return (f"{p.hostname} is not a loopback host; the demo sign-in (and IB_DEMO_PASSCODE) is sent "
+                "only to 127.0.0.1, localhost or ::1 unless you pass --allow-remote")
+    if p.scheme != "https":
+        return f"{p.hostname} is remote: use https:// (the passcode is never sent over plain http off this machine)"
+    return None
 
 
 def main() -> int:
@@ -170,7 +205,14 @@ def main() -> int:
     ap.add_argument("--phrase", help="ad hoc: check a judge's own phrase (with --question and --as)")
     ap.add_argument("--question")
     ap.add_argument("--as", dest="persona", default="jdoe")
+    ap.add_argument("--allow-remote", action="store_true",
+                    help="allow a non-loopback https --base (the demo sign-in and passcode go there)")
     a = ap.parse_args()
+    if not a.offline:
+        err = origin_error(a.base, a.allow_remote)
+        if err:
+            print(f"refusing --base: {err}", file=sys.stderr)
+            return 2
     if a.phrase:                       # ad hoc check for a templated, judge-supplied sentence
         w = World(WORLD)
         absent = norm(a.phrase) not in w.text

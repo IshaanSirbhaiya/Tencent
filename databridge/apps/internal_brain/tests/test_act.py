@@ -62,8 +62,9 @@ class FakeJira(FakeConnector):
         return keys, "ok" if keys else "not_permitted"
 
     def create_issue(self, user, project_key, summary, description):
-        if self.fail_create:
-            raise SourceFailure(self.fail_create)
+        if self.fail_create:                 # "reason" or ("reason", http status)
+            fc = self.fail_create
+            raise SourceFailure(*(fc if isinstance(fc, tuple) else (fc,)))
         n = sum(1 for c in self.created if c["project"] == project_key) + 100
         key = f"{project_key}-{n}"
         self.created.append({"key": key, "project": project_key, "summary": summary,
@@ -142,8 +143,9 @@ def test_split_facts_keeps_only_tagged_sentences_in_order():
     model = "The cutover moved, e.g. to Friday [C1][C2]. Nothing else"
     assert split_facts(model) == [actmod.Fact("The cutover moved, e.g. to Friday.", ("C1", "C2"))]
     assert split_facts(REFUSAL_TEXT) == []
-    assert default_summary("  why\nis it\tlate? ") == "Follow-up: why is it late?"
-    assert len(default_summary("x" * 500)) == actmod.DEFAULT_SUMMARY_MAX
+    # the default summary is neutral: the question is never copied word for word (Opus r2 #5)
+    assert default_summary("why is Northwind frozen?") == actmod.NEUTRAL_SUMMARY
+    assert "Northwind" not in default_summary("why is Northwind frozen?")
 
 
 def test_script_lines_use_the_approved_wording_only():
@@ -401,11 +403,15 @@ def test_ticket_is_proposed_then_created_only_after_confirm(tmp_path):
     assert {x["key"] for x in p["projects"]} <= {"PAY", "OPS"}
     if any(c["doc_id"].startswith("jira:PAY") for c in ans["citations"]):
         assert p["project"]["key"] == "PAY"                         # a cited project comes first
-    assert p["summary"] == f"Follow-up: {Q}"
-    # the description: the request id and links only (no titles, no answer text)
+    assert p["summary"] == actmod.NEUTRAL_SUMMARY and Q not in p["summary"]
+    # the description: the request id and opaque links only (no titles, ids, containers or
+    # source links in clear; no answer text)
     assert ans["request_id"] in p["description"]
-    for c in p["citations"]:
-        assert c["deep_link"] in p["description"] and c["title"] not in p["description"]
+    for n, c in enumerate(p["citations"], 1):
+        for leak in (c["deep_link"], c["title"], c["doc_id"], c["container"], c["container_name"]):
+            assert leak not in p["description"]
+        assert svc.actions.open_link(c["doc_id"]) in p["description"]
+    assert "Source 1: http://127.0.0.1:3100/api/ib/ib/open/" in p["description"]
     for f in split_facts(ans["answer"]):
         assert f.text not in p["description"]
     r = jd.post("/ib/act/ticket/confirm", json={"proposal_id": p["proposal_id"],
@@ -425,8 +431,9 @@ def test_ticket_is_proposed_then_created_only_after_confirm(tmp_path):
                           "description": p["description"]}, sort_keys=True, ensure_ascii=False)
     assert conf.digest == hashlib.sha256(payload.encode()).hexdigest()
     assert done.result_ref == out["issue"]["key"]
-    # once only, and only by its owner
-    assert jd.post("/ib/act/ticket/confirm", json={"proposal_id": p["proposal_id"]}).status_code == 404
+    # once only: a repeat confirm replays the known result and creates nothing (Codex r2 #1)
+    again = jd.post("/ib/act/ticket/confirm", json={"proposal_id": p["proposal_id"]})
+    assert again.status_code == 200 and again.json() == out
     assert len(jira.created) == 1
 
 
@@ -490,11 +497,11 @@ def test_write_denied_at_the_source_is_one_polite_message(tmp_path):
     assert kinds == ["action.proposed", "action.confirmed", "action.failed"]
     assert _events(svc, "action.failed")[-1].stage == "confirm"
     assert svc.connectors["jira"].created == []
-    # 4. the create call itself fails
+    # 4. the create call itself is definitely refused by Jira (a 4xx: nothing was created)
     app, svc = _world(tmp_path / "d")
     jd = _c(app, svc, "jdoe")
     p = _propose(jd, _ask(jd)["request_id"])
-    svc.connectors["jira"].fail_create = "source_error"
+    svc.connectors["jira"].fail_create = ("source_error", 400)
     r = jd.post("/ib/act/ticket/confirm", json={"proposal_id": p["proposal_id"]})
     bodies.append((r.status_code, r.content))
     assert _events(svc, "action.failed")[-1].stage == "execute"

@@ -36,10 +36,29 @@ Follow-up tickets (``propose`` → ``confirm``)
 ---------------------------------------------
 The project is chosen by our code from a closed, validated set: the projects the person may
 CREATE issues in, checked LIVE at the source (``JiraConnector.creatable``), cited projects first.
-The summary defaults to the person's own question; the description carries the request id and
-the cited documents' LINKS only (no titles, no text: other people who can browse the project may
-not be able to open them). Nothing is created until the person confirms; the confirm re-checks the
-create permission live, then our code (never a model) calls ``JiraConnector.create_issue`` once.
+The summary defaults to a neutral line (never the question word for word: the question can name
+something the people who browse the project may not open; the person can edit it). The description
+carries the request id and one neutral label per cited document ("Source 1") with an OPAQUE Internal
+Brain link (``/ib/open/<token>``, an HMAC of the document id): no title, id, space, channel or file id
+in clear, because other people who can browse the project may not be able to open them (rule 4).
+The link runs Gate 1 and a live Gate 2 for whoever CLICKS it and answers like an unknown item when
+they cannot open it. Nothing is created until the person confirms; the confirm re-checks, live,
+that every cited document is still openable for them (the same Gate 1 + Gate 2 context check) and the
+create permission, then our code (never a model) calls ``JiraConnector.create_issue`` once.
+
+Outcomes (v3.1). A proposal is ``pending`` → ``inflight`` → ``created`` / ``failed`` / ``unknown`` (or
+``cancelled``). A create that Jira definitely refused (a 4xx, a rate limit, no account) is ``failed``:
+"Nothing was changed" is true. A timeout, a lost or malformed response or a 5xx is ``unknown``: Jira
+may have created the issue, so the person is told exactly that (``TICKET_OUTCOME_UNKNOWN``), the same
+proposal never creates again, and a NEW proposal or confirm for the same answer is held for
+``UNKNOWN_HOLD_S``. A repeat confirm of a ``created`` proposal replays its result (and re-tries the
+``action.executed`` receipt if that append had failed: the first call was a 503). Jira POSTs are
+never retried. The state is in memory (one process; a restart forgets it, documented limit).
+
+Limits: per person, ``RATE_N`` drafts/proposals and ``RATE_N`` confirms per ``RATE_WINDOW_S``
+(``action.failed`` stage ``rate``, 429), and at most ``MAX_PROPOSALS_PER_PERSON`` pending proposals
+(a new one replaces only that person's oldest pending one). An in-flight or unresolved proposal is
+never evicted.
 
 Ledger (write-ahead; a ledger failure is 503 and nothing happens)
 -----------------------------------------------------------------
@@ -56,11 +75,14 @@ under the asker's own account after their own confirm.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import os
 import re
 import threading
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping, Optional, Sequence
@@ -73,12 +95,22 @@ from .models import (SCOPE_NOTE, ActionConfirmed, ActionExecuted, ActionFailed, 
 DRAFT_LABEL = "Draft for your review"
 #: the ONE message for every reason a ticket cannot be proposed or created (no detail, ever)
 TICKET_UNAVAILABLE = "A follow-up ticket can't be created from this answer. Nothing was changed."
+#: a create whose result is not known (timeout, lost or malformed response): never "nothing changed"
+TICKET_OUTCOME_UNKNOWN = ("We could not confirm whether the ticket was created. Check the project "
+                          "before trying again.")
 DRAFT_PROMPT_VERSION = "ib-draft-2026-10-30.1"
 DETERMINISTIC = ModelInfo(provider="deterministic", model="draft-template-v1")
 #: a reply built from an approved script's own words (``script_lines``); no model is asked
 SCRIPT = ModelInfo(provider="deterministic", model="approved-script-v1")
 PROPOSAL_TTL_S = 15 * 60
 MAX_PROPOSALS = 500
+MAX_PROPOSALS_PER_PERSON = 5
+RETAIN_S = 60 * 60                  # a finished proposal is kept this long for a replay
+UNKNOWN_HOLD_S = PROPOSAL_TTL_S     # no new create for the same answer while an outcome is unknown
+RATE_N, RATE_WINDOW_S = 10, 60.0
+OPEN_PATH = "/ib/open/"
+OPEN_TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
+NEUTRAL_SUMMARY = "Follow-up on an Internal Brain answer"
 MAX_FACTS = 6
 SUMMARY_MAX = 200
 DEFAULT_SUMMARY_MAX = 120
@@ -122,7 +154,36 @@ class Unavailable(Exception):
 
 
 class ActionError(Exception):
-    """The action could not be recorded or its inputs verified: 503, nothing happens."""
+    """The action could not be recorded or its inputs verified: 503."""
+
+
+class OutcomeUnknown(Exception):
+    """The create may or may not have happened: 409 with TICKET_OUTCOME_UNKNOWN (never "nothing
+    was changed")."""
+
+
+class RateLimited(Exception):
+    """Too many action calls by this person: 429."""
+
+
+class _Limiter:
+    """Per-person sliding window (the same shape as deliverables' limiter)."""
+
+    def __init__(self, n: int, window: float):
+        self.n, self.window = n, window
+        self._hits: dict[str, deque] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            q = self._hits.setdefault(key, deque())
+            while q and now - q[0] > self.window:
+                q.popleft()
+            if len(q) >= self.n:
+                return False
+            q.append(now)
+            return True
 
 
 @dataclass(frozen=True)
@@ -151,7 +212,11 @@ class Proposal:
     doc_ids: tuple[str, ...]
     citations: list[dict[str, Any]]
     created: float = field(default_factory=time.monotonic)
-    used: bool = False
+    #: pending | inflight | created | failed | unknown | cancelled
+    state: str = "pending"
+    finished: float = 0.0
+    result: Optional[dict[str, Any]] = None      # the created response (replayed on a repeat)
+    receipt: bool = False                        # action.executed is on record
 
 
 def _sha(s: str) -> str:
@@ -214,17 +279,24 @@ def one_line(s: str) -> str:
     return " ".join(_CONTROL.sub(" ", s or "").split())
 
 
-def default_summary(question: str) -> str:
-    q = one_line(question)
-    s = f"Follow-up: {q}" if q else "Follow-up"
-    return s if len(s) <= DEFAULT_SUMMARY_MAX else s[:DEFAULT_SUMMARY_MAX - 1].rstrip() + "…"
+def default_summary(question: str = "") -> str:
+    """A neutral default summary. The question is NOT copied: it can name something the people who
+    browse the project may not open (Opus round-2 #5). The person can edit the summary."""
+    return NEUTRAL_SUMMARY
+
+
+def open_token(key: bytes, doc_id: str) -> str:
+    """The opaque link token of one document: an HMAC of its id (no id, title or container in it)."""
+    return hmac.new(key, ("ib-open-v1\x00" + doc_id).encode("utf-8"), hashlib.sha256).hexdigest()[:32]
 
 
 def ticket_description(req_id: str, links: Sequence[str]) -> str:
-    """The fixed description: the request id and the cited documents' links, nothing else."""
-    lines = "\n".join(f"[{n}] {u}" for n, u in enumerate(links, 1))
+    """The fixed description: the request id and one neutral label per source with an opaque
+    Internal Brain link, nothing else (no titles, ids, spaces or channels in clear)."""
+    lines = "\n".join(f"Source {n}: {u}" for n, u in enumerate(links, 1))
     return ("Follow-up created from an Internal Brain answer (request " + req_id + ").\n\n"
-            "Sources (each link opens only for people the source system allows):\n\n" + lines)
+            "Sources (each link opens only for people allowed to open that source; for anyone "
+            "else it is not found):\n\n" + lines)
 
 
 class ActionService:
@@ -234,12 +306,47 @@ class ActionService:
     def __init__(self, *, index: Any, directory: Any, connectors: Mapping[str, Any], ledger: Any,
                  answers: Any, projection: Any, chain: Any = None,
                  sync: Optional[Callable[[], None]] = None,
-                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+                 clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+                 open_key: Optional[bytes] = None, open_base: str = ""):
         self.index, self.directory, self.connectors = index, directory, connectors
         self.ledger, self.answers, self.projection = ledger, answers, projection
         self.chain, self.sync, self.clock = chain, sync, clock
+        # the opaque-link key (the app derives it from IB_TOKEN_KEY, so links survive a restart)
+        self.open_key = open_key or os.urandom(32)
+        self.open_base = (open_base or "").rstrip("/")
         self._proposals: dict[str, Proposal] = {}
+        self._unknown: dict[tuple[str, str], float] = {}      # (sub, req_id) -> when
         self._lock = threading.Lock()
+        self._rate = _Limiter(RATE_N, RATE_WINDOW_S)
+        self._confirm_rate = _Limiter(RATE_N, RATE_WINDOW_S)
+
+    # -- limits and opaque links --------------------------------------------------------------
+    def _limit(self, limiter: _Limiter, user: DirectoryUser, action: str) -> None:
+        if not limiter.allow(user.id):
+            self._fail(user, "rate", "rate_limited", action=action)    # no ids
+            raise RateLimited()
+
+    def open_link(self, doc_id: str) -> str:
+        return f"{self.open_base}{OPEN_PATH}{open_token(self.open_key, doc_id)}"
+
+    def resolve_open(self, token: str) -> Optional[str]:
+        """The indexed document whose opaque token this is, else None. Every indexed id is
+        compared (no early exit); access is decided by the caller (Gate 1 + Gate 2)."""
+        if not isinstance(token, str) or not OPEN_TOKEN_RE.match(token):
+            return None
+        found = None
+        for d in self.index.doc_ids():
+            if hmac.compare_digest(open_token(self.open_key, d), token):
+                found = d
+        return found
+
+    def _held(self, user: DirectoryUser, req_id: str) -> bool:
+        with self._lock:
+            at = self._unknown.get((user.id, req_id))
+            if at is not None and time.monotonic() - at > UNKNOWN_HOLD_S:
+                del self._unknown[(user.id, req_id)]
+                at = None
+            return at is not None
 
     # -- ledger -------------------------------------------------------------------------------
     def _append(self, event) -> None:
@@ -335,6 +442,7 @@ class ActionService:
         if kind not in KINDS:
             raise ValueError("kind")
         action = f"draft.{kind}"
+        self._limit(self._rate, user, action)
         ctx = self.context(user, req_id)
         if ctx is None:
             raise self._not_found(user, action)
@@ -378,9 +486,13 @@ class ActionService:
 
     def propose_ticket(self, user: DirectoryUser, req_id: str) -> dict[str, Any]:
         action = "ticket.create"
+        self._limit(self._rate, user, action)
         ctx = self.context(user, req_id)
         if ctx is None:
             raise self._not_found(user, action)
+        if self._held(user, req_id):            # an earlier create from this answer is unresolved
+            self._fail(user, "propose", "outcome_unknown_hold", req_id=req_id, action=action)
+            raise OutcomeUnknown()
         jira = self._jira()
         if jira is None:
             self._fail(user, "propose", "no_ticket_target", req_id=req_id, action=action)
@@ -402,9 +514,13 @@ class ActionService:
             raise Unavailable()
         project = next(iter(options))
         citations = self._citations(ctx, [t for f in ctx.facts for t in f.tags])
-        links = list(dict.fromkeys(c["deep_link"] for c in citations if c.get("deep_link")))
+        # opaque links only: the ticket is read by everyone who can browse the project (rule 4)
+        links = [self.open_link(d) for d in dict.fromkeys(c["doc_id"] for c in citations)]
         summary = default_summary(ctx.question)
         description = ticket_description(req_id, links)
+        if not self._has_room(user):
+            self._fail(user, "propose", "capacity", req_id=req_id, action=action)
+            raise Unavailable()
         pid = uuid.uuid4().hex
         prop = Proposal(proposal_id=pid, sub=user.id, req_id=req_id, project=project,
                         options=options, summary=summary, description=description,
@@ -416,7 +532,7 @@ class ActionService:
             options=len(options), digest=_sha(self._payload(project, summary, description)),
             policy_version=POLICY_VERSION, event_time=self.clock()))
         with self._lock:
-            self._evict()
+            self._evict_locked(user.id)
             self._proposals[pid] = prop
         expires = self.clock() + timedelta(seconds=PROPOSAL_TTL_S)
         return {"proposal_id": pid, "action_id": pid, "kind": "ticket", "status": "proposed",
@@ -432,42 +548,120 @@ class ActionService:
         return json.dumps({"project": project, "summary": summary, "description": description},
                           sort_keys=True, ensure_ascii=False)
 
-    def _evict(self) -> None:
+    _KEEP = frozenset({"inflight", "unknown"})        # never evicted
+
+    def _evict_locked(self, sub: Optional[str] = None) -> None:
         now = time.monotonic()
         for k in [k for k, p in self._proposals.items()
-                  if p.used or now - p.created > PROPOSAL_TTL_S]:
+                  if (p.state == "pending" and now - p.created > PROPOSAL_TTL_S)
+                  or (p.state not in self._KEEP and p.state != "pending"
+                      and now - p.finished > RETAIN_S)
+                  or (p.state == "unknown" and now - p.finished > RETAIN_S + UNKNOWN_HOLD_S)]:
             del self._proposals[k]
-        while len(self._proposals) >= MAX_PROPOSALS:
-            self._proposals.pop(next(iter(self._proposals)))
+        if sub is not None:             # one person's pending proposals evict only their own
+            mine = [k for k, p in self._proposals.items() if p.sub == sub and p.state == "pending"]
+            for k in mine[:max(0, len(mine) - MAX_PROPOSALS_PER_PERSON + 1)]:
+                del self._proposals[k]
+        if len(self._proposals) >= MAX_PROPOSALS:   # then finished, replay-only entries, oldest first
+            done = [k for k, p in self._proposals.items()
+                    if p.state in ("failed", "cancelled") or (p.state == "created" and p.receipt)]
+            for k in done[:len(self._proposals) - MAX_PROPOSALS + 1]:
+                del self._proposals[k]
 
-    def _take(self, user: DirectoryUser, proposal_id: str) -> Optional[Proposal]:
-        """The caller's own live proposal, marked used (a double click cannot create twice)."""
+    def _has_room(self, user: DirectoryUser) -> bool:
+        """Room for one more proposal without evicting anyone else's pending or unresolved one."""
+        with self._lock:
+            self._evict_locked()
+            mine = sum(1 for p in self._proposals.values()
+                       if p.sub == user.id and p.state == "pending")
+            # full of other people's live proposals: refuse rather than evict theirs
+            return len(self._proposals) < MAX_PROPOSALS or mine >= MAX_PROPOSALS_PER_PERSON
+
+    def _claim(self, user: DirectoryUser, proposal_id: str) -> tuple[Optional[Proposal], str]:
+        """The caller's own proposal and the state it was in. A ``pending`` one is moved to
+        ``inflight`` under the lock (a double click cannot create twice)."""
         if not isinstance(proposal_id, str) or not ID_RE.match(proposal_id):
-            return None
+            return None, ""
         with self._lock:
             p = self._proposals.get(proposal_id)
-            if (p is None or p.sub != user.id or p.used
-                    or time.monotonic() - p.created > PROPOSAL_TTL_S):
-                return None
-            p.used = True
-            return p
+            if p is None or p.sub != user.id:
+                return None, ""
+            prev = p.state
+            if prev == "pending":
+                if time.monotonic() - p.created > PROPOSAL_TTL_S:
+                    return None, ""
+                p.state = "inflight"
+            return p, prev
+
+    def _take(self, user: DirectoryUser, proposal_id: str) -> Optional[Proposal]:
+        p, prev = self._claim(user, proposal_id)
+        if p is None:
+            return None
+        if prev != "pending":
+            return None
+        return p
 
     def _release(self, p: Proposal) -> None:
+        """Back to pending: nothing happened at the source (a validation or pre-effect failure).
+        The entry is never evicted while in flight, so it is still in the store."""
         with self._lock:
-            p.used = False
+            p.state = "pending"
+
+    def _finish(self, p: Proposal, state: str) -> None:
+        with self._lock:
+            p.state, p.finished = state, time.monotonic()
+            if state == "unknown":
+                self._unknown[(p.sub, p.req_id)] = time.monotonic()
+
+    def _replay(self, user: DirectoryUser, p: Proposal, action: str) -> dict[str, Any]:
+        """A repeat confirm of a created proposal: the known result. If its ``action.executed``
+        receipt did not reach the ledger, it is appended now (a failure is the 503 again)."""
+        if not p.receipt:
+            self._append(ActionExecuted(sub=user.id, req_id=p.req_id, action_id=p.proposal_id,
+                                        action=action, target=p.result["project"]["key"],
+                                        result_ref=p.result["issue"]["key"],
+                                        event_time=self.clock()))
+            p.receipt = True
+        return dict(p.result)
+
+    @staticmethod
+    def _definite(exc: Exception) -> bool:
+        """True when the create certainly did not happen: no request was sent, or Jira answered
+        with a 4xx (incl. a rate limit). A timeout, a transport error with no status, a 5xx or a
+        malformed success are NOT definite: Jira may have created the issue."""
+        reason, status = getattr(exc, "reason", None), getattr(exc, "status", None)
+        if reason == "no_platform_identity":
+            return True
+        return isinstance(status, int) and 400 <= status < 500 and reason != "source_bad_payload"
 
     def confirm_ticket(self, user: DirectoryUser, proposal_id: str, *,
                        summary: Optional[str] = None, project: Optional[str] = None
                        ) -> dict[str, Any]:
         action = "ticket.create"
-        p = self._take(user, proposal_id)
-        if p is None:
+        self._limit(self._confirm_rate, user, action)
+        p, prev = self._claim(user, proposal_id)
+        if p is None or prev == "cancelled":
             raise self._not_found(user, action)
+        if prev == "created":
+            return self._replay(user, p, action)
+        if prev in ("inflight", "unknown"):
+            self._fail(user, "confirm", "outcome_unknown_repeat", req_id=p.req_id,
+                       action_id=p.proposal_id, action=action)
+            raise OutcomeUnknown()
+        if prev == "failed":
+            self._fail(user, "confirm", "already_failed", req_id=p.req_id,
+                       action_id=p.proposal_id, action=action)
+            raise Unavailable()
         final = one_line(summary) if summary is not None else p.summary
         target = project if project is not None else p.project
         if not final or len(final) > SUMMARY_MAX or target not in p.options:
             self._release(p)
             raise ValueError("invalid")
+        if self._held(user, p.req_id):          # another proposal for this answer is unresolved
+            self._release(p)
+            self._fail(user, "confirm", "outcome_unknown_hold", req_id=p.req_id,
+                       action_id=p.proposal_id, action=action)
+            raise OutcomeUnknown()
         payload = self._payload(target, final, p.description)
         try:                    # write-ahead: confirmed BEFORE anything changes in the source
             self._append(ActionConfirmed(sub=user.id, req_id=p.req_id, action_id=p.proposal_id,
@@ -477,26 +671,55 @@ class ActionService:
         except ActionError:
             self._release(p)                    # nothing happened: the person may try again
             raise
+        # the cited sources, re-checked live for the CONFIRMING person (Gate 1 + Gate 2): any one
+        # no longer openable refuses the confirm, without saying which (rule 4)
+        try:
+            ctx = self.context(user, p.req_id)
+        except Exception as exc:                                    # noqa: BLE001
+            self._release(p)                    # nothing happened at the source
+            try:
+                self._fail(user, "confirm", "context_" + type(exc).__name__, req_id=p.req_id,
+                           action_id=p.proposal_id, action=action)
+            except ActionError:
+                pass
+            raise ActionError("context") from None
+        openable = {s.doc_id for s in ctx.cites.values()} if ctx is not None else set()
+        if not p.doc_ids or not set(p.doc_ids) <= openable:
+            self._finish(p, "failed")
+            self._fail(user, "confirm", "sources_changed", req_id=p.req_id,
+                       action_id=p.proposal_id, action=action)
+            raise Unavailable()
         jira = self._jira()
         allowed, reason = self._recheck(jira, user, target)
         if not allowed:
+            self._finish(p, "failed")
             self._fail(user, "confirm", reason, req_id=p.req_id, action_id=p.proposal_id,
                        action=action)
             raise Unavailable()
         try:
             issue = jira.create_issue(user, target, final, p.description)
+            key, url = issue["key"], issue["deep_link"]
+            if not isinstance(key, str) or not key or not isinstance(url, str):
+                raise ValueError("bad_payload")
         except Exception as exc:                                    # noqa: BLE001
-            self._fail(user, "execute", getattr(exc, "reason", None) or type(exc).__name__,
+            definite = self._definite(exc)
+            self._finish(p, "failed" if definite else "unknown")
+            code = getattr(exc, "reason", None) or type(exc).__name__
+            self._fail(user, "execute", code if definite else "outcome_unknown:" + code,
                        req_id=p.req_id, action_id=p.proposal_id, action=action)
-            raise Unavailable() from None
+            raise (Unavailable() if definite else OutcomeUnknown()) from None
+        result = {"status": "created", "action_id": p.proposal_id, "req_id": p.req_id,
+                  "project": {"key": target, "name": p.options[target]}, "summary": final,
+                  "issue": {"key": key, "url": url, "doc_id": f"jira:{key}"},
+                  "as_of": self.clock().isoformat()}
+        with self._lock:
+            p.result = result
+        self._finish(p, "created")              # replayable from here on, even if the receipt fails
         self._append(ActionExecuted(sub=user.id, req_id=p.req_id, action_id=p.proposal_id,
-                                    action=action, target=target, result_ref=issue["key"],
+                                    action=action, target=target, result_ref=key,
                                     event_time=self.clock()))
-        return {"status": "created", "action_id": p.proposal_id, "req_id": p.req_id,
-                "project": {"key": target, "name": p.options[target]}, "summary": final,
-                "issue": {"key": issue["key"], "url": issue["deep_link"],
-                          "doc_id": f"jira:{issue['key']}"},
-                "as_of": self.clock().isoformat()}
+        p.receipt = True
+        return dict(result)
 
     @staticmethod
     def _recheck(jira, user: DirectoryUser, target: str) -> tuple[bool, str]:
@@ -522,8 +745,10 @@ class ActionService:
         except ActionError:
             self._release(p)
             raise
+        self._finish(p, "cancelled")
         return {"status": "cancelled", "action_id": p.proposal_id}
 
 
-__all__ = ["ActionService", "NotFound", "Unavailable", "ActionError", "TICKET_UNAVAILABLE",
+__all__ = ["ActionService", "NotFound", "Unavailable", "ActionError", "OutcomeUnknown",
+           "RateLimited", "TICKET_UNAVAILABLE", "TICKET_OUTCOME_UNKNOWN", "open_token",
            "DRAFT_LABEL", "split_facts", "script_lines", "default_summary", "ticket_description"]

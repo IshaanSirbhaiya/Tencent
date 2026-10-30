@@ -34,6 +34,19 @@ def _env() -> dict:
     return env
 
 
+def completion_text(data: object) -> str:
+    """The assistant text of an OpenAI-style chat completion, or "" when the reply is not one: an
+    HTTP-200 error envelope, ``{}``, no ``choices``, or an empty message are NOT a live model."""
+    if not isinstance(data, dict) or data.get("error"):
+        return ""
+    choices = data.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return ""
+    msg = choices[0].get("message")
+    content = msg.get("content") if isinstance(msg, dict) else None
+    return content.strip() if isinstance(content, str) else ""
+
+
 def check(model: str, key: str, base: str) -> tuple[bool, str, float]:
     body = json.dumps({"model": model, "messages": [{"role": "user", "content": "Reply with OK."}],
                        "max_tokens": 5}).encode()
@@ -42,8 +55,14 @@ def check(model: str, key: str, base: str) -> tuple[bool, str, float]:
     t0 = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            json.loads(r.read())
-            return True, "live", time.perf_counter() - t0
+            data = json.loads(r.read())
+        if not completion_text(data):
+            code = ""
+            if isinstance(data, dict) and isinstance(data.get("error"), dict):
+                code = str(data["error"].get("code", ""))
+            why = f"no completion in the reply {code} {HINT.get(code, '')}".strip()
+            return False, why, time.perf_counter() - t0
+        return True, "live", time.perf_counter() - t0
     except urllib.error.HTTPError as e:
         try:
             code = str(json.loads(e.read()).get("error", {}).get("code", ""))

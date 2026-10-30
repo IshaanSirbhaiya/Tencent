@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+# session / bearer token files written by demo scripts (never committed)
+*.tok
 
 # Python
 __pycache__/

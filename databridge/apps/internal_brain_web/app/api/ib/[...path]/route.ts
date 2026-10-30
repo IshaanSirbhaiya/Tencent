@@ -37,6 +37,8 @@ const ALLOWED: { method: 'GET' | 'POST'; re: RegExp }[] = [
   { method: 'POST', re: /^ib\/graph\/openable$/ },
   // Act on an answer: main session only (never in a compare slot)
   { method: 'POST', re: /^ib\/act\/(draft|ticket\/(propose|confirm|cancel))$/ },
+  // A ticket's opaque source link (Act v3.1): main session only
+  { method: 'GET', re: /^ib\/open\/[0-9a-f]{32}$/ },
   // Deliverables from an answer (IB_DELIVERABLES=1): main session only (never in a compare slot)
   { method: 'POST', re: /^ib\/deliverables(\/export)?$/ },
   { method: 'GET', re: new RegExp(`^ib\\/doc\\/${DOC_ID}$`) },
@@ -204,6 +206,28 @@ function getFromThisSite(req: NextRequest): boolean {
   return site === null || site === 'same-origin' || site === 'none';
 }
 
+// A ticket's opaque source link is clicked from the Jira tab (another site), so it is the one GET
+// allowed from elsewhere: a top-level navigation only. Its only effects are a doc.viewed record and a
+// 303 to a source the signed-in person can open now (Gate 1 + Gate 2 in the IB); anything else is
+// the IB's one 404.
+const OPEN_LINK = /^ib\/open\/[0-9a-f]{32}$/;
+function openNavigation(req: NextRequest, path: string): boolean {
+  const mode = req.headers.get('sec-fetch-mode');
+  return OPEN_LINK.test(path) && (mode === null || mode === 'navigate');
+}
+
+/** The IB's 303 for an open link: relayed only on that route, only to an http(s) URL. */
+function openLocation(path: string, upstream: Response): string | null {
+  if (!OPEN_LINK.test(path) || upstream.status !== 303) return null;
+  const loc = upstream.headers.get('location') ?? '';
+  try {
+    const u = new URL(loc);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Promise<NextResponse> {
   // One deadline for the whole exchange, started before the incoming body is read.
   const signal = AbortSignal.timeout(DEADLINE_MS);
@@ -212,7 +236,7 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   const method = req.method.toUpperCase();
   if (!cleanSegments(segments)) return fail(400, 'bad request');
   if (!allowedHost(req)) return fail(403, 'forbidden');
-  if (method === 'GET' && !getFromThisSite(req)) return fail(403, 'forbidden');
+  if (method === 'GET' && !getFromThisSite(req) && !openNavigation(req, path)) return fail(403, 'forbidden');
   if (!allowed(ALLOWED, method, path)) return fail(404, 'not found');
   const slot = slotOf(req);
   if (slot === null) return fail(400, 'bad request');
@@ -289,6 +313,13 @@ async function handle(req: NextRequest, ctx: { params: { path: string[] } }): Pr
   }
 
   let out: NextResponse;
+  const location = openLocation(path, upstream);
+  if (location) {
+    out = new NextResponse(null, { status: 303 });
+    out.headers.set('location', location);
+    out.headers.set('cache-control', 'no-store');
+    return out;
+  }
   if (upstream.status >= 500) {
     const known = upstream.status === 503 ? knownUnavailable(payload) : null;
     out = NextResponse.json({ error: known ?? UNAVAILABLE }, { status: upstream.status });

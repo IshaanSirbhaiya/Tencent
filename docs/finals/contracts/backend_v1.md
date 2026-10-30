@@ -638,6 +638,60 @@ asker's `/ib/trace/{req}` `records`, and in `/audit/stats` `kinds` plus the new 
 - `POST /jira/rest/api/3/permissions/check` accepts `CREATE_ISSUES` for `projects`: a project's `create`
   holders from `world.json`, by default its `Developers` role (Viewers browse, they do not create).
 
+## Act v3.1 (30 Oct, round-2 review fixes)
+
+Code: `actions.py`, `app.py`, `models.py` (`action.failed` stage `rate`), web proxy
+`app/api/ib/[...path]/route.ts`, web mock `lib/mock/extra/act.ts`. Tests: `tests/test_act_round2.py`
+(plus updates in `tests/test_act.py`). Findings: `docs/finals/reviews/round2_opus_act_tools_kit.md`
+#1-#5, `round2_codex_act_tools_kit.md` #1, #3, #8.
+
+- **429.** Per person, at most 10 drafts + proposals and 10 confirms a minute:
+  `429 {"detail": "too many requests"}`, ledger `action.failed` stage `rate`, reason `rate_limited`, no
+  ids. At most 5 pending proposals per person; a 6th replaces only that person's oldest pending one.
+  The store never evicts another person's pending proposal or any in-flight / unresolved one; when it
+  is full of other people's live proposals, propose is the usual 409 (reason `capacity`).
+- **Ticket description (rule 4).** `summary` defaults to `"Follow-up on an Internal Brain answer"` (the
+  question is no longer copied). The description no longer holds source links:
+
+  ```
+  Follow-up created from an Internal Brain answer (request <req_id>).
+
+  Sources (each link opens only for people allowed to open that source; for anyone else it is not found):
+
+  Source 1: <IB_OPEN_LINK_BASE>/ib/open/<32 hex>
+  ```
+
+  No title, doc id, space, channel or file id in clear. The token is an HMAC of the doc id under a key
+  derived from `IB_TOKEN_KEY` (links survive a restart). `IB_OPEN_LINK_BASE` defaults to
+  `IB_PUBLIC_ORIGIN + "/api/ib"`, else `http://127.0.0.1:3100/api/ib` (the web proxy).
+- **`GET /ib/open/{token}`** (any employee role; main session only in the proxy, pattern
+  `^ib\/open\/[0-9a-f]{32}$`, allowed as a top-level navigation from another site). Write-ahead
+  `doc.viewed` (`doc_id` = the resolved id, or `ib-open:unresolved`), then Gate 1 + live Gate 2 for the
+  CLICKER. Openable: `303` to the source's deep link (`Cache-Control: no-store`; the proxy relays only an
+  http(s) `Location` on this route). Unknown, malformed, not openable, a failed check: the one
+  `404 {"detail": "not found"}`. Ledger down: 503. 401 when signed out.
+- **Confirm re-checks the sources.** After `action.confirmed`, the proposal's cited documents go through
+  the same Gate 1 + live Gate 2 context check for the confirming person; if any one is no longer openable
+  the reply is the polite 409 (never which), ledger `action.failed` stage `confirm`, reason
+  `sources_changed`, nothing is created.
+- **Unknown outcomes (new 409 body).** A create that Jira definitely refused (a 4xx, 429, no Jira account)
+  stays the polite 409 ("Nothing was changed" is true). A timeout, a transport error with no status, a 5xx
+  or a malformed success is
+  `409 {"error": "outcome_unknown", "message": "We could not confirm whether the ticket was created. Check the project before trying again."}`,
+  ledger `action.failed` stage `execute`, reason `outcome_unknown:<code>`. Then the same proposal never
+  creates again (repeat confirm: the same body), and a new propose or confirm for the same answer by the
+  same person gets the same body for 15 minutes. Jira POSTs are still never retried.
+- **Replay.** A repeat confirm of a created proposal returns the same 200 body (no second create, no new
+  record). If `action.executed` could not be appended after a successful create, that call is the 503 and
+  the proposal stays replayable: a repeat confirm appends the receipt and returns the result (or the 503
+  again while the ledger is down). A repeat confirm of a definitely failed proposal is the polite 409; a
+  cancelled, unknown-id, someone else's or expired one is still the 404.
+- **Limit (documented).** This outcome state is in memory in one IB process: a restart forgets it (an
+  old proposal id is then the 404, and the 15-minute hold is lost).
+- **Web follow-up (not in this change).** `ActSheet.tsx` still maps every 409 to the "Nothing was
+  changed" text and every 503 to "Nothing was sent or created"; it must show `message` for
+  `error: "outcome_unknown"` and must not claim nothing was created on a 503 after Confirm.
+
 ## Demo-proof features (v4, 30 Oct): live growth, add a document, absence check, engine refresh (D-24)
 
 Plan: `docs/finals/live_growth/PLAN.md`. Security: `docs/tencent/SECURITY.md` §15.13. Code: `live.py`,

@@ -141,33 +141,44 @@ function Wait-Http([string]$Url, [int]$Seconds) {
 }
 
 # --------------------------------------------------------------------- our processes, by port
-# demo_up.sh stops services by port with netstat. When that misses (it can, e.g. under a sandbox or
-# when a process was started from another console) we fall back to the command line, matching only
-# this repo's own services.
-$DbLower = $Db.ToLower()
+# demo_up.sh stops services by port. When that misses (it can, e.g. under a sandbox or when a process
+# was started from another console) we fall back to the command line. EVERY candidate, whether found
+# by its command line or as the owner of the port's socket, must name this repo's own path in its
+# command line (demo_up.sh starts Python by its absolute .venv path; Next runs from
+# apps\internal_brain_web\node_modules). Anything else on a demo port is reported, never killed.
+$DbLower = $Db.ToLower().TrimEnd('\') + '\'
+$DbFwd = $DbLower.Replace('\', '/')
+function Test-OursCommandLine([string]$CommandLine) {
+  if (-not $CommandLine) { return $false }
+  $l = $CommandLine.ToLower()
+  return ($l.Contains($DbLower) -or $l.Contains($DbFwd))
+}
+
 function Get-DemoProcesses([int]$Port) {
   $procs = @(Get-CimInstance Win32_Process -Filter "Name='python.exe' or Name='node.exe'" -ErrorAction SilentlyContinue)
   $hits = @()
   foreach ($p in $procs) {
     $c = [string]$p.CommandLine
-    if (-not $c) { continue }
+    if (-not (Test-OursCommandLine $c)) { continue }
     $l = $c.ToLower()
     $mine = $false
     switch ($Port) {
       8200 { $mine = $l.Contains('mock_platforms') -and $l.Contains('--port 8200') }
-      8100 { $mine = $l.Contains('-m databridge_ib') -and $l.Contains($DbLower) }
-      8300 { $mine = ($l.Contains('apps/gateway/serve.py') -or $l.Contains('apps\gateway\serve.py')) -and $l.Contains($DbLower) }
+      8100 { $mine = $l.Contains('-m databridge_ib') }
+      8300 { $mine = ($l.Contains('apps/gateway/serve.py') -or $l.Contains('apps\gateway\serve.py')) }
       default { $mine = $l.Contains('next') -and ($l -match "-p $Port(\s|$|`")") -and ($l.Contains(' start') -or $l.Contains('start-server')) }
     }
     if ($mine) { $hits += $p }
   }
-  # Owners by socket, when Windows tells us (normal case outside a sandbox).
+  # Owners by socket, when Windows tells us (normal case outside a sandbox): only this repo's own.
   try {
     $owners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique)
     foreach ($o in $owners) {
       if ($o -and -not ($hits | Where-Object { $_.ProcessId -eq $o })) {
         $p = Get-CimInstance Win32_Process -Filter "ProcessId=$o" -ErrorAction SilentlyContinue
-        if ($p -and ($p.Name -eq 'python.exe' -or $p.Name -eq 'node.exe')) { $hits += $p }
+        if (-not $p) { continue }
+        if (($p.Name -eq 'python.exe' -or $p.Name -eq 'node.exe') -and (Test-OursCommandLine ([string]$p.CommandLine))) { $hits += $p }
+        else { Warn "Port ${Port}: $($p.Name) (PID $o) is not part of this repo; it is left running" }
       }
     }
   } catch { }

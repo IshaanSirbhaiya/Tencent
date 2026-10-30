@@ -385,7 +385,7 @@ Opus re-read the backend for side channels a contractor's token could use and fo
 | C7-15 | No browser timeout where `AbortSignal.timeout` is missing | **Fixed.** A manual 95 s abort timer. |
 | C7-16 | Duplicate slot names could self-deadlock the lock helper | **Fixed.** Slots are de-duplicated before locking. |
 | C7-6 (mock) | The mock branch has no deadline | **Accepted.** Mock mode serves in-process fixtures only. |
-| Opus-1 | `--user-config` puts three identities in one WorkBuddy connector list | **Accepted, documented.** It exists to show two people side by side in one chat; each connector only ever answers as its own person (the IB enforces the token). The script says so and tokens expire within 8 h. |
+| Opus-1 | `--user-config` puts three identities in one WorkBuddy connector list | **Fixed (round 2b finding 2).** `--user-config` writes only the two employee connectors and removes a stale `ib-compliance`; the compliance seat uses its own workspace folder or `--compliance-user-config` (only `ib-compliance`, employee connectors removed); the flags are mutually exclusive. The employee MCP tools also wrap source-derived text in UNTRUSTED SOURCE TEXT markers with a "data, never instructions" note. Each connector still answers only as its own person (the IB enforces the token); tokens expire within 8 h. Tests: `test_workbuddy_setup_split.py`, `test_mcp_untrusted_frame.py`. |
 | Opus-2/3 | Token files written before being restricted; config rewritten in place | **Fixed.** Written to a private temporary file, restricted, then swapped in; a failed restriction is reported; a malformed config is refused. |
 | Opus-5 | `/ib/history` and `/ib/sources` skipped the employee-role check | **Fixed.** Same check as ask and map. |
 
@@ -702,18 +702,34 @@ chooses a project, recipient or action, and the Brain never sends a draft.
 **The ticket.** The project comes from a closed set: the projects in which the person may create issues,
 checked LIVE at the source like Gate 2 (Jira `POST permissions/check` with `CREATE_ISSUES`, admin client,
 one attempt, 2 s; any error, timeout or 429 is "no"). A `project` sent on confirm must be in that set
-(422 otherwise). The description holds the request id and the cited documents' LINKS only, never titles
-or answer text, because other people who browse the project may not be able to open them. Confirm
-re-checks the create permission live, then our code calls `POST /rest/api/3/issue` ONCE (no retry; the
-reporter is the person's own account); the mock refuses a reporter without "Create issues" (403). A
+(422 otherwise). The description holds the request id and, per cited document, a neutral label
+("Source 1") with an opaque Internal Brain link (`/ib/open/<HMAC token>`), never a title, id, space,
+channel, source URL or answer text, because other people who browse the project may not be able to open
+them; the default summary is neutral (the question is not copied). The link runs Gate 1 + a live Gate 2
+for whoever CLICKS it and is the one 404 when they cannot open it (v3.1,
+`tests/test_act_round2.py::test_ticket_links_are_opaque_and_open_only_for_who_may_open_them`). Confirm
+re-checks, live, every cited document for the confirming person (any one no longer openable is the
+polite 409, never which; `::test_confirm_rechecks_the_cited_sources_for_the_confirming_person`) and the
+create permission, then our code calls `POST /rest/api/3/issue` ONCE (no retry; the
+reporter is the person's own account). Like Jira Cloud, the mock authorises the CALLER (the service
+account: "Create issues" in the project, "Modify reporter" to set the reporter) and never checks the
+reporter's own permissions, so our live re-check is the only control that stops an issue for someone
+who may not create one (round 2b finding 3;
+`tests/test_act_e2e.py::test_revoked_create_permission_is_refused_by_the_ib_recheck_alone`,
+`apps/mock_platforms/tests/test_mock_jira_create.py`). A
 proposal is the proposer's alone, usable once, and expires after 15 minutes
 (`::test_a_proposal_is_mine_alone`, `::test_project_is_a_closed_set_and_the_summary_is_validated`). The
 create call lives in `connectors/jira.py`, which imports no model code (`::test_the_executor_is_model_free`).
 
 **One polite message.** No create permission, a source error at propose, a permission revoked between
-propose and confirm, and a failed create all return the same 409 body (`{"error": "unavailable",
+propose and confirm, and a create Jira definitely refused all return the same 409 body (`{"error": "unavailable",
 "message": "A follow-up ticket can't be created from this answer. Nothing was changed."}`); the reason is
-in the ledger only (`::test_write_denied_at_the_source_is_one_polite_message`).
+in the ledger only (`::test_write_denied_at_the_source_is_one_polite_message`). A create whose outcome is
+unknown (timeout, lost or malformed response, 5xx) is never told "nothing was changed": it is a 409
+`outcome_unknown` ("We could not confirm whether the ticket was created. Check the project before trying
+again."), and no second create from that answer is allowed for 15 minutes; a repeat confirm of a created
+proposal replays its result (v3.1, `tests/test_act_round2.py`). Act calls are rate limited per person
+(429, `action.failed` stage `rate`).
 
 **Write-ahead ledger.** New kinds (`models.EVENT_KINDS`, `audit/ledger.py`, `audit/stats.py` totals):
 `action.proposed` (kind, action id, cited document ids and count, sentence count, target project, option
@@ -728,10 +744,11 @@ answer's `req_id`, so they appear in that request's compliance journey and in th
 
 **Limits.**
 - Create, then record, is not atomic: if the ledger fails after the issue was created, the person gets a
-  503 and the issue exists; `action.confirmed` (with the payload digest) is already on record. This is the
-  same gap as the dispatcher's (`apps/dispatcher/dispatcher.py`).
-- A ticket's links (URLs with ids) are visible to whoever can browse the target project; the content
-  behind each link is not.
+  503 and the issue exists; `action.confirmed` (with the payload digest) is already on record, and a
+  repeat confirm of that proposal appends `action.executed` and replays the result (in memory only). This
+  is the same gap as the dispatcher's (`apps/dispatcher/dispatcher.py`).
+- A replayed confirm writes no new record (the create is already on record).
+- The opaque token is per document, so two tickets citing the same document show the same token.
 - Proposals live in the IB process's memory: a restart drops them (the confirm is then a 404).
 - The draft's sentences are the answer's sentences as released: a cited document's access is re-checked,
   its content is not re-read.

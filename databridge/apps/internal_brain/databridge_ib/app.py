@@ -6,6 +6,7 @@ is never imported or mounted here.
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import logging
@@ -18,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Literal, Mapping, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,7 +33,8 @@ from . import actions as actmod
 from . import authz, docview, graph
 from .knowledge_map import build_map
 from .llm import ModelChain
-from .models import AskRequest, DirectoryUser, SessionStarted, TraceViewed
+from .config import POLICY_VERSION
+from .models import AskRequest, DirectoryUser, DocViewed, SessionStarted, TraceViewed
 from .pipeline import Pipeline
 
 log = logging.getLogger("databridge_ib.app")
@@ -457,15 +459,22 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
         svc.actions = actmod.ActionService(
             index=svc.index, directory=svc.directory, connectors=svc.connectors,
             ledger=svc.ledger, answers=svc.answers, projection=svc.projection,
-            chain=getattr(svc.pipeline, "chain", None), sync=_trace_sync)
+            chain=getattr(svc.pipeline, "chain", None), sync=_trace_sync,
+            open_key=open_link_key(svc.cfg.token_key), open_base=open_link_base(svc.cfg))
 
     def _act(fn: Callable[[], Any], what: str):
         """One error mapping for every action route: 404 (one body for every not-found case),
-        409 (one polite message for every reason a ticket cannot be made), 422, else 503."""
+        409 (one polite message for every reason a ticket cannot be made; a different one when a
+        create's outcome is unknown), 422, 429, else 503."""
         try:
             return fn()
         except actmod.NotFound:
             raise HTTPException(404, NOT_FOUND) from None
+        except actmod.RateLimited:
+            raise HTTPException(429, "too many requests") from None
+        except actmod.OutcomeUnknown:
+            return JSONResponse(status_code=409, content={
+                "error": "outcome_unknown", "message": actmod.TICKET_OUTCOME_UNKNOWN})
         except actmod.Unavailable:
             return JSONResponse(status_code=409, content={
                 "error": "unavailable", "message": actmod.TICKET_UNAVAILABLE})
@@ -502,6 +511,32 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
     def act_ticket_cancel(body: ActCancelBody, user: DirectoryUser = Depends(current)):
         _employee(user)
         return _act(lambda: svc.actions.cancel_ticket(user, body.proposal_id), "act cancel")
+
+    @app.get("/ib/open/{token}")
+    def open_source(token: str, user: DirectoryUser = Depends(current)):
+        """The opaque source link in a follow-up ticket (v3.1). Gate 1 + a live Gate 2 for the
+        person who CLICKS it (their own token), then a 303 to the source. Not openable, unknown
+        or malformed token, a failed check: the same 404 as any unknown id (rule 4). Write-ahead
+        ``doc.viewed`` before the decision; a ledger failure is a 503."""
+        _employee(user)
+        try:
+            doc_id = svc.actions.resolve_open(token) if len(token) <= 64 else None
+            svc.ledger.append(DocViewed(sub=user.id, doc_id=(doc_id or "ib-open:unresolved")[:300],
+                                        policy_version=POLICY_VERSION,
+                                        event_time=datetime.now(timezone.utc)))
+            snap = None
+            if doc_id is not None:
+                ok, _ = authz.authorize(user, [doc_id], index=svc.index,
+                                        connectors=svc.connectors,
+                                        directory_epoch=getattr(svc.directory, "epoch", 0))
+                snap = ok.get(doc_id)
+        except Exception as exc:                                    # noqa: BLE001
+            log.error("open failed: %s", type(exc).__name__)        # incl. ledger down
+            return JSONResponse(status_code=503, content={"error": "temporarily unavailable"})
+        link = getattr(snap, "deep_link", "") or ""
+        if snap is None or not link.startswith(("https://", "http://")):
+            raise HTTPException(404, NOT_FOUND)
+        return RedirectResponse(link, status_code=303, headers={"Cache-Control": "no-store"})
 
     # -- deliverables from an answer (deliverables/; built on the Act context above) ------------
     from .deliverables import routes as deliv_routes, service as deliv_service
@@ -601,6 +636,22 @@ def create_app(svc: Services, *, audit_router_factory: Optional[Callable] = None
     if bad:                                   # the allowlist is enforced, not documented (sec1 #26)
         raise RuntimeError(f"routes outside the allowlist: {bad}")
     return app
+
+
+def open_link_key(token_key: str) -> bytes:
+    """The key of the opaque ticket links (``/ib/open/<token>``), derived from IB_TOKEN_KEY so a
+    link keeps working after a restart and cannot be computed without the key."""
+    return hmac.new(token_key.encode("utf-8"), b"ib-open-link-key-v1", hashlib.sha256).digest()
+
+
+def open_link_base(cfg: IbConfig) -> str:
+    """Where a ticket's source links point: ``IB_OPEN_LINK_BASE``, else the web app's same-origin
+    proxy (``IB_PUBLIC_ORIGIN`` or the local demo web app) under ``/api/ib``."""
+    explicit = os.environ.get("IB_OPEN_LINK_BASE", "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    origin = (getattr(cfg, "public_origin", "") or "http://127.0.0.1:3100").rstrip("/")
+    return origin + "/api/ib"
 
 
 def iter_routes(app: FastAPI):

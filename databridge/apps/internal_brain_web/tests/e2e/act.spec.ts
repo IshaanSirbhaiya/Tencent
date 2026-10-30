@@ -79,10 +79,18 @@ test('engineer: a follow-up ticket is proposed, confirmed and created', async ({
   await expect(sheet.getByTestId('act-ticket-view')).toBeVisible();
   await expect(sheet.getByTestId('act-ticket-project')).toBeVisible();
   const summary = sheet.getByTestId('act-ticket-summary');
-  await expect(summary).toHaveValue(`Follow-up: ${S1}`);
+  await expect(summary).toHaveValue('Follow-up on an Internal Brain answer');
   const desc = sheet.getByTestId('act-ticket-description');
   await expect(desc).toContainText(`(request ${reqId})`);
-  await expect(desc).toContainText('https://');
+  await expect(desc).toContainText('Source 1: ');
+  await expect(desc).toContainText('/api/ib/ib/open/');
+  // The scrollable description is a focusable, named region (axe scrollable-region-focusable), in English.
+  await expect(desc).toHaveAttribute('tabindex', '0');
+  await expect(desc).toHaveAttribute('role', 'region');
+  await expect(sheet.getByRole('region', { name: 'Ticket description (scrollable)' })).toBeVisible();
+  await expect(desc).toHaveAttribute('lang', 'en');
+  // The confirm button names where the ticket goes (round-2 Sonnet #4).
+  await expect(sheet.getByTestId('act-ticket-confirm')).toHaveText('Create ticket in DBMIG');
   await expectAccessible(page, 'act ticket proposal (light)');
   await summary.fill('Chase the replica lag blocker before the wave 4 cutover');
   await page.screenshot({ path: 'screenshots/act/act-ticket-proposal-light.png' });
@@ -156,5 +164,64 @@ test('Chinese: the act row and sheet are translated', async ({ page }) => {
   await expect(row.getByTestId('act-draft')).toHaveText('起草回复');
   await expect(row.getByTestId('act-ticket')).toHaveText('创建跟进工单');
   await row.getByTestId('act-draft').click();
-  await expect(page.getByTestId('act-draft-sheet').getByRole('heading', { name: '草稿，请你审阅' })).toBeVisible();
+  const sheet = page.getByTestId('act-draft-sheet');
+  await expect(sheet.getByRole('heading', { name: '草稿，请你审阅' })).toBeVisible();
+  // The server's English text is marked as English (WCAG 3.1.2) and one zh line says so; the fixed
+  // server label is translated, the chrome around it is Chinese.
+  await expect(sheet.getByTestId('act-draft-text')).toHaveAttribute('lang', 'en');
+  await expect(sheet.getByTestId('act-draft-label')).toHaveText('草稿，请你审阅');
+  await expect(sheet.getByTestId('act-lang-note')).toHaveText('草稿和工单内容按服务器返回的英文原文显示，未翻译。');
+  await expect(page.locator('html')).toHaveAttribute('lang', /^zh/);
+});
+
+test('Chinese ticket sheet: English server text is marked lang="en"; the confirm names the project', async ({ page }) => {
+  await quiet(page);
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('ib-lang', 'zh');
+    } catch {
+      /* storage blocked */
+    }
+  });
+  await login(page, 'jdoe');
+  await page.getByLabel(/Your question|你的问题/).fill(S1);
+  await page.getByRole('button', { name: /^(Ask|提问)$/ }).click();
+  await page.getByTestId('answer').getByTestId('act-ticket').click();
+  const sheet = page.getByTestId('act-ticket-sheet');
+  await expect(sheet.getByTestId('act-ticket-view')).toBeVisible();
+  await expect(sheet.getByTestId('act-ticket-type')).toHaveAttribute('lang', 'en');
+  await expect(sheet.getByTestId('act-ticket-description')).toHaveAttribute('lang', 'en');
+  await expect(sheet.getByRole('region', { name: '工单描述（可滚动）' })).toBeVisible();
+  await expect(sheet.getByTestId('act-lang-note')).toBeVisible();
+  await expect(sheet.getByTestId('act-ticket-confirm')).toHaveText('在 DBMIG 中创建工单');
+  await expectAccessible(page, 'act ticket proposal (zh)');
+  await sheet.getByTestId('act-ticket-cancel').click();
+});
+
+test('phone width: the tour offer hides while a sheet is open, and the confirm row stays in view', async ({ page }) => {
+  // No quiet(): the first-visit "New here?" offer is left on, as a first-time user sees it.
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('ib-theme', 'dark');
+    } catch {
+      /* storage blocked */
+    }
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, 'jdoe');
+  const offer = page.getByTestId('tour-offer');
+  await expect(offer).toBeVisible();
+  await ask(page, S1);
+  await page.getByTestId('answer').getByTestId('act-ticket').click();
+  const sheet = page.getByTestId('act-ticket-sheet');
+  await expect(sheet.getByTestId('act-ticket-view')).toBeVisible();
+  await expect(offer).toHaveCount(0);
+  // Sticky confirm row: inside the viewport without scrolling the sheet.
+  const box = await sheet.getByTestId('act-ticket-confirm').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+  await expectAccessible(page, 'act ticket proposal 390');
+  await sheet.getByTestId('act-ticket-cancel').click();
+  await expect(sheet).toBeHidden();
+  await expect(offer).toBeVisible();
 });

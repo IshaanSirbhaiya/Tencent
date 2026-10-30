@@ -204,14 +204,17 @@ function propose(sub: string, b: Record<string, unknown>) {
     .map((d) => d.container);
   const options = Array.from(new Set([...cited, ...[...allowed].sort()])).filter((k) => allowed.includes(k));
   const citations = citationsOf(ctx, ctx.facts.flatMap((f) => f.tags));
-  const links = Array.from(new Set(citations.map((c) => c.deep_link)));
-  const q = (ctx.req.question ?? '').replace(/\s+/g, ' ').trim();
-  const full = q ? `Follow-up: ${q}` : 'Follow-up';
-  const summary = full.length <= 120 ? full : `${full.slice(0, 119).trimEnd()}…`;
+  // v3.1: opaque Internal Brain links and neutral labels only (no ids, titles or channels in clear),
+  // and a neutral summary (the question is not copied), as the Brain does
+  const base = `${(process.env.IB_PUBLIC_ORIGIN || 'http://127.0.0.1:3100').replace(/\/+$/, '')}/api/ib`;
+  const links = Array.from(new Set(citations.map((c) => c.doc_id))).map(
+    (d) => `${base}/ib/open/${createHash('sha256').update(`ib-open-mock\u0000${d}`).digest('hex').slice(0, 32)}`,
+  );
+  const summary = 'Follow-up on an Internal Brain answer';
   const description =
     `Follow-up created from an Internal Brain answer (request ${ctx.req.req_id}).\n\n` +
-    'Sources (each link opens only for people the source system allows):\n\n' +
-    links.map((u, i) => `[${i + 1}] ${u}`).join('\n');
+    'Sources (each link opens only for people allowed to open that source; for anyone else it is not found):\n\n' +
+    links.map((u, i) => `Source ${i + 1}: ${u}`).join('\n');
   const id = randomUUID().replace(/-/g, '');
   act().proposals.set(id, { id, sub, req: ctx.req.req_id, project: options[0], options, summary, description, used: false });
   record(ctx.req.req_id, 'action.proposed');
