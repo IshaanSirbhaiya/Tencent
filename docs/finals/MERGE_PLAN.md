@@ -3,6 +3,8 @@
 Written Fri 30 Oct 2026. Repo `IshaanSirbhaiya/Tencent`, local `E:\Tenecent Hack_Walnut\Tencent`.
 Our branch is `final_v1.2`; `final_v1.3` is its verified pointer. Helper: `databridge/scripts/merge_precheck.py`.
 
+**Status (30 Oct):** final_mehulupdates merged into final_v1.4 (WIP; blocked on onboarding.py). Details: `MERGE_ANALYSIS_final_mehulupdates.md`.
+
 The three branches are not on origin yet. Each one merges on its own, into a new branch:
 
 | Order | Feature | New branch | Cut from |

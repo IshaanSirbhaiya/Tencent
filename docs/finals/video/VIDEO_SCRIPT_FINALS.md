@@ -413,12 +413,21 @@ makes it refuse a take that disagrees. The frame line is rules 1, 3 and 5 of `CL
 
 ### S2 · Just-in-time UI
 **Cuts:** not in the short cut · main 8 s · full 20 s. **Left out until `clips/S2_jit_ui.webm` exists.**
-**Original beat:** enhancement.
-**On screen:** TODO(founder).
-**Caption:** TODO.
-**Proof:** TODO.
+**Status:** merged into `final_v1.4` from `final_mehulupdates` (980b17b), WIP and not verified
+(`docs/finals/MERGE_ANALYSIS_final_mehulupdates.md`). Record only after that branch is verified.
+**Original beat:** enhancement to 3 (the cited answer can also open as a page beside the chat, built only from
+that answer's sources).
+**On screen:** Jordan, the same kind of answer. **Open as page** under it: the page opens on the right and the
+sidebar shrinks to icons. In the box under the page, type "make the table black" and press **Update**; the page
+is rebuilt and only its layout changes.
+**Caption:** "Jordan · backend engineer: an answer becomes a page", "Built only from this answer's sources",
+"Change the layout in plain words".
+**Proof:** `databridge_ib/views/` (`pagecheck.py`, `service.py`), `tests/test_views.py`,
+`tests/test_views_composer.py`, `tests/e2e/views.spec.ts`, `tests/e2e/tour.spec.ts` (the page steps). Say nothing
+about which model laid out the page: the badge and the narration stay neutral (QA_BANK Q51).
 
-> TODO(founder): the voice-over line for just-in-time UI, after the merge.
+> And now an answer can also open as a page beside the chat, built only from that answer's sources and checked again.
+> **[FULL]** Ask for a change in plain words, and only the layout changes; the words and numbers stay those of the sources.
 
 ### S3 · Dots
 **Cuts:** not in the short cut · main 6 s · full 15 s. **Left out until `clips/S3_dots.webm` exists.**

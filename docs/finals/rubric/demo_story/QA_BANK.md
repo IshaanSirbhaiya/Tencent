@@ -1,4 +1,4 @@
-# Q&A bank: 25 questions, about 15 seconds each (plus Q26 to Q48, added 30 Oct)
+# Q&A bank: 25 questions, about 15 seconds each (plus Q26 to Q51, added 30 Oct)
 
 > Questions judges ask **the team** are below. For questions to **ask the product live** (verified answers per persona), see [JUDGE_QUESTION_BANK.md](JUDGE_QUESTION_BANK.md).
 
@@ -75,6 +75,25 @@ Same rules as above. Each answer is 15 to 30 seconds spoken. Every number was re
 | 46 | What does one answer cost? | "About 0.07 US cents on Hy3 at list price, under a tenth of a cent. That assumes about 4,000 tokens in and 300 out, which we have not measured. Refusals and quoted answers cost nothing. For 600 staff at ten answers a day, about 1,000 dollars a year. It is an estimate until Hy3 runs live." [EST] | Aaruni | `COST_PER_ANSWER.md` §1 to §3 (US$0.00069 per answer; about US$1,040 a year) |
 | 47 | Why not just use Copilot or Glean? | "If your data lives in one suite, they are strong: real tenants and scale we do not have, and Glean already checks Slack live. What their public documents do not show is what we test: restricted looks identical to non-existent, 0 of 400 pairs differ; a log you watched break; a compartment for a regulated case. 'Not in their documents' is not proof they cannot." | Ishaan | `INNOVATION_ONE_PAGER.md` §2 (table and "Where an incumbent is ahead") |
 | 48 | What is your biggest weakness right now? | "Hy3 is not live, the connectors have not met a real tenant, and our human evidence is thin: the hallway test with five people is on 31 October. [TESTER] Quote a result only if a FIX_LOG row exists. We would rather say it than have you find it." | Ishaan | `STATUS.md` §3; `FIX_LOG.md` (empty until the test) |
+
+### C. Pages beside the chat (merged from `final_mehulupdates`, WIP): Q49 to Q51
+
+Added 30 Oct after the merge into `final_v1.4` (commit cddd878, not yet verified; see
+`docs/finals/MERGE_ANALYSIS_final_mehulupdates.md`). Rules for this block:
+1. Use it only once that merge is verified. Until then the feature is **[PLANNED]**: say "being merged".
+2. Never name the model provider. Say "an AI model" or "a third-party model". Never say Hy3 laid out a page.
+3. The stage IB runs with the third-party model **off** (the default; `IB_CLAUDE=1` is the opt-in). With it off,
+   Q7, Q18, Q37 and Q46 stay true as written: answers are quoted from the sources and Hy3 is not live. If anyone
+   switches it on for the stage, those four answers are no longer accurate: stop and fix them first.
+
+| # | Question | Answer (15 to 30 s) | Lead | Source in repo |
+|---|---|---|---|---|
+| 49 | Who lays out the page? | "By default, our own rules do: the words in the request ('a table, then the timeline') pick the blocks, and each block is filled from the answer's cited sources. A model can propose the layout instead, but only the layout and the wording: every number and name it proposes must be found in the cited sources, or it is removed, and every removal is counted. The page is a draft for the person to review." | Dev | `databridge_ib/views/plan.py` (trigger words); `views/pagecheck.py` docstring; `test_views.py::test_offline_auto_view_is_built_from_the_sources`, `::test_model_invents_values_names_and_headings`; `test_views_composer.py::test_claude_page_values_are_checked_and_styles_are_enums` |
+| 50 | Can the page say more than the answer did? | "A little, and only from the asker's own documents. It may read up to 12 more documents on the same subject, but only ones the asker can open: each goes through Gate 1 and the live Gate 2, like any answer. A value that fails the source check is dropped and counted. With and without a restricted document in the world, the page and the prompt are identical." | Dev | `views/service.py` (`MAX_EXTRA = 12`, Gate 1 + Gate 2 + read-through); `test_views_composer.py::test_restricted_documents_never_reach_claude_or_the_page`; `test_views.py::test_restricted_question_equals_a_world_without_it` |
+| 51 | Which model is this? | "Hy3 through TokenHub is the model we intend. Until our TokenHub activation completes, the page layout can use a third-party model as a stand-in, and it is off by default. The same Gate 1, Gate 2 and grounding checks apply either way, and every value on the page must be found in the cited sources." Do not name the stand-in. If asked directly, say "a third-party model, off by default; it is in the repo". | Aaruni | `views/composer.py` (`IB_CLAUDE` opt-in, US$10 spend cap); `bootstrap.py` (model chain); `MERGE_ANALYSIS_final_mehulupdates.md` §4, §6 |
+
+Q41 says the just-in-time interface is "being merged". That stays the line until the merge is verified; then use
+Q49 to Q51 for it and keep "do not describe" for voice and the dots.
 
 ## Questions we should expect that are not in the 25
 
