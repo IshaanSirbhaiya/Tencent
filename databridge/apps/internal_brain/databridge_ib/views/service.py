@@ -195,8 +195,8 @@ class ViewService:
             if got is not None:
                 allowed = blocks.allowed_words(evidence, ctx.question) | pagecheck.PAGE_WORDS
                 render, decided_by, model = got.render, "model", info
-                title = blocks.checked_label(got.title[:pagecheck.LIMIT], allowed,
-                                             limit=pagecheck.LIMIT) or ""
+                rule = pagecheck.LabelRule(evidence, ctx.question, set(), allowed)
+                title = pagecheck.grounded_label(got.title[:pagecheck.LIMIT], rule) or ""
         if decided_by == "rules":
             render = "page" if plan.wants_page(ctx.question) else "chat"
         resp = {"view_id": vid, "req_id": req_id, "render": render,
@@ -325,7 +325,8 @@ class ViewService:
             page, info, code = self.composer.compose(user.id, ctx.question, layout, context, people)
             fallback = code
             if page is not None:
-                allowed = (blocks.allowed_words(evidence, ctx.question, layout) | names
+                # the "Change this page" words set the layout, never the content: not allowed
+                allowed = (blocks.allowed_words(evidence, ctx.question) | names
                            | pagecheck.PAGE_WORDS)
                 got, title, accent = pagecheck.check_page(
                     page, evidence, cites, title_of, ctx.question, terms, allowed, names, check)
@@ -345,7 +346,7 @@ class ViewService:
             fallback = code
             if parsed is not None:
                 spec = parsed.model_dump(mode="json")
-                allowed = blocks.allowed_words(evidence, ctx.question, layout)
+                allowed = blocks.allowed_words(evidence, ctx.question)     # not the layout words
                 got = [blocks.check_model_block(b, evidence, cites, title_of, ctx.question, terms,
                                                 allowed, check) for b in spec["blocks"]]
                 kept = [b for b in got if b is not None]

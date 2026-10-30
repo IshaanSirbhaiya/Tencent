@@ -14,6 +14,14 @@ What a value has to satisfy to be shown (the deliverables rules, verify.py):
   speaks in them); a role, a heading, a title or a column label is made of allowed words, else it
   is dropped and the component shows its own fixed label.
 
+An UNTAGGED label (a title, heading, eyebrow, card title, role, column or stat label, an untagged
+cell) binds to no source line, so it must not carry content (``grounded_label``): no digits; no
+capitalised name unless it is a page word or a name the tagged people carry; and its content words
+(beyond the page words, the person's question and those names) must all come from ONE source, so
+a heading cannot be stitched from two sources' rare words. The person's "Change this page" words
+may set the layout, never the content: they are not allowed words. A chart's heading may only use
+the words of its own checked labels (the deliverables' ``title_labels`` rule).
+
 Styles are closed enums. A block with nothing left is dropped. Every drop is counted in ``Check``.
 """
 from __future__ import annotations
@@ -26,6 +34,7 @@ from databridge_core.value_forms import value_spans
 from ..deliverables.evidence import Evidence, nfkc
 from ..deliverables.verify import (Check, _value_supported, check_chart, check_sentence,
                                    check_short_text, label_tokens, norm, unsafe_text, words)
+from ..deliverables import build as dbuild
 from . import blocks as vblocks
 
 LIMIT = 80
@@ -41,8 +50,54 @@ updates update latest glance current today recent activity at a an and of the by
 """.split())
 
 
-def _label(text: str, allowed: set[str], check: Check) -> str:
-    got = vblocks.checked_label(str(text or ""), allowed, limit=LIMIT)
+_ALPHA_WORD = re.compile(r"[^\W\d_]+", re.U)
+
+
+class LabelRule:
+    """What an untagged label may say (see the module doc): ``allowed`` words only, no digits, no
+    capitalised name beyond ``PAGE_WORDS`` and ``names``, content words from one source."""
+
+    def __init__(self, evidence: Mapping[str, Evidence], question: str, names: set[str],
+                 allowed: set[str]):
+        self.allowed = set(allowed)
+        self.names = {n.lower() for n in names}
+        self.question = set(words(question))
+        self.per_source = [set(words(" ".join(u.text for u in ev.units)))
+                           for ev in evidence.values()]
+        text = " ".join([question, *(u.text for ev in evidence.values() for u in ev.units)])
+        #: words the sources or the question also use in lower case: ordinary words, not names
+        self.lower_used = {w for w in _ALPHA_WORD.findall(nfkc(text)) if w.islower()}
+
+    def ok(self, text: str, *, bound: frozenset[str] = frozenset()) -> bool:
+        """``bound``: the words of the ONE source line set a label is paired with (a stat's value
+        tag), whose capitalised names it may repeat; never digits."""
+        if any(ch.isdigit() for ch in text):
+            return False
+        toks = label_tokens(text)
+        if not toks or not set(toks) <= self.allowed:
+            return False
+        for i, w in enumerate(_ALPHA_WORD.findall(text)):
+            if not (w[0].isupper() and any(c.islower() for c in w[1:])):
+                continue                                   # lower case, or an acronym ("FX")
+            low = w.lower()
+            if low in PAGE_WORDS or low in self.names or low in bound:
+                continue
+            if i == 0 and low in self.lower_used:          # sentence case: an ordinary word
+                continue
+            return False                                   # a capitalised name
+        content = set(toks) - PAGE_WORDS - self.question - self.names
+        return not content or content <= bound or any(content <= src for src in self.per_source)
+
+
+def grounded_label(text: str, rule: LabelRule, *, limit: int = LIMIT,
+                   bound: frozenset[str] = frozenset()) -> Optional[str]:
+    """``text`` when it passes ``checked_label`` (short, safe, allowed words) AND ``rule``."""
+    got = vblocks.checked_label(str(text or ""), rule.allowed, limit=limit)
+    return got if got is not None and rule.ok(got, bound=bound) else None
+
+
+def _label(text: str, rule: LabelRule, check: Check) -> str:
+    got = grounded_label(text, rule)
     if got is None and str(text or "").strip():
         check.names_dropped += 1
     return got or ""
@@ -65,7 +120,7 @@ def _hay(tags: Sequence[str], evidence) -> tuple[str, list]:
     return norm("\n".join(" | ".join(u.cells) if u.cells else u.text for u in units)), units
 
 
-def _cell(cell: Mapping[str, Any], evidence, allowed: set[str], check: Check) -> dict[str, Any]:
+def _cell(cell: Mapping[str, Any], evidence, rule: LabelRule, check: Check) -> dict[str, Any]:
     text = nfkc(str(cell.get("text", ""))).strip()
     tags = [str(t) for t in dict.fromkeys(cell.get("tags") or [])]
     empty = {"text": "", "tags": [], "numeric": False}
@@ -80,7 +135,7 @@ def _cell(cell: Mapping[str, Any], evidence, allowed: set[str], check: Check) ->
     nums = [s for s in spans if s.kind == "num"]
     check.values_proposed += len(nums)
     if not tags:                                    # a label copied as is: words only, no digits
-        if toks and set(toks) <= allowed and not any(ch.isdigit() for ch in text):
+        if toks and rule.ok(text):
             check.items_kept += 1
             return {"text": text, "tags": [], "numeric": False}
         check.drop("untagged", name=True)
@@ -105,16 +160,17 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
     """``(blocks, title, accent)``: the blocks that still hold something after the checks."""
     out: list[dict[str, Any]] = []
     accent = str(page.get("accent") or "blue")
+    rule = LabelRule(evidence, question, names, allowed)
     for b in page.get("blocks") or []:
         kind = b.get("type")
-        heading = _label(b.get("heading", ""), allowed, check)
+        heading = _label(b.get("heading", ""), rule, check)
         got: Optional[dict[str, Any]] = None
         if kind == "hero":
             summary = _items(b.get("summary") or [], evidence, check)
-            title = _label(b.get("title", ""), allowed, check)
+            title = _label(b.get("title", ""), rule, check)
             if title or summary:
                 got = {"type": "hero", "title": title, "eyebrow": _label(b.get("eyebrow", ""),
-                                                                         allowed, check),
+                                                                         rule, check),
                        "summary": summary, "accent": accent}
         elif kind in ("prose", "steps"):
             items = _items(b.get("items") or [], evidence, check)
@@ -135,7 +191,9 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
                 ok = (tag in evidence and value and not unsafe_text(value)
                       and re.search(r"(?<![\w.])" + re.escape(norm(value)) + r"(?![\w])", hay)
                       and all(_value_supported(value, s, hay) for s in value_spans(value)))
-                label = vblocks.checked_label(str(st.get("label", "")), allowed, limit=LIMIT)
+                # a stat label may repeat the names of its own value's source line, nothing else
+                label = grounded_label(str(st.get("label", "")), rule,
+                                       bound=frozenset(words(hay)) if ok else frozenset())
                 if not ok or not label:
                     check.drop("value" if not ok else "label", value=not ok, name=bool(ok))
                     continue
@@ -154,8 +212,8 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
                     if name:
                         check.names_dropped += 1
                     continue
-                people.append({"name": name, "role": vblocks.checked_label(
-                    str(p.get("role", "")), allowed, limit=LIMIT) or "", "items": items})
+                people.append({"name": name, "role": grounded_label(str(p.get("role", "")), rule)
+                               or "", "items": items})
             if people:
                 got = {"type": "people", "heading": heading, "people": people}
         elif kind == "cards":
@@ -163,17 +221,17 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
             for c in b.get("cards") or []:
                 items = _items(c.get("items") or [], evidence, check)
                 if items:
-                    cards.append({"title": _label(c.get("title", ""), allowed, check),
+                    cards.append({"title": _label(c.get("title", ""), rule, check),
                                   "items": items})
             if cards:
                 got = {"type": "cards", "heading": heading, "cards": cards}
         elif kind == "table":
             cols = []
             for i, col in enumerate(b.get("columns") or [], 1):
-                cols.append(_label(col, allowed, check) or f"Column {i}")
+                cols.append(_label(col, rule, check) or f"Column {i}")
             rows = []
             for r in b.get("rows") or []:
-                cells = [_cell(c, evidence, allowed, check) for c in list(r)[:len(cols)]]
+                cells = [_cell(c, evidence, rule, check) for c in list(r)[:len(cols)]]
                 cells += [{"text": "", "tags": [], "numeric": False}] * (len(cols) - len(cells))
                 if any(c["text"] for c in cells):
                     rows.append(cells)
@@ -206,6 +264,11 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
                     "series": [{"name": b.get("series_name", ""), "points": b.get("points") or []}]}
             c = check_chart(spec, evidence, check)
             if c is not None:
+                # the deliverables' chart rule: the title only uses its own checked labels' words
+                labels = dbuild.title_labels("chart", c) or []
+                if heading and not set(label_tokens(heading)) <= set(words(" ".join(labels))):
+                    check.names_dropped += 1
+                    heading = ""
                 got = {"type": "chart", "heading": heading, "title": heading, "chart": c}
         elif kind in ("conversation", "sections"):
             got = vblocks.build_rules(kind, evidence, cites, title_of, question, terms)
@@ -213,7 +276,7 @@ def check_page(page: Mapping[str, Any], evidence: Mapping[str, Evidence],
                 got["heading"] = heading
         if got is not None:
             out.append(got)
-    title = _label(page.get("title", ""), allowed, check)
+    title = _label(page.get("title", ""), rule, check)
     return out, title, accent
 
 
@@ -236,4 +299,4 @@ def page_tags(block: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(out))
 
 
-__all__ = ["check_page", "page_tags"]
+__all__ = ["check_page", "page_tags", "grounded_label", "LabelRule", "PAGE_WORDS"]
