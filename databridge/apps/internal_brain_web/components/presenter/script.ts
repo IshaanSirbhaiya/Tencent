@@ -186,7 +186,7 @@ export const STEPS: PresenterStep[] = [
   {
     id: 'workbuddy',
     title: 'WorkBuddy (off-app)',
-    say: 'Mehul: "Aaruni, Tencent." Aaruni: "Tencent's WorkBuddy is a second front door to the product. Jordan is on call at 3 a.m. and asks from WorkBuddy."',
+    say: 'Mehul: "Aaruni, Tencent." Aaruni: "Tencent\'s WorkBuddy is a second front door to the product. Jordan is on call at 3 a.m. and asks from WorkBuddy."',
     url: '/dev/audit',
     clip: CLIPS.C,
     offApp: true,
