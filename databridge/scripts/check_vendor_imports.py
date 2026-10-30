@@ -21,6 +21,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN = ("anthropic", "openai")
 ALLOWED_PREFIX = "packages/harness/"
 
+# Temporary exceptions (DECISIONS D-41): the stand-in model client, used only while Tencent Hy3 is
+# not live. Each entry allows exactly ONE lazy `import anthropic` in that one file; a second vendor
+# import there, or one anywhere else, still fails. Removed together with the stand-in once Hy3 is live.
+EXCEPTIONS = {
+    # the stand-in answer backend (a harness Backend), imported only when IB_CLAUDE=1
+    "apps/internal_brain/databridge_ib/claude.py": "import anthropic",
+    # the stand-in page composer, imported only when IB_CLAUDE=1
+    "apps/internal_brain/databridge_ib/views/composer.py": "import anthropic",
+}
+
 # Directories never scanned (not first-party source).
 SKIP_DIRS = {
     ".git", "__pycache__", ".venv", "venv", ".uv", "build", "dist",
@@ -50,7 +60,11 @@ def find_violations(root: Path) -> list[tuple[str, int, str]]:
             continue
         if rel.startswith(ALLOWED_PREFIX):
             continue
-        for line_no, line in scan_text(path.read_text(encoding="utf-8", errors="replace")):
+        hits = scan_text(path.read_text(encoding="utf-8", errors="replace"))
+        allowed = EXCEPTIONS.get(rel)
+        if allowed is not None and [h[1] for h in hits] == [allowed]:
+            continue                                   # exactly the one recorded exception
+        for line_no, line in hits:
             violations.append((rel, line_no, line))
     return violations
 
@@ -64,7 +78,7 @@ def main() -> int:
             print(f"   - {rel}:{line_no}: {line}")
         return 1
     print(f"[ok] vendor-import rule — no {'/'.join(FORBIDDEN)} imports outside "
-          f"{ALLOWED_PREFIX}")
+          f"{ALLOWED_PREFIX} (temporary exceptions: {len(EXCEPTIONS)}, DECISIONS D-41)")
     return 0
 
 

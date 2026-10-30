@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from check_vendor_imports import REPO_ROOT, find_violations, scan_text
+from check_vendor_imports import EXCEPTIONS, REPO_ROOT, find_violations, scan_text
 
 
 def test_repo_currently_has_no_vendor_imports():
@@ -40,3 +40,20 @@ def test_harness_path_would_be_allowed(tmp_path):
     flagged = {v[0] for v in viols}
     assert "packages/convert/bad.py" in flagged
     assert "packages/harness/client.py" not in flagged
+
+
+def test_stand_in_exceptions_allow_exactly_one_import_in_exactly_those_files(tmp_path):
+    # D-41: the two stand-in model files may each hold ONE `import anthropic`, nothing more
+    assert set(EXCEPTIONS) == {"apps/internal_brain/databridge_ib/claude.py",
+                               "apps/internal_brain/databridge_ib/views/composer.py"}
+    root = tmp_path
+    ok = root / "apps" / "internal_brain" / "databridge_ib" / "claude.py"
+    ok.parent.mkdir(parents=True)
+    ok.write_text("def f():\n    import anthropic\n", encoding="utf-8")
+    assert find_violations(root) == []
+    ok.write_text("def f():\n    import anthropic\n    import openai\n", encoding="utf-8")
+    assert {v[2] for v in find_violations(root)} == {"import anthropic", "import openai"}
+    other = root / "apps" / "internal_brain" / "databridge_ib" / "llm.py"
+    other.write_text("import anthropic\n", encoding="utf-8")
+    ok.write_text("def f():\n    import anthropic\n", encoding="utf-8")
+    assert [v[0] for v in find_violations(root)] == ["apps/internal_brain/databridge_ib/llm.py"]
